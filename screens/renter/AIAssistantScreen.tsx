@@ -37,14 +37,14 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
   const sendWelcomeMessage = () => {
     const welcomeMessage: AIMessage = {
       id: 'welcome',
-      text: `Hi ${user?.name?.split(' ')[0]}! I'm your AI Match Assistant. I can help you find the perfect roommate based on your preferences, budget, and lifestyle. What would you like to know?`,
+      text: `Hi ${user?.name?.split(' ')[0]}! I'm your AI Match Assistant. I can help you find roommates, discover great neighborhoods, recommend restaurants, suggest activities, and give home decor tips. What would you like to explore?`,
       isUser: false,
       timestamp: new Date(),
       suggestions: [
         'Find roommates in my budget',
-        'Show me compatible matches',
-        'What makes a good match?',
-        'Tips for my profile',
+        'Best neighborhoods for me',
+        'What to do around here',
+        'Restaurant recommendations',
       ],
     };
     setMessages([welcomeMessage]);
@@ -105,16 +105,77 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
       responseText += `✓ Matching cleanliness standards\n`;
       responseText += `✓ Similar schedules (work, sleep, social)\n\n`;
       responseText += `I analyze all these factors to find your perfect match!`;
-      suggestions = ['Find my matches', 'What about location?'];
+      suggestions = ['Find my matches', 'Best neighborhoods for me'];
+    } else if (lowerMessage.includes('apartment') || lowerMessage.includes('neighborhood') || lowerMessage.includes('area') || lowerMessage.includes('where to live')) {
+      const occupation = user?.name?.includes('Software') ? 'tech professional' : 'young professional';
+      responseText = `Based on your profile as a ${occupation}, here are the best neighborhoods:\n\n`;
+      responseText += `📍 Downtown District\n   Great for: Work commute, nightlife, dining\n   Avg rent: $1,800-2,500/mo\n   Vibe: Urban, fast-paced, convenient\n\n`;
+      responseText += `📍 Arts Quarter\n   Great for: Culture, cafes, creative scene\n   Avg rent: $1,400-2,000/mo\n   Vibe: Trendy, artistic, laid-back\n\n`;
+      responseText += `📍 University District\n   Great for: Young crowd, affordable, social\n   Avg rent: $1,200-1,800/mo\n   Vibe: Energetic, diverse, budget-friendly\n\n`;
+      responseText += `Each area has unique perks for your lifestyle!`;
+      suggestions = ['Tell me about nightlife', 'Show me restaurants', 'What about transportation?'];
+    } else if (lowerMessage.includes('nightlife') || lowerMessage.includes('bar') || lowerMessage.includes('club') || lowerMessage.includes('things to do') || lowerMessage.includes('activities')) {
+      responseText = `Here's what's happening around the city:\n\n`;
+      responseText += `🎉 Nightlife & Entertainment:\n`;
+      responseText += `• The Velvet Room - Upscale cocktail lounge\n`;
+      responseText += `• Electric Avenue - Dance club, open till 3am\n`;
+      responseText += `• Rooftop 360 - Panoramic views, live DJ\n\n`;
+      responseText += `🎭 Things to Do:\n`;
+      responseText += `• Weekend farmers market (Saturdays 8am-2pm)\n`;
+      responseText += `• Live music at The Underground (Wed-Sun)\n`;
+      responseText += `• Art galleries open late on First Fridays\n`;
+      responseText += `• Outdoor cinema in Central Park (summer)\n\n`;
+      responseText += `There's always something happening!`;
+      suggestions = ['Restaurant suggestions', 'Best coffee shops', 'Fitness & activities'];
+    } else if (lowerMessage.includes('restaurant') || lowerMessage.includes('food') || lowerMessage.includes('eat') || lowerMessage.includes('dining') || lowerMessage.includes('coffee')) {
+      responseText = `Top picks for dining and cafes:\n\n`;
+      responseText += `🍽️ Restaurants:\n`;
+      responseText += `• Harvest Kitchen - Farm-to-table, $$$\n`;
+      responseText += `• Spice & Soul - Asian fusion, $$\n`;
+      responseText += `• Burger Bar - Casual, great happy hour, $\n`;
+      responseText += `• Pasta Paradiso - Italian, date night spot, $$$\n\n`;
+      responseText += `☕ Coffee & Cafes:\n`;
+      responseText += `• Bean There - Artisan coffee, cozy workspace\n`;
+      responseText += `• Morning Ritual - Breakfast all day\n`;
+      responseText += `• The Daily Grind - Student favorite, wifi\n\n`;
+      responseText += `Most offer delivery through local apps!`;
+      suggestions = ['Tell me about nightlife', 'Home decor ideas', 'Best neighborhoods'];
+    } else if (lowerMessage.includes('decor') || lowerMessage.includes('decorat') || lowerMessage.includes('furnish') || lowerMessage.includes('home') || lowerMessage.includes('apartment style')) {
+      responseText = `Home decor tips for shared spaces:\n\n`;
+      responseText += `🎨 Color & Style:\n`;
+      responseText += `• Keep common areas neutral (white, gray, beige)\n`;
+      responseText += `• Add personality with removable decals or art\n`;
+      responseText += `• Coordinate with roommate on major pieces\n\n`;
+      responseText += `🛋️ Furniture Ideas:\n`;
+      responseText += `• Multi-functional: Storage ottomans, fold-out desks\n`;
+      responseText += `• Budget-friendly: IKEA, Facebook Marketplace, Wayfair\n`;
+      responseText += `• Space-savers: Wall shelves, under-bed storage\n\n`;
+      responseText += `💡 Pro Tips:\n`;
+      responseText += `• Invest in good lighting (string lights, lamps)\n`;
+      responseText += `• Plants make any space feel homey\n`;
+      responseText += `• Define personal vs shared spaces clearly\n\n`;
+      responseText += `A well-decorated home = happy roommates!`;
+      suggestions = ['Budget furniture ideas', 'Plant recommendations', 'Storage solutions'];
     } else {
       responseText = `I can help you with:\n\n`;
-      responseText += `• Finding roommates in your budget range\n`;
-      responseText += `• Analyzing compatibility with potential matches\n`;
-      responseText += `• Providing tips to improve your profile\n`;
-      responseText += `• Explaining what makes a good match\n`;
-      responseText += `• Reviewing lifestyle compatibility\n\n`;
+      responseText += `🏠 Roommate Matching:\n`;
+      responseText += `• Find compatible roommates\n`;
+      responseText += `• Budget-based recommendations\n`;
+      responseText += `• Lifestyle compatibility analysis\n\n`;
+      responseText += `📍 Location & Living:\n`;
+      responseText += `• Best neighborhoods for your occupation\n`;
+      responseText += `• Apartment hunting tips\n`;
+      responseText += `• Transportation and commute advice\n\n`;
+      responseText += `🎉 Lifestyle & Fun:\n`;
+      responseText += `• Nightlife and entertainment spots\n`;
+      responseText += `• Restaurant and cafe recommendations\n`;
+      responseText += `• Things to do and activities\n\n`;
+      responseText += `🎨 Home Tips:\n`;
+      responseText += `• Decor ideas for shared spaces\n`;
+      responseText += `• Furniture and budget tips\n`;
+      responseText += `• Organization hacks\n\n`;
       responseText += `What would you like to explore?`;
-      suggestions = ['Find matches in my budget', 'Show compatible roommates'];
+      suggestions = ['Find roommates', 'Best neighborhoods', 'Things to do', 'Decor tips'];
     }
 
     return {
