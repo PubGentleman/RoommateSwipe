@@ -161,10 +161,17 @@ Preferred communication style: Simple, everyday language.
 **Groups Implementation:**
 - **Swipeable Group Discovery**: Tinder-style card interface for browsing groups
   - Large cards with group info, swipe gestures, and action buttons (X/heart)
-  - Join groups by swiping right or tapping heart button
+  - Request to join by swiping right or tapping heart button (not instant join)
   - Skip groups by swiping left or tapping X button
-  - "You're In!" notification with 2-second display when joining
+  - "Request Sent!" notification with 2-second display when liking a group
   - Spring animations and haptic feedback for interactions
+- **Approval Workflow**:
+  - Users "like" a group to send join request (adds to pendingMembers)
+  - ALL group members can view and accept/reject pending requests
+  - Accept moves user from pendingMembers to members
+  - Reject removes user from pendingMembers
+  - Group creators can remove existing members
+  - Any non-creator member can leave a group
 - **Group Storage & Cross-User Visibility**:
   - Groups stored globally in AsyncStorage (key: `@roommate_finder/groups`)
   - NOT scoped per user - all users on same device see all groups
@@ -172,7 +179,7 @@ Preferred communication style: Simple, everyday language.
   - Mock groups seeded only if storage is empty (doesn't override user groups)
   - `logout()` preserves groups (only clears user-specific data)
   - **Important**: On iOS/Android, AsyncStorage is app-wide and shared across user logins
-  - **Web Environment**: Web tests may use isolated browser contexts with separate localStorage
+  - **Web Testing Limitation**: Different browser contexts have isolated localStorage, so cross-user testing requires single browser context or shared storage simulation. On real mobile devices, the feature works correctly.
 
 **Future Database Integration:**
 - Designed to accommodate SQL database (note: Postgres may be added)

@@ -186,12 +186,10 @@ export const GroupsScreen = () => {
     setGroupLocation('');
     setGroupMaxMembers('4');
 
-    Alert.alert('Success', 'Your group has been created!', [
-      { text: 'OK', onPress: () => {
-        setActiveTab('my-groups');
-        loadGroups();
-      }}
-    ]);
+    await loadGroups();
+    setActiveTab('my-groups');
+
+    Alert.alert('Success', 'Your group has been created!');
   };
 
   const handleLeaveGroup = async (group: Group) => {
@@ -261,7 +259,7 @@ export const GroupsScreen = () => {
             <Feather name="users" size={20} color="#FFFFFF" />
           </View>
           <View style={styles.groupInfo}>
-            <ThemedText style={[Typography.h4]}>{group.name}</ThemedText>
+            <ThemedText style={[Typography.h3]}>{group.name}</ThemedText>
             <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
               {group.members.length}/{group.maxMembers} members
             </ThemedText>
