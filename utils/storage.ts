@@ -37,6 +37,36 @@ export const StorageService = {
     }
   },
 
+  async seedInitialMatches(currentUserId: string): Promise<void> {
+    try {
+      const existingMatches = await this.getMatches();
+      const userMatches = existingMatches.filter(
+        m => m.userId1 === currentUserId || m.userId2 === currentUserId
+      );
+      if (userMatches.length > 0) return;
+      
+      const newMatches: Match[] = [
+        {
+          id: `match_${currentUserId}_1`,
+          userId1: currentUserId,
+          userId2: '1',
+          matchedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+        },
+        {
+          id: `match_${currentUserId}_2`,
+          userId1: currentUserId,
+          userId2: '2',
+          matchedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+        },
+      ];
+      
+      const allMatches = [...existingMatches, ...newMatches];
+      await this.setMatches(allMatches);
+    } catch (error) {
+      console.error('Error seeding initial matches:', error);
+    }
+  },
+
   async getUsers(): Promise<User[]> {
     try {
       const data = await AsyncStorage.getItem(STORAGE_KEYS.USERS);

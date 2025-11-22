@@ -52,6 +52,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     await StorageService.setCurrentUser(mockUser);
     await StorageService.addOrUpdateUser(mockUser);
+    if (role === 'renter') {
+      await StorageService.seedInitialMatches(mockUser.id);
+    }
     setUser(mockUser);
   };
 
@@ -64,6 +67,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     await StorageService.setCurrentUser(mockUser);
     await StorageService.addOrUpdateUser(mockUser);
+    if (role === 'renter') {
+      await StorageService.seedInitialMatches(mockUser.id);
+    }
     setUser(mockUser);
   };
 

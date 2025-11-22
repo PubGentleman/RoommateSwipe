@@ -53,11 +53,13 @@ Preferred communication style: Simple, everyday language.
 **Core Features by Role:**
 
 *Renter Features:*
-- Swipe-based roommate matching interface (Tinder-style)
+- Swipe-based roommate matching interface (Tinder-style) with reciprocal matching
+- Automatic conversation creation from matches
+- Real-time 1-on-1 messaging with matched roommates
+- Group creation from conversations with multiple matches
 - Property exploration and search
-- Roommate group browsing and creation
+- Roommate group browsing with "My Groups" and "All Groups" sections
 - Saved properties functionality
-- Direct messaging with matches
 
 *Host Features:*
 - Property listing management with CRUD operations
@@ -118,8 +120,27 @@ Preferred communication style: Simple, everyday language.
 - `RoommateProfile` - User profiles with lifestyle preferences, budget, compatibility scores
 - `Property` - Rental listings with amenities, photos, pricing
 - `Group` - Roommate groups with member management
-- `Conversation` - Messaging threads with participants
+- `Conversation` - Messaging threads with participants and messages array
+- `Message` - Individual chat messages with sender, text, timestamp
+- `Match` - Reciprocal matches between two users with matchedAt timestamp
 - `Application` - Tenant applications for properties
+
+**Matching & Messaging Implementation:**
+- **Reciprocal Matching**: Users must mutually like each other before a match is created
+  - `StorageService.addLike()` stores individual likes
+  - `StorageService.checkReciprocalLike()` verifies both users have liked each other
+  - `StorageService.addMatch()` creates a match only when reciprocal like is detected
+- **Automatic Conversation Creation**: Conversations are auto-created from matches
+  - `MessagesScreen.loadConversations()` checks for matches and creates missing conversations
+  - Each conversation includes the participant profile, messages array, and timestamp
+- **Message Persistence**: All messages and conversations persist in AsyncStorage
+  - Timestamp serialization/deserialization handled by `StorageService.getConversations()`
+  - Both conversation timestamps and message timestamps converted to Date objects on load
+  - Messages sorted by timestamp within conversations
+- **Initial Match Seeding**: For testing and demo purposes
+  - `StorageService.seedInitialMatches()` creates 2 initial matches when renters first log in
+  - Seeded matches with profiles '1' (Sarah Johnson) and '2' (Michael Chen)
+  - Prevents empty state for new users and enables immediate testing of messaging flow
 
 **Future Database Integration:**
 - Designed to accommodate SQL database (note: Postgres may be added)
