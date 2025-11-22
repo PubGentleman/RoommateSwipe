@@ -67,6 +67,28 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     },
     compatibility: 78,
   },
+  {
+    id: '4',
+    name: 'Bob Anderson',
+    age: 27,
+    bio: 'Teacher by day, musician by night. Looking for a chill roommate who appreciates good music and great conversations.',
+    occupation: 'High School Teacher',
+    budget: 1100,
+    photos: ['https://picsum.photos/400/500?random=4'],
+    lifestyle: {
+      cleanliness: 7,
+      socialLevel: 7,
+      workSchedule: 'Office',
+      pets: false,
+      smoking: false,
+    },
+    preferences: {
+      location: 'Downtown',
+      moveInDate: '2025-01-10',
+      bedrooms: 2,
+    },
+    compatibility: 88,
+  },
 ];
 
 export const mockProperties: Property[] = [
