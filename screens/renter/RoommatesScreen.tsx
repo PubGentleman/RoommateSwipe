@@ -101,6 +101,16 @@ export const RoommatesScreen = () => {
     : false;
   const isBoosted = isBoostActive;
   const subscriptionPlan = currentProfileUser?.subscription?.plan || 'free';
+  
+  const canSeeOnlineStatus = () => {
+    const userPlan = user?.subscription?.plan || 'free';
+    const userStatus = user?.subscription?.status || 'active';
+    const canSee = userPlan === 'vip' && userStatus === 'active';
+    console.log('[RoommatesScreen] Online status check:', { userPlan, userStatus, canSee });
+    return canSee;
+  };
+  
+  const isProfileOnline = currentProfile ? Math.random() > 0.5 : false;
 
   const handleSwipeAction = async (action: 'like' | 'nope' | 'superlike') => {
     if (!currentProfile || !user) return;
@@ -254,6 +264,14 @@ export const RoommatesScreen = () => {
                     </ThemedText>
                   </View>
                 ) : null}
+                {canSeeOnlineStatus() && isProfileOnline ? (
+                  <View style={[styles.onlineBadge, { backgroundColor: theme.success }]}>
+                    <View style={styles.onlineDot} />
+                    <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '600', marginLeft: 4 }]}>
+                      Online
+                    </ThemedText>
+                  </View>
+                ) : null}
                 <View style={[styles.compatibilityBadge, { backgroundColor: theme.success }]}>
                   <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '600' }]}>
                     {currentProfile.compatibility}% Match
@@ -391,6 +409,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.small,
+  },
+  onlineBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.small,
+  },
+  onlineDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FFFFFF',
   },
   cardInfo: {
     gap: Spacing.xs,

@@ -163,6 +163,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await StorageService.setCurrentUser(updatedUser);
     await StorageService.addOrUpdateUser(updatedUser);
     setUser(updatedUser);
+    console.log('[Auth] Upgraded to Premium:', updatedUser.subscription);
   };
 
   const upgradeToVIP = async () => {
@@ -180,6 +181,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await StorageService.setCurrentUser(updatedUser);
     await StorageService.addOrUpdateUser(updatedUser);
     setUser(updatedUser);
+    console.log('[Auth] Upgraded to VIP:', updatedUser.subscription);
   };
 
   const updateUser = async (updates: Partial<User>) => {
