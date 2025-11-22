@@ -243,8 +243,10 @@ export const RoommatesScreen = () => {
     
     console.log('[AI Assistant] User plan:', userPlan, 'Status:', userStatus);
     
-    if (userPlan !== 'vip' || userStatus !== 'active') {
-      console.log('[AI Assistant] Showing VIP upgrade modal');
+    const isPaidMember = (userPlan === 'premium' || userPlan === 'vip') && userStatus === 'active';
+    
+    if (!isPaidMember) {
+      console.log('[AI Assistant] Showing upgrade modal');
       setShowVIPModal(true);
       return;
     }
@@ -253,7 +255,7 @@ export const RoommatesScreen = () => {
     (navigation as any).navigate('AIAssistant');
   };
 
-  const handleUpgradeToVIP = () => {
+  const handleUpgradeToPaid = () => {
     setShowVIPModal(false);
     (navigation as any).navigate('Profile', { screen: 'Payment' });
   };
@@ -386,10 +388,10 @@ export const RoommatesScreen = () => {
             
             <View style={styles.vipModalContent}>
               <ThemedText style={[Typography.h2, { textAlign: 'center', marginBottom: Spacing.sm }]}>
-                VIP Feature
+                Premium Feature
               </ThemedText>
               <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary, marginBottom: Spacing.xl }]}>
-                AI Match Assistant is exclusively available for VIP members. Upgrade to VIP to get personalized roommate recommendations powered by AI!
+                AI Match Assistant is available for Premium and VIP members. Upgrade to get personalized roommate recommendations powered by AI!
               </ThemedText>
               
               <View style={styles.vipFeaturesList}>
@@ -417,10 +419,10 @@ export const RoommatesScreen = () => {
             <View style={styles.vipModalActions}>
               <Pressable
                 style={[styles.vipModalButton, { backgroundColor: theme.primary }]}
-                onPress={handleUpgradeToVIP}
+                onPress={handleUpgradeToPaid}
               >
                 <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
-                  Upgrade to VIP
+                  Upgrade Now
                 </ThemedText>
               </Pressable>
               <Pressable

@@ -42,7 +42,7 @@ Preferred communication style: Simple, everyday language.
 - Platform-specific optimizations.
 
 **Core Features by Role:**
-- **Renter:** Swipe-based roommate matching with priority placement (boosted → VIP → Premium → Free), 1-on-1 messaging with limits (Free: 50 total messages, Premium/VIP: unlimited), comprehensive group management (create, discover, join via request, manage members), property exploration with advanced filters (Premium/VIP only: budget, location, rooms, amenities), saved properties, and AI Match Assistant (VIP only - chat-based personalized roommate recommendations). Group creation/joining limits enforced for free users. Boost feature available (Premium: 1/week, VIP: unlimited) for 24-hour profile visibility.
+- **Renter:** Swipe-based roommate matching with priority placement (boosted → VIP → Premium → Free), 1-on-1 messaging with limits (Free: 50 total messages, Premium/VIP: unlimited), comprehensive group management (create, discover, join via request, manage members), property exploration with advanced filters (Premium/VIP only: budget, location, rooms, amenities), saved properties, and AI Match Assistant (Premium/VIP - chat-based personalized roommate recommendations). Group creation/joining limits enforced for free users. Boost feature available (Premium: 1/week, VIP: unlimited) for 24-hour profile visibility.
 - **Host:** Property listing management (CRUD), application review, listing status control, and featured listings (VIP only - properties appear first in renter search).
 - **Agent:** Multi-property portfolio management, document verification, legal template library, and professional credential verification.
 
@@ -62,9 +62,9 @@ Preferred communication style: Simple, everyday language.
 - **User Model:** Defines `id`, `email`, `name`, `role` ('renter' | 'host' | 'agent'), `profilePicture`, and optional `subscription` and `paymentMethods` details.
 - **Authorization:** Role-based navigation rendering and conditional screen access.
 - **Subscription & Payments:** Stripe integration configured. Defines three subscription tiers:
-  - **Free Plan:** 50 message limit, no boost, no filters, no featured listings, 1 group max
-  - **Premium Plan ($14.99/month):** Unlimited messaging, 1 boost/week, advanced filters, 3 groups max
-  - **VIP Plan ($49.99-$99/month role-based):** Unlimited messaging, unlimited boosts, advanced filters, featured listings (hosts only), 5 groups max, AI match assistant
+  - **Free Plan:** 50 message limit, no boost, no filters, no featured listings, no AI assistant, 1 group max
+  - **Premium Plan ($14.99/month):** Unlimited messaging, 1 boost/week, advanced filters, AI match assistant, 3 groups max
+  - **VIP Plan ($49.99-$99/month role-based):** Unlimited messaging, unlimited boosts, advanced filters, AI match assistant, featured listings (hosts only), 5 groups max
 - **Functional Differentiation:** All subscription features enforce limits in real-time with upgrade prompts guiding free users to payment screen.
 - **Messaging Limits:** Enforced at send-time with message count tracking in User model. Free users blocked after 50 messages with upgrade prompt.
 - **Boost System:** 24-hour profile visibility boost with visual "BOOSTED" badge. Premium users limited to 1 boost every 7 days with cooldown tracking. VIP users have unlimited boosts. Expired boosts automatically removed from priority.
@@ -74,13 +74,13 @@ Preferred communication style: Simple, everyday language.
 - **Online Status Visibility:** 
   - **Chat (Premium/VIP):** Premium and VIP users can see real-time online/offline status in Messages list (green dot on avatar) and Chat screen header (online/offline text). Free users see upgrade banner.
   - **Roommate Cards (VIP Only):** VIP users exclusively see "Online" badge on roommate profile cards during swiping. This helps VIP members identify and connect with active users immediately.
-- **AI Match Assistant (VIP Only):** Chat-based AI assistant accessible from Roommates screen (CPU icon button). Provides personalized roommate recommendations by analyzing user preferences, budget, compatibility scores, and lifestyle factors. Features include:
+- **AI Match Assistant (Premium/VIP):** Chat-based AI assistant accessible from Roommates screen (CPU icon button). Provides personalized roommate recommendations by analyzing user preferences, budget, compatibility scores, and lifestyle factors. Features include:
   - Interactive chat interface with suggestion chips for quick actions
   - Budget-based match finding with detailed profile comparisons
   - Compatibility analysis explaining why matches are good fits
   - Profile improvement tips and matching strategy advice
   - Lifestyle-compatible roommate discovery
-  - VIP-gated access with cross-platform upgrade modal for non-VIP users
+  - Premium/VIP-gated access with cross-platform upgrade modal for free users
   - Real-time typing indicators and scrollable chat history
 
 ## Data Layer

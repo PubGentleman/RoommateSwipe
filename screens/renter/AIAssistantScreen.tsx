@@ -223,7 +223,7 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
               <View style={[styles.vipBadge, { backgroundColor: '#7C3AED' }]}>
                 <Feather name="award" size={10} color="#FFD700" />
                 <ThemedText style={[Typography.small, { color: '#FFFFFF', marginLeft: 4, fontSize: 10 }]}>
-                  VIP EXCLUSIVE
+                  PREMIUM FEATURE
                 </ThemedText>
               </View>
             </View>
