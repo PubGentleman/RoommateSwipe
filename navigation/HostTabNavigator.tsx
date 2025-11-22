@@ -5,7 +5,7 @@ import { BlurView } from 'expo-blur';
 import { Platform, StyleSheet } from 'react-native';
 import { MyListingsScreen } from '../screens/host/MyListingsScreen';
 import { ApplicationsScreen } from '../screens/host/ApplicationsScreen';
-import { MessagesScreen } from '../screens/shared/MessagesScreen';
+import { MessagesStackNavigator } from './MessagesStackNavigator';
 import { ProfileScreen } from '../screens/shared/ProfileScreen';
 import { useTheme } from '../hooks/useTheme';
 
@@ -62,7 +62,7 @@ export const HostTabNavigator = () => {
       />
       <Tab.Screen
         name="Messages"
-        component={MessagesScreen}
+        component={MessagesStackNavigator}
         options={{
           tabBarIcon: ({ color, size }) => <Feather name="message-circle" size={size} color={color} />,
         }}

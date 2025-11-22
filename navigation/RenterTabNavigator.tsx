@@ -6,7 +6,7 @@ import { Platform, StyleSheet } from 'react-native';
 import { ExploreScreen } from '../screens/renter/ExploreScreen';
 import { RoommatesScreen } from '../screens/renter/RoommatesScreen';
 import { GroupsScreen } from '../screens/renter/GroupsScreen';
-import { MessagesScreen } from '../screens/shared/MessagesScreen';
+import { MessagesStackNavigator } from './MessagesStackNavigator';
 import { ProfileScreen } from '../screens/shared/ProfileScreen';
 import { useTheme } from '../hooks/useTheme';
 
@@ -70,7 +70,7 @@ export const RenterTabNavigator = () => {
       />
       <Tab.Screen
         name="Messages"
-        component={MessagesScreen}
+        component={MessagesStackNavigator}
         options={{
           tabBarIcon: ({ color, size }) => <Feather name="message-circle" size={size} color={color} />,
         }}

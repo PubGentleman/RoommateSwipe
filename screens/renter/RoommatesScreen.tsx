@@ -65,8 +65,10 @@ export const RoommatesScreen = () => {
     await StorageService.addToSwipeHistory(currentProfile.id);
     
     if (action === 'like' || action === 'superlike') {
-      const isMatch = Math.random() > 0.5;
-      if (isMatch) {
+      await StorageService.addLike(user.id, currentProfile.id);
+      
+      const isReciprocalMatch = await StorageService.checkReciprocalLike(user.id, currentProfile.id);
+      if (isReciprocalMatch) {
         const match: Match = {
           id: `match_${Date.now()}`,
           userId1: user.id,

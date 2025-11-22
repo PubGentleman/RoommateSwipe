@@ -11,6 +11,7 @@ const STORAGE_KEYS = {
   MATCHES: '@roommate_finder/matches',
   APPLICATIONS: '@roommate_finder/applications',
   SWIPE_HISTORY: '@roommate_finder/swipe_history',
+  LIKES: '@roommate_finder/likes',
 };
 
 export const StorageService = {
@@ -162,7 +163,11 @@ export const StorageService = {
       const conversations = JSON.parse(data);
       return conversations.map((conv: any) => ({
         ...conv,
-        lastMessageTime: new Date(conv.lastMessageTime),
+        timestamp: new Date(conv.timestamp),
+        messages: conv.messages.map((msg: any) => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp),
+        })),
       }));
     } catch (error) {
       console.error('Error getting conversations:', error);
@@ -284,12 +289,50 @@ export const StorageService = {
     }
   },
 
+  async getLikes(): Promise<Record<string, string[]>> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.LIKES);
+      return data ? JSON.parse(data) : {};
+    } catch (error) {
+      console.error('Error getting likes:', error);
+      return {};
+    }
+  },
+
+  async addLike(userId: string, likedProfileId: string): Promise<void> {
+    try {
+      const likes = await this.getLikes();
+      if (!likes[userId]) {
+        likes[userId] = [];
+      }
+      if (!likes[userId].includes(likedProfileId)) {
+        likes[userId].push(likedProfileId);
+        await AsyncStorage.setItem(STORAGE_KEYS.LIKES, JSON.stringify(likes));
+      }
+    } catch (error) {
+      console.error('Error adding like:', error);
+    }
+  },
+
+  async checkReciprocalLike(userId1: string, userId2: string): Promise<boolean> {
+    try {
+      const likes = await this.getLikes();
+      const user1Likes = likes[userId1] || [];
+      const user2Likes = likes[userId2] || [];
+      return user1Likes.includes(userId2) && user2Likes.includes(userId1);
+    } catch (error) {
+      console.error('Error checking reciprocal like:', error);
+      return false;
+    }
+  },
+
   async clearUserData(): Promise<void> {
     try {
       await AsyncStorage.multiRemove([
         STORAGE_KEYS.CURRENT_USER,
         STORAGE_KEYS.SWIPE_HISTORY,
         STORAGE_KEYS.MATCHES,
+        STORAGE_KEYS.LIKES,
       ]);
     } catch (error) {
       console.error('Error clearing user data:', error);

@@ -1,17 +1,89 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, Pressable, FlatList, Image } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, Pressable, FlatList } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
-import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
-import { mockConversations } from '../../utils/mockData';
-import { Conversation } from '../../types/models';
+import { Spacing, BorderRadius, Typography } from '../../constants/theme';
+import { Conversation, Match, RoommateProfile } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StorageService } from '../../utils/storage';
+import { useAuth } from '../../contexts/AuthContext';
+import { useFocusEffect } from '@react-navigation/native';
+import { Image } from 'expo-image';
 
-export const MessagesScreen = () => {
+type MessagesScreenProps = {
+  navigation: any;
+};
+
+export const MessagesScreen = ({ navigation }: MessagesScreenProps) => {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
-  const [conversations, setConversations] = useState<Conversation[]>(mockConversations);
+  const { user } = useAuth();
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadConversations();
+    }, [user])
+  );
+
+  const loadConversations = async () => {
+    if (!user) return;
+    
+    try {
+      setIsLoading(true);
+      let existingConversations = await StorageService.getConversations();
+      const matches = await StorageService.getMatches();
+      const profiles = await StorageService.getRoommateProfiles();
+
+      for (const match of matches) {
+        if (match.userId1 !== user.id && match.userId2 !== user.id) {
+          continue;
+        }
+
+        const otherUserId = match.userId1 === user.id ? match.userId2 : match.userId1;
+        const conversationExists = existingConversations.some(
+          c => c.participant.id === otherUserId
+        );
+
+        if (!conversationExists) {
+          const otherProfile = profiles.find(p => p.id === otherUserId);
+          if (otherProfile) {
+            const newConversation: Conversation = {
+              id: `conv_${match.id}`,
+              participant: {
+                id: otherProfile.id,
+                name: otherProfile.name,
+                photo: otherProfile.photo,
+                online: Math.random() > 0.5,
+              },
+              lastMessage: 'You matched!',
+              timestamp: match.matchedAt,
+              unread: 0,
+              messages: [],
+            };
+            existingConversations.push(newConversation);
+          }
+        }
+      }
+
+      const userConversations = existingConversations.filter(
+        c => matches.some(match => 
+          (match.userId1 === user.id && match.userId2 === c.participant.id) ||
+          (match.userId2 === user.id && match.userId1 === c.participant.id)
+        )
+      );
+
+      userConversations.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+      await StorageService.setConversations(existingConversations);
+      setConversations(userConversations);
+    } catch (error) {
+      console.error('Error loading conversations:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const formatTime = (date: Date) => {
     const now = new Date();
@@ -31,7 +103,12 @@ export const MessagesScreen = () => {
         styles.conversationItem,
         { backgroundColor: item.unread > 0 ? theme.backgroundSecondary : theme.backgroundRoot },
       ]}
-      onPress={() => {}}
+      onPress={() => {
+        navigation.navigate('Chat', {
+          conversationId: item.id,
+          otherUser: item.participant,
+        });
+      }}
     >
       <View style={styles.avatarContainer}>
         <Image source={{ uri: item.participant.photo }} style={styles.avatar} />
@@ -72,6 +149,16 @@ export const MessagesScreen = () => {
     </Pressable>
   );
 
+  const renderEmptyState = () => (
+    <View style={styles.emptyState}>
+      <Feather name="message-circle" size={64} color={theme.textSecondary} />
+      <ThemedText style={[Typography.h2, styles.emptyTitle]}>No Messages Yet</ThemedText>
+      <ThemedText style={[Typography.body, styles.emptySubtitle, { color: theme.textSecondary }]}>
+        Match with roommates on the Roommates tab to start chatting
+      </ThemedText>
+    </View>
+  );
+
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <View style={[styles.header, { paddingTop: insets.top + 60 }]}>
@@ -83,7 +170,11 @@ export const MessagesScreen = () => {
         data={conversations}
         renderItem={renderConversation}
         keyExtractor={item => item.id}
-        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 100 }]}
+        contentContainerStyle={[
+          styles.list,
+          { paddingBottom: insets.bottom + 100, flexGrow: 1 },
+        ]}
+        ListEmptyComponent={!isLoading ? renderEmptyState : null}
       />
     </View>
   );
@@ -153,5 +244,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: Spacing.xs,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.xxl,
+  },
+  emptyTitle: {
+    marginTop: Spacing.lg,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    marginTop: Spacing.md,
+    textAlign: 'center',
   },
 });
