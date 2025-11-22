@@ -1,25 +1,44 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Image, Pressable, FlatList } from 'react-native';
+import { View, StyleSheet, Image, Pressable, FlatList, Modal, TextInput, ScrollView, Switch } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { ThemedText } from '../../components/ThemedText';
 import { ThemedView } from '../../components/ThemedView';
 import { useTheme } from '../../hooks/useTheme';
+import { useAuth } from '../../contexts/AuthContext';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { StorageService } from '../../utils/storage';
-import { Property } from '../../types/models';
+import { Property, PropertyFilter } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
+
+const COMMON_AMENITIES = [
+  'Parking', 'Gym', 'Pool', 'Laundry', 'Pet Friendly',
+  'Air Conditioning', 'Dishwasher', 'Balcony',
+];
 
 export const ExploreScreen = () => {
   const { theme } = useTheme();
+  const { user } = useAuth();
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [properties, setProperties] = useState<Property[]>([]);
+  const [filteredProperties, setFilteredProperties] = useState<Property[]>([]);
   const [saved, setSaved] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+  const [filters, setFilters] = useState<PropertyFilter>({});
+  const [tempFilters, setTempFilters] = useState<PropertyFilter>({});
 
   useEffect(() => {
     loadProperties();
   }, []);
+
+  useEffect(() => {
+    applyFilters();
+  }, [properties, filters]);
 
   const loadProperties = async () => {
     try {
@@ -28,12 +47,85 @@ export const ExploreScreen = () => {
       await StorageService.initializeWithMockData();
       const allProperties = await StorageService.getProperties();
       setProperties(allProperties);
+      setFilteredProperties(allProperties);
     } catch (err) {
       setError('Failed to load properties');
       console.error('Error loading properties:', err);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const applyFilters = () => {
+    let filtered = [...properties];
+
+    if (filters.minPrice !== undefined) {
+      filtered = filtered.filter(p => p.price >= filters.minPrice!);
+    }
+    if (filters.maxPrice !== undefined) {
+      filtered = filtered.filter(p => p.price <= filters.maxPrice!);
+    }
+    if (filters.city) {
+      filtered = filtered.filter(p => 
+        p.city.toLowerCase().includes(filters.city!.toLowerCase())
+      );
+    }
+    if (filters.minBedrooms !== undefined) {
+      filtered = filtered.filter(p => p.bedrooms >= filters.minBedrooms!);
+    }
+    if (filters.minBathrooms !== undefined) {
+      filtered = filtered.filter(p => p.bathrooms >= filters.minBathrooms!);
+    }
+    if (filters.amenities && filters.amenities.length > 0) {
+      filtered = filtered.filter(p =>
+        filters.amenities!.every(amenity =>
+          p.amenities.some(a => a.toLowerCase() === amenity.toLowerCase())
+        )
+      );
+    }
+
+    setFilteredProperties(filtered);
+  };
+
+  const handleFilterPress = () => {
+    const userPlan = user?.subscription?.plan || 'free';
+    const userStatus = user?.subscription?.status || 'active';
+    const hasActiveSubscription = (userPlan === 'premium' || userPlan === 'vip') && userStatus === 'active';
+    
+    if (!hasActiveSubscription) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      setShowUpgradePrompt(true);
+    } else {
+      setTempFilters({ ...filters });
+      setShowFilterModal(true);
+    }
+  };
+
+  const handleApplyFilters = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setFilters(tempFilters);
+    setShowFilterModal(false);
+  };
+
+  const handleClearFilters = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setTempFilters({});
+    setFilters({});
+    setShowFilterModal(false);
+  };
+
+  const toggleAmenity = (amenity: string) => {
+    const current = tempFilters.amenities || [];
+    const updated = current.includes(amenity)
+      ? current.filter(a => a !== amenity)
+      : [...current, amenity];
+    setTempFilters({ ...tempFilters, amenities: updated });
+  };
+
+  const hasActiveFilters = () => {
+    return Object.keys(filters).length > 0 && Object.values(filters).some(v => 
+      v !== undefined && (Array.isArray(v) ? v.length > 0 : true)
+    );
   };
 
   const toggleSave = (id: string) => {
@@ -111,7 +203,7 @@ export const ExploreScreen = () => {
             onPress={loadProperties}
           >
             <Feather name="refresh-cw" size={20} color="#FFFFFF" />
-            <ThemedText style={[Typography.button, { color: '#FFFFFF', marginLeft: Spacing.sm }]}>
+            <ThemedText style={[Typography.body, { color: '#FFFFFF', marginLeft: Spacing.sm, fontWeight: '600' }]}>
               Retry
             </ThemedText>
           </Pressable>
@@ -140,12 +232,30 @@ export const ExploreScreen = () => {
             Search location...
           </ThemedText>
         </View>
-        <Pressable style={styles.filterButton} onPress={() => {}}>
+        <Pressable style={styles.filterButton} onPress={handleFilterPress}>
           <Feather name="sliders" size={24} color={theme.text} />
+          {hasActiveFilters() ? (
+            <View style={[styles.filterBadge, { backgroundColor: theme.primary }]} />
+          ) : null}
         </Pressable>
       </View>
+      {hasActiveFilters() ? (
+        <View style={styles.filterBanner}>
+          <View style={styles.filterBannerContent}>
+            <Feather name="filter" size={16} color={theme.primary} />
+            <ThemedText style={[Typography.small, { color: theme.primary, marginLeft: Spacing.xs }]}>
+              {filteredProperties.length} properties match your filters
+            </ThemedText>
+          </View>
+          <Pressable onPress={handleClearFilters}>
+            <ThemedText style={[Typography.small, { color: theme.primary, fontWeight: '600' }]}>
+              Clear
+            </ThemedText>
+          </Pressable>
+        </View>
+      ) : null}
       <FlatList
-        data={properties}
+        data={filteredProperties}
         renderItem={renderProperty}
         keyExtractor={item => item.id}
         contentContainerStyle={[
@@ -162,6 +272,218 @@ export const ExploreScreen = () => {
           </View>
         }
       />
+
+      <Modal
+        visible={showFilterModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowFilterModal(false)}
+      >
+        <View style={[styles.modalContainer, { backgroundColor: theme.backgroundRoot }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
+            <Pressable onPress={() => setShowFilterModal(false)}>
+              <Feather name="x" size={24} color={theme.text} />
+            </Pressable>
+            <ThemedText style={Typography.h2}>Filters</ThemedText>
+            <Pressable onPress={handleClearFilters}>
+              <ThemedText style={[Typography.body, { color: theme.primary, fontWeight: '600' }]}>Clear</ThemedText>
+            </Pressable>
+          </View>
+
+          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+            <View style={styles.filterSection}>
+              <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Budget Range</ThemedText>
+              <View style={styles.budgetInputs}>
+                <View style={[styles.budgetInput, { backgroundColor: theme.backgroundDefault }]}>
+                  <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Min</ThemedText>
+                  <TextInput
+                    style={[styles.input, { color: theme.text }]}
+                    placeholder="$0"
+                    placeholderTextColor={theme.textSecondary}
+                    keyboardType="numeric"
+                    value={tempFilters.minPrice?.toString() || ''}
+                    onChangeText={text => setTempFilters({ ...tempFilters, minPrice: text ? parseInt(text) : undefined })}
+                  />
+                </View>
+                <ThemedText style={{ color: theme.textSecondary }}>—</ThemedText>
+                <View style={[styles.budgetInput, { backgroundColor: theme.backgroundDefault }]}>
+                  <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Max</ThemedText>
+                  <TextInput
+                    style={[styles.input, { color: theme.text }]}
+                    placeholder="$5000"
+                    placeholderTextColor={theme.textSecondary}
+                    keyboardType="numeric"
+                    value={tempFilters.maxPrice?.toString() || ''}
+                    onChangeText={text => setTempFilters({ ...tempFilters, maxPrice: text ? parseInt(text) : undefined })}
+                  />
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.filterSection}>
+              <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Location</ThemedText>
+              <TextInput
+                style={[styles.locationInput, { backgroundColor: theme.backgroundDefault, color: theme.text }]}
+                placeholder="Enter city..."
+                placeholderTextColor={theme.textSecondary}
+                value={tempFilters.city || ''}
+                onChangeText={text => setTempFilters({ ...tempFilters, city: text })}
+              />
+            </View>
+
+            <View style={styles.filterSection}>
+              <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Rooms</ThemedText>
+              <View style={styles.roomsRow}>
+                <View style={styles.roomInput}>
+                  <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>Bedrooms</ThemedText>
+                  <View style={styles.counterRow}>
+                    <Pressable
+                      style={[styles.counterButton, { backgroundColor: theme.backgroundDefault }]}
+                      onPress={() => setTempFilters({ ...tempFilters, minBedrooms: Math.max(0, (tempFilters.minBedrooms || 0) - 1) })}
+                    >
+                      <Feather name="minus" size={20} color={theme.text} />
+                    </Pressable>
+                    <ThemedText style={[Typography.h3, { marginHorizontal: Spacing.lg }]}>
+                      {tempFilters.minBedrooms || 0}+
+                    </ThemedText>
+                    <Pressable
+                      style={[styles.counterButton, { backgroundColor: theme.backgroundDefault }]}
+                      onPress={() => setTempFilters({ ...tempFilters, minBedrooms: (tempFilters.minBedrooms || 0) + 1 })}
+                    >
+                      <Feather name="plus" size={20} color={theme.text} />
+                    </Pressable>
+                  </View>
+                </View>
+                <View style={styles.roomInput}>
+                  <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>Bathrooms</ThemedText>
+                  <View style={styles.counterRow}>
+                    <Pressable
+                      style={[styles.counterButton, { backgroundColor: theme.backgroundDefault }]}
+                      onPress={() => setTempFilters({ ...tempFilters, minBathrooms: Math.max(0, (tempFilters.minBathrooms || 0) - 0.5) })}
+                    >
+                      <Feather name="minus" size={20} color={theme.text} />
+                    </Pressable>
+                    <ThemedText style={[Typography.h3, { marginHorizontal: Spacing.lg }]}>
+                      {tempFilters.minBathrooms || 0}+
+                    </ThemedText>
+                    <Pressable
+                      style={[styles.counterButton, { backgroundColor: theme.backgroundDefault }]}
+                      onPress={() => setTempFilters({ ...tempFilters, minBathrooms: (tempFilters.minBathrooms || 0) + 0.5 })}
+                    >
+                      <Feather name="plus" size={20} color={theme.text} />
+                    </Pressable>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.filterSection}>
+              <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Amenities</ThemedText>
+              <View style={styles.amenitiesGrid}>
+                {COMMON_AMENITIES.map(amenity => {
+                  const isSelected = tempFilters.amenities?.includes(amenity) || false;
+                  return (
+                    <Pressable
+                      key={amenity}
+                      style={[
+                        styles.amenityChip,
+                        { 
+                          backgroundColor: isSelected ? theme.primary : theme.backgroundDefault,
+                          borderColor: isSelected ? theme.primary : theme.border,
+                        }
+                      ]}
+                      onPress={() => toggleAmenity(amenity)}
+                    >
+                      <ThemedText
+                        style={[
+                          Typography.small,
+                          { color: isSelected ? '#FFFFFF' : theme.text }
+                        ]}
+                      >
+                        {amenity}
+                      </ThemedText>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          </ScrollView>
+
+          <View style={[styles.modalFooter, { borderTopColor: theme.border, paddingBottom: insets.bottom + Spacing.lg }]}>
+            <Pressable
+              style={[styles.applyButton, { backgroundColor: theme.primary }]}
+              onPress={handleApplyFilters}
+            >
+              <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>
+                Apply Filters
+              </ThemedText>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showUpgradePrompt}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowUpgradePrompt(false)}
+      >
+        <Pressable
+          style={styles.upgradeOverlay}
+          onPress={() => setShowUpgradePrompt(false)}
+        >
+          <Pressable
+            style={[styles.upgradeModal, { backgroundColor: theme.backgroundDefault }]}
+            onPress={e => e.stopPropagation()}
+          >
+            <View style={[styles.upgradeIconContainer, { backgroundColor: theme.primary + '20' }]}>
+              <Feather name="filter" size={32} color={theme.primary} />
+            </View>
+            <ThemedText style={[Typography.h2, { textAlign: 'center', marginTop: Spacing.lg }]}>
+              Advanced Filters
+            </ThemedText>
+            <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary, marginTop: Spacing.sm }]}>
+              Upgrade to Premium or VIP to unlock advanced property filters and find your perfect match faster.
+            </ThemedText>
+            <View style={styles.upgradeFeatures}>
+              <View style={styles.upgradeFeature}>
+                <Feather name="check" size={20} color={theme.success} />
+                <ThemedText style={[Typography.body, { marginLeft: Spacing.md }]}>
+                  Budget range filters
+                </ThemedText>
+              </View>
+              <View style={styles.upgradeFeature}>
+                <Feather name="check" size={20} color={theme.success} />
+                <ThemedText style={[Typography.body, { marginLeft: Spacing.md }]}>
+                  Location search
+                </ThemedText>
+              </View>
+              <View style={styles.upgradeFeature}>
+                <Feather name="check" size={20} color={theme.success} />
+                <ThemedText style={[Typography.body, { marginLeft: Spacing.md }]}>
+                  Amenity preferences
+                </ThemedText>
+              </View>
+            </View>
+            <Pressable
+              style={[styles.upgradeButton, { backgroundColor: theme.primary }]}
+              onPress={() => {
+                setShowUpgradePrompt(false);
+                (navigation as any).navigate('Profile', { screen: 'Payment' });
+              }}
+            >
+              <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>
+                Upgrade Now
+              </ThemedText>
+            </Pressable>
+            <Pressable onPress={() => setShowUpgradePrompt(false)} style={{ marginTop: Spacing.md }}>
+              <ThemedText style={[Typography.body, { color: theme.textSecondary, fontWeight: '600' }]}>
+                Maybe Later
+              </ThemedText>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 };
@@ -188,6 +510,30 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  filterBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  filterBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
+    borderRadius: BorderRadius.medium,
+    backgroundColor: 'rgba(var(--primary-rgb), 0.1)',
+  },
+  filterBannerContent: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
   list: {
@@ -246,5 +592,120 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.xl,
     borderRadius: BorderRadius.full,
+  },
+  modalContainer: {
+    flex: 1,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.lg,
+    borderBottomWidth: 1,
+  },
+  modalContent: {
+    flex: 1,
+    paddingHorizontal: Spacing.lg,
+  },
+  filterSection: {
+    paddingVertical: Spacing.lg,
+  },
+  budgetInputs: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  budgetInput: {
+    flex: 1,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.medium,
+  },
+  input: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: Spacing.xs,
+  },
+  locationInput: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.medium,
+    fontSize: 16,
+  },
+  roomsRow: {
+    flexDirection: 'row',
+    gap: Spacing.lg,
+  },
+  roomInput: {
+    flex: 1,
+  },
+  counterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  counterButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  amenitiesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  amenityChip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+  },
+  modalFooter: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.lg,
+    borderTopWidth: 1,
+  },
+  applyButton: {
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.full,
+    alignItems: 'center',
+  },
+  upgradeOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.xl,
+  },
+  upgradeModal: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: BorderRadius.large,
+    padding: Spacing.xxl,
+    alignItems: 'center',
+  },
+  upgradeIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  upgradeFeatures: {
+    width: '100%',
+    marginTop: Spacing.xl,
+    gap: Spacing.md,
+  },
+  upgradeFeature: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  upgradeButton: {
+    width: '100%',
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.full,
+    alignItems: 'center',
+    marginTop: Spacing.xl,
   },
 });

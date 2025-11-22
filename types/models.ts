@@ -35,8 +35,19 @@ export interface Property {
   amenities: string[];
   description: string;
   available: boolean;
+  availableDate?: Date;
   hostId: string;
   hostName: string;
+}
+
+export interface PropertyFilter {
+  minPrice?: number;
+  maxPrice?: number;
+  city?: string;
+  minBedrooms?: number;
+  minBathrooms?: number;
+  amenities?: string[];
+  availableFrom?: Date;
 }
 
 export interface Group {

@@ -1,6 +1,6 @@
 # Overview
 
-RoomieMatch is a React Native mobile application built with Expo that connects renters, hosts, and agents/landlords in the roommate-finding marketplace. The app features role-based navigation, swipe-based roommate matching (similar to dating apps), property listings, group formation, and messaging capabilities. It serves as an "Airbnb for roommates," facilitating connections between people looking for housing and those offering it.
+RoomieMatch is a React Native mobile application built with Expo, designed to connect renters, hosts, and agents/landlords in the roommate-finding marketplace. It aims to be an "Airbnb for roommates," offering features such as role-based navigation, swipe-based roommate matching, property listings, group formation, and messaging capabilities to streamline the housing and roommate search process.
 
 # User Preferences
 
@@ -25,283 +25,99 @@ Preferred communication style: Simple, everyday language.
 ## Frontend Architecture
 
 **Framework & Platform:**
-- React Native 0.81.5 with Expo 54.0.23
+- React Native with Expo
 - TypeScript for type safety
-- React 19.1.0 with experimental React Compiler enabled
-- New Architecture enabled for improved performance
+- React with experimental React Compiler enabled and New Architecture for improved performance
 - Cross-platform support (iOS, Android, Web)
 
 **Navigation Structure:**
-- React Navigation v7 with native stack and bottom tabs
-- Role-based navigation with three distinct user flows:
-  - **Renter**: 5 tabs (Explore, Roommates, Groups, Messages, Profile)
-  - **Host**: 4 tabs (My Listings, Applications, Messages, Profile)
-  - **Agent/Landlord**: 5 tabs (Properties, Verification, Documents, Messages, Profile)
-- Nested navigators:
-  - `MessagesStackNavigator`: Messages → Chat → CreateGroup
-  - `ProfileStackNavigator`: ProfileMain → Payment
-- Transparent header with blur effects (iOS) using `expo-blur`
-- Custom header components with app icon and title
+- React Navigation with native stack and bottom tabs
+- Role-based navigation providing distinct user flows for Renters, Hosts, and Agents/Landlords.
+- Nested navigators for specific functionalities like messaging and profile management.
+- Custom header components and transparent headers with blur effects (iOS).
 
 **UI/UX Design Patterns:**
-- Theme system supporting light/dark modes via `useTheme` hook
-- Consistent design tokens in `/constants/theme.ts` (colors, spacing, typography, border radius)
-- Reusable themed components (`ThemedView`, `ThemedText`)
-- Custom wrapper components for safe area handling:
-  - `ScreenScrollView` - Standard scrollable content
-  - `ScreenKeyboardAwareScrollView` - Keyboard-aware scrolling
-  - `ScreenFlatList` - List rendering with proper insets
-- Platform-specific optimizations (iOS blur effects, Android edge-to-edge)
+- Theme system supporting light/dark modes with consistent design tokens (colors, spacing, typography) defined in `/constants/theme.ts`.
+- Reusable themed components (`ThemedView`, `ThemedText`) and custom wrapper components for safe area and keyboard handling.
+- Platform-specific optimizations.
 
 **Core Features by Role:**
-
-*Renter Features:*
-- Swipe-based roommate matching interface (Tinder-style) with reciprocal matching
-- Automatic conversation creation from matches
-- Real-time 1-on-1 messaging with matched roommates
-- Comprehensive group management with three tabs:
-  - **My Groups Tab:** View joined groups, leave groups, manage members and pending requests
-  - **Discover Tab (Default):** Swipeable Tinder-style cards to browse and like groups
-  - **Create Tab:** Standalone form to create new groups without requiring conversations
-- Request-based group joining workflow:
-  - Users "like" groups to request membership (not instant join)
-  - Request appears in group's pending members list
-  - ALL group members can accept or reject pending requests
-  - "Request Sent!" notification when liking a group
-  - Group creators can remove existing members
-  - Any member can leave a group (with confirmation)
-- **Group Limits (Free Plan):**
-  - Users can only create 1 group maximum
-  - Users can only join 1 group maximum (excluding groups they created)
-  - Upgrade prompt shown when limits are reached
-  - Limits enforced on both group creation and join requests
-- Property exploration and search
-- Saved properties functionality
-
-*Host Features:*
-- Property listing management with CRUD operations
-- Application review and approval workflow
-- Active/inactive listing status management
-- Property analytics (views, applications)
-
-*Agent Features:*
-- Multi-property portfolio management
-- Document verification system
-- Legal template library
-- Professional credential verification
+- **Renter:** Swipe-based roommate matching, 1-on-1 messaging, comprehensive group management (create, discover, join via request, manage members), property exploration, and saved properties. Group creation/joining limits are enforced for free users.
+- **Host:** Property listing management (CRUD), application review, and listing status control.
+- **Agent:** Multi-property portfolio management, document verification, legal template library, and professional credential verification.
 
 **Animation & Gestures:**
-- Reanimated v4 for high-performance animations
-- Gesture Handler for swipe interactions
-- Spring animations with custom configurations
-- Haptic feedback integration via `expo-haptics`
-- Worklets for UI thread animations
+- React Native Reanimated for high-performance animations.
+- React Native Gesture Handler for swipe interactions.
+- Spring animations, haptic feedback, and Worklets for UI thread animations.
 
 **State Management:**
-- React Context API for authentication (`AuthContext`)
-- Local component state with hooks
-- AsyncStorage for persistent auth data
+- React Context API for authentication.
+- Local component state with hooks.
+- AsyncStorage for persistent authentication data.
 
 ## Authentication & Authorization
 
-**Authentication Flow:**
-- SSO support (Apple/Google) planned with email fallback
-- Currently mock authentication implementation
-- Role selection during login (renter/host/agent)
-- Persistent sessions via AsyncStorage
-- Loading states with activity indicators
-
-**User Model:**
-```typescript
-{
-  id: string
-  email: string
-  name: string
-  role: 'renter' | 'host' | 'agent'
-  profilePicture?: string
-  subscription?: {
-    plan: 'free' | 'premium' | 'vip'
-    status: 'active' | 'cancelled' | 'expired'
-    expiresAt?: Date
-  }
-  paymentMethods?: Array<{
-    id: string
-    type: 'card'
-    last4: string
-    brand: string
-    expiryMonth: number
-    expiryYear: number
-  }>
-}
-```
-
-**Authorization:**
-- Role-based navigation rendering
-- Conditional screen access based on user role
-- Role badges with distinct colors (renter: blue, host: green, agent: purple)
-
-**Subscription & Payments:**
-- Stripe integration setup (frontend-ready, backend pending)
-- **Free Plan ($0/mo):**
-  - 1 group creation, 1 group join limit
-  - Basic messaging
-  - Browse listings
-- **Premium Plan ($14.99/mo):**
-  - Unlimited group creation and joining
-  - Unlimited messaging
-  - Full profile visibility
-  - Advanced filters
-  - 1 boost per week
-- **VIP Plan:**
-  - $49.99/mo for roommate seekers (renters)
-  - $99/mo for hosts/agents
-  - Everything in Premium plus:
-    - Priority placement
-    - VIP badge with award icon
-    - Unlimited boosts
-    - Featured listings
-    - AI match assistant
-- Payment method management with validated card input
-- Cross-platform confirmation modals for upgrades
-- Group limits enforced: Free (1/1), Premium & VIP (unlimited)
+- **Authentication Flow:** SSO support (Apple/Google) planned, currently mock authentication. Role selection during login, persistent sessions via AsyncStorage, and loading states.
+- **User Model:** Defines `id`, `email`, `name`, `role` ('renter' | 'host' | 'agent'), `profilePicture`, and optional `subscription` and `paymentMethods` details.
+- **Authorization:** Role-based navigation rendering and conditional screen access.
+- **Subscription & Payments:** Stripe integration planned. Defines Free, Premium, and VIP plans with varying feature access, group limits, and pricing. Includes payment method management.
+- **Boost & Priority Placement:** Boost feature for 24-hour profile visibility with usage limits based on subscription tier. Priority placement in swipe decks is determined by boost status, subscription tier, and compatibility. Messaging limits are enforced for free users.
 
 ## Data Layer
 
-**Current Implementation:**
-- Mock data in `/utils/mockData.ts` for all entity types
-- TypeScript interfaces in `/types/models.ts` defining data structures
-
-**Data Models:**
-- `RoommateProfile` - User profiles with lifestyle preferences, budget, compatibility scores
-- `Property` - Rental listings with amenities, photos, pricing
-- `Group` - Roommate groups with:
-  - `members: string[]` - Array of user IDs (not full profile objects)
-  - `maxMembers: number` - Maximum group size (2-10)
-  - `description: string` - Optional group description
-  - `budget: number` - Monthly budget
-  - `preferredLocation: string` - Desired area
-  - `createdAt: Date` - Creation timestamp
-  - `createdBy: string` - Creator user ID
-- `Conversation` - Messaging threads with participants and messages array
-- `Message` - Individual chat messages with sender, text, timestamp
-- `Match` - Reciprocal matches between two users with matchedAt timestamp
-- `Application` - Tenant applications for properties
-
-**Matching & Messaging Implementation:**
-- **Reciprocal Matching**: Users must mutually like each other before a match is created
-  - `StorageService.addLike()` stores individual likes
-  - `StorageService.checkReciprocalLike()` verifies both users have liked each other
-  - `StorageService.addMatch()` creates a match only when reciprocal like is detected
-- **Automatic Conversation Creation**: Conversations are auto-created from matches
-  - `MessagesScreen.loadConversations()` checks for matches and creates missing conversations
-  - Each conversation includes the participant profile, messages array, and timestamp
-- **Message Persistence**: All messages and conversations persist in AsyncStorage
-  - Timestamp serialization/deserialization handled by `StorageService.getConversations()`
-  - Both conversation timestamps and message timestamps converted to Date objects on load
-  - Messages sorted by timestamp within conversations
-- **Initial Match Seeding**: For testing and demo purposes
-  - `StorageService.seedInitialMatches()` creates 2 initial matches when renters first log in
-  - Seeded matches with profiles '1' (Sarah Johnson) and '2' (Michael Chen)
-  - Prevents empty state for new users and enables immediate testing of messaging flow
-
-**Groups Implementation:**
-- **Swipeable Group Discovery**: Tinder-style card interface for browsing groups
-  - Large cards with group info, swipe gestures, and action buttons (X/heart)
-  - Request to join by swiping right or tapping heart button (not instant join)
-  - Skip groups by swiping left or tapping X button
-  - "Request Sent!" notification with 2-second display when liking a group
-  - Spring animations and haptic feedback for interactions
-- **Approval Workflow**:
-  - Users "like" a group to send join request (adds to pendingMembers)
-  - ALL group members can view and accept/reject pending requests
-  - Accept moves user from pendingMembers to members (with validation)
-  - **Acceptance Validation**: Before accepting, checks if user has already joined another group. If so, removes from pendingMembers and shows error message
-  - Reject removes user from pendingMembers
-  - Group creators can remove existing members
-  - Any non-creator member can leave a group
-  - Users who leave a joined group can be accepted into new groups
-- **Group Storage & Cross-User Visibility**:
-  - Groups stored globally in AsyncStorage (key: `@roommate_finder/groups`)
-  - NOT scoped per user - all users on same device see all groups
-  - `StorageService.getGroups()` deserializes `createdAt` timestamps
-  - Mock groups seeded only if storage is empty (doesn't override user groups)
-  - `logout()` preserves groups (only clears user-specific data)
-  - **Important**: On iOS/Android, AsyncStorage is app-wide and shared across user logins
-  - **Web Testing Limitation**: Different browser contexts have isolated localStorage, so cross-user testing requires single browser context or shared storage simulation. On real mobile devices, the feature works correctly.
-
-**Future Database Integration:**
-- Designed to accommodate SQL database (note: Postgres may be added)
-- Separate environments planned (dev, test, prod)
-- No JSON file storage for production data
+- **Current Implementation:** Utilizes mock data from `/utils/mockData.ts` and TypeScript interfaces from `/types/models.ts`.
+- **Data Models:** Includes `RoommateProfile`, `Property`, `Group` (with members, maxMembers, description, budget, preferredLocation, createdAt, createdBy), `Conversation`, `Message`, `Match`, and `Application`.
+- **Matching & Messaging:** Implements reciprocal matching and automatic conversation creation upon a match. Messages and conversations are persisted in AsyncStorage.
+- **Groups Implementation:** Features swipeable group discovery with a request-to-join approval workflow. Group data is stored globally in AsyncStorage and is not user-scoped.
+- **Future Database Integration:** Designed for future integration with a SQL database (e.g., Postgres) and separate environments.
 
 ## Key Technical Decisions
 
-**Module Resolution:**
-- Babel module resolver with `@/` alias pointing to root
-- Simplifies imports across the codebase
-- TypeScript path mapping configured in `tsconfig.json`
-
-**Platform-Specific Handling:**
-- Keyboard controller only on native (falls back to standard ScrollView on web)
-- Blur effects use native APIs on iOS, solid backgrounds on Android/web
-- Separate color schemes and rendering for iOS/Android/web
-
-**Performance Optimizations:**
-- New Architecture enabled for improved rendering
-- React Compiler for automatic optimizations
-- Reanimated on UI thread for smooth animations
-- Gesture-driven interactions with native performance
-
-**Error Handling:**
-- Error boundary component wrapping entire app
-- Development-mode error details with stack traces
-- Graceful fallback UI for production errors
-- App reload functionality on critical errors
-
-**Development Environment:**
-- Replit-specific configuration in scripts and package.json
-- Custom dev command with proxy URL configuration
-- Expo Web Browser integration for OAuth flows
-- ESLint with Prettier for code quality
+- **Module Resolution:** Babel module resolver with `@/` alias for simplified imports.
+- **Platform-Specific Handling:** Adapts UI components and features for iOS, Android, and Web platforms (e.g., keyboard controller, blur effects).
+- **Performance Optimizations:** Leverages React Native's New Architecture, React Compiler, Reanimated, and gesture-driven interactions for smooth performance.
+- **Error Handling:** Implements an error boundary component for graceful error handling and app reload functionality.
+- **Development Environment:** Configured for Replit with custom dev commands and Expo Web Browser integration for OAuth.
 
 # External Dependencies
 
 **Core Framework:**
-- `expo` - Development platform and SDK
-- `react-native` - Mobile framework
-- `react-navigation` - Navigation library (native stack, bottom tabs, elements)
+- `expo`
+- `react-native`
+- `react-navigation`
 
 **UI Components & Styling:**
-- `expo-blur` - Native blur effects
-- `expo-symbols` - System symbols
-- `@expo/vector-icons` - Icon library (Feather icons)
-- `react-native-safe-area-context` - Safe area handling
-- `expo-system-ui` - System UI control
+- `expo-blur`
+- `expo-symbols`
+- `@expo/vector-icons`
+- `react-native-safe-area-context`
+- `expo-system-ui`
 
 **Animations & Gestures:**
-- `react-native-reanimated` - High-performance animations
-- `react-native-gesture-handler` - Touch gesture handling
-- `react-native-worklets` - UI thread JavaScript execution
-- `expo-haptics` - Tactile feedback
+- `react-native-reanimated`
+- `react-native-gesture-handler`
+- `react-native-worklets`
+- `expo-haptics`
 
 **Storage & State:**
-- `@react-native-async-storage/async-storage` - Persistent key-value storage
+- `@react-native-async-storage/async-storage`
 
 **Utilities:**
-- `expo-linking` - Deep linking
-- `expo-web-browser` - In-app browser
-- `expo-constants` - App constants
-- `expo-splash-screen` - Splash screen control
-- `expo-image` - Optimized image component
-- `react-native-keyboard-controller` - Keyboard behavior management
+- `expo-linking`
+- `expo-web-browser`
+- `expo-constants`
+- `expo-splash-screen`
+- `expo-image`
+- `react-native-keyboard-controller`
 
 **Development Tools:**
-- `typescript` - Type checking
-- `eslint` with `eslint-config-expo` - Linting
-- `prettier` - Code formatting
-- `babel-plugin-module-resolver` - Import aliasing
+- `typescript`
+- `eslint`
+- `prettier`
+- `babel-plugin-module-resolver`
 
 **Planned Integrations:**
-- Elasticsearch for search functionality (via Elastic.co hosting with dev/prod indexes)
-- SQL database for production data storage
+- Elasticsearch
+- SQL database (e.g., Postgres)
 - SSO providers (Apple, Google)
