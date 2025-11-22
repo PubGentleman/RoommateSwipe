@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, Image, Pressable, Dimensions, Animated, Modal } from 'react-native';
+import { View, StyleSheet, Image, Pressable, Dimensions, Animated, Modal, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { scheduleOnRN } from 'react-native-worklets';
 import { Feather } from '@expo/vector-icons';
@@ -13,9 +13,7 @@ import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme
 import { StorageService } from '../../utils/storage';
 import { RoommateProfile, Match } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const CARD_WIDTH = SCREEN_WIDTH - Spacing.xxl;
+import { scaleFont, moderateScale, getResponsiveSpacing } from '../../utils/responsive';
 
 export const RoommatesScreen = () => {
   const { theme } = useTheme();
