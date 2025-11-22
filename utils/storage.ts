@@ -191,6 +191,74 @@ export const StorageService = {
     }
   },
 
+  async likeGroup(groupId: string, userId: string): Promise<void> {
+    try {
+      const groups = await this.getGroups();
+      const group = groups.find(g => g.id === groupId);
+      if (group && !group.pendingMembers.includes(userId) && !group.members.includes(userId)) {
+        group.pendingMembers.push(userId);
+        await this.setGroups(groups);
+      }
+    } catch (error) {
+      console.error('Error liking group:', error);
+    }
+  },
+
+  async acceptGroupMember(groupId: string, userId: string): Promise<void> {
+    try {
+      const groups = await this.getGroups();
+      const group = groups.find(g => g.id === groupId);
+      if (group) {
+        group.pendingMembers = group.pendingMembers.filter(id => id !== userId);
+        if (!group.members.includes(userId) && group.members.length < group.maxMembers) {
+          group.members.push(userId);
+        }
+        await this.setGroups(groups);
+      }
+    } catch (error) {
+      console.error('Error accepting group member:', error);
+    }
+  },
+
+  async rejectGroupMember(groupId: string, userId: string): Promise<void> {
+    try {
+      const groups = await this.getGroups();
+      const group = groups.find(g => g.id === groupId);
+      if (group) {
+        group.pendingMembers = group.pendingMembers.filter(id => id !== userId);
+        await this.setGroups(groups);
+      }
+    } catch (error) {
+      console.error('Error rejecting group member:', error);
+    }
+  },
+
+  async leaveGroup(groupId: string, userId: string): Promise<void> {
+    try {
+      const groups = await this.getGroups();
+      const group = groups.find(g => g.id === groupId);
+      if (group) {
+        group.members = group.members.filter(id => id !== userId);
+        await this.setGroups(groups);
+      }
+    } catch (error) {
+      console.error('Error leaving group:', error);
+    }
+  },
+
+  async removeMemberFromGroup(groupId: string, userId: string): Promise<void> {
+    try {
+      const groups = await this.getGroups();
+      const group = groups.find(g => g.id === groupId);
+      if (group) {
+        group.members = group.members.filter(id => id !== userId);
+        await this.setGroups(groups);
+      }
+    } catch (error) {
+      console.error('Error removing member from group:', error);
+    }
+  },
+
   async getConversations(): Promise<Conversation[]> {
     try {
       const data = await AsyncStorage.getItem(STORAGE_KEYS.CONVERSATIONS);
