@@ -84,6 +84,12 @@ export const ExploreScreen = () => {
       );
     }
 
+    filtered.sort((a, b) => {
+      if (a.featured && !b.featured) return -1;
+      if (!a.featured && b.featured) return 1;
+      return 0;
+    });
+
     setFilteredProperties(filtered);
   };
 
@@ -146,6 +152,14 @@ export const ExploreScreen = () => {
       onPress={() => {}}
     >
       <Image source={{ uri: item.photos[0] }} style={styles.propertyImage} />
+      {item.featured ? (
+        <View style={[styles.featuredBadge, { backgroundColor: theme.primary }]}>
+          <Feather name="star" size={12} color="#FFFFFF" />
+          <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '700', marginLeft: 4 }]}>
+            FEATURED
+          </ThemedText>
+        </View>
+      ) : null}
       <Pressable
         style={[styles.saveButton, { backgroundColor: theme.backgroundDefault }]}
         onPress={() => toggleSave(item.id)}
@@ -558,6 +572,16 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  featuredBadge: {
+    position: 'absolute',
+    top: Spacing.md,
+    left: Spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.small,
   },
   propertyInfo: {
     padding: Spacing.lg,

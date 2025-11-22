@@ -38,6 +38,7 @@ export interface Property {
   availableDate?: Date;
   hostId: string;
   hostName: string;
+  featured?: boolean;
 }
 
 export interface PropertyFilter {

@@ -1,19 +1,49 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Pressable, Image } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { ScreenScrollView } from '../../components/ScreenScrollView';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
+import { useAuth } from '../../contexts/AuthContext';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
-import { mockProperties } from '../../utils/mockData';
+import { StorageService } from '../../utils/storage';
+import { Property } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 
 export const MyListingsScreen = () => {
   const { theme } = useTheme();
+  const { user } = useAuth();
   const insets = useSafeAreaInsets();
-  const [listings, setListings] = useState(mockProperties);
+  const [listings, setListings] = useState<Property[]>([]);
 
-  const renderListing = (listing: any) => (
+  useEffect(() => {
+    loadListings();
+  }, [user]);
+
+  const loadListings = async () => {
+    if (!user) return;
+    await StorageService.initializeWithMockData();
+    const allProperties = await StorageService.getProperties();
+    const myListings = allProperties.filter(p => p.hostId === user.id);
+    setListings(myListings);
+  };
+
+  const toggleFeatured = async (propertyId: string) => {
+    if (!user) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const property = listings.find(p => p.id === propertyId);
+    if (!property || property.hostId !== user.id) return;
+
+    const updated = { ...property, featured: !property.featured };
+    await StorageService.addOrUpdateProperty(updated);
+    
+    setListings(prev => prev.map(p => p.id === propertyId ? updated : p));
+  };
+
+  const isVIP = user?.subscription?.plan === 'vip' && user?.subscription?.status === 'active';
+
+  const renderListing = (listing: Property) => (
     <Pressable
       key={listing.id}
       style={[styles.listingCard, { backgroundColor: theme.backgroundDefault }]}
@@ -25,6 +55,14 @@ export const MyListingsScreen = () => {
           {listing.available ? 'Active' : 'Inactive'}
         </ThemedText>
       </View>
+      {listing.featured ? (
+        <View style={[styles.featuredBadge, { backgroundColor: theme.primary }]}>
+          <Feather name="star" size={12} color="#FFFFFF" />
+          <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '700', marginLeft: 4 }]}>
+            FEATURED
+          </ThemedText>
+        </View>
+      ) : null}
       <View style={styles.listingInfo}>
         <ThemedText style={[Typography.h3]} numberOfLines={1}>{listing.title}</ThemedText>
         <ThemedText style={[Typography.body, { color: theme.primary, marginTop: Spacing.xs }]}>
@@ -43,9 +81,23 @@ export const MyListingsScreen = () => {
             <Feather name="edit-2" size={16} color={theme.text} />
             <ThemedText style={[Typography.caption, { marginLeft: Spacing.xs }]}>Edit</ThemedText>
           </Pressable>
+          {isVIP ? (
+            <Pressable 
+              style={[
+                styles.actionButton, 
+                { backgroundColor: listing.featured ? theme.primary : theme.backgroundSecondary }
+              ]} 
+              onPress={() => toggleFeatured(listing.id)}
+            >
+              <Feather name="star" size={16} color={listing.featured ? '#FFFFFF' : theme.text} />
+              <ThemedText style={[Typography.caption, { marginLeft: Spacing.xs, color: listing.featured ? '#FFFFFF' : theme.text }]}>
+                {listing.featured ? 'Featured' : 'Feature'}
+              </ThemedText>
+            </Pressable>
+          ) : null}
           <Pressable style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]} onPress={() => {}}>
             <Feather name="users" size={16} color={theme.text} />
-            <ThemedText style={[Typography.caption, { marginLeft: Spacing.xs }]}>Applications</ThemedText>
+            <ThemedText style={[Typography.caption, { marginLeft: Spacing.xs }]}>Apps</ThemedText>
           </Pressable>
           <Pressable style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]} onPress={() => {}}>
             <Feather name="share-2" size={16} color={theme.text} />
@@ -95,6 +147,16 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: Spacing.md,
     left: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.small,
+  },
+  featuredBadge: {
+    position: 'absolute',
+    top: Spacing.md,
+    right: Spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.small,
