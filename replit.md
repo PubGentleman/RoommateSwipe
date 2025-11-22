@@ -56,14 +56,17 @@ Preferred communication style: Simple, everyday language.
 - Swipe-based roommate matching interface (Tinder-style) with reciprocal matching
 - Automatic conversation creation from matches
 - Real-time 1-on-1 messaging with matched roommates
-- Group creation from conversations with multiple matches
-- Swipeable group discovery interface (Tinder-style cards):
-  - "My Groups" section showing joined groups
-  - "Discover Groups" section with swipeable cards
-  - Swipe right (or tap heart button) to join a group
-  - Swipe left (or tap X button) to skip  
-  - "You're In!" notification when joining
-  - Group cards display name, description, member count, budget, location
+- Comprehensive group management with three tabs:
+  - **My Groups Tab:** View joined groups, leave groups, manage members and pending requests
+  - **Discover Tab:** Swipeable Tinder-style cards to browse and like groups
+  - **Create Tab:** Standalone form to create new groups without requiring conversations
+- Request-based group joining workflow:
+  - Users "like" groups to request membership (not instant join)
+  - Request appears in group's pending members list
+  - ALL group members can accept or reject pending requests
+  - "Request Sent!" notification when liking a group
+  - Group creators can remove existing members
+  - Any member can leave a group (with confirmation)
 - Property exploration and search
 - Saved properties functionality
 
