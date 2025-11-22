@@ -16,7 +16,7 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - Spacing.xxl;
 
 export const RoommatesScreen = () => {
-  const theme = useTheme();
+  const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const [profiles, setProfiles] = useState<RoommateProfile[]>(mockRoommateProfiles);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -94,11 +94,11 @@ export const RoommatesScreen = () => {
 
   if (!currentProfile) {
     return (
-      <View style={[styles.container, { backgroundColor: Colors[theme].backgroundRoot }]}>
+      <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
         <View style={styles.emptyState}>
-          <Feather name="users" size={64} color={Colors[theme].textSecondary} />
+          <Feather name="users" size={64} color={theme.textSecondary} />
           <ThemedText style={[Typography.h2, styles.emptyTitle]}>No More Profiles</ThemedText>
-          <ThemedText style={[Typography.body, { color: Colors[theme].textSecondary, textAlign: 'center' }]}>
+          <ThemedText style={[Typography.body, { color: theme.textSecondary, textAlign: 'center' }]}>
             Check back later for new potential roommates
           </ThemedText>
         </View>
@@ -112,10 +112,10 @@ export const RoommatesScreen = () => {
   });
 
   return (
-    <View style={[styles.container, { backgroundColor: Colors[theme].backgroundRoot }]}>
+    <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <View style={[styles.header, { paddingTop: insets.top + 60 }]}>
         <Pressable onPress={() => {}} style={styles.iconButton}>
-          <Feather name="sliders" size={24} color={Colors[theme].text} />
+          <Feather name="sliders" size={24} color={theme.text} />
         </Pressable>
       </View>
 
@@ -135,7 +135,7 @@ export const RoommatesScreen = () => {
           >
             <Image source={{ uri: currentProfile.photos[0] }} style={styles.cardImage} />
             <View style={styles.gradient}>
-              <View style={[styles.compatibilityBadge, { backgroundColor: Colors[theme].success }]}>
+              <View style={[styles.compatibilityBadge, { backgroundColor: theme.success }]}>
                 <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '600' }]}>
                   {currentProfile.compatibility}% Match
                 </ThemedText>
@@ -172,22 +172,22 @@ export const RoommatesScreen = () => {
 
       <View style={[styles.actions, { paddingBottom: insets.bottom + 100 }]}>
         <Pressable
-          style={[styles.actionButton, { backgroundColor: '#FFFFFF', borderColor: Colors[theme].error }]}
+          style={[styles.actionButton, { backgroundColor: '#FFFFFF', borderColor: theme.error }]}
           onPress={() => handleSwipeAction('nope')}
         >
-          <Feather name="x" size={32} color={Colors[theme].error} />
+          <Feather name="x" size={32} color={theme.error} />
         </Pressable>
         <Pressable
-          style={[styles.actionButtonSmall, { backgroundColor: '#FFFFFF', borderColor: Colors[theme].info }]}
+          style={[styles.actionButtonSmall, { backgroundColor: '#FFFFFF', borderColor: theme.info }]}
           onPress={() => handleSwipeAction('superlike')}
         >
-          <Feather name="star" size={24} color={Colors[theme].info} />
+          <Feather name="star" size={24} color={theme.info} />
         </Pressable>
         <Pressable
-          style={[styles.actionButton, { backgroundColor: '#FFFFFF', borderColor: Colors[theme].success }]}
+          style={[styles.actionButton, { backgroundColor: '#FFFFFF', borderColor: theme.success }]}
           onPress={() => handleSwipeAction('like')}
         >
-          <Feather name="heart" size={32} color={Colors[theme].success} />
+          <Feather name="heart" size={32} color={theme.success} />
         </Pressable>
       </View>
 

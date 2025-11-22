@@ -10,7 +10,7 @@ import { Property } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export const ExploreScreen = () => {
-  const theme = useTheme();
+  const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const [properties, setProperties] = useState<Property[]>(mockProperties);
   const [saved, setSaved] = useState<Set<string>>(new Set());

@@ -8,7 +8,7 @@ import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme
 import { mockApplications } from '../../utils/mockData';
 
 export const ApplicationsScreen = () => {
-  const theme = useTheme();
+  const { theme } = useTheme();
   const [applications, setApplications] = useState(mockApplications);
 
   const formatDate = (date: Date) => {

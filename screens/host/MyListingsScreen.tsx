@@ -9,7 +9,7 @@ import { mockProperties } from '../../utils/mockData';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export const MyListingsScreen = () => {
-  const theme = useTheme();
+  const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const [listings, setListings] = useState(mockProperties);
 

@@ -7,7 +7,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 
 export const DocumentsScreen = () => {
-  const theme = useTheme();
+  const { theme } = useTheme();
 
   const DocumentItem = ({ icon, title, description }: any) => (
     <Pressable

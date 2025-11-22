@@ -9,7 +9,7 @@ import { Conversation } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export const MessagesScreen = () => {
-  const theme = useTheme();
+  const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const [conversations, setConversations] = useState<Conversation[]>(mockConversations);
 

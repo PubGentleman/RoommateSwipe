@@ -7,7 +7,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 
 export const VerificationScreen = () => {
-  const theme = useTheme();
+  const { theme } = useTheme();
 
   const VerificationItem = ({ title, status, description }: any) => (
     <Pressable

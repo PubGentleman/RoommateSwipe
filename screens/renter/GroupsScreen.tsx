@@ -10,7 +10,7 @@ import { mockGroups } from '../../utils/mockData';
 import { Group } from '../../types/models';
 
 export const GroupsScreen = () => {
-  const theme = useTheme();
+  const { theme } = useTheme();
   const [groups, setGroups] = useState<Group[]>(mockGroups);
 
   const renderGroup = (group: Group) => (

@@ -8,7 +8,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 
 export const ProfileScreen = () => {
-  const theme = useTheme();
+  const { theme } = useTheme();
   const { user, logout } = useAuth();
 
   const getRoleBadgeColor = () => {

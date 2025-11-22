@@ -8,7 +8,7 @@ import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme
 import { mockProperties } from '../../utils/mockData';
 
 export const PropertiesScreen = () => {
-  const theme = useTheme();
+  const { theme } = useTheme();
   const [properties, setProperties] = useState(mockProperties);
 
   const renderProperty = (property: any) => (
