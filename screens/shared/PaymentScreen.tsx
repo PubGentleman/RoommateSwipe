@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Pressable, Alert, TextInput } from 'react-native';
+import { View, StyleSheet, Pressable, Alert, TextInput, Modal } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { ScreenKeyboardAwareScrollView } from '../../components/ScreenKeyboardAwareScrollView';
@@ -18,6 +18,7 @@ export const PaymentScreen = () => {
   const [expiryDate, setExpiryDate] = useState('');
   const [cvv, setCvv] = useState('');
   const [processing, setProcessing] = useState(false);
+  const [showUpgradeConfirm, setShowUpgradeConfirm] = useState(false);
 
   const isPremium = user?.subscription?.plan === 'premium';
   const monthlyPrice = 9.99;
@@ -33,34 +34,27 @@ export const PaymentScreen = () => {
       return;
     }
 
+    setShowUpgradeConfirm(true);
+  };
+
+  const confirmUpgrade = async () => {
+    setShowUpgradeConfirm(false);
+    setProcessing(true);
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    await upgradeToPremium();
+    
     Alert.alert(
-      'Upgrade to Premium',
-      `Unlock unlimited group creation and joining for $${monthlyPrice}/month.\n\nContinue with upgrade?`,
+      'Success!',
+      'Welcome to Premium! You can now create and join unlimited groups.',
       [
-        { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Upgrade',
-          onPress: async () => {
-            setProcessing(true);
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            
-            await upgradeToPremium();
-            
-            Alert.alert(
-              'Success!',
-              'Welcome to Premium! You can now create and join unlimited groups.',
-              [
-                {
-                  text: 'OK',
-                  onPress: () => navigation.goBack(),
-                },
-              ]
-            );
-            setProcessing(false);
-          },
+          text: 'OK',
+          onPress: () => navigation.goBack(),
         },
       ]
     );
+    setProcessing(false);
   };
 
   const handleAddPaymentMethod = async () => {
@@ -359,6 +353,40 @@ export const PaymentScreen = () => {
           </View>
         ) : null}
       </View>
+
+      <Modal
+        visible={showUpgradeConfirm}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowUpgradeConfirm(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.backgroundRoot }]}>
+            <ThemedText style={[Typography.h2, { marginBottom: Spacing.md }]}>
+              Upgrade to Premium
+            </ThemedText>
+            <ThemedText style={[Typography.body, { color: theme.textSecondary, marginBottom: Spacing.xl }]}>
+              Unlock unlimited group creation and joining for ${monthlyPrice}/month.{'\n\n'}Continue with upgrade?
+            </ThemedText>
+            <View style={styles.modalActions}>
+              <Pressable
+                style={[styles.modalButton, { borderColor: theme.border }]}
+                onPress={() => setShowUpgradeConfirm(false)}
+              >
+                <ThemedText style={[Typography.body]}>Cancel</ThemedText>
+              </Pressable>
+              <Pressable
+                style={[styles.modalButton, styles.modalButtonPrimary, { backgroundColor: theme.primary }]}
+                onPress={confirmUpgrade}
+              >
+                <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>
+                  Upgrade
+                </ThemedText>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScreenKeyboardAwareScrollView>
   );
 };
@@ -473,5 +501,32 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: Spacing.lg,
     borderRadius: BorderRadius.medium,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.xl,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 400,
+    padding: Spacing.xxl,
+    borderRadius: BorderRadius.large,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+  },
+  modalButton: {
+    flex: 1,
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.medium,
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  modalButtonPrimary: {
+    borderWidth: 0,
   },
 });
