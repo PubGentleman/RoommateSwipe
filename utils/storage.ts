@@ -475,7 +475,7 @@ export const StorageService = {
 
   async initializeWithMockData(): Promise<void> {
     try {
-      const { mockRoommateProfiles, mockProperties, mockGroups } = await import('./mockData');
+      const { mockRoommateProfiles, mockProperties, mockGroups, mockProfileUsers } = await import('./mockData');
       
       console.log('[StorageService] Loading fresh mock data...');
       await this.setRoommateProfiles(mockRoommateProfiles);
@@ -486,6 +486,14 @@ export const StorageService = {
       
       await this.setGroups(mockGroups);
       console.log(`[StorageService] ✓ Loaded ${mockGroups.length} groups`);
+      
+      const existingUsers = await this.getUsers();
+      if (existingUsers.length === 0 || !existingUsers.some(u => u.id === '1')) {
+        for (const profileUser of mockProfileUsers) {
+          await this.addOrUpdateUser(profileUser);
+        }
+        console.log(`[StorageService] ✓ Seeded ${mockProfileUsers.length} profile users`);
+      }
       
       console.log('[StorageService] Mock data initialization complete!');
     } catch (error) {

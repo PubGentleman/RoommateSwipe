@@ -25,6 +25,7 @@ export const RoommatesScreen = () => {
   const [showMatch, setShowMatch] = useState(false);
   const [swipedIds, setSwipedIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
+  const [profileUsers, setProfileUsers] = useState<Map<string, any>>(new Map());
 
   const translateX = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(0)).current;
@@ -38,10 +39,46 @@ export const RoommatesScreen = () => {
     try {
       setIsLoading(true);
       const allProfiles = await StorageService.getRoommateProfiles();
+      const allUsers = await StorageService.getUsers();
       const history = await StorageService.getSwipeHistory();
       setSwipedIds(history);
+      
+      const userMap = new Map(allUsers.map(u => [u.id, u]));
+      setProfileUsers(userMap);
+      
       const unseen = allProfiles.filter(p => !history.has(p.id) && p.id !== user?.id);
-      setProfiles(unseen);
+      
+      const sortedProfiles = unseen.sort((a, b) => {
+        const userA = userMap.get(a.id);
+        const userB = userMap.get(b.id);
+        
+        const now = new Date();
+        const isActiveBoostA = userA?.boostData?.isBoosted && userA?.boostData?.boostExpiresAt
+          ? new Date(userA.boostData.boostExpiresAt) > now
+          : false;
+        const isActiveBoostB = userB?.boostData?.isBoosted && userB?.boostData?.boostExpiresAt
+          ? new Date(userB.boostData.boostExpiresAt) > now
+          : false;
+        
+        const isBoostedA = isActiveBoostA ? 1 : 0;
+        const isBoostedB = isActiveBoostB ? 1 : 0;
+        if (isBoostedA !== isBoostedB) return isBoostedB - isBoostedA;
+        
+        const getPriority = (user: typeof userA) => {
+          const plan = user?.subscription?.plan || 'free';
+          if (plan === 'vip') return 3;
+          if (plan === 'premium') return 2;
+          return 1;
+        };
+        
+        const priorityA = getPriority(userA);
+        const priorityB = getPriority(userB);
+        if (priorityA !== priorityB) return priorityB - priorityA;
+        
+        return (b.compatibility || 0) - (a.compatibility || 0);
+      });
+      
+      setProfiles(sortedProfiles);
       setCurrentIndex(0);
     } catch (error) {
       console.error('Error loading profiles:', error);
@@ -56,6 +93,14 @@ export const RoommatesScreen = () => {
   };
 
   const currentProfile = profiles[currentIndex];
+  const currentProfileUser = currentProfile ? profileUsers.get(currentProfile.id) : null;
+  
+  const now = new Date();
+  const isBoostActive = currentProfileUser?.boostData?.isBoosted && currentProfileUser?.boostData?.boostExpiresAt
+    ? new Date(currentProfileUser.boostData.boostExpiresAt) > now
+    : false;
+  const isBoosted = isBoostActive;
+  const subscriptionPlan = currentProfileUser?.subscription?.plan || 'free';
 
   const handleSwipeAction = async (action: 'like' | 'nope' | 'superlike') => {
     if (!currentProfile || !user) return;
@@ -162,7 +207,7 @@ export const RoommatesScreen = () => {
             onPress={resetSwipeHistory}
           >
             <Feather name="refresh-cw" size={20} color="#FFFFFF" />
-            <ThemedText style={[Typography.button, { color: '#FFFFFF', marginLeft: Spacing.sm }]}>
+            <ThemedText style={[Typography.body, { color: '#FFFFFF', marginLeft: Spacing.sm, fontWeight: '600' }]}>
               Start Over
             </ThemedText>
           </Pressable>
@@ -200,10 +245,20 @@ export const RoommatesScreen = () => {
           >
             <Image source={{ uri: currentProfile.photos[0] }} style={styles.cardImage} />
             <View style={styles.gradient}>
-              <View style={[styles.compatibilityBadge, { backgroundColor: theme.success }]}>
-                <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '600' }]}>
-                  {currentProfile.compatibility}% Match
-                </ThemedText>
+              <View style={styles.topBadges}>
+                {isBoosted ? (
+                  <View style={[styles.boostBadge, { backgroundColor: '#FFD700' }]}>
+                    <Feather name="zap" size={14} color="#000000" />
+                    <ThemedText style={[Typography.small, { color: '#000000', fontWeight: '700', marginLeft: 4 }]}>
+                      BOOSTED
+                    </ThemedText>
+                  </View>
+                ) : null}
+                <View style={[styles.compatibilityBadge, { backgroundColor: theme.success }]}>
+                  <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '600' }]}>
+                    {currentProfile.compatibility}% Match
+                  </ThemedText>
+                </View>
               </View>
               <View style={styles.cardInfo}>
                 <ThemedText style={[Typography.hero, { color: '#FFFFFF' }]}>
@@ -317,10 +372,22 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     padding: Spacing.lg,
   },
-  compatibilityBadge: {
+  topBadges: {
     position: 'absolute',
     top: Spacing.lg,
     right: Spacing.lg,
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    gap: Spacing.sm,
+  },
+  compatibilityBadge: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.small,
+  },
+  boostBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.small,
