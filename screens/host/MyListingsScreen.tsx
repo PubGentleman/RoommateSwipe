@@ -41,7 +41,7 @@ export const MyListingsScreen = () => {
     setListings(prev => prev.map(p => p.id === propertyId ? updated : p));
   };
 
-  const isVIP = user?.subscription?.plan === 'vip' && user?.subscription?.status === 'active';
+  const isPriority = user?.subscription?.plan === 'priority' && user?.subscription?.status === 'active';
 
   const renderListing = (listing: Property) => (
     <Pressable
@@ -81,7 +81,7 @@ export const MyListingsScreen = () => {
             <Feather name="edit-2" size={16} color={theme.text} />
             <ThemedText style={[Typography.caption, { marginLeft: Spacing.xs }]}>Edit</ThemedText>
           </Pressable>
-          {isVIP ? (
+          {isPriority ? (
             <Pressable 
               style={[
                 styles.actionButton, 

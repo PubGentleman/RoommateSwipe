@@ -6,7 +6,7 @@ export const mockProfileUsers: User[] = [
     email: 'sarah.johnson@email.com',
     name: 'Sarah Johnson',
     role: 'renter',
-    subscription: { plan: 'vip', status: 'active' },
+    subscription: { plan: 'priority', status: 'active' },
     boostData: { boostsUsed: 2, isBoosted: true, boostExpiresAt: new Date(Date.now() + 20 * 60 * 60 * 1000), lastBoostDate: new Date() },
   },
   {
@@ -14,7 +14,7 @@ export const mockProfileUsers: User[] = [
     email: 'michael.chen@email.com',
     name: 'Michael Chen',
     role: 'renter',
-    subscription: { plan: 'premium', status: 'active' },
+    subscription: { plan: 'plus', status: 'active' },
     boostData: { boostsUsed: 1, isBoosted: true, boostExpiresAt: new Date(Date.now() + 10 * 60 * 60 * 1000), lastBoostDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) },
   },
   {
@@ -22,7 +22,7 @@ export const mockProfileUsers: User[] = [
     email: 'emily.rodriguez@email.com',
     name: 'Emily Rodriguez',
     role: 'renter',
-    subscription: { plan: 'free', status: 'active' },
+    subscription: { plan: 'basic', status: 'active' },
     boostData: { boostsUsed: 0, isBoosted: false },
   },
   {
@@ -30,7 +30,7 @@ export const mockProfileUsers: User[] = [
     email: 'bob.anderson@email.com',
     name: 'Bob Anderson',
     role: 'renter',
-    subscription: { plan: 'vip', status: 'active' },
+    subscription: { plan: 'priority', status: 'active' },
     boostData: { boostsUsed: 5, isBoosted: false },
   },
   {
@@ -38,7 +38,7 @@ export const mockProfileUsers: User[] = [
     email: 'jessica.park@email.com',
     name: 'Jessica Park',
     role: 'renter',
-    subscription: { plan: 'premium', status: 'active' },
+    subscription: { plan: 'plus', status: 'active' },
     boostData: { boostsUsed: 0, isBoosted: false },
   },
   {
@@ -46,7 +46,7 @@ export const mockProfileUsers: User[] = [
     email: 'david.martinez@email.com',
     name: 'David Martinez',
     role: 'renter',
-    subscription: { plan: 'free', status: 'active' },
+    subscription: { plan: 'basic', status: 'active' },
     boostData: { boostsUsed: 0, isBoosted: false },
   },
   {
@@ -54,7 +54,7 @@ export const mockProfileUsers: User[] = [
     email: 'lisa.thompson@email.com',
     name: 'Lisa Thompson',
     role: 'renter',
-    subscription: { plan: 'premium', status: 'active' },
+    subscription: { plan: 'plus', status: 'active' },
     boostData: { boostsUsed: 1, isBoosted: true, boostExpiresAt: new Date(Date.now() + 5 * 60 * 60 * 1000), lastBoostDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000) },
   },
   {
@@ -62,7 +62,7 @@ export const mockProfileUsers: User[] = [
     email: 'james.wilson@email.com',
     name: 'James Wilson',
     role: 'renter',
-    subscription: { plan: 'vip', status: 'active' },
+    subscription: { plan: 'priority', status: 'active' },
     boostData: { boostsUsed: 3, isBoosted: false },
   },
   {
@@ -70,7 +70,7 @@ export const mockProfileUsers: User[] = [
     email: 'amanda.lee@email.com',
     name: 'Amanda Lee',
     role: 'renter',
-    subscription: { plan: 'free', status: 'active' },
+    subscription: { plan: 'basic', status: 'active' },
     boostData: { boostsUsed: 0, isBoosted: false },
   },
   {
@@ -78,7 +78,7 @@ export const mockProfileUsers: User[] = [
     email: 'ryan.garcia@email.com',
     name: 'Ryan Garcia',
     role: 'renter',
-    subscription: { plan: 'premium', status: 'active' },
+    subscription: { plan: 'plus', status: 'active' },
     boostData: { boostsUsed: 0, isBoosted: false },
   },
   {
@@ -86,7 +86,7 @@ export const mockProfileUsers: User[] = [
     email: 'sophia.brown@email.com',
     name: 'Sophia Brown',
     role: 'renter',
-    subscription: { plan: 'vip', status: 'active' },
+    subscription: { plan: 'priority', status: 'active' },
     boostData: { boostsUsed: 4, isBoosted: true, boostExpiresAt: new Date(Date.now() + 15 * 60 * 60 * 1000), lastBoostDate: new Date() },
   },
   {
@@ -94,7 +94,7 @@ export const mockProfileUsers: User[] = [
     email: 'matthew.davis@email.com',
     name: 'Matthew Davis',
     role: 'renter',
-    subscription: { plan: 'free', status: 'active' },
+    subscription: { plan: 'basic', status: 'active' },
     boostData: { boostsUsed: 0, isBoosted: false },
   },
   {
@@ -102,7 +102,7 @@ export const mockProfileUsers: User[] = [
     email: 'olivia.miller@email.com',
     name: 'Olivia Miller',
     role: 'renter',
-    subscription: { plan: 'premium', status: 'active' },
+    subscription: { plan: 'plus', status: 'active' },
     boostData: { boostsUsed: 1, isBoosted: false, lastBoostDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000) },
   },
   {
@@ -110,7 +110,7 @@ export const mockProfileUsers: User[] = [
     email: 'daniel.moore@email.com',
     name: 'Daniel Moore',
     role: 'renter',
-    subscription: { plan: 'vip', status: 'active' },
+    subscription: { plan: 'priority', status: 'active' },
     boostData: { boostsUsed: 6, isBoosted: false },
   },
   {
@@ -118,7 +118,7 @@ export const mockProfileUsers: User[] = [
     email: 'emma.taylor@email.com',
     name: 'Emma Taylor',
     role: 'renter',
-    subscription: { plan: 'free', status: 'active' },
+    subscription: { plan: 'basic', status: 'active' },
     boostData: { boostsUsed: 0, isBoosted: false },
   },
   {
@@ -126,28 +126,28 @@ export const mockProfileUsers: User[] = [
     email: 'john.smith@host.com',
     name: 'John Smith',
     role: 'host',
-    subscription: { plan: 'vip', status: 'active' },
+    subscription: { plan: 'priority', status: 'active' },
   },
   {
     id: 'host2',
     email: 'lisa.williams@host.com',
     name: 'Lisa Williams',
     role: 'host',
-    subscription: { plan: 'premium', status: 'active' },
+    subscription: { plan: 'plus', status: 'active' },
   },
   {
     id: 'host3',
     email: 'robert.jones@host.com',
     name: 'Robert Jones',
     role: 'host',
-    subscription: { plan: 'free', status: 'active' },
+    subscription: { plan: 'basic', status: 'active' },
   },
   {
     id: 'host4',
     email: 'maria.garcia@host.com',
     name: 'Maria Garcia',
     role: 'host',
-    subscription: { plan: 'vip', status: 'active' },
+    subscription: { plan: 'priority', status: 'active' },
   },
 ];
 

@@ -98,9 +98,9 @@ export const MessagesScreen = ({ navigation }: MessagesScreenProps) => {
   };
 
   const canSeeOnlineStatus = () => {
-    const userPlan = user?.subscription?.plan || 'free';
+    const userPlan = user?.subscription?.plan || 'basic';
     const userStatus = user?.subscription?.status || 'active';
-    return (userPlan === 'premium' || userPlan === 'vip') && userStatus === 'active';
+    return (userPlan === 'plus' || userPlan === 'priority') && userStatus === 'active';
   };
 
   const renderConversation = ({ item }: { item: Conversation }) => (

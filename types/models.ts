@@ -114,7 +114,7 @@ export interface User {
   role: 'renter' | 'host' | 'agent';
   profilePicture?: string;
   subscription?: {
-    plan: 'free' | 'premium' | 'vip';
+    plan: 'basic' | 'plus' | 'priority';
     status: 'active' | 'cancelled' | 'expired';
     expiresAt?: Date;
   };

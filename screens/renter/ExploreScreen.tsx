@@ -94,9 +94,9 @@ export const ExploreScreen = () => {
   };
 
   const handleFilterPress = () => {
-    const userPlan = user?.subscription?.plan || 'free';
+    const userPlan = user?.subscription?.plan || 'basic';
     const userStatus = user?.subscription?.status || 'active';
-    const hasActiveSubscription = (userPlan === 'premium' || userPlan === 'vip') && userStatus === 'active';
+    const hasActiveSubscription = (userPlan === 'plus' || userPlan === 'priority') && userStatus === 'active';
     
     if (!hasActiveSubscription) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -457,7 +457,7 @@ export const ExploreScreen = () => {
               Advanced Filters
             </ThemedText>
             <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary, marginTop: Spacing.sm }]}>
-              Upgrade to Premium or VIP to unlock advanced property filters and find your perfect match faster.
+              Upgrade to Plus or Priority to unlock advanced property filters and find your perfect match faster.
             </ThemedText>
             <View style={styles.upgradeFeatures}>
               <View style={styles.upgradeFeature}>

@@ -29,10 +29,10 @@ export const ProfileScreen = () => {
       Alert.alert('Boost Activated!', result.message);
     } else {
       const boostStatus = canBoost();
-      if (!boostStatus.canBoost && user?.subscription?.plan === 'free') {
+      if (!boostStatus.canBoost && user?.subscription?.plan === 'basic') {
         Alert.alert(
           'Upgrade Required',
-          boostStatus.reason || 'Boost is a Premium feature',
+          boostStatus.reason || 'Boost is a Plus feature',
           [
             { text: 'Maybe Later', style: 'cancel' },
             { text: 'View Plans', onPress: () => navigation.navigate('Payment') },
@@ -102,25 +102,25 @@ export const ProfileScreen = () => {
             <View style={styles.subscriptionHeader}>
               <View style={styles.subscriptionInfo}>
                 <ThemedText style={[Typography.h3, { textTransform: 'capitalize' }]}>
-                  {user?.subscription?.plan || 'Free'} Plan
+                  {user?.subscription?.plan || 'Basic'} Plan
                 </ThemedText>
-                {user?.subscription?.plan === 'premium' ? (
+                {user?.subscription?.plan === 'plus' ? (
                   <View style={[styles.badge, { backgroundColor: theme.primary }]}>
                     <Feather name="star" size={12} color="#FFFFFF" />
                     <ThemedText style={[Typography.small, { color: '#FFFFFF', marginLeft: 4, fontWeight: '600' }]}>
-                      Premium
+                      Plus
                     </ThemedText>
                   </View>
-                ) : user?.subscription?.plan === 'vip' ? (
+                ) : user?.subscription?.plan === 'priority' ? (
                   <View style={[styles.badge, { backgroundColor: '#7C3AED' }]}>
                     <Feather name="award" size={12} color="#FFD700" />
                     <ThemedText style={[Typography.small, { color: '#FFFFFF', marginLeft: 4, fontWeight: '600' }]}>
-                      VIP
+                      Priority
                     </ThemedText>
                   </View>
                 ) : null}
               </View>
-              {user?.subscription?.plan === 'free' ? (
+              {user?.subscription?.plan === 'basic' ? (
                 <Pressable
                   style={[styles.upgradeButton, { backgroundColor: theme.primary }]}
                   onPress={() => navigation.navigate('Payment')}
@@ -132,10 +132,10 @@ export const ProfileScreen = () => {
               ) : null}
             </View>
             
-            {user?.subscription?.plan === 'free' ? (
+            {user?.subscription?.plan === 'basic' ? (
               <View style={styles.benefitsList}>
                 <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.sm }]}>
-                  Free plan limitations:
+                  Basic plan limitations:
                 </ThemedText>
                 <View style={styles.benefitItem}>
                   <Feather name="x" size={16} color={theme.textSecondary} />
@@ -220,7 +220,7 @@ export const ProfileScreen = () => {
                       </ThemedText>
                     </View>
                   </View>
-                  {user.subscription?.plan === 'premium' && user.boostData?.lastBoostDate ? (
+                  {user.subscription?.plan === 'plus' && user.boostData?.lastBoostDate ? (
                     <ThemedText style={[Typography.small, { color: theme.textSecondary, marginTop: Spacing.md }]}>
                       {(() => {
                         const boostStatus = canBoost();
@@ -236,7 +236,7 @@ export const ProfileScreen = () => {
                       backgroundColor: canBoost().canBoost ? theme.primary : theme.backgroundSecondary 
                     }]}
                     onPress={handleBoost}
-                    disabled={!canBoost().canBoost && user.subscription?.plan !== 'free'}
+                    disabled={!canBoost().canBoost && user.subscription?.plan !== 'basic'}
                   >
                     <Feather name="zap" size={20} color={canBoost().canBoost ? '#FFFFFF' : theme.textSecondary} />
                     <ThemedText style={[Typography.body, { 
@@ -244,7 +244,7 @@ export const ProfileScreen = () => {
                       fontWeight: '600', 
                       marginLeft: Spacing.sm 
                     }]}>
-                      {user.subscription?.plan === 'free' 
+                      {user.subscription?.plan === 'basic' 
                         ? 'Upgrade to Boost' 
                         : canBoost().canBoost 
                           ? 'Activate Boost' 

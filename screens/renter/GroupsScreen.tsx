@@ -73,7 +73,7 @@ export const GroupsScreen = () => {
   const handleLikeGroup = async (group: Group) => {
     if (!user) return;
 
-    const isPremium = user.subscription?.plan === 'premium' || user.subscription?.plan === 'vip';
+    const isPremium = user.subscription?.plan === 'plus' || user.subscription?.plan === 'priority';
 
     if (!isPremium) {
       try {
@@ -88,7 +88,7 @@ export const GroupsScreen = () => {
           console.log('[GroupsScreen] Group join limit reached, showing alert');
           Alert.alert(
             'Upgrade Required',
-            'You can only join 1 group with the free plan. Upgrade to Premium or VIP for unlimited group joining!',
+            'You can only join 1 group with the basic plan. Upgrade to Plus or Priority for unlimited group joining!',
             [
               { text: 'Maybe Later', style: 'cancel' },
               {
@@ -178,7 +178,7 @@ export const GroupsScreen = () => {
   const handleCreateGroup = async () => {
     if (!user) return;
 
-    const isPremium = user.subscription?.plan === 'premium' || user.subscription?.plan === 'vip';
+    const isPremium = user.subscription?.plan === 'plus' || user.subscription?.plan === 'priority';
 
     if (!isPremium) {
       try {
@@ -191,7 +191,7 @@ export const GroupsScreen = () => {
           console.log('[GroupsScreen] Group creation limit reached, showing alert');
           Alert.alert(
             'Upgrade Required',
-            'You can only create 1 group with the free plan. Upgrade to Premium or VIP for unlimited group creation!',
+            'You can only create 1 group with the basic plan. Upgrade to Plus or Priority for unlimited group creation!',
             [
               { text: 'Maybe Later', style: 'cancel' },
               {

@@ -42,8 +42,8 @@ Preferred communication style: Simple, everyday language.
 - Platform-specific optimizations.
 
 **Core Features by Role:**
-- **Renter:** Swipe-based roommate matching with priority placement (boosted → VIP → Premium → Free), 1-on-1 messaging with limits (Free: 50 total messages, Premium/VIP: unlimited), comprehensive group management (create, discover, join via request, manage members), property exploration with advanced filters (Premium/VIP only: budget, location, rooms, amenities), saved properties, and AI Match Assistant (Premium/VIP - chat-based personalized roommate recommendations). Group creation/joining limits enforced for free users. Boost feature available (Premium: 1/week, VIP: unlimited) for 24-hour profile visibility.
-- **Host:** Property listing management (CRUD), application review, listing status control, and featured listings (VIP only - properties appear first in renter search).
+- **Renter:** Swipe-based roommate matching with priority placement (boosted → Priority → Plus → Basic), 1-on-1 messaging with limits (Basic: 50 total messages, Plus/Priority: unlimited), comprehensive group management (create, discover, join via request, manage members), property exploration with advanced filters (Plus/Priority only: budget, location, rooms, amenities), saved properties, and AI Match Assistant (Plus/Priority - chat-based personalized roommate recommendations). Group creation/joining limits enforced for basic users. Boost feature available (Plus: 1/week, Priority: unlimited) for 24-hour profile visibility.
+- **Host:** Property listing management (CRUD), application review, listing status control, and featured listings (Priority only - properties appear first in renter search).
 - **Agent:** Multi-property portfolio management, document verification, legal template library, and professional credential verification.
 
 **Animation & Gestures:**
@@ -62,26 +62,26 @@ Preferred communication style: Simple, everyday language.
 - **User Model:** Defines `id`, `email`, `name`, `role` ('renter' | 'host' | 'agent'), `profilePicture`, and optional `subscription` and `paymentMethods` details.
 - **Authorization:** Role-based navigation rendering and conditional screen access.
 - **Subscription & Payments:** Stripe integration configured. Defines three subscription tiers:
-  - **Free Plan:** 50 message limit, no boost, no filters, no featured listings, no AI assistant, 1 group max
-  - **Premium Plan ($14.99/month):** Unlimited messaging, 1 boost/week, advanced filters, AI match assistant, 3 groups max
-  - **VIP Plan ($49.99-$99/month role-based):** Unlimited messaging, unlimited boosts, advanced filters, AI match assistant, featured listings (hosts only), 5 groups max
-- **Functional Differentiation:** All subscription features enforce limits in real-time with upgrade prompts guiding free users to payment screen.
-- **Messaging Limits:** Enforced at send-time with message count tracking in User model. Free users blocked after 50 messages with upgrade prompt.
-- **Boost System:** 24-hour profile visibility boost with visual "BOOSTED" badge. Premium users limited to 1 boost every 7 days with cooldown tracking. VIP users have unlimited boosts. Expired boosts automatically removed from priority.
-- **Priority Placement:** Swipe deck sorting prioritizes profiles: Active boost (valid expiry) → VIP tier → Premium tier → Free tier → Compatibility score tiebreaker.
-- **Advanced Filters:** Premium/VIP-exclusive property filters (budget range, location, bedrooms, bathrooms, amenities) with gated access and upgrade modal.
-- **Featured Listings:** VIP hosts can feature their properties to appear first in renter explore screen. Toggle via "Feature" button with ownership validation and AsyncStorage persistence.
+  - **Basic Plan:** 50 message limit, no boost, no filters, no featured listings, no AI assistant, 1 group max
+  - **Plus Plan ($14.99/month):** Unlimited messaging, 1 boost/week, advanced filters, AI match assistant, 3 groups max
+  - **Priority Plan ($49.99-$99/month role-based):** Unlimited messaging, unlimited boosts, advanced filters, AI match assistant, featured listings (hosts only), 5 groups max
+- **Functional Differentiation:** All subscription features enforce limits in real-time with upgrade prompts guiding basic users to payment screen.
+- **Messaging Limits:** Enforced at send-time with message count tracking in User model. Basic users blocked after 50 messages with upgrade prompt.
+- **Boost System:** 24-hour profile visibility boost with visual "BOOSTED" badge. Plus users limited to 1 boost every 7 days with cooldown tracking. Priority users have unlimited boosts. Expired boosts automatically removed from priority.
+- **Priority Placement:** Swipe deck sorting prioritizes profiles: Active boost (valid expiry) → Priority tier → Plus tier → Basic tier → Compatibility score tiebreaker.
+- **Advanced Filters:** Plus/Priority-exclusive property filters (budget range, location, bedrooms, bathrooms, amenities) with gated access and upgrade modal.
+- **Featured Listings:** Priority hosts can feature their properties to appear first in renter explore screen. Toggle via "Feature" button with ownership validation and AsyncStorage persistence.
 - **Online Status Visibility:** 
-  - **Chat (Premium/VIP):** Premium and VIP users can see real-time online/offline status in Messages list (green dot on avatar) and Chat screen header (online/offline text). Free users see upgrade banner.
-  - **Roommate Cards (VIP Only):** VIP users exclusively see "Online" badge on roommate profile cards during swiping. This helps VIP members identify and connect with active users immediately.
-- **AI Match Assistant (Premium/VIP):** Comprehensive chat-based AI assistant accessible from Roommates screen (CPU icon button). Provides intelligent recommendations across multiple categories:
+  - **Chat (Plus/Priority):** Plus and Priority users can see real-time online/offline status in Messages list (green dot on avatar) and Chat screen header (online/offline text). Basic users see upgrade banner.
+  - **Roommate Cards (Priority Only):** Priority users exclusively see online indicator (green light) on roommate profile cards during swiping. This helps Priority members identify and connect with active users immediately.
+- **AI Match Assistant (Plus/Priority):** Comprehensive chat-based AI assistant accessible from Roommates screen (CPU icon button). Provides intelligent recommendations across multiple categories:
   - **Roommate Matching:** Personalized recommendations, budget-based matching, compatibility analysis, profile improvement tips
   - **Location & Apartments:** Best neighborhoods by occupation/lifestyle, area comparisons with rent ranges, commute advice
   - **Nightlife & Activities:** Bar and club recommendations, entertainment venues, events and things to do, cultural activities
   - **Restaurants & Food:** Dining recommendations with price ranges, coffee shop suggestions, cuisine variety
   - **Home Decor:** Shared space decoration tips, furniture ideas on budget, storage solutions, styling advice for roommates
   - Interactive chat interface with contextual suggestion chips, real-time typing indicators, and scrollable history
-  - Premium/VIP-gated access with cross-platform upgrade modal for free users
+  - Plus/Priority-gated access with cross-platform upgrade modal for basic users
 
 ## Data Layer
 

@@ -10,7 +10,7 @@ export interface User {
   role: UserRole;
   profilePicture?: string;
   subscription?: {
-    plan: 'free' | 'premium' | 'vip';
+    plan: 'basic' | 'plus' | 'priority';
     status: 'active' | 'cancelled' | 'expired';
     expiresAt?: Date;
   };
@@ -37,8 +37,8 @@ interface AuthContextType {
   login: (email: string, password: string, role: UserRole) => Promise<void>;
   register: (email: string, password: string, name: string, role: UserRole) => Promise<void>;
   logout: () => Promise<void>;
-  upgradeToPremium: () => Promise<void>;
-  upgradeToVIP: () => Promise<void>;
+  upgradeToPlus: () => Promise<void>;
+  upgradeToPriority: () => Promise<void>;
   updateUser: (updates: Partial<User>) => Promise<void>;
   incrementMessageCount: () => Promise<void>;
   canSendMessage: () => boolean;
@@ -109,7 +109,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       name: email.split('@')[0],
       role,
       subscription: {
-        plan: 'free',
+        plan: 'basic',
         status: 'active',
       },
       messageCount: 0,
@@ -129,7 +129,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       name,
       role,
       subscription: {
-        plan: 'free',
+        plan: 'basic',
         status: 'active',
       },
       messageCount: 0,
@@ -148,13 +148,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   };
 
-  const upgradeToPremium = async () => {
+  const upgradeToPlus = async () => {
     if (!user) return;
     
     const updatedUser: User = {
       ...user,
       subscription: {
-        plan: 'premium',
+        plan: 'plus',
         status: 'active',
         expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       },
@@ -163,16 +163,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await StorageService.setCurrentUser(updatedUser);
     await StorageService.addOrUpdateUser(updatedUser);
     setUser(updatedUser);
-    console.log('[Auth] Upgraded to Premium:', updatedUser.subscription);
+    console.log('[Auth] Upgraded to Plus:', updatedUser.subscription);
   };
 
-  const upgradeToVIP = async () => {
+  const upgradeToPriority = async () => {
     if (!user) return;
     
     const updatedUser: User = {
       ...user,
       subscription: {
-        plan: 'vip',
+        plan: 'priority',
         status: 'active',
         expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       },
@@ -181,7 +181,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await StorageService.setCurrentUser(updatedUser);
     await StorageService.addOrUpdateUser(updatedUser);
     setUser(updatedUser);
-    console.log('[Auth] Upgraded to VIP:', updatedUser.subscription);
+    console.log('[Auth] Upgraded to Priority:', updatedUser.subscription);
   };
 
   const updateUser = async (updates: Partial<User>) => {
@@ -214,8 +214,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const canSendMessage = (): boolean => {
     if (!user) return false;
     
-    const plan = user.subscription?.plan || 'free';
-    if (plan === 'premium' || plan === 'vip') {
+    const plan = user.subscription?.plan || 'basic';
+    if (plan === 'plus' || plan === 'priority') {
       return true;
     }
     
@@ -226,10 +226,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const canBoost = (): { canBoost: boolean; reason?: string } => {
     if (!user) return { canBoost: false, reason: 'Not logged in' };
     
-    const plan = user.subscription?.plan || 'free';
+    const plan = user.subscription?.plan || 'basic';
     
-    if (plan === 'free') {
-      return { canBoost: false, reason: 'Boost is available for Premium and VIP members only' };
+    if (plan === 'basic') {
+      return { canBoost: false, reason: 'Boost is available for Plus and Priority members only' };
     }
     
     if (user.boostData?.isBoosted && user.boostData.boostExpiresAt) {
@@ -239,11 +239,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
     
-    if (plan === 'vip') {
+    if (plan === 'priority') {
       return { canBoost: true };
     }
     
-    if (plan === 'premium') {
+    if (plan === 'plus') {
       const lastBoostDate = user.boostData?.lastBoostDate;
       if (lastBoostDate) {
         const weekAgo = new Date();
@@ -321,7 +321,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPremium, upgradeToVIP, updateUser, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPlus, upgradeToPriority, updateUser, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus }}>
       {children}
     </AuthContext.Provider>
   );

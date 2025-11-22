@@ -15,6 +15,9 @@ import { RoommateProfile, Match } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scaleFont, moderateScale, getResponsiveSpacing } from '../../utils/responsive';
 
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const CARD_WIDTH = SCREEN_WIDTH - Spacing.xxl;
+
 export const RoommatesScreen = () => {
   const { theme } = useTheme();
   const { user } = useAuth();
@@ -66,9 +69,9 @@ export const RoommatesScreen = () => {
         if (isBoostedA !== isBoostedB) return isBoostedB - isBoostedA;
         
         const getPriority = (user: typeof userA) => {
-          const plan = user?.subscription?.plan || 'free';
-          if (plan === 'vip') return 3;
-          if (plan === 'premium') return 2;
+          const plan = user?.subscription?.plan || 'basic';
+          if (plan === 'priority') return 3;
+          if (plan === 'plus') return 2;
           return 1;
         };
         
@@ -101,12 +104,12 @@ export const RoommatesScreen = () => {
     ? new Date(currentProfileUser.boostData.boostExpiresAt) > now
     : false;
   const isBoosted = isBoostActive;
-  const subscriptionPlan = currentProfileUser?.subscription?.plan || 'free';
+  const subscriptionPlan = currentProfileUser?.subscription?.plan || 'basic';
   
   const canSeeOnlineStatus = () => {
-    const userPlan = user?.subscription?.plan || 'free';
+    const userPlan = user?.subscription?.plan || 'basic';
     const userStatus = user?.subscription?.status || 'active';
-    const canSee = userPlan === 'vip' && userStatus === 'active';
+    const canSee = userPlan === 'priority' && userStatus === 'active';
     console.log('[RoommatesScreen] Online status check:', { userPlan, userStatus, canSee });
     return canSee;
   };
@@ -236,12 +239,12 @@ export const RoommatesScreen = () => {
     console.log('[AI Assistant] Button clicked');
     const users = await StorageService.getUsers();
     const currentUser = users.find(u => u.id === user?.id);
-    const userPlan = currentUser?.subscription?.plan || 'free';
+    const userPlan = currentUser?.subscription?.plan || 'basic';
     const userStatus = currentUser?.subscription?.status || 'active';
     
     console.log('[AI Assistant] User plan:', userPlan, 'Status:', userStatus);
     
-    const isPaidMember = (userPlan === 'premium' || userPlan === 'vip') && userStatus === 'active';
+    const isPaidMember = (userPlan === 'plus' || userPlan === 'priority') && userStatus === 'active';
     
     if (!isPaidMember) {
       console.log('[AI Assistant] Showing upgrade modal');
@@ -381,10 +384,10 @@ export const RoommatesScreen = () => {
             
             <View style={styles.vipModalContent}>
               <ThemedText style={[Typography.h2, { textAlign: 'center', marginBottom: Spacing.sm }]}>
-                Premium Feature
+                Plus Feature
               </ThemedText>
               <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary, marginBottom: Spacing.xl }]}>
-                AI Match Assistant is available for Premium and VIP members. Upgrade to get personalized roommate recommendations powered by AI!
+                AI Match Assistant is available for Plus and Priority members. Upgrade to get personalized roommate recommendations powered by AI!
               </ThemedText>
               
               <View style={styles.vipFeaturesList}>
