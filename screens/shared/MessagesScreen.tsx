@@ -97,6 +97,12 @@ export const MessagesScreen = ({ navigation }: MessagesScreenProps) => {
     return `${days}d ago`;
   };
 
+  const canSeeOnlineStatus = () => {
+    const userPlan = user?.subscription?.plan || 'free';
+    const userStatus = user?.subscription?.status || 'active';
+    return (userPlan === 'premium' || userPlan === 'vip') && userStatus === 'active';
+  };
+
   const renderConversation = ({ item }: { item: Conversation }) => (
     <Pressable
       style={[
@@ -112,7 +118,9 @@ export const MessagesScreen = ({ navigation }: MessagesScreenProps) => {
     >
       <View style={styles.avatarContainer}>
         <Image source={{ uri: item.participant.photo }} style={styles.avatar} />
-        {item.participant.online ? <View style={[styles.onlineIndicator, { backgroundColor: theme.success }]} /> : null}
+        {canSeeOnlineStatus() && item.participant.online ? (
+          <View style={[styles.onlineIndicator, { backgroundColor: theme.success }]} />
+        ) : null}
       </View>
       <View style={styles.conversationContent}>
         <View style={styles.conversationHeader}>

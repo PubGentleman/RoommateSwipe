@@ -71,6 +71,7 @@ Preferred communication style: Simple, everyday language.
 - **Priority Placement:** Swipe deck sorting prioritizes profiles: Active boost (valid expiry) → VIP tier → Premium tier → Free tier → Compatibility score tiebreaker.
 - **Advanced Filters:** Premium/VIP-exclusive property filters (budget range, location, bedrooms, bathrooms, amenities) with gated access and upgrade modal.
 - **Featured Listings:** VIP hosts can feature their properties to appear first in renter explore screen. Toggle via "Feature" button with ownership validation and AsyncStorage persistence.
+- **Online Status Visibility:** Premium/VIP-exclusive feature showing real-time online/offline status of matched users. Green indicator appears on avatar in Messages list and Chat screen header. Free users see upgrade banner prompting them to subscribe for online status visibility.
 
 ## Data Layer
 

@@ -28,7 +28,14 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [showGroupOption, setShowGroupOption] = useState(true);
+  const [isOnline, setIsOnline] = useState(Math.random() > 0.5);
   const flatListRef = useRef<FlatList>(null);
+
+  const canSeeOnlineStatus = () => {
+    const userPlan = user?.subscription?.plan || 'free';
+    const userStatus = user?.subscription?.status || 'active';
+    return (userPlan === 'premium' || userPlan === 'vip') && userStatus === 'active';
+  };
 
   useEffect(() => {
     loadMessages();
@@ -133,15 +140,40 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           <Feather name="arrow-left" size={24} color={theme.text} />
         </Pressable>
         <View style={styles.headerCenter}>
-          <Image source={{ uri: otherUser.photos?.[0] }} style={styles.headerAvatar} />
-          <ThemedText style={[Typography.h3, { marginLeft: Spacing.md }]}>
-            {otherUser.name}
-          </ThemedText>
+          <View style={styles.avatarWrapper}>
+            <Image source={{ uri: otherUser.photos?.[0] }} style={styles.headerAvatar} />
+            {canSeeOnlineStatus() && isOnline ? (
+              <View style={[styles.headerOnlineIndicator, { backgroundColor: theme.success }]} />
+            ) : null}
+          </View>
+          <View style={{ flex: 1, marginLeft: Spacing.md }}>
+            <ThemedText style={[Typography.h3]}>
+              {otherUser.name}
+            </ThemedText>
+            {canSeeOnlineStatus() ? (
+              <ThemedText style={[Typography.caption, { color: isOnline ? theme.success : theme.textSecondary }]}>
+                {isOnline ? 'Online' : 'Offline'}
+              </ThemedText>
+            ) : null}
+          </View>
         </View>
         <Pressable onPress={handleCreateGroup} style={styles.moreButton}>
           <Feather name="more-vertical" size={24} color={theme.text} />
         </Pressable>
       </View>
+
+      {!canSeeOnlineStatus() ? (
+        <Pressable
+          style={[styles.premiumBanner, { backgroundColor: theme.backgroundSecondary }]}
+          onPress={() => (navigation as any).navigate('Profile', { screen: 'Payment' })}
+        >
+          <Feather name="zap" size={18} color={theme.primary} />
+          <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.sm, flex: 1 }]}>
+            Upgrade to Premium to see who's online
+          </ThemedText>
+          <Feather name="chevron-right" size={18} color={theme.textSecondary} />
+        </Pressable>
+      ) : null}
 
       {showGroupOption ? (
         <Pressable
@@ -224,16 +256,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginLeft: Spacing.md,
   },
+  avatarWrapper: {
+    position: 'relative',
+  },
   headerAvatar: {
     width: 36,
     height: 36,
     borderRadius: 18,
+  },
+  headerOnlineIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
   },
   moreButton: {
     width: 44,
     height: 44,
     justifyContent: 'center',
     alignItems: 'flex-end',
+  },
+  premiumBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.md,
+    borderRadius: BorderRadius.small,
   },
   groupBanner: {
     flexDirection: 'row',
