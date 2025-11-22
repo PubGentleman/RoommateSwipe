@@ -44,6 +44,7 @@ export interface Group {
   name: string;
   description?: string;
   members: string[];
+  pendingMembers: string[];
   maxMembers: number;
   budget: number;
   preferredLocation: string;
