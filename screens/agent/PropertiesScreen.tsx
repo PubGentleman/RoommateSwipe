@@ -14,7 +14,7 @@ export const PropertiesScreen = () => {
   const renderProperty = (property: any) => (
     <Pressable
       key={property.id}
-      style={[styles.propertyCard, { backgroundColor: Colors[theme].backgroundDefault }]}
+      style={[styles.propertyCard, { backgroundColor: theme.backgroundDefault }]}
       onPress={() => {}}
     >
       <Image source={{ uri: property.photos[0] }} style={styles.propertyImage} />
@@ -22,11 +22,11 @@ export const PropertiesScreen = () => {
         <View style={styles.propertyHeader}>
           <View style={{ flex: 1 }}>
             <ThemedText style={[Typography.h3]} numberOfLines={1}>{property.title}</ThemedText>
-            <ThemedText style={[Typography.body, { color: Colors[theme].primary, marginTop: Spacing.xs }]}>
+            <ThemedText style={[Typography.body, { color: theme.primary, marginTop: Spacing.xs }]}>
               ${property.price}/mo
             </ThemedText>
           </View>
-          <View style={[styles.verificationBadge, { backgroundColor: Colors[theme].success }]}>
+          <View style={[styles.verificationBadge, { backgroundColor: theme.success }]}>
             <Feather name="check-circle" size={16} color="#FFFFFF" />
             <ThemedText style={[Typography.small, { color: '#FFFFFF', marginLeft: Spacing.xs }]}>
               Verified
@@ -35,14 +35,14 @@ export const PropertiesScreen = () => {
         </View>
         <View style={styles.propertyStats}>
           <View style={styles.stat}>
-            <Feather name="eye" size={16} color={Colors[theme].textSecondary} />
-            <ThemedText style={[Typography.caption, { color: Colors[theme].textSecondary, marginLeft: Spacing.xs }]}>
+            <Feather name="eye" size={16} color={theme.textSecondary} />
+            <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
               124 views
             </ThemedText>
           </View>
           <View style={styles.stat}>
-            <Feather name="users" size={16} color={Colors[theme].textSecondary} />
-            <ThemedText style={[Typography.caption, { color: Colors[theme].textSecondary, marginLeft: Spacing.xs }]}>
+            <Feather name="users" size={16} color={theme.textSecondary} />
+            <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
               8 applications
             </ThemedText>
           </View>
@@ -55,15 +55,15 @@ export const PropertiesScreen = () => {
     <ScreenScrollView>
       <View style={styles.container}>
         <View style={styles.statsOverview}>
-          <View style={[styles.statCard, { backgroundColor: Colors[theme].backgroundDefault }]}>
+          <View style={[styles.statCard, { backgroundColor: theme.backgroundDefault }]}>
             <ThemedText style={[Typography.h1]}>{properties.length}</ThemedText>
-            <ThemedText style={[Typography.caption, { color: Colors[theme].textSecondary }]}>
+            <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
               Total Properties
             </ThemedText>
           </View>
-          <View style={[styles.statCard, { backgroundColor: Colors[theme].backgroundDefault }]}>
+          <View style={[styles.statCard, { backgroundColor: theme.backgroundDefault }]}>
             <ThemedText style={[Typography.h1]}>16</ThemedText>
-            <ThemedText style={[Typography.caption, { color: Colors[theme].textSecondary }]}>
+            <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
               Applications
             </ThemedText>
           </View>

@@ -16,39 +16,39 @@ export const MyListingsScreen = () => {
   const renderListing = (listing: any) => (
     <Pressable
       key={listing.id}
-      style={[styles.listingCard, { backgroundColor: Colors[theme].backgroundDefault }]}
+      style={[styles.listingCard, { backgroundColor: theme.backgroundDefault }]}
       onPress={() => {}}
     >
       <Image source={{ uri: listing.photos[0] }} style={styles.listingImage} />
-      <View style={[styles.statusBadge, { backgroundColor: listing.available ? Colors[theme].success : Colors[theme].warning }]}>
+      <View style={[styles.statusBadge, { backgroundColor: listing.available ? theme.success : theme.warning }]}>
         <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '600' }]}>
           {listing.available ? 'Active' : 'Inactive'}
         </ThemedText>
       </View>
       <View style={styles.listingInfo}>
         <ThemedText style={[Typography.h3]} numberOfLines={1}>{listing.title}</ThemedText>
-        <ThemedText style={[Typography.body, { color: Colors[theme].primary, marginTop: Spacing.xs }]}>
+        <ThemedText style={[Typography.body, { color: theme.primary, marginTop: Spacing.xs }]}>
           ${listing.price}/mo
         </ThemedText>
         <View style={styles.listingDetails}>
           <View style={styles.detail}>
-            <Feather name="home" size={16} color={Colors[theme].textSecondary} />
-            <ThemedText style={[Typography.caption, { color: Colors[theme].textSecondary, marginLeft: Spacing.xs }]}>
+            <Feather name="home" size={16} color={theme.textSecondary} />
+            <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
               {listing.bedrooms} bd • {listing.bathrooms} ba
             </ThemedText>
           </View>
         </View>
         <View style={styles.actions}>
-          <Pressable style={[styles.actionButton, { backgroundColor: Colors[theme].backgroundSecondary }]} onPress={() => {}}>
-            <Feather name="edit-2" size={16} color={Colors[theme].text} />
+          <Pressable style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]} onPress={() => {}}>
+            <Feather name="edit-2" size={16} color={theme.text} />
             <ThemedText style={[Typography.caption, { marginLeft: Spacing.xs }]}>Edit</ThemedText>
           </Pressable>
-          <Pressable style={[styles.actionButton, { backgroundColor: Colors[theme].backgroundSecondary }]} onPress={() => {}}>
-            <Feather name="users" size={16} color={Colors[theme].text} />
+          <Pressable style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]} onPress={() => {}}>
+            <Feather name="users" size={16} color={theme.text} />
             <ThemedText style={[Typography.caption, { marginLeft: Spacing.xs }]}>Applications</ThemedText>
           </Pressable>
-          <Pressable style={[styles.actionButton, { backgroundColor: Colors[theme].backgroundSecondary }]} onPress={() => {}}>
-            <Feather name="share-2" size={16} color={Colors[theme].text} />
+          <Pressable style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]} onPress={() => {}}>
+            <Feather name="share-2" size={16} color={theme.text} />
           </Pressable>
         </View>
       </View>
@@ -56,7 +56,7 @@ export const MyListingsScreen = () => {
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: Colors[theme].backgroundRoot }}>
+    <View style={{ flex: 1, backgroundColor: theme.backgroundRoot }}>
       <ScreenScrollView>
         <View style={styles.container}>
           {listings.map(listing => renderListing(listing))}
@@ -66,7 +66,7 @@ export const MyListingsScreen = () => {
         style={[
           styles.fab,
           {
-            backgroundColor: Colors[theme].primary,
+            backgroundColor: theme.primary,
             bottom: insets.bottom + 100,
           },
         ]}

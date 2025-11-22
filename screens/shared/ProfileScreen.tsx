@@ -12,16 +12,16 @@ export const ProfileScreen = () => {
   const { user, logout } = useAuth();
 
   const getRoleBadgeColor = () => {
-    if (!user) return Colors[theme].primary;
+    if (!user) return theme.primary;
     switch (user.role) {
       case 'renter':
-        return Colors[theme].renterBadge;
+        return theme.renterBadge;
       case 'host':
-        return Colors[theme].hostBadge;
+        return theme.hostBadge;
       case 'agent':
-        return Colors[theme].agentBadge;
+        return theme.agentBadge;
       default:
-        return Colors[theme].primary;
+        return theme.primary;
     }
   };
 
@@ -32,14 +32,14 @@ export const ProfileScreen = () => {
 
   const MenuItem = ({ icon, label, onPress, danger }: any) => (
     <Pressable
-      style={[styles.menuItem, { backgroundColor: Colors[theme].backgroundDefault }]}
+      style={[styles.menuItem, { backgroundColor: theme.backgroundDefault }]}
       onPress={onPress}
     >
-      <Feather name={icon} size={20} color={danger ? Colors[theme].error : Colors[theme].text} />
-      <ThemedText style={[Typography.body, { flex: 1, marginLeft: Spacing.lg, color: danger ? Colors[theme].error : Colors[theme].text }]}>
+      <Feather name={icon} size={20} color={danger ? theme.error : theme.text} />
+      <ThemedText style={[Typography.body, { flex: 1, marginLeft: Spacing.lg, color: danger ? theme.error : theme.text }]}>
         {label}
       </ThemedText>
-      <Feather name="chevron-right" size={20} color={Colors[theme].textSecondary} />
+      <Feather name="chevron-right" size={20} color={theme.textSecondary} />
     </Pressable>
   );
 
@@ -48,8 +48,8 @@ export const ProfileScreen = () => {
       <View style={styles.container}>
         <View style={styles.profileHeader}>
           <View style={styles.avatarContainer}>
-            <View style={[styles.avatar, { backgroundColor: Colors[theme].backgroundSecondary }]}>
-              <Feather name="user" size={48} color={Colors[theme].textSecondary} />
+            <View style={[styles.avatar, { backgroundColor: theme.backgroundSecondary }]}>
+              <Feather name="user" size={48} color={theme.textSecondary} />
             </View>
             <View style={[styles.roleBadge, { backgroundColor: getRoleBadgeColor() }]}>
               <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '600' }]}>
@@ -58,7 +58,7 @@ export const ProfileScreen = () => {
             </View>
           </View>
           <ThemedText style={[Typography.h1, styles.name]}>{user?.name || 'User'}</ThemedText>
-          <ThemedText style={[Typography.body, { color: Colors[theme].textSecondary }]}>
+          <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
             {user?.email}
           </ThemedText>
         </View>

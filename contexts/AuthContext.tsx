@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { StorageService } from '../utils/storage';
 
 export type UserRole = 'renter' | 'host' | 'agent';
 
@@ -31,9 +31,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loadUser = async () => {
     try {
-      const userJson = await AsyncStorage.getItem('user');
-      if (userJson) {
-        setUser(JSON.parse(userJson));
+      await StorageService.initializeWithMockData();
+      const currentUser = await StorageService.getCurrentUser();
+      if (currentUser) {
+        setUser(currentUser);
       }
     } catch (error) {
       console.error('Error loading user:', error);
@@ -49,7 +50,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       name: email.split('@')[0],
       role,
     };
-    await AsyncStorage.setItem('user', JSON.stringify(mockUser));
+    await StorageService.setCurrentUser(mockUser);
+    await StorageService.addOrUpdateUser(mockUser);
     setUser(mockUser);
   };
 
@@ -60,12 +62,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       name,
       role,
     };
-    await AsyncStorage.setItem('user', JSON.stringify(mockUser));
+    await StorageService.setCurrentUser(mockUser);
+    await StorageService.addOrUpdateUser(mockUser);
     setUser(mockUser);
   };
 
   const logout = async () => {
-    await AsyncStorage.clear();
+    await StorageService.clearUserData();
+    await StorageService.clearSwipeHistory();
     setUser(null);
   };
 

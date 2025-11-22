@@ -16,21 +16,21 @@ export const GroupsScreen = () => {
   const renderGroup = (group: Group) => (
     <Pressable
       key={group.id}
-      style={[styles.groupCard, { backgroundColor: Colors[theme].backgroundDefault }]}
+      style={[styles.groupCard, { backgroundColor: theme.backgroundDefault }]}
       onPress={() => {}}
     >
       <View style={styles.groupHeader}>
-        <View style={[styles.groupIcon, { backgroundColor: Colors[theme].primary }]}>
+        <View style={[styles.groupIcon, { backgroundColor: theme.primary }]}>
           <Feather name="users" size={24} color="#FFFFFF" />
         </View>
         <View style={styles.groupInfo}>
           <ThemedText style={[Typography.h3]}>{group.name}</ThemedText>
-          <ThemedText style={[Typography.caption, { color: Colors[theme].textSecondary }]}>
+          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
             {group.members.length} member{group.members.length !== 1 ? 's' : ''} • Looking for {group.lookingFor} more
           </ThemedText>
         </View>
         {group.compatibility ? (
-          <View style={[styles.compatibilityBadge, { backgroundColor: Colors[theme].success }]}>
+          <View style={[styles.compatibilityBadge, { backgroundColor: theme.success }]}>
             <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '600' }]}>
               {group.compatibility}%
             </ThemedText>
@@ -39,26 +39,26 @@ export const GroupsScreen = () => {
       </View>
       <View style={styles.groupDetails}>
         <View style={styles.groupDetail}>
-          <Feather name="dollar-sign" size={16} color={Colors[theme].textSecondary} />
-          <ThemedText style={[Typography.body, { color: Colors[theme].text, marginLeft: Spacing.xs }]}>
+          <Feather name="dollar-sign" size={16} color={theme.textSecondary} />
+          <ThemedText style={[Typography.body, { color: theme.text, marginLeft: Spacing.xs }]}>
             ${group.budget}/mo budget
           </ThemedText>
         </View>
         <View style={styles.groupDetail}>
-          <Feather name="map-pin" size={16} color={Colors[theme].textSecondary} />
-          <ThemedText style={[Typography.body, { color: Colors[theme].text, marginLeft: Spacing.xs }]}>
+          <Feather name="map-pin" size={16} color={theme.textSecondary} />
+          <ThemedText style={[Typography.body, { color: theme.text, marginLeft: Spacing.xs }]}>
             {group.location}
           </ThemedText>
         </View>
         <View style={styles.groupDetail}>
-          <Feather name="home" size={16} color={Colors[theme].textSecondary} />
-          <ThemedText style={[Typography.body, { color: Colors[theme].text, marginLeft: Spacing.xs }]}>
+          <Feather name="home" size={16} color={theme.textSecondary} />
+          <ThemedText style={[Typography.body, { color: theme.text, marginLeft: Spacing.xs }]}>
             {group.targetBedrooms} bedrooms
           </ThemedText>
         </View>
       </View>
       <Pressable
-        style={[styles.joinButton, { backgroundColor: Colors[theme].primary }]}
+        style={[styles.joinButton, { backgroundColor: theme.primary }]}
         onPress={() => {}}
       >
         <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>
@@ -75,10 +75,10 @@ export const GroupsScreen = () => {
           <View style={styles.sectionHeader}>
             <ThemedText style={[Typography.h2]}>My Groups</ThemedText>
             <Pressable onPress={() => {}}>
-              <Feather name="plus-circle" size={24} color={Colors[theme].primary} />
+              <Feather name="plus-circle" size={24} color={theme.primary} />
             </Pressable>
           </View>
-          <ThemedText style={[Typography.body, { color: Colors[theme].textSecondary }]}>
+          <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
             You haven't joined any groups yet
           </ThemedText>
         </View>

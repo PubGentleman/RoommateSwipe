@@ -11,19 +11,19 @@ export const DocumentsScreen = () => {
 
   const DocumentItem = ({ icon, title, description }: any) => (
     <Pressable
-      style={[styles.documentCard, { backgroundColor: Colors[theme].backgroundDefault }]}
+      style={[styles.documentCard, { backgroundColor: theme.backgroundDefault }]}
       onPress={() => {}}
     >
-      <View style={[styles.iconContainer, { backgroundColor: Colors[theme].primary }]}>
+      <View style={[styles.iconContainer, { backgroundColor: theme.primary }]}>
         <Feather name={icon} size={24} color="#FFFFFF" />
       </View>
       <View style={styles.documentInfo}>
         <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{title}</ThemedText>
-        <ThemedText style={[Typography.caption, { color: Colors[theme].textSecondary, marginTop: Spacing.xs }]}>
+        <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
           {description}
         </ThemedText>
       </View>
-      <Feather name="chevron-right" size={20} color={Colors[theme].textSecondary} />
+      <Feather name="chevron-right" size={20} color={theme.textSecondary} />
     </Pressable>
   );
 

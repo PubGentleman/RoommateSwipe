@@ -21,21 +21,21 @@ export const ApplicationsScreen = () => {
   const renderApplication = (app: any) => (
     <Pressable
       key={app.id}
-      style={[styles.applicationCard, { backgroundColor: Colors[theme].backgroundDefault }]}
+      style={[styles.applicationCard, { backgroundColor: theme.backgroundDefault }]}
       onPress={() => {}}
     >
       <View style={styles.header}>
         <Image source={{ uri: app.applicantPhoto }} style={styles.avatar} />
         <View style={styles.applicantInfo}>
           <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{app.applicantName}</ThemedText>
-          <ThemedText style={[Typography.caption, { color: Colors[theme].textSecondary }]}>
+          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
             {app.propertyTitle}
           </ThemedText>
-          <ThemedText style={[Typography.small, { color: Colors[theme].textSecondary, marginTop: Spacing.xs }]}>
+          <ThemedText style={[Typography.small, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
             Applied {formatDate(app.submittedDate)}
           </ThemedText>
         </View>
-        <View style={[styles.statusBadge, { backgroundColor: Colors[theme].warning }]}>
+        <View style={[styles.statusBadge, { backgroundColor: theme.warning }]}>
           <ThemedText style={[Typography.small, { color: '#FFFFFF' }]}>Pending</ThemedText>
         </View>
       </View>
@@ -44,7 +44,7 @@ export const ApplicationsScreen = () => {
       </ThemedText>
       <View style={styles.actions}>
         <Pressable
-          style={[styles.actionButton, { backgroundColor: Colors[theme].success, flex: 1 }]}
+          style={[styles.actionButton, { backgroundColor: theme.success, flex: 1 }]}
           onPress={() => {}}
         >
           <Feather name="check" size={20} color="#FFFFFF" />
@@ -53,10 +53,10 @@ export const ApplicationsScreen = () => {
           </ThemedText>
         </Pressable>
         <Pressable
-          style={[styles.actionButton, { backgroundColor: Colors[theme].backgroundSecondary, flex: 1 }]}
+          style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary, flex: 1 }]}
           onPress={() => {}}
         >
-          <Feather name="x" size={20} color={Colors[theme].text} />
+          <Feather name="x" size={20} color={theme.text} />
           <ThemedText style={[Typography.body, { marginLeft: Spacing.sm, fontWeight: '600' }]}>
             Reject
           </ThemedText>

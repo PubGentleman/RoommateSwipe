@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, StyleSheet, Image, Pressable, Dimensions, Animated } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { scheduleOnRN } from 'react-native-worklets';
@@ -7,9 +7,10 @@ import * as Haptics from 'expo-haptics';
 import { ThemedText } from '../../components/ThemedText';
 import { ThemedView } from '../../components/ThemedView';
 import { useTheme } from '../../hooks/useTheme';
+import { useAuth } from '../../contexts/AuthContext';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
-import { mockRoommateProfiles } from '../../utils/mockData';
-import { RoommateProfile } from '../../types/models';
+import { StorageService } from '../../utils/storage';
+import { RoommateProfile, Match } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -17,19 +18,66 @@ const CARD_WIDTH = SCREEN_WIDTH - Spacing.xxl;
 
 export const RoommatesScreen = () => {
   const { theme } = useTheme();
+  const { user } = useAuth();
   const insets = useSafeAreaInsets();
-  const [profiles, setProfiles] = useState<RoommateProfile[]>(mockRoommateProfiles);
+  const [profiles, setProfiles] = useState<RoommateProfile[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showMatch, setShowMatch] = useState(false);
+  const [swipedIds, setSwipedIds] = useState<Set<string>>(new Set());
+  const [isLoading, setIsLoading] = useState(true);
 
   const translateX = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(0)).current;
   const rotation = useRef(new Animated.Value(0)).current;
 
+  useEffect(() => {
+    loadProfiles();
+  }, []);
+
+  const loadProfiles = async () => {
+    try {
+      setIsLoading(true);
+      const allProfiles = await StorageService.getRoommateProfiles();
+      const history = await StorageService.getSwipeHistory();
+      setSwipedIds(history);
+      const unseen = allProfiles.filter(p => !history.has(p.id) && p.id !== user?.id);
+      setProfiles(unseen);
+      setCurrentIndex(0);
+    } catch (error) {
+      console.error('Error loading profiles:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const resetSwipeHistory = async () => {
+    await StorageService.clearSwipeHistory();
+    await loadProfiles();
+  };
+
   const currentProfile = profiles[currentIndex];
 
-  const handleSwipeAction = (action: 'like' | 'nope' | 'superlike') => {
+  const handleSwipeAction = async (action: 'like' | 'nope' | 'superlike') => {
+    if (!currentProfile || !user) return;
+
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
+    await StorageService.addToSwipeHistory(currentProfile.id);
+    
+    if (action === 'like' || action === 'superlike') {
+      const isMatch = Math.random() > 0.5;
+      if (isMatch) {
+        const match: Match = {
+          id: `match_${Date.now()}`,
+          userId1: user.id,
+          userId2: currentProfile.id,
+          matchedAt: new Date(),
+        };
+        await StorageService.addMatch(match);
+        scheduleOnRN(setShowMatch, true);
+        setTimeout(() => scheduleOnRN(setShowMatch, false), 3000);
+      }
+    }
     
     const direction = action === 'like' ? 1 : action === 'nope' ? -1 : 0;
     const toX = direction * SCREEN_WIDTH * 1.5;
@@ -53,11 +101,6 @@ export const RoommatesScreen = () => {
         useNativeDriver: true,
       }),
     ]).start(() => {
-      if (action === 'like' && Math.random() > 0.5) {
-        scheduleOnRN(setShowMatch, true);
-        setTimeout(() => scheduleOnRN(setShowMatch, false), 3000);
-      }
-      
       translateX.setValue(0);
       translateY.setValue(0);
       rotation.setValue(0);
@@ -92,15 +135,35 @@ export const RoommatesScreen = () => {
       }
     });
 
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+        <View style={styles.emptyState}>
+          <Feather name="loader" size={64} color={theme.textSecondary} />
+          <ThemedText style={[Typography.h2, styles.emptyTitle]}>Loading...</ThemedText>
+        </View>
+      </View>
+    );
+  }
+
   if (!currentProfile) {
     return (
       <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
         <View style={styles.emptyState}>
           <Feather name="users" size={64} color={theme.textSecondary} />
           <ThemedText style={[Typography.h2, styles.emptyTitle]}>No More Profiles</ThemedText>
-          <ThemedText style={[Typography.body, { color: theme.textSecondary, textAlign: 'center' }]}>
-            Check back later for new potential roommates
+          <ThemedText style={[Typography.body, { color: theme.textSecondary, textAlign: 'center', marginBottom: Spacing.xl }]}>
+            You've seen all available roommates
           </ThemedText>
+          <Pressable
+            style={[styles.resetButton, { backgroundColor: theme.primary }]}
+            onPress={resetSwipeHistory}
+          >
+            <Feather name="refresh-cw" size={20} color="#FFFFFF" />
+            <ThemedText style={[Typography.button, { color: '#FFFFFF', marginLeft: Spacing.sm }]}>
+              Start Over
+            </ThemedText>
+          </Pressable>
         </View>
       </View>
     );
@@ -317,6 +380,13 @@ const styles = StyleSheet.create({
   emptyTitle: {
     marginTop: Spacing.xl,
     marginBottom: Spacing.sm,
+  },
+  resetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+    borderRadius: BorderRadius.full,
   },
   matchOverlay: {
     position: 'absolute',

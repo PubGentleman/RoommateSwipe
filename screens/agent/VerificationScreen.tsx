@@ -11,22 +11,22 @@ export const VerificationScreen = () => {
 
   const VerificationItem = ({ title, status, description }: any) => (
     <Pressable
-      style={[styles.verificationCard, { backgroundColor: Colors[theme].backgroundDefault }]}
+      style={[styles.verificationCard, { backgroundColor: theme.backgroundDefault }]}
       onPress={() => {}}
     >
       <View style={styles.cardHeader}>
         <View style={{ flex: 1 }}>
           <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{title}</ThemedText>
-          <ThemedText style={[Typography.caption, { color: Colors[theme].textSecondary, marginTop: Spacing.xs }]}>
+          <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
             {description}
           </ThemedText>
         </View>
         {status === 'verified' ? (
-          <Feather name="check-circle" size={24} color={Colors[theme].success} />
+          <Feather name="check-circle" size={24} color={theme.success} />
         ) : status === 'pending' ? (
-          <Feather name="clock" size={24} color={Colors[theme].warning} />
+          <Feather name="clock" size={24} color={theme.warning} />
         ) : (
-          <Feather name="alert-circle" size={24} color={Colors[theme].error} />
+          <Feather name="alert-circle" size={24} color={theme.error} />
         )}
       </View>
     </Pressable>
@@ -35,7 +35,7 @@ export const VerificationScreen = () => {
   return (
     <ScreenScrollView>
       <View style={styles.container}>
-        <View style={[styles.statusCard, { backgroundColor: Colors[theme].success, marginBottom: Spacing.xl }]}>
+        <View style={[styles.statusCard, { backgroundColor: theme.success, marginBottom: Spacing.xl }]}>
           <Feather name="shield" size={32} color="#FFFFFF" />
           <ThemedText style={[Typography.h2, { color: '#FFFFFF', marginTop: Spacing.md }]}>
             Agent Verified

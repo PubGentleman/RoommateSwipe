@@ -29,20 +29,20 @@ export const MessagesScreen = () => {
     <Pressable
       style={[
         styles.conversationItem,
-        { backgroundColor: item.unread > 0 ? Colors[theme].backgroundSecondary : Colors[theme].backgroundRoot },
+        { backgroundColor: item.unread > 0 ? theme.backgroundSecondary : theme.backgroundRoot },
       ]}
       onPress={() => {}}
     >
       <View style={styles.avatarContainer}>
         <Image source={{ uri: item.participant.photo }} style={styles.avatar} />
-        {item.participant.online ? <View style={[styles.onlineIndicator, { backgroundColor: Colors[theme].success }]} /> : null}
+        {item.participant.online ? <View style={[styles.onlineIndicator, { backgroundColor: theme.success }]} /> : null}
       </View>
       <View style={styles.conversationContent}>
         <View style={styles.conversationHeader}>
           <ThemedText style={[Typography.body, { fontWeight: item.unread > 0 ? '600' : '400' }]}>
             {item.participant.name}
           </ThemedText>
-          <ThemedText style={[Typography.caption, { color: Colors[theme].textSecondary }]}>
+          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
             {formatTime(item.timestamp)}
           </ThemedText>
         </View>
@@ -51,7 +51,7 @@ export const MessagesScreen = () => {
             style={[
               Typography.caption,
               {
-                color: item.unread > 0 ? Colors[theme].text : Colors[theme].textSecondary,
+                color: item.unread > 0 ? theme.text : theme.textSecondary,
                 flex: 1,
                 fontWeight: item.unread > 0 ? '500' : '400',
               },
@@ -61,7 +61,7 @@ export const MessagesScreen = () => {
             {item.lastMessage}
           </ThemedText>
           {item.unread > 0 ? (
-            <View style={[styles.unreadBadge, { backgroundColor: Colors[theme].primary }]}>
+            <View style={[styles.unreadBadge, { backgroundColor: theme.primary }]}>
               <ThemedText style={[Typography.small, { color: '#FFFFFF', fontSize: 10 }]}>
                 {item.unread}
               </ThemedText>
@@ -73,10 +73,10 @@ export const MessagesScreen = () => {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: Colors[theme].backgroundRoot }]}>
+    <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <View style={[styles.header, { paddingTop: insets.top + 60 }]}>
         <Pressable style={styles.searchButton} onPress={() => {}}>
-          <Feather name="search" size={24} color={Colors[theme].text} />
+          <Feather name="search" size={24} color={theme.text} />
         </Pressable>
       </View>
       <FlatList
