@@ -299,12 +299,7 @@ export const RoommatesScreen = () => {
                   </View>
                 ) : null}
                 {canSeeOnlineStatus() && isProfileOnline ? (
-                  <View style={[styles.onlineBadge, { backgroundColor: theme.success }]}>
-                    <View style={styles.onlineDot} />
-                    <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '600', marginLeft: 4 }]}>
-                      Online
-                    </ThemedText>
-                  </View>
+                  <View style={[styles.onlineIndicator, { backgroundColor: theme.success }]} />
                 ) : null}
                 <View style={[styles.compatibilityBadge, { backgroundColor: theme.success }]}>
                   <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '600' }]}>
@@ -526,18 +521,17 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.small,
   },
-  onlineBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.small,
-  },
-  onlineDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#FFFFFF',
+  onlineIndicator: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 3,
   },
   cardInfo: {
     gap: Spacing.xs,
