@@ -58,7 +58,7 @@ Preferred communication style: Simple, everyday language.
 - Real-time 1-on-1 messaging with matched roommates
 - Comprehensive group management with three tabs:
   - **My Groups Tab:** View joined groups, leave groups, manage members and pending requests
-  - **Discover Tab:** Swipeable Tinder-style cards to browse and like groups
+  - **Discover Tab (Default):** Swipeable Tinder-style cards to browse and like groups
   - **Create Tab:** Standalone form to create new groups without requiring conversations
 - Request-based group joining workflow:
   - Users "like" groups to request membership (not instant join)
@@ -67,6 +67,11 @@ Preferred communication style: Simple, everyday language.
   - "Request Sent!" notification when liking a group
   - Group creators can remove existing members
   - Any member can leave a group (with confirmation)
+- **Group Limits (Free Plan):**
+  - Users can only create 1 group maximum
+  - Users can only join 1 group maximum (excluding groups they created)
+  - Upgrade prompt shown when limits are reached
+  - Limits enforced on both group creation and join requests
 - Property exploration and search
 - Saved properties functionality
 

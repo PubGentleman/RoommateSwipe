@@ -256,8 +256,14 @@ export const GroupsScreen = () => {
     );
   };
 
-  const handleAcceptMember = async (groupId: string, userId: string) => {
-    await StorageService.acceptGroupMember(groupId, userId);
+  const handleAcceptMember = async (groupId: string, userId: string, userName: string) => {
+    const success = await StorageService.acceptGroupMember(groupId, userId);
+    if (!success) {
+      Alert.alert(
+        'Cannot Accept',
+        `${userName} has already joined another group. They must leave that group first before joining this one.`
+      );
+    }
     loadGroups();
   };
 
@@ -335,7 +341,7 @@ export const GroupsScreen = () => {
                 <View style={styles.pendingActions}>
                   <Pressable
                     style={[styles.pendingButton, { backgroundColor: theme.primary }]}
-                    onPress={() => handleAcceptMember(group.id, profile.id)}
+                    onPress={() => handleAcceptMember(group.id, profile.id, profile.name)}
                   >
                     <Feather name="check" size={16} color="#FFFFFF" />
                   </Pressable>

@@ -204,19 +204,32 @@ export const StorageService = {
     }
   },
 
-  async acceptGroupMember(groupId: string, userId: string): Promise<void> {
+  async acceptGroupMember(groupId: string, userId: string): Promise<boolean> {
     try {
       const groups = await this.getGroups();
       const group = groups.find(g => g.id === groupId);
       if (group) {
+        const joinedGroups = groups.filter(
+          g => g.members.includes(userId) && g.createdBy !== userId
+        );
+        
+        if (joinedGroups.length >= 1) {
+          group.pendingMembers = group.pendingMembers.filter(id => id !== userId);
+          await this.setGroups(groups);
+          return false;
+        }
+        
         group.pendingMembers = group.pendingMembers.filter(id => id !== userId);
         if (!group.members.includes(userId) && group.members.length < group.maxMembers) {
           group.members.push(userId);
         }
         await this.setGroups(groups);
+        return true;
       }
+      return false;
     } catch (error) {
       console.error('Error accepting group member:', error);
+      return false;
     }
   },
 
