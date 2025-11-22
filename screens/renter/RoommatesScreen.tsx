@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, Image, Pressable, Dimensions, Animated, Alert } from 'react-native';
+import { View, StyleSheet, Image, Pressable, Dimensions, Animated, Modal } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { scheduleOnRN } from 'react-native-worklets';
 import { Feather } from '@expo/vector-icons';
@@ -28,6 +28,7 @@ export const RoommatesScreen = () => {
   const [swipedIds, setSwipedIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [profileUsers, setProfileUsers] = useState<Map<string, any>>(new Map());
+  const [showVIPModal, setShowVIPModal] = useState(false);
 
   const translateX = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(0)).current;
@@ -234,27 +235,27 @@ export const RoommatesScreen = () => {
   });
 
   const handleOpenAIAssistant = async () => {
+    console.log('[AI Assistant] Button clicked');
     const users = await StorageService.getUsers();
     const currentUser = users.find(u => u.id === user?.id);
     const userPlan = currentUser?.subscription?.plan || 'free';
     const userStatus = currentUser?.subscription?.status || 'active';
     
+    console.log('[AI Assistant] User plan:', userPlan, 'Status:', userStatus);
+    
     if (userPlan !== 'vip' || userStatus !== 'active') {
-      Alert.alert(
-        'VIP Feature',
-        'AI Match Assistant is exclusively available for VIP members. Upgrade to VIP to get personalized roommate recommendations powered by AI!',
-        [
-          { text: 'Maybe Later', style: 'cancel' },
-          {
-            text: 'Upgrade to VIP',
-            onPress: () => (navigation as any).navigate('Profile', { screen: 'Payment' }),
-          },
-        ]
-      );
+      console.log('[AI Assistant] Showing VIP upgrade modal');
+      setShowVIPModal(true);
       return;
     }
     
+    console.log('[AI Assistant] Navigating to AI Assistant screen');
     (navigation as any).navigate('AIAssistant');
+  };
+
+  const handleUpgradeToVIP = () => {
+    setShowVIPModal(false);
+    (navigation as any).navigate('Profile', { screen: 'Payment' });
   };
 
   return (
@@ -370,6 +371,70 @@ export const RoommatesScreen = () => {
           </ThemedText>
         </View>
       ) : null}
+
+      <Modal
+        visible={showVIPModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowVIPModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.vipModalContainer, { backgroundColor: theme.backgroundSecondary }]}>
+            <View style={[styles.vipModalHeader, { backgroundColor: theme.primary }]}>
+              <Feather name="cpu" size={32} color="#FFFFFF" />
+            </View>
+            
+            <View style={styles.vipModalContent}>
+              <ThemedText style={[Typography.h2, { textAlign: 'center', marginBottom: Spacing.sm }]}>
+                VIP Feature
+              </ThemedText>
+              <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary, marginBottom: Spacing.xl }]}>
+                AI Match Assistant is exclusively available for VIP members. Upgrade to VIP to get personalized roommate recommendations powered by AI!
+              </ThemedText>
+              
+              <View style={styles.vipFeaturesList}>
+                <View style={styles.vipFeatureItem}>
+                  <Feather name="check-circle" size={20} color={theme.success} />
+                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
+                    AI-powered match recommendations
+                  </ThemedText>
+                </View>
+                <View style={styles.vipFeatureItem}>
+                  <Feather name="check-circle" size={20} color={theme.success} />
+                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
+                    Personalized roommate insights
+                  </ThemedText>
+                </View>
+                <View style={styles.vipFeatureItem}>
+                  <Feather name="check-circle" size={20} color={theme.success} />
+                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
+                    Chat-based assistance 24/7
+                  </ThemedText>
+                </View>
+              </View>
+            </View>
+            
+            <View style={styles.vipModalActions}>
+              <Pressable
+                style={[styles.vipModalButton, { backgroundColor: theme.primary }]}
+                onPress={handleUpgradeToVIP}
+              >
+                <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
+                  Upgrade to VIP
+                </ThemedText>
+              </Pressable>
+              <Pressable
+                style={[styles.vipModalButtonSecondary, { borderColor: theme.border }]}
+                onPress={() => setShowVIPModal(false)}
+              >
+                <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
+                  Maybe Later
+                </ThemedText>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -546,5 +611,52 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,107,107,0.95)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.xl,
+  },
+  vipModalContainer: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: BorderRadius.large,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  vipModalHeader: {
+    padding: Spacing.xxl,
+    alignItems: 'center',
+  },
+  vipModalContent: {
+    padding: Spacing.xl,
+  },
+  vipFeaturesList: {
+    gap: Spacing.md,
+  },
+  vipFeatureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  vipModalActions: {
+    padding: Spacing.xl,
+    gap: Spacing.md,
+  },
+  vipModalButton: {
+    paddingVertical: Spacing.lg,
+    borderRadius: BorderRadius.medium,
+    alignItems: 'center',
+  },
+  vipModalButtonSecondary: {
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.medium,
+    alignItems: 'center',
+    borderWidth: 1,
   },
 });

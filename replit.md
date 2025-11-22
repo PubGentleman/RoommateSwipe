@@ -33,7 +33,7 @@ Preferred communication style: Simple, everyday language.
 **Navigation Structure:**
 - React Navigation with native stack and bottom tabs
 - Role-based navigation providing distinct user flows for Renters, Hosts, and Agents/Landlords.
-- Nested navigators for specific functionalities like messaging and profile management.
+- Nested navigators for specific functionalities like messaging, profile management, and AI Match Assistant (RoommatesStackNavigator).
 - Custom header components and transparent headers with blur effects (iOS).
 
 **UI/UX Design Patterns:**
@@ -42,7 +42,7 @@ Preferred communication style: Simple, everyday language.
 - Platform-specific optimizations.
 
 **Core Features by Role:**
-- **Renter:** Swipe-based roommate matching with priority placement (boosted → VIP → Premium → Free), 1-on-1 messaging with limits (Free: 50 total messages, Premium/VIP: unlimited), comprehensive group management (create, discover, join via request, manage members), property exploration with advanced filters (Premium/VIP only: budget, location, rooms, amenities), and saved properties. Group creation/joining limits enforced for free users. Boost feature available (Premium: 1/week, VIP: unlimited) for 24-hour profile visibility.
+- **Renter:** Swipe-based roommate matching with priority placement (boosted → VIP → Premium → Free), 1-on-1 messaging with limits (Free: 50 total messages, Premium/VIP: unlimited), comprehensive group management (create, discover, join via request, manage members), property exploration with advanced filters (Premium/VIP only: budget, location, rooms, amenities), saved properties, and AI Match Assistant (VIP only - chat-based personalized roommate recommendations). Group creation/joining limits enforced for free users. Boost feature available (Premium: 1/week, VIP: unlimited) for 24-hour profile visibility.
 - **Host:** Property listing management (CRUD), application review, listing status control, and featured listings (VIP only - properties appear first in renter search).
 - **Agent:** Multi-property portfolio management, document verification, legal template library, and professional credential verification.
 
@@ -74,6 +74,14 @@ Preferred communication style: Simple, everyday language.
 - **Online Status Visibility:** 
   - **Chat (Premium/VIP):** Premium and VIP users can see real-time online/offline status in Messages list (green dot on avatar) and Chat screen header (online/offline text). Free users see upgrade banner.
   - **Roommate Cards (VIP Only):** VIP users exclusively see "Online" badge on roommate profile cards during swiping. This helps VIP members identify and connect with active users immediately.
+- **AI Match Assistant (VIP Only):** Chat-based AI assistant accessible from Roommates screen (CPU icon button). Provides personalized roommate recommendations by analyzing user preferences, budget, compatibility scores, and lifestyle factors. Features include:
+  - Interactive chat interface with suggestion chips for quick actions
+  - Budget-based match finding with detailed profile comparisons
+  - Compatibility analysis explaining why matches are good fits
+  - Profile improvement tips and matching strategy advice
+  - Lifestyle-compatible roommate discovery
+  - VIP-gated access with cross-platform upgrade modal for non-VIP users
+  - Real-time typing indicators and scrollable chat history
 
 ## Data Layer
 
