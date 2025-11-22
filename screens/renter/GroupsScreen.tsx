@@ -73,7 +73,7 @@ export const GroupsScreen = () => {
   const handleLikeGroup = async (group: Group) => {
     if (!user) return;
 
-    const isPremium = user.subscription?.plan === 'premium';
+    const isPremium = user.subscription?.plan === 'premium' || user.subscription?.plan === 'vip';
 
     if (!isPremium) {
       try {
@@ -87,12 +87,12 @@ export const GroupsScreen = () => {
         if (joinedGroups.length >= 1) {
           console.log('[GroupsScreen] Group join limit reached, showing alert');
           Alert.alert(
-            'Upgrade to Premium',
-            'You can only join 1 group with the free plan. Upgrade to Premium for unlimited group joining!',
+            'Upgrade Required',
+            'You can only join 1 group with the free plan. Upgrade to Premium or VIP for unlimited group joining!',
             [
               { text: 'Maybe Later', style: 'cancel' },
               {
-                text: 'Upgrade Now',
+                text: 'View Plans',
                 onPress: () => navigation.navigate('Profile', { screen: 'Payment' }),
               },
             ]
@@ -178,7 +178,7 @@ export const GroupsScreen = () => {
   const handleCreateGroup = async () => {
     if (!user) return;
 
-    const isPremium = user.subscription?.plan === 'premium';
+    const isPremium = user.subscription?.plan === 'premium' || user.subscription?.plan === 'vip';
 
     if (!isPremium) {
       try {
@@ -190,12 +190,12 @@ export const GroupsScreen = () => {
         if (userCreatedGroups.length >= 1) {
           console.log('[GroupsScreen] Group creation limit reached, showing alert');
           Alert.alert(
-            'Upgrade to Premium',
-            'You can only create 1 group with the free plan. Upgrade to Premium for unlimited group creation!',
+            'Upgrade Required',
+            'You can only create 1 group with the free plan. Upgrade to Premium or VIP for unlimited group creation!',
             [
               { text: 'Maybe Later', style: 'cancel' },
               {
-                text: 'Upgrade Now',
+                text: 'View Plans',
                 onPress: () => navigation.navigate('Profile', { screen: 'Payment' }),
               },
             ]

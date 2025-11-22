@@ -10,7 +10,7 @@ import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme
 
 export const PaymentScreen = () => {
   const { theme } = useTheme();
-  const { user, upgradeToPremium, updateUser } = useAuth();
+  const { user, upgradeToPremium, upgradeToVIP, updateUser } = useAuth();
   const navigation = useNavigation();
   
   const [showAddCard, setShowAddCard] = useState(false);
@@ -19,34 +19,59 @@ export const PaymentScreen = () => {
   const [cvv, setCvv] = useState('');
   const [processing, setProcessing] = useState(false);
   const [showUpgradeConfirm, setShowUpgradeConfirm] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<'premium' | 'vip' | null>(null);
 
-  const isPremium = user?.subscription?.plan === 'premium';
-  const monthlyPrice = 9.99;
+  const currentPlan = user?.subscription?.plan || 'free';
+  const isPremium = currentPlan === 'premium';
+  const isVIP = currentPlan === 'vip';
+  
+  const PRICING = {
+    premium: 14.99,
+    vip: user?.role === 'renter' ? 49.99 : 99.00,
+  };
 
-  const handleUpgrade = () => {
+  const handleUpgrade = (plan: 'premium' | 'vip') => {
     if (!user?.paymentMethods || user.paymentMethods.length === 0) {
       Alert.alert(
         'Payment Method Required',
-        'Please add a payment method before upgrading to Premium.',
+        'Please add a payment method before upgrading.',
         [{ text: 'OK' }]
       );
       setShowAddCard(true);
       return;
     }
 
+    setSelectedPlan(plan);
     setShowUpgradeConfirm(true);
   };
 
   const confirmUpgrade = async () => {
+    if (!selectedPlan) {
+      setShowUpgradeConfirm(false);
+      return;
+    }
+
+    if (selectedPlan === currentPlan) {
+      Alert.alert('Error', 'You are already on this plan.');
+      setShowUpgradeConfirm(false);
+      setSelectedPlan(null);
+      return;
+    }
+
     setShowUpgradeConfirm(false);
     setProcessing(true);
     await new Promise(resolve => setTimeout(resolve, 1500));
     
-    await upgradeToPremium();
+    if (selectedPlan === 'premium') {
+      await upgradeToPremium();
+    } else if (selectedPlan === 'vip') {
+      await upgradeToVIP();
+    }
     
+    const planName = selectedPlan === 'premium' ? 'Premium' : 'VIP';
     Alert.alert(
       'Success!',
-      'Welcome to Premium! You can now create and join unlimited groups.',
+      `Welcome to ${planName}! You now have access to all ${planName} features.`,
       [
         {
           text: 'OK',
@@ -55,6 +80,7 @@ export const PaymentScreen = () => {
       ]
     );
     setProcessing(false);
+    setSelectedPlan(null);
   };
 
   const handleAddPaymentMethod = async () => {
@@ -140,78 +166,102 @@ export const PaymentScreen = () => {
     return cleaned;
   };
 
+  const renderPlanCard = (
+    planType: 'free' | 'premium' | 'vip',
+    price: string,
+    features: string[],
+    isCurrentPlan: boolean
+  ) => {
+    const planColors = {
+      free: theme.backgroundDefault,
+      premium: theme.primary,
+      vip: '#7C3AED',
+    };
+    const bgColor = isCurrentPlan ? planColors[planType] : theme.backgroundDefault;
+    const textColor = isCurrentPlan && planType !== 'free' ? '#FFFFFF' : theme.text;
+
+    return (
+      <View key={planType} style={[styles.planCard, { backgroundColor: bgColor, borderColor: theme.border, borderWidth: isCurrentPlan ? 0 : 1 }]}>
+        <View style={styles.planHeader}>
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+              <ThemedText style={[Typography.h2, { color: textColor }]}>
+                {planType.charAt(0).toUpperCase() + planType.slice(1)}
+              </ThemedText>
+              {planType === 'vip' && <Feather name="award" size={20} color={isCurrentPlan ? '#FFD700' : '#7C3AED'} />}
+            </View>
+            <ThemedText style={[Typography.body, { color: isCurrentPlan && planType !== 'free' ? 'rgba(255,255,255,0.9)' : theme.textSecondary, marginTop: Spacing.xs }]}>
+              {price}
+            </ThemedText>
+          </View>
+        </View>
+
+        <View style={styles.features}>
+          {features.map((feature, index) => (
+            <View key={index} style={styles.feature}>
+              <Feather name="check" size={18} color={isCurrentPlan && planType !== 'free' ? '#FFFFFF' : theme.primary} />
+              <ThemedText style={[Typography.small, { marginLeft: Spacing.sm, color: textColor, flex: 1 }]}>
+                {feature}
+              </ThemedText>
+            </View>
+          ))}
+        </View>
+
+        {isCurrentPlan ? (
+          <View style={[styles.activeSubscription, { backgroundColor: planType === 'free' ? theme.primary + '20' : 'rgba(255, 255, 255, 0.2)' }]}>
+            <Feather name="check-circle" size={18} color={planType === 'free' ? theme.primary : '#FFFFFF'} />
+            <ThemedText style={[Typography.small, { color: planType === 'free' ? theme.primary : '#FFFFFF', marginLeft: Spacing.sm, fontWeight: '600' }]}>
+              Current Plan
+            </ThemedText>
+          </View>
+        ) : planType !== 'free' ? (
+          <Pressable
+            style={[styles.upgradeButton, { backgroundColor: planType === 'premium' ? theme.primary : '#7C3AED', opacity: (planType === 'premium' && isVIP) ? 0.5 : 1 }]}
+            onPress={() => handleUpgrade(planType)}
+            disabled={processing || (planType === 'premium' && isVIP)}
+          >
+            <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>
+              {processing ? 'Processing...' : (planType === 'premium' && isVIP) ? 'Downgrade Not Available' : `Upgrade - ${price}`}
+            </ThemedText>
+          </Pressable>
+        ) : null}
+      </View>
+    );
+  };
+
   return (
     <ScreenKeyboardAwareScrollView>
       <View style={styles.container}>
-        <View style={[styles.planCard, { backgroundColor: isPremium ? theme.primary : theme.backgroundDefault }]}>
-          <View style={styles.planHeader}>
-            <View>
-              <ThemedText style={[Typography.h2, { color: isPremium ? '#FFFFFF' : theme.text }]}>
-                {isPremium ? 'Premium' : 'Free'} Plan
-              </ThemedText>
-              {isPremium ? (
-                <ThemedText style={[Typography.body, { color: '#FFFFFF', opacity: 0.9, marginTop: Spacing.xs }]}>
-                  ${monthlyPrice}/month
-                </ThemedText>
-              ) : (
-                <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
-                  $0/month
-                </ThemedText>
-              )}
-            </View>
-            {isPremium ? (
-              <View style={styles.premiumBadge}>
-                <Feather name="star" size={24} color="#FFD700" />
-              </View>
-            ) : null}
-          </View>
+        <ThemedText style={[Typography.h2, { marginBottom: Spacing.lg }]}>Choose Your Plan</ThemedText>
+        
+        {renderPlanCard('free', '$0/month', [
+          'Create 1 group',
+          'Join 1 group',
+          'Basic messaging',
+          'Browse listings',
+        ], currentPlan === 'free')}
 
-          <View style={styles.features}>
-            <View style={styles.feature}>
-              <Feather name="check" size={20} color={isPremium ? '#FFFFFF' : theme.primary} />
-              <ThemedText style={[Typography.body, { marginLeft: Spacing.md, color: isPremium ? '#FFFFFF' : theme.text }]}>
-                {isPremium ? 'Unlimited' : 'Create 1'} group creation
-              </ThemedText>
-            </View>
-            <View style={styles.feature}>
-              <Feather name="check" size={20} color={isPremium ? '#FFFFFF' : theme.primary} />
-              <ThemedText style={[Typography.body, { marginLeft: Spacing.md, color: isPremium ? '#FFFFFF' : theme.text }]}>
-                {isPremium ? 'Unlimited' : 'Join 1'} group joining
-              </ThemedText>
-            </View>
-            <View style={styles.feature}>
-              <Feather name="check" size={20} color={isPremium ? '#FFFFFF' : theme.primary} />
-              <ThemedText style={[Typography.body, { marginLeft: Spacing.md, color: isPremium ? '#FFFFFF' : theme.text }]}>
-                Unlimited messaging
-              </ThemedText>
-            </View>
-            <View style={styles.feature}>
-              <Feather name="check" size={20} color={isPremium ? '#FFFFFF' : theme.primary} />
-              <ThemedText style={[Typography.body, { marginLeft: Spacing.md, color: isPremium ? '#FFFFFF' : theme.text }]}>
-                Priority support
-              </ThemedText>
-            </View>
-          </View>
+        {renderPlanCard('premium', `$${PRICING.premium}/month`, [
+          'Unlimited groups',
+          'Unlimited messaging',
+          'Full profile visibility',
+          'Advanced filters',
+          '1 boost per week',
+        ], currentPlan === 'premium')}
 
-          {!isPremium ? (
-            <Pressable
-              style={[styles.upgradeButton, { backgroundColor: theme.primary }]}
-              onPress={handleUpgrade}
-              disabled={processing}
-            >
-              <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>
-                {processing ? 'Processing...' : `Upgrade to Premium - $${monthlyPrice}/mo`}
-              </ThemedText>
-            </Pressable>
-          ) : (
-            <View style={[styles.activeSubscription, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
-              <Feather name="check-circle" size={20} color="#FFFFFF" />
-              <ThemedText style={[Typography.body, { color: '#FFFFFF', marginLeft: Spacing.sm, fontWeight: '600' }]}>
-                Active Subscription
-              </ThemedText>
-            </View>
-          )}
-        </View>
+        {renderPlanCard(
+          'vip',
+          `$${PRICING.vip}/month ${user?.role === 'renter' ? '(Seekers)' : '(Hosts/Agents)'}`,
+          [
+            'Everything in Premium',
+            'Priority placement',
+            'VIP badge',
+            'Unlimited boosts',
+            'Featured listings',
+            'AI match assistant',
+          ],
+          currentPlan === 'vip'
+        )}
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -338,17 +388,21 @@ export const PaymentScreen = () => {
           ) : null}
         </View>
 
-        {isPremium ? (
+        {(isPremium || isVIP) ? (
           <View style={styles.section}>
             <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Billing History</ThemedText>
             <View style={[styles.billingItem, { backgroundColor: theme.backgroundDefault }]}>
               <View>
-                <ThemedText style={[Typography.body, { fontWeight: '600' }]}>Premium Subscription</ThemedText>
+                <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
+                  {isVIP ? 'VIP' : 'Premium'} Subscription
+                </ThemedText>
                 <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
                   {new Date().toLocaleDateString()}
                 </ThemedText>
               </View>
-              <ThemedText style={[Typography.body, { fontWeight: '600' }]}>${monthlyPrice}</ThemedText>
+              <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
+                ${isVIP ? PRICING.vip : PRICING.premium}
+              </ThemedText>
             </View>
           </View>
         ) : null}
@@ -363,20 +417,26 @@ export const PaymentScreen = () => {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: theme.backgroundRoot }]}>
             <ThemedText style={[Typography.h2, { marginBottom: Spacing.md }]}>
-              Upgrade to Premium
+              Upgrade to {selectedPlan === 'premium' ? 'Premium' : 'VIP'}
             </ThemedText>
             <ThemedText style={[Typography.body, { color: theme.textSecondary, marginBottom: Spacing.xl }]}>
-              Unlock unlimited group creation and joining for ${monthlyPrice}/month.{'\n\n'}Continue with upgrade?
+              {selectedPlan === 'premium' 
+                ? `Unlock unlimited groups and advanced features for $${PRICING.premium}/month.`
+                : `Get priority placement, VIP badge, and unlimited boosts for $${PRICING.vip}/month.`}
+              {'\n\n'}Continue with upgrade?
             </ThemedText>
             <View style={styles.modalActions}>
               <Pressable
                 style={[styles.modalButton, { borderColor: theme.border }]}
-                onPress={() => setShowUpgradeConfirm(false)}
+                onPress={() => {
+                  setShowUpgradeConfirm(false);
+                  setSelectedPlan(null);
+                }}
               >
                 <ThemedText style={[Typography.body]}>Cancel</ThemedText>
               </Pressable>
               <Pressable
-                style={[styles.modalButton, styles.modalButtonPrimary, { backgroundColor: theme.primary }]}
+                style={[styles.modalButton, styles.modalButtonPrimary, { backgroundColor: selectedPlan === 'premium' ? theme.primary : '#7C3AED' }]}
                 onPress={confirmUpgrade}
               >
                 <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>

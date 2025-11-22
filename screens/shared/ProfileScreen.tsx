@@ -84,6 +84,13 @@ export const ProfileScreen = () => {
                       Premium
                     </ThemedText>
                   </View>
+                ) : user?.subscription?.plan === 'vip' ? (
+                  <View style={[styles.badge, { backgroundColor: '#7C3AED' }]}>
+                    <Feather name="award" size={12} color="#FFD700" />
+                    <ThemedText style={[Typography.small, { color: '#FFFFFF', marginLeft: 4, fontWeight: '600' }]}>
+                      VIP
+                    </ThemedText>
+                  </View>
                 ) : null}
               </View>
               {user?.subscription?.plan === 'free' ? (

@@ -10,7 +10,7 @@ export interface User {
   role: UserRole;
   profilePicture?: string;
   subscription?: {
-    plan: 'free' | 'premium';
+    plan: 'free' | 'premium' | 'vip';
     status: 'active' | 'cancelled' | 'expired';
     expiresAt?: Date;
   };
@@ -31,6 +31,7 @@ interface AuthContextType {
   register: (email: string, password: string, name: string, role: UserRole) => Promise<void>;
   logout: () => Promise<void>;
   upgradeToPremium: () => Promise<void>;
+  upgradeToVIP: () => Promise<void>;
   updateUser: (updates: Partial<User>) => Promise<void>;
 }
 
@@ -119,6 +120,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(updatedUser);
   };
 
+  const upgradeToVIP = async () => {
+    if (!user) return;
+    
+    const updatedUser: User = {
+      ...user,
+      subscription: {
+        plan: 'vip',
+        status: 'active',
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      },
+    };
+    
+    await StorageService.setCurrentUser(updatedUser);
+    await StorageService.addOrUpdateUser(updatedUser);
+    setUser(updatedUser);
+  };
+
   const updateUser = async (updates: Partial<User>) => {
     if (!user) return;
     
@@ -133,7 +151,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPremium, updateUser }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPremium, upgradeToVIP, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

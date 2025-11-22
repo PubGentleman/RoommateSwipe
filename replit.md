@@ -120,7 +120,7 @@ Preferred communication style: Simple, everyday language.
   role: 'renter' | 'host' | 'agent'
   profilePicture?: string
   subscription?: {
-    plan: 'free' | 'premium'
+    plan: 'free' | 'premium' | 'vip'
     status: 'active' | 'cancelled' | 'expired'
     expiresAt?: Date
   }
@@ -142,11 +142,28 @@ Preferred communication style: Simple, everyday language.
 
 **Subscription & Payments:**
 - Stripe integration setup (frontend-ready, backend pending)
-- Free plan: 1 group creation, 1 group join limit
-- Premium plan ($9.99/mo): Unlimited group creation and joining
-- Payment method management with validation (simulated)
-- Subscription upgrade flow with payment requirement
-- Group limit checks respect premium status
+- **Free Plan ($0/mo):**
+  - 1 group creation, 1 group join limit
+  - Basic messaging
+  - Browse listings
+- **Premium Plan ($14.99/mo):**
+  - Unlimited group creation and joining
+  - Unlimited messaging
+  - Full profile visibility
+  - Advanced filters
+  - 1 boost per week
+- **VIP Plan:**
+  - $49.99/mo for roommate seekers (renters)
+  - $99/mo for hosts/agents
+  - Everything in Premium plus:
+    - Priority placement
+    - VIP badge with award icon
+    - Unlimited boosts
+    - Featured listings
+    - AI match assistant
+- Payment method management with validated card input
+- Cross-platform confirmation modals for upgrades
+- Group limits enforced: Free (1/1), Premium & VIP (unlimited)
 
 ## Data Layer
 
