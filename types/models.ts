@@ -42,13 +42,13 @@ export interface Property {
 export interface Group {
   id: string;
   name: string;
-  members: RoommateProfile[];
+  description?: string;
+  members: string[];
+  maxMembers: number;
   budget: number;
-  location: string;
-  targetBedrooms: number;
-  lookingFor: number;
-  photo?: string;
-  compatibility?: number;
+  preferredLocation: string;
+  createdAt: Date;
+  createdBy: string;
 }
 
 export interface Message {

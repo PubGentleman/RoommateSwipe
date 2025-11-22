@@ -57,8 +57,14 @@ Preferred communication style: Simple, everyday language.
 - Automatic conversation creation from matches
 - Real-time 1-on-1 messaging with matched roommates
 - Group creation from conversations with multiple matches
+- Swipeable group discovery interface (Tinder-style cards):
+  - "My Groups" section showing joined groups
+  - "Discover Groups" section with swipeable cards
+  - Swipe right (or tap heart button) to join a group
+  - Swipe left (or tap X button) to skip  
+  - "You're In!" notification when joining
+  - Group cards display name, description, member count, budget, location
 - Property exploration and search
-- Roommate group browsing with "My Groups" and "All Groups" sections
 - Saved properties functionality
 
 *Host Features:*
@@ -119,7 +125,14 @@ Preferred communication style: Simple, everyday language.
 **Data Models:**
 - `RoommateProfile` - User profiles with lifestyle preferences, budget, compatibility scores
 - `Property` - Rental listings with amenities, photos, pricing
-- `Group` - Roommate groups with member management
+- `Group` - Roommate groups with:
+  - `members: string[]` - Array of user IDs (not full profile objects)
+  - `maxMembers: number` - Maximum group size (2-10)
+  - `description: string` - Optional group description
+  - `budget: number` - Monthly budget
+  - `preferredLocation: string` - Desired area
+  - `createdAt: Date` - Creation timestamp
+  - `createdBy: string` - Creator user ID
 - `Conversation` - Messaging threads with participants and messages array
 - `Message` - Individual chat messages with sender, text, timestamp
 - `Match` - Reciprocal matches between two users with matchedAt timestamp
@@ -141,6 +154,22 @@ Preferred communication style: Simple, everyday language.
   - `StorageService.seedInitialMatches()` creates 2 initial matches when renters first log in
   - Seeded matches with profiles '1' (Sarah Johnson) and '2' (Michael Chen)
   - Prevents empty state for new users and enables immediate testing of messaging flow
+
+**Groups Implementation:**
+- **Swipeable Group Discovery**: Tinder-style card interface for browsing groups
+  - Large cards with group info, swipe gestures, and action buttons (X/heart)
+  - Join groups by swiping right or tapping heart button
+  - Skip groups by swiping left or tapping X button
+  - "You're In!" notification with 2-second display when joining
+  - Spring animations and haptic feedback for interactions
+- **Group Storage & Cross-User Visibility**:
+  - Groups stored globally in AsyncStorage (key: `@roommate_finder/groups`)
+  - NOT scoped per user - all users on same device see all groups
+  - `StorageService.getGroups()` deserializes `createdAt` timestamps
+  - Mock groups seeded only if storage is empty (doesn't override user groups)
+  - `logout()` preserves groups (only clears user-specific data)
+  - **Important**: On iOS/Android, AsyncStorage is app-wide and shared across user logins
+  - **Web Environment**: Web tests may use isolated browser contexts with separate localStorage
 
 **Future Database Integration:**
 - Designed to accommodate SQL database (note: Postgres may be added)

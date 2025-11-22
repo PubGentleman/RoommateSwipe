@@ -156,7 +156,12 @@ export const StorageService = {
   async getGroups(): Promise<Group[]> {
     try {
       const data = await AsyncStorage.getItem(STORAGE_KEYS.GROUPS);
-      return data ? JSON.parse(data) : [];
+      if (!data) return [];
+      const groups = JSON.parse(data);
+      return groups.map((group: any) => ({
+        ...group,
+        createdAt: new Date(group.createdAt),
+      }));
     } catch (error) {
       console.error('Error getting groups:', error);
       return [];
