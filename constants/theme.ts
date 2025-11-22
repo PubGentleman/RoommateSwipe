@@ -1,30 +1,54 @@
 import { Platform } from "react-native";
 
-const tintColorLight = "#007AFF";
-const tintColorDark = "#0A84FF";
+const primaryColor = "#FF6B6B";
+const secondaryColor = "#4ECDC4";
 
 export const Colors = {
   light: {
-    text: "#11181C",
+    text: "#1A1A1A",
+    textSecondary: "#6C757D",
     buttonText: "#FFFFFF",
-    tabIconDefault: "#687076",
-    tabIconSelected: tintColorLight,
-    link: "#007AFF",
-    backgroundRoot: "#FFFFFF", // Elevation 0
-    backgroundDefault: "#F2F2F2", // Elevation 1
-    backgroundSecondary: "#E6E6E6", // Elevation 2
-    backgroundTertiary: "#D9D9D9", // Elevation 3
+    tabIconDefault: "#6C757D",
+    tabIconSelected: primaryColor,
+    link: primaryColor,
+    backgroundRoot: "#F8F9FA",
+    backgroundDefault: "#FFFFFF",
+    backgroundSecondary: "#F8F9FA",
+    backgroundTertiary: "#E9ECEF",
+    primary: primaryColor,
+    secondary: secondaryColor,
+    success: "#3ECF8E",
+    warning: "#FFA500",
+    error: "#FF4757",
+    info: "#5B7FFF",
+    renterBadge: "#5B7FFF",
+    hostBadge: "#3ECF8E",
+    agentBadge: "#9B59B6",
+    border: "#E9ECEF",
+    cardShadow: "rgba(0, 0, 0, 0.1)",
   },
   dark: {
-    text: "#ECEDEE",
+    text: "#FFFFFF",
+    textSecondary: "#A0A0A0",
     buttonText: "#FFFFFF",
-    tabIconDefault: "#9BA1A6",
-    tabIconSelected: tintColorDark,
-    link: "#0A84FF",
-    backgroundRoot: "#1F2123", // Elevation 0
-    backgroundDefault: "#2A2C2E", // Elevation 1
-    backgroundSecondary: "#353739", // Elevation 2
-    backgroundTertiary: "#404244", // Elevation 3
+    tabIconDefault: "#A0A0A0",
+    tabIconSelected: primaryColor,
+    link: primaryColor,
+    backgroundRoot: "#1A1A1A",
+    backgroundDefault: "#2A2A2A",
+    backgroundSecondary: "#1A1A1A",
+    backgroundTertiary: "#3A3A3A",
+    primary: primaryColor,
+    secondary: secondaryColor,
+    success: "#3ECF8E",
+    warning: "#FFA500",
+    error: "#FF4757",
+    info: "#5B7FFF",
+    renterBadge: "#5B7FFF",
+    hostBadge: "#3ECF8E",
+    agentBadge: "#9B59B6",
+    border: "#3A3A3A",
+    cardShadow: "rgba(0, 0, 0, 0.2)",
   },
 };
 
@@ -33,60 +57,49 @@ export const Spacing = {
   sm: 8,
   md: 12,
   lg: 16,
-  xl: 20,
-  "2xl": 24,
-  "3xl": 32,
-  "4xl": 40,
-  "5xl": 48,
+  xl: 24,
+  xxl: 32,
   inputHeight: 48,
   buttonHeight: 52,
+  fabSize: 56,
+  swipeButtonSize: 60,
+  swipeButtonSmall: 48,
 };
 
 export const BorderRadius = {
-  xs: 8,
-  sm: 12,
-  md: 18,
-  lg: 24,
-  xl: 30,
-  "2xl": 40,
-  "3xl": 50,
+  small: 8,
+  medium: 12,
+  large: 16,
   full: 9999,
 };
 
 export const Typography = {
+  hero: {
+    fontSize: 34,
+    fontWeight: "700" as const,
+  },
   h1: {
-    fontSize: 32,
-    lineHeight: 40,
+    fontSize: 28,
     fontWeight: "700" as const,
   },
   h2: {
-    fontSize: 28,
-    lineHeight: 36,
-    fontWeight: "700" as const,
-  },
-  h3: {
-    fontSize: 24,
-    lineHeight: 32,
+    fontSize: 22,
     fontWeight: "600" as const,
   },
-  h4: {
-    fontSize: 20,
-    lineHeight: 28,
+  h3: {
+    fontSize: 18,
     fontWeight: "600" as const,
   },
   body: {
     fontSize: 16,
-    lineHeight: 24,
+    fontWeight: "400" as const,
+  },
+  caption: {
+    fontSize: 14,
     fontWeight: "400" as const,
   },
   small: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: "400" as const,
-  },
-  link: {
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: 12,
     fontWeight: "400" as const,
   },
 };

@@ -1,0 +1,182 @@
+import { RoommateProfile, Property, Group, Conversation, Application } from '../types/models';
+
+export const mockRoommateProfiles: RoommateProfile[] = [
+  {
+    id: '1',
+    name: 'Sarah Johnson',
+    age: 24,
+    bio: 'Software engineer who loves hiking, cooking, and quiet evenings. Looking for a clean and respectful roommate.',
+    occupation: 'Software Engineer',
+    budget: 1200,
+    photos: ['https://picsum.photos/400/500?random=1'],
+    lifestyle: {
+      cleanliness: 9,
+      socialLevel: 6,
+      workSchedule: 'Hybrid',
+      pets: false,
+      smoking: false,
+    },
+    preferences: {
+      location: 'Downtown',
+      moveInDate: '2025-01-01',
+      bedrooms: 2,
+    },
+    compatibility: 92,
+  },
+  {
+    id: '2',
+    name: 'Michael Chen',
+    age: 26,
+    bio: 'Marketing professional, gym enthusiast, and weekend adventurer. Love to host small gatherings!',
+    occupation: 'Marketing Manager',
+    budget: 1400,
+    photos: ['https://picsum.photos/400/500?random=2'],
+    lifestyle: {
+      cleanliness: 7,
+      socialLevel: 9,
+      workSchedule: 'Office',
+      pets: true,
+      smoking: false,
+    },
+    preferences: {
+      location: 'Midtown',
+      moveInDate: '2025-02-01',
+      bedrooms: 2,
+    },
+    compatibility: 85,
+  },
+  {
+    id: '3',
+    name: 'Emily Rodriguez',
+    age: 23,
+    bio: 'Graphic designer working from home. Cat mom, plant lover, and yoga enthusiast.',
+    occupation: 'Graphic Designer',
+    budget: 1000,
+    photos: ['https://picsum.photos/400/500?random=3'],
+    lifestyle: {
+      cleanliness: 8,
+      socialLevel: 5,
+      workSchedule: 'Remote',
+      pets: true,
+      smoking: false,
+    },
+    preferences: {
+      location: 'Westside',
+      moveInDate: '2025-01-15',
+      bedrooms: 2,
+    },
+    compatibility: 78,
+  },
+];
+
+export const mockProperties: Property[] = [
+  {
+    id: '1',
+    title: 'Modern Downtown Apartment',
+    price: 2400,
+    bedrooms: 2,
+    bathrooms: 2,
+    sqft: 1200,
+    address: '123 Main St',
+    city: 'San Francisco',
+    state: 'CA',
+    photos: ['https://picsum.photos/800/600?random=10'],
+    amenities: ['Gym', 'Pool', 'Parking', 'Laundry'],
+    description: 'Beautiful modern apartment in the heart of downtown with stunning city views.',
+    available: true,
+    hostId: 'host1',
+    hostName: 'John Smith',
+  },
+  {
+    id: '2',
+    title: 'Cozy Suburban House',
+    price: 1800,
+    bedrooms: 3,
+    bathrooms: 2,
+    sqft: 1500,
+    address: '456 Oak Ave',
+    city: 'San Francisco',
+    state: 'CA',
+    photos: ['https://picsum.photos/800/600?random=11'],
+    amenities: ['Backyard', 'Garage', 'Fireplace'],
+    description: 'Quiet neighborhood, perfect for professionals. Pet-friendly with large backyard.',
+    available: true,
+    hostId: 'host2',
+    hostName: 'Lisa Williams',
+  },
+];
+
+export const mockGroups: Group[] = [
+  {
+    id: '1',
+    name: 'Tech Professionals',
+    members: [mockRoommateProfiles[0], mockRoommateProfiles[1]],
+    budget: 2800,
+    location: 'Downtown',
+    targetBedrooms: 3,
+    lookingFor: 1,
+    compatibility: 88,
+  },
+  {
+    id: '2',
+    name: 'Creative Roommates',
+    members: [mockRoommateProfiles[2]],
+    budget: 2000,
+    location: 'Westside',
+    targetBedrooms: 2,
+    lookingFor: 1,
+    compatibility: 75,
+  },
+];
+
+export const mockConversations: Conversation[] = [
+  {
+    id: '1',
+    participant: {
+      id: '1',
+      name: 'Sarah Johnson',
+      photo: 'https://picsum.photos/100/100?random=1',
+      online: true,
+    },
+    lastMessage: 'That sounds great! When can we schedule a viewing?',
+    timestamp: new Date(Date.now() - 1000 * 60 * 5),
+    unread: 2,
+  },
+  {
+    id: '2',
+    participant: {
+      id: '2',
+      name: 'Michael Chen',
+      photo: 'https://picsum.photos/100/100?random=2',
+      online: false,
+    },
+    lastMessage: 'Thanks for reaching out!',
+    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
+    unread: 0,
+  },
+];
+
+export const mockApplications: Application[] = [
+  {
+    id: '1',
+    propertyId: '1',
+    propertyTitle: 'Modern Downtown Apartment',
+    applicantId: 'renter1',
+    applicantName: 'Sarah Johnson',
+    applicantPhoto: 'https://picsum.photos/100/100?random=1',
+    status: 'pending',
+    submittedDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2),
+    message: 'I am very interested in this property. I work as a software engineer and can provide references.',
+  },
+  {
+    id: '2',
+    propertyId: '2',
+    propertyTitle: 'Cozy Suburban House',
+    applicantId: 'renter2',
+    applicantName: 'Michael Chen',
+    applicantPhoto: 'https://picsum.photos/100/100?random=2',
+    status: 'pending',
+    submittedDate: new Date(Date.now() - 1000 * 60 * 60 * 24),
+    message: 'This looks perfect for my needs. I have a stable job and excellent credit.',
+  },
+];
