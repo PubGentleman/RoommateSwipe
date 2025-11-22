@@ -475,20 +475,17 @@ export const StorageService = {
     try {
       const { mockRoommateProfiles, mockProperties, mockGroups } = await import('./mockData');
       
-      const existingProfiles = await this.getRoommateProfiles();
-      if (existingProfiles.length === 0) {
-        await this.setRoommateProfiles(mockRoommateProfiles);
-      }
+      console.log('[StorageService] Loading fresh mock data...');
+      await this.setRoommateProfiles(mockRoommateProfiles);
+      console.log(`[StorageService] ✓ Loaded ${mockRoommateProfiles.length} roommate profiles`);
       
-      const existingProperties = await this.getProperties();
-      if (existingProperties.length === 0) {
-        await this.setProperties(mockProperties);
-      }
+      await this.setProperties(mockProperties);
+      console.log(`[StorageService] ✓ Loaded ${mockProperties.length} properties`);
       
-      const existingGroups = await this.getGroups();
-      if (existingGroups.length === 0) {
-        await this.setGroups(mockGroups);
-      }
+      await this.setGroups(mockGroups);
+      console.log(`[StorageService] ✓ Loaded ${mockGroups.length} groups`);
+      
+      console.log('[StorageService] Mock data initialization complete!');
     } catch (error) {
       console.error('Error initializing with mock data:', error);
     }
