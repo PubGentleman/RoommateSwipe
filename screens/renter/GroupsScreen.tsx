@@ -144,6 +144,18 @@ export const GroupsScreen = () => {
   const handleCreateGroup = async () => {
     if (!user) return;
 
+    const allExistingGroups = await StorageService.getGroups();
+    const userCreatedGroups = allExistingGroups.filter(g => g.createdBy === user.id);
+    
+    if (userCreatedGroups.length >= 1) {
+      Alert.alert(
+        'Upgrade Required',
+        'You can only create 1 group with the free plan. Upgrade to create more groups!',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
     if (!groupName.trim()) {
       Alert.alert('Error', 'Please enter a group name');
       return;
