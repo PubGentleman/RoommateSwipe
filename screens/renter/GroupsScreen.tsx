@@ -72,17 +72,26 @@ export const GroupsScreen = () => {
   const handleLikeGroup = async (group: Group) => {
     if (!user) return;
 
-    const allExistingGroups = await StorageService.getGroups();
-    const joinedGroups = allExistingGroups.filter(
-      g => g.members.includes(user.id) && g.createdBy !== user.id
-    );
-    
-    if (joinedGroups.length >= 1) {
-      Alert.alert(
-        'Upgrade Required',
-        'You can only join 1 group with the free plan. Upgrade to join more groups!',
-        [{ text: 'OK' }]
+    try {
+      const allExistingGroups = await StorageService.getGroups();
+      const joinedGroups = allExistingGroups.filter(
+        g => g.members.includes(user.id) && g.createdBy !== user.id
       );
+      
+      console.log('[GroupsScreen] User joined groups:', joinedGroups.length);
+      
+      if (joinedGroups.length >= 1) {
+        console.log('[GroupsScreen] Group join limit reached, showing alert');
+        Alert.alert(
+          'Upgrade Required',
+          'You can only join 1 group with the free plan. Upgrade to join more groups!',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+    } catch (error) {
+      console.error('[GroupsScreen] Error checking join limits:', error);
+      Alert.alert('Error', 'Failed to check join limits');
       return;
     }
 
@@ -158,15 +167,24 @@ export const GroupsScreen = () => {
   const handleCreateGroup = async () => {
     if (!user) return;
 
-    const allExistingGroups = await StorageService.getGroups();
-    const userCreatedGroups = allExistingGroups.filter(g => g.createdBy === user.id);
-    
-    if (userCreatedGroups.length >= 1) {
-      Alert.alert(
-        'Upgrade Required',
-        'You can only create 1 group with the free plan. Upgrade to create more groups!',
-        [{ text: 'OK' }]
-      );
+    try {
+      const allExistingGroups = await StorageService.getGroups();
+      const userCreatedGroups = allExistingGroups.filter(g => g.createdBy === user.id);
+      
+      console.log('[GroupsScreen] User created groups:', userCreatedGroups.length);
+      
+      if (userCreatedGroups.length >= 1) {
+        console.log('[GroupsScreen] Group creation limit reached, showing alert');
+        Alert.alert(
+          'Upgrade Required',
+          'You can only create 1 group with the free plan. Upgrade to create more groups!',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+    } catch (error) {
+      console.error('[GroupsScreen] Error checking group limits:', error);
+      Alert.alert('Error', 'Failed to check group limits');
       return;
     }
 

@@ -173,10 +173,12 @@ Preferred communication style: Simple, everyday language.
 - **Approval Workflow**:
   - Users "like" a group to send join request (adds to pendingMembers)
   - ALL group members can view and accept/reject pending requests
-  - Accept moves user from pendingMembers to members
+  - Accept moves user from pendingMembers to members (with validation)
+  - **Acceptance Validation**: Before accepting, checks if user has already joined another group. If so, removes from pendingMembers and shows error message
   - Reject removes user from pendingMembers
   - Group creators can remove existing members
   - Any non-creator member can leave a group
+  - Users who leave a joined group can be accepted into new groups
 - **Group Storage & Cross-User Visibility**:
   - Groups stored globally in AsyncStorage (key: `@roommate_finder/groups`)
   - NOT scoped per user - all users on same device see all groups
