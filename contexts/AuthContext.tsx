@@ -9,6 +9,19 @@ export interface User {
   name: string;
   role: UserRole;
   profilePicture?: string;
+  subscription?: {
+    plan: 'free' | 'premium';
+    status: 'active' | 'cancelled' | 'expired';
+    expiresAt?: Date;
+  };
+  paymentMethods?: Array<{
+    id: string;
+    type: 'card';
+    last4: string;
+    brand: string;
+    expiryMonth: number;
+    expiryYear: number;
+  }>;
 }
 
 interface AuthContextType {
@@ -17,6 +30,8 @@ interface AuthContextType {
   login: (email: string, password: string, role: UserRole) => Promise<void>;
   register: (email: string, password: string, name: string, role: UserRole) => Promise<void>;
   logout: () => Promise<void>;
+  upgradeToPremium: () => Promise<void>;
+  updateUser: (updates: Partial<User>) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -49,6 +64,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       email,
       name: email.split('@')[0],
       role,
+      subscription: {
+        plan: 'free',
+        status: 'active',
+      },
     };
     await StorageService.setCurrentUser(mockUser);
     await StorageService.addOrUpdateUser(mockUser);
@@ -64,6 +83,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       email,
       name,
       role,
+      subscription: {
+        plan: 'free',
+        status: 'active',
+      },
     };
     await StorageService.setCurrentUser(mockUser);
     await StorageService.addOrUpdateUser(mockUser);
@@ -79,8 +102,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   };
 
+  const upgradeToPremium = async () => {
+    if (!user) return;
+    
+    const updatedUser: User = {
+      ...user,
+      subscription: {
+        plan: 'premium',
+        status: 'active',
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      },
+    };
+    
+    await StorageService.setCurrentUser(updatedUser);
+    await StorageService.addOrUpdateUser(updatedUser);
+    setUser(updatedUser);
+  };
+
+  const updateUser = async (updates: Partial<User>) => {
+    if (!user) return;
+    
+    const updatedUser: User = {
+      ...user,
+      ...updates,
+    };
+    
+    await StorageService.setCurrentUser(updatedUser);
+    await StorageService.addOrUpdateUser(updatedUser);
+    setUser(updatedUser);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPremium, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

@@ -7,7 +7,7 @@ import { ExploreScreen } from '../screens/renter/ExploreScreen';
 import { RoommatesScreen } from '../screens/renter/RoommatesScreen';
 import { GroupsScreen } from '../screens/renter/GroupsScreen';
 import { MessagesStackNavigator } from './MessagesStackNavigator';
-import { ProfileScreen } from '../screens/shared/ProfileScreen';
+import { ProfileStackNavigator } from './ProfileStackNavigator';
 import { useTheme } from '../hooks/useTheme';
 
 export type RenterTabParamList = {
@@ -44,7 +44,6 @@ export const RenterTabNavigator = () => {
           ) : null,
         headerShown: true,
         headerTransparent: true,
-        headerBlurEffect: isDark ? 'dark' : 'light',
       }}
     >
       <Tab.Screen
@@ -77,7 +76,7 @@ export const RenterTabNavigator = () => {
       />
       <Tab.Screen
         name="Profile"
-        component={ProfileScreen}
+        component={ProfileStackNavigator}
         options={{
           tabBarIcon: ({ color, size }) => <Feather name="user" size={size} color={color} />,
         }}

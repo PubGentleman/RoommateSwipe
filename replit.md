@@ -37,6 +37,9 @@ Preferred communication style: Simple, everyday language.
   - **Renter**: 5 tabs (Explore, Roommates, Groups, Messages, Profile)
   - **Host**: 4 tabs (My Listings, Applications, Messages, Profile)
   - **Agent/Landlord**: 5 tabs (Properties, Verification, Documents, Messages, Profile)
+- Nested navigators:
+  - `MessagesStackNavigator`: Messages → Chat → CreateGroup
+  - `ProfileStackNavigator`: ProfileMain → Payment
 - Transparent header with blur effects (iOS) using `expo-blur`
 - Custom header components with app icon and title
 
@@ -116,6 +119,19 @@ Preferred communication style: Simple, everyday language.
   name: string
   role: 'renter' | 'host' | 'agent'
   profilePicture?: string
+  subscription?: {
+    plan: 'free' | 'premium'
+    status: 'active' | 'cancelled' | 'expired'
+    expiresAt?: Date
+  }
+  paymentMethods?: Array<{
+    id: string
+    type: 'card'
+    last4: string
+    brand: string
+    expiryMonth: number
+    expiryYear: number
+  }>
 }
 ```
 
@@ -123,6 +139,14 @@ Preferred communication style: Simple, everyday language.
 - Role-based navigation rendering
 - Conditional screen access based on user role
 - Role badges with distinct colors (renter: blue, host: green, agent: purple)
+
+**Subscription & Payments:**
+- Stripe integration setup (frontend-ready, backend pending)
+- Free plan: 1 group creation, 1 group join limit
+- Premium plan ($9.99/mo): Unlimited group creation and joining
+- Payment method management with validation (simulated)
+- Subscription upgrade flow with payment requirement
+- Group limit checks respect premium status
 
 ## Data Layer
 

@@ -5,11 +5,17 @@ import { ScreenScrollView } from '../../components/ScreenScrollView';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { ProfileStackParamList } from '../../navigation/ProfileStackNavigator';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
+
+type ProfileScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'ProfileMain'>;
 
 export const ProfileScreen = () => {
   const { theme } = useTheme();
   const { user, logout } = useAuth();
+  const navigation = useNavigation<ProfileScreenNavigationProp>();
 
   const getRoleBadgeColor = () => {
     if (!user) return theme.primary;
@@ -61,6 +67,83 @@ export const ProfileScreen = () => {
           <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
             {user?.email}
           </ThemedText>
+        </View>
+
+        <View style={styles.section}>
+          <ThemedText style={[Typography.h3, styles.sectionTitle]}>Subscription</ThemedText>
+          <View style={[styles.subscriptionCard, { backgroundColor: theme.backgroundDefault }]}>
+            <View style={styles.subscriptionHeader}>
+              <View style={styles.subscriptionInfo}>
+                <ThemedText style={[Typography.h3, { textTransform: 'capitalize' }]}>
+                  {user?.subscription?.plan || 'Free'} Plan
+                </ThemedText>
+                {user?.subscription?.plan === 'premium' ? (
+                  <View style={[styles.badge, { backgroundColor: theme.primary }]}>
+                    <Feather name="star" size={12} color="#FFFFFF" />
+                    <ThemedText style={[Typography.small, { color: '#FFFFFF', marginLeft: 4, fontWeight: '600' }]}>
+                      Premium
+                    </ThemedText>
+                  </View>
+                ) : null}
+              </View>
+              {user?.subscription?.plan === 'free' ? (
+                <Pressable
+                  style={[styles.upgradeButton, { backgroundColor: theme.primary }]}
+                  onPress={() => navigation.navigate('Payment')}
+                >
+                  <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>
+                    Upgrade
+                  </ThemedText>
+                </Pressable>
+              ) : null}
+            </View>
+            
+            {user?.subscription?.plan === 'free' ? (
+              <View style={styles.benefitsList}>
+                <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.sm }]}>
+                  Free plan limitations:
+                </ThemedText>
+                <View style={styles.benefitItem}>
+                  <Feather name="x" size={16} color={theme.textSecondary} />
+                  <ThemedText style={[Typography.body, { color: theme.textSecondary, marginLeft: Spacing.sm }]}>
+                    Create 1 group only
+                  </ThemedText>
+                </View>
+                <View style={styles.benefitItem}>
+                  <Feather name="x" size={16} color={theme.textSecondary} />
+                  <ThemedText style={[Typography.body, { color: theme.textSecondary, marginLeft: Spacing.sm }]}>
+                    Join 1 group only
+                  </ThemedText>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.benefitsList}>
+                <View style={styles.benefitItem}>
+                  <Feather name="check" size={16} color={theme.primary} />
+                  <ThemedText style={[Typography.body, { marginLeft: Spacing.sm }]}>
+                    Unlimited group creation
+                  </ThemedText>
+                </View>
+                <View style={styles.benefitItem}>
+                  <Feather name="check" size={16} color={theme.primary} />
+                  <ThemedText style={[Typography.body, { marginLeft: Spacing.sm }]}>
+                    Unlimited group joining
+                  </ThemedText>
+                </View>
+                {user?.subscription?.expiresAt ? (
+                  <ThemedText style={[Typography.small, { color: theme.textSecondary, marginTop: Spacing.md }]}>
+                    Renews on {new Date(user.subscription.expiresAt).toLocaleDateString()}
+                  </ThemedText>
+                ) : null}
+              </View>
+            )}
+          </View>
+          
+          <MenuItem 
+            icon="credit-card" 
+            label="Payment Methods" 
+            onPress={() => navigation.navigate('Payment')} 
+          />
         </View>
 
         <View style={styles.section}>
@@ -128,5 +211,40 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     borderRadius: BorderRadius.medium,
     marginBottom: Spacing.sm,
+  },
+  subscriptionCard: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.medium,
+    marginBottom: Spacing.sm,
+  },
+  subscriptionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.lg,
+  },
+  subscriptionInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.small,
+  },
+  upgradeButton: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.medium,
+  },
+  benefitsList: {
+    gap: Spacing.sm,
+  },
+  benefitItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 });

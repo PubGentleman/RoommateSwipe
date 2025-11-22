@@ -10,7 +10,7 @@ import { Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { Group } from '../../types/models';
 import { StorageService } from '../../utils/storage';
 import { useAuth } from '../../contexts/AuthContext';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { mockRoommateProfiles } from '../../utils/mockData';
 
@@ -23,6 +23,7 @@ export const GroupsScreen = () => {
   const { theme } = useTheme();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<any>();
   const [activeTab, setActiveTab] = useState<Tab>('discover');
   const [myGroups, setMyGroups] = useState<Group[]>([]);
   const [allGroups, setAllGroups] = useState<Group[]>([]);
@@ -72,27 +73,37 @@ export const GroupsScreen = () => {
   const handleLikeGroup = async (group: Group) => {
     if (!user) return;
 
-    try {
-      const allExistingGroups = await StorageService.getGroups();
-      const joinedGroups = allExistingGroups.filter(
-        g => g.members.includes(user.id) && g.createdBy !== user.id
-      );
-      
-      console.log('[GroupsScreen] User joined groups:', joinedGroups.length);
-      
-      if (joinedGroups.length >= 1) {
-        console.log('[GroupsScreen] Group join limit reached, showing alert');
-        Alert.alert(
-          'Upgrade Required',
-          'You can only join 1 group with the free plan. Upgrade to join more groups!',
-          [{ text: 'OK' }]
+    const isPremium = user.subscription?.plan === 'premium';
+
+    if (!isPremium) {
+      try {
+        const allExistingGroups = await StorageService.getGroups();
+        const joinedGroups = allExistingGroups.filter(
+          g => g.members.includes(user.id) && g.createdBy !== user.id
         );
+        
+        console.log('[GroupsScreen] User joined groups:', joinedGroups.length);
+        
+        if (joinedGroups.length >= 1) {
+          console.log('[GroupsScreen] Group join limit reached, showing alert');
+          Alert.alert(
+            'Upgrade to Premium',
+            'You can only join 1 group with the free plan. Upgrade to Premium for unlimited group joining!',
+            [
+              { text: 'Maybe Later', style: 'cancel' },
+              {
+                text: 'Upgrade Now',
+                onPress: () => navigation.navigate('Profile', { screen: 'Payment' }),
+              },
+            ]
+          );
+          return;
+        }
+      } catch (error) {
+        console.error('[GroupsScreen] Error checking join limits:', error);
+        Alert.alert('Error', 'Failed to check join limits');
         return;
       }
-    } catch (error) {
-      console.error('[GroupsScreen] Error checking join limits:', error);
-      Alert.alert('Error', 'Failed to check join limits');
-      return;
     }
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -167,25 +178,35 @@ export const GroupsScreen = () => {
   const handleCreateGroup = async () => {
     if (!user) return;
 
-    try {
-      const allExistingGroups = await StorageService.getGroups();
-      const userCreatedGroups = allExistingGroups.filter(g => g.createdBy === user.id);
-      
-      console.log('[GroupsScreen] User created groups:', userCreatedGroups.length);
-      
-      if (userCreatedGroups.length >= 1) {
-        console.log('[GroupsScreen] Group creation limit reached, showing alert');
-        Alert.alert(
-          'Upgrade Required',
-          'You can only create 1 group with the free plan. Upgrade to create more groups!',
-          [{ text: 'OK' }]
-        );
+    const isPremium = user.subscription?.plan === 'premium';
+
+    if (!isPremium) {
+      try {
+        const allExistingGroups = await StorageService.getGroups();
+        const userCreatedGroups = allExistingGroups.filter(g => g.createdBy === user.id);
+        
+        console.log('[GroupsScreen] User created groups:', userCreatedGroups.length);
+        
+        if (userCreatedGroups.length >= 1) {
+          console.log('[GroupsScreen] Group creation limit reached, showing alert');
+          Alert.alert(
+            'Upgrade to Premium',
+            'You can only create 1 group with the free plan. Upgrade to Premium for unlimited group creation!',
+            [
+              { text: 'Maybe Later', style: 'cancel' },
+              {
+                text: 'Upgrade Now',
+                onPress: () => navigation.navigate('Profile', { screen: 'Payment' }),
+              },
+            ]
+          );
+          return;
+        }
+      } catch (error) {
+        console.error('[GroupsScreen] Error checking group limits:', error);
+        Alert.alert('Error', 'Failed to check group limits');
         return;
       }
-    } catch (error) {
-      console.error('[GroupsScreen] Error checking group limits:', error);
-      Alert.alert('Error', 'Failed to check group limits');
-      return;
     }
 
     if (!groupName.trim()) {
