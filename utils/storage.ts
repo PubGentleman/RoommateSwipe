@@ -280,8 +280,10 @@ export const StorageService = {
       return conversations.map((conv: any) => ({
         ...conv,
         timestamp: new Date(conv.timestamp),
-        messages: conv.messages.map((msg: any) => ({
+        messages: (conv.messages || []).map((msg: any) => ({
           ...msg,
+          text: msg.text || msg.content || '',
+          content: msg.content || msg.text || '',
           timestamp: new Date(msg.timestamp),
         })),
       }));

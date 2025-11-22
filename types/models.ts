@@ -55,10 +55,11 @@ export interface Group {
 export interface Message {
   id: string;
   senderId: string;
-  recipientId: string;
-  content: string;
+  recipientId?: string;
+  text?: string;
+  content?: string;
   timestamp: Date;
-  read: boolean;
+  read?: boolean;
 }
 
 export interface Conversation {
@@ -72,6 +73,7 @@ export interface Conversation {
   lastMessage: string;
   timestamp: Date;
   unread: number;
+  messages: Message[];
 }
 
 export interface Application {
@@ -84,4 +86,39 @@ export interface Application {
   status: 'pending' | 'approved' | 'rejected';
   submittedDate: Date;
   message: string;
+}
+
+export interface Match {
+  id: string;
+  userId1: string;
+  userId2: string;
+  matchedAt: Date;
+}
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: 'renter' | 'host' | 'agent';
+  profilePicture?: string;
+  subscription?: {
+    plan: 'free' | 'premium' | 'vip';
+    status: 'active' | 'cancelled' | 'expired';
+    expiresAt?: Date;
+  };
+  paymentMethods?: Array<{
+    id: string;
+    type: 'card';
+    last4: string;
+    brand: string;
+    expiryMonth: number;
+    expiryYear: number;
+  }>;
+  messageCount?: number;
+  boostData?: {
+    boostsUsed: number;
+    lastBoostDate?: Date;
+    isBoosted: boolean;
+    boostExpiresAt?: Date;
+  };
 }

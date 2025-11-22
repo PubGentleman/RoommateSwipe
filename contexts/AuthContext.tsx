@@ -22,6 +22,13 @@ export interface User {
     expiryMonth: number;
     expiryYear: number;
   }>;
+  messageCount?: number;
+  boostData?: {
+    boostsUsed: number;
+    lastBoostDate?: Date;
+    isBoosted: boolean;
+    boostExpiresAt?: Date;
+  };
 }
 
 interface AuthContextType {
@@ -33,6 +40,8 @@ interface AuthContextType {
   upgradeToPremium: () => Promise<void>;
   upgradeToVIP: () => Promise<void>;
   updateUser: (updates: Partial<User>) => Promise<void>;
+  incrementMessageCount: () => Promise<void>;
+  canSendMessage: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -50,6 +59,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await StorageService.initializeWithMockData();
       const currentUser = await StorageService.getCurrentUser();
       if (currentUser) {
+        if (currentUser.messageCount === undefined) {
+          currentUser.messageCount = 0;
+        }
         setUser(currentUser);
       }
     } catch (error) {
@@ -69,6 +81,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         plan: 'free',
         status: 'active',
       },
+      messageCount: 0,
     };
     await StorageService.setCurrentUser(mockUser);
     await StorageService.addOrUpdateUser(mockUser);
@@ -88,6 +101,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         plan: 'free',
         status: 'active',
       },
+      messageCount: 0,
     };
     await StorageService.setCurrentUser(mockUser);
     await StorageService.addOrUpdateUser(mockUser);
@@ -150,8 +164,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(updatedUser);
   };
 
+  const incrementMessageCount = async () => {
+    if (!user) return;
+    
+    const currentCount = user.messageCount || 0;
+    const updatedUser: User = {
+      ...user,
+      messageCount: currentCount + 1,
+    };
+    
+    await StorageService.setCurrentUser(updatedUser);
+    await StorageService.addOrUpdateUser(updatedUser);
+    setUser(updatedUser);
+  };
+
+  const canSendMessage = (): boolean => {
+    if (!user) return false;
+    
+    const plan = user.subscription?.plan || 'free';
+    if (plan === 'premium' || plan === 'vip') {
+      return true;
+    }
+    
+    const messageCount = user.messageCount || 0;
+    return messageCount < 50;
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPremium, upgradeToVIP, updateUser }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPremium, upgradeToVIP, updateUser, incrementMessageCount, canSendMessage }}>
       {children}
     </AuthContext.Provider>
   );

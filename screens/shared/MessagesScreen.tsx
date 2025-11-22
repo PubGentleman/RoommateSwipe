@@ -55,7 +55,7 @@ export const MessagesScreen = ({ navigation }: MessagesScreenProps) => {
               participant: {
                 id: otherProfile.id,
                 name: otherProfile.name,
-                photo: otherProfile.photo,
+                photo: otherProfile.photos?.[0],
                 online: Math.random() > 0.5,
               },
               lastMessage: 'You matched!',

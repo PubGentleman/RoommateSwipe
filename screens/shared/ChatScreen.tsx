@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Pressable, FlatList, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, StyleSheet, Pressable, FlatList, TextInput, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
@@ -23,7 +23,7 @@ type ChatScreenProps = {
 export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const { conversationId, otherUser } = route.params;
   const { theme } = useTheme();
-  const { user } = useAuth();
+  const { user, incrementMessageCount, canSendMessage } = useAuth();
   const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
@@ -38,12 +38,27 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     const conversations = await StorageService.getConversations();
     const conversation = conversations.find(c => c.id === conversationId);
     if (conversation) {
-      setMessages(conversation.messages);
+      setMessages(conversation.messages || []);
     }
   };
 
   const sendMessage = async () => {
     if (!inputText.trim() || !user) return;
+
+    if (!canSendMessage()) {
+      Alert.alert(
+        'Message Limit Reached',
+        `You've reached your limit of 50 messages on the free plan. Upgrade to Premium or VIP for unlimited messaging!`,
+        [
+          { text: 'Maybe Later', style: 'cancel' },
+          {
+            text: 'View Plans',
+            onPress: () => navigation.navigate('Profile', { screen: 'Payment' }),
+          },
+        ]
+      );
+      return;
+    }
 
     const newMessage: Message = {
       id: `msg_${Date.now()}`,
@@ -56,10 +71,14 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     const conversationIndex = conversations.findIndex(c => c.id === conversationId);
     
     if (conversationIndex >= 0) {
+      if (!conversations[conversationIndex].messages) {
+        conversations[conversationIndex].messages = [];
+      }
       conversations[conversationIndex].messages.push(newMessage);
       conversations[conversationIndex].timestamp = new Date();
-      conversations[conversationIndex].lastMessage = newMessage.text;
+      conversations[conversationIndex].lastMessage = newMessage.text || '';
       await StorageService.setConversations(conversations);
+      await incrementMessageCount();
       setMessages([...conversations[conversationIndex].messages]);
       setInputText('');
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
@@ -114,7 +133,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           <Feather name="arrow-left" size={24} color={theme.text} />
         </Pressable>
         <View style={styles.headerCenter}>
-          <Image source={{ uri: otherUser.photo }} style={styles.headerAvatar} />
+          <Image source={{ uri: otherUser.photos?.[0] }} style={styles.headerAvatar} />
           <ThemedText style={[Typography.h3, { marginLeft: Spacing.md }]}>
             {otherUser.name}
           </ThemedText>
