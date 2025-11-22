@@ -72,6 +72,20 @@ export const GroupsScreen = () => {
   const handleLikeGroup = async (group: Group) => {
     if (!user) return;
 
+    const allExistingGroups = await StorageService.getGroups();
+    const joinedGroups = allExistingGroups.filter(
+      g => g.members.includes(user.id) && g.createdBy !== user.id
+    );
+    
+    if (joinedGroups.length >= 1) {
+      Alert.alert(
+        'Upgrade Required',
+        'You can only join 1 group with the free plan. Upgrade to join more groups!',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     
     await StorageService.likeGroup(group.id, user.id);
