@@ -23,7 +23,7 @@ export const GroupsScreen = () => {
   const { theme } = useTheme();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
-  const [activeTab, setActiveTab] = useState<Tab>('my-groups');
+  const [activeTab, setActiveTab] = useState<Tab>('discover');
   const [myGroups, setMyGroups] = useState<Group[]>([]);
   const [allGroups, setAllGroups] = useState<Group[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
