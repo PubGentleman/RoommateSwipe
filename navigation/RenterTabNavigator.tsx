@@ -4,7 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { Platform, StyleSheet } from 'react-native';
 import { ExploreScreen } from '../screens/renter/ExploreScreen';
-import { RoommatesScreen } from '../screens/renter/RoommatesScreen';
+import { RoommatesStackNavigator } from './RoommatesStackNavigator';
 import { GroupsScreen } from '../screens/renter/GroupsScreen';
 import { MessagesStackNavigator } from './MessagesStackNavigator';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
@@ -55,7 +55,7 @@ export const RenterTabNavigator = () => {
       />
       <Tab.Screen
         name="Roommates"
-        component={RoommatesScreen}
+        component={RoommatesStackNavigator}
         options={{
           tabBarIcon: ({ color, size }) => <Feather name="users" size={size} color={color} />,
         }}

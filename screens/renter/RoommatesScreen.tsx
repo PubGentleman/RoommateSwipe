@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, Image, Pressable, Dimensions, Animated } from 'react-native';
+import { View, StyleSheet, Image, Pressable, Dimensions, Animated, Alert } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { scheduleOnRN } from 'react-native-worklets';
 import { Feather } from '@expo/vector-icons';
@@ -16,7 +16,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - Spacing.xxl;
 
-export const RoommatesScreen = () => {
+type RoommatesScreenProps = {
+  navigation?: any;
+};
+
+export const RoommatesScreen = ({ navigation }: RoommatesScreenProps = {}) => {
   const { theme } = useTheme();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
@@ -231,9 +235,36 @@ export const RoommatesScreen = () => {
     outputRange: ['-15deg', '15deg'],
   });
 
+  const handleOpenAIAssistant = () => {
+    const userPlan = user?.subscription?.plan || 'free';
+    const userStatus = user?.subscription?.status || 'active';
+    
+    if (userPlan !== 'vip' || userStatus !== 'active') {
+      Alert.alert(
+        'VIP Feature',
+        'AI Match Assistant is exclusively available for VIP members. Upgrade to VIP to get personalized roommate recommendations powered by AI!',
+        [
+          { text: 'Maybe Later', style: 'cancel' },
+          {
+            text: 'Upgrade to VIP',
+            onPress: () => (navigation as any).navigate('Profile', { screen: 'Payment' }),
+          },
+        ]
+      );
+      return;
+    }
+    
+    (navigation as any).navigate('AIAssistant');
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <View style={[styles.header, { paddingTop: insets.top + 60 }]}>
+        <Pressable onPress={handleOpenAIAssistant} style={styles.aiButton}>
+          <View style={[styles.aiButtonInner, { backgroundColor: theme.primary }]}>
+            <Feather name="cpu" size={20} color="#FFFFFF" />
+          </View>
+        </Pressable>
         <Pressable onPress={() => {}} style={styles.iconButton}>
           <Feather name="sliders" size={24} color={theme.text} />
         </Pressable>
@@ -349,9 +380,27 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.lg,
+  },
+  aiButton: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  aiButtonInner: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
   iconButton: {
     width: 44,
