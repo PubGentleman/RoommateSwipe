@@ -12,7 +12,7 @@ import { StorageService } from '../../utils/storage';
 import { useAuth } from '../../contexts/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { mockProfiles } from '../../utils/mockData';
+import { mockRoommateProfiles } from '../../utils/mockData';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - Spacing.xxl;
@@ -245,10 +245,10 @@ export const GroupsScreen = () => {
   const renderMyGroup = (group: Group) => {
     const isCreator = group.createdBy === user?.id;
     const memberProfiles = group.members
-      .map(id => mockProfiles.find(p => p.id === id))
+      .map(id => mockRoommateProfiles.find(p => p.id === id))
       .filter(Boolean);
     const pendingProfiles = group.pendingMembers
-      .map(id => mockProfiles.find(p => p.id === id))
+      .map(id => mockRoommateProfiles.find(p => p.id === id))
       .filter(Boolean);
 
     return (
@@ -300,7 +300,7 @@ export const GroupsScreen = () => {
           </View>
         ) : null}
 
-        {isCreator && pendingProfiles.length > 0 ? (
+        {pendingProfiles.length > 0 ? (
           <View style={styles.pendingSection}>
             <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.sm }]}>
               Pending Requests ({pendingProfiles.length})
