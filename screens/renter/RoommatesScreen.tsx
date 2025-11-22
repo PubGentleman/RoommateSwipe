@@ -4,6 +4,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { scheduleOnRN } from 'react-native-worklets';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useNavigation } from '@react-navigation/native';
 import { ThemedText } from '../../components/ThemedText';
 import { ThemedView } from '../../components/ThemedView';
 import { useTheme } from '../../hooks/useTheme';
@@ -16,13 +17,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - Spacing.xxl;
 
-type RoommatesScreenProps = {
-  navigation?: any;
-};
-
-export const RoommatesScreen = ({ navigation }: RoommatesScreenProps = {}) => {
+export const RoommatesScreen = () => {
   const { theme } = useTheme();
   const { user } = useAuth();
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [profiles, setProfiles] = useState<RoommateProfile[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -235,9 +233,11 @@ export const RoommatesScreen = ({ navigation }: RoommatesScreenProps = {}) => {
     outputRange: ['-15deg', '15deg'],
   });
 
-  const handleOpenAIAssistant = () => {
-    const userPlan = user?.subscription?.plan || 'free';
-    const userStatus = user?.subscription?.status || 'active';
+  const handleOpenAIAssistant = async () => {
+    const users = await StorageService.getUsers();
+    const currentUser = users.find(u => u.id === user?.id);
+    const userPlan = currentUser?.subscription?.plan || 'free';
+    const userStatus = currentUser?.subscription?.status || 'active';
     
     if (userPlan !== 'vip' || userStatus !== 'active') {
       Alert.alert(
