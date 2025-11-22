@@ -1020,6 +1020,7 @@ export const mockConversations: Conversation[] = [
     lastMessage: 'That sounds great! When can we schedule a viewing?',
     timestamp: new Date(Date.now() - 1000 * 60 * 5),
     unread: 2,
+    messages: [],
   },
   {
     id: '2',
@@ -1032,6 +1033,7 @@ export const mockConversations: Conversation[] = [
     lastMessage: 'Thanks for reaching out!',
     timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
     unread: 0,
+    messages: [],
   },
 ];
 

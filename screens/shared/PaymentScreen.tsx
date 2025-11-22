@@ -184,13 +184,13 @@ export const PaymentScreen = () => {
       <View key={planType} style={[styles.planCard, { backgroundColor: bgColor, borderColor: theme.border, borderWidth: isCurrentPlan ? 0 : 1 }]}>
         <View style={styles.planHeader}>
           <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flexWrap: 'wrap' }}>
               <ThemedText style={[Typography.h2, { color: textColor }]}>
                 {planType.charAt(0).toUpperCase() + planType.slice(1)}
               </ThemedText>
               {planType === 'priority' && <Feather name="award" size={20} color={isCurrentPlan ? '#FFD700' : '#7C3AED'} />}
             </View>
-            <ThemedText style={[Typography.body, { color: isCurrentPlan && planType !== 'basic' ? 'rgba(255,255,255,0.9)' : theme.textSecondary, marginTop: Spacing.xs }]}>
+            <ThemedText style={[Typography.body, { color: isCurrentPlan && planType !== 'basic' ? 'rgba(255,255,255,0.9)' : theme.textSecondary, marginTop: Spacing.sm, marginBottom: Spacing.md }]}>
               {price}
             </ThemedText>
           </View>
@@ -461,10 +461,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xxl,
   },
   planHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.lg,
   },
   premiumBadge: {
     width: 48,
