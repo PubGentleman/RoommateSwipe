@@ -493,4 +493,24 @@ export const StorageService = {
       console.error('Error initializing with mock data:', error);
     }
   },
+
+  async forceReloadMockData(): Promise<void> {
+    try {
+      console.log('[StorageService] Force reloading all mock data...');
+      const { mockRoommateProfiles, mockProperties, mockGroups } = await import('./mockData');
+      
+      await this.setRoommateProfiles(mockRoommateProfiles);
+      console.log(`[StorageService] Loaded ${mockRoommateProfiles.length} roommate profiles`);
+      
+      await this.setProperties(mockProperties);
+      console.log(`[StorageService] Loaded ${mockProperties.length} properties`);
+      
+      await this.setGroups(mockGroups);
+      console.log(`[StorageService] Loaded ${mockGroups.length} groups`);
+      
+      console.log('[StorageService] Mock data reload complete!');
+    } catch (error) {
+      console.error('Error force reloading mock data:', error);
+    }
+  },
 };
