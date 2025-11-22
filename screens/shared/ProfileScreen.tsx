@@ -1,11 +1,11 @@
-import React from 'react';
-import { View, StyleSheet, Pressable, Image } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, StyleSheet, Pressable, Image, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { ScreenScrollView } from '../../components/ScreenScrollView';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { ProfileStackParamList } from '../../navigation/ProfileStackNavigator';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
@@ -14,8 +14,35 @@ type ProfileScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamLi
 
 export const ProfileScreen = () => {
   const { theme } = useTheme();
-  const { user, logout } = useAuth();
+  const { user, logout, activateBoost, canBoost, checkAndUpdateBoostStatus } = useAuth();
   const navigation = useNavigation<ProfileScreenNavigationProp>();
+
+  useFocusEffect(
+    React.useCallback(() => {
+      checkAndUpdateBoostStatus();
+    }, [user])
+  );
+
+  const handleBoost = async () => {
+    const result = await activateBoost();
+    if (result.success) {
+      Alert.alert('Boost Activated!', result.message);
+    } else {
+      const boostStatus = canBoost();
+      if (!boostStatus.canBoost && user?.subscription?.plan === 'free') {
+        Alert.alert(
+          'Upgrade Required',
+          boostStatus.reason || 'Boost is a Premium feature',
+          [
+            { text: 'Maybe Later', style: 'cancel' },
+            { text: 'View Plans', onPress: () => navigation.navigate('Payment') },
+          ]
+        );
+      } else {
+        Alert.alert('Cannot Boost', result.message);
+      }
+    }
+  };
 
   const getRoleBadgeColor = () => {
     if (!user) return theme.primary;
@@ -153,6 +180,83 @@ export const ProfileScreen = () => {
           />
         </View>
 
+        {user?.role === 'renter' ? (
+          <View style={styles.section}>
+            <ThemedText style={[Typography.h3, styles.sectionTitle]}>Profile Boost</ThemedText>
+            <View style={[styles.boostCard, { backgroundColor: theme.backgroundDefault }]}>
+              {user.boostData?.isBoosted ? (
+                <View style={styles.boostActive}>
+                  <View style={[styles.boostBadge, { backgroundColor: '#10B981' }]}>
+                    <Feather name="zap" size={16} color="#FFFFFF" />
+                    <ThemedText style={[Typography.small, { color: '#FFFFFF', marginLeft: 4, fontWeight: '600' }]}>
+                      Active
+                    </ThemedText>
+                  </View>
+                  <ThemedText style={[Typography.body, { marginTop: Spacing.sm }]}>
+                    Your profile is currently boosted!
+                  </ThemedText>
+                  {user.boostData.boostExpiresAt ? (
+                    <ThemedText style={[Typography.small, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
+                      Expires: {new Date(user.boostData.boostExpiresAt).toLocaleString()}
+                    </ThemedText>
+                  ) : null}
+                </View>
+              ) : (
+                <>
+                  <ThemedText style={[Typography.body, { color: theme.textSecondary, marginBottom: Spacing.md }]}>
+                    Boost your profile to appear first in roommate searches for 24 hours
+                  </ThemedText>
+                  <View style={styles.boostInfo}>
+                    <View style={styles.boostFeature}>
+                      <Feather name="trending-up" size={16} color={theme.primary} />
+                      <ThemedText style={[Typography.small, { marginLeft: Spacing.sm }]}>
+                        Priority placement
+                      </ThemedText>
+                    </View>
+                    <View style={styles.boostFeature}>
+                      <Feather name="clock" size={16} color={theme.primary} />
+                      <ThemedText style={[Typography.small, { marginLeft: Spacing.sm }]}>
+                        24 hour duration
+                      </ThemedText>
+                    </View>
+                  </View>
+                  {user.subscription?.plan === 'premium' && user.boostData?.lastBoostDate ? (
+                    <ThemedText style={[Typography.small, { color: theme.textSecondary, marginTop: Spacing.md }]}>
+                      {(() => {
+                        const boostStatus = canBoost();
+                        if (!boostStatus.canBoost && boostStatus.reason) {
+                          return boostStatus.reason;
+                        }
+                        return 'Boost available!';
+                      })()}
+                    </ThemedText>
+                  ) : null}
+                  <Pressable
+                    style={[styles.boostButton, { 
+                      backgroundColor: canBoost().canBoost ? theme.primary : theme.backgroundSecondary 
+                    }]}
+                    onPress={handleBoost}
+                    disabled={!canBoost().canBoost && user.subscription?.plan !== 'free'}
+                  >
+                    <Feather name="zap" size={20} color={canBoost().canBoost ? '#FFFFFF' : theme.textSecondary} />
+                    <ThemedText style={[Typography.body, { 
+                      color: canBoost().canBoost ? '#FFFFFF' : theme.textSecondary, 
+                      fontWeight: '600', 
+                      marginLeft: Spacing.sm 
+                    }]}>
+                      {user.subscription?.plan === 'free' 
+                        ? 'Upgrade to Boost' 
+                        : canBoost().canBoost 
+                          ? 'Activate Boost' 
+                          : 'Boost Unavailable'}
+                    </ThemedText>
+                  </Pressable>
+                </>
+              )}
+            </View>
+          </View>
+        ) : null}
+
         <View style={styles.section}>
           <ThemedText style={[Typography.h3, styles.sectionTitle]}>Account</ThemedText>
           <MenuItem icon="edit-3" label="Edit Profile" onPress={() => {}} />
@@ -253,5 +357,36 @@ const styles = StyleSheet.create({
   benefitItem: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  boostCard: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.medium,
+    marginBottom: Spacing.sm,
+  },
+  boostActive: {
+    alignItems: 'flex-start',
+  },
+  boostBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.small,
+  },
+  boostInfo: {
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  boostFeature: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  boostButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.medium,
+    marginTop: Spacing.md,
   },
 });

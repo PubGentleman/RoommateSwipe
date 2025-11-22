@@ -42,6 +42,9 @@ interface AuthContextType {
   updateUser: (updates: Partial<User>) => Promise<void>;
   incrementMessageCount: () => Promise<void>;
   canSendMessage: () => boolean;
+  activateBoost: () => Promise<{ success: boolean; message: string }>;
+  canBoost: () => { canBoost: boolean; reason?: string };
+  checkAndUpdateBoostStatus: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -57,11 +60,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loadUser = async () => {
     try {
       await StorageService.initializeWithMockData();
-      const currentUser = await StorageService.getCurrentUser();
+      let currentUser = await StorageService.getCurrentUser();
       if (currentUser) {
         if (currentUser.messageCount === undefined) {
           currentUser.messageCount = 0;
         }
+        
+        if (currentUser.boostData) {
+          currentUser.boostData = {
+            ...currentUser.boostData,
+            lastBoostDate: currentUser.boostData.lastBoostDate 
+              ? new Date(currentUser.boostData.lastBoostDate) 
+              : undefined,
+            boostExpiresAt: currentUser.boostData.boostExpiresAt 
+              ? new Date(currentUser.boostData.boostExpiresAt) 
+              : undefined,
+          };
+          
+          if (currentUser.boostData.isBoosted && currentUser.boostData.boostExpiresAt) {
+            const now = new Date();
+            if (currentUser.boostData.boostExpiresAt <= now) {
+              currentUser = {
+                ...currentUser,
+                boostData: {
+                  ...currentUser.boostData,
+                  isBoosted: false,
+                },
+              };
+              await StorageService.setCurrentUser(currentUser);
+              await StorageService.addOrUpdateUser(currentUser);
+            }
+          }
+        }
+        
         setUser(currentUser);
       }
     } catch (error) {
@@ -190,8 +221,105 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return messageCount < 50;
   };
 
+  const canBoost = (): { canBoost: boolean; reason?: string } => {
+    if (!user) return { canBoost: false, reason: 'Not logged in' };
+    
+    const plan = user.subscription?.plan || 'free';
+    
+    if (plan === 'free') {
+      return { canBoost: false, reason: 'Boost is available for Premium and VIP members only' };
+    }
+    
+    if (user.boostData?.isBoosted && user.boostData.boostExpiresAt) {
+      const now = new Date();
+      if (user.boostData.boostExpiresAt > now) {
+        return { canBoost: false, reason: 'Boost is already active' };
+      }
+    }
+    
+    if (plan === 'vip') {
+      return { canBoost: true };
+    }
+    
+    if (plan === 'premium') {
+      const lastBoostDate = user.boostData?.lastBoostDate;
+      if (lastBoostDate) {
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        if (lastBoostDate > weekAgo) {
+          const nextBoostDate = new Date(lastBoostDate);
+          nextBoostDate.setDate(nextBoostDate.getDate() + 7);
+          return { 
+            canBoost: false, 
+            reason: `Next boost available on ${nextBoostDate.toLocaleDateString()}` 
+          };
+        }
+      }
+      return { canBoost: true };
+    }
+    
+    return { canBoost: false };
+  };
+
+  const activateBoost = async (): Promise<{ success: boolean; message: string }> => {
+    if (!user) {
+      return { success: false, message: 'Not logged in' };
+    }
+    
+    const boostCheck = canBoost();
+    if (!boostCheck.canBoost) {
+      return { success: false, message: boostCheck.reason || 'Cannot boost' };
+    }
+    
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    
+    const updatedUser: User = {
+      ...user,
+      boostData: {
+        boostsUsed: (user.boostData?.boostsUsed || 0) + 1,
+        lastBoostDate: now,
+        isBoosted: true,
+        boostExpiresAt: expiresAt,
+      },
+    };
+    
+    await StorageService.setCurrentUser(updatedUser);
+    await StorageService.addOrUpdateUser(updatedUser);
+    setUser(updatedUser);
+    
+    return { success: true, message: 'Boost activated! Your profile will be prioritized for 24 hours.' };
+  };
+
+  const checkAndUpdateBoostStatus = async () => {
+    if (!user || !user.boostData?.isBoosted) return;
+    
+    const now = new Date();
+    const expiresAt = user.boostData.boostExpiresAt 
+      ? new Date(user.boostData.boostExpiresAt)
+      : null;
+    
+    if (expiresAt && expiresAt <= now) {
+      const updatedUser: User = {
+        ...user,
+        boostData: {
+          ...user.boostData,
+          lastBoostDate: user.boostData.lastBoostDate 
+            ? new Date(user.boostData.lastBoostDate)
+            : undefined,
+          boostExpiresAt: expiresAt,
+          isBoosted: false,
+        },
+      };
+      
+      await StorageService.setCurrentUser(updatedUser);
+      await StorageService.addOrUpdateUser(updatedUser);
+      setUser(updatedUser);
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPremium, upgradeToVIP, updateUser, incrementMessageCount, canSendMessage }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPremium, upgradeToVIP, updateUser, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus }}>
       {children}
     </AuthContext.Provider>
   );
