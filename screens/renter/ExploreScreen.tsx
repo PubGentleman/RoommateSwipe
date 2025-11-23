@@ -136,6 +136,8 @@ export const ExploreScreen = () => {
   const applyFilters = () => {
     let filtered = [...properties];
 
+    filtered = filtered.filter(p => p.available);
+
     if (viewMode === 'saved') {
       filtered = filtered.filter(p => saved.has(p.id));
     }

@@ -72,6 +72,7 @@ export const NotificationsScreen = () => {
       case 'group_accepted':
         return 'users';
       case 'property_update':
+      case 'property_rented':
         return 'home';
       case 'application_status':
         return 'file-text';

@@ -42,6 +42,7 @@ export interface Property {
   description: string;
   available: boolean;
   availableDate?: Date;
+  rentedDate?: Date;
   hostId: string;
   hostName: string;
   featured?: boolean;
@@ -189,7 +190,7 @@ export interface User {
 export interface Notification {
   id: string;
   userId: string;
-  type: 'match' | 'message' | 'group_invite' | 'group_accepted' | 'property_update' | 'application_status' | 'system';
+  type: 'match' | 'message' | 'group_invite' | 'group_accepted' | 'property_update' | 'property_rented' | 'application_status' | 'system';
   title: string;
   body: string;
   isRead: boolean;
