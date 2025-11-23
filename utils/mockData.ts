@@ -24,6 +24,23 @@ export const mockProfileUsers: User[] = [
     role: 'renter',
     subscription: { plan: 'basic', status: 'active' },
     boostData: { boostsUsed: 0, isBoosted: false },
+    profileData: {
+      bio: 'Graphic designer working from home. Cat mom, plant lover, and yoga enthusiast.',
+      budget: 1000,
+      location: 'Westside',
+      occupation: 'Graphic Designer',
+      interests: 'yoga, plants, cats, design',
+      preferences: {
+        sleepSchedule: 'flexible',
+        cleanliness: 'clean',
+        guestPolicy: 'occasional',
+        petFriendly: true,
+      },
+      lifestyle: {
+        smoking: false,
+        drinking: 'social',
+      },
+    },
   },
   {
     id: '4',
