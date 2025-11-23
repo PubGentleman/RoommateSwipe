@@ -889,7 +889,7 @@ export const ExploreScreen = () => {
                       <View style={styles.detailRow}>
                         <Feather name="user-x" size={20} color={theme.primary} />
                         <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Other Roommates (Not on App)</ThemedText>
+                          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Other Roommates</ThemedText>
                           <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
                             {selectedProperty.existingRoommates.filter(rm => !rm.onApp).map((rm) => getGenderSymbol(rm.gender)).join('')}
                           </ThemedText>
