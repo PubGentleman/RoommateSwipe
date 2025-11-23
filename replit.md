@@ -39,7 +39,14 @@ Animations use React Native Reanimated, and gestures are handled by React Native
 
 ## Authentication & Authorization
 
-The system supports mock authentication with email/password and planned SSO (Apple/Google). Users have defined roles (`renter`, `host`, `agent`) with role-based navigation and conditional screen access. Three subscription tiers are implemented via Stripe integration: Basic, Plus ($14.99/month), and Priority ($49.99-$99/month). Subscription management includes full lifecycle support for cancellation, downgrades, and reactivation with prorated access and clear UI indicators. Messaging limits, boost systems, advanced filters, featured listings, online status visibility (Plus/Priority), and an AI Match Assistant (Plus/Priority) are all gated by subscription tiers.
+The system supports mock authentication with email/password and planned SSO (Apple/Google). Users have defined roles (`renter`, `host`, `agent`) with role-based navigation and conditional screen access. Three subscription tiers are implemented via Stripe integration: Basic, Plus ($14.99/month), and Priority ($49.99-$99/month). Subscription management includes full lifecycle support for cancellation, downgrades, and reactivation with prorated access and clear UI indicators. Messaging limits, boost systems, advanced filters, featured listings, online status visibility (Plus/Priority), Walk Score access (Plus/Priority), and an AI Match Assistant (Plus/Priority) are all gated by subscription tiers.
+
+**Walk Score Feature:**
+- Walk Score displays walkability ratings (0-100) for properties with color-coded scores and official-style circular green badge with walking person icon
+- Basic users see lock icons on property listings with upgrade prompts
+- Plus and Priority users have full access to Walk Score data across all property views
+- Hosts and agents always see Walk Scores on their own listings regardless of subscription tier
+- Score color-coding: green (90-100), lime green (80-89), yellow (70-79), orange (50-69), red-orange (25-49), dark red (0-24)
 
 ## Data Layer
 
