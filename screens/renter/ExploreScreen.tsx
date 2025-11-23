@@ -34,14 +34,16 @@ export const ExploreScreen = () => {
   const [tempFilters, setTempFilters] = useState<PropertyFilter>({});
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [showPropertyDetail, setShowPropertyDetail] = useState(false);
+  const [viewMode, setViewMode] = useState<'all' | 'saved'>('all');
 
   useEffect(() => {
     loadProperties();
+    loadSavedProperties();
   }, []);
 
   useEffect(() => {
     applyFilters();
-  }, [properties, filters]);
+  }, [properties, filters, viewMode, saved]);
 
   const loadProperties = async () => {
     try {
@@ -59,8 +61,22 @@ export const ExploreScreen = () => {
     }
   };
 
+  const loadSavedProperties = async () => {
+    if (!user?.id) return;
+    try {
+      const savedIds = await StorageService.getSavedProperties(user.id);
+      setSaved(new Set(savedIds));
+    } catch (err) {
+      console.error('Error loading saved properties:', err);
+    }
+  };
+
   const applyFilters = () => {
     let filtered = [...properties];
+
+    if (viewMode === 'saved') {
+      filtered = filtered.filter(p => saved.has(p.id));
+    }
 
     if (filters.minPrice !== undefined) {
       filtered = filtered.filter(p => p.price >= filters.minPrice!);
@@ -137,7 +153,10 @@ export const ExploreScreen = () => {
     );
   };
 
-  const toggleSave = (id: string) => {
+  const toggleSave = async (id: string) => {
+    if (!user?.id) return;
+    
+    const wasSaved = saved.has(id);
     setSaved(prev => {
       const newSet = new Set(prev);
       if (newSet.has(id)) {
@@ -147,6 +166,25 @@ export const ExploreScreen = () => {
       }
       return newSet;
     });
+
+    try {
+      if (wasSaved) {
+        await StorageService.unsaveProperty(user.id, id);
+      } else {
+        await StorageService.saveProperty(user.id, id);
+      }
+    } catch (err) {
+      console.error('Error toggling save:', err);
+      setSaved(prev => {
+        const newSet = new Set(prev);
+        if (wasSaved) {
+          newSet.add(id);
+        } else {
+          newSet.delete(id);
+        }
+        return newSet;
+      });
+    }
   };
 
   const renderProperty = ({ item }: { item: Property }) => (
