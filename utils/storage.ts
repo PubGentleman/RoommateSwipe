@@ -261,9 +261,12 @@ export const StorageService = {
           return false;
         }
         
-        const newMember = await this.getUser(userId);
+        const users = await this.getUsers();
+        const newMember = users.find(u => u.id === userId);
         const existingMembers = [...group.members];
-        const interestedUsers = [...group.pendingMembers.filter(id => id !== userId)];
+        const interestedUsers = [...group.pendingMembers.filter(
+          id => id !== userId && !group.members.includes(id)
+        )];
         
         group.pendingMembers = group.pendingMembers.filter(id => id !== userId);
         if (!group.members.includes(userId) && group.members.length < group.maxMembers) {
