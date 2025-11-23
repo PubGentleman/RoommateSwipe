@@ -31,7 +31,7 @@ Roomdr utilizes a comprehensive points-based compatibility system (0-100 score) 
 The application is built with React Native and Expo, using TypeScript and leveraging React's experimental features for performance. It employs React Navigation for a role-based navigation structure (Renter, Host, Agent/Landlord) with nested navigators. UI/UX follows a theme system supporting light/dark modes and uses reusable, themed components.
 
 **Core Features by Role:**
-- **Renter:** Swipe-based matching with priority visibility (Elite), 1-on-1 messaging, Priority messaging (Elite users can message without matching; Basic users can pay $0.99 for single message), comprehensive group management, property exploration with advanced filters (Plus/Elite only), saved properties, rewind functionality (Plus/Elite), profile views tracking (Plus/Elite), see who liked you (Elite only), and an AI Match Assistant (Plus/Elite). Boost feature available for profile visibility. Property listings display room type (ROOM vs ENTIRE APARTMENT), existing roommate gender for room listings, and compatibility scores with hosts for informed decision-making.
+- **Renter:** Swipe-based matching with priority visibility (Elite), 1-on-1 messaging, Priority messaging (Elite users can message without matching; Basic users can pay $0.99 for single message), comprehensive group management, property exploration with advanced filters (Plus/Elite only), saved properties, rewind functionality (1/day for Basic, 5/day for Plus, unlimited for Elite), profile views tracking (Plus/Elite), see who liked you (Elite only), and an AI Match Assistant (Plus/Elite). Boost feature available for profile visibility. Property listings display room type (ROOM vs ENTIRE APARTMENT), existing roommate gender for room listings, and compatibility scores with hosts for informed decision-making.
 - **Host:** Property listing management (CRUD) with room type specification (room or entire apartment), existing roommate gender tracking for room listings, application review, listing status control, and featured listings (Elite only).
 - **Agent:** Multi-property portfolio management, document verification, legal template library, and professional credential verification.
 
@@ -46,6 +46,7 @@ The system supports mock authentication with email/password and planned SSO (App
 **Basic (Free):**
 - Unlimited messages (must match first)
 - 3 active chats maximum
+- 1 free rewind per day
 - Create 1 group
 - Join 1 group
 - Browse listings

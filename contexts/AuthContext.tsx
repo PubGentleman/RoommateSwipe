@@ -704,22 +704,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    if (user.undoPassData?.hasUndoPass) {
+    if (userPlan === 'basic') {
       const now = new Date();
-      const expiresAt = user.undoPassData.undoPassExpiresAt 
-        ? new Date(user.undoPassData.undoPassExpiresAt)
+      const lastReset = user.rewindData?.lastRewindReset 
+        ? new Date(user.rewindData.lastRewindReset)
         : null;
       
-      if (expiresAt && expiresAt > now) {
-        return { canRewind: true, remaining: 1, limit: 1 };
+      let rewindsUsed = user.rewindData?.rewindsUsedToday || 0;
+      
+      if (!lastReset || !isSameDay(lastReset, now)) {
+        rewindsUsed = 0;
       }
+      
+      const limit = 1;
+      const remaining = Math.max(0, limit - rewindsUsed);
+      
+      if (remaining > 0) {
+        return { canRewind: true, remaining, limit };
+      }
+
+      if (user.undoPassData?.hasUndoPass) {
+        const expiresAt = user.undoPassData.undoPassExpiresAt 
+          ? new Date(user.undoPassData.undoPassExpiresAt)
+          : null;
+        
+        if (expiresAt && expiresAt > now) {
+          return { canRewind: true, remaining: 1, limit: 1 };
+        }
+      }
+
+      return { 
+        canRewind: false, 
+        remaining: 0, 
+        limit,
+        message: 'Daily rewind used (1/1). Purchase a 24h undo pass for more or upgrade to Plus (5 rewinds/day)!'
+      };
     }
 
     return { 
       canRewind: false, 
       remaining: 0, 
       limit: 0,
-      message: 'Rewind not available. Upgrade to Plus (5 rewinds/day) or Elite (unlimited rewinds)!'
+      message: 'Rewind not available.'
     };
   };
 
@@ -767,19 +793,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    if (user.undoPassData?.hasUndoPass) {
-      await StorageService.consumeUndoPass(user.id);
+    if (userPlan === 'basic') {
+      const now = new Date();
+      const lastReset = user.rewindData?.lastRewindReset 
+        ? new Date(user.rewindData.lastRewindReset)
+        : null;
       
-      const updatedUser: User = {
-        ...user,
-        undoPassData: {
-          hasUndoPass: false,
-          undoPassExpiresAt: null as any,
-        },
-      };
+      let rewindsUsed = user.rewindData?.rewindsUsedToday || 0;
       
-      setUser(updatedUser);
-      console.log('[Auth] 24h undo pass consumed');
+      if (!lastReset || !isSameDay(lastReset, now)) {
+        rewindsUsed = 0;
+      }
+
+      if (rewindsUsed < 1) {
+        const updatedUser: User = {
+          ...user,
+          rewindData: {
+            rewindsUsedToday: rewindsUsed + 1,
+            lastRewindReset: now,
+          },
+        };
+        
+        await StorageService.setCurrentUser(updatedUser);
+        await StorageService.addOrUpdateUser(updatedUser);
+        setUser(updatedUser);
+        
+        console.log('[Auth] Free daily rewind used (Basic tier)');
+        return;
+      }
+
+      if (user.undoPassData?.hasUndoPass) {
+        await StorageService.consumeUndoPass(user.id);
+        
+        const updatedUser: User = {
+          ...user,
+          undoPassData: {
+            hasUndoPass: false,
+            undoPassExpiresAt: null as any,
+          },
+        };
+        
+        setUser(updatedUser);
+        console.log('[Auth] 24h undo pass consumed');
+      }
     }
   };
 
