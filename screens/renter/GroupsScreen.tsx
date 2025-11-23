@@ -313,12 +313,12 @@ export const GroupsScreen = () => {
 
   const renderMyGroup = (group: Group) => {
     const isCreator = group.createdBy === user?.id;
-    const memberProfiles = group.members
+    const memberProfiles = (group.members || [])
       .map(id => mockRoommateProfiles.find(p => p.id === id))
-      .filter(Boolean);
-    const pendingProfiles = group.pendingMembers
+      .filter((p): p is NonNullable<typeof p> => p !== null && p !== undefined);
+    const pendingProfiles = (group.pendingMembers || [])
       .map(id => mockRoommateProfiles.find(p => p.id === id))
-      .filter(Boolean);
+      .filter((p): p is NonNullable<typeof p> => p !== null && p !== undefined);
 
     return (
       <View
@@ -356,16 +356,16 @@ export const GroupsScreen = () => {
             <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.sm }]}>
               Members
             </ThemedText>
-            {memberProfiles.map(profile => profile ? (
+            {memberProfiles.map(profile => (
               <View key={profile.id} style={styles.memberRow}>
-                <ThemedText style={Typography.body}>{profile.name}</ThemedText>
+                <ThemedText style={Typography.body}>{profile.name || 'Unknown'}</ThemedText>
                 {isCreator && profile.id !== user?.id ? (
-                  <Pressable onPress={() => handleRemoveMember(group.id, profile.id, profile.name)}>
+                  <Pressable onPress={() => handleRemoveMember(group.id, profile.id, profile.name || 'Member')}>
                     <Feather name="x-circle" size={20} color={theme.error} />
                   </Pressable>
                 ) : null}
               </View>
-            ) : null)}
+            ))}
           </View>
         ) : null}
 
@@ -374,13 +374,13 @@ export const GroupsScreen = () => {
             <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.sm }]}>
               Pending Requests ({pendingProfiles.length})
             </ThemedText>
-            {pendingProfiles.map(profile => profile ? (
+            {pendingProfiles.map(profile => (
               <View key={profile.id} style={styles.pendingRow}>
-                <ThemedText style={Typography.body}>{profile.name}</ThemedText>
+                <ThemedText style={Typography.body}>{profile.name || 'Unknown'}</ThemedText>
                 <View style={styles.pendingActions}>
                   <Pressable
                     style={[styles.pendingButton, { backgroundColor: theme.primary }]}
-                    onPress={() => handleAcceptMember(group.id, profile.id, profile.name)}
+                    onPress={() => handleAcceptMember(group.id, profile.id, profile.name || 'Member')}
                   >
                     <Feather name="check" size={16} color="#FFFFFF" />
                   </Pressable>
@@ -392,7 +392,7 @@ export const GroupsScreen = () => {
                   </Pressable>
                 </View>
               </View>
-            ) : null)}
+            ))}
           </View>
         ) : null}
       </View>
