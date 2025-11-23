@@ -595,7 +595,7 @@ export const ExploreScreen = () => {
               <View style={styles.upgradeFeature}>
                 <Feather name="check" size={20} color={theme.success} />
                 <ThemedText style={[Typography.body, { marginLeft: Spacing.md }]}>
-                  Location search
+                  Bedroom & bathroom filters
                 </ThemedText>
               </View>
               <View style={styles.upgradeFeature}>
