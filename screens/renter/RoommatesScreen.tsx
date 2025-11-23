@@ -14,7 +14,7 @@ import { StorageService } from '../../utils/storage';
 import { RoommateProfile, Match } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scaleFont, moderateScale, getResponsiveSpacing } from '../../utils/responsive';
-import { calculateCompatibility, getMatchQualityColor, getCleanlinessLabel, getSocialLevelLabel, getWorkScheduleLabel, formatMoveInDate } from '../../utils/matchingAlgorithm';
+import { calculateCompatibility, getMatchQualityColor, getCleanlinessLabel, getSocialLevelLabel, getWorkScheduleLabel, formatMoveInDate, getGenderSymbol } from '../../utils/matchingAlgorithm';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Limit card size for web/desktop viewing
@@ -376,7 +376,7 @@ export const RoommatesScreen = () => {
               ) : null}
               <View style={styles.cardInfo}>
                 <ThemedText style={[Typography.hero, { color: '#FFFFFF', textShadowColor: 'rgba(0, 0, 0, 0.75)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 }]}>
-                  {currentProfile.name}, {currentProfile.age}{currentProfile.gender ? `, ${currentProfile.gender.charAt(0).toUpperCase() + currentProfile.gender.slice(1)}` : ''}
+                  {currentProfile.name}, {currentProfile.age} {getGenderSymbol(currentProfile.gender)}
                 </ThemedText>
                 <ThemedText style={[Typography.body, { color: '#FFFFFF', marginTop: Spacing.sm, textShadowColor: 'rgba(0, 0, 0, 0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }]}>
                   {currentProfile.occupation}

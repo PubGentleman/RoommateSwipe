@@ -680,3 +680,17 @@ export const numberToCleanliness = (value: number): 'very_tidy' | 'moderately_ti
   if (value >= 4) return 'moderately_tidy';
   return 'relaxed';
 };
+
+/**
+ * Get gender symbol for display
+ * Returns unicode symbols: ♂ (male), ♀ (female), ⚧ (non-binary/other)
+ */
+export const getGenderSymbol = (gender: 'male' | 'female' | 'other' | undefined): string => {
+  if (!gender) return '';
+  const symbols: Record<string, string> = {
+    male: '♂',
+    female: '♀',
+    other: '⚧',
+  };
+  return symbols[gender] || '';
+};
