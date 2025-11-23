@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { ScreenScrollView } from '../../components/ScreenScrollView';
 import { ThemedText } from '../../components/ThemedText';
+import { WalkScoreBadge } from '../../components/WalkScoreBadge';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
@@ -88,12 +89,7 @@ export const PropertiesScreen = () => {
             </ThemedText>
           </View>
           {property.walkScore ? (
-            <View style={styles.stat}>
-              <Feather name="navigation" size={16} color={theme.textSecondary} />
-              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
-                Walk Score {property.walkScore}
-              </ThemedText>
-            </View>
+            <WalkScoreBadge score={property.walkScore} size="small" />
           ) : null}
         </View>
         <View style={styles.actions}>

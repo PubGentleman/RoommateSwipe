@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { ThemedText } from '../../components/ThemedText';
 import { ThemedView } from '../../components/ThemedView';
+import { WalkScoreBadge } from '../../components/WalkScoreBadge';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
@@ -354,32 +355,29 @@ export const ExploreScreen = () => {
               </ThemedText>
             </View>
           ) : null}
-          <View style={styles.details}>
-            <View style={styles.detail}>
-              <Feather name="home" size={16} color={theme.textSecondary} />
-              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
-                {item.bedrooms} bd
-              </ThemedText>
-            </View>
-            <View style={styles.detail}>
-              <Feather name="droplet" size={16} color={theme.textSecondary} />
-              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
-                {item.bathrooms} ba
-              </ThemedText>
-            </View>
-            <View style={styles.detail}>
-              <Feather name="maximize" size={16} color={theme.textSecondary} />
-              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
-                {item.sqft} sqft
-              </ThemedText>
-            </View>
-            {item.walkScore ? (
+          <View style={styles.detailsRow}>
+            <View style={styles.details}>
               <View style={styles.detail}>
-                <Feather name="navigation" size={16} color={theme.textSecondary} />
+                <Feather name="home" size={16} color={theme.textSecondary} />
                 <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
-                  {item.walkScore}
+                  {item.bedrooms} bd
                 </ThemedText>
               </View>
+              <View style={styles.detail}>
+                <Feather name="droplet" size={16} color={theme.textSecondary} />
+                <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
+                  {item.bathrooms} ba
+                </ThemedText>
+              </View>
+              <View style={styles.detail}>
+                <Feather name="maximize" size={16} color={theme.textSecondary} />
+                <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
+                  {item.sqft} sqft
+                </ThemedText>
+              </View>
+            </View>
+            {item.walkScore ? (
+              <WalkScoreBadge score={item.walkScore} size="small" />
             ) : null}
           </View>
           <View style={styles.locationRow}>
@@ -978,16 +976,18 @@ export const ExploreScreen = () => {
                     </View>
                     {selectedProperty.walkScore ? (
                       <View style={styles.detailRow}>
-                        <Feather name="navigation" size={20} color={theme.primary} />
-                        <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Walk Score</ThemedText>
+                        <WalkScoreBadge score={selectedProperty.walkScore} size="large" />
+                        <View style={{ flex: 1, marginLeft: Spacing.lg }}>
                           <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
-                            {selectedProperty.walkScore} - {
+                            {
                               selectedProperty.walkScore >= 90 ? "Walker's Paradise" :
                               selectedProperty.walkScore >= 70 ? "Very Walkable" :
                               selectedProperty.walkScore >= 50 ? "Somewhat Walkable" :
                               "Car-Dependent"
                             }
+                          </ThemedText>
+                          <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
+                            Daily errands do not require a car
                           </ThemedText>
                         </View>
                       </View>
@@ -1163,10 +1163,16 @@ const styles = StyleSheet.create({
   propertyInfo: {
     padding: Spacing.lg,
   },
+  detailsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: Spacing.md,
+  },
   details: {
     flexDirection: 'row',
     gap: Spacing.lg,
-    marginTop: Spacing.md,
+    flex: 1,
   },
   detail: {
     flexDirection: 'row',
