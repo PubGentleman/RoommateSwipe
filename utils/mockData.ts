@@ -6,6 +6,7 @@ export const mockProfileUsers: User[] = [
     email: 'sarah.johnson@email.com',
     name: 'Sarah Johnson',
     role: 'renter',
+    profilePicture: 'https://picsum.photos/400/500?random=1',
     subscription: { plan: 'priority', status: 'active' },
     boostData: { boostsUsed: 2, isBoosted: true, boostExpiresAt: new Date(Date.now() + 20 * 60 * 60 * 1000), lastBoostDate: new Date() },
     profileData: {
@@ -33,6 +34,7 @@ export const mockProfileUsers: User[] = [
     email: 'michael.chen@email.com',
     name: 'Michael Chen',
     role: 'renter',
+    profilePicture: 'https://picsum.photos/400/500?random=2',
     subscription: { plan: 'plus', status: 'active' },
     boostData: { boostsUsed: 1, isBoosted: true, boostExpiresAt: new Date(Date.now() + 10 * 60 * 60 * 1000), lastBoostDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) },
     profileData: {
@@ -60,6 +62,7 @@ export const mockProfileUsers: User[] = [
     email: 'emily.rodriguez@email.com',
     name: 'Emily Rodriguez',
     role: 'renter',
+    profilePicture: 'https://picsum.photos/400/500?random=3',
     subscription: { plan: 'basic', status: 'active' },
     boostData: { boostsUsed: 0, isBoosted: false },
     profileData: {
