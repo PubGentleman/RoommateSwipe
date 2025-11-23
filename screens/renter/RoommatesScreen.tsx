@@ -14,7 +14,7 @@ import { StorageService } from '../../utils/storage';
 import { RoommateProfile, Match } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scaleFont, moderateScale, getResponsiveSpacing } from '../../utils/responsive';
-import { calculateCompatibility, getMatchQualityColor } from '../../utils/matchingAlgorithm';
+import { calculateCompatibility, getMatchQualityColor, getCleanlinessLabel, getSocialLevelLabel, getWorkScheduleLabel, formatMoveInDate } from '../../utils/matchingAlgorithm';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Limit card size for web/desktop viewing
@@ -728,7 +728,7 @@ export const RoommatesScreen = () => {
                   <Feather name="calendar" size={20} color={theme.primary} />
                   <View style={{ flex: 1, marginLeft: Spacing.md }}>
                     <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Move-in Date</ThemedText>
-                    <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{currentProfile.preferences.moveInDate}</ThemedText>
+                    <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{formatMoveInDate(currentProfile.preferences.moveInDate)}</ThemedText>
                   </View>
                 </View>
                 <View style={styles.detailRow}>
@@ -746,21 +746,21 @@ export const RoommatesScreen = () => {
                   <Feather name="droplet" size={20} color={theme.primary} />
                   <View style={{ flex: 1, marginLeft: Spacing.md }}>
                     <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Cleanliness</ThemedText>
-                    <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{currentProfile.lifestyle.cleanliness}/10</ThemedText>
+                    <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{getCleanlinessLabel(currentProfile.lifestyle.cleanliness)}</ThemedText>
                   </View>
                 </View>
                 <View style={styles.detailRow}>
                   <Feather name="users" size={20} color={theme.primary} />
                   <View style={{ flex: 1, marginLeft: Spacing.md }}>
                     <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Social Level</ThemedText>
-                    <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{currentProfile.lifestyle.socialLevel}/10</ThemedText>
+                    <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{getSocialLevelLabel(currentProfile.lifestyle.socialLevel)}</ThemedText>
                   </View>
                 </View>
                 <View style={styles.detailRow}>
                   <Feather name="briefcase" size={20} color={theme.primary} />
                   <View style={{ flex: 1, marginLeft: Spacing.md }}>
                     <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Work Schedule</ThemedText>
-                    <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{currentProfile.lifestyle.workSchedule}</ThemedText>
+                    <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{getWorkScheduleLabel(currentProfile.lifestyle.workSchedule)}</ThemedText>
                   </View>
                 </View>
                 <View style={styles.detailRow}>
