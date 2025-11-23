@@ -136,11 +136,7 @@ export const ExploreScreen = () => {
   const applyFilters = () => {
     let filtered = [...properties];
 
-    console.log('[ExploreScreen] applyFilters - Total properties:', properties.length);
-    console.log('[ExploreScreen] Properties:', properties.map(p => ({ id: p.id, city: p.city, available: p.available })));
-
     filtered = filtered.filter(p => p.available);
-    console.log('[ExploreScreen] After available filter:', filtered.length);
 
     if (viewMode === 'saved') {
       filtered = filtered.filter(p => saved.has(p.id));
@@ -150,9 +146,6 @@ export const ExploreScreen = () => {
     // unless they're actively searching for a different city/neighborhood
     const userCity = user?.profileData?.city;
     const query = searchQuery.toLowerCase().trim();
-    
-    console.log('[ExploreScreen] User city:', userCity);
-    console.log('[ExploreScreen] Search query:', query);
     
     // Check if search query is a location name (city, state, or neighborhood from locationData)
     const allCities = getAllCities();
@@ -164,15 +157,9 @@ export const ExploreScreen = () => {
       allStates.some(state => state.toLowerCase() === query)
     ));
     
-    console.log('[ExploreScreen] isSearchingLocation:', isSearchingLocation);
-    
     if (userCity && !isSearchingLocation) {
       // Default: Only show properties in the user's city
-      console.log('[ExploreScreen] Filtering by city:', userCity);
       filtered = filtered.filter(p => p.city === userCity);
-      console.log('[ExploreScreen] After city filter:', filtered.length);
-    } else {
-      console.log('[ExploreScreen] Skipping city filter');
     }
 
     if (searchQuery.trim()) {
