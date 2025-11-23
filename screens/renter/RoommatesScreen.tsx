@@ -116,34 +116,10 @@ export const RoommatesScreen = () => {
   
   const isProfileOnline = currentProfile ? Math.random() > 0.5 : false;
 
-  const handleSwipeAction = async (action: 'like' | 'nope' | 'superlike') => {
-    console.log('[RoommatesScreen] handleSwipeAction called:', action);
-    if (!currentProfile || !user) {
-      console.log('[RoommatesScreen] No profile or user, returning');
-      return;
-    }
+  const handleSwipeAction = (action: 'like' | 'nope' | 'superlike') => {
+    if (!currentProfile || !user) return;
 
-    console.log('[RoommatesScreen] Processing swipe for profile:', currentProfile.id);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    
-    await StorageService.addToSwipeHistory(currentProfile.id);
-    
-    if (action === 'like' || action === 'superlike') {
-      await StorageService.addLike(user.id, currentProfile.id);
-      
-      const isReciprocalMatch = await StorageService.checkReciprocalLike(user.id, currentProfile.id);
-      if (isReciprocalMatch) {
-        const match: Match = {
-          id: `match_${Date.now()}`,
-          userId1: user.id,
-          userId2: currentProfile.id,
-          matchedAt: new Date(),
-        };
-        await StorageService.addMatch(match);
-        setShowMatch(true);
-        setTimeout(() => setShowMatch(false), 3000);
-      }
-    }
     
     const direction = action === 'like' ? 1 : action === 'nope' ? -1 : 0;
     const toX = direction * SCREEN_WIDTH * 1.5;
@@ -172,6 +148,33 @@ export const RoommatesScreen = () => {
       rotation.setValue(0);
       setCurrentIndex(currentIndex + 1);
     });
+
+    processSwipeAsync(action, currentProfile.id, user.id);
+  };
+
+  const processSwipeAsync = async (action: 'like' | 'nope' | 'superlike', profileId: string, userId: string) => {
+    try {
+      await StorageService.addToSwipeHistory(profileId);
+      
+      if (action === 'like' || action === 'superlike') {
+        await StorageService.addLike(userId, profileId);
+        
+        const isReciprocalMatch = await StorageService.checkReciprocalLike(userId, profileId);
+        if (isReciprocalMatch) {
+          const match: Match = {
+            id: `match_${Date.now()}`,
+            userId1: userId,
+            userId2: profileId,
+            matchedAt: new Date(),
+          };
+          await StorageService.addMatch(match);
+          setShowMatch(true);
+          setTimeout(() => setShowMatch(false), 3000);
+        }
+      }
+    } catch (error) {
+      console.error('[RoommatesScreen] Error processing swipe:', error);
+    }
   };
 
   const pan = Gesture.Pan()
@@ -181,20 +184,13 @@ export const RoommatesScreen = () => {
       rotation.setValue(event.translationX / 20);
     })
     .onEnd((event) => {
-      console.log('[RoommatesScreen] Pan gesture ended:', { 
-        translationX: event.translationX, 
-        translationY: event.translationY 
-      });
-      
+      'worklet';
       if (Math.abs(event.translationX) > 120) {
         const action = event.translationX > 0 ? 'like' : 'nope';
-        console.log('[RoommatesScreen] Horizontal swipe detected:', action);
         scheduleOnRN(() => handleSwipeAction(action));
       } else if (event.translationY < -120) {
-        console.log('[RoommatesScreen] Vertical swipe detected: superlike');
         scheduleOnRN(() => handleSwipeAction('superlike'));
       } else {
-        console.log('[RoommatesScreen] Swipe too short, resetting position');
 
         Animated.spring(translateX, {
           toValue: 0,
