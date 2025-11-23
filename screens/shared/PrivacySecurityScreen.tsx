@@ -223,7 +223,7 @@ export const PrivacySecurityScreen = () => {
         <MenuItem
           icon="shield"
           label="Terms of Service"
-          onPress={() => {}}
+          onPress={() => navigation.navigate('TermsOfService')}
         />
       </View>
 
