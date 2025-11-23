@@ -48,9 +48,7 @@ export const MyListingsScreen = () => {
     if (!property || property.hostId !== user.id) return;
 
     await StorageService.markPropertyAsRented(propertyId);
-    setListings(prev => prev.map(p => 
-      p.id === propertyId ? { ...p, available: false, rentedDate: new Date() } : p
-    ));
+    await loadListings();
   };
 
   const isPriority = user?.subscription?.plan === 'priority' && user?.subscription?.status === 'active';

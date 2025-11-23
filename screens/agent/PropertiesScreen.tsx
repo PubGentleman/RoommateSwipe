@@ -34,9 +34,7 @@ export const PropertiesScreen = () => {
     if (!property || property.hostId !== user.id) return;
 
     await StorageService.markPropertyAsRented(propertyId);
-    setProperties(prev => prev.map(p => 
-      p.id === propertyId ? { ...p, available: false, rentedDate: new Date() } : p
-    ));
+    await loadProperties();
   };
 
   const renderProperty = (property: Property) => (

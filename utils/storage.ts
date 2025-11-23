@@ -16,6 +16,14 @@ const STORAGE_KEYS = {
   NOTIFICATIONS: '@roomdr/notifications',
 };
 
+let notificationIdCounter = 0;
+const generateNotificationId = (): string => {
+  const timestamp = Date.now();
+  const counter = notificationIdCounter++;
+  const random = Math.floor(Math.random() * 1000);
+  return `notif-${timestamp}-${counter}-${random}`;
+};
+
 export const StorageService = {
   async getCurrentUser(): Promise<User | null> {
     try {
@@ -130,6 +138,8 @@ export const StorageService = {
         propertyType: p.propertyType || 'lease',
         roomType: p.roomType || 'entire',
         existingRoommates: p.existingRoommates || [],
+        availableDate: p.availableDate ? new Date(p.availableDate) : undefined,
+        rentedDate: p.rentedDate ? new Date(p.rentedDate) : undefined,
       }));
     } catch (error) {
       console.error('Error getting properties:', error);
@@ -188,8 +198,9 @@ export const StorageService = {
       const property = properties.find(p => p.id === propertyId);
       if (!property) return;
 
+      const rentedDate = new Date();
       property.available = false;
-      property.rentedDate = new Date();
+      property.rentedDate = rentedDate;
       await this.setProperties(properties);
 
       const users = await this.getUsers();
@@ -197,7 +208,7 @@ export const StorageService = {
         const savedProperties = await this.getSavedProperties(user.id);
         if (savedProperties.includes(propertyId)) {
           await this.addNotification({
-            id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            id: generateNotificationId(),
             userId: user.id,
             type: 'property_rented',
             title: 'Property Rented',
@@ -312,7 +323,7 @@ export const StorageService = {
         for (const memberId of existingMembers) {
           if (memberId !== userId) {
             await this.addNotification({
-              id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              id: generateNotificationId(),
               userId: memberId,
               type: 'group_accepted',
               title: 'New Group Member',
@@ -330,7 +341,7 @@ export const StorageService = {
         
         for (const interestedUserId of interestedUsers) {
           await this.addNotification({
-            id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            id: generateNotificationId(),
             userId: interestedUserId,
             type: 'group_accepted',
             title: 'Group Update',
@@ -669,6 +680,15 @@ export const StorageService = {
 
   async initializeWithMockData(): Promise<void> {
     try {
+      const existingProperties = await this.getProperties();
+      const existingProfiles = await this.getRoommateProfiles();
+      const existingGroups = await this.getGroups();
+      
+      if (existingProperties.length > 0 && existingProfiles.length > 0 && existingGroups.length > 0) {
+        console.log('[StorageService] Data already initialized, skipping mock data load');
+        return;
+      }
+      
       const { mockRoommateProfiles, mockProperties, mockGroups, mockProfileUsers } = await import('./mockData');
       
       console.log('[StorageService] Loading fresh mock data...');
