@@ -42,10 +42,7 @@ export const ProfileStackNavigator = () => {
         name="EditProfile" 
         component={EditProfileScreen}
         options={{
-          headerShown: true,
-          headerTransparent: true,
-          headerTitle: 'Edit Profile',
-          headerBlurEffect: 'regular',
+          headerShown: false,
         }}
       />
     </Stack.Navigator>
