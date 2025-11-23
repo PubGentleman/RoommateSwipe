@@ -6,7 +6,7 @@ import { Platform, StyleSheet } from 'react-native';
 import { MyListingsScreen } from '../screens/host/MyListingsScreen';
 import { ApplicationsScreen } from '../screens/host/ApplicationsScreen';
 import { MessagesStackNavigator } from './MessagesStackNavigator';
-import { ProfileScreen } from '../screens/shared/ProfileScreen';
+import { ProfileStackNavigator } from './ProfileStackNavigator';
 import { useTheme } from '../hooks/useTheme';
 
 export type HostTabParamList = {
@@ -42,7 +42,6 @@ export const HostTabNavigator = () => {
           ) : null,
         headerShown: true,
         headerTransparent: true,
-        headerBlurEffect: isDark ? 'dark' : 'light',
       }}
     >
       <Tab.Screen
@@ -69,8 +68,9 @@ export const HostTabNavigator = () => {
       />
       <Tab.Screen
         name="Profile"
-        component={ProfileScreen}
+        component={ProfileStackNavigator}
         options={{
+          headerShown: false,
           tabBarIcon: ({ color, size }) => <Feather name="user" size={size} color={color} />,
         }}
       />

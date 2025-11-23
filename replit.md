@@ -33,8 +33,10 @@ Preferred communication style: Simple, everyday language.
 **Navigation Structure:**
 - React Navigation with native stack and bottom tabs
 - Role-based navigation providing distinct user flows for Renters, Hosts, and Agents/Landlords.
-- Nested navigators for specific functionalities like messaging, profile management, and AI Match Assistant (RoommatesStackNavigator).
+- Nested navigators for specific functionalities: messaging (MessagesStackNavigator), profile management (ProfileStackNavigator), and AI Match Assistant (RoommatesStackNavigator).
+- ProfileStackNavigator used by all roles to access Profile, Subscription Plans, and Payment Methods screens
 - Custom header components and transparent headers with blur effects (iOS).
+- Web-optimized header configuration to prevent title concatenation in nested navigators.
 
 **UI/UX Design Patterns:**
 - Theme system supporting light/dark modes with consistent design tokens (colors, spacing, typography) defined in `/constants/theme.ts`.

@@ -7,7 +7,7 @@ import { PropertiesScreen } from '../screens/agent/PropertiesScreen';
 import { VerificationScreen } from '../screens/agent/VerificationScreen';
 import { DocumentsScreen } from '../screens/agent/DocumentsScreen';
 import { MessagesStackNavigator } from './MessagesStackNavigator';
-import { ProfileScreen } from '../screens/shared/ProfileScreen';
+import { ProfileStackNavigator } from './ProfileStackNavigator';
 import { useTheme } from '../hooks/useTheme';
 
 export type AgentTabParamList = {
@@ -44,7 +44,6 @@ export const AgentTabNavigator = () => {
           ) : null,
         headerShown: true,
         headerTransparent: true,
-        headerBlurEffect: isDark ? 'dark' : 'light',
       }}
     >
       <Tab.Screen
@@ -77,8 +76,9 @@ export const AgentTabNavigator = () => {
       />
       <Tab.Screen
         name="Profile"
-        component={ProfileScreen}
+        component={ProfileStackNavigator}
         options={{
+          headerShown: false,
           tabBarIcon: ({ color, size }) => <Feather name="user" size={size} color={color} />,
         }}
       />

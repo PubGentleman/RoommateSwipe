@@ -78,6 +78,7 @@ export const RenterTabNavigator = () => {
         name="Profile"
         component={ProfileStackNavigator}
         options={{
+          headerShown: false,
           tabBarIcon: ({ color, size }) => <Feather name="user" size={size} color={color} />,
         }}
       />
