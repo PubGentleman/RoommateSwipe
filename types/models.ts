@@ -40,6 +40,7 @@ export interface Property {
   hostId: string;
   hostName: string;
   featured?: boolean;
+  propertyType: 'lease' | 'sublet';
 }
 
 export interface PropertyFilter {
