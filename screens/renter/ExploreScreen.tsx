@@ -157,15 +157,14 @@ export const ExploreScreen = () => {
     if (!user?.id) return;
     
     const wasSaved = saved.has(id);
-    setSaved(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(id)) {
-        newSet.delete(id);
-      } else {
-        newSet.add(id);
-      }
-      return newSet;
-    });
+    
+    const newSaved = new Set(saved);
+    if (wasSaved) {
+      newSaved.delete(id);
+    } else {
+      newSaved.add(id);
+    }
+    setSaved(newSaved);
 
     try {
       if (wasSaved) {
@@ -175,15 +174,13 @@ export const ExploreScreen = () => {
       }
     } catch (err) {
       console.error('Error toggling save:', err);
-      setSaved(prev => {
-        const newSet = new Set(prev);
-        if (wasSaved) {
-          newSet.add(id);
-        } else {
-          newSet.delete(id);
-        }
-        return newSet;
-      });
+      const rollbackSaved = new Set(newSaved);
+      if (wasSaved) {
+        rollbackSaved.add(id);
+      } else {
+        rollbackSaved.delete(id);
+      }
+      setSaved(rollbackSaved);
     }
   };
 
