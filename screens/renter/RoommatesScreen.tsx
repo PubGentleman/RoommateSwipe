@@ -135,8 +135,8 @@ export const RoommatesScreen = () => {
           matchedAt: new Date(),
         };
         await StorageService.addMatch(match);
-        scheduleOnRN(setShowMatch, true);
-        setTimeout(() => scheduleOnRN(setShowMatch, false), 3000);
+        setShowMatch(true);
+        setTimeout(() => setShowMatch(false), 3000);
       }
     }
     
@@ -165,7 +165,7 @@ export const RoommatesScreen = () => {
       translateX.setValue(0);
       translateY.setValue(0);
       rotation.setValue(0);
-      scheduleOnRN(setCurrentIndex, currentIndex + 1);
+      setCurrentIndex(currentIndex + 1);
     });
   };
 
