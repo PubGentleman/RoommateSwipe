@@ -2,6 +2,7 @@ export interface RoommateProfile {
   id: string;
   name: string;
   age: number;
+  gender?: 'male' | 'female' | 'other';
   bio: string;
   occupation: string;
   budget: number;
@@ -147,6 +148,7 @@ export interface User {
     location?: string;
     occupation?: string;
     interests?: string;
+    gender?: 'male' | 'female' | 'other';
     preferences?: {
       sleepSchedule?: 'early_sleeper' | 'late_sleeper' | 'flexible' | 'irregular';
       cleanliness?: 'very_tidy' | 'moderately_tidy' | 'relaxed';

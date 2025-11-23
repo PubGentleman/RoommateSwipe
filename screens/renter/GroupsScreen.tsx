@@ -460,7 +460,9 @@ export const GroupsScreen = () => {
             </ThemedText>
             {memberProfiles.map(profile => (
               <View key={profile.id} style={styles.memberRow}>
-                <ThemedText style={Typography.body}>{profile.name || 'Unknown'}</ThemedText>
+                <ThemedText style={Typography.body}>
+                  {profile.name || 'Unknown'}{profile.age ? `, ${profile.age}` : ''}{profile.gender ? `, ${profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1)}` : ''}
+                </ThemedText>
                 {isCreator && profile.id !== user?.id ? (
                   <Pressable onPress={() => handleRemoveMember(group.id, profile.id, profile.name || 'Member')}>
                     <Feather name="x-circle" size={20} color={theme.error} />
@@ -478,7 +480,9 @@ export const GroupsScreen = () => {
             </ThemedText>
             {pendingProfiles.map(profile => (
               <View key={profile.id} style={styles.pendingRow}>
-                <ThemedText style={Typography.body}>{profile.name || 'Unknown'}</ThemedText>
+                <ThemedText style={Typography.body}>
+                  {profile.name || 'Unknown'}{profile.age ? `, ${profile.age}` : ''}{profile.gender ? `, ${profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1)}` : ''}
+                </ThemedText>
                 <View style={styles.pendingActions}>
                   <Pressable
                     style={[styles.pendingButton, { backgroundColor: theme.primary }]}
@@ -1099,7 +1103,9 @@ export const GroupsScreen = () => {
                       const profile = mockRoommateProfiles.find(p => p.id === memberId);
                       return profile ? (
                         <View key={memberId} style={styles.memberRow}>
-                          <ThemedText style={Typography.body}>{profile.name}</ThemedText>
+                          <ThemedText style={Typography.body}>
+                            {profile.name}{profile.age ? `, ${profile.age}` : ''}{profile.gender ? `, ${profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1)}` : ''}
+                          </ThemedText>
                         </View>
                       ) : null;
                     })}

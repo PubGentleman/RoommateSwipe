@@ -42,6 +42,7 @@ export interface User {
     location?: string;
     occupation?: string;
     interests?: string;
+    gender?: 'male' | 'female' | 'other';
     preferences?: {
       sleepSchedule?: 'early_sleeper' | 'late_sleeper' | 'flexible' | 'irregular';
       cleanliness?: 'very_tidy' | 'moderately_tidy' | 'relaxed';

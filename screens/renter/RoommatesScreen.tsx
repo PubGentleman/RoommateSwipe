@@ -376,7 +376,7 @@ export const RoommatesScreen = () => {
               ) : null}
               <View style={styles.cardInfo}>
                 <ThemedText style={[Typography.hero, { color: '#FFFFFF', textShadowColor: 'rgba(0, 0, 0, 0.75)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 }]}>
-                  {currentProfile.name}, {currentProfile.age}
+                  {currentProfile.name}, {currentProfile.age}{currentProfile.gender ? `, ${currentProfile.gender.charAt(0).toUpperCase() + currentProfile.gender.slice(1)}` : ''}
                 </ThemedText>
                 <ThemedText style={[Typography.body, { color: '#FFFFFF', marginTop: Spacing.sm, textShadowColor: 'rgba(0, 0, 0, 0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }]}>
                   {currentProfile.occupation}

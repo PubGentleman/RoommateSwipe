@@ -20,6 +20,7 @@ export const EditProfileScreen = () => {
   const [location, setLocation] = useState(user?.profileData?.location || '');
   const [occupation, setOccupation] = useState(user?.profileData?.occupation || '');
   const [interests, setInterests] = useState(user?.profileData?.interests || '');
+  const [gender, setGender] = useState<'male' | 'female' | 'other' | undefined>(user?.profileData?.gender);
   
   const [sleepSchedule, setSleepSchedule] = useState<'early_sleeper' | 'late_sleeper' | 'flexible' | 'irregular'>(user?.profileData?.preferences?.sleepSchedule || 'flexible');
   const [cleanliness, setCleanliness] = useState<'very_tidy' | 'moderately_tidy' | 'relaxed'>(user?.profileData?.preferences?.cleanliness || 'moderately_tidy');
@@ -76,6 +77,7 @@ export const EditProfileScreen = () => {
         location: location.trim() || undefined,
         occupation: occupation.trim() || undefined,
         interests: interests.trim() || undefined,
+        gender,
         preferences: {
           sleepSchedule,
           cleanliness,
@@ -238,6 +240,17 @@ export const EditProfileScreen = () => {
               value={interests}
               onChangeText={setInterests}
             />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>
+              Gender
+            </ThemedText>
+            <View style={styles.optionsRow}>
+              <OptionButton label="Male" value="male" isSelected={gender === 'male'} onPress={() => setGender('male')} />
+              <OptionButton label="Female" value="female" isSelected={gender === 'female'} onPress={() => setGender('female')} />
+              <OptionButton label="Other" value="other" isSelected={gender === 'other'} onPress={() => setGender('other')} />
+            </View>
           </View>
         </View>
 
