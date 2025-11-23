@@ -8,6 +8,15 @@ interface WalkScoreBadgeProps {
   size?: 'small' | 'medium' | 'large';
 }
 
+const getScoreColor = (score: number): string => {
+  if (score >= 90) return '#22C55E';
+  if (score >= 80) return '#84CC16';
+  if (score >= 70) return '#EAB308';
+  if (score >= 50) return '#F97316';
+  if (score >= 25) return '#EF4444';
+  return '#DC2626';
+};
+
 export const WalkScoreBadge = ({ score, size = 'medium' }: WalkScoreBadgeProps) => {
   const { theme } = useTheme();
 
@@ -18,6 +27,7 @@ export const WalkScoreBadge = ({ score, size = 'medium' }: WalkScoreBadgeProps) 
   };
 
   const dim = dimensions[size];
+  const scoreColor = getScoreColor(score);
 
   return (
     <View style={[styles.container, { width: dim.size, height: dim.size }]}>
@@ -31,7 +41,7 @@ export const WalkScoreBadge = ({ score, size = 'medium' }: WalkScoreBadgeProps) 
           styles.score,
           {
             fontSize: dim.fontSize,
-            color: '#4A4A4A',
+            color: scoreColor,
           },
         ]}
       >
