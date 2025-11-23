@@ -217,6 +217,9 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           placeholderTextColor={theme.textSecondary}
           value={inputText}
           onChangeText={setInputText}
+          onSubmitEditing={sendMessage}
+          blurOnSubmit={false}
+          returnKeyType="send"
           multiline
           maxLength={500}
         />
