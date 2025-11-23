@@ -322,13 +322,6 @@ export const RoommatesScreen = () => {
                   </View>
                 </View>
               ) : null}
-              <View style={styles.topBadges}>
-                <View style={[styles.compatibilityBadge, { backgroundColor: getMatchQualityColor(currentProfile.compatibility || 50) }]}>
-                  <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '600' }]}>
-                    {currentProfile.compatibility || 50}% Match
-                  </ThemedText>
-                </View>
-              </View>
               <View style={styles.cardInfo}>
                 <ThemedText style={[Typography.hero, { color: '#FFFFFF', textShadowColor: 'rgba(0, 0, 0, 0.75)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 }]}>
                   {currentProfile.name}, {currentProfile.age}
@@ -350,6 +343,12 @@ export const RoommatesScreen = () => {
                     <Feather name="map-pin" size={14} color="#FFFFFF" />
                     <ThemedText style={[Typography.small, { color: '#FFFFFF', marginLeft: Spacing.xs }]}>
                       {currentProfile.preferences.location}
+                    </ThemedText>
+                  </View>
+                  <View style={[styles.badge, { backgroundColor: getMatchQualityColor(currentProfile.compatibility || 50) }]}>
+                    <Feather name="heart" size={14} color="#FFFFFF" />
+                    <ThemedText style={[Typography.small, { color: '#FFFFFF', marginLeft: Spacing.xs, fontWeight: '600' }]}>
+                      {currentProfile.compatibility || 50}% Match
                     </ThemedText>
                   </View>
                 </View>
