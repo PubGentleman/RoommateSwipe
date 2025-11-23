@@ -778,6 +778,7 @@ export const mockProperties: Property[] = [
     hostId: 'host1',
     hostName: 'John Smith',
     featured: true,
+    propertyType: 'lease',
   },
   {
     id: '2',
@@ -796,6 +797,7 @@ export const mockProperties: Property[] = [
     hostId: 'host2',
     hostName: 'Lisa Williams',
     featured: false,
+    propertyType: 'lease',
   },
   {
     id: '3',
@@ -814,6 +816,7 @@ export const mockProperties: Property[] = [
     hostId: 'host4',
     hostName: 'Maria Garcia',
     featured: true,
+    propertyType: 'lease',
   },
   {
     id: '4',
@@ -832,6 +835,7 @@ export const mockProperties: Property[] = [
     hostId: 'host3',
     hostName: 'Robert Jones',
     featured: false,
+    propertyType: 'sublet',
   },
   {
     id: '5',
@@ -850,6 +854,7 @@ export const mockProperties: Property[] = [
     hostId: 'host1',
     hostName: 'John Smith',
     featured: false,
+    propertyType: 'lease',
   },
   {
     id: '6',
@@ -868,6 +873,7 @@ export const mockProperties: Property[] = [
     hostId: 'host2',
     hostName: 'Lisa Williams',
     featured: false,
+    propertyType: 'sublet',
   },
 ];
 
