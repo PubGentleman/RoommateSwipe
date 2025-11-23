@@ -774,19 +774,40 @@ export const ExploreScreen = () => {
 
                   <View style={styles.detailSection}>
                     <View style={styles.detailRow}>
-                      <ThemedText style={{ fontSize: 24 }}>
-                        {(() => {
-                          if (selectedProperty.hostProfileId) {
-                            const hostUser = hostProfiles.get(selectedProperty.hostProfileId);
-                            return hostUser?.profileData?.gender ? getGenderSymbol(hostUser.profileData.gender) : '👤';
-                          }
-                          return '👤';
-                        })()}
-                      </ThemedText>
+                      {(() => {
+                        const hostUser = selectedProperty.hostProfileId ? hostProfiles.get(selectedProperty.hostProfileId) : null;
+                        const hostPhoto = hostUser?.profilePicture;
+                        return hostPhoto ? (
+                          <Image 
+                            source={{ uri: hostPhoto }} 
+                            style={{ width: 48, height: 48, borderRadius: 24 }} 
+                          />
+                        ) : (
+                          <View style={{ 
+                            width: 48, 
+                            height: 48, 
+                            borderRadius: 24, 
+                            backgroundColor: theme.backgroundSecondary, 
+                            justifyContent: 'center', 
+                            alignItems: 'center' 
+                          }}>
+                            <Feather name="user" size={24} color={theme.textSecondary} />
+                          </View>
+                        );
+                      })()}
                       <View style={{ flex: 1, marginLeft: Spacing.md }}>
                         <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Host</ThemedText>
                         <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
                           {selectedProperty.hostName}
+                        </ThemedText>
+                        <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginTop: 2 }]}>
+                          {(() => {
+                            if (selectedProperty.hostProfileId) {
+                              const hostUser = hostProfiles.get(selectedProperty.hostProfileId);
+                              return hostUser?.profileData?.gender ? getGenderSymbol(hostUser.profileData.gender) : '';
+                            }
+                            return '';
+                          })()}
                         </ThemedText>
                       </View>
                     </View>
