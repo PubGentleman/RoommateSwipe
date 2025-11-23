@@ -154,25 +154,7 @@ export const ProfileScreen = () => {
               ) : null}
             </View>
             
-            {user?.subscription?.plan === 'basic' ? (
-              <View style={styles.benefitsList}>
-                <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.sm }]}>
-                  Basic plan limitations:
-                </ThemedText>
-                <View style={styles.benefitItem}>
-                  <Feather name="x" size={16} color={theme.textSecondary} />
-                  <ThemedText style={[Typography.body, { color: theme.textSecondary, marginLeft: Spacing.sm }]}>
-                    Create 1 group only
-                  </ThemedText>
-                </View>
-                <View style={styles.benefitItem}>
-                  <Feather name="x" size={16} color={theme.textSecondary} />
-                  <ThemedText style={[Typography.body, { color: theme.textSecondary, marginLeft: Spacing.sm }]}>
-                    Join 1 group only
-                  </ThemedText>
-                </View>
-              </View>
-            ) : (
+            {user?.subscription?.plan !== 'basic' ? (
               <View style={styles.benefitsList}>
                 <View style={styles.benefitItem}>
                   <Feather name="check" size={16} color={theme.primary} />
