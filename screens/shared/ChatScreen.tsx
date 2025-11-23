@@ -7,7 +7,7 @@ import { Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { Message, RoommateProfile } from '../../types/models';
 import { StorageService } from '../../utils/storage';
 import { useAuth } from '../../contexts/AuthContext';
-import { useScreenInsets } from '../../hooks/useScreenInsets';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 
 type ChatScreenProps = {
@@ -24,12 +24,15 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const { conversationId, otherUser } = route.params;
   const { theme } = useTheme();
   const { user, incrementMessageCount, canSendMessage } = useAuth();
-  const screenInsets = useScreenInsets();
+  const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [showGroupOption, setShowGroupOption] = useState(true);
   const [isOnline, setIsOnline] = useState(Math.random() > 0.5);
   const flatListRef = useRef<FlatList>(null);
+
+  // Tab bar height for bottom padding
+  const TAB_BAR_HEIGHT = 80;
 
   const canSeeOnlineStatus = () => {
     const userPlan = user?.subscription?.plan || 'basic';
@@ -201,7 +204,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         />
       </View>
 
-      <View style={[styles.inputContainer, { backgroundColor: theme.backgroundRoot, paddingBottom: screenInsets.paddingBottom }]}>
+      <View style={[styles.inputContainer, { backgroundColor: theme.backgroundRoot, paddingBottom: TAB_BAR_HEIGHT + Spacing.md }]}>
         <TextInput
           style={[
             styles.input,
