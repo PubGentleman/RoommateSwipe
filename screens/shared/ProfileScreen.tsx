@@ -133,11 +133,11 @@ export const ProfileScreen = () => {
                       Plus
                     </ThemedText>
                   </View>
-                ) : user?.subscription?.plan === 'priority' ? (
+                ) : user?.subscription?.plan === 'elite' ? (
                   <View style={[styles.badge, { backgroundColor: '#7C3AED' }]}>
                     <Feather name="award" size={12} color="#FFD700" />
                     <ThemedText style={[Typography.small, { color: '#FFFFFF', marginLeft: 4, fontWeight: '600' }]}>
-                      Priority
+                      Elite
                     </ThemedText>
                   </View>
                 ) : null}

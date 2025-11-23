@@ -31,20 +31,54 @@ Roomdr utilizes a comprehensive points-based compatibility system (0-100 score) 
 The application is built with React Native and Expo, using TypeScript and leveraging React's experimental features for performance. It employs React Navigation for a role-based navigation structure (Renter, Host, Agent/Landlord) with nested navigators. UI/UX follows a theme system supporting light/dark modes and uses reusable, themed components.
 
 **Core Features by Role:**
-- **Renter:** Swipe-based matching with priority placement, 1-on-1 messaging (with limits for Basic users), Priority messaging (Priority users can message without matching; Basic users can pay $0.99 for single message), comprehensive group management, property exploration with advanced filters (Plus/Priority only), saved properties, and an AI Match Assistant (Plus/Priority). Boost feature available for profile visibility. Property listings display room type (ROOM vs ENTIRE APARTMENT), existing roommate gender for room listings, and compatibility scores with hosts for informed decision-making.
-- **Host:** Property listing management (CRUD) with room type specification (room or entire apartment), existing roommate gender tracking for room listings, application review, listing status control, and featured listings (Priority only).
+- **Renter:** Swipe-based matching with priority visibility (Elite), 1-on-1 messaging, Priority messaging (Elite users can message without matching; Basic users can pay $0.99 for single message), comprehensive group management, property exploration with advanced filters (Plus/Elite only), saved properties, rewind functionality (Plus/Elite), profile views tracking (Plus/Elite), see who liked you (Elite only), and an AI Match Assistant (Plus/Elite). Boost feature available for profile visibility. Property listings display room type (ROOM vs ENTIRE APARTMENT), existing roommate gender for room listings, and compatibility scores with hosts for informed decision-making.
+- **Host:** Property listing management (CRUD) with room type specification (room or entire apartment), existing roommate gender tracking for room listings, application review, listing status control, and featured listings (Elite only).
 - **Agent:** Multi-property portfolio management, document verification, legal template library, and professional credential verification.
 
 Animations use React Native Reanimated, and gestures are handled by React Native Gesture Handler. State management relies on React Context API for authentication and local component state, with AsyncStorage for persistent data.
 
 ## Authentication & Authorization
 
-The system supports mock authentication with email/password and planned SSO (Apple/Google). Users have defined roles (`renter`, `host`, `agent`) with role-based navigation and conditional screen access. Three subscription tiers are implemented via Stripe integration: Basic, Plus ($14.99/month), and Priority ($49.99-$99/month). Subscription management includes full lifecycle support for cancellation, downgrades, and reactivation with prorated access and clear UI indicators. Messaging limits, boost systems, advanced filters, featured listings, online status visibility (Plus/Priority), Walk Score access (Plus/Priority), and an AI Match Assistant (Plus/Priority) are all gated by subscription tiers.
+The system supports mock authentication with email/password and planned SSO (Apple/Google). Users have defined roles (`renter`, `host`, `agent`) with role-based navigation and conditional screen access. Three subscription tiers are implemented via Stripe integration: Basic (Free), Plus ($14.99/month), and Elite ($49.99-$99/month). Subscription management includes full lifecycle support for cancellation, downgrades, and reactivation with prorated access and clear UI indicators.
+
+**Subscription Tiers:**
+
+**Basic (Free):**
+- Unlimited messages (must match first)
+- 3 active chats maximum
+- Create 1 group
+- Join 1 group
+- Browse listings
+- Basic features
+
+**Plus ($14.99/month):**
+- Unlimited messages
+- 10 active chats
+- 5 rewinds per day
+- See who viewed your profile
+- Unlimited groups
+- Advanced filters
+- Walk Score access
+- Online status visibility
+- AI match assistant
+- 1 boost per week
+
+**Elite ($49.99-$99/month):**
+- Unlimited messages
+- Unlimited chats
+- Unlimited rewinds
+- See who liked you
+- Priority visibility in swipe queue
+- Boosted matching access
+- Priority messaging (message without matching)
+- Featured listings (for hosts/agents)
+- AI match assistant
+- All Plus features included
 
 **Walk Score Feature:**
 - Walk Score displays walkability ratings (0-100) for properties with color-coded scores and official-style circular green badge with walking person icon
 - Basic users see lock icons on property listings with upgrade prompts
-- Plus and Priority users have full access to Walk Score data across all property views
+- Plus and Elite users have full access to Walk Score data across all property views
 - Hosts and agents always see Walk Scores on their own listings regardless of subscription tier
 - Score color-coding: green (90-100), lime green (80-89), yellow (70-79), orange (50-69), red-orange (25-49), dark red (0-24)
 

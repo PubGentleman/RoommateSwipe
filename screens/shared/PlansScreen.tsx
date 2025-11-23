@@ -14,13 +14,13 @@ type PlansScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList
 
 export const PlansScreen = () => {
   const { theme } = useTheme();
-  const { user, upgradeToPlus, upgradeToPriority, downgradeToPlan, cancelSubscription, reactivateSubscription } = useAuth();
+  const { user, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, reactivateSubscription } = useAuth();
   const navigation = useNavigation<PlansScreenNavigationProp>();
   
   const [showUpgradeConfirm, setShowUpgradeConfirm] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [showDowngradeConfirm, setShowDowngradeConfirm] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<'plus' | 'priority' | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<'plus' | 'elite' | null>(null);
   const [downgradeTo, setDowngradeTo] = useState<'basic' | 'plus' | null>(null);
   const [processing, setProcessing] = useState(false);
 
@@ -29,14 +29,14 @@ export const PlansScreen = () => {
   const scheduledPlan = user?.subscription?.scheduledPlan;
   const scheduledChangeDate = user?.subscription?.scheduledChangeDate;
   const isPlus = currentPlan === 'plus';
-  const isPriority = currentPlan === 'priority';
+  const isElite = currentPlan === 'elite';
   
   const PRICING = {
     plus: 14.99,
-    priority: user?.role === 'renter' ? 49.99 : 99.00,
+    elite: user?.role === 'renter' ? 49.99 : 99.00,
   };
 
-  const handleUpgrade = (plan: 'plus' | 'priority') => {
+  const handleUpgrade = (plan: 'plus' | 'elite') => {
     if (!user?.paymentMethods || user.paymentMethods.length === 0) {
       Alert.alert(
         'Payment Method Required',
@@ -72,11 +72,11 @@ export const PlansScreen = () => {
     
     if (selectedPlan === 'plus') {
       await upgradeToPlus();
-    } else if (selectedPlan === 'priority') {
-      await upgradeToPriority();
+    } else if (selectedPlan === 'elite') {
+      await upgradeToElite();
     }
     
-    const planName = selectedPlan === 'plus' ? 'Plus' : 'Priority';
+    const planName = selectedPlan === 'plus' ? 'Plus' : 'Elite';
     Alert.alert(
       'Success!',
       `Welcome to ${planName}! You now have access to all ${planName} features.`,
@@ -115,7 +115,7 @@ export const PlansScreen = () => {
     const targetPlanName = downgradeTo.charAt(0).toUpperCase() + downgradeTo.slice(1);
     Alert.alert(
       'Downgrade Scheduled',
-      `Your plan will change to ${targetPlanName} on ${expiryDate}. You'll keep your current ${currentPlan === 'plus' ? 'Plus' : 'Priority'} features until then.`,
+      `Your plan will change to ${targetPlanName} on ${expiryDate}. You'll keep your current ${currentPlan === 'plus' ? 'Plus' : 'Elite'} features until then.`,
       [{ text: 'OK' }]
     );
     
@@ -136,7 +136,7 @@ export const PlansScreen = () => {
     
     Alert.alert(
       'Subscription Cancelled',
-      `Your subscription has been cancelled. You'll keep your current ${currentPlan === 'plus' ? 'Plus' : 'Priority'} features until ${expiryDate}.`,
+      `Your subscription has been cancelled. You'll keep your current ${currentPlan === 'plus' ? 'Plus' : 'Elite'} features until ${expiryDate}.`,
       [{ text: 'OK' }]
     );
     
@@ -144,7 +144,7 @@ export const PlansScreen = () => {
   };
 
   const renderPlanCard = (
-    planType: 'basic' | 'plus' | 'priority',
+    planType: 'basic' | 'plus' | 'elite',
     price: string,
     features: string[],
     isCurrentPlan: boolean
@@ -152,7 +152,7 @@ export const PlansScreen = () => {
     const planColors = {
       basic: theme.backgroundDefault,
       plus: theme.primary,
-      priority: '#7C3AED',
+      elite: '#7C3AED',
     };
     const bgColor = isCurrentPlan ? planColors[planType] : theme.backgroundDefault;
     const textColor = isCurrentPlan && planType !== 'basic' ? '#FFFFFF' : theme.text;
@@ -165,7 +165,7 @@ export const PlansScreen = () => {
               <ThemedText style={[Typography.h2, { color: textColor }]}>
                 {planType.charAt(0).toUpperCase() + planType.slice(1)}
               </ThemedText>
-              {planType === 'priority' && <Feather name="award" size={20} color={isCurrentPlan ? '#FFD700' : '#7C3AED'} />}
+              {planType === 'elite' && <Feather name="award" size={20} color={isCurrentPlan ? '#FFD700' : '#7C3AED'} />}
             </View>
             <ThemedText style={[Typography.body, { color: isCurrentPlan && planType !== 'basic' ? 'rgba(255,255,255,0.9)' : theme.textSecondary, marginTop: Spacing.sm, marginBottom: Spacing.md }]}>
               {price}
@@ -195,7 +195,7 @@ export const PlansScreen = () => {
             
             {planType !== 'basic' && subscriptionStatus === 'active' && !scheduledPlan ? (
               <View style={{ marginTop: Spacing.md, gap: Spacing.sm }}>
-                {planType === 'priority' ? (
+                {planType === 'elite' ? (
                   <>
                     <Pressable
                       style={[styles.downgradeButton, { borderColor: 'rgba(255,255,255,0.3)' }]}
@@ -241,12 +241,12 @@ export const PlansScreen = () => {
           </>
         ) : planType !== 'basic' ? (
           <Pressable
-            style={[styles.upgradeButton, { backgroundColor: planType === 'plus' ? theme.primary : '#7C3AED', opacity: (planType === 'plus' && isPriority) ? 0.5 : 1 }]}
+            style={[styles.upgradeButton, { backgroundColor: planType === 'plus' ? theme.primary : '#7C3AED', opacity: (planType === 'plus' && isElite) ? 0.5 : 1 }]}
             onPress={() => handleUpgrade(planType)}
-            disabled={processing || (planType === 'plus' && isPriority)}
+            disabled={processing || (planType === 'plus' && isElite)}
           >
             <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>
-              {processing ? 'Processing...' : (planType === 'plus' && isPriority) ? 'Downgrade Not Available' : `Upgrade - ${price}`}
+              {processing ? 'Processing...' : (planType === 'plus' && isElite) ? 'Downgrade Not Available' : `Upgrade - ${price}`}
             </ThemedText>
           </Pressable>
         ) : null}
@@ -260,32 +260,42 @@ export const PlansScreen = () => {
         <ThemedText style={[Typography.h2, { marginBottom: Spacing.lg }]}>Choose Your Plan</ThemedText>
         
         {renderPlanCard('basic', '$0/month', [
+          'Unlimited messages (must match first)',
+          '3 active chats maximum',
           'Create 1 group',
           'Join 1 group',
-          'Basic messaging',
           'Browse listings',
         ], currentPlan === 'basic')}
 
         {renderPlanCard('plus', `$${PRICING.plus}/month`, [
+          'Unlimited messages',
+          '10 active chats',
+          '5 rewinds per day',
+          'See who viewed your profile',
           'Unlimited groups',
-          'Unlimited messaging',
-          'Full profile visibility',
           'Advanced filters',
+          'Walk Score access',
+          'Online status visibility',
+          'AI match assistant',
           '1 boost per week',
         ], currentPlan === 'plus')}
 
         {renderPlanCard(
-          'priority',
-          `$${PRICING.priority}/month ${user?.role === 'renter' ? '(Seekers)' : '(Hosts/Agents)'}`,
+          'elite',
+          `$${PRICING.elite}/month ${user?.role === 'renter' ? '(Seekers)' : '(Hosts/Agents)'}`,
           [
             'Everything in Plus',
-            'Priority placement',
-            'Priority badge',
-            'Unlimited boosts',
+            'Unlimited messages',
+            'Unlimited chats',
+            'Unlimited rewinds',
+            'See who liked you',
+            'Priority visibility boost',
+            'Boosted matching',
+            'Priority messaging (no match needed)',
             'Featured listings',
             'AI match assistant',
           ],
-          currentPlan === 'priority'
+          currentPlan === 'elite'
         )}
 
         {scheduledPlan && scheduledChangeDate ? (
@@ -321,20 +331,20 @@ export const PlansScreen = () => {
           </View>
         ) : null}
 
-        {(isPlus || isPriority) ? (
+        {(isPlus || isElite) ? (
           <View style={styles.section}>
             <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Billing History</ThemedText>
             <View style={[styles.billingItem, { backgroundColor: theme.backgroundDefault }]}>
               <View>
                 <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
-                  {isPriority ? 'Priority' : 'Plus'} Subscription
+                  {isElite ? 'Elite' : 'Plus'} Subscription
                 </ThemedText>
                 <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
                   {new Date().toLocaleDateString()}
                 </ThemedText>
               </View>
               <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
-                ${isPriority ? PRICING.priority : PRICING.plus}
+                ${isElite ? PRICING.elite : PRICING.plus}
               </ThemedText>
             </View>
           </View>
@@ -350,12 +360,12 @@ export const PlansScreen = () => {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: theme.backgroundRoot }]}>
             <ThemedText style={[Typography.h2, { marginBottom: Spacing.md }]}>
-              Upgrade to {selectedPlan === 'plus' ? 'Plus' : 'Priority'}
+              Upgrade to {selectedPlan === 'plus' ? 'Plus' : 'Elite'}
             </ThemedText>
             <ThemedText style={[Typography.body, { color: theme.textSecondary, marginBottom: Spacing.xl }]}>
               {selectedPlan === 'plus' 
                 ? `Unlock unlimited groups and advanced features for $${PRICING.plus}/month.`
-                : `Get priority placement, Priority badge, and unlimited boosts for $${PRICING.priority}/month.`}
+                : `Get priority visibility, unlimited rewinds, and premium features for $${PRICING.elite}/month.`}
               {'\n\n'}Continue with upgrade?
             </ThemedText>
             <View style={styles.modalActions}>
@@ -394,7 +404,7 @@ export const PlansScreen = () => {
             </ThemedText>
             <ThemedText style={[Typography.body, { color: theme.textSecondary, marginBottom: Spacing.xl }]}>
               Your plan will change to {downgradeTo === 'basic' ? 'Basic' : 'Plus'} at the end of your current billing period. 
-              {'\n\n'}You'll keep your current {currentPlan === 'plus' ? 'Plus' : 'Priority'} features until {user?.subscription?.expiresAt ? new Date(user.subscription.expiresAt).toLocaleDateString() : 'the end of your billing period'}.
+              {'\n\n'}You'll keep your current {currentPlan === 'plus' ? 'Plus' : 'Elite'} features until {user?.subscription?.expiresAt ? new Date(user.subscription.expiresAt).toLocaleDateString() : 'the end of your billing period'}.
               {'\n\n'}Continue with downgrade?
             </ThemedText>
             <View style={styles.modalActions}>
@@ -432,7 +442,7 @@ export const PlansScreen = () => {
               Cancel Subscription
             </ThemedText>
             <ThemedText style={[Typography.body, { color: theme.textSecondary, marginBottom: Spacing.xl }]}>
-              Are you sure you want to cancel your {currentPlan === 'plus' ? 'Plus' : 'Priority'} subscription?
+              Are you sure you want to cancel your {currentPlan === 'plus' ? 'Plus' : 'Elite'} subscription?
               {'\n\n'}You'll keep your current features until {user?.subscription?.expiresAt ? new Date(user.subscription.expiresAt).toLocaleDateString() : 'the end of your billing period'}, then your plan will revert to Basic.
               {'\n\n'}You can re-subscribe at any time.
             </ThemedText>

@@ -1,70 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { StorageService } from '../utils/storage';
+import { User } from '../types/models';
 
 export type UserRole = 'renter' | 'host' | 'agent';
-
-export interface User {
-  id: string;
-  email: string;
-  name: string;
-  role: UserRole;
-  profilePicture?: string;
-  subscription?: {
-    plan: 'basic' | 'plus' | 'priority';
-    status: 'active' | 'cancelled' | 'expired';
-    expiresAt?: Date;
-    scheduledPlan?: 'basic' | 'plus' | 'priority';
-    scheduledChangeDate?: Date;
-  };
-  paymentMethods?: Array<{
-    id: string;
-    type: 'card';
-    last4: string;
-    brand: string;
-    expiryMonth: number;
-    expiryYear: number;
-  }>;
-  messageCount?: number;
-  boostData?: {
-    boostsUsed: number;
-    lastBoostDate?: Date;
-    isBoosted: boolean;
-    boostExpiresAt?: Date;
-  };
-  undoPassData?: {
-    hasUndoPass: boolean;
-    undoPassExpiresAt?: Date;
-  };
-  profileData?: {
-    bio?: string;
-    age?: number;
-    budget?: number;
-    location?: string;
-    neighborhood?: string;
-    city?: string;
-    state?: string;
-    coordinates?: {
-      lat: number;
-      lng: number;
-    };
-    occupation?: string;
-    interests?: string;
-    gender?: 'male' | 'female' | 'other';
-    preferences?: {
-      sleepSchedule?: 'early_sleeper' | 'late_sleeper' | 'flexible' | 'irregular';
-      cleanliness?: 'very_tidy' | 'moderately_tidy' | 'relaxed';
-      guestPolicy?: 'rarely' | 'occasionally' | 'frequently' | 'prefer_no_guests';
-      noiseTolerance?: 'prefer_quiet' | 'normal_noise' | 'loud_environments';
-      smoking?: 'yes' | 'no' | 'only_outside';
-      workLocation?: 'wfh_fulltime' | 'hybrid' | 'office_fulltime' | 'irregular';
-      roommateRelationship?: 'respectful_coliving' | 'occasional_hangouts' | 'prefer_friends' | 'minimal_interaction';
-      pets?: 'have_pets' | 'open_to_pets' | 'no_pets';
-      lifestyle?: Array<'active_gym' | 'homebody' | 'nightlife_social' | 'quiet_introverted' | 'creative_artistic' | 'professional_focused'>;
-      moveInDate?: string;
-      bedrooms?: number;
-    };
-  };
-}
 
 interface AuthContextType {
   user: User | null;
@@ -73,7 +11,7 @@ interface AuthContextType {
   register: (email: string, password: string, name: string, role: UserRole) => Promise<void>;
   logout: () => Promise<void>;
   upgradeToPlus: () => Promise<void>;
-  upgradeToPriority: () => Promise<void>;
+  upgradeToElite: () => Promise<void>;
   downgradeToPlan: (plan: 'basic' | 'plus') => Promise<void>;
   cancelSubscription: () => Promise<void>;
   reactivateSubscription: () => Promise<void>;
@@ -315,7 +253,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log('[Auth] Upgraded to Plus:', updatedUser.subscription);
   };
 
-  const upgradeToPriority = async () => {
+  const upgradeToElite = async () => {
     if (!user) return;
     
     const expiresAt = user.subscription?.expiresAt 
@@ -325,7 +263,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updatedUser: User = {
       ...user,
       subscription: {
-        plan: 'priority',
+        plan: 'elite',
         status: 'active',
         expiresAt,
         scheduledPlan: undefined,
@@ -336,7 +274,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await StorageService.setCurrentUser(updatedUser);
     await StorageService.addOrUpdateUser(updatedUser);
     setUser(updatedUser);
-    console.log('[Auth] Upgraded to Priority:', updatedUser.subscription);
+    console.log('[Auth] Upgraded to Elite:', updatedUser.subscription);
   };
 
   const downgradeToPlan = async (targetPlan: 'basic' | 'plus') => {
@@ -466,7 +404,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) return false;
     
     const plan = user.subscription?.plan || 'basic';
-    if (plan === 'plus' || plan === 'priority') {
+    if (plan === 'plus' || plan === 'elite') {
       return true;
     }
     
@@ -490,7 +428,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { canBoost: true, requiresPayment: true };
     }
     
-    if (plan === 'priority') {
+    if (plan === 'elite') {
       return { canBoost: true };
     }
     
@@ -636,7 +574,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) return false;
     
     const userPlan = user.subscription?.plan || 'basic';
-    if (userPlan === 'plus' || userPlan === 'priority') {
+    if (userPlan === 'plus' || userPlan === 'elite') {
       return true;
     }
     
@@ -651,7 +589,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPlus, upgradeToPriority, downgradeToPlan, cancelSubscription, reactivateSubscription, updateUser, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, reactivateSubscription, updateUser, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass }}>
       {children}
     </AuthContext.Provider>
   );

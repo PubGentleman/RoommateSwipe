@@ -100,7 +100,7 @@ export const RoommatesScreen = () => {
         
         const getPriority = (user: typeof userA) => {
           const plan = user?.subscription?.plan || 'basic';
-          if (plan === 'priority') return 3;
+          if (plan === 'elite') return 3;
           if (plan === 'plus') return 2;
           return 1;
         };
@@ -139,7 +139,7 @@ export const RoommatesScreen = () => {
   const canSeeOnlineStatus = () => {
     const userPlan = user?.subscription?.plan || 'basic';
     const userStatus = user?.subscription?.status || 'active';
-    const canSee = userPlan === 'priority' && userStatus === 'active';
+    const canSee = userPlan === 'elite' && userStatus === 'active';
     console.log('[RoommatesScreen] Online status check:', { userPlan, userStatus, canSee });
     return canSee;
   };
@@ -287,7 +287,7 @@ export const RoommatesScreen = () => {
     
     console.log('[AI Assistant] User plan:', userPlan, 'Status:', userStatus);
     
-    const isPaidMember = (userPlan === 'plus' || userPlan === 'priority') && userStatus === 'active';
+    const isPaidMember = (userPlan === 'plus' || userPlan === 'elite') && userStatus === 'active';
     
     if (!isPaidMember) {
       console.log('[AI Assistant] Showing upgrade modal');
@@ -342,9 +342,9 @@ export const RoommatesScreen = () => {
     const userPlan = currentUser?.subscription?.plan || 'basic';
     const userStatus = currentUser?.subscription?.status || 'active';
     
-    const isPriorityMember = userPlan === 'priority' && userStatus === 'active';
+    const isEliteMember = userPlan === 'elite' && userStatus === 'active';
     
-    if (isPriorityMember) {
+    if (isEliteMember) {
       handleSendDirectMessage();
     } else {
       setShowMessageModal(true);
@@ -561,7 +561,7 @@ export const RoommatesScreen = () => {
                 Plus Feature
               </ThemedText>
               <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary, marginBottom: Spacing.xl }]}>
-                AI Match Assistant is available for Plus and Priority members. Upgrade to get personalized roommate recommendations powered by AI!
+                AI Match Assistant is available for Plus and Elite members. Upgrade to get personalized roommate recommendations powered by AI!
               </ThemedText>
               
               <View style={styles.vipFeaturesList}>

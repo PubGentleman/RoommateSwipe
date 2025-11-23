@@ -38,7 +38,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const canSeeOnlineStatus = () => {
     const userPlan = user?.subscription?.plan || 'basic';
     const userStatus = user?.subscription?.status || 'active';
-    return (userPlan === 'plus' || userPlan === 'priority') && userStatus === 'active';
+    return (userPlan === 'plus' || userPlan === 'elite') && userStatus === 'active';
   };
 
   useEffect(() => {
@@ -75,7 +75,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     if (!canSendMessage()) {
       Alert.alert(
         'Message Limit Reached',
-        `You've reached your limit of 50 messages on the basic plan. Upgrade to Plus or Priority for unlimited messaging!`,
+        `You've reached your limit of 50 messages on the basic plan. Upgrade to Plus or Elite for unlimited messaging!`,
         [
           { text: 'Maybe Later', style: 'cancel' },
           {

@@ -207,7 +207,7 @@ export const ExploreScreen = () => {
   const handleFilterPress = () => {
     const userPlan = user?.subscription?.plan || 'basic';
     const userStatus = user?.subscription?.status || 'active';
-    const hasActiveSubscription = (userPlan === 'plus' || userPlan === 'priority') && userStatus === 'active';
+    const hasActiveSubscription = (userPlan === 'plus' || userPlan === 'elite') && userStatus === 'active';
     
     if (!hasActiveSubscription) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -379,7 +379,7 @@ export const ExploreScreen = () => {
             {item.walkScore ? (
               (() => {
                 const userPlan = user?.subscription?.plan || 'basic';
-                const hasWalkScoreAccess = userPlan === 'plus' || userPlan === 'priority';
+                const hasWalkScoreAccess = userPlan === 'plus' || userPlan === 'elite';
                 
                 return hasWalkScoreAccess ? (
                   <WalkScoreBadge score={item.walkScore} size="small" />
@@ -750,7 +750,7 @@ export const ExploreScreen = () => {
               Walk Score Feature
             </ThemedText>
             <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary, marginTop: Spacing.sm }]}>
-              Upgrade to Plus or Priority to see walkability ratings for all properties and make informed decisions about neighborhood accessibility.
+              Upgrade to Plus or Elite to see walkability ratings for all properties and make informed decisions about neighborhood accessibility.
             </ThemedText>
             <View style={styles.upgradeFeatures}>
               <View style={styles.upgradeFeature}>
@@ -1004,7 +1004,7 @@ export const ExploreScreen = () => {
                     {selectedProperty.walkScore ? (
                       (() => {
                         const userPlan = user?.subscription?.plan || 'basic';
-                        const hasWalkScoreAccess = userPlan === 'plus' || userPlan === 'priority';
+                        const hasWalkScoreAccess = userPlan === 'plus' || userPlan === 'elite';
                         
                         return hasWalkScoreAccess ? (
                           <View style={styles.detailRow}>

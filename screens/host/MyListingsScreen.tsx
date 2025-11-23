@@ -62,7 +62,7 @@ export const MyListingsScreen = () => {
     await loadListings();
   };
 
-  const isPriority = user?.subscription?.plan === 'priority' && user?.subscription?.status === 'active';
+  const isElite = user?.subscription?.plan === 'elite' && user?.subscription?.status === 'active';
 
   const renderListing = (listing: Property) => (
     <Pressable
@@ -105,7 +105,7 @@ export const MyListingsScreen = () => {
             <Feather name="edit-2" size={16} color={theme.text} />
             <ThemedText style={[Typography.caption, { marginLeft: Spacing.xs }]}>Edit</ThemedText>
           </Pressable>
-          {isPriority ? (
+          {isElite ? (
             <Pressable 
               style={[
                 styles.actionButton, 

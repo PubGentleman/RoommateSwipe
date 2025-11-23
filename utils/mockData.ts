@@ -9,7 +9,7 @@ export const mockProfileUsers: User[] = [
     age: 28,
     role: 'renter',
     profilePicture: 'https://picsum.photos/400/500?random=1',
-    subscription: { plan: 'priority', status: 'active' },
+    subscription: { plan: 'elite', status: 'active' },
     boostData: { boostsUsed: 2, isBoosted: true, boostExpiresAt: new Date(Date.now() + 20 * 60 * 60 * 1000), lastBoostDate: new Date() },
     profileData: {
       bio: 'Software engineer who loves hiking, cooking, and quiet evenings. Looking for a clean and respectful roommate.',
@@ -106,7 +106,7 @@ export const mockProfileUsers: User[] = [
     email: 'bob.anderson@email.com',
     name: 'Bob Anderson',
     role: 'renter',
-    subscription: { plan: 'priority', status: 'active' },
+    subscription: { plan: 'elite', status: 'active' },
     boostData: { boostsUsed: 5, isBoosted: false },
     profileData: {
       bio: 'Teacher by day, musician by night. Looking for a chill roommate who appreciates good music and great conversations.',
@@ -231,7 +231,7 @@ export const mockProfileUsers: User[] = [
     email: 'james.wilson@email.com',
     name: 'James Wilson',
     role: 'renter',
-    subscription: { plan: 'priority', status: 'active' },
+    subscription: { plan: 'elite', status: 'active' },
     boostData: { boostsUsed: 3, isBoosted: false },
     profileData: {
       bio: 'Finance analyst. Clean, organized, and professional. Prefer a quiet home environment.',
@@ -278,7 +278,7 @@ export const mockProfileUsers: User[] = [
     email: 'sophia.brown@email.com',
     name: 'Sophia Brown',
     role: 'renter',
-    subscription: { plan: 'priority', status: 'active' },
+    subscription: { plan: 'elite', status: 'active' },
     boostData: { boostsUsed: 4, isBoosted: true, boostExpiresAt: new Date(Date.now() + 15 * 60 * 60 * 1000), lastBoostDate: new Date() },
   },
   {
@@ -302,7 +302,7 @@ export const mockProfileUsers: User[] = [
     email: 'daniel.moore@email.com',
     name: 'Daniel Moore',
     role: 'renter',
-    subscription: { plan: 'priority', status: 'active' },
+    subscription: { plan: 'elite', status: 'active' },
     boostData: { boostsUsed: 6, isBoosted: false },
   },
   {

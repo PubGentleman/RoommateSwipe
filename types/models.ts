@@ -133,10 +133,10 @@ export interface User {
   role: 'renter' | 'host' | 'agent';
   profilePicture?: string;
   subscription?: {
-    plan: 'basic' | 'plus' | 'priority';
+    plan: 'basic' | 'plus' | 'elite';
     status: 'active' | 'cancelled' | 'expired';
     expiresAt?: Date;
-    scheduledPlan?: 'basic' | 'plus' | 'priority';
+    scheduledPlan?: 'basic' | 'plus' | 'elite';
     scheduledChangeDate?: Date;
   };
   paymentMethods?: Array<{
@@ -158,6 +158,23 @@ export interface User {
     hasUndoPass: boolean;
     undoPassExpiresAt?: Date;
   };
+  activeChatsCount?: number;
+  rewindData?: {
+    rewindsUsedToday: number;
+    lastRewindReset: Date;
+  };
+  profileViews?: Array<{
+    viewerId: string;
+    viewerName: string;
+    viewerPhoto?: string;
+    viewedAt: Date;
+  }>;
+  receivedLikes?: Array<{
+    likerId: string;
+    likerName: string;
+    likerPhoto?: string;
+    likedAt: Date;
+  }>;
   profileData?: {
     bio?: string;
     budget?: number;

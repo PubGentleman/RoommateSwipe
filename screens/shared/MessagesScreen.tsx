@@ -105,7 +105,7 @@ export const MessagesScreen = () => {
   const canSeeOnlineStatus = () => {
     const userPlan = user?.subscription?.plan || 'basic';
     const userStatus = user?.subscription?.status || 'active';
-    return (userPlan === 'plus' || userPlan === 'priority') && userStatus === 'active';
+    return (userPlan === 'plus' || userPlan === 'elite') && userStatus === 'active';
   };
 
   const renderConversation = ({ item }: { item: Conversation }) => {
