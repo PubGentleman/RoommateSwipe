@@ -95,6 +95,14 @@ export const MyListingsScreen = () => {
               {listing.bedrooms} bd • {listing.bathrooms} ba
             </ThemedText>
           </View>
+          {listing.walkScore ? (
+            <View style={styles.detail}>
+              <Feather name="navigation" size={16} color={theme.textSecondary} />
+              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
+                Walk Score {listing.walkScore}
+              </ThemedText>
+            </View>
+          ) : null}
         </View>
         <View style={styles.actions}>
           <Pressable style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]} onPress={() => {}}>

@@ -800,6 +800,7 @@ export const mockProperties: Property[] = [
     featured: true,
     propertyType: 'lease',
     roomType: 'entire',
+    walkScore: 98,
   },
   {
     id: '2',
@@ -826,6 +827,7 @@ export const mockProperties: Property[] = [
       { gender: 'female', onApp: false },
     ],
     hostProfileId: '1',
+    walkScore: 94,
   },
   {
     id: '3',
@@ -848,6 +850,7 @@ export const mockProperties: Property[] = [
     featured: true,
     propertyType: 'lease',
     roomType: 'entire',
+    walkScore: 97,
   },
   {
     id: '4',
@@ -875,6 +878,7 @@ export const mockProperties: Property[] = [
       { gender: 'female', onApp: true, userId: '5' },
     ],
     hostProfileId: '2',
+    walkScore: 88,
   },
   {
     id: '5',
@@ -897,6 +901,7 @@ export const mockProperties: Property[] = [
     featured: false,
     propertyType: 'lease',
     roomType: 'entire',
+    walkScore: 91,
   },
   {
     id: '6',
@@ -923,6 +928,7 @@ export const mockProperties: Property[] = [
       { gender: 'female', onApp: false },
     ],
     hostProfileId: '3',
+    walkScore: 93,
   },
   {
     id: '7',
@@ -945,6 +951,7 @@ export const mockProperties: Property[] = [
     featured: false,
     propertyType: 'lease',
     roomType: 'entire',
+    walkScore: 96,
   },
   {
     id: '8',
@@ -972,6 +979,7 @@ export const mockProperties: Property[] = [
       { gender: 'female', onApp: false },
     ],
     hostProfileId: '4',
+    walkScore: 90,
   },
   {
     id: '9',
@@ -994,6 +1002,7 @@ export const mockProperties: Property[] = [
     featured: true,
     propertyType: 'lease',
     roomType: 'entire',
+    walkScore: 97,
   },
   {
     id: '10',
@@ -1020,6 +1029,7 @@ export const mockProperties: Property[] = [
       { gender: 'male', onApp: false },
     ],
     hostProfileId: '6',
+    walkScore: 92,
   },
   {
     id: '11',
@@ -1042,6 +1052,7 @@ export const mockProperties: Property[] = [
     featured: false,
     propertyType: 'lease',
     roomType: 'entire',
+    walkScore: 93,
   },
   {
     id: '12',
@@ -1064,6 +1075,7 @@ export const mockProperties: Property[] = [
     featured: true,
     propertyType: 'lease',
     roomType: 'entire',
+    walkScore: 96,
   },
   {
     id: '13',
@@ -1092,6 +1104,7 @@ export const mockProperties: Property[] = [
       { gender: 'female', onApp: false },
     ],
     hostProfileId: '7',
+    walkScore: 89,
   },
   {
     id: '14',
@@ -1114,6 +1127,7 @@ export const mockProperties: Property[] = [
     featured: false,
     propertyType: 'sublet',
     roomType: 'entire',
+    walkScore: 95,
   },
   {
     id: '15',
@@ -1136,6 +1150,7 @@ export const mockProperties: Property[] = [
     featured: false,
     propertyType: 'lease',
     roomType: 'entire',
+    walkScore: 87,
   },
   {
     id: '16',
@@ -1163,6 +1178,7 @@ export const mockProperties: Property[] = [
       { gender: 'male', onApp: false },
     ],
     hostProfileId: '8',
+    walkScore: 90,
   },
   {
     id: '17',
@@ -1185,6 +1201,7 @@ export const mockProperties: Property[] = [
     featured: false,
     propertyType: 'lease',
     roomType: 'entire',
+    walkScore: 88,
   },
   {
     id: '18',
@@ -1213,6 +1230,7 @@ export const mockProperties: Property[] = [
       { gender: 'female', onApp: true, userId: '9' },
     ],
     hostProfileId: '9',
+    walkScore: 94,
   },
   {
     id: '19',
@@ -1235,6 +1253,7 @@ export const mockProperties: Property[] = [
     featured: false,
     propertyType: 'lease',
     roomType: 'entire',
+    walkScore: 89,
   },
   {
     id: '20',
@@ -1257,6 +1276,7 @@ export const mockProperties: Property[] = [
     featured: false,
     propertyType: 'lease',
     roomType: 'entire',
+    walkScore: 91,
   },
 ];
 

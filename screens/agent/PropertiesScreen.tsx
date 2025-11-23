@@ -87,6 +87,14 @@ export const PropertiesScreen = () => {
               8 applications
             </ThemedText>
           </View>
+          {property.walkScore ? (
+            <View style={styles.stat}>
+              <Feather name="navigation" size={16} color={theme.textSecondary} />
+              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
+                Walk Score {property.walkScore}
+              </ThemedText>
+            </View>
+          ) : null}
         </View>
         <View style={styles.actions}>
           {property.available ? (

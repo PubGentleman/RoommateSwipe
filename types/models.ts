@@ -54,6 +54,7 @@ export interface Property {
     userId?: string;
   }>;
   hostProfileId?: string;
+  walkScore?: number;
 }
 
 export interface PropertyFilter {

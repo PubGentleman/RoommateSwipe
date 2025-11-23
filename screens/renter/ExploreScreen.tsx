@@ -373,6 +373,14 @@ export const ExploreScreen = () => {
                 {item.sqft} sqft
               </ThemedText>
             </View>
+            {item.walkScore ? (
+              <View style={styles.detail}>
+                <Feather name="navigation" size={16} color={theme.textSecondary} />
+                <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
+                  {item.walkScore}
+                </ThemedText>
+              </View>
+            ) : null}
           </View>
           <View style={styles.locationRow}>
             <View style={styles.location}>
@@ -968,6 +976,22 @@ export const ExploreScreen = () => {
                         </ThemedText>
                       </View>
                     </View>
+                    {selectedProperty.walkScore ? (
+                      <View style={styles.detailRow}>
+                        <Feather name="navigation" size={20} color={theme.primary} />
+                        <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Walk Score</ThemedText>
+                          <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
+                            {selectedProperty.walkScore} - {
+                              selectedProperty.walkScore >= 90 ? "Walker's Paradise" :
+                              selectedProperty.walkScore >= 70 ? "Very Walkable" :
+                              selectedProperty.walkScore >= 50 ? "Somewhat Walkable" :
+                              "Car-Dependent"
+                            }
+                          </ThemedText>
+                        </View>
+                      </View>
+                    ) : null}
                     {selectedProperty.availableDate ? (
                       <View style={styles.detailRow}>
                         <Feather name="calendar" size={20} color={theme.primary} />
