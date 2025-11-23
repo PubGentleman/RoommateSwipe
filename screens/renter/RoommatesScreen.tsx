@@ -520,8 +520,8 @@ const styles = StyleSheet.create({
   },
   onlineIndicatorContainer: {
     position: 'absolute',
-    top: Spacing.lg,
-    right: Spacing.lg,
+    top: Spacing.sm,
+    right: Spacing.sm,
     zIndex: 3,
   },
   onlineIndicator: {
