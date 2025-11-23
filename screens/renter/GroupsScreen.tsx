@@ -659,10 +659,12 @@ export const GroupsScreen = () => {
         </View>
 
         <View style={styles.inputGroup}>
-          <ThemedText style={[Typography.body, { marginBottom: Spacing.xs }]}>Minimum Monthly Budget (per person) *</ThemedText>
+          <ThemedText style={[Typography.body, { marginBottom: Spacing.xs }]}>
+            Minimum Monthly Budget (per person) {(groupApartmentPrice.trim() && groupBedrooms.trim()) ? '(Auto-calculated)' : '*'}
+          </ThemedText>
           <TextInput
             style={[styles.input, { 
-              backgroundColor: theme.backgroundDefault, 
+              backgroundColor: (groupApartmentPrice.trim() && groupBedrooms.trim()) ? theme.backgroundSecondary : theme.backgroundDefault, 
               color: theme.text,
               borderColor: theme.border
             }]}
@@ -671,7 +673,13 @@ export const GroupsScreen = () => {
             value={groupBudget}
             onChangeText={setGroupBudget}
             keyboardType="numeric"
+            editable={!(groupApartmentPrice.trim() && groupBedrooms.trim())}
           />
+          {(groupApartmentPrice.trim() && groupBedrooms.trim()) ? (
+            <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
+              Automatically calculated from apartment price ÷ bedrooms
+            </ThemedText>
+          ) : null}
         </View>
 
         <View style={styles.inputGroup}>
@@ -685,9 +693,23 @@ export const GroupsScreen = () => {
             placeholder="e.g., 2500"
             placeholderTextColor={theme.textSecondary}
             value={groupApartmentPrice}
-            onChangeText={setGroupApartmentPrice}
+            onChangeText={(value) => {
+              setGroupApartmentPrice(value);
+              // Auto-calculate minimum budget per person
+              if (value.trim() && !isNaN(parseInt(value)) && groupBedrooms.trim() && !isNaN(parseInt(groupBedrooms))) {
+                const totalPrice = parseInt(value);
+                const rooms = parseInt(groupBedrooms);
+                const perPerson = Math.ceil(totalPrice / rooms);
+                setGroupBudget(perPerson.toString());
+              }
+            }}
             keyboardType="numeric"
           />
+          {groupApartmentPrice.trim() && groupBedrooms.trim() ? (
+            <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
+              Minimum budget will be auto-calculated as ${groupApartmentPrice} ÷ {groupBedrooms} bedrooms
+            </ThemedText>
+          ) : null}
         </View>
 
         <View style={styles.inputGroup}>
@@ -706,6 +728,13 @@ export const GroupsScreen = () => {
               // Auto-set max members to match bedrooms
               if (value.trim() && !isNaN(parseInt(value))) {
                 setGroupMaxMembers(value);
+                // Auto-calculate minimum budget if apartment price is set
+                if (groupApartmentPrice.trim() && !isNaN(parseInt(groupApartmentPrice))) {
+                  const totalPrice = parseInt(groupApartmentPrice);
+                  const rooms = parseInt(value);
+                  const perPerson = Math.ceil(totalPrice / rooms);
+                  setGroupBudget(perPerson.toString());
+                }
               }
             }}
             keyboardType="numeric"
