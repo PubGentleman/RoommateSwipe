@@ -58,7 +58,9 @@ export interface Group {
   members: string[];
   pendingMembers: string[];
   maxMembers: number;
-  budget: number;
+  budget: number; // Minimum monthly budget per person
+  apartmentPrice?: number; // Total apartment price
+  bedrooms?: number; // Number of bedrooms
   preferredLocation: string;
   createdAt: Date;
   createdBy: string;

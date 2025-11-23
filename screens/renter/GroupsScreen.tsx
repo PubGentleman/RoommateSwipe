@@ -35,6 +35,8 @@ export const GroupsScreen = () => {
   const [groupName, setGroupName] = useState('');
   const [groupDescription, setGroupDescription] = useState('');
   const [groupBudget, setGroupBudget] = useState('');
+  const [groupApartmentPrice, setGroupApartmentPrice] = useState('');
+  const [groupBedrooms, setGroupBedrooms] = useState('');
   const [groupLocation, setGroupLocation] = useState('');
   const [groupMaxMembers, setGroupMaxMembers] = useState('4');
 
@@ -232,6 +234,9 @@ export const GroupsScreen = () => {
       return;
     }
 
+    const apartmentPrice = groupApartmentPrice.trim() ? parseInt(groupApartmentPrice) : undefined;
+    const bedrooms = groupBedrooms.trim() ? parseInt(groupBedrooms) : undefined;
+
     const newGroup: Group = {
       id: Math.random().toString(36).substr(2, 9),
       name: groupName.trim(),
@@ -239,6 +244,8 @@ export const GroupsScreen = () => {
       members: [user.id],
       pendingMembers: [],
       budget: parseInt(groupBudget),
+      apartmentPrice: apartmentPrice,
+      bedrooms: bedrooms,
       preferredLocation: groupLocation.trim(),
       maxMembers: maxMembers,
       createdAt: new Date(),
@@ -250,6 +257,8 @@ export const GroupsScreen = () => {
     setGroupName('');
     setGroupDescription('');
     setGroupBudget('');
+    setGroupApartmentPrice('');
+    setGroupBedrooms('');
     setGroupLocation('');
     setGroupMaxMembers('4');
 
@@ -352,6 +361,37 @@ export const GroupsScreen = () => {
             {group.description}
           </ThemedText>
         ) : null}
+
+        <View style={{ flexDirection: 'row', gap: Spacing.lg, marginTop: Spacing.md, flexWrap: 'wrap' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
+            <Feather name="dollar-sign" size={16} color={theme.primary} />
+            <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+              Min ${group.budget}/mo
+            </ThemedText>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
+            <Feather name="map-pin" size={16} color={theme.primary} />
+            <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+              {group.preferredLocation}
+            </ThemedText>
+          </View>
+          {group.apartmentPrice ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
+              <Feather name="home" size={16} color={theme.primary} />
+              <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+                ${group.apartmentPrice} total
+              </ThemedText>
+            </View>
+          ) : null}
+          {group.bedrooms ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
+              <Feather name="grid" size={16} color={theme.primary} />
+              <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+                {group.bedrooms} bedrooms
+              </ThemedText>
+            </View>
+          ) : null}
+        </View>
 
         {memberProfiles.length > 0 ? (
           <View style={styles.membersSection}>
@@ -488,7 +528,7 @@ export const GroupsScreen = () => {
                     <Feather name="dollar-sign" size={20} color={theme.primary} />
                     <View style={styles.cardDetailText}>
                       <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
-                        Budget
+                        Min Budget
                       </ThemedText>
                       <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
                         ${currentGroup.budget}/mo
@@ -507,6 +547,37 @@ export const GroupsScreen = () => {
                     </View>
                   </View>
                 </View>
+
+                {(currentGroup.apartmentPrice || currentGroup.bedrooms) ? (
+                  <View style={[styles.cardDetails, { marginTop: Spacing.md }]}>
+                    {currentGroup.apartmentPrice ? (
+                      <View style={styles.cardDetail}>
+                        <Feather name="home" size={20} color={theme.primary} />
+                        <View style={styles.cardDetailText}>
+                          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
+                            Total Price
+                          </ThemedText>
+                          <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
+                            ${currentGroup.apartmentPrice}
+                          </ThemedText>
+                        </View>
+                      </View>
+                    ) : null}
+                    {currentGroup.bedrooms ? (
+                      <View style={styles.cardDetail}>
+                        <Feather name="grid" size={20} color={theme.primary} />
+                        <View style={styles.cardDetailText}>
+                          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
+                            Bedrooms
+                          </ThemedText>
+                          <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
+                            {currentGroup.bedrooms}
+                          </ThemedText>
+                        </View>
+                      </View>
+                    ) : null}
+                  </View>
+                ) : null}
               </View>
             </Animated.View>
           </GestureDetector>
@@ -588,17 +659,49 @@ export const GroupsScreen = () => {
         </View>
 
         <View style={styles.inputGroup}>
-          <ThemedText style={[Typography.body, { marginBottom: Spacing.xs }]}>Monthly Budget *</ThemedText>
+          <ThemedText style={[Typography.body, { marginBottom: Spacing.xs }]}>Minimum Monthly Budget (per person) *</ThemedText>
           <TextInput
             style={[styles.input, { 
               backgroundColor: theme.backgroundDefault, 
               color: theme.text,
               borderColor: theme.border
             }]}
-            placeholder="e.g., 2000"
+            placeholder="e.g., 800"
             placeholderTextColor={theme.textSecondary}
             value={groupBudget}
             onChangeText={setGroupBudget}
+            keyboardType="numeric"
+          />
+        </View>
+
+        <View style={styles.inputGroup}>
+          <ThemedText style={[Typography.body, { marginBottom: Spacing.xs }]}>Entire Apartment Price</ThemedText>
+          <TextInput
+            style={[styles.input, { 
+              backgroundColor: theme.backgroundDefault, 
+              color: theme.text,
+              borderColor: theme.border
+            }]}
+            placeholder="e.g., 2500"
+            placeholderTextColor={theme.textSecondary}
+            value={groupApartmentPrice}
+            onChangeText={setGroupApartmentPrice}
+            keyboardType="numeric"
+          />
+        </View>
+
+        <View style={styles.inputGroup}>
+          <ThemedText style={[Typography.body, { marginBottom: Spacing.xs }]}>Number of Bedrooms</ThemedText>
+          <TextInput
+            style={[styles.input, { 
+              backgroundColor: theme.backgroundDefault, 
+              color: theme.text,
+              borderColor: theme.border
+            }]}
+            placeholder="e.g., 3"
+            placeholderTextColor={theme.textSecondary}
+            value={groupBedrooms}
+            onChangeText={setGroupBedrooms}
             keyboardType="numeric"
           />
         </View>
