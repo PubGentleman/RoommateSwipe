@@ -801,20 +801,27 @@ export const ExploreScreen = () => {
                         </ThemedText>
                       </View>
                     </View>
-                    {selectedProperty.roomType === 'room' && (selectedProperty.hostProfileId || (selectedProperty.existingRoommates && selectedProperty.existingRoommates.length > 0)) ? (
+                    {selectedProperty.roomType === 'room' && selectedProperty.hostProfileId && hostProfiles.get(selectedProperty.hostProfileId) ? (
+                      <View style={styles.detailRow}>
+                        <Feather name="user" size={20} color={theme.primary} />
+                        <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Host</ThemedText>
+                          <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
+                            {(() => {
+                              const hostUser = hostProfiles.get(selectedProperty.hostProfileId!);
+                              return hostUser?.profileData?.gender ? getGenderSymbol(hostUser.profileData.gender) : '';
+                            })()}
+                          </ThemedText>
+                        </View>
+                      </View>
+                    ) : null}
+                    {selectedProperty.roomType === 'room' && selectedProperty.existingRoommates && selectedProperty.existingRoommates.length > 0 ? (
                       <View style={styles.detailRow}>
                         <Feather name="users" size={20} color={theme.primary} />
                         <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Current Household</ThemedText>
+                          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Other Roommates (Not on App)</ThemedText>
                           <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
-                            {(() => {
-                              const hostUser = selectedProperty.hostProfileId ? hostProfiles.get(selectedProperty.hostProfileId) : null;
-                              const hostGender = hostUser?.profileData?.gender ? getGenderSymbol(hostUser.profileData.gender) : '';
-                              const roommateGenders = selectedProperty.existingRoommates && selectedProperty.existingRoommates.length > 0
-                                ? selectedProperty.existingRoommates.map((rm) => getGenderSymbol(rm.gender)).join('')
-                                : '';
-                              return hostGender + roommateGenders;
-                            })()}
+                            {selectedProperty.existingRoommates.filter(rm => !rm.onApp).map((rm) => getGenderSymbol(rm.gender)).join('') || 'None'}
                           </ThemedText>
                         </View>
                       </View>
