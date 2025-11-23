@@ -31,6 +31,10 @@ export interface User {
     isBoosted: boolean;
     boostExpiresAt?: Date;
   };
+  undoPassData?: {
+    hasUndoPass: boolean;
+    undoPassExpiresAt?: Date;
+  };
 }
 
 interface AuthContextType {
@@ -51,6 +55,8 @@ interface AuthContextType {
   canBoost: () => { canBoost: boolean; reason?: string; requiresPayment?: boolean };
   checkAndUpdateBoostStatus: () => Promise<void>;
   purchaseBoost: () => Promise<{ success: boolean; message: string }>;
+  purchaseUndoPass: () => Promise<{ success: boolean; message: string }>;
+  hasActiveUndoPass: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -527,8 +533,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const purchaseUndoPass = async (): Promise<{ success: boolean; message: string }> => {
+    if (!user) {
+      return { success: false, message: 'Not logged in' };
+    }
+
+    if (!user.paymentMethods || user.paymentMethods.length === 0) {
+      return { success: false, message: 'Please add a payment method first' };
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    
+    const updatedUser: User = {
+      ...user,
+      undoPassData: {
+        hasUndoPass: true,
+        undoPassExpiresAt: expiresAt,
+      },
+    };
+    
+    await StorageService.setCurrentUser(updatedUser);
+    await StorageService.addOrUpdateUser(updatedUser);
+    setUser(updatedUser);
+    
+    return { success: true, message: 'Undo Pass activated! You can now undo swipes for 24 hours.' };
+  };
+
+  const hasActiveUndoPass = (): boolean => {
+    if (!user) return false;
+    
+    const userPlan = user.subscription?.plan || 'basic';
+    if (userPlan === 'plus' || userPlan === 'priority') {
+      return true;
+    }
+    
+    if (!user.undoPassData?.hasUndoPass) return false;
+    
+    const now = new Date();
+    const expiresAt = user.undoPassData.undoPassExpiresAt 
+      ? new Date(user.undoPassData.undoPassExpiresAt)
+      : null;
+    
+    return expiresAt ? expiresAt > now : false;
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPlus, upgradeToPriority, downgradeToPlan, cancelSubscription, reactivateSubscription, updateUser, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPlus, upgradeToPriority, downgradeToPlan, cancelSubscription, reactivateSubscription, updateUser, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass }}>
       {children}
     </AuthContext.Provider>
   );

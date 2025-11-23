@@ -23,7 +23,7 @@ const CARD_WIDTH = Math.min(SCREEN_WIDTH - Spacing.xxl, MAX_CARD_WIDTH);
 
 export const RoommatesScreen = () => {
   const { theme } = useTheme();
-  const { user, purchaseBoost } = useAuth();
+  const { user, purchaseBoost, purchaseUndoPass, hasActiveUndoPass } = useAuth();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [profiles, setProfiles] = useState<RoommateProfile[]>([]);
@@ -37,6 +37,7 @@ export const RoommatesScreen = () => {
   const [processingBoost, setProcessingBoost] = useState(false);
   const [lastSwipedProfile, setLastSwipedProfile] = useState<{ profile: RoommateProfile; action: 'like' | 'nope' | 'superlike' } | null>(null);
   const [showUndoUpgradeModal, setShowUndoUpgradeModal] = useState(false);
+  const [processingUndoPass, setProcessingUndoPass] = useState(false);
 
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -168,9 +169,7 @@ export const RoommatesScreen = () => {
   };
 
   const handleUndo = () => {
-    const userPlan = user?.subscription?.plan || 'basic';
-    
-    if (userPlan === 'basic') {
+    if (!hasActiveUndoPass()) {
       setShowUndoUpgradeModal(true);
       return;
     }
@@ -318,6 +317,22 @@ export const RoommatesScreen = () => {
     }
   };
 
+  const handlePurchaseUndoPass = async () => {
+    setProcessingUndoPass(true);
+    const result = await purchaseUndoPass();
+    setProcessingUndoPass(false);
+    
+    if (result.success) {
+      setShowUndoUpgradeModal(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } else {
+      if (result.message.includes('payment method')) {
+        (navigation as any).navigate('Profile', { screen: 'Payment' });
+        setShowUndoUpgradeModal(false);
+      }
+    }
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <View style={[styles.header, { paddingTop: insets.top + 60 }]}>
@@ -399,13 +414,13 @@ export const RoommatesScreen = () => {
             styles.actionButtonSmall, 
             { 
               backgroundColor: '#FFFFFF', 
-              borderColor: lastSwipedProfile ? Colors.warning : theme.textSecondary,
+              borderColor: lastSwipedProfile ? theme.warning : theme.textSecondary,
               opacity: lastSwipedProfile ? 1 : 0.4,
             }
           ]}
           onPress={handleUndo}
         >
-          <Feather name="rotate-ccw" size={24} color={lastSwipedProfile ? Colors.warning : theme.textSecondary} />
+          <Feather name="rotate-ccw" size={24} color={lastSwipedProfile ? theme.warning : theme.textSecondary} />
         </Pressable>
         <Pressable
           style={[styles.actionButton, { backgroundColor: '#FFFFFF', borderColor: theme.error }]}
@@ -585,7 +600,7 @@ export const RoommatesScreen = () => {
       >
         <View style={styles.modalOverlay}>
           <View style={[styles.vipModalContainer, { backgroundColor: theme.backgroundSecondary }]}>
-            <View style={[styles.vipModalHeader, { backgroundColor: Colors.warning }]}>
+            <View style={[styles.vipModalHeader, { backgroundColor: theme.warning }]}>
               <Feather name="rotate-ccw" size={32} color="#FFFFFF" />
             </View>
             
@@ -594,26 +609,32 @@ export const RoommatesScreen = () => {
                 Undo Swipe
               </ThemedText>
               <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary, marginBottom: Spacing.xl }]}>
-                Take back your last swipe and get a second chance! This feature is available for Plus and Priority members.
+                Take back your last swipe and get a second chance!
               </ThemedText>
+              
+              <View style={[styles.priceCard, { backgroundColor: theme.backgroundDefault, borderColor: theme.border, marginBottom: Spacing.lg }]}>
+                <ThemedText style={[Typography.h3, { marginBottom: Spacing.xs }]}>
+                  24-Hour Undo Pass
+                </ThemedText>
+                <ThemedText style={[Typography.h1, { color: theme.warning, marginBottom: Spacing.xs }]}>
+                  $1.99
+                </ThemedText>
+                <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+                  Undo swipes for 24 hours
+                </ThemedText>
+              </View>
               
               <View style={styles.vipFeaturesList}>
                 <View style={styles.vipFeatureItem}>
                   <Feather name="check-circle" size={20} color={theme.success} />
                   <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
-                    Undo your last swipe anytime
+                    Take back your last swipe
                   </ThemedText>
                 </View>
                 <View style={styles.vipFeatureItem}>
                   <Feather name="check-circle" size={20} color={theme.success} />
                   <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
-                    Unlimited messaging
-                  </ThemedText>
-                </View>
-                <View style={styles.vipFeatureItem}>
-                  <Feather name="check-circle" size={20} color={theme.success} />
-                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
-                    Advanced filters and more
+                    24-hour unlimited undo access
                   </ThemedText>
                 </View>
               </View>
@@ -621,7 +642,16 @@ export const RoommatesScreen = () => {
             
             <View style={styles.vipModalActions}>
               <Pressable
-                style={[styles.vipModalButton, { backgroundColor: theme.primary }]}
+                style={[styles.vipModalButton, { backgroundColor: theme.warning, opacity: processingUndoPass ? 0.7 : 1 }]}
+                onPress={handlePurchaseUndoPass}
+                disabled={processingUndoPass}
+              >
+                <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
+                  {processingUndoPass ? 'Processing...' : 'Get 24hr Pass - $1.99'}
+                </ThemedText>
+              </Pressable>
+              <Pressable
+                style={[styles.vipModalButton, { backgroundColor: theme.primary, marginTop: Spacing.md }]}
                 onPress={() => {
                   setShowUndoUpgradeModal(false);
                   navigation.navigate('Settings' as never);

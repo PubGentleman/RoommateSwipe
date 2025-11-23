@@ -137,6 +137,10 @@ export interface User {
     isBoosted: boolean;
     boostExpiresAt?: Date;
   };
+  undoPassData?: {
+    hasUndoPass: boolean;
+    undoPassExpiresAt?: Date;
+  };
   profileData?: {
     bio?: string;
     budget?: number;
