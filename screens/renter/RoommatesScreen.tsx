@@ -613,8 +613,8 @@ const styles = StyleSheet.create({
   },
   boostBadgeLeft: {
     position: 'absolute',
-    top: Spacing.lg,
-    left: Spacing.md,
+    top: Spacing.md,
+    right: Spacing.md,
     zIndex: 2,
   },
   boostBadge: {
@@ -647,18 +647,17 @@ const styles = StyleSheet.create({
   },
   badges: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
+    flexWrap: 'nowrap',
+    gap: Spacing.xs,
     marginTop: Spacing.md,
   },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.small,
     flexShrink: 1,
-    maxWidth: CARD_WIDTH - (Spacing.xxl * 2),
   },
   actions: {
     flexDirection: 'row',
