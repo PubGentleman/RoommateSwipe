@@ -40,7 +40,7 @@ export const ProfileStackNavigator = () => {
           headerTransparent: true,
           headerTitle: 'Payment Methods',
           headerBlurEffect: 'regular',
-          headerBackVisible: true,
+          headerBackVisible: false,
           headerLeft: () => (
             <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
               <Feather name="chevron-left" size={28} color="#007AFF" />
@@ -56,7 +56,7 @@ export const ProfileStackNavigator = () => {
           headerTransparent: true,
           headerTitle: 'Subscription Plans',
           headerBlurEffect: 'regular',
-          headerBackVisible: true,
+          headerBackVisible: false,
           headerLeft: () => (
             <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
               <Feather name="chevron-left" size={28} color="#007AFF" />
@@ -86,7 +86,7 @@ export const ProfileStackNavigator = () => {
           headerTransparent: true,
           headerTitle: 'Privacy & Security',
           headerBlurEffect: 'regular',
-          headerBackVisible: true,
+          headerBackVisible: false,
           headerLeft: () => (
             <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
               <Feather name="chevron-left" size={28} color="#007AFF" />
@@ -102,7 +102,7 @@ export const ProfileStackNavigator = () => {
           headerTransparent: true,
           headerTitle: 'Profile Views',
           headerBlurEffect: 'regular',
-          headerBackVisible: true,
+          headerBackVisible: false,
           headerLeft: () => (
             <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
               <Feather name="chevron-left" size={28} color="#007AFF" />
@@ -118,7 +118,7 @@ export const ProfileStackNavigator = () => {
           headerTransparent: true,
           headerTitle: 'Privacy Policy',
           headerBlurEffect: 'regular',
-          headerBackVisible: true,
+          headerBackVisible: false,
           headerLeft: () => (
             <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
               <Feather name="chevron-left" size={28} color="#007AFF" />
@@ -134,7 +134,7 @@ export const ProfileStackNavigator = () => {
           headerTransparent: true,
           headerTitle: 'Terms of Service',
           headerBlurEffect: 'regular',
-          headerBackVisible: true,
+          headerBackVisible: false,
           headerLeft: () => (
             <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
               <Feather name="chevron-left" size={28} color="#007AFF" />
@@ -150,7 +150,7 @@ export const ProfileStackNavigator = () => {
           headerTransparent: true,
           headerTitle: 'Download My Data',
           headerBlurEffect: 'regular',
-          headerBackVisible: true,
+          headerBackVisible: false,
           headerLeft: () => (
             <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
               <Feather name="chevron-left" size={28} color="#007AFF" />
