@@ -136,7 +136,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={90}
+      keyboardVerticalOffset={0}
     >
       <View style={[styles.header, { backgroundColor: theme.backgroundRoot, paddingTop: insets.top + 60 }]}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -204,7 +204,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         />
       </View>
 
-      <View style={[styles.inputContainer, { backgroundColor: theme.backgroundRoot, paddingBottom: TAB_BAR_HEIGHT + Spacing.md }]}>
+      <View style={[styles.inputContainer, { backgroundColor: theme.backgroundRoot, paddingBottom: insets.bottom + Spacing.md }]}>
         <TextInput
           style={[
             styles.input,
