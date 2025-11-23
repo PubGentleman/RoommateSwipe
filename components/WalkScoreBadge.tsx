@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, StyleSheet, Image } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { ThemedText } from './ThemedText';
 import { useTheme } from '../hooks/useTheme';
 
@@ -41,14 +42,14 @@ export const WalkScoreBadge = ({ score, size = 'medium' }: WalkScoreBadgeProps) 
             borderWidth: dim.borderWidth,
             borderColor: green,
             borderRadius: dim.size / 2,
-            backgroundColor: theme.backgroundDefault,
           },
         ]}
       >
-        <Image
-          source={require('../assets/images/walking-person-green.png')}
-          style={[styles.icon, { width: dim.iconSize, height: dim.iconSize }]}
-          resizeMode="contain"
+        <Feather 
+          name="user" 
+          size={dim.iconSize} 
+          color={green}
+          style={styles.icon}
         />
         <ThemedText
           style={[
@@ -72,6 +73,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   circle: {
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
   },
