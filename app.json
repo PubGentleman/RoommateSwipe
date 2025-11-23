@@ -1,19 +1,19 @@
 {
   "expo": {
-    "name": "RoomieMatch",
-    "slug": "roomiematch",
+    "name": "Roomdr",
+    "slug": "roomdr",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "roomiematch",
+    "scheme": "roomdr",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.roomiematch.app"
+      "bundleIdentifier": "com.roomdr.app"
     },
     "android": {
-      "package": "com.roomiematch.app",
+      "package": "com.roomdr.app",
       "adaptiveIcon": {
         "backgroundColor": "#FF6B6B",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

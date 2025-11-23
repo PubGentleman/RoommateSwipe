@@ -1,6 +1,6 @@
 # Overview
 
-RoomieMatch is a React Native mobile application built with Expo, designed to connect renters, hosts, and agents/landlords in the roommate-finding marketplace. It aims to be an "Airbnb for roommates," offering features such as role-based navigation, swipe-based roommate matching, property listings, group formation, and messaging capabilities to streamline the housing and roommate search process.
+Roomdr is a React Native mobile application built with Expo, designed to connect renters, hosts, and agents/landlords in the roommate-finding marketplace. It aims to be an "Airbnb for roommates," offering features such as role-based navigation, swipe-based roommate matching, property listings, group formation, and messaging capabilities to streamline the housing and roommate search process.
 
 # User Preferences
 
@@ -24,7 +24,7 @@ Preferred communication style: Simple, everyday language.
 
 ## Matching Algorithm
 
-RoomieMatch utilizes a comprehensive points-based compatibility system (0-100 score) across 12 weighted factors, with location being a major determinant through neighborhood proximity mapping. It provides detailed breakdowns with strengths, concerns, and notes for each match. Key factors include Location, Budget, Sleep Schedule, Cleanliness, Smoking/Substances, Work Location, Guest Policy, Noise Tolerance, Pets, Roommate Relationship, Lifestyle Tags, and Occupation. The system calculates scores in real-time and dynamically color-codes compatibility (Green 80%+, Blue 70%+, Orange 60%+, Red <60%).
+Roomdr utilizes a comprehensive points-based compatibility system (0-100 score) across 12 weighted factors, with location being a major determinant through neighborhood proximity mapping. It provides detailed breakdowns with strengths, concerns, and notes for each match. Key factors include Location, Budget, Sleep Schedule, Cleanliness, Smoking/Substances, Work Location, Guest Policy, Noise Tolerance, Pets, Roommate Relationship, Lifestyle Tags, and Occupation. The system calculates scores in real-time and dynamically color-codes compatibility (Green 80%+, Blue 70%+, Orange 60%+, Red <60%).
 
 ## Frontend Architecture
 

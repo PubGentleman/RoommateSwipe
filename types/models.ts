@@ -189,7 +189,7 @@ export interface User {
 export interface Notification {
   id: string;
   userId: string;
-  type: 'match' | 'message' | 'group_invite' | 'group_accepted' | 'property_update' | 'application_status';
+  type: 'match' | 'message' | 'group_invite' | 'group_accepted' | 'property_update' | 'application_status' | 'system';
   title: string;
   body: string;
   isRead: boolean;

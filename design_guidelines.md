@@ -1,4 +1,4 @@
-# Roommate Finder App - Mobile Design Guidelines
+# Roomdr - Mobile Design Guidelines
 
 ## Architecture & Navigation
 

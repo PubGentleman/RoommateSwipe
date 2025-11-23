@@ -40,6 +40,13 @@ export interface User {
     age?: number;
     budget?: number;
     location?: string;
+    neighborhood?: string;
+    city?: string;
+    state?: string;
+    coordinates?: {
+      lat: number;
+      lng: number;
+    };
     occupation?: string;
     interests?: string;
     gender?: 'male' | 'female' | 'other';

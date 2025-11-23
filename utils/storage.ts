@@ -2,18 +2,18 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User, RoommateProfile, Property, Group, Conversation, Message, Match, Application, Notification } from '../types/models';
 
 const STORAGE_KEYS = {
-  CURRENT_USER: '@roommate_finder/current_user',
-  USERS: '@roommate_finder/users',
-  ROOMMATE_PROFILES: '@roommate_finder/roommate_profiles',
-  PROPERTIES: '@roommate_finder/properties',
-  GROUPS: '@roommate_finder/groups',
-  CONVERSATIONS: '@roommate_finder/conversations',
-  MATCHES: '@roommate_finder/matches',
-  APPLICATIONS: '@roommate_finder/applications',
-  SWIPE_HISTORY: '@roommate_finder/swipe_history',
-  LIKES: '@roommate_finder/likes',
-  SAVED_PROPERTIES: '@roommate_finder/saved_properties',
-  NOTIFICATIONS: '@roommate_finder/notifications',
+  CURRENT_USER: '@roomdr/current_user',
+  USERS: '@roomdr/users',
+  ROOMMATE_PROFILES: '@roomdr/roommate_profiles',
+  PROPERTIES: '@roomdr/properties',
+  GROUPS: '@roomdr/groups',
+  CONVERSATIONS: '@roomdr/conversations',
+  MATCHES: '@roomdr/matches',
+  APPLICATIONS: '@roomdr/applications',
+  SWIPE_HISTORY: '@roomdr/swipe_history',
+  LIKES: '@roomdr/likes',
+  SAVED_PROPERTIES: '@roomdr/saved_properties',
+  NOTIFICATIONS: '@roomdr/notifications',
 };
 
 export const StorageService = {
@@ -776,7 +776,7 @@ export const StorageService = {
           id: 'notif-6',
           userId,
           type: 'system',
-          title: 'Welcome to RoomieMatch!',
+          title: 'Welcome to Roomdr!',
           body: 'Complete your profile to start finding compatible roommates',
           isRead: true,
           createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3),
