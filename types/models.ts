@@ -41,6 +41,9 @@ export interface Property {
   hostName: string;
   featured?: boolean;
   propertyType: 'lease' | 'sublet';
+  roomType: 'room' | 'entire';
+  existingRoommateGender?: 'male' | 'female';
+  hostProfileId?: string;
 }
 
 export interface PropertyFilter {
