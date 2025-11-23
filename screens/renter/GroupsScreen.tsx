@@ -137,63 +137,71 @@ export const GroupsScreen = () => {
       setAvatarsExpanded(!avatarsExpanded);
     };
 
+    const totalMembers = memberProfiles.length + (remainingCount > 0 ? 1 : 0);
+    const stackWidth = avatarsExpanded 
+      ? totalMembers * EXPANDED_SPACING
+      : AVATAR_SIZE + (totalMembers - 1) * (AVATAR_SIZE - OVERLAP);
+    const centerOffset = (CARD_WIDTH - stackWidth) / 2;
+
     return (
       <Pressable 
         onPress={handleStackPress}
         style={styles.avatarStackContainer}
       >
-        {memberProfiles.map((profile, index) => {
-          const baseLeft = index * (AVATAR_SIZE - OVERLAP);
-          const expandedLeft = index * EXPANDED_SPACING;
+        <View style={{ position: 'relative', width: stackWidth, height: AVATAR_SIZE }}>
+          {memberProfiles.map((profile, index) => {
+            const baseLeft = index * (AVATAR_SIZE - OVERLAP);
+            const expandedLeft = index * EXPANDED_SPACING;
+            
+            return (
+              <Pressable
+                key={profile.id}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handleMemberPress(profile);
+                }}
+                style={[
+                  styles.avatarWrapper,
+                  {
+                    left: avatarsExpanded ? expandedLeft : baseLeft,
+                    zIndex: MAX_VISIBLE - index,
+                  }
+                ]}
+              >
+                {profile.photos && profile.photos.length > 0 ? (
+                  <Image
+                    source={{ uri: profile.photos[0] }}
+                    style={[styles.avatar, { borderColor: theme.backgroundDefault }]}
+                  />
+                ) : (
+                  <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: theme.primary, borderColor: theme.backgroundDefault }]}>
+                    <Feather name="user" size={32} color="#FFFFFF" />
+                  </View>
+                )}
+              </Pressable>
+            );
+          })}
           
-          return (
-            <Pressable
-              key={profile.id}
-              onPress={(e) => {
-                e.stopPropagation();
-                handleMemberPress(profile);
-              }}
+          {remainingCount > 0 ? (
+            <View
               style={[
                 styles.avatarWrapper,
                 {
-                  left: avatarsExpanded ? expandedLeft : baseLeft,
-                  zIndex: MAX_VISIBLE - index,
+                  left: avatarsExpanded 
+                    ? memberProfiles.length * EXPANDED_SPACING 
+                    : memberProfiles.length * (AVATAR_SIZE - OVERLAP),
+                  zIndex: 0,
                 }
               ]}
             >
-              {profile.photos && profile.photos.length > 0 ? (
-                <Image
-                  source={{ uri: profile.photos[0] }}
-                  style={[styles.avatar, { borderColor: theme.backgroundDefault }]}
-                />
-              ) : (
-                <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: theme.primary, borderColor: theme.backgroundDefault }]}>
-                  <Feather name="user" size={28} color="#FFFFFF" />
-                </View>
-              )}
-            </Pressable>
-          );
-        })}
-        
-        {remainingCount > 0 ? (
-          <View
-            style={[
-              styles.avatarWrapper,
-              {
-                left: avatarsExpanded 
-                  ? memberProfiles.length * EXPANDED_SPACING 
-                  : memberProfiles.length * (AVATAR_SIZE - OVERLAP),
-                zIndex: 0,
-              }
-            ]}
-          >
-            <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: theme.textSecondary, borderColor: theme.backgroundDefault }]}>
-              <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
-                +{remainingCount}
-              </ThemedText>
+              <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: theme.textSecondary, borderColor: theme.backgroundDefault }]}>
+                <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
+                  +{remainingCount}
+                </ThemedText>
+              </View>
             </View>
-          </View>
-        ) : null}
+          ) : null}
+        </View>
       </Pressable>
     );
   };
