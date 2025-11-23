@@ -1,8 +1,7 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Image } from 'react-native';
 import { ThemedText } from './ThemedText';
 import { useTheme } from '../hooks/useTheme';
-import { Spacing, BorderRadius, Typography } from '../constants/theme';
 
 interface WalkScoreBadgeProps {
   score: number;
@@ -13,65 +12,31 @@ export const WalkScoreBadge = ({ score, size = 'medium' }: WalkScoreBadgeProps) 
   const { theme } = useTheme();
 
   const dimensions = {
-    small: { width: 50, height: 50, fontSize: 20, labelSize: 8 },
-    medium: { width: 65, height: 65, fontSize: 28, labelSize: 9 },
-    large: { width: 80, height: 80, fontSize: 36, labelSize: 10 },
+    small: { size: 50, fontSize: 14 },
+    medium: { size: 65, fontSize: 18 },
+    large: { size: 80, fontSize: 22 },
   };
 
   const dim = dimensions[size];
 
   return (
-    <View style={styles.container}>
-      <View
+    <View style={[styles.container, { width: dim.size, height: dim.size }]}>
+      <Image
+        source={require('../assets/images/walk-score-badge.png')}
+        style={[styles.badge, { width: dim.size, height: dim.size }]}
+        resizeMode="contain"
+      />
+      <ThemedText
         style={[
-          styles.badge,
+          styles.score,
           {
-            width: dim.width,
-            height: dim.height,
-            backgroundColor: '#E8F0F7',
-            borderColor: '#7DA3C6',
+            fontSize: dim.fontSize,
+            color: '#4A4A4A',
           },
         ]}
       >
-        <ThemedText
-          style={[
-            styles.label,
-            {
-              fontSize: dim.labelSize,
-              color: '#5B8AB8',
-            },
-          ]}
-        >
-          Walk Score
-        </ThemedText>
-        <ThemedText
-          style={[
-            styles.score,
-            {
-              fontSize: dim.fontSize,
-              color: '#2C4A61',
-            },
-          ]}
-        >
-          {score}
-        </ThemedText>
-      </View>
-      <View
-        style={[
-          styles.pointer,
-          {
-            borderTopColor: '#7DA3C6',
-          },
-        ]}
-      />
-      <View
-        style={[
-          styles.pointerInner,
-          {
-            borderTopColor: '#E8F0F7',
-          },
-        ]}
-      />
+        {score}
+      </ThemedText>
     </View>
   );
 };
@@ -80,50 +45,14 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
   },
   badge: {
-    borderRadius: BorderRadius.medium,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.xs,
-    paddingHorizontal: Spacing.sm,
-  },
-  label: {
-    fontWeight: '600',
-    letterSpacing: 0.3,
-    marginBottom: 2,
+    position: 'absolute',
   },
   score: {
     fontWeight: '700',
-    lineHeight: undefined,
-  },
-  pointer: {
-    width: 0,
-    height: 0,
-    backgroundColor: 'transparent',
-    borderStyle: 'solid',
-    borderTopWidth: 6,
-    borderRightWidth: 5,
-    borderBottomWidth: 0,
-    borderLeftWidth: 5,
-    borderRightColor: 'transparent',
-    borderBottomColor: 'transparent',
-    borderLeftColor: 'transparent',
-    marginTop: -2,
-  },
-  pointerInner: {
-    width: 0,
-    height: 0,
-    backgroundColor: 'transparent',
-    borderStyle: 'solid',
-    borderTopWidth: 5,
-    borderRightWidth: 4,
-    borderBottomWidth: 0,
-    borderLeftWidth: 4,
-    borderRightColor: 'transparent',
-    borderBottomColor: 'transparent',
-    borderLeftColor: 'transparent',
-    marginTop: -5,
+    position: 'absolute',
+    bottom: '18%',
   },
 });
