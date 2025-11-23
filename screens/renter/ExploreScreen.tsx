@@ -297,6 +297,55 @@ export const ExploreScreen = () => {
           ) : null}
         </Pressable>
       </View>
+      
+      <View style={styles.viewToggleContainer}>
+        <Pressable
+          style={[
+            styles.viewToggleButton,
+            viewMode === 'all' && { backgroundColor: theme.primary },
+          ]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setViewMode('all');
+          }}
+        >
+          <ThemedText
+            style={[
+              Typography.body,
+              { fontWeight: '600' },
+              viewMode === 'all' ? { color: '#FFFFFF' } : { color: theme.text },
+            ]}
+          >
+            All Properties
+          </ThemedText>
+        </Pressable>
+        <Pressable
+          style={[
+            styles.viewToggleButton,
+            viewMode === 'saved' && { backgroundColor: theme.primary },
+          ]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setViewMode('saved');
+          }}
+        >
+          <Feather
+            name="heart"
+            size={18}
+            color={viewMode === 'saved' ? '#FFFFFF' : theme.text}
+          />
+          <ThemedText
+            style={[
+              Typography.body,
+              { fontWeight: '600', marginLeft: Spacing.xs },
+              viewMode === 'saved' ? { color: '#FFFFFF' } : { color: theme.text },
+            ]}
+          >
+            Saved ({saved.size})
+          </ThemedText>
+        </Pressable>
+      </View>
+
       {hasActiveFilters() ? (
         <View style={styles.filterBanner}>
           <View style={styles.filterBannerContent}>
@@ -323,10 +372,15 @@ export const ExploreScreen = () => {
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyStateInline}>
-            <Feather name="home" size={64} color={theme.textSecondary} />
+            <Feather name={viewMode === 'saved' ? 'heart' : 'home'} size={64} color={theme.textSecondary} />
             <ThemedText style={[Typography.h2, { marginTop: Spacing.xl, textAlign: 'center' }]}>
-              No Properties Available
+              {viewMode === 'saved' ? 'No Saved Properties' : 'No Properties Available'}
             </ThemedText>
+            {viewMode === 'saved' ? (
+              <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.sm, textAlign: 'center' }]}>
+                Save properties by tapping the heart icon
+              </ThemedText>
+            ) : null}
           </View>
         }
       />
@@ -696,6 +750,21 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
+  },
+  viewToggleContainer: {
+    flexDirection: 'row',
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.md,
+    gap: Spacing.sm,
+  },
+  viewToggleButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.medium,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
   },
   filterBanner: {
     flexDirection: 'row',
