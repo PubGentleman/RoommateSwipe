@@ -21,9 +21,9 @@ export const WalkScoreBadge = ({ score, size = 'medium' }: WalkScoreBadgeProps) 
   const { theme } = useTheme();
 
   const dimensions = {
-    small: { size: 50, fontSize: 11, borderWidth: 2, iconScale: 0.55 },
-    medium: { size: 65, fontSize: 14, borderWidth: 3, iconScale: 0.75 },
-    large: { size: 80, fontSize: 18, borderWidth: 4, iconScale: 0.95 },
+    small: { size: 50, fontSize: 11, borderWidth: 2, iconScale: 0.5 },
+    medium: { size: 65, fontSize: 14, borderWidth: 3, iconScale: 0.65 },
+    large: { size: 80, fontSize: 18, borderWidth: 4, iconScale: 0.8 },
   };
 
   const dim = dimensions[size];
@@ -46,15 +46,20 @@ export const WalkScoreBadge = ({ score, size = 'medium' }: WalkScoreBadgeProps) 
           },
         ]}
       >
-        <View style={[styles.pedestrian, { transform: [{ scale }] }]}>
+        <View style={[styles.walker, { transform: [{ scale }] }]}>
           <View style={[styles.head, { backgroundColor: green }]} />
-          <View style={[styles.torso, { backgroundColor: green }]} />
-          <View style={[styles.leftArmUpper, { backgroundColor: green }]} />
-          <View style={[styles.leftArmLower, { backgroundColor: green }]} />
-          <View style={[styles.rightArm, { backgroundColor: green }]} />
-          <View style={[styles.rightLegUpper, { backgroundColor: green }]} />
-          <View style={[styles.rightLegLower, { backgroundColor: green }]} />
-          <View style={[styles.leftLeg, { backgroundColor: green }]} />
+          
+          <View style={[styles.body, { backgroundColor: green }]} />
+          
+          <View style={[styles.armBack, { backgroundColor: green }]} />
+          
+          <View style={[styles.armForwardUpper, { backgroundColor: green }]} />
+          <View style={[styles.armForwardLower, { backgroundColor: green }]} />
+          
+          <View style={[styles.legBack, { backgroundColor: green }]} />
+          
+          <View style={[styles.legForwardUpper, { backgroundColor: green }]} />
+          <View style={[styles.legForwardLower, { backgroundColor: green }]} />
         </View>
         <ThemedText
           style={[
@@ -82,77 +87,77 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pedestrian: {
-    width: 28,
-    height: 36,
+  walker: {
+    width: 32,
+    height: 40,
     position: 'relative',
-    marginTop: -12,
+    marginTop: -14,
   },
   head: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    position: 'absolute',
-    top: 0,
-    left: 10.5,
-  },
-  torso: {
-    width: 2.5,
-    height: 12,
-    position: 'absolute',
-    top: 8,
-    left: 12.75,
-  },
-  leftArmUpper: {
-    width: 7,
-    height: 2.5,
-    position: 'absolute',
-    top: 10,
-    left: 7,
-    transform: [{ rotate: '-55deg' }],
-  },
-  leftArmLower: {
-    width: 5,
-    height: 2.5,
-    position: 'absolute',
-    top: 14,
-    left: 3.5,
-    transform: [{ rotate: '-25deg' }],
-  },
-  rightArm: {
     width: 8,
-    height: 2.5,
+    height: 8,
+    borderRadius: 4,
+    position: 'absolute',
+    top: 2,
+    left: 12,
+  },
+  body: {
+    width: 3,
+    height: 14,
     position: 'absolute',
     top: 11,
-    right: 5,
-    transform: [{ rotate: '45deg' }],
+    left: 14.5,
   },
-  rightLegUpper: {
-    width: 8,
-    height: 2.5,
+  armBack: {
+    width: 3,
+    height: 11,
     position: 'absolute',
-    bottom: 8,
-    right: 7,
+    top: 13,
+    left: 18,
+    transform: [{ rotate: '50deg' }],
+  },
+  armForwardUpper: {
+    width: 3,
+    height: 9,
+    position: 'absolute',
+    top: 13,
+    left: 8,
+    transform: [{ rotate: '-60deg' }],
+  },
+  armForwardLower: {
+    width: 3,
+    height: 7,
+    position: 'absolute',
+    top: 19,
+    left: 4,
+    transform: [{ rotate: '-30deg' }],
+  },
+  legBack: {
+    width: 3,
+    height: 13,
+    position: 'absolute',
+    bottom: 2,
+    left: 9,
+    transform: [{ rotate: '40deg' }],
+  },
+  legForwardUpper: {
+    width: 3,
+    height: 10,
+    position: 'absolute',
+    bottom: 10,
+    left: 17,
     transform: [{ rotate: '-50deg' }],
   },
-  rightLegLower: {
-    width: 7,
-    height: 2.5,
+  legForwardLower: {
+    width: 3,
+    height: 9,
     position: 'absolute',
-    bottom: 1,
-    right: 3.5,
-    transform: [{ rotate: '-75deg' }],
-  },
-  leftLeg: {
-    width: 11,
-    height: 2.5,
-    position: 'absolute',
-    bottom: 3,
-    left: 5.5,
-    transform: [{ rotate: '35deg' }],
+    bottom: 2,
+    left: 19,
+    transform: [{ rotate: '-70deg' }],
   },
   score: {
     fontWeight: '700',
-    marginTop: 6,
+    marginTop: 8,
   },
 });
