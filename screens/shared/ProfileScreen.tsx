@@ -145,7 +145,7 @@ export const ProfileScreen = () => {
               {user?.subscription?.plan === 'basic' ? (
                 <Pressable
                   style={[styles.upgradeButton, { backgroundColor: theme.primary }]}
-                  onPress={() => navigation.navigate('Payment')}
+                  onPress={() => navigation.navigate('Plans')}
                 >
                   <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>
                     Upgrade
@@ -195,6 +195,11 @@ export const ProfileScreen = () => {
             )}
           </View>
           
+          <MenuItem 
+            icon="package" 
+            label="Subscription Plans" 
+            onPress={() => navigation.navigate('Plans')} 
+          />
           <MenuItem 
             icon="credit-card" 
             label="Payment Methods" 

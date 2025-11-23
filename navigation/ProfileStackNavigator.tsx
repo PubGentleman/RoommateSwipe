@@ -2,10 +2,12 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ProfileScreen } from '../screens/shared/ProfileScreen';
 import { PaymentScreen } from '../screens/shared/PaymentScreen';
+import { PlansScreen } from '../screens/shared/PlansScreen';
 
 export type ProfileStackParamList = {
   ProfileMain: undefined;
   Payment: undefined;
+  Plans: undefined;
 };
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
@@ -20,7 +22,17 @@ export const ProfileStackNavigator = () => {
         options={{
           headerShown: true,
           headerTransparent: true,
-          headerTitle: 'Payment & Subscription',
+          headerTitle: 'Payment Methods',
+          headerBlurEffect: 'regular',
+        }}
+      />
+      <Stack.Screen 
+        name="Plans" 
+        component={PlansScreen}
+        options={{
+          headerShown: true,
+          headerTransparent: true,
+          headerTitle: 'Subscription Plans',
           headerBlurEffect: 'regular',
         }}
       />
