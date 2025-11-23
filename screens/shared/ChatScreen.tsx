@@ -243,12 +243,15 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0,0,0,0.05)',
+    zIndex: 10,
+    elevation: 10,
   },
   backButton: {
     width: 44,
     height: 44,
     justifyContent: 'center',
     alignItems: 'flex-start',
+    zIndex: 20,
   },
   headerCenter: {
     flex: 1,
@@ -279,6 +282,7 @@ const styles = StyleSheet.create({
     height: 44,
     justifyContent: 'center',
     alignItems: 'flex-end',
+    zIndex: 20,
   },
   premiumBanner: {
     flexDirection: 'row',
@@ -288,6 +292,7 @@ const styles = StyleSheet.create({
     marginHorizontal: Spacing.lg,
     marginTop: Spacing.md,
     borderRadius: BorderRadius.small,
+    zIndex: 1,
   },
   groupBanner: {
     flexDirection: 'row',
@@ -296,6 +301,7 @@ const styles = StyleSheet.create({
     marginHorizontal: Spacing.lg,
     marginVertical: Spacing.md,
     borderRadius: BorderRadius.medium,
+    zIndex: 1,
   },
   dismissButton: {
     marginLeft: 'auto',
