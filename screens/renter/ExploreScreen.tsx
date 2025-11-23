@@ -832,7 +832,9 @@ export const ExploreScreen = () => {
                         );
                       })()}
                       <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                        <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Host</ThemedText>
+                        <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
+                          {selectedProperty.hostId?.startsWith('agent') ? 'Agent' : 'Host'}
+                        </ThemedText>
                         <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
                           {(() => {
                             if (selectedProperty.hostProfileId) {
