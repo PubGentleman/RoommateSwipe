@@ -698,9 +698,15 @@ export const StorageService = {
       const existingProfiles = await this.getRoommateProfiles();
       const existingGroups = await this.getGroups();
       
-      if (existingProperties.length > 0 && existingProfiles.length > 0 && existingGroups.length > 0) {
+      const hasWalkScores = existingProperties.length > 0 && existingProperties.every(p => p.walkScore !== undefined);
+      
+      if (existingProperties.length > 0 && existingProfiles.length > 0 && existingGroups.length > 0 && hasWalkScores) {
         console.log('[StorageService] Data already initialized, skipping mock data load');
         return;
+      }
+      
+      if (existingProperties.length > 0 && !hasWalkScores) {
+        console.log('[StorageService] Detected missing walkScore data, reloading properties...');
       }
       
       const { mockRoommateProfiles, mockProperties, mockGroups, mockProfileUsers } = await import('./mockData');
@@ -710,7 +716,7 @@ export const StorageService = {
       console.log(`[StorageService] ✓ Loaded ${mockRoommateProfiles.length} roommate profiles`);
       
       await this.setProperties(mockProperties);
-      console.log(`[StorageService] ✓ Loaded ${mockProperties.length} properties`);
+      console.log(`[StorageService] ✓ Loaded ${mockProperties.length} properties with walk scores`);
       
       await this.setGroups(mockGroups);
       console.log(`[StorageService] ✓ Loaded ${mockGroups.length} groups`);
