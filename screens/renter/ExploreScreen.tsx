@@ -781,9 +781,10 @@ export const ExploreScreen = () => {
                       {(() => {
                         const hostUser = selectedProperty.hostProfileId ? hostProfiles.get(selectedProperty.hostProfileId) : null;
                         const hostPhoto = hostUser?.profilePicture;
+                        console.log('[ExploreScreen] Property ID:', selectedProperty.id, 'Title:', selectedProperty.title);
                         console.log('[ExploreScreen] Property hostProfileId:', selectedProperty.hostProfileId);
-                        console.log('[ExploreScreen] Host user found:', hostUser?.name);
-                        console.log('[ExploreScreen] Host photo:', hostPhoto);
+                        console.log('[ExploreScreen] Host user found:', hostUser?.name, 'age:', hostUser?.age);
+                        console.log('[ExploreScreen] Host photo URL:', hostPhoto);
                         console.log('[ExploreScreen] Host gender:', hostUser?.profileData?.gender);
                         return hostPhoto ? (
                           <Image 

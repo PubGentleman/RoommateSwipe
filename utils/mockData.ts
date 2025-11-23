@@ -273,34 +273,6 @@ export const mockProfileUsers: User[] = [
     subscription: { plan: 'basic', status: 'active' },
     boostData: { boostsUsed: 0, isBoosted: false },
   },
-  {
-    id: 'host1',
-    email: 'john.smith@host.com',
-    name: 'John Smith',
-    role: 'host',
-    subscription: { plan: 'priority', status: 'active' },
-  },
-  {
-    id: 'host2',
-    email: 'lisa.williams@host.com',
-    name: 'Lisa Williams',
-    role: 'host',
-    subscription: { plan: 'plus', status: 'active' },
-  },
-  {
-    id: 'host3',
-    email: 'robert.jones@host.com',
-    name: 'Robert Jones',
-    role: 'host',
-    subscription: { plan: 'basic', status: 'active' },
-  },
-  {
-    id: 'host4',
-    email: 'maria.garcia@host.com',
-    name: 'Maria Garcia',
-    role: 'host',
-    subscription: { plan: 'priority', status: 'active' },
-  },
 ];
 
 export const mockRoommateProfiles: RoommateProfile[] = [
