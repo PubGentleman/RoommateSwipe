@@ -912,8 +912,13 @@ export const ExploreScreen = () => {
                       <View style={{ flex: 1, marginLeft: Spacing.md }}>
                         <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Location</ThemedText>
                         <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
-                          {selectedProperty.address}, {selectedProperty.city}, {selectedProperty.state}
+                          {selectedProperty.city}, {selectedProperty.state}
                         </ThemedText>
+                        {selectedProperty.neighborhood ? (
+                          <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginTop: 2 }]}>
+                            {selectedProperty.neighborhood}
+                          </ThemedText>
+                        ) : null}
                       </View>
                     </View>
                     {selectedProperty.availableDate ? (

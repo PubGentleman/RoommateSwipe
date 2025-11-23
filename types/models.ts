@@ -32,6 +32,7 @@ export interface Property {
   address: string;
   city: string;
   state: string;
+  neighborhood?: string;
   photos: string[];
   amenities: string[];
   description: string;
