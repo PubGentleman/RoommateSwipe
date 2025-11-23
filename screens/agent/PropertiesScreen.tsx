@@ -1,23 +1,56 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Pressable, Image } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { ScreenScrollView } from '../../components/ScreenScrollView';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
+import { useAuth } from '../../contexts/AuthContext';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
-import { mockProperties } from '../../utils/mockData';
+import { StorageService } from '../../utils/storage';
+import { Property } from '../../types/models';
 
 export const PropertiesScreen = () => {
   const { theme } = useTheme();
-  const [properties, setProperties] = useState(mockProperties);
+  const { user } = useAuth();
+  const [properties, setProperties] = useState<Property[]>([]);
 
-  const renderProperty = (property: any) => (
+  useEffect(() => {
+    loadProperties();
+  }, [user]);
+
+  const loadProperties = async () => {
+    if (!user) return;
+    await StorageService.initializeWithMockData();
+    const allProperties = await StorageService.getProperties();
+    const myProperties = allProperties.filter(p => p.hostId === user.id);
+    setProperties(myProperties);
+  };
+
+  const markAsRented = async (propertyId: string) => {
+    if (!user) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const property = properties.find(p => p.id === propertyId);
+    if (!property || property.hostId !== user.id) return;
+
+    await StorageService.markPropertyAsRented(propertyId);
+    setProperties(prev => prev.map(p => 
+      p.id === propertyId ? { ...p, available: false, rentedDate: new Date() } : p
+    ));
+  };
+
+  const renderProperty = (property: Property) => (
     <Pressable
       key={property.id}
       style={[styles.propertyCard, { backgroundColor: theme.backgroundDefault }]}
       onPress={() => {}}
     >
       <Image source={{ uri: property.photos[0] }} style={styles.propertyImage} />
+      <View style={[styles.statusBadge, { backgroundColor: property.available ? theme.success : theme.warning }]}>
+        <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '600' }]}>
+          {property.available ? 'Active' : 'Inactive'}
+        </ThemedText>
+      </View>
       <View style={styles.propertyInfo}>
         <View style={styles.propertyHeader}>
           <View style={{ flex: 1 }}>
@@ -47,6 +80,19 @@ export const PropertiesScreen = () => {
             </ThemedText>
           </View>
         </View>
+        {property.available ? (
+          <View style={styles.actions}>
+            <Pressable 
+              style={[styles.actionButton, { backgroundColor: theme.warning }]} 
+              onPress={() => markAsRented(property.id)}
+            >
+              <Feather name="check-circle" size={16} color="#FFFFFF" />
+              <ThemedText style={[Typography.caption, { marginLeft: Spacing.xs, color: '#FFFFFF' }]}>
+                Mark as Rented
+              </ThemedText>
+            </Pressable>
+          </View>
+        ) : null}
       </View>
     </Pressable>
   );
@@ -116,9 +162,30 @@ const styles = StyleSheet.create({
   propertyStats: {
     flexDirection: 'row',
     gap: Spacing.lg,
+    marginBottom: Spacing.md,
   },
   stat: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  statusBadge: {
+    position: 'absolute',
+    top: Spacing.md,
+    left: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.small,
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.small,
   },
 });

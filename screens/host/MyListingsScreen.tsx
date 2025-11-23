@@ -41,6 +41,18 @@ export const MyListingsScreen = () => {
     setListings(prev => prev.map(p => p.id === propertyId ? updated : p));
   };
 
+  const markAsRented = async (propertyId: string) => {
+    if (!user) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const property = listings.find(p => p.id === propertyId);
+    if (!property || property.hostId !== user.id) return;
+
+    await StorageService.markPropertyAsRented(propertyId);
+    setListings(prev => prev.map(p => 
+      p.id === propertyId ? { ...p, available: false, rentedDate: new Date() } : p
+    ));
+  };
+
   const isPriority = user?.subscription?.plan === 'priority' && user?.subscription?.status === 'active';
 
   const renderListing = (listing: Property) => (
@@ -99,6 +111,15 @@ export const MyListingsScreen = () => {
             <Feather name="users" size={16} color={theme.text} />
             <ThemedText style={[Typography.caption, { marginLeft: Spacing.xs }]}>Apps</ThemedText>
           </Pressable>
+          {listing.available ? (
+            <Pressable 
+              style={[styles.actionButton, { backgroundColor: theme.warning }]} 
+              onPress={() => markAsRented(listing.id)}
+            >
+              <Feather name="check-circle" size={16} color="#FFFFFF" />
+              <ThemedText style={[Typography.caption, { marginLeft: Spacing.xs, color: '#FFFFFF' }]}>Rented</ThemedText>
+            </Pressable>
+          ) : null}
           <Pressable style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]} onPress={() => {}}>
             <Feather name="share-2" size={16} color={theme.text} />
           </Pressable>

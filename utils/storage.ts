@@ -182,6 +182,39 @@ export const StorageService = {
     }
   },
 
+  async markPropertyAsRented(propertyId: string): Promise<void> {
+    try {
+      const properties = await this.getProperties();
+      const property = properties.find(p => p.id === propertyId);
+      if (!property) return;
+
+      property.available = false;
+      property.rentedDate = new Date();
+      await this.setProperties(properties);
+
+      const users = await this.getUsers();
+      for (const user of users) {
+        const savedProperties = await this.getSavedProperties(user.id);
+        if (savedProperties.includes(propertyId)) {
+          await this.addNotification({
+            id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            userId: user.id,
+            type: 'property_rented',
+            title: 'Property Rented',
+            body: `${property.title} has been rented and is no longer available`,
+            isRead: false,
+            createdAt: new Date(),
+            data: {
+              propertyId: property.id,
+            },
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error marking property as rented:', error);
+    }
+  },
+
   async getGroups(): Promise<Group[]> {
     try {
       const data = await AsyncStorage.getItem(STORAGE_KEYS.GROUPS);
