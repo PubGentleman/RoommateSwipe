@@ -35,6 +35,27 @@ export interface User {
     hasUndoPass: boolean;
     undoPassExpiresAt?: Date;
   };
+  profileData?: {
+    bio?: string;
+    age?: number;
+    budget?: number;
+    location?: string;
+    occupation?: string;
+    interests?: string;
+    preferences?: {
+      sleepSchedule?: 'early_sleeper' | 'late_sleeper' | 'flexible' | 'irregular';
+      cleanliness?: 'very_tidy' | 'moderately_tidy' | 'relaxed';
+      guestPolicy?: 'rarely' | 'occasionally' | 'frequently' | 'prefer_no_guests';
+      noiseTolerance?: 'prefer_quiet' | 'normal_noise' | 'loud_environments';
+      smoking?: 'yes' | 'no' | 'only_outside';
+      workLocation?: 'wfh_fulltime' | 'hybrid' | 'office_fulltime' | 'irregular';
+      roommateRelationship?: 'respectful_coliving' | 'occasional_hangouts' | 'prefer_friends' | 'minimal_interaction';
+      pets?: 'have_pets' | 'open_to_pets' | 'no_pets';
+      lifestyle?: Array<'active_gym' | 'homebody' | 'nightlife_social' | 'quiet_introverted' | 'creative_artistic' | 'professional_focused'>;
+      moveInDate?: string;
+      bedrooms?: number;
+    };
+  };
 }
 
 interface AuthContextType {
