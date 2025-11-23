@@ -24,109 +24,30 @@ Preferred communication style: Simple, everyday language.
 
 ## Matching Algorithm
 
-**Points-Based Compatibility System:**
-- Calculates compatibility scores (0-100) between users based on profile preferences collected through 10 specific matching questions
-- 10 core matching factors with weighted scoring:
-  1. **Sleep Schedule** (15 points): Early Sleeper/Late Sleeper/Flexible/Irregular - exact match or flexible compatibility
-  2. **Cleanliness** (15 points): Very Tidy/Moderately Tidy/Relaxed - closer cleanliness levels score higher
-  3. **Guest Policy** (10 points): Rarely/Occasionally/Frequently/Prefer No Guests - exact match or adjacent frequency tolerance
-  4. **Noise Tolerance** (10 points): Prefer Quiet/Normal Noise/Loud Environments - similar tolerance levels required
-  5. **Smoking/Substances** (10 points): Yes/No/Only Outside - strong preference matching (no smoking vs outdoor compromise)
-  6. **Work Location** (10 points): WFH Full-time/Hybrid/Office/Irregular - compatible work-from-home schedules
-  7. **Roommate Relationship** (10 points): Respectful Co-living/Occasional Hangouts/Prefer Friends/Minimal Interaction - desired social dynamic alignment
-  8. **Budget** (15 points): Numeric value - within 10% (full points), 25% (partial), or 50% (minimal) alignment
-  9. **Pets** (10 points): Have Pets/Open to Pets/No Pets - pet ownership and tolerance compatibility
-  10. **Lifestyle** (5 points): Multi-select up to 3 from (Active/Gym, Homebody, Nightlife/Social, Quiet/Introverted, Creative/Artistic, Professional-focused) - shared lifestyle overlap scoring
-- **Compatibility Display:** Dynamic color coding on profile cards - Green (80%+), Blue (70%+), Orange (60%+), Red (<60%)
-- **Real-time Calculation:** Scores computed when profiles load using `calculateCompatibility()` in `utils/matchingAlgorithm.ts`
-- **Edit Profile Integration:** All 10 questions accessible via Edit Profile screen with intuitive option buttons and multi-select interface
+RoomieMatch utilizes a comprehensive points-based compatibility system (0-100 score) across 12 weighted factors, with location being a major determinant through neighborhood proximity mapping. It provides detailed breakdowns with strengths, concerns, and notes for each match. Key factors include Location, Budget, Sleep Schedule, Cleanliness, Smoking/Substances, Work Location, Guest Policy, Noise Tolerance, Pets, Roommate Relationship, Lifestyle Tags, and Occupation. The system calculates scores in real-time and dynamically color-codes compatibility (Green 80%+, Blue 70%+, Orange 60%+, Red <60%).
 
 ## Frontend Architecture
 
-**Framework & Platform:**
-- React Native with Expo
-- TypeScript for type safety
-- React with experimental React Compiler enabled and New Architecture for improved performance
-- Cross-platform support (iOS, Android, Web)
-
-**Navigation Structure:**
-- React Navigation with native stack and bottom tabs
-- Role-based navigation providing distinct user flows for Renters, Hosts, and Agents/Landlords.
-- Nested navigators for specific functionalities: messaging (MessagesStackNavigator), profile management (ProfileStackNavigator), and AI Match Assistant (RoommatesStackNavigator).
-- ProfileStackNavigator used by all roles to access Profile, Subscription Plans, and Payment Methods screens
-- Custom header components and transparent headers with blur effects (iOS).
-- Web-optimized header configuration to prevent title concatenation in nested navigators.
-
-**UI/UX Design Patterns:**
-- Theme system supporting light/dark modes with consistent design tokens (colors, spacing, typography) defined in `/constants/theme.ts`.
-- Reusable themed components (`ThemedView`, `ThemedText`) and custom wrapper components for safe area and keyboard handling.
-- Platform-specific optimizations.
+The application is built with React Native and Expo, using TypeScript and leveraging React's experimental features for performance. It employs React Navigation for a role-based navigation structure (Renter, Host, Agent/Landlord) with nested navigators. UI/UX follows a theme system supporting light/dark modes and uses reusable, themed components.
 
 **Core Features by Role:**
-- **Renter:** Swipe-based roommate matching with priority placement (boosted → Priority → Plus → Basic), 1-on-1 messaging with limits (Basic: 50 total messages, Plus/Priority: unlimited), comprehensive group management (create, discover, join via request, manage members), property exploration with advanced filters (Plus/Priority only: budget, location, rooms, amenities), saved properties, and AI Match Assistant (Plus/Priority - chat-based personalized roommate recommendations). Group creation/joining limits enforced for basic users. Boost feature available (Plus: 1/week, Priority: unlimited) for 24-hour profile visibility.
-- **Host:** Property listing management (CRUD), application review, listing status control, and featured listings (Priority only - properties appear first in renter search).
+- **Renter:** Swipe-based matching with priority placement, 1-on-1 messaging (with limits for Basic users), comprehensive group management, property exploration with advanced filters (Plus/Priority only), saved properties, and an AI Match Assistant (Plus/Priority). Boost feature available for profile visibility.
+- **Host:** Property listing management (CRUD), application review, listing status control, and featured listings (Priority only).
 - **Agent:** Multi-property portfolio management, document verification, legal template library, and professional credential verification.
 
-**Animation & Gestures:**
-- React Native Reanimated for high-performance animations.
-- React Native Gesture Handler for swipe interactions.
-- Spring animations, haptic feedback, and Worklets for UI thread animations.
-
-**State Management:**
-- React Context API for authentication.
-- Local component state with hooks.
-- AsyncStorage for persistent authentication data.
+Animations use React Native Reanimated, and gestures are handled by React Native Gesture Handler. State management relies on React Context API for authentication and local component state, with AsyncStorage for persistent data.
 
 ## Authentication & Authorization
 
-- **Authentication Flow:** SSO support (Apple/Google) planned, currently mock authentication with email/password. Login function now intelligently retrieves existing mock users (matching by email) to preserve profileData, or creates new basic users if not found. Role selection during login, persistent sessions via AsyncStorage, and loading states.
-- **User Model:** Defines `id`, `email`, `name`, `role` ('renter' | 'host' | 'agent'), `profilePicture`, optional `subscription` and `paymentMethods`, and comprehensive `profileData` with matching preferences for all 10 compatibility questions.
-- **Authorization:** Role-based navigation rendering and conditional screen access.
-- **Subscription & Payments:** Stripe integration configured. Defines three subscription tiers:
-  - **Basic Plan:** 50 message limit, can purchase individual boosts for $3 each, no filters, no featured listings, no AI assistant, 1 group max
-  - **Plus Plan ($14.99/month):** Unlimited messaging, 1 boost/week (included), advanced filters, AI match assistant, 3 groups max
-  - **Priority Plan ($49.99-$99/month role-based):** Unlimited messaging, unlimited boosts (included), advanced filters, AI match assistant, featured listings (hosts only), 5 groups max
-- **Subscription Management:** Full lifecycle support for subscription changes with prorated access:
-  - **Cancellation Flow:** Users can cancel paid subscriptions at any time. Cancellation schedules downgrade to Basic plan at current billing cycle end. Users retain full access to paid features until `expiresAt` date. Cancelled subscriptions show status banner with expiry date and reactivation option.
-  - **Downgrade Flow:** Priority users can downgrade to Plus or Basic; Plus users can downgrade to Basic. Downgrades are scheduled for current billing period end. Users keep current plan features until scheduled change applies.
-  - **Scheduled Changes:** Tracked via `scheduledPlan` and `scheduledChangeDate` fields. Automatically enforced in `loadUser()` when app starts after scheduled date. Status banner displays scheduled change details and effective date.
-  - **Reactivation:** Users can undo cancellations or downgrades before effective date via "Reactivate Subscription" button. Clears scheduled changes and restores active status immediately.
-  - **Date Handling:** All subscription timestamps (expiresAt, scheduledChangeDate) normalized from ISO strings to Date objects on load for consistent comparison. Billing cycles aligned to original expiry dates to prevent drift.
-  - **UI Indicators:** PlansScreen shows current plan badge, scheduled change warning banner (orange for downgrades, red for cancellations), downgrade/cancel action buttons (hidden when change pending), and reactivation controls.
-- **Functional Differentiation:** All subscription features enforce limits in real-time with upgrade prompts guiding basic users to payment screen.
-- **Messaging Limits:** Enforced at send-time with message count tracking in User model. Basic users blocked after 50 messages with upgrade prompt.
-- **Boost System:** 24-hour profile visibility boost with visual "BOOSTED" badge. Basic users can purchase individual boosts for $3 each via in-app modal. Plus users get 1 boost every 7 days with cooldown tracking. Priority users have unlimited boosts. Expired boosts automatically removed from priority. All boosts provide the same 24-hour priority placement.
-- **Priority Placement:** Swipe deck sorting prioritizes profiles: Active boost (valid expiry) → Priority tier → Plus tier → Basic tier → Compatibility score tiebreaker.
-- **Advanced Filters:** Plus/Priority-exclusive property filters (budget range, location, bedrooms, bathrooms, amenities) with gated access and upgrade modal.
-- **Featured Listings:** Priority hosts can feature their properties to appear first in renter explore screen. Toggle via "Feature" button with ownership validation and AsyncStorage persistence.
-- **Online Status Visibility:** 
-  - **Chat (Plus/Priority):** Plus and Priority users can see real-time online/offline status in Messages list (green dot on avatar) and Chat screen header (online/offline text). Basic users see upgrade banner.
-  - **Roommate Cards (Priority Only):** Priority users exclusively see online indicator (green light) on roommate profile cards during swiping. This helps Priority members identify and connect with active users immediately.
-- **AI Match Assistant (Plus/Priority):** Comprehensive chat-based AI assistant accessible from Roommates screen (CPU icon button). Provides intelligent recommendations across multiple categories:
-  - **Roommate Matching:** Personalized recommendations, budget-based matching, compatibility analysis, profile improvement tips
-  - **Location & Apartments:** Best neighborhoods by occupation/lifestyle, area comparisons with rent ranges, commute advice
-  - **Nightlife & Activities:** Bar and club recommendations, entertainment venues, events and things to do, cultural activities
-  - **Restaurants & Food:** Dining recommendations with price ranges, coffee shop suggestions, cuisine variety
-  - **Home Decor:** Shared space decoration tips, furniture ideas on budget, storage solutions, styling advice for roommates
-  - Interactive chat interface with contextual suggestion chips, real-time typing indicators, and scrollable history
-  - Plus/Priority-gated access with cross-platform upgrade modal for basic users
+The system supports mock authentication with email/password and planned SSO (Apple/Google). Users have defined roles (`renter`, `host`, `agent`) with role-based navigation and conditional screen access. Three subscription tiers are implemented via Stripe integration: Basic, Plus ($14.99/month), and Priority ($49.99-$99/month). Subscription management includes full lifecycle support for cancellation, downgrades, and reactivation with prorated access and clear UI indicators. Messaging limits, boost systems, advanced filters, featured listings, online status visibility (Plus/Priority), and an AI Match Assistant (Plus/Priority) are all gated by subscription tiers.
 
 ## Data Layer
 
-- **Current Implementation:** Utilizes mock data from `/utils/mockData.ts` and TypeScript interfaces from `/types/models.ts`.
-- **Data Models:** Includes `RoommateProfile`, `Property` (with `featured` field for VIP host priority), `Group` (with members, maxMembers, description, budget, preferredLocation, createdAt, createdBy), `Conversation`, `Message`, `Match`, and `Application`. User model extended with `messageCount` for limit tracking and `boostData` (boostsUsed, isBoosted, boostExpiresAt, lastBoostDate) for boost management.
-- **Matching & Messaging:** Implements reciprocal matching and automatic conversation creation upon a match. Messages and conversations are persisted in AsyncStorage. Message limits enforced for free users with real-time count tracking.
-- **Groups Implementation:** Features swipeable group discovery with a request-to-join approval workflow. Group data is stored globally in AsyncStorage and is not user-scoped.
-- **Property Management:** Featured property status persisted via StorageService with ownership validation. Only property owners can toggle featured status. Host listings filtered by `hostId` for access control.
-- **Future Database Integration:** Designed for future integration with a SQL database (e.g., Postgres) and separate environments.
+The current implementation uses mock data and TypeScript interfaces for data models such as `RoommateProfile`, `Property`, `Group`, `Conversation`, `Message`, `Match`, and `Application`. The User model tracks `messageCount` and `boostData`. It implements reciprocal matching, automatic conversation creation, and enforces message limits. Group management includes swipeable discovery and a request-to-join workflow. Property management handles featured status and host listing filtering. The architecture is designed for future integration with a SQL database.
 
 ## Key Technical Decisions
 
-- **Module Resolution:** Babel module resolver with `@/` alias for simplified imports.
-- **Platform-Specific Handling:** Adapts UI components and features for iOS, Android, and Web platforms (e.g., keyboard controller, blur effects).
-- **Performance Optimizations:** Leverages React Native's New Architecture, React Compiler, Reanimated, and gesture-driven interactions for smooth performance.
-- **Error Handling:** Implements an error boundary component for graceful error handling and app reload functionality.
-- **Development Environment:** Configured for Replit with custom dev commands and Expo Web Browser integration for OAuth.
+Key technical decisions include Babel module resolver for simplified imports, platform-specific UI adaptations (iOS, Android, Web), performance optimizations using React Native's New Architecture, React Compiler, Reanimated, and gesture-driven interactions. Error handling is managed by an error boundary component.
 
 # External Dependencies
 
