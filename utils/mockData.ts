@@ -120,6 +120,7 @@ export const mockProfileUsers: User[] = [
     email: 'jessica.park@email.com',
     name: 'Jessica Park',
     role: 'renter',
+    profilePicture: 'https://picsum.photos/400/500?random=5',
     subscription: { plan: 'plus', status: 'active' },
     boostData: { boostsUsed: 0, isBoosted: false },
     profileData: {

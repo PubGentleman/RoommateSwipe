@@ -866,10 +866,25 @@ export const ExploreScreen = () => {
                           {selectedProperty.existingRoommates.filter(rm => rm.onApp && rm.userId).map((rm, idx) => {
                             const roommateUser = hostProfiles.get(rm.userId!);
                             return (
-                              <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginTop: idx > 0 ? Spacing.xs : 0 }}>
-                                <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
-                                  {getGenderSymbol(rm.gender)} {roommateUser?.name || 'User'}
-                                </ThemedText>
+                              <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginTop: idx > 0 ? Spacing.md : Spacing.sm }}>
+                                {roommateUser?.profilePicture ? (
+                                  <Image 
+                                    source={{ uri: roommateUser.profilePicture }} 
+                                    style={styles.roommateProfilePicture} 
+                                  />
+                                ) : (
+                                  <View style={[styles.roommateProfilePicture, { backgroundColor: theme.border, justifyContent: 'center', alignItems: 'center' }]}>
+                                    <Feather name="user" size={20} color={theme.textSecondary} />
+                                  </View>
+                                )}
+                                <View style={{ marginLeft: Spacing.md }}>
+                                  <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
+                                    {roommateUser?.name || 'User'}
+                                  </ThemedText>
+                                  <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
+                                    {getGenderSymbol(rm.gender)}
+                                  </ThemedText>
+                                </View>
                               </View>
                             );
                           })}
@@ -1304,5 +1319,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: Spacing.md,
+  },
+  roommateProfilePicture: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
   },
 });
