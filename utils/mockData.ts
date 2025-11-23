@@ -8,6 +8,23 @@ export const mockProfileUsers: User[] = [
     role: 'renter',
     subscription: { plan: 'priority', status: 'active' },
     boostData: { boostsUsed: 2, isBoosted: true, boostExpiresAt: new Date(Date.now() + 20 * 60 * 60 * 1000), lastBoostDate: new Date() },
+    profileData: {
+      bio: 'Software engineer who loves hiking, cooking, and quiet evenings. Looking for a clean and respectful roommate.',
+      budget: 1200,
+      location: 'Downtown',
+      occupation: 'Software Engineer',
+      interests: 'hiking, cooking, reading',
+      preferences: {
+        sleepSchedule: 'early',
+        cleanliness: 'very_clean',
+        guestPolicy: 'rarely',
+        petFriendly: false,
+      },
+      lifestyle: {
+        smoking: false,
+        drinking: 'non-drinker',
+      },
+    },
   },
   {
     id: '2',
@@ -16,6 +33,23 @@ export const mockProfileUsers: User[] = [
     role: 'renter',
     subscription: { plan: 'plus', status: 'active' },
     boostData: { boostsUsed: 1, isBoosted: true, boostExpiresAt: new Date(Date.now() + 10 * 60 * 60 * 1000), lastBoostDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) },
+    profileData: {
+      bio: 'Marketing professional, gym enthusiast, and weekend adventurer. Love to host small gatherings!',
+      budget: 1400,
+      location: 'Midtown',
+      occupation: 'Marketing Manager',
+      interests: 'fitness, social events, traveling',
+      preferences: {
+        sleepSchedule: 'late',
+        cleanliness: 'clean',
+        guestPolicy: 'frequent',
+        petFriendly: true,
+      },
+      lifestyle: {
+        smoking: false,
+        drinking: 'regular',
+      },
+    },
   },
   {
     id: '3',
@@ -49,6 +83,23 @@ export const mockProfileUsers: User[] = [
     role: 'renter',
     subscription: { plan: 'priority', status: 'active' },
     boostData: { boostsUsed: 5, isBoosted: false },
+    profileData: {
+      bio: 'Teacher by day, musician by night. Looking for a chill roommate who appreciates good music and great conversations.',
+      budget: 1100,
+      location: 'Downtown',
+      occupation: 'High School Teacher',
+      interests: 'music, teaching, coffee shops',
+      preferences: {
+        sleepSchedule: 'flexible',
+        cleanliness: 'clean',
+        guestPolicy: 'occasional',
+        petFriendly: false,
+      },
+      lifestyle: {
+        smoking: false,
+        drinking: 'social',
+      },
+    },
   },
   {
     id: '5',
@@ -57,6 +108,23 @@ export const mockProfileUsers: User[] = [
     role: 'renter',
     subscription: { plan: 'plus', status: 'active' },
     boostData: { boostsUsed: 0, isBoosted: false },
+    profileData: {
+      bio: 'Nurse working night shifts. Love yoga and meditation. Seeking a quiet, respectful living space.',
+      budget: 950,
+      location: 'Westside',
+      occupation: 'Registered Nurse',
+      interests: 'yoga, meditation, wellness',
+      preferences: {
+        sleepSchedule: 'late',
+        cleanliness: 'very_clean',
+        guestPolicy: 'rarely',
+        petFriendly: true,
+      },
+      lifestyle: {
+        smoking: false,
+        drinking: 'non-drinker',
+      },
+    },
   },
   {
     id: '6',
@@ -65,6 +133,23 @@ export const mockProfileUsers: User[] = [
     role: 'renter',
     subscription: { plan: 'basic', status: 'active' },
     boostData: { boostsUsed: 0, isBoosted: false },
+    profileData: {
+      bio: 'College student studying engineering. Easy-going, budget-conscious, and love gaming with friends.',
+      budget: 800,
+      location: 'University District',
+      occupation: 'Student',
+      interests: 'gaming, studying, basketball',
+      preferences: {
+        sleepSchedule: 'late',
+        cleanliness: 'moderate',
+        guestPolicy: 'frequent',
+        petFriendly: false,
+      },
+      lifestyle: {
+        smoking: false,
+        drinking: 'social',
+      },
+    },
   },
   {
     id: '7',
@@ -73,6 +158,23 @@ export const mockProfileUsers: User[] = [
     role: 'renter',
     subscription: { plan: 'plus', status: 'active' },
     boostData: { boostsUsed: 1, isBoosted: true, boostExpiresAt: new Date(Date.now() + 5 * 60 * 60 * 1000), lastBoostDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000) },
+    profileData: {
+      bio: 'Veterinary assistant and dog lover. Looking for a pet-friendly home with outdoor space.',
+      budget: 1050,
+      location: 'Westside',
+      occupation: 'Veterinary Assistant',
+      interests: 'animals, hiking, outdoor activities',
+      preferences: {
+        sleepSchedule: 'early',
+        cleanliness: 'clean',
+        guestPolicy: 'occasional',
+        petFriendly: true,
+      },
+      lifestyle: {
+        smoking: false,
+        drinking: 'social',
+      },
+    },
   },
   {
     id: '8',
@@ -81,6 +183,23 @@ export const mockProfileUsers: User[] = [
     role: 'renter',
     subscription: { plan: 'priority', status: 'active' },
     boostData: { boostsUsed: 3, isBoosted: false },
+    profileData: {
+      bio: 'Finance analyst. Clean, organized, and professional. Prefer a quiet home environment.',
+      budget: 1600,
+      location: 'Downtown',
+      occupation: 'Financial Analyst',
+      interests: 'finance, running, podcasts',
+      preferences: {
+        sleepSchedule: 'early',
+        cleanliness: 'very_clean',
+        guestPolicy: 'rarely',
+        petFriendly: false,
+      },
+      lifestyle: {
+        smoking: false,
+        drinking: 'social',
+      },
+    },
   },
   {
     id: '9',
