@@ -24,6 +24,8 @@ interface AuthContextType {
   purchaseBoost: () => Promise<{ success: boolean; message: string }>;
   purchaseUndoPass: () => Promise<{ success: boolean; message: string }>;
   hasActiveUndoPass: () => boolean;
+  canRewind: () => { canRewind: boolean; remaining: number; limit: number; message?: string };
+  useRewind: () => Promise<void>;
   getActiveChatLimit: () => number;
   canStartNewChat: (conversationId: string) => Promise<{ canStart: boolean; limit: number; current: number; reason?: string }>;
   incrementActiveChatCount: (conversationId: string) => Promise<void>;
@@ -663,8 +665,126 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log('[Auth] Active chats updated:', newCount);
   };
 
+  const canRewind = (): { canRewind: boolean; remaining: number; limit: number; message?: string } => {
+    if (!user) {
+      return { canRewind: false, remaining: 0, limit: 0, message: 'Not logged in' };
+    }
+
+    const userPlan = user.subscription?.plan || 'basic';
+    const userStatus = user.subscription?.status || 'active';
+    
+    if (userPlan === 'elite' && userStatus === 'active') {
+      return { canRewind: true, remaining: Infinity, limit: Infinity };
+    }
+
+    if (userPlan === 'plus' && userStatus === 'active') {
+      const now = new Date();
+      const lastReset = user.rewindData?.lastRewindReset 
+        ? new Date(user.rewindData.lastRewindReset)
+        : null;
+      
+      let rewindsUsed = user.rewindData?.rewindsUsedToday || 0;
+      
+      if (!lastReset || !isSameDay(lastReset, now)) {
+        rewindsUsed = 0;
+      }
+      
+      const limit = 5;
+      const remaining = Math.max(0, limit - rewindsUsed);
+      
+      if (remaining > 0) {
+        return { canRewind: true, remaining, limit };
+      } else {
+        return { 
+          canRewind: false, 
+          remaining: 0, 
+          limit,
+          message: 'Daily rewind limit reached (5/5). Upgrade to Elite for unlimited rewinds or wait until tomorrow!'
+        };
+      }
+    }
+
+    if (user.undoPassData?.hasUndoPass) {
+      const now = new Date();
+      const expiresAt = user.undoPassData.undoPassExpiresAt 
+        ? new Date(user.undoPassData.undoPassExpiresAt)
+        : null;
+      
+      if (expiresAt && expiresAt > now) {
+        return { canRewind: true, remaining: 1, limit: 1 };
+      }
+    }
+
+    return { 
+      canRewind: false, 
+      remaining: 0, 
+      limit: 0,
+      message: 'Rewind not available. Upgrade to Plus (5 rewinds/day) or Elite (unlimited rewinds)!'
+    };
+  };
+
+  const isSameDay = (date1: Date, date2: Date): boolean => {
+    return date1.getFullYear() === date2.getFullYear() &&
+           date1.getMonth() === date2.getMonth() &&
+           date1.getDate() === date2.getDate();
+  };
+
+  const useRewind = async (): Promise<void> => {
+    if (!user) return;
+
+    const userPlan = user.subscription?.plan || 'basic';
+    const userStatus = user.subscription?.status || 'active';
+    
+    if (userPlan === 'elite' && userStatus === 'active') {
+      return;
+    }
+
+    if (userPlan === 'plus' && userStatus === 'active') {
+      const now = new Date();
+      const lastReset = user.rewindData?.lastRewindReset 
+        ? new Date(user.rewindData.lastRewindReset)
+        : null;
+      
+      let rewindsUsed = user.rewindData?.rewindsUsedToday || 0;
+      
+      if (!lastReset || !isSameDay(lastReset, now)) {
+        rewindsUsed = 0;
+      }
+      
+      const updatedUser: User = {
+        ...user,
+        rewindData: {
+          rewindsUsedToday: rewindsUsed + 1,
+          lastRewindReset: now,
+        },
+      };
+      
+      await StorageService.setCurrentUser(updatedUser);
+      await StorageService.addOrUpdateUser(updatedUser);
+      setUser(updatedUser);
+      
+      console.log('[Auth] Rewind used. Total today:', rewindsUsed + 1);
+      return;
+    }
+
+    if (user.undoPassData?.hasUndoPass) {
+      await StorageService.consumeUndoPass(user.id);
+      
+      const updatedUser: User = {
+        ...user,
+        undoPassData: {
+          hasUndoPass: false,
+          undoPassExpiresAt: null as any,
+        },
+      };
+      
+      setUser(updatedUser);
+      console.log('[Auth] 24h undo pass consumed');
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, reactivateSubscription, updateUser, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, reactivateSubscription, updateUser, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind }}>
       {children}
     </AuthContext.Provider>
   );

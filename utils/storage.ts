@@ -546,6 +546,31 @@ export const StorageService = {
     }
   },
 
+  async consumeUndoPass(userId: string): Promise<void> {
+    try {
+      const users = await this.getUsers();
+      const user = users.find(u => u.id === userId);
+      if (user) {
+        user.undoPassData = {
+          hasUndoPass: false,
+          undoPassExpiresAt: null as any,
+        };
+        await this.addOrUpdateUser(user);
+      }
+      
+      const currentUser = await this.getCurrentUser();
+      if (currentUser && currentUser.id === userId) {
+        currentUser.undoPassData = {
+          hasUndoPass: false,
+          undoPassExpiresAt: null as any,
+        };
+        await this.setCurrentUser(currentUser);
+      }
+    } catch (error) {
+      console.error('Error consuming undo pass:', error);
+    }
+  },
+
   async getSwipeHistory(): Promise<Set<string>> {
     try {
       const data = await AsyncStorage.getItem(STORAGE_KEYS.SWIPE_HISTORY);

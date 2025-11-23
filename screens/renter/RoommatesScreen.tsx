@@ -23,7 +23,7 @@ const CARD_WIDTH = Math.min(SCREEN_WIDTH - Spacing.xxl, MAX_CARD_WIDTH);
 
 export const RoommatesScreen = () => {
   const { theme } = useTheme();
-  const { user, purchaseBoost, purchaseUndoPass, hasActiveUndoPass } = useAuth();
+  const { user, purchaseBoost, purchaseUndoPass, canRewind, useRewind } = useAuth();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [profiles, setProfiles] = useState<RoommateProfile[]>([]);
@@ -171,8 +171,10 @@ export const RoommatesScreen = () => {
     processSwipeAsync(action, currentProfile.id, user.id);
   };
 
-  const handleUndo = () => {
-    if (!hasActiveUndoPass()) {
+  const handleUndo = async () => {
+    const rewindCheck = canRewind();
+    
+    if (!rewindCheck.canRewind) {
       setShowUndoUpgradeModal(true);
       return;
     }
@@ -181,7 +183,9 @@ export const RoommatesScreen = () => {
     
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     
-    undoLastSwipeAsync(lastSwipedProfile.profile.id, lastSwipedProfile.action);
+    await undoLastSwipeAsync(lastSwipedProfile.profile.id, lastSwipedProfile.action);
+    
+    await useRewind();
     
     setCurrentIndex(currentIndex - 1);
     setLastSwipedProfile(null);
@@ -697,61 +701,98 @@ export const RoommatesScreen = () => {
             
             <View style={styles.vipModalContent}>
               <ThemedText style={[Typography.h2, { textAlign: 'center', marginBottom: Spacing.sm }]}>
-                Undo Swipe
+                {user?.subscription?.plan === 'plus' ? 'Daily Rewind Limit Reached' : 'Undo Swipe'}
               </ThemedText>
               <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary, marginBottom: Spacing.xl }]}>
-                Take back your last swipe and get a second chance!
+                {user?.subscription?.plan === 'plus' 
+                  ? "You've used all 5 rewinds for today! Upgrade to Elite for unlimited rewinds or try again tomorrow."
+                  : 'Take back your last swipe and get a second chance!'}
               </ThemedText>
               
-              <View style={[styles.priceCard, { backgroundColor: theme.backgroundDefault, borderColor: theme.border, marginBottom: Spacing.lg }]}>
-                <ThemedText style={[Typography.h3, { marginBottom: Spacing.xs }]}>
-                  24-Hour Undo Pass
-                </ThemedText>
-                <ThemedText style={[Typography.h1, { color: theme.warning, marginBottom: Spacing.xs }]}>
-                  $1.99
-                </ThemedText>
-                <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
-                  Undo swipes for 24 hours
-                </ThemedText>
-              </View>
-              
-              <View style={styles.vipFeaturesList}>
-                <View style={styles.vipFeatureItem}>
-                  <Feather name="check-circle" size={20} color={theme.success} />
-                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
-                    Take back your last swipe
-                  </ThemedText>
+              {user?.subscription?.plan === 'plus' ? (
+                <View style={styles.vipFeaturesList}>
+                  <View style={styles.vipFeatureItem}>
+                    <Feather name="info" size={20} color={theme.info} />
+                    <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
+                      Your 5 daily rewinds reset at midnight
+                    </ThemedText>
+                  </View>
+                  <View style={styles.vipFeatureItem}>
+                    <Feather name="zap" size={20} color={theme.warning} />
+                    <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
+                      Elite members get unlimited rewinds
+                    </ThemedText>
+                  </View>
                 </View>
-                <View style={styles.vipFeatureItem}>
-                  <Feather name="check-circle" size={20} color={theme.success} />
-                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
-                    24-hour unlimited undo access
-                  </ThemedText>
-                </View>
-              </View>
+              ) : (
+                <>
+                  <View style={[styles.priceCard, { backgroundColor: theme.backgroundDefault, borderColor: theme.border, marginBottom: Spacing.lg }]}>
+                    <ThemedText style={[Typography.h3, { marginBottom: Spacing.xs }]}>
+                      24-Hour Undo Pass
+                    </ThemedText>
+                    <ThemedText style={[Typography.h1, { color: theme.warning, marginBottom: Spacing.xs }]}>
+                      $1.99
+                    </ThemedText>
+                    <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+                      Undo swipes for 24 hours
+                    </ThemedText>
+                  </View>
+                  
+                  <View style={styles.vipFeaturesList}>
+                    <View style={styles.vipFeatureItem}>
+                      <Feather name="check-circle" size={20} color={theme.success} />
+                      <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
+                        Take back your last swipe
+                      </ThemedText>
+                    </View>
+                    <View style={styles.vipFeatureItem}>
+                      <Feather name="check-circle" size={20} color={theme.success} />
+                      <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
+                        24-hour unlimited undo access
+                      </ThemedText>
+                    </View>
+                  </View>
+                </>
+              )}
             </View>
             
             <View style={styles.vipModalActions}>
-              <Pressable
-                style={[styles.vipModalButton, { backgroundColor: theme.warning, opacity: processingUndoPass ? 0.7 : 1 }]}
-                onPress={handlePurchaseUndoPass}
-                disabled={processingUndoPass}
-              >
-                <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
-                  {processingUndoPass ? 'Processing...' : 'Get 24hr Pass - $1.99'}
-                </ThemedText>
-              </Pressable>
-              <Pressable
-                style={[styles.vipModalButton, { backgroundColor: theme.primary, marginTop: Spacing.md }]}
-                onPress={() => {
-                  setShowUndoUpgradeModal(false);
-                  navigation.navigate('Settings' as never);
-                }}
-              >
-                <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
-                  Upgrade to Plus
-                </ThemedText>
-              </Pressable>
+              {user?.subscription?.plan !== 'plus' ? (
+                <>
+                  <Pressable
+                    style={[styles.vipModalButton, { backgroundColor: theme.warning, opacity: processingUndoPass ? 0.7 : 1 }]}
+                    onPress={handlePurchaseUndoPass}
+                    disabled={processingUndoPass}
+                  >
+                    <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
+                      {processingUndoPass ? 'Processing...' : 'Get 24hr Pass - $1.99'}
+                    </ThemedText>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.vipModalButton, { backgroundColor: theme.primary, marginTop: Spacing.md }]}
+                    onPress={() => {
+                      setShowUndoUpgradeModal(false);
+                      navigation.navigate('Settings' as never);
+                    }}
+                  >
+                    <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
+                      Upgrade to Plus
+                    </ThemedText>
+                  </Pressable>
+                </>
+              ) : (
+                <Pressable
+                  style={[styles.vipModalButton, { backgroundColor: theme.primary }]}
+                  onPress={() => {
+                    setShowUndoUpgradeModal(false);
+                    navigation.navigate('Settings' as never);
+                  }}
+                >
+                  <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
+                    Upgrade to Elite
+                  </ThemedText>
+                </Pressable>
+              )}
               <Pressable
                 style={[styles.vipModalButtonSecondary, { borderColor: theme.border }]}
                 onPress={() => setShowUndoUpgradeModal(false)}
