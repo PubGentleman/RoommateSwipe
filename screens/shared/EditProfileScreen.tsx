@@ -131,69 +131,7 @@ export const EditProfileScreen = () => {
           <Feather name="arrow-left" size={24} color={theme.text} />
         </Pressable>
 
-        <ThemedText style={[Typography.h1, { marginBottom: Spacing.md }]}>Edit Profile</ThemedText>
-
-        <View style={[styles.infoCard, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
-          <View style={styles.infoHeader}>
-            <Feather name="info" size={20} color={theme.primary} />
-            <ThemedText style={[Typography.body, { fontWeight: '600', marginLeft: Spacing.sm }]}>
-              How Matching Works
-            </ThemedText>
-          </View>
-          <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.md }]}>
-            Your answers help us find your best roommate matches. Compatibility is scored out of 100 points:
-          </ThemedText>
-          
-          <View style={styles.matchingFactors}>
-            <View style={styles.factorRow}>
-              <View style={[styles.pointBadge, { backgroundColor: theme.primary + '20' }]}>
-                <ThemedText style={[Typography.caption, { color: theme.primary, fontWeight: '600' }]}>15</ThemedText>
-              </View>
-              <ThemedText style={[Typography.small, { marginLeft: Spacing.sm, flex: 1 }]}>
-                Sleep Schedule & Cleanliness
-              </ThemedText>
-            </View>
-            <View style={styles.factorRow}>
-              <View style={[styles.pointBadge, { backgroundColor: theme.primary + '20' }]}>
-                <ThemedText style={[Typography.caption, { color: theme.primary, fontWeight: '600' }]}>15</ThemedText>
-              </View>
-              <ThemedText style={[Typography.small, { marginLeft: Spacing.sm, flex: 1 }]}>
-                Lifestyle (Smoking & Drinking)
-              </ThemedText>
-            </View>
-            <View style={styles.factorRow}>
-              <View style={[styles.pointBadge, { backgroundColor: theme.primary + '20' }]}>
-                <ThemedText style={[Typography.caption, { color: theme.primary, fontWeight: '600' }]}>15</ThemedText>
-              </View>
-              <ThemedText style={[Typography.small, { marginLeft: Spacing.sm, flex: 1 }]}>
-                Budget Compatibility
-              </ThemedText>
-            </View>
-            <View style={styles.factorRow}>
-              <View style={[styles.pointBadge, { backgroundColor: theme.primary + '20' }]}>
-                <ThemedText style={[Typography.caption, { color: theme.primary, fontWeight: '600' }]}>10</ThemedText>
-              </View>
-              <ThemedText style={[Typography.small, { marginLeft: Spacing.sm, flex: 1 }]}>
-                Guest Policy, Pets, Location & Occupation
-              </ThemedText>
-            </View>
-          </View>
-          
-          <View style={styles.colorGuide}>
-            <View style={styles.colorRow}>
-              <View style={[styles.colorDot, { backgroundColor: '#10B981' }]} />
-              <ThemedText style={[Typography.caption, { marginLeft: Spacing.xs }]}>80%+ Excellent</ThemedText>
-              <View style={[styles.colorDot, { backgroundColor: '#3B82F6', marginLeft: Spacing.md }]} />
-              <ThemedText style={[Typography.caption, { marginLeft: Spacing.xs }]}>70-79% Great</ThemedText>
-            </View>
-            <View style={styles.colorRow}>
-              <View style={[styles.colorDot, { backgroundColor: '#F59E0B' }]} />
-              <ThemedText style={[Typography.caption, { marginLeft: Spacing.xs }]}>60-69% Good</ThemedText>
-              <View style={[styles.colorDot, { backgroundColor: '#EF4444', marginLeft: Spacing.md }]} />
-              <ThemedText style={[Typography.caption, { marginLeft: Spacing.xs }]}>&lt;60% Fair</ThemedText>
-            </View>
-          </View>
-        </View>
+        <ThemedText style={[Typography.h1, { marginBottom: Spacing.xl }]}>Edit Profile</ThemedText>
 
         {/* Basic Information */}
         <View style={styles.section}>
@@ -305,9 +243,75 @@ export const EditProfileScreen = () => {
           </View>
         </View>
 
+        {/* Matching Algorithm Explanation */}
+        <View style={[styles.infoCard, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
+          <View style={styles.infoHeader}>
+            <Feather name="info" size={20} color={theme.primary} />
+            <ThemedText style={[Typography.body, { fontWeight: '600', marginLeft: Spacing.sm }]}>
+              How Matching Works
+            </ThemedText>
+          </View>
+          <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.md }]}>
+            Answer the questions below to help us calculate your compatibility with potential roommates. Your score is based on 100 points:
+          </ThemedText>
+          
+          <View style={styles.matchingFactors}>
+            <View style={styles.factorRow}>
+              <View style={[styles.pointBadge, { backgroundColor: theme.primary + '20' }]}>
+                <ThemedText style={[Typography.caption, { color: theme.primary, fontWeight: '600' }]}>15</ThemedText>
+              </View>
+              <ThemedText style={[Typography.small, { marginLeft: Spacing.sm, flex: 1 }]}>
+                Sleep Schedule & Cleanliness
+              </ThemedText>
+            </View>
+            <View style={styles.factorRow}>
+              <View style={[styles.pointBadge, { backgroundColor: theme.primary + '20' }]}>
+                <ThemedText style={[Typography.caption, { color: theme.primary, fontWeight: '600' }]}>15</ThemedText>
+              </View>
+              <ThemedText style={[Typography.small, { marginLeft: Spacing.sm, flex: 1 }]}>
+                Lifestyle (Smoking & Drinking)
+              </ThemedText>
+            </View>
+            <View style={styles.factorRow}>
+              <View style={[styles.pointBadge, { backgroundColor: theme.primary + '20' }]}>
+                <ThemedText style={[Typography.caption, { color: theme.primary, fontWeight: '600' }]}>15</ThemedText>
+              </View>
+              <ThemedText style={[Typography.small, { marginLeft: Spacing.sm, flex: 1 }]}>
+                Budget Compatibility
+              </ThemedText>
+            </View>
+            <View style={styles.factorRow}>
+              <View style={[styles.pointBadge, { backgroundColor: theme.primary + '20' }]}>
+                <ThemedText style={[Typography.caption, { color: theme.primary, fontWeight: '600' }]}>10</ThemedText>
+              </View>
+              <ThemedText style={[Typography.small, { marginLeft: Spacing.sm, flex: 1 }]}>
+                Guest Policy, Pets, Location & Occupation
+              </ThemedText>
+            </View>
+          </View>
+          
+          <View style={styles.colorGuide}>
+            <View style={styles.colorRow}>
+              <View style={[styles.colorDot, { backgroundColor: '#10B981' }]} />
+              <ThemedText style={[Typography.caption, { marginLeft: Spacing.xs }]}>80%+ Excellent</ThemedText>
+              <View style={[styles.colorDot, { backgroundColor: '#3B82F6', marginLeft: Spacing.md }]} />
+              <ThemedText style={[Typography.caption, { marginLeft: Spacing.xs }]}>70-79% Great</ThemedText>
+            </View>
+            <View style={styles.colorRow}>
+              <View style={[styles.colorDot, { backgroundColor: '#F59E0B' }]} />
+              <ThemedText style={[Typography.caption, { marginLeft: Spacing.xs }]}>60-69% Good</ThemedText>
+              <View style={[styles.colorDot, { backgroundColor: '#EF4444', marginLeft: Spacing.md }]} />
+              <ThemedText style={[Typography.caption, { marginLeft: Spacing.xs }]}>&lt;60% Fair</ThemedText>
+            </View>
+          </View>
+        </View>
+
         {/* Lifestyle Preferences */}
         <View style={styles.section}>
-          <ThemedText style={[Typography.h3, styles.sectionTitle]}>Lifestyle</ThemedText>
+          <ThemedText style={[Typography.h3, styles.sectionTitle]}>Matching Questions</ThemedText>
+          <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.lg }]}>
+            Your answers to these questions determine your compatibility score
+          </ThemedText>
           
           <View style={styles.inputGroup}>
             <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
