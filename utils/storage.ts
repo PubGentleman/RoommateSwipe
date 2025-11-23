@@ -12,6 +12,7 @@ const STORAGE_KEYS = {
   APPLICATIONS: '@roommate_finder/applications',
   SWIPE_HISTORY: '@roommate_finder/swipe_history',
   LIKES: '@roommate_finder/likes',
+  SAVED_PROPERTIES: '@roommate_finder/saved_properties',
 };
 
 export const StorageService = {
@@ -518,6 +519,44 @@ export const StorageService = {
       await AsyncStorage.removeItem(STORAGE_KEYS.SWIPE_HISTORY);
     } catch (error) {
       console.error('Error clearing swipe history:', error);
+    }
+  },
+
+  async getSavedProperties(userId: string): Promise<string[]> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.SAVED_PROPERTIES);
+      const allSaved: Record<string, string[]> = data ? JSON.parse(data) : {};
+      return allSaved[userId] || [];
+    } catch (error) {
+      console.error('Error getting saved properties:', error);
+      return [];
+    }
+  },
+
+  async saveProperty(userId: string, propertyId: string): Promise<void> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.SAVED_PROPERTIES);
+      const allSaved: Record<string, string[]> = data ? JSON.parse(data) : {};
+      const userSaved = allSaved[userId] || [];
+      if (!userSaved.includes(propertyId)) {
+        userSaved.push(propertyId);
+        allSaved[userId] = userSaved;
+        await AsyncStorage.setItem(STORAGE_KEYS.SAVED_PROPERTIES, JSON.stringify(allSaved));
+      }
+    } catch (error) {
+      console.error('Error saving property:', error);
+    }
+  },
+
+  async unsaveProperty(userId: string, propertyId: string): Promise<void> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.SAVED_PROPERTIES);
+      const allSaved: Record<string, string[]> = data ? JSON.parse(data) : {};
+      const userSaved = allSaved[userId] || [];
+      allSaved[userId] = userSaved.filter(id => id !== propertyId);
+      await AsyncStorage.setItem(STORAGE_KEYS.SAVED_PROPERTIES, JSON.stringify(allSaved));
+    } catch (error) {
+      console.error('Error unsaving property:', error);
     }
   },
 
