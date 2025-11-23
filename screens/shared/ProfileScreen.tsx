@@ -288,6 +288,9 @@ export const ProfileScreen = () => {
           <ThemedText style={[Typography.h3, styles.sectionTitle]}>Account</ThemedText>
           <MenuItem icon="edit-3" label="Edit Profile" onPress={() => navigation.navigate('EditProfile')} />
           <MenuItem icon="bell" label="Notifications" onPress={() => navigation.navigate('Notifications')} />
+          {(user?.subscription?.plan === 'plus' || user?.subscription?.plan === 'elite') ? (
+            <MenuItem icon="eye" label="Profile Views" onPress={() => navigation.navigate('ProfileViews')} />
+          ) : null}
           <MenuItem icon="shield" label="Privacy & Security" onPress={() => navigation.navigate('PrivacySecurity')} />
         </View>
 

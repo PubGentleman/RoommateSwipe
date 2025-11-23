@@ -67,10 +67,16 @@ export const ProfileViewsScreen = () => {
         console.log('[ProfileViewsScreen] View profile:', item.viewerId);
       }}
     >
-      <Image
-        source={item.viewerPhoto ? { uri: item.viewerPhoto } : require('../../assets/images/avatar-placeholder.png')}
-        style={styles.avatar}
-      />
+      {item.viewerPhoto ? (
+        <Image
+          source={{ uri: item.viewerPhoto }}
+          style={styles.avatar}
+        />
+      ) : (
+        <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: theme.border }]}>
+          <Feather name="user" size={32} color={theme.textSecondary} />
+        </View>
+      )}
       <View style={styles.viewInfo}>
         <ThemedText style={[Typography.h3, { marginBottom: Spacing.xs }]}>
           {item.viewerName}
@@ -183,6 +189,10 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 28,
     marginRight: Spacing.md,
+  },
+  avatarPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   viewInfo: {
     flex: 1,
