@@ -718,4 +718,77 @@ export const StorageService = {
       return 0;
     }
   },
+
+  async seedMockNotifications(userId: string): Promise<void> {
+    try {
+      const existingNotifications = await this.getNotifications(userId);
+      if (existingNotifications.length > 0) {
+        return;
+      }
+
+      const mockNotifications: Notification[] = [
+        {
+          id: 'notif-1',
+          userId,
+          type: 'match',
+          title: 'New Match!',
+          body: 'You matched with Sarah Chen. Start a conversation!',
+          isRead: false,
+          createdAt: new Date(Date.now() - 1000 * 60 * 5),
+        },
+        {
+          id: 'notif-2',
+          userId,
+          type: 'message',
+          title: 'New Message',
+          body: 'Alex Martinez sent you a message',
+          isRead: false,
+          createdAt: new Date(Date.now() - 1000 * 60 * 30),
+        },
+        {
+          id: 'notif-3',
+          userId,
+          type: 'group_invite',
+          title: 'Group Invitation',
+          body: 'Jordan Taylor invited you to join Williamsburg Roommates',
+          isRead: false,
+          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2),
+        },
+        {
+          id: 'notif-4',
+          userId,
+          type: 'property_update',
+          title: 'Property Update',
+          body: 'Modern 2BR Apartment in Williamsburg is now available',
+          isRead: true,
+          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24),
+        },
+        {
+          id: 'notif-5',
+          userId,
+          type: 'application_status',
+          title: 'Application Update',
+          body: 'Your application for Cozy Studio in East Village has been reviewed',
+          isRead: true,
+          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2),
+        },
+        {
+          id: 'notif-6',
+          userId,
+          type: 'system',
+          title: 'Welcome to RoomieMatch!',
+          body: 'Complete your profile to start finding compatible roommates',
+          isRead: true,
+          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3),
+        },
+      ];
+
+      for (const notification of mockNotifications) {
+        await this.addNotification(notification);
+      }
+      console.log(`[StorageService] ✓ Seeded ${mockNotifications.length} mock notifications for user ${userId}`);
+    } catch (error) {
+      console.error('Error seeding mock notifications:', error);
+    }
+  },
 };

@@ -195,6 +195,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         currentUser = await checkAndApplyScheduledChanges(currentUser);
         
+        await StorageService.seedMockNotifications(currentUser.id);
+        
         setUser(currentUser);
       }
     } catch (error) {
@@ -245,6 +247,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (role === 'renter' && mockUser.id) {
       await StorageService.seedInitialMatches(mockUser.id);
     }
+    await StorageService.seedMockNotifications(mockUser.id);
     setUser(mockUser);
   };
 
@@ -271,6 +274,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (role === 'renter') {
       await StorageService.seedInitialMatches(mockUser.id);
     }
+    await StorageService.seedMockNotifications(mockUser.id);
     setUser(mockUser);
   };
 
