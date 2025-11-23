@@ -157,6 +157,8 @@ export interface User {
       roommateRelationship?: 'respectful_coliving' | 'occasional_hangouts' | 'prefer_friends' | 'minimal_interaction';
       pets?: 'have_pets' | 'open_to_pets' | 'no_pets';
       lifestyle?: Array<'active_gym' | 'homebody' | 'nightlife_social' | 'quiet_introverted' | 'creative_artistic' | 'professional_focused'>;
+      moveInDate?: string;
+      bedrooms?: number;
     };
   };
 }

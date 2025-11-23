@@ -528,16 +528,6 @@ const inferLifestyleTags = (profile: RoommateProfile): Array<'active_gym' | 'hom
 };
 
 /**
- * Convert cleanliness string to numeric scale (1-10)
- */
-const cleanlinessToNumber = (level: 'very_tidy' | 'moderately_tidy' | 'relaxed'): number => {
-  if (level === 'very_tidy') return 9;
-  if (level === 'moderately_tidy') return 5;
-  if (level === 'relaxed') return 2;
-  return 5;
-};
-
-/**
  * Check if two guest policies are adjacent/compatible
  */
 const isAdjacentGuestPolicy = (
@@ -667,4 +657,26 @@ export const formatMoveInDate = (dateString: string): string => {
   
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   return `${months[date.getMonth()]} ${date.getFullYear()}`;
+};
+
+/**
+ * Convert string cleanliness preference to numeric value (1-10 scale)
+ * Used to normalize User.profileData preferences for matching algorithm
+ */
+export const cleanlinessToNumber = (cleanliness: 'very_tidy' | 'moderately_tidy' | 'relaxed' | undefined): number => {
+  const map: Record<string, number> = {
+    very_tidy: 9,
+    moderately_tidy: 6,
+    relaxed: 3,
+  };
+  return cleanliness ? map[cleanliness] : 5;
+};
+
+/**
+ * Convert numeric cleanliness value to string preference
+ */
+export const numberToCleanliness = (value: number): 'very_tidy' | 'moderately_tidy' | 'relaxed' => {
+  if (value >= 7) return 'very_tidy';
+  if (value >= 4) return 'moderately_tidy';
+  return 'relaxed';
 };

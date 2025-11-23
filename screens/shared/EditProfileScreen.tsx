@@ -30,6 +30,8 @@ export const EditProfileScreen = () => {
   const [roommateRelationship, setRoommateRelationship] = useState<'respectful_coliving' | 'occasional_hangouts' | 'prefer_friends' | 'minimal_interaction'>(user?.profileData?.preferences?.roommateRelationship || 'respectful_coliving');
   const [pets, setPets] = useState<'have_pets' | 'open_to_pets' | 'no_pets'>(user?.profileData?.preferences?.pets || 'open_to_pets');
   const [lifestyle, setLifestyle] = useState<Array<'active_gym' | 'homebody' | 'nightlife_social' | 'quiet_introverted' | 'creative_artistic' | 'professional_focused'>>(user?.profileData?.preferences?.lifestyle || []);
+  const [moveInDate, setMoveInDate] = useState(user?.profileData?.preferences?.moveInDate || '');
+  const [bedrooms, setBedrooms] = useState(user?.profileData?.preferences?.bedrooms?.toString() || '');
   
   const [isSaving, setIsSaving] = useState(false);
 
@@ -84,6 +86,8 @@ export const EditProfileScreen = () => {
           roommateRelationship,
           pets,
           lifestyle,
+          moveInDate: moveInDate.trim() || undefined,
+          bedrooms: bedrooms.trim() ? parseInt(bedrooms) : undefined,
         },
       },
     });
@@ -343,6 +347,35 @@ export const EditProfileScreen = () => {
               placeholderTextColor={theme.textSecondary}
               value={budget}
               onChangeText={setBudget}
+              keyboardType="numeric"
+            />
+          </View>
+
+          {/* Move-in Date */}
+          <View style={styles.inputGroup}>
+            <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
+              When are you looking to move in?
+            </ThemedText>
+            <TextInput
+              style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
+              placeholder="YYYY-MM-DD (e.g., 2025-02-01)"
+              placeholderTextColor={theme.textSecondary}
+              value={moveInDate}
+              onChangeText={setMoveInDate}
+            />
+          </View>
+
+          {/* Bedrooms */}
+          <View style={styles.inputGroup}>
+            <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
+              How many bedrooms are you looking for?
+            </ThemedText>
+            <TextInput
+              style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
+              placeholder="e.g., 2"
+              placeholderTextColor={theme.textSecondary}
+              value={bedrooms}
+              onChangeText={setBedrooms}
               keyboardType="numeric"
             />
           </View>
