@@ -114,7 +114,12 @@ export const StorageService = {
   async getProperties(): Promise<Property[]> {
     try {
       const data = await AsyncStorage.getItem(STORAGE_KEYS.PROPERTIES);
-      return data ? JSON.parse(data) : [];
+      if (!data) return [];
+      const properties = JSON.parse(data);
+      return properties.map((p: any) => ({
+        ...p,
+        propertyType: p.propertyType || 'lease',
+      }));
     } catch (error) {
       console.error('Error getting properties:', error);
       return [];
@@ -123,7 +128,11 @@ export const StorageService = {
 
   async setProperties(properties: Property[]): Promise<void> {
     try {
-      await AsyncStorage.setItem(STORAGE_KEYS.PROPERTIES, JSON.stringify(properties));
+      const normalizedProperties = properties.map(p => ({
+        ...p,
+        propertyType: p.propertyType || 'lease',
+      }));
+      await AsyncStorage.setItem(STORAGE_KEYS.PROPERTIES, JSON.stringify(normalizedProperties));
     } catch (error) {
       console.error('Error setting properties:', error);
     }
@@ -131,12 +140,16 @@ export const StorageService = {
 
   async addOrUpdateProperty(property: Property): Promise<void> {
     try {
+      const normalizedProperty = {
+        ...property,
+        propertyType: property.propertyType || 'lease',
+      };
       const properties = await this.getProperties();
-      const index = properties.findIndex(p => p.id === property.id);
+      const index = properties.findIndex(p => p.id === normalizedProperty.id);
       if (index >= 0) {
-        properties[index] = property;
+        properties[index] = normalizedProperty;
       } else {
-        properties.push(property);
+        properties.push(normalizedProperty);
       }
       await AsyncStorage.setItem(STORAGE_KEYS.PROPERTIES, JSON.stringify(properties));
     } catch (error) {

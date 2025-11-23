@@ -209,14 +209,26 @@ export const ExploreScreen = () => {
       }}
     >
       <Image source={{ uri: item.photos[0] }} style={styles.propertyImage} />
-      {item.featured ? (
-        <View style={[styles.featuredBadge, { backgroundColor: theme.primary }]}>
-          <Feather name="star" size={12} color="#FFFFFF" />
-          <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '700', marginLeft: 4 }]}>
-            FEATURED
-          </ThemedText>
-        </View>
-      ) : null}
+      <View style={styles.badgeContainer}>
+        {item.propertyType ? (
+          <View style={[
+            styles.propertyTypeBadge,
+            { backgroundColor: item.propertyType === 'lease' ? theme.primary : theme.success }
+          ]}>
+            <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '700' }]}>
+              {item.propertyType.toUpperCase()}
+            </ThemedText>
+          </View>
+        ) : null}
+        {item.featured ? (
+          <View style={[styles.featuredBadge, { backgroundColor: theme.primary }]}>
+            <Feather name="star" size={12} color="#FFFFFF" />
+            <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '700', marginLeft: 4 }]}>
+              FEATURED
+            </ThemedText>
+          </View>
+        ) : null}
+      </View>
       <Pressable
         style={[styles.saveButton, { backgroundColor: theme.backgroundDefault }]}
         onPress={() => toggleSave(item.id)}
@@ -675,6 +687,17 @@ export const ExploreScreen = () => {
 
                   <View style={styles.detailSection}>
                     <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Details</ThemedText>
+                    {selectedProperty.propertyType ? (
+                      <View style={styles.detailRow}>
+                        <Feather name="file-text" size={20} color={theme.primary} />
+                        <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Property Type</ThemedText>
+                          <ThemedText style={[Typography.body, { fontWeight: '600', textTransform: 'capitalize' }]}>
+                            {selectedProperty.propertyType}
+                          </ThemedText>
+                        </View>
+                      </View>
+                    ) : null}
                     <View style={styles.detailRow}>
                       <Feather name="home" size={20} color={theme.primary} />
                       <View style={{ flex: 1, marginLeft: Spacing.md }}>
@@ -837,10 +860,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  featuredBadge: {
+  badgeContainer: {
     position: 'absolute',
     top: Spacing.md,
     left: Spacing.md,
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  propertyTypeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.small,
+  },
+  featuredBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.md,
