@@ -11,6 +11,7 @@ import { PrivacySecurityScreen } from '../screens/shared/PrivacySecurityScreen';
 import { ProfileViewsScreen } from '../screens/renter/ProfileViewsScreen';
 import PrivacyPolicyScreen from '../screens/shared/PrivacyPolicyScreen';
 import TermsOfServiceScreen from '../screens/shared/TermsOfServiceScreen';
+import AboutScreen from '../screens/shared/AboutScreen';
 import { DownloadDataScreen } from '../screens/shared/DownloadDataScreen';
 
 export type ProfileStackParamList = {
@@ -23,6 +24,7 @@ export type ProfileStackParamList = {
   ProfileViews: undefined;
   PrivacyPolicy: undefined;
   TermsOfService: undefined;
+  About: undefined;
   DownloadData: undefined;
 };
 
@@ -159,6 +161,27 @@ export const ProfileStackNavigator = () => {
           headerShown: true,
           headerTransparent: true,
           headerTitle: 'Terms of Service',
+          headerTintColor: '#FFFFFF',
+          headerTitleStyle: {
+            fontSize: 17,
+            fontWeight: '600',
+          },
+          headerBlurEffect: 'regular',
+          headerBackVisible: false,
+          headerLeft: () => (
+            <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
+              <Feather name="chevron-left" size={28} color="#FFFFFF" />
+            </Pressable>
+          ),
+        })}
+      />
+      <Stack.Screen 
+        name="About" 
+        component={AboutScreen}
+        options={({ navigation }) => ({
+          headerShown: true,
+          headerTransparent: true,
+          headerTitle: 'About Roomdr',
           headerTintColor: '#FFFFFF',
           headerTitleStyle: {
             fontSize: 17,
