@@ -138,13 +138,24 @@ export const ExploreScreen = () => {
       filtered = filtered.filter(p => saved.has(p.id));
     }
 
+    // City-based filtering: Only show properties in user's city by default
+    // unless they're actively searching for a different city
+    const userCity = user?.profileData?.city;
+    const hasLocationSearch = searchQuery.trim() || filters.city;
+    
+    if (userCity && !hasLocationSearch) {
+      // Default: Only show properties in the user's city
+      filtered = filtered.filter(p => p.city === userCity);
+    }
+
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
       filtered = filtered.filter(p => 
         p.city.toLowerCase().includes(query) ||
         p.state.toLowerCase().includes(query) ||
         p.title.toLowerCase().includes(query) ||
-        p.address.toLowerCase().includes(query)
+        p.address.toLowerCase().includes(query) ||
+        p.neighborhood?.toLowerCase().includes(query)
       );
     }
 
