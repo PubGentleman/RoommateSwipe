@@ -333,7 +333,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       smoking: false,
     },
     preferences: {
-      location: 'Downtown',
+      location: 'Financial District',
       moveInDate: '2025-01-01',
       bedrooms: 2,
     },
@@ -356,7 +356,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       smoking: false,
     },
     preferences: {
-      location: 'Midtown',
+      location: 'Bushwick',
       moveInDate: '2025-02-01',
       bedrooms: 2,
     },
@@ -379,7 +379,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       smoking: false,
     },
     preferences: {
-      location: 'Westside',
+      location: 'Park Slope',
       moveInDate: '2025-01-15',
       bedrooms: 2,
     },
@@ -402,7 +402,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       smoking: false,
     },
     preferences: {
-      location: 'Downtown',
+      location: 'Astoria',
       moveInDate: '2025-01-10',
       bedrooms: 2,
     },
@@ -425,7 +425,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       smoking: false,
     },
     preferences: {
-      location: 'University Area',
+      location: 'Williamsburg',
       moveInDate: '2025-01-20',
       bedrooms: 1,
     },
@@ -471,7 +471,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       smoking: false,
     },
     preferences: {
-      location: 'Sunset District',
+      location: 'Crown Heights',
       moveInDate: '2025-01-25',
       bedrooms: 2,
     },
@@ -494,7 +494,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       smoking: false,
     },
     preferences: {
-      location: 'Mission District',
+      location: 'Bushwick',
       moveInDate: '2025-02-01',
       bedrooms: 1,
     },
@@ -517,7 +517,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       smoking: false,
     },
     preferences: {
-      location: 'Noe Valley',
+      location: 'Park Slope',
       moveInDate: '2025-01-30',
       bedrooms: 2,
     },
@@ -540,7 +540,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       smoking: false,
     },
     preferences: {
-      location: 'SOMA',
+      location: 'Tribeca',
       moveInDate: '2025-02-10',
       bedrooms: 2,
     },
@@ -563,7 +563,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       smoking: false,
     },
     preferences: {
-      location: 'Richmond District',
+      location: 'Upper East Side',
       moveInDate: '2025-01-05',
       bedrooms: 1,
     },
@@ -586,7 +586,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       smoking: false,
     },
     preferences: {
-      location: 'Marina District',
+      location: 'Greenwich Village',
       moveInDate: '2025-02-20',
       bedrooms: 2,
     },
@@ -609,7 +609,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       smoking: false,
     },
     preferences: {
-      location: 'Outer Sunset',
+      location: 'East Williamsburg',
       moveInDate: '2025-01-15',
       bedrooms: 2,
     },
@@ -632,7 +632,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       smoking: false,
     },
     preferences: {
-      location: 'Castro',
+      location: 'Chelsea',
       moveInDate: '2025-02-05',
       bedrooms: 1,
     },
@@ -655,7 +655,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       smoking: false,
     },
     preferences: {
-      location: 'Pacific Heights',
+      location: 'Upper West Side',
       moveInDate: '2025-03-01',
       bedrooms: 2,
     },
@@ -678,7 +678,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       smoking: false,
     },
     preferences: {
-      location: 'SoMa',
+      location: 'SoHo',
       moveInDate: '2025-01-12',
       bedrooms: 1,
     },
@@ -701,7 +701,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       smoking: false,
     },
     preferences: {
-      location: 'Hayes Valley',
+      location: 'East Village',
       moveInDate: '2025-02-12',
       bedrooms: 2,
     },
@@ -724,7 +724,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       smoking: false,
     },
     preferences: {
-      location: 'North Beach',
+      location: 'Hell\'s Kitchen',
       moveInDate: '2025-01-28',
       bedrooms: 2,
     },
@@ -747,7 +747,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       smoking: false,
     },
     preferences: {
-      location: 'Inner Richmond',
+      location: 'Bedford-Stuyvesant',
       moveInDate: '2025-02-08',
       bedrooms: 1,
     },
@@ -770,7 +770,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       smoking: false,
     },
     preferences: {
-      location: 'Potrero Hill',
+      location: 'Flushing',
       moveInDate: '2025-02-18',
       bedrooms: 2,
     },

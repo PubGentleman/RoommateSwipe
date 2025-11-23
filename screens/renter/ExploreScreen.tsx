@@ -12,6 +12,7 @@ import { Property, PropertyFilter, User, RoommateProfile } from '../../types/mod
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { formatMoveInDate, calculateCompatibility, getMatchQualityColor, getGenderSymbol } from '../../utils/matchingAlgorithm';
+import { NEIGHBORHOODS, getAllCities } from '../../utils/locationData';
 
 const COMMON_AMENITIES = [
   'Parking', 'Gym', 'Pool', 'Laundry', 'Pet Friendly',
@@ -100,11 +101,12 @@ export const ExploreScreen = () => {
     return {
       id: user.id,
       name: user.name,
-      age: 25,
+      age: user.age || 25,
       bio: profile.bio || '',
       occupation: profile.occupation || '',
       budget: profile.budget || 0,
       photos: user.profilePicture ? [user.profilePicture] : [],
+      gender: profile.gender || 'other',
       lifestyle: {
         cleanliness: profile.preferences?.cleanliness ? cleanlinessToNumber(profile.preferences.cleanliness) : 5,
         socialLevel: 5,
@@ -113,7 +115,7 @@ export const ExploreScreen = () => {
         smoking: profile.preferences?.smoking === 'yes',
       },
       preferences: {
-        location: profile.location || '',
+        location: profile.neighborhood || profile.location || '',
         moveInDate: profile.preferences?.moveInDate || '',
         bedrooms: profile.preferences?.bedrooms || 1,
       },
@@ -139,11 +141,21 @@ export const ExploreScreen = () => {
     }
 
     // City-based filtering: Only show properties in user's city by default
-    // unless they're actively searching for a different city
+    // unless they're actively searching for a different city/neighborhood
     const userCity = user?.profileData?.city;
-    const hasLocationSearch = searchQuery.trim() || filters.city;
+    const query = searchQuery.toLowerCase().trim();
     
-    if (userCity && !hasLocationSearch) {
+    // Check if search query is a location name (city, state, or neighborhood from locationData)
+    const allCities = getAllCities();
+    const allNeighborhoods = Object.keys(NEIGHBORHOODS);
+    const allStates = ['NY'];
+    const isSearchingLocation = filters.city || (query && (
+      allCities.some(city => city.toLowerCase().includes(query) || query.includes(city.toLowerCase())) ||
+      allNeighborhoods.some(n => n.toLowerCase().includes(query) || query.includes(n.toLowerCase())) ||
+      allStates.some(state => state.toLowerCase() === query)
+    ));
+    
+    if (userCity && !isSearchingLocation) {
       // Default: Only show properties in the user's city
       filtered = filtered.filter(p => p.city === userCity);
     }
