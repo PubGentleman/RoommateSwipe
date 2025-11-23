@@ -279,7 +279,7 @@ export const ProfileScreen = () => {
         <View style={styles.section}>
           <ThemedText style={[Typography.h3, styles.sectionTitle]}>Support</ThemedText>
           <MenuItem icon="help-circle" label="Help Center" onPress={() => {}} />
-          <MenuItem icon="file-text" label="Terms & Conditions" onPress={() => {}} />
+          <MenuItem icon="file-text" label="Terms & Conditions" onPress={() => navigation.navigate('TermsOfService')} />
           <MenuItem icon="info" label="About" onPress={() => {}} />
         </View>
 
