@@ -130,9 +130,17 @@ export const EditProfileScreen = () => {
   const [email, setEmail] = useState(user?.email || '');
   
   useEffect(() => {
+    console.log('[EditProfileScreen] User object changed:', {
+      userId: user?.id,
+      photosCount: user?.photos?.length || 0,
+      photos: user?.photos,
+      profilePicture: user?.profilePicture,
+    });
     if (user?.photos && user.photos.length > 0) {
+      console.log('[EditProfileScreen] Setting photos from user.photos:', user.photos);
       setPhotos(user.photos);
     } else if (user?.profilePicture) {
+      console.log('[EditProfileScreen] Setting photos from profilePicture:', [user.profilePicture]);
       setPhotos([user.profilePicture]);
     }
   }, [user?.photos, user?.profilePicture]);
@@ -282,6 +290,7 @@ export const EditProfileScreen = () => {
     setIsSaving(true);
     await new Promise(resolve => setTimeout(resolve, 500));
 
+    console.log('[EditProfileScreen] Saving profile with photos:', photos);
     await updateUser({
       name: name.trim(),
       email: email.trim(),
@@ -309,6 +318,7 @@ export const EditProfileScreen = () => {
         },
       },
     });
+    console.log('[EditProfileScreen] Profile saved successfully');
 
     setIsSaving(false);
     Alert.alert('Success', 'Profile updated successfully');
@@ -745,6 +755,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 10,
   },
   addPhotoButton: {
     width: 120,
@@ -757,19 +768,21 @@ const styles = StyleSheet.create({
   },
   reorderButtons: {
     position: 'absolute',
-    bottom: Spacing.xs,
+    bottom: Spacing.sm,
     left: 0,
     right: 0,
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: Spacing.xs,
+    gap: Spacing.sm,
+    pointerEvents: 'box-none',
   },
   reorderButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+    pointerEvents: 'auto',
   },
   inputGroup: {
     marginBottom: Spacing.lg,
