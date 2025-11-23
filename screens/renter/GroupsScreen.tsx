@@ -119,7 +119,7 @@ export const GroupsScreen = () => {
       setTimeout(() => {
         setShowLikedNotification(false);
       }, 800);
-    }, 400);
+    }, 300);
   };
 
   const handleSwipeAction = async (action: 'like' | 'skip') => {
@@ -132,8 +132,8 @@ export const GroupsScreen = () => {
 
     // Animate card off screen
     translateX.value = withSpring(toX, { 
-      damping: 20,
-      stiffness: 90 
+      damping: 15,
+      stiffness: 120 
     });
     rotation.value = withSpring(direction * 15);
 
@@ -142,8 +142,8 @@ export const GroupsScreen = () => {
       await handleLikeGroup(currentGroup);
     }
 
-    // Wait for notification to finish before showing next card
-    const resetDelay = action === 'like' ? 1200 : 400;
+    // Show next card faster
+    const resetDelay = action === 'like' ? 1100 : 300;
     setTimeout(() => {
       translateX.value = 0;
       rotation.value = 0;
