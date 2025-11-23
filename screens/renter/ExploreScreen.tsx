@@ -11,6 +11,7 @@ import { StorageService } from '../../utils/storage';
 import { Property, PropertyFilter } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import { formatMoveInDate } from '../../utils/matchingAlgorithm';
 
 const COMMON_AMENITIES = [
   'Parking', 'Gym', 'Pool', 'Laundry', 'Pet Friendly',
@@ -579,6 +580,17 @@ export const ExploreScreen = () => {
                         </ThemedText>
                       </View>
                     </View>
+                    {selectedProperty.availableDate ? (
+                      <View style={styles.detailRow}>
+                        <Feather name="calendar" size={20} color={theme.primary} />
+                        <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Available Date</ThemedText>
+                          <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
+                            {formatMoveInDate(selectedProperty.availableDate.toString())}
+                          </ThemedText>
+                        </View>
+                      </View>
+                    ) : null}
                   </View>
 
                   <View style={styles.detailSection}>
