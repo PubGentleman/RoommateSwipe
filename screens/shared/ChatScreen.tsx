@@ -138,7 +138,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={0}
     >
-      <View style={[styles.header, { backgroundColor: theme.backgroundRoot, paddingTop: insets.top + 60 }]}>
+      <View style={[styles.header, { backgroundColor: theme.backgroundRoot, paddingTop: insets.top + Spacing.lg }]}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
           <Feather name="arrow-left" size={24} color={theme.text} />
         </Pressable>

@@ -336,7 +336,7 @@ export const RoommatesScreen = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
-      <View style={[styles.header, { paddingTop: insets.top + 60 }]}>
+      <View style={[styles.header, { paddingTop: insets.top + Spacing.lg }]}>
         <Pressable onPress={handleOpenAIAssistant} style={styles.aiButton}>
           <View style={[styles.aiButtonInner, { backgroundColor: theme.primary }]}>
             <Feather name="cpu" size={20} color="#FFFFFF" />

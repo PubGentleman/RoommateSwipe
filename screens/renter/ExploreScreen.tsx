@@ -245,7 +245,7 @@ export const ExploreScreen = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
-      <View style={[styles.header, { paddingTop: insets.top + 60 }]}>
+      <View style={[styles.header, { paddingTop: insets.top + Spacing.lg }]}>
         <View style={[styles.searchBar, { backgroundColor: theme.backgroundDefault }]}>
           <Feather name="search" size={20} color={theme.textSecondary} />
           <ThemedText style={[Typography.body, { color: theme.textSecondary, marginLeft: Spacing.md }]}>

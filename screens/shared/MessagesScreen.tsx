@@ -179,7 +179,7 @@ export const MessagesScreen = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
-      <View style={[styles.header, { paddingTop: insets.top + 60 }]}>
+      <View style={[styles.header, { paddingTop: insets.top + Spacing.lg }]}>
         <Pressable style={styles.searchButton} onPress={() => {}}>
           <Feather name="search" size={24} color={theme.text} />
         </Pressable>
