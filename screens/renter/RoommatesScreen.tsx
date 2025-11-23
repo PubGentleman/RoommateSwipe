@@ -341,7 +341,7 @@ export const RoommatesScreen = () => {
                   </View>
                   <View style={[styles.badge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
                     <Feather name="map-pin" size={14} color="#FFFFFF" />
-                    <ThemedText style={[Typography.small, { color: '#FFFFFF', marginLeft: Spacing.xs, flex: 1 }]} numberOfLines={1}>
+                    <ThemedText style={[Typography.small, { color: '#FFFFFF', marginLeft: Spacing.xs }]} numberOfLines={1}>
                       {currentProfile.preferences.location}
                     </ThemedText>
                   </View>
