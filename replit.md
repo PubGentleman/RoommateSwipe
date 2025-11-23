@@ -31,8 +31,8 @@ RoomieMatch utilizes a comprehensive points-based compatibility system (0-100 sc
 The application is built with React Native and Expo, using TypeScript and leveraging React's experimental features for performance. It employs React Navigation for a role-based navigation structure (Renter, Host, Agent/Landlord) with nested navigators. UI/UX follows a theme system supporting light/dark modes and uses reusable, themed components.
 
 **Core Features by Role:**
-- **Renter:** Swipe-based matching with priority placement, 1-on-1 messaging (with limits for Basic users), Priority messaging (Priority users can message without matching; Basic users can pay $0.99 for single message), comprehensive group management, property exploration with advanced filters (Plus/Priority only), saved properties, and an AI Match Assistant (Plus/Priority). Boost feature available for profile visibility. Gender displayed using modern Unicode symbols (♂♀⚧).
-- **Host:** Property listing management (CRUD), application review, listing status control, and featured listings (Priority only).
+- **Renter:** Swipe-based matching with priority placement, 1-on-1 messaging (with limits for Basic users), Priority messaging (Priority users can message without matching; Basic users can pay $0.99 for single message), comprehensive group management, property exploration with advanced filters (Plus/Priority only), saved properties, and an AI Match Assistant (Plus/Priority). Boost feature available for profile visibility. Property listings display room type (ROOM vs ENTIRE APARTMENT), existing roommate gender for room listings, and compatibility scores with hosts for informed decision-making.
+- **Host:** Property listing management (CRUD) with room type specification (room or entire apartment), existing roommate gender tracking for room listings, application review, listing status control, and featured listings (Priority only).
 - **Agent:** Multi-property portfolio management, document verification, legal template library, and professional credential verification.
 
 Animations use React Native Reanimated, and gestures are handled by React Native Gesture Handler. State management relies on React Context API for authentication and local component state, with AsyncStorage for persistent data.
@@ -43,7 +43,13 @@ The system supports mock authentication with email/password and planned SSO (App
 
 ## Data Layer
 
-The current implementation uses mock data and TypeScript interfaces for data models such as `RoommateProfile`, `Property`, `Group`, `Conversation`, `Message`, `Match`, and `Application`. The User model tracks `messageCount` and `boostData`. It implements reciprocal matching, automatic conversation creation, and enforces message limits. Group management includes swipeable discovery and a request-to-join workflow. Property management handles featured status and host listing filtering. The architecture is designed for future integration with a SQL database.
+The current implementation uses mock data and TypeScript interfaces for data models such as `RoommateProfile`, `Property`, `Group`, `Conversation`, `Message`, `Match`, and `Application`. The User model tracks `messageCount` and `boostData`. It implements reciprocal matching, automatic conversation creation, and enforces message limits. Group management includes swipeable discovery and a request-to-join workflow. Property management handles featured status, host listing filtering, room type differentiation (room vs entire apartment), existing roommate gender tracking, and host profile linking for compatibility calculations. The architecture is designed for future integration with a SQL database.
+
+**Property Model Enhancements:**
+- `roomType`: Distinguishes between 'room' (single room in shared apartment) and 'entire' (entire apartment)
+- `existingRoommateGender`: Tracks gender ('male' or 'female') of existing roommate for room listings
+- `hostProfileId`: Links to host's User profile for compatibility score calculation using the matching algorithm
+- `propertyType`: Distinguishes between 'lease' (long-term) and 'sublet' (short-term) arrangements
 
 ## Key Technical Decisions
 
