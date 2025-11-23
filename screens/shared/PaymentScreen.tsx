@@ -232,6 +232,11 @@ export const PaymentScreen = () => {
   return (
     <ScreenKeyboardAwareScrollView>
       <View style={styles.container}>
+        <View style={styles.header}>
+          <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Feather name="arrow-left" size={24} color={theme.text} />
+          </Pressable>
+        </View>
         <ThemedText style={[Typography.h2, { marginBottom: Spacing.lg }]}>Choose Your Plan</ThemedText>
         
         {renderPlanCard('basic', '$0/month', [
@@ -454,6 +459,16 @@ export const PaymentScreen = () => {
 const styles = StyleSheet.create({
   container: {
     padding: Spacing.lg,
+  },
+  header: {
+    marginBottom: Spacing.lg,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   planCard: {
     padding: Spacing.xl,
