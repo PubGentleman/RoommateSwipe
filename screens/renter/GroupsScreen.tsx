@@ -114,9 +114,9 @@ export const GroupsScreen = () => {
 
   const MemberAvatarStack = ({ group }: { group: Group }) => {
     const MAX_VISIBLE = 4;
-    const AVATAR_SIZE = 64;
+    const AVATAR_SIZE = 56;
     const OVERLAP = 16;
-    const EXPANDED_SPACING = 80;
+    const EXPANDED_SPACING = 70;
 
     const memberProfiles = (group.members || [])
       .map(id => mockRoommateProfiles.find(p => p.id === id))
@@ -783,28 +783,24 @@ export const GroupsScreen = () => {
                   contentContainerStyle={styles.cardContent}
                   showsVerticalScrollIndicator={false}
                 >
-                <View style={{ marginTop: Spacing.xl }}>
+                <View style={{ marginTop: Spacing.md, alignItems: 'center' }}>
                   <MemberAvatarStack group={currentGroup} />
-                </View>
-
-                {(() => {
-                  const compatibility = calculateGroupCompatibility(currentGroup);
-                  const color = getCompatibilityColor(compatibility);
-                  const label = getCompatibilityLabel(compatibility);
                   
-                  return (
-                    <View style={[styles.compatibilityBadge, { backgroundColor: color, marginTop: Spacing.md }]}>
-                      <ThemedText style={[Typography.h2, { color: '#FFFFFF', fontWeight: '700' }]}>
-                        {compatibility}%
-                      </ThemedText>
-                      <ThemedText style={[Typography.small, { color: '#FFFFFF', marginTop: 2 }]}>
-                        {label}
-                      </ThemedText>
-                    </View>
-                  );
-                })()}
+                  {(() => {
+                    const compatibility = calculateGroupCompatibility(currentGroup);
+                    const color = getCompatibilityColor(compatibility);
+                    
+                    return (
+                      <View style={[styles.compatibilityBadge, { backgroundColor: color, marginTop: Spacing.sm }]}>
+                        <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>
+                          {compatibility}% Match
+                        </ThemedText>
+                      </View>
+                    );
+                  })()}
+                </View>
                 
-                <ThemedText style={[Typography.h2, { marginTop: Spacing.lg, marginBottom: Spacing.sm }]}>
+                <ThemedText style={[Typography.h2, { marginTop: Spacing.md, marginBottom: Spacing.sm }]}>
                   {currentGroup.name}
                 </ThemedText>
                 
@@ -1827,18 +1823,19 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   avatarStackContainer: {
-    height: 80,
+    height: 70,
     alignItems: 'center',
     justifyContent: 'center',
-    position: 'relative',
+    alignSelf: 'center',
+    width: '100%',
   },
   avatarWrapper: {
     position: 'absolute',
   },
   avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     borderWidth: 3,
   },
   avatarPlaceholder: {
@@ -1873,17 +1870,17 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(0, 0, 0, 0.05)',
   },
   compatibilityBadge: {
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    borderRadius: BorderRadius.large,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.medium,
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'center',
-    minWidth: 140,
+    minWidth: 100,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 2,
   },
 });
