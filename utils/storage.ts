@@ -611,7 +611,7 @@ export const StorageService = {
     }
   },
 
-  async addLike(userId: string, likedProfileId: string): Promise<void> {
+  async addLike(userId: string, likedProfileId: string, isSuperLike: boolean = false): Promise<void> {
     try {
       const likes = await this.getLikes();
       if (!likes[userId]) {
@@ -621,8 +621,50 @@ export const StorageService = {
         likes[userId].push(likedProfileId);
         await AsyncStorage.setItem(STORAGE_KEYS.LIKES, JSON.stringify(likes));
       }
+      
+      const allUsers = await this.getUsers();
+      const likedUser = allUsers.find(u => u.id === likedProfileId);
+      if (likedUser) {
+        const currentUser = allUsers.find(u => u.id === userId);
+        if (!likedUser.receivedLikes) {
+          likedUser.receivedLikes = [];
+        }
+        if (!likedUser.receivedLikes.some((l: { likerId: string }) => l.likerId === userId)) {
+          likedUser.receivedLikes.push({
+            likerId: userId,
+            likerName: currentUser?.name || 'Unknown',
+            likerPhoto: currentUser?.profilePicture,
+            likedAt: new Date(),
+            isSuperLike,
+          });
+          await this.addOrUpdateUser(likedUser);
+        }
+      }
     } catch (error) {
       console.error('Error adding like:', error);
+    }
+  },
+
+  async addSuperLike(userId: string, superLikerId: string, superLikerName?: string, superLikerPhoto?: string): Promise<void> {
+    try {
+      const allUsers = await this.getUsers();
+      const targetUser = allUsers.find(u => u.id === userId);
+      if (targetUser) {
+        if (!targetUser.receivedSuperLikes) {
+          targetUser.receivedSuperLikes = [];
+        }
+        if (!targetUser.receivedSuperLikes.some((sl: { superLikerId: string }) => sl.superLikerId === superLikerId)) {
+          targetUser.receivedSuperLikes.push({
+            superLikerId,
+            superLikerName: superLikerName || 'Unknown',
+            superLikerPhoto,
+            superLikedAt: new Date(),
+          });
+          await this.addOrUpdateUser(targetUser);
+        }
+      }
+    } catch (error) {
+      console.error('Error adding super like:', error);
     }
   },
 

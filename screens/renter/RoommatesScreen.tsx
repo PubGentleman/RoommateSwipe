@@ -23,7 +23,7 @@ const CARD_WIDTH = Math.min(SCREEN_WIDTH - Spacing.xxl, MAX_CARD_WIDTH);
 
 export const RoommatesScreen = () => {
   const { theme } = useTheme();
-  const { user, purchaseBoost, purchaseUndoPass, canRewind, useRewind } = useAuth();
+  const { user, purchaseBoost, purchaseUndoPass, canRewind, useRewind, canSuperLike, useSuperLike } = useAuth();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [profiles, setProfiles] = useState<RoommateProfile[]>([]);
@@ -41,6 +41,7 @@ export const RoommatesScreen = () => {
   const [showProfileDetail, setShowProfileDetail] = useState(false);
   const [showMessageModal, setShowMessageModal] = useState(false);
   const [processingMessagePurchase, setProcessingMessagePurchase] = useState(false);
+  const [showSuperLikeUpgradeModal, setShowSuperLikeUpgradeModal] = useState(false);
 
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -146,8 +147,17 @@ export const RoommatesScreen = () => {
   
   const isProfileOnline = currentProfile ? Math.random() > 0.5 : false;
 
-  const handleSwipeAction = (action: 'like' | 'nope' | 'superlike') => {
+  const handleSwipeAction = async (action: 'like' | 'nope' | 'superlike') => {
     if (!currentProfile || !user) return;
+
+    if (action === 'superlike') {
+      const superLikeCheck = canSuperLike();
+      if (!superLikeCheck.canSuperLike) {
+        setShowSuperLikeUpgradeModal(true);
+        return;
+      }
+      await useSuperLike();
+    }
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     
@@ -168,7 +178,7 @@ export const RoommatesScreen = () => {
       setCurrentIndex(currentIndex + 1);
     }, 300);
 
-    processSwipeAsync(action, currentProfile.id, user.id);
+    await processSwipeAsync(action, currentProfile.id, user.id);
   };
 
   const handleUndo = async () => {
@@ -209,7 +219,27 @@ export const RoommatesScreen = () => {
       await StorageService.addToSwipeHistory(profileId);
       
       if (action === 'like' || action === 'superlike') {
-        await StorageService.addLike(userId, profileId);
+        const isSuperLike = action === 'superlike';
+        await StorageService.addLike(userId, profileId, isSuperLike);
+        
+        if (isSuperLike) {
+          await StorageService.addNotification({
+            id: `notification_superlike_${Date.now()}_${Math.random()}`,
+            userId: profileId,
+            type: 'super_like',
+            title: 'Super Like!',
+            body: `${user?.name || 'Someone'} super liked you!`,
+            isRead: false,
+            createdAt: new Date(),
+            data: {
+              fromUserId: userId,
+              fromUserName: user?.name,
+              fromUserPhoto: user?.profilePicture,
+            },
+          });
+          
+          await StorageService.addSuperLike(profileId, userId, user?.name, user?.profilePicture);
+        }
         
         const isReciprocalMatch = await StorageService.checkReciprocalLike(userId, profileId);
         if (isReciprocalMatch) {
@@ -218,6 +248,8 @@ export const RoommatesScreen = () => {
             userId1: userId,
             userId2: profileId,
             matchedAt: new Date(),
+            isSuperLike,
+            superLiker: isSuperLike ? userId : undefined,
           };
           await StorageService.addMatch(match);
           setShowMatch(true);
@@ -887,6 +919,75 @@ export const RoommatesScreen = () => {
               >
                 <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
                   Cancel
+                </ThemedText>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showSuperLikeUpgradeModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowSuperLikeUpgradeModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.vipModalContainer, { backgroundColor: theme.backgroundSecondary }]}>
+            <View style={[styles.vipModalHeader, { backgroundColor: theme.info }]}>
+              <Feather name="star" size={32} color="#FFFFFF" />
+            </View>
+            
+            <View style={styles.vipModalContent}>
+              <ThemedText style={[Typography.h2, { textAlign: 'center', marginBottom: Spacing.sm }]}>
+                {canSuperLike().message?.includes('Upgrade to Plus') ? 'Plus Feature' : 'Elite Feature'}
+              </ThemedText>
+              <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary, marginBottom: Spacing.xl }]}>
+                {canSuperLike().message}
+              </ThemedText>
+              
+              <View style={styles.vipFeatureList}>
+                <View style={styles.vipFeatureItem}>
+                  <Feather name="star" size={20} color={theme.info} />
+                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
+                    Basic: 1 Super Like per day
+                  </ThemedText>
+                </View>
+                <View style={styles.vipFeatureItem}>
+                  <Feather name="star" size={20} color={theme.info} />
+                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
+                    Plus: 3 Super Likes per day
+                  </ThemedText>
+                </View>
+                <View style={styles.vipFeatureItem}>
+                  <Feather name="star" size={20} color={theme.info} />
+                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
+                    Elite: Unlimited Super Likes
+                  </ThemedText>
+                </View>
+              </View>
+            </View>
+            
+            <View style={styles.vipModalActions}>
+              <Pressable
+                style={[styles.vipCancelButton, { borderColor: theme.border }]}
+                onPress={() => setShowSuperLikeUpgradeModal(false)}
+              >
+                <ThemedText style={[Typography.h3, { color: theme.textSecondary }]}>
+                  Maybe Later
+                </ThemedText>
+              </Pressable>
+              <Pressable
+                style={[styles.vipUpgradeButton, { backgroundColor: theme.info }]}
+                onPress={() => {
+                  setShowSuperLikeUpgradeModal(false);
+                  (navigation as any).navigate('Profile', { 
+                    screen: 'Subscription',
+                  });
+                }}
+              >
+                <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
+                  Upgrade
                 </ThemedText>
               </Pressable>
             </View>

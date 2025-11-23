@@ -123,6 +123,8 @@ export interface Match {
   userId1: string;
   userId2: string;
   matchedAt: Date;
+  isSuperLike?: boolean;
+  superLiker?: string;
 }
 
 export interface User {
@@ -163,6 +165,10 @@ export interface User {
     rewindsUsedToday: number;
     lastRewindReset: Date;
   };
+  superLikeData?: {
+    superLikesUsedToday: number;
+    lastSuperLikeReset: Date;
+  };
   profileViews?: Array<{
     viewerId: string;
     viewerName: string;
@@ -174,6 +180,13 @@ export interface User {
     likerName: string;
     likerPhoto?: string;
     likedAt: Date;
+    isSuperLike?: boolean;
+  }>;
+  receivedSuperLikes?: Array<{
+    superLikerId: string;
+    superLikerName: string;
+    superLikerPhoto?: string;
+    superLikedAt: Date;
   }>;
   profileData?: {
     bio?: string;
@@ -208,7 +221,7 @@ export interface User {
 export interface Notification {
   id: string;
   userId: string;
-  type: 'match' | 'message' | 'group_invite' | 'group_accepted' | 'property_update' | 'property_rented' | 'application_status' | 'system';
+  type: 'match' | 'message' | 'group_invite' | 'group_accepted' | 'property_update' | 'property_rented' | 'application_status' | 'system' | 'super_like';
   title: string;
   body: string;
   isRead: boolean;

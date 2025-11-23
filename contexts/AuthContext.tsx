@@ -26,6 +26,8 @@ interface AuthContextType {
   hasActiveUndoPass: () => boolean;
   canRewind: () => { canRewind: boolean; remaining: number; limit: number; message?: string };
   useRewind: () => Promise<void>;
+  canSuperLike: () => { canSuperLike: boolean; remaining: number; limit: number; message?: string };
+  useSuperLike: () => Promise<void>;
   getActiveChatLimit: () => number;
   canStartNewChat: (conversationId: string) => Promise<{ canStart: boolean; limit: number; current: number; reason?: string }>;
   incrementActiveChatCount: (conversationId: string) => Promise<void>;
@@ -839,8 +841,86 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const canSuperLike = (): { canSuperLike: boolean; remaining: number; limit: number; message?: string } => {
+    if (!user) {
+      return { canSuperLike: false, remaining: 0, limit: 0, message: 'Not logged in' };
+    }
+
+    const userPlan = user.subscription?.plan || 'basic';
+    const userStatus = user.subscription?.status || 'active';
+    
+    if (userPlan === 'elite' && userStatus === 'active') {
+      return { canSuperLike: true, remaining: Infinity, limit: Infinity };
+    }
+
+    const now = new Date();
+    const lastReset = user.superLikeData?.lastSuperLikeReset 
+      ? new Date(user.superLikeData.lastSuperLikeReset)
+      : null;
+    
+    let superLikesUsed = user.superLikeData?.superLikesUsedToday || 0;
+    
+    if (!lastReset || !isSameDay(lastReset, now)) {
+      superLikesUsed = 0;
+    }
+    
+    const limit = userPlan === 'plus' && userStatus === 'active' ? 3 : 1;
+    const remaining = Math.max(0, limit - superLikesUsed);
+    
+    if (remaining > 0) {
+      return { canSuperLike: true, remaining, limit };
+    }
+    
+    return { 
+      canSuperLike: false, 
+      remaining: 0, 
+      limit,
+      message: `You've used all ${limit} Super Like${limit > 1 ? 's' : ''} today. ${userPlan === 'basic' ? 'Upgrade to Plus for 3/day or Elite for unlimited!' : 'Upgrade to Elite for unlimited!'}` 
+    };
+  };
+
+  const useSuperLike = async (): Promise<void> => {
+    if (!user) return;
+
+    const userPlan = user.subscription?.plan || 'basic';
+    const userStatus = user.subscription?.status || 'active';
+    
+    if (userPlan === 'elite' && userStatus === 'active') {
+      return;
+    }
+
+    const now = new Date();
+    const lastReset = user.superLikeData?.lastSuperLikeReset 
+      ? new Date(user.superLikeData.lastSuperLikeReset)
+      : null;
+    
+    let superLikesUsed = user.superLikeData?.superLikesUsedToday || 0;
+    
+    if (!lastReset || !isSameDay(lastReset, now)) {
+      superLikesUsed = 0;
+    }
+    
+    const updatedUser: User = {
+      ...user,
+      superLikeData: {
+        superLikesUsedToday: superLikesUsed + 1,
+        lastSuperLikeReset: now,
+      },
+    };
+    
+    await StorageService.setCurrentUser(updatedUser);
+    await StorageService.addOrUpdateUser(updatedUser);
+    setUser(updatedUser);
+    
+    console.log('[Auth] Super Like used:', {
+      plan: userPlan,
+      used: superLikesUsed + 1,
+      limit: userPlan === 'plus' ? 3 : 1,
+    });
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, reactivateSubscription, updateUser, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, reactivateSubscription, updateUser, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike }}>
       {children}
     </AuthContext.Provider>
   );

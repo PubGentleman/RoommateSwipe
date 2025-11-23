@@ -23,7 +23,7 @@ export const DownloadDataScreen = () => {
         StorageService.getMatches(),
         StorageService.getGroups(),
         StorageService.getProperties(),
-        StorageService.getNotifications(),
+        StorageService.getNotifications(user?.id || ''),
       ]);
       
       const exportData = {
