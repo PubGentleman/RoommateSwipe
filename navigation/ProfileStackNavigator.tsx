@@ -40,6 +40,10 @@ export const ProfileStackNavigator = () => {
           headerTransparent: true,
           headerTitle: 'Payment Methods',
           headerTintColor: '#FFFFFF',
+          headerTitleStyle: {
+            fontSize: 17,
+            fontWeight: '600',
+          },
           headerBlurEffect: 'regular',
           headerBackVisible: false,
           headerLeft: () => (
@@ -57,6 +61,10 @@ export const ProfileStackNavigator = () => {
           headerTransparent: true,
           headerTitle: 'Subscription Plans',
           headerTintColor: '#FFFFFF',
+          headerTitleStyle: {
+            fontSize: 17,
+            fontWeight: '600',
+          },
           headerBlurEffect: 'regular',
           headerBackVisible: false,
           headerLeft: () => (
@@ -88,10 +96,15 @@ export const ProfileStackNavigator = () => {
           headerTransparent: true,
           headerTitle: 'Privacy & Security',
           headerTintColor: '#FFFFFF',
+          headerTitleStyle: {
+            fontSize: 17,
+            fontWeight: '600',
+          },
+          headerShadowVisible: false,
           headerBlurEffect: 'regular',
           headerBackVisible: false,
           headerLeft: () => (
-            <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
+            <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={{ marginLeft: 8 }}>
               <Feather name="chevron-left" size={28} color="#FFFFFF" />
             </Pressable>
           ),
@@ -105,6 +118,10 @@ export const ProfileStackNavigator = () => {
           headerTransparent: true,
           headerTitle: 'Profile Views',
           headerTintColor: '#FFFFFF',
+          headerTitleStyle: {
+            fontSize: 17,
+            fontWeight: '600',
+          },
           headerBlurEffect: 'regular',
           headerBackVisible: false,
           headerLeft: () => (
@@ -122,6 +139,10 @@ export const ProfileStackNavigator = () => {
           headerTransparent: true,
           headerTitle: 'Privacy Policy',
           headerTintColor: '#FFFFFF',
+          headerTitleStyle: {
+            fontSize: 17,
+            fontWeight: '600',
+          },
           headerBlurEffect: 'regular',
           headerBackVisible: false,
           headerLeft: () => (
@@ -139,6 +160,10 @@ export const ProfileStackNavigator = () => {
           headerTransparent: true,
           headerTitle: 'Terms of Service',
           headerTintColor: '#FFFFFF',
+          headerTitleStyle: {
+            fontSize: 17,
+            fontWeight: '600',
+          },
           headerBlurEffect: 'regular',
           headerBackVisible: false,
           headerLeft: () => (
@@ -156,6 +181,10 @@ export const ProfileStackNavigator = () => {
           headerTransparent: true,
           headerTitle: 'Download My Data',
           headerTintColor: '#FFFFFF',
+          headerTitleStyle: {
+            fontSize: 17,
+            fontWeight: '600',
+          },
           headerBlurEffect: 'regular',
           headerBackVisible: false,
           headerLeft: () => (
