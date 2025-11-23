@@ -118,7 +118,6 @@ export const GroupsScreen = () => {
       // Hide notification after 1.2 seconds
       setTimeout(() => {
         setShowLikedNotification(false);
-        loadGroups();
       }, 1200);
     }, 400);
   };
@@ -143,14 +142,13 @@ export const GroupsScreen = () => {
       await handleLikeGroup(currentGroup);
     }
 
-    // Wait for notification to finish before resetting card
+    // Wait for notification to finish before showing next card
     const resetDelay = action === 'like' ? 1600 : 400;
     setTimeout(() => {
       translateX.value = 0;
       rotation.value = 0;
-      if (action === 'skip') {
-        setCurrentIndex(currentIndex + 1);
-      }
+      // Advance to next card for both like and skip
+      setCurrentIndex(currentIndex + 1);
     }, resetDelay);
   };
 
