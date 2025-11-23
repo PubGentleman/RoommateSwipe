@@ -446,6 +446,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.lg,
+    zIndex: 10,
   },
   aiButton: {
     width: 44,
@@ -475,6 +476,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: Spacing.xxl,
   },
   card: {
     width: CARD_WIDTH,
