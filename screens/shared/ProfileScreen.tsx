@@ -1,6 +1,7 @@
-import React, { useEffect } from 'react';
-import { View, StyleSheet, Pressable, Image, Alert } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, StyleSheet, Pressable, Image, Alert, Modal } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { ScreenScrollView } from '../../components/ScreenScrollView';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
@@ -14,8 +15,10 @@ type ProfileScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamLi
 
 export const ProfileScreen = () => {
   const { theme } = useTheme();
-  const { user, logout, activateBoost, canBoost, checkAndUpdateBoostStatus } = useAuth();
+  const { user, logout, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost } = useAuth();
   const navigation = useNavigation<ProfileScreenNavigationProp>();
+  const [showPurchaseBoostModal, setShowPurchaseBoostModal] = useState(false);
+  const [processingBoost, setProcessingBoost] = useState(false);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -24,22 +27,41 @@ export const ProfileScreen = () => {
   );
 
   const handleBoost = async () => {
+    const boostStatus = canBoost();
+    
+    if (user?.subscription?.plan === 'basic' && boostStatus.requiresPayment) {
+      setShowPurchaseBoostModal(true);
+      return;
+    }
+    
+    if (!boostStatus.canBoost) {
+      Alert.alert('Cannot Boost', boostStatus.reason || 'Boost is currently unavailable');
+      return;
+    }
+    
     const result = await activateBoost();
     if (result.success) {
       Alert.alert('Boost Activated!', result.message);
     } else {
-      const boostStatus = canBoost();
-      if (!boostStatus.canBoost && user?.subscription?.plan === 'basic') {
-        Alert.alert(
-          'Upgrade Required',
-          boostStatus.reason || 'Boost is a Plus feature',
-          [
-            { text: 'Maybe Later', style: 'cancel' },
-            { text: 'View Plans', onPress: () => navigation.navigate('Payment') },
-          ]
-        );
+      Alert.alert('Cannot Boost', result.message);
+    }
+  };
+
+  const handlePurchaseBoost = async () => {
+    setProcessingBoost(true);
+    const result = await purchaseBoost();
+    setProcessingBoost(false);
+    
+    if (result.success) {
+      setShowPurchaseBoostModal(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('Boost Activated!', result.message);
+    } else {
+      if (result.message === 'Please add a payment method first') {
+        setShowPurchaseBoostModal(false);
+        navigation.navigate('Payment');
       } else {
-        Alert.alert('Cannot Boost', result.message);
+        Alert.alert('Purchase Failed', result.message);
       }
     }
   };
@@ -245,7 +267,7 @@ export const ProfileScreen = () => {
                       marginLeft: Spacing.sm 
                     }]}>
                       {user.subscription?.plan === 'basic' 
-                        ? 'Upgrade to Boost' 
+                        ? 'Purchase Boost - $3' 
                         : canBoost().canBoost 
                           ? 'Activate Boost' 
                           : 'Boost Unavailable'}
@@ -275,6 +297,81 @@ export const ProfileScreen = () => {
           <MenuItem icon="log-out" label="Log Out" onPress={logout} danger />
         </View>
       </View>
+
+      <Modal
+        visible={showPurchaseBoostModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowPurchaseBoostModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, { backgroundColor: theme.backgroundSecondary }]}>
+            <View style={[styles.modalHeader, { backgroundColor: '#FFD700' }]}>
+              <Feather name="zap" size={32} color="#000000" />
+            </View>
+            
+            <View style={styles.modalContent}>
+              <ThemedText style={[Typography.h2, { textAlign: 'center', marginBottom: Spacing.sm }]}>
+                Purchase Boost
+              </ThemedText>
+              <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary, marginBottom: Spacing.xl }]}>
+                Boost your profile for 24 hours and get prioritized placement in the swipe deck!
+              </ThemedText>
+              
+              <View style={[styles.priceCard, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+                <ThemedText style={[Typography.h1, { color: theme.primary, marginBottom: Spacing.xs }]}>
+                  $3.00
+                </ThemedText>
+                <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
+                  24 hours of priority placement
+                </ThemedText>
+              </View>
+              
+              <View style={styles.featuresList}>
+                <View style={styles.featureItem}>
+                  <Feather name="check-circle" size={20} color={theme.success} />
+                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
+                    Priority placement in swipe deck
+                  </ThemedText>
+                </View>
+                <View style={styles.featureItem}>
+                  <Feather name="check-circle" size={20} color={theme.success} />
+                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
+                    Visible BOOSTED badge on profile
+                  </ThemedText>
+                </View>
+                <View style={styles.featureItem}>
+                  <Feather name="check-circle" size={20} color={theme.success} />
+                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
+                    Instant activation
+                  </ThemedText>
+                </View>
+              </View>
+            </View>
+            
+            <View style={styles.modalActions}>
+              <Pressable
+                style={[styles.modalButton, { backgroundColor: '#FFD700', opacity: processingBoost ? 0.7 : 1 }]}
+                onPress={handlePurchaseBoost}
+                disabled={processingBoost}
+              >
+                <ThemedText style={[Typography.h3, { color: '#000000' }]}>
+                  {processingBoost ? 'Processing...' : 'Purchase for $3'}
+                </ThemedText>
+              </Pressable>
+              <Pressable
+                style={[styles.modalButtonSecondary, { borderColor: theme.border }]}
+                onPress={() => setShowPurchaseBoostModal(false)}
+                disabled={processingBoost}
+              >
+                <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
+                  Cancel
+                </ThemedText>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScreenScrollView>
   );
 };
@@ -388,5 +485,54 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     borderRadius: BorderRadius.medium,
     marginTop: Spacing.md,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.xl,
+  },
+  modalContainer: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: BorderRadius.large,
+    overflow: 'hidden',
+  },
+  modalHeader: {
+    padding: Spacing.xxl,
+    alignItems: 'center',
+  },
+  modalContent: {
+    padding: Spacing.xl,
+  },
+  priceCard: {
+    padding: Spacing.xl,
+    borderRadius: BorderRadius.medium,
+    borderWidth: 2,
+    alignItems: 'center',
+    marginBottom: Spacing.xl,
+  },
+  featuresList: {
+    gap: Spacing.md,
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  modalActions: {
+    padding: Spacing.xl,
+    gap: Spacing.md,
+  },
+  modalButton: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.medium,
+    alignItems: 'center',
+  },
+  modalButtonSecondary: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.medium,
+    borderWidth: 1,
+    alignItems: 'center',
   },
 });
