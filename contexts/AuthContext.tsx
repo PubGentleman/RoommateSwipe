@@ -43,8 +43,9 @@ interface AuthContextType {
   incrementMessageCount: () => Promise<void>;
   canSendMessage: () => boolean;
   activateBoost: () => Promise<{ success: boolean; message: string }>;
-  canBoost: () => { canBoost: boolean; reason?: string };
+  canBoost: () => { canBoost: boolean; reason?: string; requiresPayment?: boolean };
   checkAndUpdateBoostStatus: () => Promise<void>;
+  purchaseBoost: () => Promise<{ success: boolean; message: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -223,20 +224,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return messageCount < 50;
   };
 
-  const canBoost = (): { canBoost: boolean; reason?: string } => {
+  const canBoost = (): { canBoost: boolean; reason?: string; requiresPayment?: boolean } => {
     if (!user) return { canBoost: false, reason: 'Not logged in' };
     
     const plan = user.subscription?.plan || 'basic';
-    
-    if (plan === 'basic') {
-      return { canBoost: false, reason: 'Boost is available for Plus and Priority members only' };
-    }
     
     if (user.boostData?.isBoosted && user.boostData.boostExpiresAt) {
       const now = new Date();
       if (user.boostData.boostExpiresAt > now) {
         return { canBoost: false, reason: 'Boost is already active' };
       }
+    }
+    
+    if (plan === 'basic') {
+      return { canBoost: true, requiresPayment: true };
     }
     
     if (plan === 'priority') {
@@ -293,6 +294,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { success: true, message: 'Boost activated! Your profile will be prioritized for 24 hours.' };
   };
 
+  const purchaseBoost = async (): Promise<{ success: boolean; message: string }> => {
+    if (!user) {
+      return { success: false, message: 'Not logged in' };
+    }
+
+    if (!user.paymentMethods || user.paymentMethods.length === 0) {
+      return { success: false, message: 'Please add a payment method first' };
+    }
+
+    const boostCheck = canBoost();
+    if (!boostCheck.canBoost) {
+      return { success: false, message: boostCheck.reason || 'Cannot purchase boost' };
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    
+    const updatedUser: User = {
+      ...user,
+      boostData: {
+        boostsUsed: (user.boostData?.boostsUsed || 0) + 1,
+        lastBoostDate: now,
+        isBoosted: true,
+        boostExpiresAt: expiresAt,
+      },
+    };
+    
+    await StorageService.setCurrentUser(updatedUser);
+    await StorageService.addOrUpdateUser(updatedUser);
+    setUser(updatedUser);
+    
+    return { success: true, message: 'Boost purchased and activated! Your profile will be prioritized for 24 hours.' };
+  };
+
   const checkAndUpdateBoostStatus = async () => {
     if (!user || !user.boostData?.isBoosted) return;
     
@@ -321,7 +356,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPlus, upgradeToPriority, updateUser, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPlus, upgradeToPriority, updateUser, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost }}>
       {children}
     </AuthContext.Provider>
   );

@@ -62,12 +62,12 @@ Preferred communication style: Simple, everyday language.
 - **User Model:** Defines `id`, `email`, `name`, `role` ('renter' | 'host' | 'agent'), `profilePicture`, and optional `subscription` and `paymentMethods` details.
 - **Authorization:** Role-based navigation rendering and conditional screen access.
 - **Subscription & Payments:** Stripe integration configured. Defines three subscription tiers:
-  - **Basic Plan:** 50 message limit, no boost, no filters, no featured listings, no AI assistant, 1 group max
-  - **Plus Plan ($14.99/month):** Unlimited messaging, 1 boost/week, advanced filters, AI match assistant, 3 groups max
-  - **Priority Plan ($49.99-$99/month role-based):** Unlimited messaging, unlimited boosts, advanced filters, AI match assistant, featured listings (hosts only), 5 groups max
+  - **Basic Plan:** 50 message limit, can purchase individual boosts for $3 each, no filters, no featured listings, no AI assistant, 1 group max
+  - **Plus Plan ($14.99/month):** Unlimited messaging, 1 boost/week (included), advanced filters, AI match assistant, 3 groups max
+  - **Priority Plan ($49.99-$99/month role-based):** Unlimited messaging, unlimited boosts (included), advanced filters, AI match assistant, featured listings (hosts only), 5 groups max
 - **Functional Differentiation:** All subscription features enforce limits in real-time with upgrade prompts guiding basic users to payment screen.
 - **Messaging Limits:** Enforced at send-time with message count tracking in User model. Basic users blocked after 50 messages with upgrade prompt.
-- **Boost System:** 24-hour profile visibility boost with visual "BOOSTED" badge. Plus users limited to 1 boost every 7 days with cooldown tracking. Priority users have unlimited boosts. Expired boosts automatically removed from priority.
+- **Boost System:** 24-hour profile visibility boost with visual "BOOSTED" badge. Basic users can purchase individual boosts for $3 each via in-app modal. Plus users get 1 boost every 7 days with cooldown tracking. Priority users have unlimited boosts. Expired boosts automatically removed from priority. All boosts provide the same 24-hour priority placement.
 - **Priority Placement:** Swipe deck sorting prioritizes profiles: Active boost (valid expiry) → Priority tier → Plus tier → Basic tier → Compatibility score tiebreaker.
 - **Advanced Filters:** Plus/Priority-exclusive property filters (budget range, location, bedrooms, bathrooms, amenities) with gated access and upgrade modal.
 - **Featured Listings:** Priority hosts can feature their properties to appear first in renter explore screen. Toggle via "Feature" button with ownership validation and AsyncStorage persistence.

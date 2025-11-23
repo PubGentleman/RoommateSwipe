@@ -20,7 +20,7 @@ const CARD_WIDTH = SCREEN_WIDTH - Spacing.xxl;
 
 export const RoommatesScreen = () => {
   const { theme } = useTheme();
-  const { user } = useAuth();
+  const { user, purchaseBoost } = useAuth();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [profiles, setProfiles] = useState<RoommateProfile[]>([]);
@@ -30,6 +30,8 @@ export const RoommatesScreen = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [profileUsers, setProfileUsers] = useState<Map<string, any>>(new Map());
   const [showVIPModal, setShowVIPModal] = useState(false);
+  const [showPurchaseBoostModal, setShowPurchaseBoostModal] = useState(false);
+  const [processingBoost, setProcessingBoost] = useState(false);
 
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -254,6 +256,22 @@ export const RoommatesScreen = () => {
     (navigation as any).navigate('Profile', { screen: 'Payment' });
   };
 
+  const handlePurchaseBoost = async () => {
+    setProcessingBoost(true);
+    const result = await purchaseBoost();
+    setProcessingBoost(false);
+    
+    if (result.success) {
+      setShowPurchaseBoostModal(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } else {
+      if (result.message.includes('payment method')) {
+        (navigation as any).navigate('Profile', { screen: 'Payment' });
+        setShowPurchaseBoostModal(false);
+      }
+    }
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <View style={[styles.header, { paddingTop: insets.top + 60 }]}>
@@ -262,9 +280,13 @@ export const RoommatesScreen = () => {
             <Feather name="cpu" size={20} color="#FFFFFF" />
           </View>
         </Pressable>
-        <Pressable onPress={() => {}} style={styles.iconButton}>
-          <Feather name="sliders" size={24} color={theme.text} />
-        </Pressable>
+        {(user?.subscription?.plan || 'basic') === 'basic' && !user?.boostData?.isBoosted ? (
+          <Pressable onPress={() => setShowPurchaseBoostModal(true)} style={styles.aiButton}>
+            <View style={[styles.aiButtonInner, { backgroundColor: '#FFD700' }]}>
+              <Feather name="zap" size={20} color="#000000" />
+            </View>
+          </Pressable>
+        ) : null}
       </View>
 
       <View style={styles.cardContainer}>
@@ -415,6 +437,81 @@ export const RoommatesScreen = () => {
               >
                 <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
                   Maybe Later
+                </ThemedText>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showPurchaseBoostModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowPurchaseBoostModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.vipModalContainer, { backgroundColor: theme.backgroundSecondary }]}>
+            <View style={[styles.vipModalHeader, { backgroundColor: '#FFD700' }]}>
+              <Feather name="zap" size={32} color="#000000" />
+            </View>
+            
+            <View style={styles.vipModalContent}>
+              <ThemedText style={[Typography.h2, { textAlign: 'center', marginBottom: Spacing.sm }]}>
+                Purchase Boost
+              </ThemedText>
+              <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary, marginBottom: Spacing.xl }]}>
+                Boost your profile for 24 hours and get prioritized placement in the swipe deck!
+              </ThemedText>
+              
+              <View style={[styles.priceCard, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+                <ThemedText style={[Typography.h1, { color: theme.primary, marginBottom: Spacing.xs }]}>
+                  $3.00
+                </ThemedText>
+                <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
+                  24 hours of priority placement
+                </ThemedText>
+              </View>
+              
+              <View style={styles.vipFeaturesList}>
+                <View style={styles.vipFeatureItem}>
+                  <Feather name="check-circle" size={20} color={theme.success} />
+                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
+                    Priority placement in swipe deck
+                  </ThemedText>
+                </View>
+                <View style={styles.vipFeatureItem}>
+                  <Feather name="check-circle" size={20} color={theme.success} />
+                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
+                    Visible BOOSTED badge on profile
+                  </ThemedText>
+                </View>
+                <View style={styles.vipFeatureItem}>
+                  <Feather name="check-circle" size={20} color={theme.success} />
+                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
+                    Instant activation
+                  </ThemedText>
+                </View>
+              </View>
+            </View>
+            
+            <View style={styles.vipModalActions}>
+              <Pressable
+                style={[styles.vipModalButton, { backgroundColor: '#FFD700', opacity: processingBoost ? 0.7 : 1 }]}
+                onPress={handlePurchaseBoost}
+                disabled={processingBoost}
+              >
+                <ThemedText style={[Typography.h3, { color: '#000000' }]}>
+                  {processingBoost ? 'Processing...' : 'Purchase for $3'}
+                </ThemedText>
+              </Pressable>
+              <Pressable
+                style={[styles.vipModalButtonSecondary, { borderColor: theme.border }]}
+                onPress={() => setShowPurchaseBoostModal(false)}
+                disabled={processingBoost}
+              >
+                <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
+                  Cancel
                 </ThemedText>
               </Pressable>
             </View>
@@ -656,6 +753,13 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.medium,
     alignItems: 'center',
+    borderWidth: 1,
+  },
+  priceCard: {
+    padding: Spacing.xl,
+    borderRadius: BorderRadius.medium,
+    alignItems: 'center',
+    marginBottom: Spacing.xl,
     borderWidth: 1,
   },
 });
