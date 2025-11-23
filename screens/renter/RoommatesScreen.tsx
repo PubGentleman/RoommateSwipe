@@ -136,14 +136,16 @@ export const RoommatesScreen = () => {
     const toX = direction * SCREEN_WIDTH * 1.5;
     const toY = action === 'superlike' ? -SCREEN_HEIGHT : 0;
 
-    translateX.value = withSpring(toX, { damping: 20, stiffness: 90 }, () => {
+    translateX.value = withSpring(toX, { damping: 15, stiffness: 100 });
+    translateY.value = withSpring(toY, { damping: 15, stiffness: 100 });
+    rotation.value = withSpring(direction * 15, { damping: 15, stiffness: 100 });
+
+    setTimeout(() => {
       translateX.value = 0;
       translateY.value = 0;
       rotation.value = 0;
-      runOnJS(setCurrentIndex)(currentIndex + 1);
-    });
-    translateY.value = withSpring(toY, { damping: 20, stiffness: 90 });
-    rotation.value = withSpring(direction * 15, { damping: 20, stiffness: 90 });
+      setCurrentIndex(currentIndex + 1);
+    }, 300);
 
     processSwipeAsync(action, currentProfile.id, user.id);
   };
