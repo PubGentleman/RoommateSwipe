@@ -204,7 +204,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         />
       </View>
 
-      <View style={[styles.inputContainer, { backgroundColor: theme.backgroundRoot, paddingBottom: insets.bottom + Spacing.md }]}>
+      <View style={[styles.inputContainer, { backgroundColor: theme.backgroundRoot, paddingBottom: TAB_BAR_HEIGHT }]}>
         <TextInput
           style={[
             styles.input,
