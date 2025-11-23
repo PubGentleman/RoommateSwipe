@@ -39,11 +39,12 @@ export const ProfileStackNavigator = () => {
           headerShown: true,
           headerTransparent: true,
           headerTitle: 'Payment Methods',
+          headerTintColor: '#FFFFFF',
           headerBlurEffect: 'regular',
           headerBackVisible: false,
           headerLeft: () => (
             <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
-              <Feather name="chevron-left" size={28} color="#007AFF" />
+              <Feather name="chevron-left" size={28} color="#FFFFFF" />
             </Pressable>
           ),
         })}
@@ -55,11 +56,12 @@ export const ProfileStackNavigator = () => {
           headerShown: true,
           headerTransparent: true,
           headerTitle: 'Subscription Plans',
+          headerTintColor: '#FFFFFF',
           headerBlurEffect: 'regular',
           headerBackVisible: false,
           headerLeft: () => (
             <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
-              <Feather name="chevron-left" size={28} color="#007AFF" />
+              <Feather name="chevron-left" size={28} color="#FFFFFF" />
             </Pressable>
           ),
         })}
@@ -85,11 +87,12 @@ export const ProfileStackNavigator = () => {
           headerShown: true,
           headerTransparent: true,
           headerTitle: 'Privacy & Security',
+          headerTintColor: '#FFFFFF',
           headerBlurEffect: 'regular',
           headerBackVisible: false,
           headerLeft: () => (
             <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
-              <Feather name="chevron-left" size={28} color="#007AFF" />
+              <Feather name="chevron-left" size={28} color="#FFFFFF" />
             </Pressable>
           ),
         })}
@@ -101,11 +104,12 @@ export const ProfileStackNavigator = () => {
           headerShown: true,
           headerTransparent: true,
           headerTitle: 'Profile Views',
+          headerTintColor: '#FFFFFF',
           headerBlurEffect: 'regular',
           headerBackVisible: false,
           headerLeft: () => (
             <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
-              <Feather name="chevron-left" size={28} color="#007AFF" />
+              <Feather name="chevron-left" size={28} color="#FFFFFF" />
             </Pressable>
           ),
         })}
@@ -117,11 +121,12 @@ export const ProfileStackNavigator = () => {
           headerShown: true,
           headerTransparent: true,
           headerTitle: 'Privacy Policy',
+          headerTintColor: '#FFFFFF',
           headerBlurEffect: 'regular',
           headerBackVisible: false,
           headerLeft: () => (
             <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
-              <Feather name="chevron-left" size={28} color="#007AFF" />
+              <Feather name="chevron-left" size={28} color="#FFFFFF" />
             </Pressable>
           ),
         })}
@@ -133,11 +138,12 @@ export const ProfileStackNavigator = () => {
           headerShown: true,
           headerTransparent: true,
           headerTitle: 'Terms of Service',
+          headerTintColor: '#FFFFFF',
           headerBlurEffect: 'regular',
           headerBackVisible: false,
           headerLeft: () => (
             <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
-              <Feather name="chevron-left" size={28} color="#007AFF" />
+              <Feather name="chevron-left" size={28} color="#FFFFFF" />
             </Pressable>
           ),
         })}
@@ -149,11 +155,12 @@ export const ProfileStackNavigator = () => {
           headerShown: true,
           headerTransparent: true,
           headerTitle: 'Download My Data',
+          headerTintColor: '#FFFFFF',
           headerBlurEffect: 'regular',
           headerBackVisible: false,
           headerLeft: () => (
             <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
-              <Feather name="chevron-left" size={28} color="#007AFF" />
+              <Feather name="chevron-left" size={28} color="#FFFFFF" />
             </Pressable>
           ),
         })}
