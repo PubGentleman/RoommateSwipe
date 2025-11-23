@@ -494,7 +494,7 @@ const styles = StyleSheet.create({
   },
   topBadges: {
     position: 'absolute',
-    top: Spacing.lg + 24,
+    top: Spacing.lg,
     right: Spacing.lg,
     flexDirection: 'column',
     alignItems: 'flex-end',
