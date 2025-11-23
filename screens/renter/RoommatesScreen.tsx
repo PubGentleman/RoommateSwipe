@@ -274,15 +274,17 @@ export const RoommatesScreen = () => {
           >
             <Image source={{ uri: currentProfile.photos[0] }} style={styles.cardImage} />
             <View style={styles.gradient}>
-              <View style={styles.topBadges}>
-                {isBoosted ? (
+              {isBoosted ? (
+                <View style={styles.boostBadgeLeft}>
                   <View style={[styles.boostBadge, { backgroundColor: '#FFD700' }]}>
                     <Feather name="zap" size={14} color="#000000" />
                     <ThemedText style={[Typography.small, { color: '#000000', fontWeight: '700', marginLeft: 4 }]}>
                       BOOSTED
                     </ThemedText>
                   </View>
-                ) : null}
+                </View>
+              ) : null}
+              <View style={styles.topBadges}>
                 {canSeeOnlineStatus() && isProfileOnline ? (
                   <View style={[styles.onlineIndicator, { backgroundColor: theme.success }]} />
                 ) : null}
@@ -500,6 +502,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.small,
+  },
+  boostBadgeLeft: {
+    position: 'absolute',
+    top: Spacing.lg,
+    left: Spacing.lg,
+    zIndex: 2,
   },
   boostBadge: {
     flexDirection: 'row',
