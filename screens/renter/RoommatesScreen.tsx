@@ -177,9 +177,10 @@ export const RoommatesScreen = () => {
     })
     .onEnd((event) => {
       if (Math.abs(event.translationX) > 120) {
-        scheduleOnRN(handleSwipeAction, event.translationX > 0 ? 'like' : 'nope');
+        const action = event.translationX > 0 ? 'like' : 'nope';
+        scheduleOnRN(() => handleSwipeAction(action));
       } else if (event.translationY < -120) {
-        scheduleOnRN(handleSwipeAction, 'superlike');
+        scheduleOnRN(() => handleSwipeAction('superlike'));
       } else {
         Animated.spring(translateX, {
           toValue: 0,
