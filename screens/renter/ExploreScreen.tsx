@@ -318,28 +318,19 @@ export const ExploreScreen = () => {
             {item.title}
           </ThemedText>
           {item.roomType === 'room' && (hostUser || (item.existingRoommates && item.existingRoommates.length > 0)) ? (
-            <View style={[styles.roommateInfo, { backgroundColor: theme.backgroundDefault, marginTop: Spacing.sm }]}>
-              <View style={styles.roommateGenderContainer}>
-                <Feather 
-                  name="users" 
-                  size={14} 
-                  color={theme.textSecondary} 
-                />
-                <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
-                  {hostUser?.profileData?.gender ? getGenderSymbol(hostUser.profileData.gender) : ''}
-                  {item.existingRoommates && item.existingRoommates.length > 0 
-                    ? item.existingRoommates.map((rm, idx) => getGenderSymbol(rm.gender)).join('')
-                    : ''
-                  }
-                </ThemedText>
-              </View>
-              {compatibility !== null ? (
-                <View style={[styles.compatibilityBadge, { backgroundColor: getMatchQualityColor(compatibility) }]}>
-                  <ThemedText style={[Typography.caption, { color: '#FFFFFF', fontWeight: '700' }]}>
-                    {compatibility}% Match
-                  </ThemedText>
-                </View>
-              ) : null}
+            <View style={[styles.roommateGenderContainer, { marginTop: Spacing.sm }]}>
+              <Feather 
+                name="users" 
+                size={14} 
+                color={theme.textSecondary} 
+              />
+              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
+                {hostUser?.profileData?.gender ? getGenderSymbol(hostUser.profileData.gender) : ''}
+                {item.existingRoommates && item.existingRoommates.length > 0 
+                  ? item.existingRoommates.map((rm, idx) => getGenderSymbol(rm.gender)).join('')
+                  : ''
+                }
+              </ThemedText>
             </View>
           ) : null}
           <View style={styles.details}>
