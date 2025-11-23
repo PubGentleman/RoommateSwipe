@@ -103,8 +103,8 @@ export const ProfileScreen = () => {
       <View style={styles.container}>
         <View style={styles.profileHeader}>
           <View style={styles.avatarContainer}>
-            <View style={[styles.avatar, { backgroundColor: theme.backgroundSecondary }]}>
-              <Feather name="user" size={48} color={theme.textSecondary} />
+            <View style={styles.avatar}>
+              <Feather name="user" size={64} color={theme.textSecondary} />
             </View>
             <View style={[styles.roleBadge, { backgroundColor: getRoleBadgeColor() }]}>
               <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '600' }]}>
