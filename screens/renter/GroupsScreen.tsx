@@ -110,12 +110,17 @@ export const GroupsScreen = () => {
     
     await StorageService.likeGroup(group.id, user.id);
     
-    setLikedGroupName(group.name);
-    setShowLikedNotification(true);
+    // Delay showing notification until card animation completes
     setTimeout(() => {
-      setShowLikedNotification(false);
-      loadGroups();
-    }, 2000);
+      setLikedGroupName(group.name);
+      setShowLikedNotification(true);
+      
+      // Hide notification after 1.2 seconds
+      setTimeout(() => {
+        setShowLikedNotification(false);
+        loadGroups();
+      }, 1200);
+    }, 400);
   };
 
   const handleSwipeAction = async (action: 'like' | 'skip') => {
@@ -123,26 +128,30 @@ export const GroupsScreen = () => {
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    if (action === 'like') {
-      await handleLikeGroup(currentGroup);
-    }
-
     const direction = action === 'like' ? 1 : -1;
     const toX = direction * SCREEN_WIDTH * 1.5;
 
+    // Animate card off screen
     translateX.value = withSpring(toX, { 
       damping: 20,
       stiffness: 90 
     });
     rotation.value = withSpring(direction * 15);
 
+    // Handle like action after starting animation
+    if (action === 'like') {
+      await handleLikeGroup(currentGroup);
+    }
+
+    // Wait for notification to finish before resetting card
+    const resetDelay = action === 'like' ? 1600 : 400;
     setTimeout(() => {
       translateX.value = 0;
       rotation.value = 0;
       if (action === 'skip') {
         setCurrentIndex(currentIndex + 1);
       }
-    }, 300);
+    }, resetDelay);
   };
 
   const pan = Gesture.Pan()
