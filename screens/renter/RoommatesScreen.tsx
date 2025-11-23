@@ -782,7 +782,7 @@ export const RoommatesScreen = () => {
                 Send Direct Message
               </ThemedText>
               <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary, marginBottom: Spacing.xl }]}>
-                Priority members can send messages without matching. Choose an option below to message {currentProfile?.name}.
+                Plus members can send messages without matching. Choose an option below to message {currentProfile?.name}.
               </ThemedText>
               
               <View style={[styles.priceCard, { backgroundColor: theme.backgroundDefault, borderColor: theme.border, marginBottom: Spacing.lg }]}>
@@ -828,7 +828,7 @@ export const RoommatesScreen = () => {
                 onPress={handleUpgradeForMessaging}
               >
                 <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
-                  Upgrade to Priority
+                  Upgrade to Plus
                 </ThemedText>
               </Pressable>
               <Pressable
