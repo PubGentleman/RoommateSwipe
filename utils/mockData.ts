@@ -800,7 +800,7 @@ export const mockProperties: Property[] = [
     featured: true,
     propertyType: 'lease',
     roomType: 'entire',
-    walkScore: 98,
+    walkScore: 70,
   },
   {
     id: '2',
@@ -827,7 +827,7 @@ export const mockProperties: Property[] = [
       { gender: 'female', onApp: false },
     ],
     hostProfileId: '1',
-    walkScore: 94,
+    walkScore: 60,
   },
   {
     id: '3',
