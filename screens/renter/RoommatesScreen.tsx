@@ -442,18 +442,23 @@ export const RoommatesScreen = () => {
           <Animated.View
             style={[styles.card, animatedCardStyle]}
           >
-            <Pressable onPress={() => {
-              setShowProfileDetail(true);
-              if (currentProfile && user && currentProfile.id !== user.id) {
-                StorageService.addProfileView(currentProfile.id, user.id);
-              }
-            }} style={{ flex: 1 }}>
-              <Image source={{ uri: currentProfile.photos[0] }} style={styles.cardImage} />
+            <Image source={{ uri: currentProfile.photos[0] }} style={styles.cardImage} />
             {canSeeOnlineStatus() && isProfileOnline ? (
               <View style={styles.onlineIndicatorContainer}>
                 <View style={[styles.onlineIndicator, { backgroundColor: theme.success }]} />
               </View>
             ) : null}
+            <Pressable 
+              onPress={() => {
+                setShowProfileDetail(true);
+                if (currentProfile && user && currentProfile.id !== user.id) {
+                  StorageService.addProfileView(currentProfile.id, user.id);
+                }
+              }}
+              style={[styles.infoButton, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
+            >
+              <Feather name="info" size={20} color="#FFFFFF" />
+            </Pressable>
             <View style={styles.gradient}>
               {isBoosted ? (
                 <View style={styles.boostBadgeLeft}>
@@ -497,7 +502,6 @@ export const RoommatesScreen = () => {
                 </View>
               </View>
             </View>
-            </Pressable>
           </Animated.View>
         </GestureDetector>
       </View>
@@ -1319,5 +1323,16 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 3,
+  },
+  infoButton: {
+    position: 'absolute',
+    top: Spacing.lg,
+    right: Spacing.lg,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
   },
 });
