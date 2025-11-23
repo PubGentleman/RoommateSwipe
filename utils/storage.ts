@@ -732,7 +732,13 @@ export const StorageService = {
   async forceReloadMockData(): Promise<void> {
     try {
       console.log('[StorageService] Force reloading all mock data...');
-      const { mockRoommateProfiles, mockProperties, mockGroups, mockProfileUsers } = await import('./mockData');
+      
+      // Clear module cache to ensure fresh data
+      const cacheBuster = `?t=${Date.now()}`;
+      const mockDataModule = await import('./mockData' + cacheBuster);
+      const { mockRoommateProfiles, mockProperties, mockGroups, mockProfileUsers } = mockDataModule;
+      
+      console.log(`[StorageService] Importing mock data with ${mockProperties.length} properties...`);
       
       await this.setRoommateProfiles(mockRoommateProfiles);
       console.log(`[StorageService] Loaded ${mockRoommateProfiles.length} roommate profiles`);
