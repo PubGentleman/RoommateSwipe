@@ -661,7 +661,7 @@ export const GroupsScreen = () => {
             >
               <Pressable onPress={() => setShowGroupDetail(true)} style={{ flex: 1 }}>
                 <View style={styles.cardContent}>
-                <View style={[styles.groupIconLarge, { backgroundColor: theme.primary }]}>
+                <View style={[styles.groupIconLarge, { backgroundColor: theme.primary, marginTop: Spacing.xl }]}>
                   <Feather name="users" size={32} color="#FFFFFF" />
                 </View>
                 
@@ -1418,7 +1418,7 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: Spacing.xl,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
   },
   groupIconLarge: {
     width: 80,
