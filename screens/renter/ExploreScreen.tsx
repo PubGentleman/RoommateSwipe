@@ -164,6 +164,11 @@ export const ExploreScreen = () => {
     );
   };
 
+  const handleClearSearch = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSearchQuery('');
+  };
+
   const toggleSave = async (id: string) => {
     if (!user?.id) return;
     
@@ -313,7 +318,7 @@ export const ExploreScreen = () => {
             returnKeyType="search"
           />
           {searchQuery.length > 0 ? (
-            <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
+            <Pressable onPress={handleClearSearch} hitSlop={8}>
               <Feather name="x-circle" size={18} color={theme.textSecondary} />
             </Pressable>
           ) : null}
