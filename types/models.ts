@@ -134,6 +134,7 @@ export interface User {
   age?: number;
   role: 'renter' | 'host' | 'agent';
   profilePicture?: string;
+  photos?: string[];
   subscription?: {
     plan: 'basic' | 'plus' | 'elite';
     status: 'active' | 'cancelled' | 'expired';

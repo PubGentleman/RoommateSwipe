@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Pressable, Alert, TextInput, ScrollView } from 'react-native';
+import { View, StyleSheet, Pressable, Alert, TextInput, ScrollView, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import * as ImagePicker from 'expo-image-picker';
+import { Image } from 'expo-image';
 import { ScreenKeyboardAwareScrollView } from '../../components/ScreenKeyboardAwareScrollView';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
@@ -13,6 +15,7 @@ export const EditProfileScreen = () => {
   const { user, updateUser } = useAuth();
   const navigation = useNavigation();
   
+  const [photos, setPhotos] = useState<string[]>(user?.photos || [user?.profilePicture].filter(Boolean) as string[] || []);
   const [name, setName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
   const [bio, setBio] = useState(user?.profileData?.bio || '');
@@ -35,6 +38,81 @@ export const EditProfileScreen = () => {
   const [bedrooms, setBedrooms] = useState(user?.profileData?.preferences?.bedrooms?.toString() || '');
   
   const [isSaving, setIsSaving] = useState(false);
+
+  const pickImage = async () => {
+    if (photos.length >= 6) {
+      Alert.alert('Maximum Reached', 'You can upload up to 6 photos');
+      return;
+    }
+
+    if (Platform.OS === 'web') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = (e: any) => {
+        const file = e.target.files?.[0];
+        if (file) {
+          if (file.size > 10 * 1024 * 1024) {
+            Alert.alert('File Too Large', 'Please select an image smaller than 10MB');
+            return;
+          }
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const imageUrl = event.target?.result as string;
+            if (imageUrl) {
+              setPhotos([...photos, imageUrl]);
+            }
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+      input.click();
+      return;
+    }
+
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    
+    if (permissionResult.granted === false) {
+      if (permissionResult.canAskAgain === false) {
+        Alert.alert(
+          'Permission Required',
+          'Photo library access is disabled. Please enable it in your device settings to add photos.',
+          [
+            { text: 'OK' },
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Permission Required',
+          'Permission to access photo library is required to add photos.',
+          [
+            { text: 'OK' },
+          ]
+        );
+      }
+      return;
+    }
+
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 5],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setPhotos([...photos, result.assets[0].uri]);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
+      console.error('Image picker error:', error);
+    }
+  };
+
+  const removePhoto = (index: number) => {
+    setPhotos(photos.filter((_, i) => i !== index));
+  };
 
   const toggleLifestyle = (item: 'active_gym' | 'homebody' | 'nightlife_social' | 'quiet_introverted' | 'creative_artistic' | 'professional_focused') => {
     if (lifestyle.includes(item)) {
@@ -71,6 +149,8 @@ export const EditProfileScreen = () => {
     await updateUser({
       name: name.trim(),
       email: email.trim(),
+      photos,
+      profilePicture: photos[0] || undefined,
       profileData: {
         bio: bio.trim() || undefined,
         budget: budget.trim() ? parseInt(budget) : undefined,
@@ -154,6 +234,52 @@ export const EditProfileScreen = () => {
         </Pressable>
 
         <ThemedText style={[Typography.h1, { marginBottom: Spacing.xl }]}>Edit Profile</ThemedText>
+
+        {/* Profile Photos */}
+        <View style={styles.section}>
+          <ThemedText style={[Typography.h3, styles.sectionTitle]}>Profile Photos</ThemedText>
+          <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.md }]}>
+            Add up to 6 photos. Your first photo will be your main profile picture.
+          </ThemedText>
+          
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            style={styles.photosScroll}
+            contentContainerStyle={styles.photosContainer}
+          >
+            {photos.map((photo, index) => (
+              <View key={index} style={styles.photoWrapper}>
+                <Image source={{ uri: photo }} style={styles.photoPreview} />
+                {index === 0 ? (
+                  <View style={[styles.mainBadge, { backgroundColor: theme.primary }]}>
+                    <ThemedText style={[Typography.tiny, { color: '#FFFFFF', fontWeight: '600' }]}>
+                      Main
+                    </ThemedText>
+                  </View>
+                ) : null}
+                <Pressable
+                  style={[styles.removePhotoButton, { backgroundColor: theme.error }]}
+                  onPress={() => removePhoto(index)}
+                >
+                  <Feather name="x" size={16} color="#FFFFFF" />
+                </Pressable>
+              </View>
+            ))}
+            
+            {photos.length < 6 ? (
+              <Pressable
+                style={[styles.addPhotoButton, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}
+                onPress={pickImage}
+              >
+                <Feather name="plus" size={32} color={theme.textSecondary} />
+                <ThemedText style={[Typography.small, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
+                  Add Photo
+                </ThemedText>
+              </Pressable>
+            ) : null}
+          </ScrollView>
+        </View>
 
         {/* Basic Information */}
         <View style={styles.section}>
@@ -453,6 +579,50 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     marginBottom: Spacing.md,
+  },
+  photosScroll: {
+    marginHorizontal: -Spacing.lg,
+  },
+  photosContainer: {
+    paddingHorizontal: Spacing.lg,
+    gap: Spacing.md,
+  },
+  photoWrapper: {
+    position: 'relative',
+    width: 120,
+    height: 150,
+  },
+  photoPreview: {
+    width: '100%',
+    height: '100%',
+    borderRadius: BorderRadius.medium,
+  },
+  mainBadge: {
+    position: 'absolute',
+    top: Spacing.xs,
+    left: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.small,
+  },
+  removePhotoButton: {
+    position: 'absolute',
+    top: Spacing.xs,
+    right: Spacing.xs,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addPhotoButton: {
+    width: 120,
+    height: 150,
+    borderRadius: BorderRadius.medium,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   inputGroup: {
     marginBottom: Spacing.lg,

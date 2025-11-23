@@ -9,6 +9,11 @@ export const mockProfileUsers: User[] = [
     age: 28,
     role: 'renter',
     profilePicture: 'https://picsum.photos/400/500?random=1',
+    photos: [
+      'https://picsum.photos/400/500?random=1',
+      'https://picsum.photos/400/500?random=11',
+      'https://picsum.photos/400/500?random=12',
+    ],
     subscription: { plan: 'elite', status: 'active' },
     boostData: { boostsUsed: 2, isBoosted: true, boostExpiresAt: new Date(Date.now() + 20 * 60 * 60 * 1000), lastBoostDate: new Date() },
     profileData: {
@@ -42,6 +47,10 @@ export const mockProfileUsers: User[] = [
     age: 31,
     role: 'renter',
     profilePicture: 'https://picsum.photos/400/500?random=2',
+    photos: [
+      'https://picsum.photos/400/500?random=2',
+      'https://picsum.photos/400/500?random=21',
+    ],
     subscription: { plan: 'plus', status: 'active' },
     boostData: { boostsUsed: 1, isBoosted: true, boostExpiresAt: new Date(Date.now() + 10 * 60 * 60 * 1000), lastBoostDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) },
     profileData: {
@@ -75,6 +84,9 @@ export const mockProfileUsers: User[] = [
     age: 26,
     role: 'renter',
     profilePicture: 'https://picsum.photos/400/500?random=3',
+    photos: [
+      'https://picsum.photos/400/500?random=3',
+    ],
     subscription: { plan: 'basic', status: 'active' },
     boostData: { boostsUsed: 0, isBoosted: false },
     profileData: {

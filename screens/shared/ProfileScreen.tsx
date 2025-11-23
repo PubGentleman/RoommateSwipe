@@ -104,7 +104,14 @@ export const ProfileScreen = () => {
         <View style={styles.profileHeader}>
           <View style={styles.avatarContainer}>
             <View style={styles.avatar}>
-              <Feather name="user" size={64} color={theme.textSecondary} />
+              {(user?.photos?.[0] || user?.profilePicture) ? (
+                <Image 
+                  source={{ uri: user?.photos?.[0] || user?.profilePicture }} 
+                  style={styles.avatarImage}
+                />
+              ) : (
+                <Feather name="user" size={64} color={theme.textSecondary} />
+              )}
             </View>
             <View style={[styles.roleBadge, { backgroundColor: getRoleBadgeColor() }]}>
               <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '600' }]}>
@@ -384,6 +391,11 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   roleBadge: {
     position: 'absolute',
