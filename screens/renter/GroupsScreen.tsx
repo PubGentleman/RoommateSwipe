@@ -110,10 +110,10 @@ export const GroupsScreen = () => {
     
     await StorageService.likeGroup(group.id, user.id);
     
-    scheduleOnRN(setLikedGroupName, group.name);
-    scheduleOnRN(setShowLikedNotification, true);
+    setLikedGroupName(group.name);
+    setShowLikedNotification(true);
     setTimeout(() => {
-      scheduleOnRN(setShowLikedNotification, false);
+      setShowLikedNotification(false);
       loadGroups();
     }, 2000);
   };
@@ -145,9 +145,24 @@ export const GroupsScreen = () => {
       translateX.setValue(0);
       rotation.setValue(0);
       if (action === 'skip') {
-        scheduleOnRN(setCurrentIndex, currentIndex + 1);
+        setCurrentIndex(currentIndex + 1);
       }
     });
+  };
+
+  const handleGestureEnd = async (translationX: number) => {
+    if (Math.abs(translationX) > 120) {
+      await handleSwipeAction(translationX > 0 ? 'like' : 'skip');
+    } else {
+      Animated.spring(translateX, {
+        toValue: 0,
+        useNativeDriver: true,
+      }).start();
+      Animated.spring(rotation, {
+        toValue: 0,
+        useNativeDriver: true,
+      }).start();
+    }
   };
 
   const pan = Gesture.Pan()
@@ -156,18 +171,7 @@ export const GroupsScreen = () => {
       rotation.setValue(event.translationX / 20);
     })
     .onEnd((event) => {
-      if (Math.abs(event.translationX) > 120) {
-        scheduleOnRN(handleSwipeAction, event.translationX > 0 ? 'like' : 'skip');
-      } else {
-        Animated.spring(translateX, {
-          toValue: 0,
-          useNativeDriver: true,
-        }).start();
-        Animated.spring(rotation, {
-          toValue: 0,
-          useNativeDriver: true,
-        }).start();
-      }
+      scheduleOnRN(handleGestureEnd, event.translationX);
     });
 
   const rotate = rotation.interpolate({
