@@ -772,24 +772,25 @@ export const ExploreScreen = () => {
                     </ThemedText>
                   </View>
 
-                  {selectedProperty.hostProfileId && hostProfiles.get(selectedProperty.hostProfileId) ? (
-                    <View style={styles.detailSection}>
-                      <View style={styles.detailRow}>
-                        <ThemedText style={{ fontSize: 24 }}>
-                          {(() => {
-                            const hostUser = hostProfiles.get(selectedProperty.hostProfileId!);
-                            return hostUser?.profileData?.gender ? getGenderSymbol(hostUser.profileData.gender) : '';
-                          })()}
+                  <View style={styles.detailSection}>
+                    <View style={styles.detailRow}>
+                      <ThemedText style={{ fontSize: 24 }}>
+                        {(() => {
+                          if (selectedProperty.hostProfileId) {
+                            const hostUser = hostProfiles.get(selectedProperty.hostProfileId);
+                            return hostUser?.profileData?.gender ? getGenderSymbol(hostUser.profileData.gender) : '👤';
+                          }
+                          return '👤';
+                        })()}
+                      </ThemedText>
+                      <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                        <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Host</ThemedText>
+                        <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
+                          {selectedProperty.hostName}
                         </ThemedText>
-                        <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Host</ThemedText>
-                          <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
-                            {selectedProperty.hostName}
-                          </ThemedText>
-                        </View>
                       </View>
                     </View>
-                  ) : null}
+                  </View>
 
                   <View style={styles.detailSection}>
                     <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Description</ThemedText>
@@ -820,20 +821,6 @@ export const ExploreScreen = () => {
                         </ThemedText>
                       </View>
                     </View>
-                    {selectedProperty.roomType === 'room' && selectedProperty.hostProfileId && hostProfiles.get(selectedProperty.hostProfileId) ? (
-                      <View style={styles.detailRow}>
-                        <Feather name="user" size={20} color={theme.primary} />
-                        <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Host</ThemedText>
-                          <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
-                            {(() => {
-                              const hostUser = hostProfiles.get(selectedProperty.hostProfileId!);
-                              return hostUser?.profileData?.gender ? getGenderSymbol(hostUser.profileData.gender) : '';
-                            })()}
-                          </ThemedText>
-                        </View>
-                      </View>
-                    ) : null}
                     {selectedProperty.roomType === 'room' && selectedProperty.existingRoommates && selectedProperty.existingRoommates.filter(rm => rm.onApp && rm.userId).length > 0 ? (
                       <View style={styles.detailRow}>
                         <Feather name="users" size={20} color={theme.primary} />
