@@ -660,7 +660,11 @@ export const GroupsScreen = () => {
               ]}
             >
               <Pressable onPress={() => setShowGroupDetail(true)} style={{ flex: 1 }}>
-                <View style={styles.cardContent}>
+                <ScrollView 
+                  style={{ flex: 1 }}
+                  contentContainerStyle={styles.cardContent}
+                  showsVerticalScrollIndicator={false}
+                >
                 <View style={[styles.groupIconLarge, { backgroundColor: theme.primary, marginTop: Spacing.xl }]}>
                   <Feather name="users" size={32} color="#FFFFFF" />
                 </View>
@@ -737,7 +741,25 @@ export const GroupsScreen = () => {
                     ) : null}
                   </View>
                 ) : null}
-              </View>
+
+                {currentGroup.members.length > 0 ? (
+                  <View style={styles.cardMembersSection}>
+                    <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.sm }]}>
+                      Current Members
+                    </ThemedText>
+                    <View style={styles.cardMembersList}>
+                      {currentGroup.members.map((memberId, index) => {
+                        const profile = mockRoommateProfiles.find(p => p.id === memberId);
+                        return profile ? (
+                          <ThemedText key={memberId} style={[Typography.body, { color: theme.text, marginRight: index < currentGroup.members.length - 1 ? Spacing.sm : 0 }]}>
+                            {profile.name.split(' ')[0]} {getGenderSymbol(profile.gender)}
+                          </ThemedText>
+                        ) : null;
+                      })}
+                    </View>
+                  </View>
+                ) : null}
+                </ScrollView>
               </Pressable>
             </Animated.View>
           </GestureDetector>
@@ -1442,6 +1464,15 @@ const styles = StyleSheet.create({
   },
   cardDetailText: {
     alignItems: 'center',
+  },
+  cardMembersSection: {
+    marginTop: Spacing.lg,
+    alignItems: 'center',
+  },
+  cardMembersList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
   },
   actionButtons: {
     flexDirection: 'row',
