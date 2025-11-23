@@ -25,19 +25,21 @@ Preferred communication style: Simple, everyday language.
 ## Matching Algorithm
 
 **Points-Based Compatibility System:**
-- Calculates compatibility scores (0-100) between users based on profile preferences
+- Calculates compatibility scores (0-100) between users based on profile preferences collected through 10 specific matching questions
 - 10 core matching factors with weighted scoring:
-  1. **Sleep Schedule** (15 points): Early/Late/Flexible
-  2. **Cleanliness** (15 points): Very Clean/Clean/Moderate
-  3. **Guest Policy** (10 points): Frequent/Occasional/Rarely
-  4. **Smoking & Drinking** (15 points): Lifestyle compatibility
-  5. **Pet Friendly** (10 points): Pet preferences
-  6. **Budget** (15 points): Monthly budget alignment (within 10%/25%/50%)
-  7. **Location** (10 points): Preferred location matching
-  8. **Occupation** (10 points): Student/Professional alignment
-- Dynamic color coding: Green (80%+), Blue (70%+), Orange (60%+), Red (<60%)
-- Real-time calculation when profiles load
-- Compatibility percentages displayed on profile cards
+  1. **Sleep Schedule** (15 points): Early Sleeper/Late Sleeper/Flexible/Irregular - exact match or flexible compatibility
+  2. **Cleanliness** (15 points): Very Tidy/Moderately Tidy/Relaxed - closer cleanliness levels score higher
+  3. **Guest Policy** (10 points): Rarely/Occasionally/Frequently/Prefer No Guests - exact match or adjacent frequency tolerance
+  4. **Noise Tolerance** (10 points): Prefer Quiet/Normal Noise/Loud Environments - similar tolerance levels required
+  5. **Smoking/Substances** (10 points): Yes/No/Only Outside - strong preference matching (no smoking vs outdoor compromise)
+  6. **Work Location** (10 points): WFH Full-time/Hybrid/Office/Irregular - compatible work-from-home schedules
+  7. **Roommate Relationship** (10 points): Respectful Co-living/Occasional Hangouts/Prefer Friends/Minimal Interaction - desired social dynamic alignment
+  8. **Budget** (15 points): Numeric value - within 10% (full points), 25% (partial), or 50% (minimal) alignment
+  9. **Pets** (10 points): Have Pets/Open to Pets/No Pets - pet ownership and tolerance compatibility
+  10. **Lifestyle** (5 points): Multi-select up to 3 from (Active/Gym, Homebody, Nightlife/Social, Quiet/Introverted, Creative/Artistic, Professional-focused) - shared lifestyle overlap scoring
+- **Compatibility Display:** Dynamic color coding on profile cards - Green (80%+), Blue (70%+), Orange (60%+), Red (<60%)
+- **Real-time Calculation:** Scores computed when profiles load using `calculateCompatibility()` in `utils/matchingAlgorithm.ts`
+- **Edit Profile Integration:** All 10 questions accessible via Edit Profile screen with intuitive option buttons and multi-select interface
 
 ## Frontend Architecture
 
@@ -77,8 +79,8 @@ Preferred communication style: Simple, everyday language.
 
 ## Authentication & Authorization
 
-- **Authentication Flow:** SSO support (Apple/Google) planned, currently mock authentication. Role selection during login, persistent sessions via AsyncStorage, and loading states.
-- **User Model:** Defines `id`, `email`, `name`, `role` ('renter' | 'host' | 'agent'), `profilePicture`, and optional `subscription` and `paymentMethods` details.
+- **Authentication Flow:** SSO support (Apple/Google) planned, currently mock authentication with email/password. Login function now intelligently retrieves existing mock users (matching by email) to preserve profileData, or creates new basic users if not found. Role selection during login, persistent sessions via AsyncStorage, and loading states.
+- **User Model:** Defines `id`, `email`, `name`, `role` ('renter' | 'host' | 'agent'), `profilePicture`, optional `subscription` and `paymentMethods`, and comprehensive `profileData` with matching preferences for all 10 compatibility questions.
 - **Authorization:** Role-based navigation rendering and conditional screen access.
 - **Subscription & Payments:** Stripe integration configured. Defines three subscription tiers:
   - **Basic Plan:** 50 message limit, can purchase individual boosts for $3 each, no filters, no featured listings, no AI assistant, 1 group max

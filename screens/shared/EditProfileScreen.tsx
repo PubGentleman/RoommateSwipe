@@ -17,18 +17,30 @@ export const EditProfileScreen = () => {
   const [email, setEmail] = useState(user?.email || '');
   const [bio, setBio] = useState(user?.profileData?.bio || '');
   const [budget, setBudget] = useState(user?.profileData?.budget?.toString() || '');
-  const [location, setLocation] = useState(user?.profileData?.location || '');
-  const [occupation, setOccupation] = useState(user?.profileData?.occupation || '');
-  const [interests, setInterests] = useState(user?.profileData?.interests || '');
   
-  const [sleepSchedule, setSleepSchedule] = useState<'early' | 'late' | 'flexible'>(user?.profileData?.preferences?.sleepSchedule || 'flexible');
-  const [cleanliness, setCleanliness] = useState<'very_clean' | 'clean' | 'moderate'>(user?.profileData?.preferences?.cleanliness || 'clean');
-  const [guestPolicy, setGuestPolicy] = useState<'frequent' | 'occasional' | 'rarely'>(user?.profileData?.preferences?.guestPolicy || 'occasional');
-  const [petFriendly, setPetFriendly] = useState(user?.profileData?.preferences?.petFriendly || false);
-  const [smoking, setSmoking] = useState(user?.profileData?.lifestyle?.smoking || false);
-  const [drinking, setDrinking] = useState<'non-drinker' | 'social' | 'regular'>(user?.profileData?.lifestyle?.drinking || 'social');
+  const [sleepSchedule, setSleepSchedule] = useState<'early_sleeper' | 'late_sleeper' | 'flexible' | 'irregular'>(user?.profileData?.preferences?.sleepSchedule || 'flexible');
+  const [cleanliness, setCleanliness] = useState<'very_tidy' | 'moderately_tidy' | 'relaxed'>(user?.profileData?.preferences?.cleanliness || 'moderately_tidy');
+  const [guestPolicy, setGuestPolicy] = useState<'rarely' | 'occasionally' | 'frequently' | 'prefer_no_guests'>(user?.profileData?.preferences?.guestPolicy || 'occasionally');
+  const [noiseTolerance, setNoiseTolerance] = useState<'prefer_quiet' | 'normal_noise' | 'loud_environments'>(user?.profileData?.preferences?.noiseTolerance || 'normal_noise');
+  const [smoking, setSmoking] = useState<'yes' | 'no' | 'only_outside'>(user?.profileData?.preferences?.smoking || 'no');
+  const [workLocation, setWorkLocation] = useState<'wfh_fulltime' | 'hybrid' | 'office_fulltime' | 'irregular'>(user?.profileData?.preferences?.workLocation || 'hybrid');
+  const [roommateRelationship, setRoommateRelationship] = useState<'respectful_coliving' | 'occasional_hangouts' | 'prefer_friends' | 'minimal_interaction'>(user?.profileData?.preferences?.roommateRelationship || 'respectful_coliving');
+  const [pets, setPets] = useState<'have_pets' | 'open_to_pets' | 'no_pets'>(user?.profileData?.preferences?.pets || 'open_to_pets');
+  const [lifestyle, setLifestyle] = useState<Array<'active_gym' | 'homebody' | 'nightlife_social' | 'quiet_introverted' | 'creative_artistic' | 'professional_focused'>>(user?.profileData?.preferences?.lifestyle || []);
   
   const [isSaving, setIsSaving] = useState(false);
+
+  const toggleLifestyle = (item: 'active_gym' | 'homebody' | 'nightlife_social' | 'quiet_introverted' | 'creative_artistic' | 'professional_focused') => {
+    if (lifestyle.includes(item)) {
+      setLifestyle(lifestyle.filter(l => l !== item));
+    } else {
+      if (lifestyle.length < 3) {
+        setLifestyle([...lifestyle, item]);
+      } else {
+        Alert.alert('Maximum Reached', 'You can select up to 3 lifestyle choices');
+      }
+    }
+  };
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -56,18 +68,16 @@ export const EditProfileScreen = () => {
       profileData: {
         bio: bio.trim() || undefined,
         budget: budget.trim() ? parseInt(budget) : undefined,
-        location: location.trim() || undefined,
-        occupation: occupation.trim() || undefined,
-        interests: interests.trim() || undefined,
         preferences: {
           sleepSchedule,
           cleanliness,
           guestPolicy,
-          petFriendly,
-        },
-        lifestyle: {
+          noiseTolerance,
           smoking,
-          drinking,
+          workLocation,
+          roommateRelationship,
+          pets,
+          lifestyle,
         },
       },
     });
@@ -182,16 +192,105 @@ export const EditProfileScreen = () => {
           </View>
         </View>
 
-        {/* Roommate Matching Info */}
+        {/* Matching Questions */}
         <View style={styles.section}>
-          <ThemedText style={[Typography.h3, styles.sectionTitle]}>Roommate Preferences</ThemedText>
+          <ThemedText style={[Typography.h3, styles.sectionTitle]}>Matching Questions</ThemedText>
           <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.lg }]}>
-            This information helps us match you with compatible roommates
+            Answer these questions to find your best roommate matches
           </ThemedText>
-          
+
+          {/* Q1: Sleep Schedule */}
           <View style={styles.inputGroup}>
-            <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>
-              Monthly Budget
+            <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
+              1. What is your sleep schedule?
+            </ThemedText>
+            <View style={styles.optionsRow}>
+              <OptionButton label="Early Sleeper / Early Riser" value="early_sleeper" isSelected={sleepSchedule === 'early_sleeper'} onPress={() => setSleepSchedule('early_sleeper')} />
+              <OptionButton label="Late Sleeper / Late Riser" value="late_sleeper" isSelected={sleepSchedule === 'late_sleeper'} onPress={() => setSleepSchedule('late_sleeper')} />
+              <OptionButton label="Flexible" value="flexible" isSelected={sleepSchedule === 'flexible'} onPress={() => setSleepSchedule('flexible')} />
+              <OptionButton label="Irregular" value="irregular" isSelected={sleepSchedule === 'irregular'} onPress={() => setSleepSchedule('irregular')} />
+            </View>
+          </View>
+
+          {/* Q2: Cleanliness */}
+          <View style={styles.inputGroup}>
+            <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
+              2. How clean/tidy are you on a daily basis?
+            </ThemedText>
+            <View style={styles.optionsRow}>
+              <OptionButton label="Very Tidy" value="very_tidy" isSelected={cleanliness === 'very_tidy'} onPress={() => setCleanliness('very_tidy')} />
+              <OptionButton label="Moderately Tidy" value="moderately_tidy" isSelected={cleanliness === 'moderately_tidy'} onPress={() => setCleanliness('moderately_tidy')} />
+              <OptionButton label="Relaxed About Clutter" value="relaxed" isSelected={cleanliness === 'relaxed'} onPress={() => setCleanliness('relaxed')} />
+            </View>
+          </View>
+
+          {/* Q3: Guests */}
+          <View style={styles.inputGroup}>
+            <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
+              3. How often do you have guests over?
+            </ThemedText>
+            <View style={styles.optionsRow}>
+              <OptionButton label="Rarely" value="rarely" isSelected={guestPolicy === 'rarely'} onPress={() => setGuestPolicy('rarely')} />
+              <OptionButton label="Occasionally" value="occasionally" isSelected={guestPolicy === 'occasionally'} onPress={() => setGuestPolicy('occasionally')} />
+              <OptionButton label="Frequently" value="frequently" isSelected={guestPolicy === 'frequently'} onPress={() => setGuestPolicy('frequently')} />
+              <OptionButton label="Prefer No Guests" value="prefer_no_guests" isSelected={guestPolicy === 'prefer_no_guests'} onPress={() => setGuestPolicy('prefer_no_guests')} />
+            </View>
+          </View>
+
+          {/* Q4: Noise Tolerance */}
+          <View style={styles.inputGroup}>
+            <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
+              4. What is your noise tolerance?
+            </ThemedText>
+            <View style={styles.optionsRow}>
+              <OptionButton label="Prefer Quiet" value="prefer_quiet" isSelected={noiseTolerance === 'prefer_quiet'} onPress={() => setNoiseTolerance('prefer_quiet')} />
+              <OptionButton label="Can Handle Normal Noise" value="normal_noise" isSelected={noiseTolerance === 'normal_noise'} onPress={() => setNoiseTolerance('normal_noise')} />
+              <OptionButton label="Don't Mind Loud Environments" value="loud_environments" isSelected={noiseTolerance === 'loud_environments'} onPress={() => setNoiseTolerance('loud_environments')} />
+            </View>
+          </View>
+
+          {/* Q5: Smoking */}
+          <View style={styles.inputGroup}>
+            <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
+              5. Do you smoke, vape, or use recreational substances?
+            </ThemedText>
+            <View style={styles.optionsRow}>
+              <OptionButton label="Yes" value="yes" isSelected={smoking === 'yes'} onPress={() => setSmoking('yes')} />
+              <OptionButton label="No" value="no" isSelected={smoking === 'no'} onPress={() => setSmoking('no')} />
+              <OptionButton label="Only Outside" value="only_outside" isSelected={smoking === 'only_outside'} onPress={() => setSmoking('only_outside')} />
+            </View>
+          </View>
+
+          {/* Q6: Work Location */}
+          <View style={styles.inputGroup}>
+            <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
+              6. Do you work from home, office, or hybrid?
+            </ThemedText>
+            <View style={styles.optionsRow}>
+              <OptionButton label="Work From Home Full-time" value="wfh_fulltime" isSelected={workLocation === 'wfh_fulltime'} onPress={() => setWorkLocation('wfh_fulltime')} />
+              <OptionButton label="Hybrid" value="hybrid" isSelected={workLocation === 'hybrid'} onPress={() => setWorkLocation('hybrid')} />
+              <OptionButton label="Office Full-time" value="office_fulltime" isSelected={workLocation === 'office_fulltime'} onPress={() => setWorkLocation('office_fulltime')} />
+              <OptionButton label="Irregular Schedule" value="irregular" isSelected={workLocation === 'irregular'} onPress={() => setWorkLocation('irregular')} />
+            </View>
+          </View>
+
+          {/* Q7: Roommate Relationship */}
+          <View style={styles.inputGroup}>
+            <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
+              7. What is your ideal roommate relationship?
+            </ThemedText>
+            <View style={styles.optionsRow}>
+              <OptionButton label="Just Respectful Co-living" value="respectful_coliving" isSelected={roommateRelationship === 'respectful_coliving'} onPress={() => setRoommateRelationship('respectful_coliving')} />
+              <OptionButton label="Occasional Hangouts" value="occasional_hangouts" isSelected={roommateRelationship === 'occasional_hangouts'} onPress={() => setRoommateRelationship('occasional_hangouts')} />
+              <OptionButton label="Prefer to Be Friends" value="prefer_friends" isSelected={roommateRelationship === 'prefer_friends'} onPress={() => setRoommateRelationship('prefer_friends')} />
+              <OptionButton label="Prefer Minimal Interaction" value="minimal_interaction" isSelected={roommateRelationship === 'minimal_interaction'} onPress={() => setRoommateRelationship('minimal_interaction')} />
+            </View>
+          </View>
+
+          {/* Q8: Budget */}
+          <View style={styles.inputGroup}>
+            <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
+              8. What is your monthly budget range?
             </ThemedText>
             <TextInput
               style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
@@ -203,171 +302,34 @@ export const EditProfileScreen = () => {
             />
           </View>
 
-          <View style={styles.inputGroup}>
-            <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>
-              Preferred Location
-            </ThemedText>
-            <TextInput
-              style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
-              placeholder="e.g., Downtown, Brooklyn"
-              placeholderTextColor={theme.textSecondary}
-              value={location}
-              onChangeText={setLocation}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>
-              Occupation
-            </ThemedText>
-            <TextInput
-              style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
-              placeholder="e.g., Software Engineer, Student"
-              placeholderTextColor={theme.textSecondary}
-              value={occupation}
-              onChangeText={setOccupation}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>
-              Interests
-            </ThemedText>
-            <TextInput
-              style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
-              placeholder="e.g., Fitness, Cooking, Gaming"
-              placeholderTextColor={theme.textSecondary}
-              value={interests}
-              onChangeText={setInterests}
-            />
-          </View>
-        </View>
-
-        {/* Lifestyle Preferences */}
-        <View style={styles.section}>
-          <ThemedText style={[Typography.h3, styles.sectionTitle]}>Lifestyle</ThemedText>
-          
+          {/* Q9: Pets */}
           <View style={styles.inputGroup}>
             <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
-              Sleep Schedule
+              9. Do you have pets, or are you open to living with pets?
             </ThemedText>
             <View style={styles.optionsRow}>
-              <OptionButton
-                label="Early Bird"
-                value="early"
-                isSelected={sleepSchedule === 'early'}
-                onPress={() => setSleepSchedule('early')}
-              />
-              <OptionButton
-                label="Night Owl"
-                value="late"
-                isSelected={sleepSchedule === 'late'}
-                onPress={() => setSleepSchedule('late')}
-              />
-              <OptionButton
-                label="Flexible"
-                value="flexible"
-                isSelected={sleepSchedule === 'flexible'}
-                onPress={() => setSleepSchedule('flexible')}
-              />
+              <OptionButton label="I Have Pets" value="have_pets" isSelected={pets === 'have_pets'} onPress={() => setPets('have_pets')} />
+              <OptionButton label="I'm Open to Pets" value="open_to_pets" isSelected={pets === 'open_to_pets'} onPress={() => setPets('open_to_pets')} />
+              <OptionButton label="I'm Allergic / Prefer No Pets" value="no_pets" isSelected={pets === 'no_pets'} onPress={() => setPets('no_pets')} />
             </View>
           </View>
 
+          {/* Q10: Lifestyle */}
           <View style={styles.inputGroup}>
             <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
-              Cleanliness Level
+              10. What describes your lifestyle best? (Choose up to 3)
+            </ThemedText>
+            <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.sm }]}>
+              Selected: {lifestyle.length}/3
             </ThemedText>
             <View style={styles.optionsRow}>
-              <OptionButton
-                label="Very Clean"
-                value="very_clean"
-                isSelected={cleanliness === 'very_clean'}
-                onPress={() => setCleanliness('very_clean')}
-              />
-              <OptionButton
-                label="Clean"
-                value="clean"
-                isSelected={cleanliness === 'clean'}
-                onPress={() => setCleanliness('clean')}
-              />
-              <OptionButton
-                label="Moderate"
-                value="moderate"
-                isSelected={cleanliness === 'moderate'}
-                onPress={() => setCleanliness('moderate')}
-              />
+              <OptionButton label="Very Active / Gym" value="active_gym" isSelected={lifestyle.includes('active_gym')} onPress={() => toggleLifestyle('active_gym')} />
+              <OptionButton label="Homebody" value="homebody" isSelected={lifestyle.includes('homebody')} onPress={() => toggleLifestyle('homebody')} />
+              <OptionButton label="Nightlife / Social" value="nightlife_social" isSelected={lifestyle.includes('nightlife_social')} onPress={() => toggleLifestyle('nightlife_social')} />
+              <OptionButton label="Quiet / Introverted" value="quiet_introverted" isSelected={lifestyle.includes('quiet_introverted')} onPress={() => toggleLifestyle('quiet_introverted')} />
+              <OptionButton label="Creative / Artistic" value="creative_artistic" isSelected={lifestyle.includes('creative_artistic')} onPress={() => toggleLifestyle('creative_artistic')} />
+              <OptionButton label="Professional-focused" value="professional_focused" isSelected={lifestyle.includes('professional_focused')} onPress={() => toggleLifestyle('professional_focused')} />
             </View>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
-              Guest Policy
-            </ThemedText>
-            <View style={styles.optionsRow}>
-              <OptionButton
-                label="Frequent"
-                value="frequent"
-                isSelected={guestPolicy === 'frequent'}
-                onPress={() => setGuestPolicy('frequent')}
-              />
-              <OptionButton
-                label="Occasional"
-                value="occasional"
-                isSelected={guestPolicy === 'occasional'}
-                onPress={() => setGuestPolicy('occasional')}
-              />
-              <OptionButton
-                label="Rarely"
-                value="rarely"
-                isSelected={guestPolicy === 'rarely'}
-                onPress={() => setGuestPolicy('rarely')}
-              />
-            </View>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
-              Drinking Habits
-            </ThemedText>
-            <View style={styles.optionsRow}>
-              <OptionButton
-                label="Non-drinker"
-                value="non-drinker"
-                isSelected={drinking === 'non-drinker'}
-                onPress={() => setDrinking('non-drinker')}
-              />
-              <OptionButton
-                label="Social"
-                value="social"
-                isSelected={drinking === 'social'}
-                onPress={() => setDrinking('social')}
-              />
-              <OptionButton
-                label="Regular"
-                value="regular"
-                isSelected={drinking === 'regular'}
-                onPress={() => setDrinking('regular')}
-              />
-            </View>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
-              Preferences
-            </ThemedText>
-            <ToggleButton
-              label="Pet Friendly"
-              value={petFriendly}
-              onPress={() => setPetFriendly(!petFriendly)}
-              icon="heart"
-            />
-            <View style={{ height: Spacing.sm }} />
-            <ToggleButton
-              label="Smoker"
-              value={smoking}
-              onPress={() => setSmoking(!smoking)}
-              icon="wind"
-            />
           </View>
         </View>
 

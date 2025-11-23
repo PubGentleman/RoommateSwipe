@@ -4,14 +4,16 @@ import { User, RoommateProfile } from '../types/models';
  * Points-based matching algorithm for roommate compatibility
  * 
  * Based on 10 core matching questions with weighted scoring:
- * - Sleep Schedule: 15 points
- * - Cleanliness: 15 points
- * - Guest Policy: 10 points
- * - Smoking/Lifestyle: 15 points
- * - Pet Friendly: 10 points
- * - Budget Compatibility: 15 points
- * - Location Preference: 10 points
- * - Occupation/Lifestyle Match: 10 points
+ * 1. Sleep Schedule: 12 points (#1 conflict factor)
+ * 2. Cleanliness: 12 points (40% of issues)
+ * 3. Guests Frequency: 10 points (social behavior match)
+ * 4. Noise Tolerance: 10 points (major predictor)
+ * 5. Smoking/Substances: 12 points (deal-breaker)
+ * 6. Work Location: 10 points (WFH needs quiet)
+ * 7. Roommate Relationship: 8 points (social expectations)
+ * 8. Budget: 12 points (realistic matches)
+ * 9. Pets: 8 points (prevents deal-breakers)
+ * 10. Lifestyle Alignment: 6 points (long-term harmony)
  * 
  * Total: 100 points
  */
@@ -22,19 +24,18 @@ export interface MatchScore {
     sleepSchedule: number;
     cleanliness: number;
     guestPolicy: number;
-    lifestyle: number;
-    pets: number;
+    noiseTolerance: number;
+    smoking: number;
+    workLocation: number;
+    roommateRelationship: number;
     budget: number;
-    location: number;
-    occupation: number;
+    pets: number;
+    lifestyle: number;
   };
 }
 
 /**
  * Calculate compatibility score between current user and a roommate profile
- * @param currentUser - The logged-in user
- * @param roommateProfile - The potential roommate's profile
- * @returns Compatibility score out of 100
  */
 export const calculateCompatibility = (
   currentUser: User,
@@ -55,70 +56,73 @@ export const calculateDetailedCompatibility = (
     sleepSchedule: 0,
     cleanliness: 0,
     guestPolicy: 0,
-    lifestyle: 0,
-    pets: 0,
+    noiseTolerance: 0,
+    smoking: 0,
+    workLocation: 0,
+    roommateRelationship: 0,
     budget: 0,
-    location: 0,
-    occupation: 0,
+    pets: 0,
+    lifestyle: 0,
   };
 
-  const userProfile = currentUser.profileData;
+  const userPrefs = currentUser.profileData?.preferences;
   
-  if (!userProfile) {
+  if (!userPrefs) {
     return { totalScore: 50, breakdown };
   }
 
-  // 1. SLEEP SCHEDULE (15 points)
-  // Exact match = 15, Flexible match = 10, Mismatch = 0
-  if (userProfile.preferences?.sleepSchedule && roommateProfile.lifestyle?.workSchedule) {
-    const userSleep = userProfile.preferences.sleepSchedule;
+  // 1. SLEEP SCHEDULE (12 points) - #1 conflict factor
+  if (userPrefs.sleepSchedule && roommateProfile.lifestyle?.workSchedule) {
+    const userSleep = userPrefs.sleepSchedule;
     const roommateSleep = mapWorkScheduleToSleep(roommateProfile.lifestyle.workSchedule);
     
     if (userSleep === roommateSleep) {
-      breakdown.sleepSchedule = 15;
+      breakdown.sleepSchedule = 12;
     } else if (userSleep === 'flexible' || roommateSleep === 'flexible') {
-      breakdown.sleepSchedule = 10;
+      breakdown.sleepSchedule = 8;
+    } else if (userSleep === 'irregular' || roommateSleep === 'irregular') {
+      breakdown.sleepSchedule = 5;
     } else {
       breakdown.sleepSchedule = 0;
     }
   } else {
-    breakdown.sleepSchedule = 8;
+    breakdown.sleepSchedule = 6;
   }
 
-  // 2. CLEANLINESS (15 points)
-  // Perfect match = 15, Close match = 10, Far match = 5, Very far = 0
-  if (userProfile.preferences?.cleanliness && roommateProfile.lifestyle?.cleanliness) {
-    const userLevel = cleanlinessToNumber(userProfile.preferences.cleanliness);
+  // 2. CLEANLINESS (12 points) - 40% of issues
+  if (userPrefs.cleanliness && roommateProfile.lifestyle?.cleanliness) {
+    const userLevel = cleanlinessToNumber(userPrefs.cleanliness);
     const roommateLevel = roommateProfile.lifestyle.cleanliness;
     
     const difference = Math.abs(userLevel - roommateLevel);
     
     if (difference === 0) {
-      breakdown.cleanliness = 15;
+      breakdown.cleanliness = 12;
     } else if (difference === 1) {
-      breakdown.cleanliness = 10;
+      breakdown.cleanliness = 8;
     } else if (difference === 2) {
-      breakdown.cleanliness = 5;
+      breakdown.cleanliness = 4;
     } else {
       breakdown.cleanliness = 0;
     }
   } else {
-    breakdown.cleanliness = 8;
+    breakdown.cleanliness = 6;
   }
 
-  // 3. GUEST POLICY (10 points)
-  // Exact match = 10, Compatible = 7, Incompatible = 0
-  if (userProfile.preferences?.guestPolicy) {
-    const userGuests = userProfile.preferences.guestPolicy;
+  // 3. GUESTS FREQUENCY (10 points) - Social behavior must match
+  if (userPrefs.guestPolicy) {
+    const userGuests = userPrefs.guestPolicy;
     const roommateGuests = inferGuestPolicyFromSocial(roommateProfile.lifestyle?.socialLevel);
     
     if (userGuests === roommateGuests) {
       breakdown.guestPolicy = 10;
+    } else if (userGuests === 'prefer_no_guests' || roommateGuests === 'prefer_no_guests') {
+      breakdown.guestPolicy = 0;
     } else if (
-      (userGuests === 'occasional' && roommateGuests !== 'rarely') ||
-      (roommateGuests === 'occasional' && userGuests !== 'rarely')
+      (userGuests === 'occasionally' && roommateGuests !== 'rarely') ||
+      (roommateGuests === 'occasionally' && userGuests !== 'rarely')
     ) {
-      breakdown.guestPolicy = 7;
+      breakdown.guestPolicy = 6;
     } else {
       breakdown.guestPolicy = 3;
     }
@@ -126,112 +130,149 @@ export const calculateDetailedCompatibility = (
     breakdown.guestPolicy = 5;
   }
 
-  // 4. SMOKING & DRINKING (15 points combined)
-  // Non-smoker + Non-smoker = 8, Smoker + Smoker = 8, Mismatch = 0
-  // Drinking compatibility = 7 (exact), 5 (compatible), 0 (very different)
-  let lifestyleScore = 0;
-  
-  if (userProfile.lifestyle?.smoking !== undefined && roommateProfile.lifestyle?.smoking !== undefined) {
-    if (userProfile.lifestyle.smoking === roommateProfile.lifestyle.smoking) {
-      lifestyleScore += 8;
-    } else {
-      lifestyleScore += 0;
-    }
-  } else {
-    lifestyleScore += 4;
-  }
-  
-  if (userProfile.lifestyle?.drinking) {
-    const userDrink = userProfile.lifestyle.drinking;
-    const roommateDrink = 'social';
+  // 4. NOISE TOLERANCE (10 points) - Major predictor
+  if (userPrefs.noiseTolerance && roommateProfile.lifestyle?.socialLevel) {
+    const userNoise = userPrefs.noiseTolerance;
+    const roommateNoise = inferNoiseToleranceFromSocial(roommateProfile.lifestyle.socialLevel);
     
-    if (userDrink === roommateDrink) {
-      lifestyleScore += 7;
-    } else if ((userDrink === 'non-drinker' || userDrink === 'regular') && roommateDrink === 'social') {
-      lifestyleScore += 5;
+    if (userNoise === roommateNoise) {
+      breakdown.noiseTolerance = 10;
+    } else if (
+      (userNoise === 'normal_noise') ||
+      (roommateNoise === 'normal_noise')
+    ) {
+      breakdown.noiseTolerance = 6;
     } else {
-      lifestyleScore += 2;
+      breakdown.noiseTolerance = 2;
     }
   } else {
-    lifestyleScore += 3;
+    breakdown.noiseTolerance = 5;
   }
-  
-  breakdown.lifestyle = lifestyleScore;
 
-  // 5. PETS (10 points)
-  // Both pet-friendly = 10, Both not = 10, Mismatch = 0
-  if (userProfile.preferences?.petFriendly !== undefined && roommateProfile.lifestyle?.pets !== undefined) {
-    if (userProfile.preferences.petFriendly === roommateProfile.lifestyle.pets) {
-      breakdown.pets = 10;
-    } else if (userProfile.preferences.petFriendly === true && roommateProfile.lifestyle.pets === false) {
-      breakdown.pets = 5;
+  // 5. SMOKING/SUBSTANCES (12 points) - Huge deal-breaker
+  if (userPrefs.smoking && roommateProfile.lifestyle?.smoking !== undefined) {
+    const userSmokes = userPrefs.smoking;
+    const roommateSmokes = roommateProfile.lifestyle.smoking;
+    
+    if (userSmokes === 'no' && !roommateSmokes) {
+      breakdown.smoking = 12;
+    } else if (userSmokes === 'only_outside' && !roommateSmokes) {
+      breakdown.smoking = 10;
+    } else if (userSmokes === 'only_outside' && roommateSmokes) {
+      breakdown.smoking = 6;
+    } else if ((userSmokes === 'yes' && roommateSmokes) || (userSmokes === 'only_outside')) {
+      breakdown.smoking = 12;
     } else {
-      breakdown.pets = 0;
+      breakdown.smoking = 0;
     }
   } else {
-    breakdown.pets = 5;
+    breakdown.smoking = 6;
   }
 
-  // 6. BUDGET COMPATIBILITY (15 points)
-  // Within 10% = 15, Within 25% = 10, Within 50% = 5, More = 0
-  if (userProfile.budget && roommateProfile.budget) {
-    const userBudget = userProfile.budget;
+  // 6. WORK LOCATION (10 points) - WFH people need compatible quiet hours
+  if (userPrefs.workLocation && roommateProfile.lifestyle?.workSchedule) {
+    const userWork = userPrefs.workLocation;
+    const roommateWork = mapToWorkLocation(roommateProfile.lifestyle.workSchedule);
+    
+    if (userWork === roommateWork) {
+      breakdown.workLocation = 10;
+    } else if (userWork === 'hybrid' || roommateWork === 'hybrid') {
+      breakdown.workLocation = 7;
+    } else if (
+      (userWork === 'wfh_fulltime' && roommateWork === 'office_fulltime') ||
+      (userWork === 'office_fulltime' && roommateWork === 'wfh_fulltime')
+    ) {
+      breakdown.workLocation = 5;
+    } else {
+      breakdown.workLocation = 4;
+    }
+  } else {
+    breakdown.workLocation = 5;
+  }
+
+  // 7. ROOMMATE RELATIONSHIP (8 points) - Social expectations matter
+  if (userPrefs.roommateRelationship) {
+    const userRel = userPrefs.roommateRelationship;
+    const roommateRel = inferRelationshipFromSocial(roommateProfile.lifestyle?.socialLevel);
+    
+    if (userRel === roommateRel) {
+      breakdown.roommateRelationship = 8;
+    } else if (userRel === 'respectful_coliving' || roommateRel === 'respectful_coliving') {
+      breakdown.roommateRelationship = 6;
+    } else if (
+      (userRel === 'minimal_interaction' && roommateRel === 'prefer_friends') ||
+      (userRel === 'prefer_friends' && roommateRel === 'minimal_interaction')
+    ) {
+      breakdown.roommateRelationship = 2;
+    } else {
+      breakdown.roommateRelationship = 5;
+    }
+  } else {
+    breakdown.roommateRelationship = 4;
+  }
+
+  // 8. BUDGET (12 points) - Determines realistic matches
+  if (currentUser.profileData?.budget && roommateProfile.budget) {
+    const userBudget = currentUser.profileData.budget;
     const roommateBudget = roommateProfile.budget;
     const percentDiff = Math.abs(userBudget - roommateBudget) / Math.max(userBudget, roommateBudget);
     
     if (percentDiff <= 0.10) {
-      breakdown.budget = 15;
+      breakdown.budget = 12;
     } else if (percentDiff <= 0.25) {
-      breakdown.budget = 10;
+      breakdown.budget = 8;
     } else if (percentDiff <= 0.50) {
-      breakdown.budget = 5;
+      breakdown.budget = 4;
     } else {
-      breakdown.budget = 2;
+      breakdown.budget = 1;
     }
   } else {
-    breakdown.budget = 8;
+    breakdown.budget = 6;
   }
 
-  // 7. LOCATION PREFERENCE (10 points)
-  // Exact match = 10, Partial match = 7, Different = 3
-  if (userProfile.location && roommateProfile.preferences?.location) {
-    const userLoc = userProfile.location.toLowerCase().trim();
-    const roommateLoc = roommateProfile.preferences.location.toLowerCase().trim();
+  // 9. PETS (8 points) - Prevents deal-breakers
+  if (userPrefs.pets && roommateProfile.lifestyle?.pets !== undefined) {
+    const userPets = userPrefs.pets;
+    const roommatePets = roommateProfile.lifestyle.pets;
     
-    if (userLoc === roommateLoc) {
-      breakdown.location = 10;
-    } else if (userLoc.includes(roommateLoc) || roommateLoc.includes(userLoc)) {
-      breakdown.location = 7;
+    if (userPets === 'have_pets' && roommatePets) {
+      breakdown.pets = 8;
+    } else if (userPets === 'open_to_pets' && (roommatePets || !roommatePets)) {
+      breakdown.pets = 8;
+    } else if (userPets === 'no_pets' && !roommatePets) {
+      breakdown.pets = 8;
+    } else if (userPets === 'no_pets' && roommatePets) {
+      breakdown.pets = 0;
     } else {
-      breakdown.location = 3;
+      breakdown.pets = 4;
     }
   } else {
-    breakdown.location = 5;
+    breakdown.pets = 4;
   }
 
-  // 8. OCCUPATION/LIFESTYLE ALIGNMENT (10 points)
-  // Similar occupations or interests = higher score
-  if (userProfile.occupation && roommateProfile.occupation) {
-    const userOcc = userProfile.occupation.toLowerCase();
+  // 10. LIFESTYLE ALIGNMENT (6 points) - Long-term harmony
+  if (userPrefs.lifestyle && userPrefs.lifestyle.length > 0 && roommateProfile.occupation) {
+    const userLifestyles = userPrefs.lifestyle;
     const roommateOcc = roommateProfile.occupation.toLowerCase();
     
-    const studentKeywords = ['student', 'university', 'college'];
-    const professionalKeywords = ['engineer', 'developer', 'manager', 'analyst', 'designer'];
+    let matchCount = 0;
     
-    const userIsStudent = studentKeywords.some(k => userOcc.includes(k));
-    const roommateIsStudent = studentKeywords.some(k => roommateOcc.includes(k));
-    const userIsProfessional = professionalKeywords.some(k => userOcc.includes(k));
-    const roommateIsProfessional = professionalKeywords.some(k => roommateOcc.includes(k));
+    if (userLifestyles.includes('active_gym') && roommateOcc.includes('fitness')) matchCount++;
+    if (userLifestyles.includes('homebody') && (roommateOcc.includes('remote') || roommateOcc.includes('home'))) matchCount++;
+    if (userLifestyles.includes('nightlife_social') && roommateOcc.includes('social')) matchCount++;
+    if (userLifestyles.includes('quiet_introverted') && (roommateOcc.includes('developer') || roommateOcc.includes('writer'))) matchCount++;
+    if (userLifestyles.includes('creative_artistic') && (roommateOcc.includes('design') || roommateOcc.includes('artist'))) matchCount++;
+    if (userLifestyles.includes('professional_focused') && (roommateOcc.includes('engineer') || roommateOcc.includes('analyst'))) matchCount++;
     
-    if (userOcc === roommateOcc) {
-      breakdown.occupation = 10;
-    } else if ((userIsStudent && roommateIsStudent) || (userIsProfessional && roommateIsProfessional)) {
-      breakdown.occupation = 8;
+    if (matchCount >= 2) {
+      breakdown.lifestyle = 6;
+    } else if (matchCount === 1) {
+      breakdown.lifestyle = 4;
     } else {
-      breakdown.occupation = 5;
+      breakdown.lifestyle = 2;
     }
   } else {
-    breakdown.occupation = 5;
+    breakdown.lifestyle = 3;
   }
 
   // Calculate total score
@@ -246,31 +287,64 @@ export const calculateDetailedCompatibility = (
 /**
  * Helper: Map work schedule to sleep pattern
  */
-const mapWorkScheduleToSleep = (workSchedule: string): 'early' | 'late' | 'flexible' => {
+const mapWorkScheduleToSleep = (workSchedule: string): 'early_sleeper' | 'late_sleeper' | 'flexible' | 'irregular' => {
   const schedule = workSchedule.toLowerCase();
-  if (schedule.includes('9-5') || schedule.includes('early')) return 'early';
-  if (schedule.includes('night') || schedule.includes('late')) return 'late';
+  if (schedule.includes('9-5') || schedule.includes('early') || schedule.includes('morning')) return 'early_sleeper';
+  if (schedule.includes('night') || schedule.includes('late') || schedule.includes('evening')) return 'late_sleeper';
+  if (schedule.includes('shift') || schedule.includes('irregular')) return 'irregular';
   return 'flexible';
 };
 
 /**
  * Helper: Convert cleanliness string to number
  */
-const cleanlinessToNumber = (level: 'very_clean' | 'clean' | 'moderate'): number => {
-  if (level === 'very_clean') return 5;
-  if (level === 'clean') return 3;
-  if (level === 'moderate') return 1;
+const cleanlinessToNumber = (level: 'very_tidy' | 'moderately_tidy' | 'relaxed'): number => {
+  if (level === 'very_tidy') return 5;
+  if (level === 'moderately_tidy') return 3;
+  if (level === 'relaxed') return 1;
   return 3;
 };
 
 /**
  * Helper: Infer guest policy from social level
  */
-const inferGuestPolicyFromSocial = (socialLevel?: number): 'frequent' | 'occasional' | 'rarely' => {
-  if (!socialLevel) return 'occasional';
-  if (socialLevel >= 8) return 'frequent';
-  if (socialLevel >= 5) return 'occasional';
-  return 'rarely';
+const inferGuestPolicyFromSocial = (socialLevel?: number): 'frequently' | 'occasionally' | 'rarely' | 'prefer_no_guests' => {
+  if (!socialLevel) return 'occasionally';
+  if (socialLevel >= 9) return 'frequently';
+  if (socialLevel >= 5) return 'occasionally';
+  if (socialLevel >= 2) return 'rarely';
+  return 'prefer_no_guests';
+};
+
+/**
+ * Helper: Infer noise tolerance from social level
+ */
+const inferNoiseToleranceFromSocial = (socialLevel: number): 'prefer_quiet' | 'normal_noise' | 'loud_environments' => {
+  if (socialLevel >= 8) return 'loud_environments';
+  if (socialLevel >= 4) return 'normal_noise';
+  return 'prefer_quiet';
+};
+
+/**
+ * Helper: Map work schedule to work location
+ */
+const mapToWorkLocation = (workSchedule: string): 'wfh_fulltime' | 'hybrid' | 'office_fulltime' | 'irregular' => {
+  const schedule = workSchedule.toLowerCase();
+  if (schedule.includes('remote') || schedule.includes('home')) return 'wfh_fulltime';
+  if (schedule.includes('hybrid') || schedule.includes('flex')) return 'hybrid';
+  if (schedule.includes('office') || schedule.includes('9-5')) return 'office_fulltime';
+  return 'irregular';
+};
+
+/**
+ * Helper: Infer relationship preference from social level
+ */
+const inferRelationshipFromSocial = (socialLevel?: number): 'respectful_coliving' | 'occasional_hangouts' | 'prefer_friends' | 'minimal_interaction' => {
+  if (!socialLevel) return 'respectful_coliving';
+  if (socialLevel >= 9) return 'prefer_friends';
+  if (socialLevel >= 6) return 'occasional_hangouts';
+  if (socialLevel >= 3) return 'respectful_coliving';
+  return 'minimal_interaction';
 };
 
 /**

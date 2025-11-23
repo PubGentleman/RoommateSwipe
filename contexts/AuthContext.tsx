@@ -162,20 +162,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const login = async (email: string, password: string, role: UserRole) => {
-    const mockUser: User = {
-      id: Math.random().toString(36).substr(2, 9),
-      email,
-      name: email.split('@')[0],
-      role,
-      subscription: {
-        plan: 'basic',
-        status: 'active',
-      },
-      messageCount: 0,
-    };
+    const users = await StorageService.getUsers();
+    let mockUser = users.find(u => u.email === email || u.email === email.replace('@example.com', '@email.com'));
+    
+    if (!mockUser) {
+      mockUser = {
+        id: Math.random().toString(36).substr(2, 9),
+        email,
+        name: email.split('@')[0],
+        role,
+        subscription: {
+          plan: 'basic',
+          status: 'active',
+        },
+        messageCount: 0,
+      };
+      await StorageService.addOrUpdateUser(mockUser);
+    }
+    
     await StorageService.setCurrentUser(mockUser);
-    await StorageService.addOrUpdateUser(mockUser);
-    if (role === 'renter') {
+    if (role === 'renter' && mockUser.id) {
       await StorageService.seedInitialMatches(mockUser.id);
     }
     setUser(mockUser);

@@ -140,18 +140,16 @@ export interface User {
   profileData?: {
     bio?: string;
     budget?: number;
-    location?: string;
-    occupation?: string;
-    interests?: string;
     preferences?: {
-      sleepSchedule: 'early' | 'late' | 'flexible';
-      cleanliness: 'very_clean' | 'clean' | 'moderate';
-      guestPolicy: 'frequent' | 'occasional' | 'rarely';
-      petFriendly: boolean;
-    };
-    lifestyle?: {
-      smoking: boolean;
-      drinking: 'non-drinker' | 'social' | 'regular';
+      sleepSchedule?: 'early_sleeper' | 'late_sleeper' | 'flexible' | 'irregular';
+      cleanliness?: 'very_tidy' | 'moderately_tidy' | 'relaxed';
+      guestPolicy?: 'rarely' | 'occasionally' | 'frequently' | 'prefer_no_guests';
+      noiseTolerance?: 'prefer_quiet' | 'normal_noise' | 'loud_environments';
+      smoking?: 'yes' | 'no' | 'only_outside';
+      workLocation?: 'wfh_fulltime' | 'hybrid' | 'office_fulltime' | 'irregular';
+      roommateRelationship?: 'respectful_coliving' | 'occasional_hangouts' | 'prefer_friends' | 'minimal_interaction';
+      pets?: 'have_pets' | 'open_to_pets' | 'no_pets';
+      lifestyle?: Array<'active_gym' | 'homebody' | 'nightlife_social' | 'quiet_introverted' | 'creative_artistic' | 'professional_focused'>;
     };
   };
 }
