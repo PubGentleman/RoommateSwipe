@@ -140,6 +140,9 @@ export interface User {
   profileData?: {
     bio?: string;
     budget?: number;
+    location?: string;
+    occupation?: string;
+    interests?: string;
     preferences?: {
       sleepSchedule?: 'early_sleeper' | 'late_sleeper' | 'flexible' | 'irregular';
       cleanliness?: 'very_tidy' | 'moderately_tidy' | 'relaxed';

@@ -11,6 +11,9 @@ export const mockProfileUsers: User[] = [
     profileData: {
       bio: 'Software engineer who loves hiking, cooking, and quiet evenings. Looking for a clean and respectful roommate.',
       budget: 1200,
+      location: 'Downtown',
+      occupation: 'Software Engineer',
+      interests: 'hiking, cooking, reading',
       preferences: {
         sleepSchedule: 'early_sleeper',
         cleanliness: 'very_tidy',
@@ -34,6 +37,9 @@ export const mockProfileUsers: User[] = [
     profileData: {
       bio: 'Marketing professional, gym enthusiast, and weekend adventurer. Love to host small gatherings!',
       budget: 1400,
+      location: 'Midtown',
+      occupation: 'Marketing Manager',
+      interests: 'fitness, social events, traveling',
       preferences: {
         sleepSchedule: 'late_sleeper',
         cleanliness: 'moderately_tidy',
@@ -57,6 +63,9 @@ export const mockProfileUsers: User[] = [
     profileData: {
       bio: 'Graphic designer working from home. Cat mom, plant lover, and yoga enthusiast.',
       budget: 1000,
+      location: 'Westside',
+      occupation: 'Graphic Designer',
+      interests: 'yoga, plants, cats, design',
       preferences: {
         sleepSchedule: 'flexible',
         cleanliness: 'moderately_tidy',
@@ -80,6 +89,9 @@ export const mockProfileUsers: User[] = [
     profileData: {
       bio: 'Teacher by day, musician by night. Looking for a chill roommate who appreciates good music and great conversations.',
       budget: 1100,
+      location: 'Downtown',
+      occupation: 'High School Teacher',
+      interests: 'music, teaching, coffee shops',
       preferences: {
         sleepSchedule: 'flexible',
         cleanliness: 'moderately_tidy',
@@ -103,6 +115,9 @@ export const mockProfileUsers: User[] = [
     profileData: {
       bio: 'Nurse working night shifts. Love yoga and meditation. Seeking a quiet, respectful living space.',
       budget: 950,
+      location: 'Westside',
+      occupation: 'Registered Nurse',
+      interests: 'yoga, meditation, wellness',
       preferences: {
         sleepSchedule: 'irregular',
         cleanliness: 'very_tidy',

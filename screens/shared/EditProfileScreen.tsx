@@ -17,6 +17,9 @@ export const EditProfileScreen = () => {
   const [email, setEmail] = useState(user?.email || '');
   const [bio, setBio] = useState(user?.profileData?.bio || '');
   const [budget, setBudget] = useState(user?.profileData?.budget?.toString() || '');
+  const [location, setLocation] = useState(user?.profileData?.location || '');
+  const [occupation, setOccupation] = useState(user?.profileData?.occupation || '');
+  const [interests, setInterests] = useState(user?.profileData?.interests || '');
   
   const [sleepSchedule, setSleepSchedule] = useState<'early_sleeper' | 'late_sleeper' | 'flexible' | 'irregular'>(user?.profileData?.preferences?.sleepSchedule || 'flexible');
   const [cleanliness, setCleanliness] = useState<'very_tidy' | 'moderately_tidy' | 'relaxed'>(user?.profileData?.preferences?.cleanliness || 'moderately_tidy');
@@ -68,6 +71,9 @@ export const EditProfileScreen = () => {
       profileData: {
         bio: bio.trim() || undefined,
         budget: budget.trim() ? parseInt(budget) : undefined,
+        location: location.trim() || undefined,
+        occupation: occupation.trim() || undefined,
+        interests: interests.trim() || undefined,
         preferences: {
           sleepSchedule,
           cleanliness,
@@ -188,6 +194,45 @@ export const EditProfileScreen = () => {
               multiline
               numberOfLines={4}
               textAlignVertical="top"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>
+              Location
+            </ThemedText>
+            <TextInput
+              style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
+              placeholder="e.g., Downtown, Brooklyn"
+              placeholderTextColor={theme.textSecondary}
+              value={location}
+              onChangeText={setLocation}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>
+              Occupation
+            </ThemedText>
+            <TextInput
+              style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
+              placeholder="e.g., Software Engineer, Student"
+              placeholderTextColor={theme.textSecondary}
+              value={occupation}
+              onChangeText={setOccupation}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>
+              Interests
+            </ThemedText>
+            <TextInput
+              style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
+              placeholder="e.g., Fitness, Cooking, Gaming"
+              placeholderTextColor={theme.textSecondary}
+              value={interests}
+              onChangeText={setInterests}
             />
           </View>
         </View>
