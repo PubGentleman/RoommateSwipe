@@ -21,9 +21,9 @@ export const WalkScoreBadge = ({ score, size = 'medium' }: WalkScoreBadgeProps) 
   const { theme } = useTheme();
 
   const dimensions = {
-    small: { size: 50, fontSize: 11, borderWidth: 2, iconScale: 0.6 },
-    medium: { size: 65, fontSize: 14, borderWidth: 3, iconScale: 0.8 },
-    large: { size: 80, fontSize: 18, borderWidth: 4, iconScale: 1 },
+    small: { size: 50, fontSize: 11, borderWidth: 2, iconScale: 0.55 },
+    medium: { size: 65, fontSize: 14, borderWidth: 3, iconScale: 0.75 },
+    large: { size: 80, fontSize: 18, borderWidth: 4, iconScale: 0.95 },
   };
 
   const dim = dimensions[size];
@@ -46,13 +46,13 @@ export const WalkScoreBadge = ({ score, size = 'medium' }: WalkScoreBadgeProps) 
           },
         ]}
       >
-        <View style={[styles.walkingPerson, { transform: [{ scale }] }]}>
+        <View style={[styles.walkingIcon, { transform: [{ scale }] }]}>
           <View style={[styles.head, { backgroundColor: green }]} />
-          <View style={[styles.torso, { backgroundColor: green }]} />
-          <View style={[styles.leftArmForward, { backgroundColor: green }]} />
-          <View style={[styles.rightArmBack, { backgroundColor: green }]} />
-          <View style={[styles.leftLegBack, { backgroundColor: green }]} />
-          <View style={[styles.rightLegForward, { backgroundColor: green }]} />
+          <View style={[styles.body, { backgroundColor: green }]} />
+          <View style={[styles.armLeft, { backgroundColor: green }]} />
+          <View style={[styles.armRight, { backgroundColor: green }]} />
+          <View style={[styles.legLeft, { backgroundColor: green }]} />
+          <View style={[styles.legRight, { backgroundColor: green }]} />
         </View>
         <ThemedText
           style={[
@@ -80,57 +80,61 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  walkingPerson: {
-    width: 24,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    marginTop: -10,
+  walkingIcon: {
+    width: 28,
+    height: 34,
+    position: 'relative',
+    marginTop: -12,
   },
   head: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    marginBottom: 1,
-  },
-  torso: {
-    width: 2.5,
-    height: 11,
-  },
-  leftArmForward: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     position: 'absolute',
-    top: 10,
-    left: 6,
-    width: 10,
-    height: 2,
-    transform: [{ rotate: '-35deg' }],
+    top: 0,
+    left: 10,
   },
-  rightArmBack: {
+  body: {
+    width: 3,
+    height: 13,
+    position: 'absolute',
+    top: 9,
+    left: 12.5,
+  },
+  armLeft: {
+    width: 2.5,
+    height: 10,
     position: 'absolute',
     top: 11,
+    left: 4,
+    transform: [{ rotate: '-45deg' }],
+  },
+  armRight: {
+    width: 2.5,
+    height: 9,
+    position: 'absolute',
+    top: 12,
     right: 5,
-    width: 9,
-    height: 2,
+    transform: [{ rotate: '50deg' }],
+  },
+  legLeft: {
+    width: 2.5,
+    height: 12,
+    position: 'absolute',
+    bottom: 0,
+    left: 5.5,
     transform: [{ rotate: '40deg' }],
   },
-  leftLegBack: {
+  legRight: {
+    width: 2.5,
+    height: 14,
     position: 'absolute',
     bottom: 0,
-    left: 6,
-    width: 2,
-    height: 11,
-    transform: [{ rotate: '35deg' }],
-  },
-  rightLegForward: {
-    position: 'absolute',
-    bottom: 0,
-    right: 6,
-    width: 2,
-    height: 13,
-    transform: [{ rotate: '-30deg' }],
+    right: 5.5,
+    transform: [{ rotate: '-35deg' }],
   },
   score: {
     fontWeight: '700',
-    marginTop: 4,
+    marginTop: 6,
   },
 });
