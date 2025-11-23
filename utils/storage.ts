@@ -261,11 +261,54 @@ export const StorageService = {
           return false;
         }
         
+        const newMember = await this.getUser(userId);
+        const existingMembers = [...group.members];
+        const interestedUsers = [...group.pendingMembers.filter(id => id !== userId)];
+        
         group.pendingMembers = group.pendingMembers.filter(id => id !== userId);
         if (!group.members.includes(userId) && group.members.length < group.maxMembers) {
           group.members.push(userId);
         }
         await this.setGroups(groups);
+        
+        const newMemberName = newMember?.name || 'A new member';
+        
+        for (const memberId of existingMembers) {
+          if (memberId !== userId) {
+            await this.addNotification({
+              id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              userId: memberId,
+              type: 'group_accepted',
+              title: 'New Group Member',
+              body: `${newMemberName} joined ${group.name}`,
+              isRead: false,
+              createdAt: new Date(),
+              data: {
+                groupId: group.id,
+                fromUserId: userId,
+                fromUserName: newMemberName,
+              },
+            });
+          }
+        }
+        
+        for (const interestedUserId of interestedUsers) {
+          await this.addNotification({
+            id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            userId: interestedUserId,
+            type: 'group_accepted',
+            title: 'Group Update',
+            body: `${newMemberName} joined ${group.name} that you're interested in`,
+            isRead: false,
+            createdAt: new Date(),
+            data: {
+              groupId: group.id,
+              fromUserId: userId,
+              fromUserName: newMemberName,
+            },
+          });
+        }
+        
         return true;
       }
       return false;
