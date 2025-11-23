@@ -865,6 +865,75 @@ export const StorageService = {
     }
   },
 
+  async addProfileView(viewedUserId: string, viewerId: string): Promise<void> {
+    try {
+      if (!viewedUserId || !viewerId || viewedUserId === viewerId) {
+        return;
+      }
+      
+      const users = await this.getUsers();
+      const viewedUser = users.find(u => u.id === viewedUserId);
+      const viewer = users.find(u => u.id === viewerId);
+      
+      if (!viewedUser || !viewer) {
+        return;
+      }
+      
+      if (!viewedUser.profileViews) {
+        viewedUser.profileViews = [];
+      }
+      
+      const existingView = viewedUser.profileViews.find(v => v.viewerId === viewerId);
+      const now = new Date();
+      
+      if (existingView) {
+        const lastViewedAt = new Date(existingView.viewedAt);
+        const hoursSinceLastView = (now.getTime() - lastViewedAt.getTime()) / (1000 * 60 * 60);
+        
+        if (hoursSinceLastView < 24) {
+          return;
+        }
+        
+        existingView.viewedAt = now;
+      } else {
+        viewedUser.profileViews.push({
+          viewerId: viewer.id,
+          viewerName: viewer.name,
+          viewerPhoto: viewer.profilePicture,
+          viewedAt: now,
+        });
+      }
+      
+      await this.addOrUpdateUser(viewedUser);
+      
+      const currentUser = await this.getCurrentUser();
+      if (currentUser && currentUser.id === viewedUserId) {
+        await this.setCurrentUser(viewedUser);
+      }
+    } catch (error) {
+      console.error('Error adding profile view:', error);
+    }
+  },
+
+  async getProfileViews(userId: string): Promise<Array<{ viewerId: string; viewerName: string; viewerPhoto?: string; viewedAt: Date }>> {
+    try {
+      const users = await this.getUsers();
+      const user = users.find(u => u.id === userId);
+      if (!user || !user.profileViews) {
+        return [];
+      }
+      
+      type ProfileView = { viewerId: string; viewerName: string; viewerPhoto?: string; viewedAt: Date };
+      
+      return user.profileViews
+        .map((v): ProfileView => ({ ...v, viewedAt: new Date(v.viewedAt) }))
+        .sort((a: ProfileView, b: ProfileView) => b.viewedAt.getTime() - a.viewedAt.getTime());
+    } catch (error) {
+      console.error('Error getting profile views:', error);
+      return [];
+    }
+  },
+
   async seedMockNotifications(userId: string): Promise<void> {
     try {
       const existingNotifications = await this.getNotifications(userId);

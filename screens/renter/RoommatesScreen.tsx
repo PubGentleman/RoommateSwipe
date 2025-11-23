@@ -442,7 +442,12 @@ export const RoommatesScreen = () => {
           <Animated.View
             style={[styles.card, animatedCardStyle]}
           >
-            <Pressable onPress={() => setShowProfileDetail(true)} style={{ flex: 1 }}>
+            <Pressable onPress={() => {
+              setShowProfileDetail(true);
+              if (currentProfile && user && currentProfile.id !== user.id) {
+                StorageService.addProfileView(currentProfile.id, user.id);
+              }
+            }} style={{ flex: 1 }}>
               <Image source={{ uri: currentProfile.photos[0] }} style={styles.cardImage} />
             {canSeeOnlineStatus() && isProfileOnline ? (
               <View style={styles.onlineIndicatorContainer}>
