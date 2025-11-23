@@ -105,13 +105,6 @@ export const PaymentScreen = () => {
   return (
     <ScreenKeyboardAwareScrollView>
       <View style={styles.container}>
-        <Pressable 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Feather name="arrow-left" size={24} color={theme.text} />
-        </Pressable>
-
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <ThemedText style={[Typography.h2]}>Payment Methods</ThemedText>
@@ -248,12 +241,6 @@ export const PaymentScreen = () => {
 const styles = StyleSheet.create({
   container: {
     padding: Spacing.lg,
-  },
-  backButton: {
-    marginBottom: Spacing.lg,
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
   },
   section: {
     marginBottom: Spacing.xxl,
