@@ -379,9 +379,25 @@ export const RoommatesScreen = () => {
   const handlePurchaseMessageCredit = async () => {
     setProcessingMessagePurchase(true);
     
-    // TODO: Implement Stripe payment for 99 cents
-    // For now, simulate success after 1 second
+    // NOTE: This is a simulated payment flow for demonstration purposes.
+    // In a production app, you would need to:
+    // 1. Set up a backend API server (Express, etc.)
+    // 2. Create a Stripe payment intent for $0.99
+    // 3. Handle the payment confirmation
+    // 4. Grant the message credit upon successful payment
+    // 5. Track message credits in user data
+    
+    // Simulated payment processing (1 second delay)
     setTimeout(async () => {
+      // In production, this would only execute after successful payment
+      const users = await StorageService.getUsers();
+      const currentUser = users.find(u => u.id === user?.id);
+      if (currentUser) {
+        // In production: increment message credits
+        // currentUser.messageCredits = (currentUser.messageCredits || 0) + 1;
+        // await StorageService.updateUser(currentUser);
+      }
+      
       setProcessingMessagePurchase(false);
       setShowMessageModal(false);
       await handleSendDirectMessage();
