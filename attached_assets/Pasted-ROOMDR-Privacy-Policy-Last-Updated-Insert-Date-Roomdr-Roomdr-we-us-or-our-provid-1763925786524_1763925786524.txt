@@ -1,0 +1,197 @@
+ROOMDR – Privacy Policy
+
+Last Updated: [Insert Date]
+
+Roomdr (“Roomdr,” “we,” “us,” or “our”) provides a roommate-matching, housing-connection, and profile-based discovery platform. This Privacy Policy explains how we collect, use, disclose, and protect your information when you use our website, mobile app, and services (the “Services”).
+
+By creating an account or using Roomdr, you agree to the practices described here.
+
+1. Information We Collect
+
+We collect information in the following categories:
+
+A. Information You Provide to Us
+
+Name
+
+Email address
+
+Phone number (optional)
+
+Neighborhood or location preference
+
+Profile details (bio, occupation, lifestyle, rent budget, habits)
+
+Survey and matching-question answers
+
+Photos uploaded to your profile
+
+Messages and interactions with other users
+
+Account settings and preferences
+
+B. Automatically Collected Information
+
+When you use Roomdr, we automatically collect:
+
+IP address
+
+Device information
+
+Browser type
+
+App usage data
+
+Search activity
+
+In-app clicks and interactions
+
+Approximate location (if granted permission)
+
+C. Location Information
+
+We collect location data to power matching:
+
+GPS location (only if you allow it)
+
+Neighborhood you select
+
+City inferred from your neighborhood
+
+Location changes you enter manually
+
+You may disable location access at any time in your device settings.
+
+2. How We Use Your Information
+
+We use the information we collect to:
+
+Create and manage your Roomdr account
+
+Match you with compatible roommates, hosts, groups, and properties
+
+Determine which profiles to show you based on city and neighborhood
+
+Improve our matching algorithm over time
+
+Enable messaging and interactions
+
+Provide customer support
+
+Process payments for premium features
+
+Prevent fraud or misuse
+
+Improve app performance and user experience
+
+Send updates, recommendations, or important notifications
+
+We never use name or email in the matching algorithm.
+
+3. How We Share Your Information
+
+We may share your info in the following ways:
+
+A. With Other Users
+
+When you interact on Roomdr, certain profile details become visible:
+
+Name (or username)
+
+Photos
+
+Neighborhood
+
+Lifestyle details
+
+Matching answers
+
+Occupation (optional)
+
+Your email and phone number are not shared unless you choose to.
+
+B. Service Providers
+
+We share data with trusted vendors who help us provide Roomdr, such as:
+
+Hosting and cloud storage providers
+
+Payment processors
+
+Analytics tools
+
+Fraud prevention partners
+
+Email or SMS verification services
+
+C. Legal Compliance
+
+We may disclose information if required by law, legal process, or to protect Roomdr and its users.
+
+D. Business Transfers
+
+If Roomdr is involved in a merger, acquisition, or sale of assets, your information may be transferred to the new entity.
+
+We do not sell your personal data to third parties.
+
+4. Your Choices and Controls
+
+You have the right to:
+
+Access and update your profile information
+
+Change your neighborhood or city
+
+Disable location access
+
+Delete your photos
+
+Request deletion of your account
+
+Opt out of marketing emails or notifications
+
+To delete your data entirely, contact: [Insert Support Email]
+
+5. Data Retention
+
+We keep your information only as long as needed to:
+
+Maintain your account
+
+Provide the Services
+
+Meet legal obligations
+
+Resolve disputes
+
+You may request full deletion at any time.
+
+6. Security
+
+We employ administrative, technical, and physical safeguards to protect your data.
+However, no system is 100% secure, and we cannot guarantee absolute protection.
+
+You are responsible for keeping your password confidential.
+
+7. Children’s Privacy
+
+Roomdr is not intended for individuals under the age of 18.
+We do not knowingly collect or store data from minors.
+
+8. International Users
+
+If you access Roomdr outside the United States, you consent to your data being transferred and processed in the U.S.
+
+9. Changes to This Policy
+
+We may update this Privacy Policy from time to time.
+When we do, we will update the “Last Updated” date.
+Continued use of the Service means you accept the updated policy.
+
+10. Contact Us
+
+If you have questions or concerns about this Privacy Policy, contact:
+
+Roomdr Support
+Email: [Insert Email]
+Website: [Insert Website]
