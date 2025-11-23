@@ -237,6 +237,18 @@ export const GroupsScreen = () => {
     const apartmentPrice = groupApartmentPrice.trim() ? parseInt(groupApartmentPrice) : undefined;
     const bedrooms = groupBedrooms.trim() ? parseInt(groupBedrooms) : undefined;
 
+    // Validate apartment price is at least budget * bedrooms
+    if (apartmentPrice !== undefined && bedrooms !== undefined) {
+      const minPrice = parseInt(groupBudget) * bedrooms;
+      if (apartmentPrice < minPrice) {
+        Alert.alert(
+          'Invalid Apartment Price',
+          `The apartment price ($${apartmentPrice}) cannot be less than the minimum budget per person ($${groupBudget}) × bedrooms (${bedrooms}) = $${minPrice}`
+        );
+        return;
+      }
+    }
+
     const newGroup: Group = {
       id: Math.random().toString(36).substr(2, 9),
       name: groupName.trim(),
