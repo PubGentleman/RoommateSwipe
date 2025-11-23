@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Pressable, Dimensions, ActivityIndicator, TextInput, ScrollView, Alert, Modal } from 'react-native';
+import { View, StyleSheet, Pressable, Dimensions, ActivityIndicator, TextInput, ScrollView, Alert, Modal, Image } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
@@ -7,7 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
 import { Spacing, BorderRadius, Typography } from '../../constants/theme';
-import { Group } from '../../types/models';
+import { Group, RoommateProfile } from '../../types/models';
 import { StorageService } from '../../utils/storage';
 import { useAuth } from '../../contexts/AuthContext';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -39,6 +39,9 @@ export const GroupsScreen = () => {
   const [showMessageModal, setShowMessageModal] = useState(false);
   const [processingMessagePurchase, setProcessingMessagePurchase] = useState(false);
   const [messageTargetUserId, setMessageTargetUserId] = useState<string | null>(null);
+  const [showMemberProfile, setShowMemberProfile] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<RoommateProfile | null>(null);
+  const [avatarsExpanded, setAvatarsExpanded] = useState(false);
   
   const [groupName, setGroupName] = useState('');
   const [groupDescription, setGroupDescription] = useState('');
@@ -79,6 +82,92 @@ export const GroupsScreen = () => {
   };
 
   const currentGroup = allGroups[currentIndex];
+
+  const MemberAvatarStack = ({ group }: { group: Group }) => {
+    const MAX_VISIBLE = 4;
+    const AVATAR_SIZE = 64;
+    const OVERLAP = 16;
+    const EXPANDED_SPACING = 80;
+
+    const memberProfiles = (group.members || [])
+      .map(id => mockRoommateProfiles.find(p => p.id === id))
+      .filter((p): p is NonNullable<typeof p> => p !== null && p !== undefined)
+      .slice(0, MAX_VISIBLE);
+
+    const remainingCount = Math.max(0, (group.members || []).length - MAX_VISIBLE);
+
+    const handleMemberPress = (profile: RoommateProfile) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setSelectedMember(profile);
+      setShowMemberProfile(true);
+      setAvatarsExpanded(false);
+    };
+
+    const handleStackPress = () => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setAvatarsExpanded(!avatarsExpanded);
+    };
+
+    return (
+      <Pressable 
+        onPress={handleStackPress}
+        style={styles.avatarStackContainer}
+      >
+        {memberProfiles.map((profile, index) => {
+          const baseLeft = index * (AVATAR_SIZE - OVERLAP);
+          const expandedLeft = index * EXPANDED_SPACING;
+          
+          return (
+            <Pressable
+              key={profile.id}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleMemberPress(profile);
+              }}
+              style={[
+                styles.avatarWrapper,
+                {
+                  left: avatarsExpanded ? expandedLeft : baseLeft,
+                  zIndex: MAX_VISIBLE - index,
+                }
+              ]}
+            >
+              {profile.photos && profile.photos.length > 0 ? (
+                <Image
+                  source={{ uri: profile.photos[0] }}
+                  style={[styles.avatar, { borderColor: theme.backgroundDefault }]}
+                />
+              ) : (
+                <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: theme.primary, borderColor: theme.backgroundDefault }]}>
+                  <Feather name="user" size={28} color="#FFFFFF" />
+                </View>
+              )}
+            </Pressable>
+          );
+        })}
+        
+        {remainingCount > 0 ? (
+          <View
+            style={[
+              styles.avatarWrapper,
+              {
+                left: avatarsExpanded 
+                  ? memberProfiles.length * EXPANDED_SPACING 
+                  : memberProfiles.length * (AVATAR_SIZE - OVERLAP),
+                zIndex: 0,
+              }
+            ]}
+          >
+            <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: theme.textSecondary, borderColor: theme.backgroundDefault }]}>
+              <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
+                +{remainingCount}
+              </ThemedText>
+            </View>
+          </View>
+        ) : null}
+      </Pressable>
+    );
+  };
 
   const handleLikeGroup = async (group: Group) => {
     if (!user) return;
@@ -665,8 +754,8 @@ export const GroupsScreen = () => {
                   contentContainerStyle={styles.cardContent}
                   showsVerticalScrollIndicator={false}
                 >
-                <View style={[styles.groupIconLarge, { backgroundColor: theme.primary, marginTop: Spacing.xl }]}>
-                  <Feather name="users" size={32} color="#FFFFFF" />
+                <View style={{ marginTop: Spacing.xl }}>
+                  <MemberAvatarStack group={currentGroup} />
                 </View>
                 
                 <ThemedText style={[Typography.h2, { marginTop: Spacing.lg, marginBottom: Spacing.sm }]}>
@@ -1326,6 +1415,52 @@ export const GroupsScreen = () => {
           </View>
         </View>
       </Modal>
+
+      <Modal
+        visible={showMemberProfile}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowMemberProfile(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.memberProfileModal, { backgroundColor: theme.backgroundSecondary }]}>
+            <View style={styles.memberProfileHeader}>
+              <ThemedText style={[Typography.h2]}>Member Profile</ThemedText>
+              <Pressable onPress={() => setShowMemberProfile(false)}>
+                <Feather name="x" size={24} color={theme.text} />
+              </Pressable>
+            </View>
+            {selectedMember ? (
+              <ScrollView style={styles.memberProfileContent} showsVerticalScrollIndicator={false}>
+                {selectedMember.photos && selectedMember.photos.length > 0 ? (
+                  <Image source={{ uri: selectedMember.photos[0] }} style={styles.memberProfileImage} />
+                ) : null}
+                
+                <View style={styles.memberProfileSection}>
+                  <ThemedText style={[Typography.h2]}>{selectedMember.name}, {selectedMember.age}</ThemedText>
+                  <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
+                    {selectedMember.occupation}
+                  </ThemedText>
+                </View>
+
+                <View style={styles.memberProfileSection}>
+                  <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>About</ThemedText>
+                  <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
+                    {selectedMember.bio}
+                  </ThemedText>
+                </View>
+
+                <View style={styles.memberProfileSection}>
+                  <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Budget</ThemedText>
+                  <ThemedText style={[Typography.h2, { color: theme.primary }]}>
+                    ${selectedMember.budget}/month
+                  </ThemedText>
+                </View>
+              </ScrollView>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -1644,5 +1779,51 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 3,
+  },
+  avatarStackContainer: {
+    height: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  avatarWrapper: {
+    position: 'absolute',
+  },
+  avatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 3,
+  },
+  avatarPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  memberProfileModal: {
+    height: '85%',
+    borderTopLeftRadius: BorderRadius.large,
+    borderTopRightRadius: BorderRadius.large,
+    overflow: 'hidden',
+  },
+  memberProfileHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: Spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  memberProfileContent: {
+    flex: 1,
+  },
+  memberProfileImage: {
+    width: '100%',
+    height: 300,
+    resizeMode: 'cover',
+  },
+  memberProfileSection: {
+    padding: Spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
   },
 });
