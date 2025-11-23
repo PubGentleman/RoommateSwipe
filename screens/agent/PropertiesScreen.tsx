@@ -37,6 +37,16 @@ export const PropertiesScreen = () => {
     await loadProperties();
   };
 
+  const markAsAvailable = async (propertyId: string) => {
+    if (!user) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const property = properties.find(p => p.id === propertyId);
+    if (!property || property.hostId !== user.id) return;
+
+    await StorageService.markPropertyAsAvailable(propertyId);
+    await loadProperties();
+  };
+
   const renderProperty = (property: Property) => (
     <Pressable
       key={property.id}
@@ -78,8 +88,8 @@ export const PropertiesScreen = () => {
             </ThemedText>
           </View>
         </View>
-        {property.available ? (
-          <View style={styles.actions}>
+        <View style={styles.actions}>
+          {property.available ? (
             <Pressable 
               style={[styles.actionButton, { backgroundColor: theme.warning }]} 
               onPress={() => markAsRented(property.id)}
@@ -89,8 +99,18 @@ export const PropertiesScreen = () => {
                 Mark as Rented
               </ThemedText>
             </Pressable>
-          </View>
-        ) : null}
+          ) : (
+            <Pressable 
+              style={[styles.actionButton, { backgroundColor: theme.success }]} 
+              onPress={() => markAsAvailable(property.id)}
+            >
+              <Feather name="refresh-cw" size={16} color="#FFFFFF" />
+              <ThemedText style={[Typography.caption, { marginLeft: Spacing.xs, color: '#FFFFFF' }]}>
+                Mark as Available
+              </ThemedText>
+            </Pressable>
+          )}
+        </View>
       </View>
     </Pressable>
   );
