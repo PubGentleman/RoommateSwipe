@@ -40,8 +40,7 @@ export const HostTabNavigator = () => {
           Platform.OS === 'ios' ? (
             <BlurView intensity={100} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
           ) : null,
-        headerShown: true,
-        headerTransparent: true,
+        headerShown: false,
       }}
     >
       <Tab.Screen
@@ -70,7 +69,6 @@ export const HostTabNavigator = () => {
         name="Profile"
         component={ProfileStackNavigator}
         options={{
-          headerShown: false,
           tabBarIcon: ({ color, size }) => <Feather name="user" size={size} color={color} />,
         }}
       />
