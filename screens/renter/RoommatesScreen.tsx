@@ -284,10 +284,12 @@ export const RoommatesScreen = () => {
                   </View>
                 </View>
               ) : null}
-              <View style={styles.topBadges}>
-                {canSeeOnlineStatus() && isProfileOnline ? (
+              {canSeeOnlineStatus() && isProfileOnline ? (
+                <View style={styles.onlineIndicatorContainer}>
                   <View style={[styles.onlineIndicator, { backgroundColor: theme.success }]} />
-                ) : null}
+                </View>
+              ) : null}
+              <View style={styles.topBadges}>
                 <View style={[styles.compatibilityBadge, { backgroundColor: theme.success }]}>
                   <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '600' }]}>
                     {currentProfile.compatibility}% Match
@@ -492,7 +494,7 @@ const styles = StyleSheet.create({
   },
   topBadges: {
     position: 'absolute',
-    top: Spacing.lg,
+    top: Spacing.lg + 24,
     right: Spacing.lg,
     flexDirection: 'column',
     alignItems: 'flex-end',
@@ -515,6 +517,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.small,
+  },
+  onlineIndicatorContainer: {
+    position: 'absolute',
+    top: Spacing.lg,
+    right: Spacing.lg,
+    zIndex: 3,
   },
   onlineIndicator: {
     width: 16,
