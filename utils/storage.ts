@@ -87,7 +87,15 @@ export const StorageService = {
       } else {
         users.push(user);
       }
-      await AsyncStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+      console.log('[StorageService] Saving user:', user.id, 'has profileData:', !!user.profileData, 'has profilePicture:', !!user.profilePicture);
+      const serialized = JSON.stringify(users);
+      await AsyncStorage.setItem(STORAGE_KEYS.USERS, serialized);
+      
+      // Verify the data was saved correctly
+      const retrieved = await AsyncStorage.getItem(STORAGE_KEYS.USERS);
+      const parsed = retrieved ? JSON.parse(retrieved) : [];
+      const savedUser = parsed.find((u: User) => u.id === user.id);
+      console.log('[StorageService] Retrieved user after save:', user.id, 'has profileData:', !!savedUser?.profileData, 'has profilePicture:', !!savedUser?.profilePicture);
     } catch (error) {
       console.error('Error adding/updating user:', error);
     }
@@ -610,7 +618,7 @@ export const StorageService = {
   async forceReloadMockData(): Promise<void> {
     try {
       console.log('[StorageService] Force reloading all mock data...');
-      const { mockRoommateProfiles, mockProperties, mockGroups } = await import('./mockData');
+      const { mockRoommateProfiles, mockProperties, mockGroups, mockProfileUsers } = await import('./mockData');
       
       await this.setRoommateProfiles(mockRoommateProfiles);
       console.log(`[StorageService] Loaded ${mockRoommateProfiles.length} roommate profiles`);
@@ -620,6 +628,14 @@ export const StorageService = {
       
       await this.setGroups(mockGroups);
       console.log(`[StorageService] Loaded ${mockGroups.length} groups`);
+      
+      // Clear and reseed users
+      await AsyncStorage.removeItem(STORAGE_KEYS.USERS);
+      console.log('[StorageService] Cleared all users');
+      for (const profileUser of mockProfileUsers) {
+        await this.addOrUpdateUser(profileUser);
+      }
+      console.log(`[StorageService] ✓ Reseeded ${mockProfileUsers.length} profile users`);
       
       console.log('[StorageService] Mock data reload complete!');
     } catch (error) {

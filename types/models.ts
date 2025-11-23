@@ -123,6 +123,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
+  age?: number;
   role: 'renter' | 'host' | 'agent';
   profilePicture?: string;
   subscription?: {

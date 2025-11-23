@@ -806,7 +806,14 @@ export const ExploreScreen = () => {
                       <View style={{ flex: 1, marginLeft: Spacing.md }}>
                         <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Host</ThemedText>
                         <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
-                          {selectedProperty.hostName}
+                          {(() => {
+                            if (selectedProperty.hostProfileId) {
+                              const hostUser = hostProfiles.get(selectedProperty.hostProfileId);
+                              const age = hostUser?.age;
+                              return age ? `${selectedProperty.hostName}, ${age}` : selectedProperty.hostName;
+                            }
+                            return selectedProperty.hostName;
+                          })()}
                         </ThemedText>
                         <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginTop: 2 }]}>
                           {(() => {
