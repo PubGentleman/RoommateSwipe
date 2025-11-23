@@ -13,7 +13,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { mockRoommateProfiles } from '../../utils/mockData';
-import { getGenderSymbol } from '../../utils/matchingAlgorithm';
+import { getGenderSymbol, calculateCompatibility } from '../../utils/matchingAlgorithm';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - Spacing.xxl;
@@ -82,6 +82,35 @@ export const GroupsScreen = () => {
   };
 
   const currentGroup = allGroups[currentIndex];
+
+  const calculateGroupCompatibility = (group: Group): number => {
+    if (!user) return 0;
+    
+    const memberProfiles = (group.members || [])
+      .map(id => mockRoommateProfiles.find(p => p.id === id))
+      .filter((p): p is RoommateProfile => p !== null && p !== undefined);
+    
+    if (memberProfiles.length === 0) return 0;
+    
+    const scores = memberProfiles.map(profile => calculateCompatibility(user, profile));
+    const averageScore = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+    
+    return Math.round(averageScore);
+  };
+
+  const getCompatibilityColor = (score: number): string => {
+    if (score >= 80) return '#4CAF50'; // Green
+    if (score >= 70) return '#2196F3'; // Blue
+    if (score >= 60) return '#FF9800'; // Orange
+    return '#F44336'; // Red
+  };
+
+  const getCompatibilityLabel = (score: number): string => {
+    if (score >= 80) return 'Great Match';
+    if (score >= 70) return 'Good Match';
+    if (score >= 60) return 'Fair Match';
+    return 'Low Match';
+  };
 
   const MemberAvatarStack = ({ group }: { group: Group }) => {
     const MAX_VISIBLE = 4;
@@ -757,6 +786,23 @@ export const GroupsScreen = () => {
                 <View style={{ marginTop: Spacing.xl }}>
                   <MemberAvatarStack group={currentGroup} />
                 </View>
+
+                {(() => {
+                  const compatibility = calculateGroupCompatibility(currentGroup);
+                  const color = getCompatibilityColor(compatibility);
+                  const label = getCompatibilityLabel(compatibility);
+                  
+                  return (
+                    <View style={[styles.compatibilityBadge, { backgroundColor: color, marginTop: Spacing.md }]}>
+                      <ThemedText style={[Typography.h2, { color: '#FFFFFF', fontWeight: '700' }]}>
+                        {compatibility}%
+                      </ThemedText>
+                      <ThemedText style={[Typography.small, { color: '#FFFFFF', marginTop: 2 }]}>
+                        {label}
+                      </ThemedText>
+                    </View>
+                  );
+                })()}
                 
                 <ThemedText style={[Typography.h2, { marginTop: Spacing.lg, marginBottom: Spacing.sm }]}>
                   {currentGroup.name}
@@ -1825,5 +1871,19 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  compatibilityBadge: {
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: BorderRadius.large,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    minWidth: 140,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
 });
