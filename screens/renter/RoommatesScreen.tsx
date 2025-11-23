@@ -321,13 +321,13 @@ export const RoommatesScreen = () => {
                 </View>
               </View>
               <View style={styles.cardInfo}>
-                <ThemedText style={[Typography.hero, { color: '#FFFFFF' }]}>
+                <ThemedText style={[Typography.hero, { color: '#FFFFFF', textShadowColor: 'rgba(0, 0, 0, 0.75)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 }]}>
                   {currentProfile.name}, {currentProfile.age}
                 </ThemedText>
-                <ThemedText style={[Typography.body, { color: '#FFFFFF', marginTop: Spacing.sm }]}>
+                <ThemedText style={[Typography.body, { color: '#FFFFFF', marginTop: Spacing.sm, textShadowColor: 'rgba(0, 0, 0, 0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }]}>
                   {currentProfile.occupation}
                 </ThemedText>
-                <ThemedText style={[Typography.caption, { color: '#FFFFFF', marginTop: Spacing.md }]} numberOfLines={3}>
+                <ThemedText style={[Typography.caption, { color: '#FFFFFF', marginTop: Spacing.md, textShadowColor: 'rgba(0, 0, 0, 0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }]} numberOfLines={3}>
                   {currentProfile.bio}
                 </ThemedText>
                 <View style={styles.badges}>
@@ -587,7 +587,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: '50%',
-    backgroundColor: 'linear-gradient(transparent, rgba(0,0,0,0.8))',
     justifyContent: 'flex-end',
     padding: Spacing.lg,
   },
