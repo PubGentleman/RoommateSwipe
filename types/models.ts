@@ -33,6 +33,10 @@ export interface Property {
   city: string;
   state: string;
   neighborhood?: string;
+  coordinates?: {
+    lat: number;
+    lng: number;
+  };
   photos: string[];
   amenities: string[];
   description: string;
@@ -156,6 +160,13 @@ export interface User {
     bio?: string;
     budget?: number;
     location?: string;
+    neighborhood?: string;
+    city?: string;
+    state?: string;
+    coordinates?: {
+      lat: number;
+      lng: number;
+    };
     occupation?: string;
     interests?: string;
     gender?: 'male' | 'female' | 'other';

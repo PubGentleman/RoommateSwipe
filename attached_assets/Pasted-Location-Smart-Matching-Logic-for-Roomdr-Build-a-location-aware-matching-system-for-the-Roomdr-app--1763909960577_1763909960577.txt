@@ -1,0 +1,93 @@
+Location-Smart Matching Logic for Roomdr
+
+Build a location-aware matching system for the Roomdr app with the following requirements:
+
+Neighborhood-Based Location Input
+
+Users should only need to select or type their neighborhood, not the full city.
+
+The system must automatically infer the city and region from the neighborhood name.
+
+Example: If a user enters Bushwick, the system automatically knows this is Brooklyn, NYC.
+
+Automatic City Detection & Filtering
+
+The app must automatically detect the user’s current city using:
+
+GPS (if granted)
+
+Their neighborhood selection
+
+Stored profile location
+
+If the detected or selected location is NYC, then:
+
+This user’s profile should only be shown to people who are in NYC or are specifically searching for NYC.
+
+The user should only see results from people in NYC unless they manually search elsewhere.
+
+User-Controlled Location Overrides
+
+The user can manually change their location in the profile settings.
+
+They can also search for a different city using a search bar (e.g., “Los Angeles,” “Miami,” “Atlanta”).
+
+When a user changes their location or searches a new city:
+
+The matching feed should refresh to reflect profiles in that city/area.
+
+Their own profile should appear in results for that city.
+
+Matching Logic Requirements
+
+Location must be a primary weighting factor in the matching algorithm.
+
+Priority order:
+
+Same neighborhood → highest score
+
+Nearby / adjacent neighborhoods → high score
+
+Same city → good score
+
+Different city → 0 score unless the user is actively searching that city
+
+Integrate this into the existing scoring system but do not use name or email in calculations.
+
+Database & Indexing Requirements
+
+Store the following fields per user:
+
+neighborhood
+
+city
+
+state
+
+geo-coordinates (lat/long)
+
+Add geospatial indexing if available in the DB.
+
+The system must support fast lookup by:
+
+city
+
+neighborhood
+
+radius (optional)
+
+Expected Output
+
+Working backend logic that:
+
+Auto-detects location
+
+Infers city from neighborhood
+
+Filters matches by city
+
+Weighs neighborhood proximity in the algorithm
+
+Allows manual overrides via profile or search input
+
+Make sure all location logic is flexible so additional cities and neighborhoods can be added without code changes.
