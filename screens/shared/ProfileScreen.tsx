@@ -154,7 +154,7 @@ export const ProfileScreen = () => {
               ) : null}
             </View>
             
-            {user?.subscription?.plan !== 'basic' ? (
+            {user?.subscription?.plan !== 'basic' && (
               <View style={styles.benefitsList}>
                 <View style={styles.benefitItem}>
                   <Feather name="check" size={16} color={theme.primary} />
