@@ -79,7 +79,7 @@ export const ExploreScreen = () => {
       const users = await StorageService.getUsers();
       const profileMap = new Map<string, User>();
       users.forEach(u => {
-        if (u.role === 'renter' && u.profileData) {
+        if ((u.role === 'renter' || u.role === 'host') && u.profileData) {
           profileMap.set(u.id, u);
         }
       });
@@ -87,6 +87,44 @@ export const ExploreScreen = () => {
     } catch (err) {
       console.error('Error loading host profiles:', err);
     }
+  };
+
+  const getUserAsRoommateProfile = (user: User): RoommateProfile | null => {
+    if (!user.profileData) return null;
+    
+    const profile = user.profileData;
+    return {
+      id: user.id,
+      name: user.name,
+      age: profile.age || 0,
+      bio: profile.bio || '',
+      occupation: profile.occupation || '',
+      budget: profile.budget || 0,
+      photos: profile.photos || [],
+      lifestyle: {
+        cleanliness: profile.preferences?.cleanliness ? cleanlinessToNumber(profile.preferences.cleanliness) : 5,
+        socialLevel: profile.lifestyle?.socialLevel || 5,
+        workSchedule: profile.lifestyle?.workSchedule || '',
+        pets: profile.preferences?.pets === 'have_pets',
+        smoking: profile.preferences?.smoking === 'yes',
+      },
+      preferences: {
+        location: profile.location || '',
+        moveInDate: profile.preferences?.moveInDate || '',
+        bedrooms: profile.preferences?.bedrooms || 1,
+      },
+    };
+  };
+
+  const cleanlinessToNumber = (cleanliness: string): number => {
+    const map: Record<string, number> = {
+      very_clean: 5,
+      clean: 4,
+      moderate: 3,
+      relaxed: 2,
+      very_relaxed: 1,
+    };
+    return map[cleanliness] || 5;
   };
 
   const applyFilters = () => {
@@ -218,29 +256,9 @@ export const ExploreScreen = () => {
   };
 
   const renderProperty = ({ item }: { item: Property }) => {
-    const compatibility = item.hostProfileId && hostProfiles.get(item.hostProfileId) && user
-      ? calculateCompatibility(user, {
-          id: item.hostProfileId,
-          name: item.hostName,
-          age: 0,
-          bio: '',
-          occupation: hostProfiles.get(item.hostProfileId)?.profileData?.occupation || '',
-          budget: hostProfiles.get(item.hostProfileId)?.profileData?.budget || 0,
-          photos: [],
-          lifestyle: {
-            cleanliness: 0,
-            socialLevel: 0,
-            workSchedule: '',
-            pets: false,
-            smoking: false,
-          },
-          preferences: {
-            location: hostProfiles.get(item.hostProfileId)?.profileData?.location || '',
-            moveInDate: '',
-            bedrooms: 1,
-          },
-        } as RoommateProfile)
-      : null;
+    const hostUser = item.hostProfileId ? hostProfiles.get(item.hostProfileId) : null;
+    const hostProfile = hostUser ? getUserAsRoommateProfile(hostUser) : null;
+    const compatibility = hostProfile && user ? calculateCompatibility(user, hostProfile) : null;
 
     return (
       <Pressable
@@ -304,7 +322,7 @@ export const ExploreScreen = () => {
                   color={theme.textSecondary} 
                 />
                 <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
-                  {item.existingRoommateGender === 'male' ? '♂ Male' : '♀ Female'} roommate
+                  {item.existingRoommateGender === 'male' ? 'Male' : 'Female'} roommate
                 </ThemedText>
               </View>
               {compatibility !== null ? (
@@ -766,6 +784,41 @@ export const ExploreScreen = () => {
                           <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Property Type</ThemedText>
                           <ThemedText style={[Typography.body, { fontWeight: '600', textTransform: 'capitalize' }]}>
                             {selectedProperty.propertyType}
+                          </ThemedText>
+                        </View>
+                      </View>
+                    ) : null}
+                    <View style={styles.detailRow}>
+                      <Feather name="grid" size={20} color={theme.primary} />
+                      <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                        <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Room Type</ThemedText>
+                        <ThemedText style={[Typography.body, { fontWeight: '600', textTransform: 'capitalize' }]}>
+                          {selectedProperty.roomType === 'room' ? 'Room' : 'Entire Apartment'}
+                        </ThemedText>
+                      </View>
+                    </View>
+                    {selectedProperty.roomType === 'room' && selectedProperty.existingRoommateGender ? (
+                      <View style={styles.detailRow}>
+                        <Feather name="users" size={20} color={theme.primary} />
+                        <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Existing Roommate</ThemedText>
+                          <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
+                            {selectedProperty.existingRoommateGender === 'male' ? 'Male' : 'Female'}
+                          </ThemedText>
+                        </View>
+                      </View>
+                    ) : null}
+                    {selectedProperty.roomType === 'room' && selectedProperty.hostProfileId && hostProfiles.get(selectedProperty.hostProfileId) ? (
+                      <View style={styles.detailRow}>
+                        <Feather name="target" size={20} color={theme.primary} />
+                        <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Compatibility</ThemedText>
+                          <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
+                            {(() => {
+                              const hostUser = hostProfiles.get(selectedProperty.hostProfileId!);
+                              const hostProfile = hostUser ? getUserAsRoommateProfile(hostUser) : null;
+                              return hostProfile && user ? calculateCompatibility(user, hostProfile) : 0;
+                            })()}% Match
                           </ThemedText>
                         </View>
                       </View>
