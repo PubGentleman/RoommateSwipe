@@ -292,84 +292,6 @@ export const ProfileScreen = () => {
         </View>
 
         <View style={styles.section}>
-          <ThemedText style={[Typography.h3, styles.sectionTitle]}>How Matching Works</ThemedText>
-          <View style={[styles.matchingCard, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
-            <ThemedText style={[Typography.body, { marginBottom: Spacing.md }]}>
-              Your compatibility score is calculated using 10 factors:
-            </ThemedText>
-            
-            <View style={styles.matchingFactors}>
-              <View style={styles.factorRow}>
-                <Feather name="moon" size={16} color={theme.textSecondary} />
-                <ThemedText style={[Typography.small, { marginLeft: Spacing.sm, flex: 1 }]}>
-                  Sleep Schedule (15 pts)
-                </ThemedText>
-              </View>
-              <View style={styles.factorRow}>
-                <Feather name="star" size={16} color={theme.textSecondary} />
-                <ThemedText style={[Typography.small, { marginLeft: Spacing.sm, flex: 1 }]}>
-                  Cleanliness Level (15 pts)
-                </ThemedText>
-              </View>
-              <View style={styles.factorRow}>
-                <Feather name="users" size={16} color={theme.textSecondary} />
-                <ThemedText style={[Typography.small, { marginLeft: Spacing.sm, flex: 1 }]}>
-                  Guest Policy (10 pts)
-                </ThemedText>
-              </View>
-              <View style={styles.factorRow}>
-                <Feather name="coffee" size={16} color={theme.textSecondary} />
-                <ThemedText style={[Typography.small, { marginLeft: Spacing.sm, flex: 1 }]}>
-                  Smoking & Drinking (15 pts)
-                </ThemedText>
-              </View>
-              <View style={styles.factorRow}>
-                <Feather name="heart" size={16} color={theme.textSecondary} />
-                <ThemedText style={[Typography.small, { marginLeft: Spacing.sm, flex: 1 }]}>
-                  Pet Friendly (10 pts)
-                </ThemedText>
-              </View>
-              <View style={styles.factorRow}>
-                <Feather name="dollar-sign" size={16} color={theme.textSecondary} />
-                <ThemedText style={[Typography.small, { marginLeft: Spacing.sm, flex: 1 }]}>
-                  Budget Match (15 pts)
-                </ThemedText>
-              </View>
-              <View style={styles.factorRow}>
-                <Feather name="map-pin" size={16} color={theme.textSecondary} />
-                <ThemedText style={[Typography.small, { marginLeft: Spacing.sm, flex: 1 }]}>
-                  Location (10 pts)
-                </ThemedText>
-              </View>
-              <View style={styles.factorRow}>
-                <Feather name="briefcase" size={16} color={theme.textSecondary} />
-                <ThemedText style={[Typography.small, { marginLeft: Spacing.sm, flex: 1 }]}>
-                  Occupation (10 pts)
-                </ThemedText>
-              </View>
-            </View>
-            
-            <View style={styles.colorGuide}>
-              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.sm }]}>
-                Match Quality:
-              </ThemedText>
-              <View style={styles.colorRow}>
-                <View style={[styles.colorDot, { backgroundColor: '#10B981' }]} />
-                <ThemedText style={[Typography.small, { marginLeft: Spacing.xs }]}>80%+ Excellent</ThemedText>
-                <View style={[styles.colorDot, { backgroundColor: '#3B82F6', marginLeft: Spacing.md }]} />
-                <ThemedText style={[Typography.small, { marginLeft: Spacing.xs }]}>70-79% Great</ThemedText>
-              </View>
-              <View style={styles.colorRow}>
-                <View style={[styles.colorDot, { backgroundColor: '#F59E0B' }]} />
-                <ThemedText style={[Typography.small, { marginLeft: Spacing.xs }]}>60-69% Good</ThemedText>
-                <View style={[styles.colorDot, { backgroundColor: '#EF4444', marginLeft: Spacing.md }]} />
-                <ThemedText style={[Typography.small, { marginLeft: Spacing.xs }]}>&lt;60% Fair</ThemedText>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.section}>
           <ThemedText style={[Typography.h3, styles.sectionTitle]}>Support</ThemedText>
           <MenuItem icon="help-circle" label="Help Center" onPress={() => {}} />
           <MenuItem icon="file-text" label="Terms & Conditions" onPress={() => {}} />
@@ -495,35 +417,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     marginBottom: Spacing.md,
     marginLeft: Spacing.sm,
-  },
-  matchingCard: {
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.medium,
-    borderWidth: 1,
-  },
-  matchingFactors: {
-    gap: Spacing.sm,
-    marginBottom: Spacing.lg,
-  },
-  factorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: Spacing.xs,
-  },
-  colorGuide: {
-    paddingTop: Spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(128, 128, 128, 0.2)',
-  },
-  colorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: Spacing.xs,
-  },
-  colorDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
   },
   menuItem: {
     flexDirection: 'row',

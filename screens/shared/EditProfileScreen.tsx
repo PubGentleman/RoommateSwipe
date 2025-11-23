@@ -131,7 +131,69 @@ export const EditProfileScreen = () => {
           <Feather name="arrow-left" size={24} color={theme.text} />
         </Pressable>
 
-        <ThemedText style={[Typography.h1, { marginBottom: Spacing.xl }]}>Edit Profile</ThemedText>
+        <ThemedText style={[Typography.h1, { marginBottom: Spacing.md }]}>Edit Profile</ThemedText>
+
+        <View style={[styles.infoCard, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
+          <View style={styles.infoHeader}>
+            <Feather name="info" size={20} color={theme.primary} />
+            <ThemedText style={[Typography.body, { fontWeight: '600', marginLeft: Spacing.sm }]}>
+              How Matching Works
+            </ThemedText>
+          </View>
+          <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.md }]}>
+            Your answers help us find your best roommate matches. Compatibility is scored out of 100 points:
+          </ThemedText>
+          
+          <View style={styles.matchingFactors}>
+            <View style={styles.factorRow}>
+              <View style={[styles.pointBadge, { backgroundColor: theme.primary + '20' }]}>
+                <ThemedText style={[Typography.caption, { color: theme.primary, fontWeight: '600' }]}>15</ThemedText>
+              </View>
+              <ThemedText style={[Typography.small, { marginLeft: Spacing.sm, flex: 1 }]}>
+                Sleep Schedule & Cleanliness
+              </ThemedText>
+            </View>
+            <View style={styles.factorRow}>
+              <View style={[styles.pointBadge, { backgroundColor: theme.primary + '20' }]}>
+                <ThemedText style={[Typography.caption, { color: theme.primary, fontWeight: '600' }]}>15</ThemedText>
+              </View>
+              <ThemedText style={[Typography.small, { marginLeft: Spacing.sm, flex: 1 }]}>
+                Lifestyle (Smoking & Drinking)
+              </ThemedText>
+            </View>
+            <View style={styles.factorRow}>
+              <View style={[styles.pointBadge, { backgroundColor: theme.primary + '20' }]}>
+                <ThemedText style={[Typography.caption, { color: theme.primary, fontWeight: '600' }]}>15</ThemedText>
+              </View>
+              <ThemedText style={[Typography.small, { marginLeft: Spacing.sm, flex: 1 }]}>
+                Budget Compatibility
+              </ThemedText>
+            </View>
+            <View style={styles.factorRow}>
+              <View style={[styles.pointBadge, { backgroundColor: theme.primary + '20' }]}>
+                <ThemedText style={[Typography.caption, { color: theme.primary, fontWeight: '600' }]}>10</ThemedText>
+              </View>
+              <ThemedText style={[Typography.small, { marginLeft: Spacing.sm, flex: 1 }]}>
+                Guest Policy, Pets, Location & Occupation
+              </ThemedText>
+            </View>
+          </View>
+          
+          <View style={styles.colorGuide}>
+            <View style={styles.colorRow}>
+              <View style={[styles.colorDot, { backgroundColor: '#10B981' }]} />
+              <ThemedText style={[Typography.caption, { marginLeft: Spacing.xs }]}>80%+ Excellent</ThemedText>
+              <View style={[styles.colorDot, { backgroundColor: '#3B82F6', marginLeft: Spacing.md }]} />
+              <ThemedText style={[Typography.caption, { marginLeft: Spacing.xs }]}>70-79% Great</ThemedText>
+            </View>
+            <View style={styles.colorRow}>
+              <View style={[styles.colorDot, { backgroundColor: '#F59E0B' }]} />
+              <ThemedText style={[Typography.caption, { marginLeft: Spacing.xs }]}>60-69% Good</ThemedText>
+              <View style={[styles.colorDot, { backgroundColor: '#EF4444', marginLeft: Spacing.md }]} />
+              <ThemedText style={[Typography.caption, { marginLeft: Spacing.xs }]}>&lt;60% Fair</ThemedText>
+            </View>
+          </View>
+        </View>
 
         {/* Basic Information */}
         <View style={styles.section}>
@@ -400,6 +462,47 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     marginBottom: Spacing.md,
+  },
+  infoCard: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.medium,
+    borderWidth: 1,
+    marginBottom: Spacing.xl,
+  },
+  infoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+  },
+  matchingFactors: {
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  factorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  pointBadge: {
+    width: 32,
+    height: 24,
+    borderRadius: BorderRadius.small,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  colorGuide: {
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(128, 128, 128, 0.2)',
+    gap: Spacing.xs,
+  },
+  colorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  colorDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
   inputGroup: {
     marginBottom: Spacing.lg,
