@@ -273,6 +273,11 @@ export const RoommatesScreen = () => {
             style={[styles.card, animatedCardStyle]}
           >
             <Image source={{ uri: currentProfile.photos[0] }} style={styles.cardImage} />
+            {canSeeOnlineStatus() && isProfileOnline ? (
+              <View style={styles.onlineIndicatorContainer}>
+                <View style={[styles.onlineIndicator, { backgroundColor: theme.success }]} />
+              </View>
+            ) : null}
             <View style={styles.gradient}>
               {isBoosted ? (
                 <View style={styles.boostBadgeLeft}>
@@ -282,11 +287,6 @@ export const RoommatesScreen = () => {
                       BOOSTED
                     </ThemedText>
                   </View>
-                </View>
-              ) : null}
-              {canSeeOnlineStatus() && isProfileOnline ? (
-                <View style={styles.onlineIndicatorContainer}>
-                  <View style={[styles.onlineIndicator, { backgroundColor: theme.success }]} />
                 </View>
               ) : null}
               <View style={styles.topBadges}>
