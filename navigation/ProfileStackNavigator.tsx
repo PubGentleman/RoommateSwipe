@@ -3,11 +3,13 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ProfileScreen } from '../screens/shared/ProfileScreen';
 import { PaymentScreen } from '../screens/shared/PaymentScreen';
 import { PlansScreen } from '../screens/shared/PlansScreen';
+import { EditProfileScreen } from '../screens/shared/EditProfileScreen';
 
 export type ProfileStackParamList = {
   ProfileMain: undefined;
   Payment: undefined;
   Plans: undefined;
+  EditProfile: undefined;
 };
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
@@ -33,6 +35,16 @@ export const ProfileStackNavigator = () => {
           headerShown: true,
           headerTransparent: true,
           headerTitle: 'Subscription Plans',
+          headerBlurEffect: 'regular',
+        }}
+      />
+      <Stack.Screen 
+        name="EditProfile" 
+        component={EditProfileScreen}
+        options={{
+          headerShown: true,
+          headerTransparent: true,
+          headerTitle: 'Edit Profile',
           headerBlurEffect: 'regular',
         }}
       />

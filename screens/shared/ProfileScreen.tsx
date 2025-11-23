@@ -286,7 +286,7 @@ export const ProfileScreen = () => {
 
         <View style={styles.section}>
           <ThemedText style={[Typography.h3, styles.sectionTitle]}>Account</ThemedText>
-          <MenuItem icon="edit-3" label="Edit Profile" onPress={() => {}} />
+          <MenuItem icon="edit-3" label="Edit Profile" onPress={() => navigation.navigate('EditProfile')} />
           <MenuItem icon="bell" label="Notifications" onPress={() => {}} />
           <MenuItem icon="shield" label="Privacy & Security" onPress={() => {}} />
         </View>

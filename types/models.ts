@@ -137,4 +137,21 @@ export interface User {
     isBoosted: boolean;
     boostExpiresAt?: Date;
   };
+  profileData?: {
+    bio?: string;
+    budget?: number;
+    location?: string;
+    occupation?: string;
+    interests?: string;
+    preferences?: {
+      sleepSchedule: 'early' | 'late' | 'flexible';
+      cleanliness: 'very_clean' | 'clean' | 'moderate';
+      guestPolicy: 'frequent' | 'occasional' | 'rarely';
+      petFriendly: boolean;
+    };
+    lifestyle?: {
+      smoking: boolean;
+      drinking: 'non-drinker' | 'social' | 'regular';
+    };
+  };
 }
