@@ -142,12 +142,9 @@ export const ExploreScreen = () => {
       filtered = filtered.filter(p => saved.has(p.id));
     }
 
-    // City-based filtering: Only show properties in user's city by default
-    // unless they're actively searching for a different city/neighborhood
     const userCity = user?.profileData?.city;
     const query = searchQuery.toLowerCase().trim();
     
-    // Check if search query is a location name (city, state, or neighborhood from locationData)
     const allCities = getAllCities();
     const allNeighborhoods = Object.keys(NEIGHBORHOODS);
     const allStates = ['NY'];
@@ -158,7 +155,6 @@ export const ExploreScreen = () => {
     ));
     
     if (userCity && !isSearchingLocation) {
-      // Default: Only show properties in the user's city
       filtered = filtered.filter(p => p.city === userCity);
     }
 
