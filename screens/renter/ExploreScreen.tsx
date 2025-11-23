@@ -77,12 +77,16 @@ export const ExploreScreen = () => {
   const loadHostProfiles = async () => {
     try {
       const users = await StorageService.getUsers();
+      console.log('[ExploreScreen] Total users loaded:', users.length);
       const profileMap = new Map<string, User>();
       users.forEach(u => {
+        console.log('[ExploreScreen] User:', u.id, 'role:', u.role, 'has profileData:', !!u.profileData, 'has profilePicture:', !!u.profilePicture);
         if ((u.role === 'renter' || u.role === 'host') && u.profileData) {
           profileMap.set(u.id, u);
         }
       });
+      console.log('[ExploreScreen] Loaded host profiles:', profileMap.size, 'profiles');
+      console.log('[ExploreScreen] Profile IDs:', Array.from(profileMap.keys()));
       setHostProfiles(profileMap);
     } catch (err) {
       console.error('Error loading host profiles:', err);
@@ -777,6 +781,10 @@ export const ExploreScreen = () => {
                       {(() => {
                         const hostUser = selectedProperty.hostProfileId ? hostProfiles.get(selectedProperty.hostProfileId) : null;
                         const hostPhoto = hostUser?.profilePicture;
+                        console.log('[ExploreScreen] Property hostProfileId:', selectedProperty.hostProfileId);
+                        console.log('[ExploreScreen] Host user found:', hostUser?.name);
+                        console.log('[ExploreScreen] Host photo:', hostPhoto);
+                        console.log('[ExploreScreen] Host gender:', hostUser?.profileData?.gender);
                         return hostPhoto ? (
                           <Image 
                             source={{ uri: hostPhoto }} 
