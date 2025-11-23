@@ -46,13 +46,13 @@ export const WalkScoreBadge = ({ score, size = 'medium' }: WalkScoreBadgeProps) 
           },
         ]}
       >
-        <View style={[styles.icon, { transform: [{ scale }] }]}>
+        <View style={[styles.walkingPerson, { transform: [{ scale }] }]}>
           <View style={[styles.head, { backgroundColor: green }]} />
-          <View style={[styles.body, { backgroundColor: green }]} />
-          <View style={[styles.leftArm, { backgroundColor: green }]} />
-          <View style={[styles.rightArm, { backgroundColor: green }]} />
-          <View style={[styles.leftLeg, { backgroundColor: green }]} />
-          <View style={[styles.rightLeg, { backgroundColor: green }]} />
+          <View style={[styles.torso, { backgroundColor: green }]} />
+          <View style={[styles.leftArmForward, { backgroundColor: green }]} />
+          <View style={[styles.rightArmBack, { backgroundColor: green }]} />
+          <View style={[styles.leftLegBack, { backgroundColor: green }]} />
+          <View style={[styles.rightLegForward, { backgroundColor: green }]} />
         </View>
         <ThemedText
           style={[
@@ -80,57 +80,57 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  icon: {
+  walkingPerson: {
     width: 24,
-    height: 30,
+    height: 32,
     alignItems: 'center',
-    marginTop: -8,
+    justifyContent: 'flex-start',
+    marginTop: -10,
   },
   head: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginBottom: 2,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    marginBottom: 1,
   },
-  body: {
-    width: 2,
-    height: 12,
-    marginBottom: 0,
+  torso: {
+    width: 2.5,
+    height: 11,
   },
-  leftArm: {
+  leftArmForward: {
     position: 'absolute',
     top: 10,
-    left: 7,
-    width: 8,
+    left: 6,
+    width: 10,
     height: 2,
-    transform: [{ rotate: '-45deg' }],
+    transform: [{ rotate: '-35deg' }],
   },
-  rightArm: {
+  rightArmBack: {
     position: 'absolute',
-    top: 10,
-    right: 7,
-    width: 8,
+    top: 11,
+    right: 5,
+    width: 9,
     height: 2,
-    transform: [{ rotate: '45deg' }],
+    transform: [{ rotate: '40deg' }],
   },
-  leftLeg: {
+  leftLegBack: {
     position: 'absolute',
     bottom: 0,
-    left: 7,
+    left: 6,
     width: 2,
-    height: 10,
-    transform: [{ rotate: '-20deg' }],
+    height: 11,
+    transform: [{ rotate: '35deg' }],
   },
-  rightLeg: {
+  rightLegForward: {
     position: 'absolute',
     bottom: 0,
-    right: 7,
+    right: 6,
     width: 2,
-    height: 10,
-    transform: [{ rotate: '20deg' }],
+    height: 13,
+    transform: [{ rotate: '-30deg' }],
   },
   score: {
     fontWeight: '700',
-    marginTop: 2,
+    marginTop: 4,
   },
 });
