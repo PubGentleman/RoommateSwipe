@@ -226,6 +226,20 @@ export const StorageService = {
     }
   },
 
+  async markPropertyAsAvailable(propertyId: string): Promise<void> {
+    try {
+      const properties = await this.getProperties();
+      const property = properties.find(p => p.id === propertyId);
+      if (!property) return;
+
+      property.available = true;
+      property.rentedDate = undefined;
+      await this.setProperties(properties);
+    } catch (error) {
+      console.error('Error marking property as available:', error);
+    }
+  },
+
   async getGroups(): Promise<Group[]> {
     try {
       const data = await AsyncStorage.getItem(STORAGE_KEYS.GROUPS);
