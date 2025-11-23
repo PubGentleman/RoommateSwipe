@@ -1,7 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, Pressable, Dimensions, Animated, ActivityIndicator, TextInput, ScrollView, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, Pressable, Dimensions, ActivityIndicator, TextInput, ScrollView, Alert } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { scheduleOnRN } from 'react-native-worklets';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { ThemedText } from '../../components/ThemedText';
@@ -38,9 +38,9 @@ export const GroupsScreen = () => {
   const [groupLocation, setGroupLocation] = useState('');
   const [groupMaxMembers, setGroupMaxMembers] = useState('4');
 
-  const translateX = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(0)).current;
-  const rotation = useRef(new Animated.Value(0)).current;
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const rotation = useSharedValue(0);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -130,53 +130,44 @@ export const GroupsScreen = () => {
     const direction = action === 'like' ? 1 : -1;
     const toX = direction * SCREEN_WIDTH * 1.5;
 
-    Animated.parallel([
-      Animated.spring(translateX, {
-        toValue: toX,
-        useNativeDriver: true,
-        speed: 20,
-        bounciness: 0,
-      }),
-      Animated.spring(rotation, {
-        toValue: direction * 15,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      translateX.setValue(0);
-      rotation.setValue(0);
+    translateX.value = withSpring(toX, { 
+      damping: 20,
+      stiffness: 90 
+    });
+    rotation.value = withSpring(direction * 15);
+
+    setTimeout(() => {
+      translateX.value = 0;
+      rotation.value = 0;
       if (action === 'skip') {
         setCurrentIndex(currentIndex + 1);
       }
-    });
-  };
-
-  const handleGestureEnd = async (translationX: number) => {
-    if (Math.abs(translationX) > 120) {
-      await handleSwipeAction(translationX > 0 ? 'like' : 'skip');
-    } else {
-      Animated.spring(translateX, {
-        toValue: 0,
-        useNativeDriver: true,
-      }).start();
-      Animated.spring(rotation, {
-        toValue: 0,
-        useNativeDriver: true,
-      }).start();
-    }
+    }, 300);
   };
 
   const pan = Gesture.Pan()
     .onChange((event) => {
-      translateX.setValue(event.translationX);
-      rotation.setValue(event.translationX / 20);
+      translateX.value = event.translationX;
+      rotation.value = event.translationX / 20;
     })
     .onEnd((event) => {
-      scheduleOnRN(handleGestureEnd, event.translationX);
+      if (Math.abs(event.translationX) > 120) {
+        const action = event.translationX > 0 ? 'like' : 'skip';
+        runOnJS(handleSwipeAction)(action);
+      } else {
+        translateX.value = withSpring(0);
+        rotation.value = withSpring(0);
+      }
     });
 
-  const rotate = rotation.interpolate({
-    inputRange: [-15, 15],
-    outputRange: ['-15deg', '15deg'],
+  const animatedCardStyle = useAnimatedStyle(() => {
+    const rotate = `${rotation.value}deg`;
+    return {
+      transform: [
+        { translateX: translateX.value },
+        { rotate },
+      ],
+    };
   });
 
   const handleCreateGroup = async () => {
@@ -459,13 +450,8 @@ export const GroupsScreen = () => {
             <Animated.View
               style={[
                 styles.card,
-                {
-                  backgroundColor: theme.backgroundDefault,
-                  transform: [
-                    { translateX },
-                    { rotate },
-                  ],
-                },
+                { backgroundColor: theme.backgroundDefault },
+                animatedCardStyle,
               ]}
             >
               <View style={styles.cardContent}>
