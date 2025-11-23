@@ -42,7 +42,11 @@ export interface Property {
   featured?: boolean;
   propertyType: 'lease' | 'sublet';
   roomType: 'room' | 'entire';
-  existingRoommateGender?: 'male' | 'female';
+  existingRoommates?: Array<{
+    gender: 'male' | 'female' | 'other';
+    onApp: boolean;
+    userId?: string;
+  }>;
   hostProfileId?: string;
 }
 

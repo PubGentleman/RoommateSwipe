@@ -120,6 +120,7 @@ export const StorageService = {
         ...p,
         propertyType: p.propertyType || 'lease',
         roomType: p.roomType || 'entire',
+        existingRoommates: p.existingRoommates || [],
       }));
     } catch (error) {
       console.error('Error getting properties:', error);
@@ -133,6 +134,7 @@ export const StorageService = {
         ...p,
         propertyType: p.propertyType || 'lease',
         roomType: p.roomType || 'entire',
+        existingRoommates: p.existingRoommates || [],
       }));
       await AsyncStorage.setItem(STORAGE_KEYS.PROPERTIES, JSON.stringify(normalizedProperties));
     } catch (error) {
@@ -146,6 +148,7 @@ export const StorageService = {
         ...property,
         propertyType: property.propertyType || 'lease',
         roomType: property.roomType || 'entire',
+        existingRoommates: property.existingRoommates || [],
       };
       const properties = await this.getProperties();
       const index = properties.findIndex(p => p.id === normalizedProperty.id);

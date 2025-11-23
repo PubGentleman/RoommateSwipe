@@ -11,7 +11,7 @@ import { StorageService } from '../../utils/storage';
 import { Property, PropertyFilter, User, RoommateProfile } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { formatMoveInDate, calculateCompatibility, getMatchQualityColor } from '../../utils/matchingAlgorithm';
+import { formatMoveInDate, calculateCompatibility, getMatchQualityColor, getGenderSymbol } from '../../utils/matchingAlgorithm';
 
 const COMMON_AMENITIES = [
   'Parking', 'Gym', 'Pool', 'Laundry', 'Pet Friendly',
@@ -313,16 +313,20 @@ export const ExploreScreen = () => {
           <ThemedText style={[Typography.body, { marginTop: Spacing.xs }]} numberOfLines={1}>
             {item.title}
           </ThemedText>
-          {item.roomType === 'room' && item.existingRoommateGender ? (
+          {item.roomType === 'room' && (hostUser || (item.existingRoommates && item.existingRoommates.length > 0)) ? (
             <View style={[styles.roommateInfo, { backgroundColor: theme.background, marginTop: Spacing.sm }]}>
               <View style={styles.roommateGenderContainer}>
                 <Feather 
-                  name="user" 
+                  name="users" 
                   size={14} 
                   color={theme.textSecondary} 
                 />
                 <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
-                  {item.existingRoommateGender === 'male' ? 'Male' : 'Female'} roommate
+                  {hostUser?.profileData?.gender ? getGenderSymbol(hostUser.profileData.gender) : ''}
+                  {item.existingRoommates && item.existingRoommates.length > 0 
+                    ? item.existingRoommates.map((rm, idx) => getGenderSymbol(rm.gender)).join('')
+                    : ''
+                  }
                 </ThemedText>
               </View>
               {compatibility !== null ? (
@@ -797,13 +801,20 @@ export const ExploreScreen = () => {
                         </ThemedText>
                       </View>
                     </View>
-                    {selectedProperty.roomType === 'room' && selectedProperty.existingRoommateGender ? (
+                    {selectedProperty.roomType === 'room' && (selectedProperty.hostProfileId || (selectedProperty.existingRoommates && selectedProperty.existingRoommates.length > 0)) ? (
                       <View style={styles.detailRow}>
                         <Feather name="users" size={20} color={theme.primary} />
                         <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Existing Roommate</ThemedText>
+                          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Current Household</ThemedText>
                           <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
-                            {selectedProperty.existingRoommateGender === 'male' ? 'Male' : 'Female'}
+                            {(() => {
+                              const hostUser = selectedProperty.hostProfileId ? hostProfiles.get(selectedProperty.hostProfileId) : null;
+                              const hostGender = hostUser?.profileData?.gender ? getGenderSymbol(hostUser.profileData.gender) : '';
+                              const roommateGenders = selectedProperty.existingRoommates && selectedProperty.existingRoommates.length > 0
+                                ? selectedProperty.existingRoommates.map((rm) => getGenderSymbol(rm.gender)).join('')
+                                : '';
+                              return hostGender + roommateGenders;
+                            })()}
                           </ThemedText>
                         </View>
                       </View>

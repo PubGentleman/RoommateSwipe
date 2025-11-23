@@ -800,7 +800,9 @@ export const mockProperties: Property[] = [
     featured: false,
     propertyType: 'lease',
     roomType: 'room',
-    existingRoommateGender: 'female',
+    existingRoommates: [
+      { gender: 'female', onApp: false },
+    ],
     hostProfileId: '1',
   },
   {
@@ -842,7 +844,9 @@ export const mockProperties: Property[] = [
     featured: false,
     propertyType: 'sublet',
     roomType: 'room',
-    existingRoommateGender: 'male',
+    existingRoommates: [
+      { gender: 'male', onApp: false },
+    ],
     hostProfileId: '2',
   },
   {
@@ -884,7 +888,9 @@ export const mockProperties: Property[] = [
     featured: false,
     propertyType: 'sublet',
     roomType: 'room',
-    existingRoommateGender: 'female',
+    existingRoommates: [
+      { gender: 'female', onApp: false },
+    ],
     hostProfileId: '3',
   },
 ];
