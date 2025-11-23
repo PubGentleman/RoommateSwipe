@@ -7,7 +7,7 @@ import { Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { Message, RoommateProfile } from '../../types/models';
 import { StorageService } from '../../utils/storage';
 import { useAuth } from '../../contexts/AuthContext';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { Image } from 'expo-image';
 
 type ChatScreenProps = {
@@ -24,7 +24,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const { conversationId, otherUser } = route.params;
   const { theme } = useTheme();
   const { user, incrementMessageCount, canSendMessage } = useAuth();
-  const insets = useSafeAreaInsets();
+  const screenInsets = useScreenInsets();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [showGroupOption, setShowGroupOption] = useState(true);
@@ -190,16 +190,18 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         </Pressable>
       ) : null}
 
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        renderItem={renderMessage}
-        keyExtractor={item => item.id}
-        contentContainerStyle={[styles.messagesList, { paddingBottom: Spacing.lg }]}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-      />
+      <View style={{ flex: 1 }}>
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          renderItem={renderMessage}
+          keyExtractor={item => item.id}
+          contentContainerStyle={[styles.messagesList, { paddingBottom: Spacing.lg }]}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+        />
+      </View>
 
-      <View style={[styles.inputContainer, { backgroundColor: theme.backgroundRoot, paddingBottom: insets.bottom + Spacing.md }]}>
+      <View style={[styles.inputContainer, { backgroundColor: theme.backgroundRoot, paddingBottom: screenInsets.paddingBottom }]}>
         <TextInput
           style={[
             styles.input,
