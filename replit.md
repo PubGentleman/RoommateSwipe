@@ -51,6 +51,24 @@ The current implementation uses mock data and TypeScript interfaces for data mod
 - `hostProfileId`: Links to host's User profile for compatibility score calculation using the matching algorithm
 - `propertyType`: Distinguishes between 'lease' (long-term) and 'sublet' (short-term) arrangements
 
+**User Model Location Data:**
+- Renter users automatically receive `profileData` with location fields (neighborhood, city, state, coordinates) on registration, login, and app load
+- Default location set to Williamsburg, Brooklyn for new renters
+- Location data is backfilled for existing users on app load to ensure city-based filtering works across all sessions
+
+## Location Privacy & Filtering
+
+**Location Privacy Enforcement:**
+- Public property displays show only "{neighborhood}, {city}" format via the `formatLocation()` utility
+- Street addresses are never displayed in public views (Explore screen, property cards, detail modals)
+- Full addresses remain accessible to hosts for their own listings
+
+**City-Based Filtering:**
+- ExploreScreen defaults to showing properties only in the user's city
+- Filter automatically relaxes when searching for specific city/neighborhood names
+- Uses `getAllCities()` from locationData.ts for maintainable city list
+- Prevents location-irrelevant results while allowing targeted location searches
+
 ## Key Technical Decisions
 
 Key technical decisions include Babel module resolver for simplified imports, platform-specific UI adaptations (iOS, Android, Web), performance optimizations using React Native's New Architecture, React Compiler, Reanimated, and gesture-driven interactions. Error handling is managed by an error boundary component.
