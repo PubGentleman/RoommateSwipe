@@ -67,6 +67,13 @@ Preferred communication style: Simple, everyday language.
   - **Basic Plan:** 50 message limit, can purchase individual boosts for $3 each, no filters, no featured listings, no AI assistant, 1 group max
   - **Plus Plan ($14.99/month):** Unlimited messaging, 1 boost/week (included), advanced filters, AI match assistant, 3 groups max
   - **Priority Plan ($49.99-$99/month role-based):** Unlimited messaging, unlimited boosts (included), advanced filters, AI match assistant, featured listings (hosts only), 5 groups max
+- **Subscription Management:** Full lifecycle support for subscription changes with prorated access:
+  - **Cancellation Flow:** Users can cancel paid subscriptions at any time. Cancellation schedules downgrade to Basic plan at current billing cycle end. Users retain full access to paid features until `expiresAt` date. Cancelled subscriptions show status banner with expiry date and reactivation option.
+  - **Downgrade Flow:** Priority users can downgrade to Plus or Basic; Plus users can downgrade to Basic. Downgrades are scheduled for current billing period end. Users keep current plan features until scheduled change applies.
+  - **Scheduled Changes:** Tracked via `scheduledPlan` and `scheduledChangeDate` fields. Automatically enforced in `loadUser()` when app starts after scheduled date. Status banner displays scheduled change details and effective date.
+  - **Reactivation:** Users can undo cancellations or downgrades before effective date via "Reactivate Subscription" button. Clears scheduled changes and restores active status immediately.
+  - **Date Handling:** All subscription timestamps (expiresAt, scheduledChangeDate) normalized from ISO strings to Date objects on load for consistent comparison. Billing cycles aligned to original expiry dates to prevent drift.
+  - **UI Indicators:** PlansScreen shows current plan badge, scheduled change warning banner (orange for downgrades, red for cancellations), downgrade/cancel action buttons (hidden when change pending), and reactivation controls.
 - **Functional Differentiation:** All subscription features enforce limits in real-time with upgrade prompts guiding basic users to payment screen.
 - **Messaging Limits:** Enforced at send-time with message count tracking in User model. Basic users blocked after 50 messages with upgrade prompt.
 - **Boost System:** 24-hour profile visibility boost with visual "BOOSTED" badge. Basic users can purchase individual boosts for $3 each via in-app modal. Plus users get 1 boost every 7 days with cooldown tracking. Priority users have unlimited boosts. Expired boosts automatically removed from priority. All boosts provide the same 24-hour priority placement.

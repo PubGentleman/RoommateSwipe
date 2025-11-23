@@ -69,21 +69,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     const now = new Date();
-    const changeDate = new Date(user.subscription.scheduledChangeDate);
+    const changeDate = user.subscription.scheduledChangeDate instanceof Date 
+      ? user.subscription.scheduledChangeDate 
+      : new Date(user.subscription.scheduledChangeDate);
 
     if (isNaN(changeDate.getTime())) {
-      console.error('[Auth] Invalid scheduledChangeDate, clearing scheduled change');
-      const updatedUser: User = {
-        ...user,
-        subscription: {
-          ...user.subscription,
-          scheduledPlan: undefined,
-          scheduledChangeDate: undefined,
-        },
-      };
-      await StorageService.setCurrentUser(updatedUser);
-      await StorageService.addOrUpdateUser(updatedUser);
-      return updatedUser;
+      console.error('[Auth] Invalid scheduledChangeDate:', user.subscription.scheduledChangeDate);
+      return user;
     }
 
     if (changeDate.getTime() <= now.getTime()) {
@@ -102,7 +94,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       await StorageService.setCurrentUser(updatedUser);
       await StorageService.addOrUpdateUser(updatedUser);
-      console.log(`[Auth] Applied scheduled change to ${updatedUser.subscription?.plan}, new expiry: ${newExpiresAt}`);
+      console.log(`[Auth] Applied scheduled change to ${updatedUser.subscription?.plan}, new expiry: ${newExpiresAt.toISOString()}`);
       
       return updatedUser;
     }
