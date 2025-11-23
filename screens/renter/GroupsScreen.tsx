@@ -115,10 +115,10 @@ export const GroupsScreen = () => {
       setLikedGroupName(group.name);
       setShowLikedNotification(true);
       
-      // Hide notification after 1.2 seconds
+      // Hide notification after 0.8 seconds
       setTimeout(() => {
         setShowLikedNotification(false);
-      }, 1200);
+      }, 800);
     }, 400);
   };
 
@@ -143,7 +143,7 @@ export const GroupsScreen = () => {
     }
 
     // Wait for notification to finish before showing next card
-    const resetDelay = action === 'like' ? 1600 : 400;
+    const resetDelay = action === 'like' ? 1200 : 400;
     setTimeout(() => {
       translateX.value = 0;
       rotation.value = 0;
