@@ -35,6 +35,7 @@ export const ExploreScreen = () => {
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [showPropertyDetail, setShowPropertyDetail] = useState(false);
   const [viewMode, setViewMode] = useState<'all' | 'saved'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     loadProperties();
@@ -43,7 +44,7 @@ export const ExploreScreen = () => {
 
   useEffect(() => {
     applyFilters();
-  }, [properties, filters, viewMode, saved]);
+  }, [properties, filters, viewMode, saved, searchQuery]);
 
   const loadProperties = async () => {
     try {
@@ -76,6 +77,16 @@ export const ExploreScreen = () => {
 
     if (viewMode === 'saved') {
       filtered = filtered.filter(p => saved.has(p.id));
+    }
+
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(p => 
+        p.city.toLowerCase().includes(query) ||
+        p.state.toLowerCase().includes(query) ||
+        p.title.toLowerCase().includes(query) ||
+        p.address.toLowerCase().includes(query)
+      );
     }
 
     if (filters.minPrice !== undefined) {
@@ -283,9 +294,29 @@ export const ExploreScreen = () => {
       <View style={[styles.header, { paddingTop: insets.top + Spacing.lg }]}>
         <View style={[styles.searchBar, { backgroundColor: theme.backgroundDefault }]}>
           <Feather name="search" size={20} color={theme.textSecondary} />
-          <ThemedText style={[Typography.body, { color: theme.textSecondary, marginLeft: Spacing.md }]}>
-            Search location...
-          </ThemedText>
+          <TextInput
+            style={[
+              Typography.body,
+              {
+                flex: 1,
+                marginLeft: Spacing.md,
+                color: theme.text,
+                paddingVertical: 0,
+              }
+            ]}
+            placeholder="Search location..."
+            placeholderTextColor={theme.textSecondary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="words"
+            autoCorrect={false}
+            returnKeyType="search"
+          />
+          {searchQuery.length > 0 ? (
+            <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
+              <Feather name="x-circle" size={18} color={theme.textSecondary} />
+            </Pressable>
+          ) : null}
         </View>
         <Pressable style={styles.filterButton} onPress={handleFilterPress}>
           <Feather name="sliders" size={24} color={theme.text} />
