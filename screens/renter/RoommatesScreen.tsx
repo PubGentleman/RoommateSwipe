@@ -356,20 +356,26 @@ export const RoommatesScreen = () => {
     
     const conversations = await StorageService.getConversations();
     const existingConversation = conversations.find(c =>
-      c.participants.includes(user.id) && c.participants.includes(currentProfile.id)
+      c.participant.id === currentProfile.id
     );
     
     if (existingConversation) {
       (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: existingConversation.id } });
     } else {
       const newConversation = {
-        id: `conv-${Date.now()}`,
-        participants: [user.id, currentProfile.id],
+        id: `conv-${currentProfile.id}-${Date.now()}`,
+        participant: {
+          id: currentProfile.id,
+          name: currentProfile.name,
+          photo: currentProfile.photos?.[0],
+          online: false,
+        },
         lastMessage: '',
-        lastMessageTime: new Date().toISOString(),
-        unreadCount: 0,
+        timestamp: new Date(),
+        unread: 0,
+        messages: [],
       };
-      await StorageService.saveConversation(newConversation);
+      await StorageService.addOrUpdateConversation(newConversation);
       (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: newConversation.id } });
     }
     
@@ -948,6 +954,21 @@ export const RoommatesScreen = () => {
                   </ThemedText>
                 </View>
               </View>
+
+              <View style={[styles.detailSection, { paddingBottom: Spacing.xxl }]}>
+                <Pressable
+                  style={[styles.detailActionButton, { backgroundColor: theme.primary }]}
+                  onPress={() => {
+                    setShowProfileDetail(false);
+                    handleMessageClick();
+                  }}
+                >
+                  <Feather name="message-circle" size={20} color="#FFFFFF" />
+                  <ThemedText style={[Typography.h3, { color: '#FFFFFF', marginLeft: Spacing.md }]}>
+                    Send Message
+                  </ThemedText>
+                </Pressable>
+              </View>
             </ScrollView>
           </View>
         </View>
@@ -1240,5 +1261,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: Spacing.lg,
     borderRadius: BorderRadius.medium,
+  },
+  detailActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.lg,
+    borderRadius: BorderRadius.medium,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
 });

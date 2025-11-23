@@ -36,6 +36,9 @@ export const GroupsScreen = () => {
   const [showUndoUpgradeModal, setShowUndoUpgradeModal] = useState(false);
   const [processingUndoPass, setProcessingUndoPass] = useState(false);
   const [showGroupDetail, setShowGroupDetail] = useState(false);
+  const [showMessageModal, setShowMessageModal] = useState(false);
+  const [processingMessagePurchase, setProcessingMessagePurchase] = useState(false);
+  const [messageTargetUserId, setMessageTargetUserId] = useState<string | null>(null);
   
   const [groupName, setGroupName] = useState('');
   const [groupDescription, setGroupDescription] = useState('');
@@ -201,6 +204,96 @@ export const GroupsScreen = () => {
         setShowUndoUpgradeModal(false);
       }
     }
+  };
+
+  const handleMessageGroupCreator = async (creatorId: string) => {
+    const users = await StorageService.getUsers();
+    const currentUser = users.find(u => u.id === user?.id);
+    const userPlan = currentUser?.subscription?.plan || 'basic';
+    const userStatus = currentUser?.subscription?.status || 'active';
+    
+    const isPriorityMember = userPlan === 'priority' && userStatus === 'active';
+    
+    setMessageTargetUserId(creatorId);
+    
+    if (isPriorityMember) {
+      handleSendDirectMessage(creatorId);
+    } else {
+      setShowMessageModal(true);
+    }
+  };
+
+  const handleSendDirectMessage = async (targetUserId: string) => {
+    if (!user) return;
+    
+    const conversations = await StorageService.getConversations();
+    const existingConversation = conversations.find(c =>
+      c.participant.id === targetUserId
+    );
+    
+    if (existingConversation) {
+      navigation.navigate('Messages', { screen: 'Chat', params: { conversationId: existingConversation.id } });
+    } else {
+      // Get target user profile
+      const roommateProfiles = await StorageService.getRoommateProfiles();
+      const targetProfile = roommateProfiles.find(p => p.id === targetUserId);
+      
+      if (!targetProfile) return;
+      
+      const newConversation = {
+        id: `conv-${targetUserId}-${Date.now()}`,
+        participant: {
+          id: targetProfile.id,
+          name: targetProfile.name,
+          photo: targetProfile.photos?.[0],
+          online: false,
+        },
+        lastMessage: '',
+        timestamp: new Date(),
+        unread: 0,
+        messages: [],
+      };
+      await StorageService.addOrUpdateConversation(newConversation);
+      navigation.navigate('Messages', { screen: 'Chat', params: { conversationId: newConversation.id } });
+    }
+    
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
+  const handlePurchaseMessageCredit = async () => {
+    setProcessingMessagePurchase(true);
+    
+    // NOTE: This is a simulated payment flow for demonstration purposes.
+    // In a production app, you would need to:
+    // 1. Set up a backend API server (Express, etc.)
+    // 2. Create a Stripe payment intent for $0.99
+    // 3. Handle the payment confirmation
+    // 4. Grant the message credit upon successful payment
+    // 5. Track message credits in user data
+    
+    // Simulated payment processing (1 second delay)
+    setTimeout(async () => {
+      // In production, this would only execute after successful payment
+      const users = await StorageService.getUsers();
+      const currentUser = users.find(u => u.id === user?.id);
+      if (currentUser) {
+        // In production: increment message credits
+        // currentUser.messageCredits = (currentUser.messageCredits || 0) + 1;
+        // await StorageService.updateUser(currentUser);
+      }
+      
+      setProcessingMessagePurchase(false);
+      setShowMessageModal(false);
+      if (messageTargetUserId) {
+        await handleSendDirectMessage(messageTargetUserId);
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }, 1000);
+  };
+
+  const handleUpgradeForMessaging = () => {
+    setShowMessageModal(false);
+    navigation.navigate('Profile', { screen: 'Payment' });
   };
 
   const pan = Gesture.Pan()
@@ -1111,9 +1204,103 @@ export const GroupsScreen = () => {
                       ) : null;
                     })}
                   </View>
+
+                  <View style={[styles.detailSection, { paddingBottom: Spacing.xxl }]}>
+                    <Pressable
+                      style={[styles.detailActionButton, { backgroundColor: theme.primary }]}
+                      onPress={() => {
+                        setShowGroupDetail(false);
+                        handleMessageGroupCreator(currentGroup.createdBy);
+                      }}
+                    >
+                      <Feather name="message-circle" size={20} color="#FFFFFF" />
+                      <ThemedText style={[Typography.h3, { color: '#FFFFFF', marginLeft: Spacing.md }]}>
+                        Message Group Creator
+                      </ThemedText>
+                    </Pressable>
+                  </View>
                 </>
               ) : null}
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showMessageModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowMessageModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.vipModalContainer, { backgroundColor: theme.backgroundSecondary }]}>
+            <View style={[styles.vipModalHeader, { backgroundColor: theme.primary }]}>
+              <Feather name="message-circle" size={32} color="#FFFFFF" />
+            </View>
+            
+            <View style={styles.vipModalContent}>
+              <ThemedText style={[Typography.h2, { textAlign: 'center', marginBottom: Spacing.sm }]}>
+                Send Direct Message
+              </ThemedText>
+              <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary, marginBottom: Spacing.xl }]}>
+                Priority members can send messages without matching. Choose an option below to message this group creator.
+              </ThemedText>
+              
+              <View style={[styles.priceCard, { backgroundColor: theme.backgroundDefault, borderColor: theme.border, marginBottom: Spacing.lg }]}>
+                <ThemedText style={[Typography.h3, { marginBottom: Spacing.xs }]}>
+                  One-Time Message
+                </ThemedText>
+                <ThemedText style={[Typography.h1, { color: theme.primary, marginBottom: Spacing.xs }]}>
+                  $0.99
+                </ThemedText>
+                <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+                  Send a single message to this person
+                </ThemedText>
+              </View>
+              
+              <View style={styles.vipFeaturesList}>
+                <View style={styles.vipFeatureItem}>
+                  <Feather name="check-circle" size={20} color={theme.success} />
+                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
+                    Start a conversation instantly
+                  </ThemedText>
+                </View>
+                <View style={styles.vipFeatureItem}>
+                  <Feather name="check-circle" size={20} color={theme.success} />
+                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
+                    No matching required
+                  </ThemedText>
+                </View>
+              </View>
+            </View>
+            
+            <View style={styles.vipModalActions}>
+              <Pressable
+                style={[styles.vipModalButton, { backgroundColor: theme.primary, opacity: processingMessagePurchase ? 0.7 : 1 }]}
+                onPress={handlePurchaseMessageCredit}
+                disabled={processingMessagePurchase}
+              >
+                <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
+                  {processingMessagePurchase ? 'Processing...' : 'Send Message - $0.99'}
+                </ThemedText>
+              </Pressable>
+              <Pressable
+                style={[styles.vipModalButton, { backgroundColor: theme.warning, marginTop: Spacing.md }]}
+                onPress={handleUpgradeForMessaging}
+              >
+                <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
+                  Upgrade to Priority
+                </ThemedText>
+              </Pressable>
+              <Pressable
+                style={[styles.vipModalButtonSecondary, { borderColor: theme.border }]}
+                onPress={() => setShowMessageModal(false)}
+              >
+                <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
+                  Cancel
+                </ThemedText>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>
@@ -1414,5 +1601,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: Spacing.md,
+  },
+  detailActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.lg,
+    borderRadius: BorderRadius.medium,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
 });

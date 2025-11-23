@@ -14,14 +14,14 @@ type ChatScreenProps = {
   route: {
     params: {
       conversationId: string;
-      otherUser: RoommateProfile;
+      otherUser?: RoommateProfile;
     };
   };
   navigation: any;
 };
 
 export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
-  const { conversationId, otherUser } = route.params;
+  const { conversationId, otherUser: routeOtherUser } = route.params;
   const { theme } = useTheme();
   const { user, incrementMessageCount, canSendMessage } = useAuth();
   const insets = useSafeAreaInsets();
@@ -29,6 +29,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [inputText, setInputText] = useState('');
   const [showGroupOption, setShowGroupOption] = useState(true);
   const [isOnline, setIsOnline] = useState(Math.random() > 0.5);
+  const [otherUser, setOtherUser] = useState<RoommateProfile | null>(routeOtherUser || null);
   const flatListRef = useRef<FlatList>(null);
 
   // Tab bar height for bottom padding
@@ -49,6 +50,22 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     const conversation = conversations.find(c => c.id === conversationId);
     if (conversation) {
       setMessages(conversation.messages || []);
+      
+      // Load other user data from conversation if not provided in route params
+      if (!otherUser && conversation.participant) {
+        const roommateProfiles = await StorageService.getRoommateProfiles();
+        const profile = roommateProfiles.find(p => p.id === conversation.participant.id);
+        if (profile) {
+          setOtherUser(profile);
+        } else {
+          // Fallback: create minimal profile from conversation participant
+          setOtherUser({
+            id: conversation.participant.id,
+            name: conversation.participant.name,
+            photos: conversation.participant.photo ? [conversation.participant.photo] : [],
+          } as RoommateProfile);
+        }
+      }
     }
   };
 
@@ -96,6 +113,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   };
 
   const handleCreateGroup = () => {
+    if (!otherUser) return;
     navigation.navigate('CreateGroup', {
       matchedUserId: otherUser.id,
       matchedUserName: otherUser.name,
@@ -131,6 +149,15 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       </View>
     );
   };
+
+  // Guard: wait for otherUser to load
+  if (!otherUser) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.backgroundRoot, justifyContent: 'center', alignItems: 'center' }]}>
+        <ThemedText>Loading...</ThemedText>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
