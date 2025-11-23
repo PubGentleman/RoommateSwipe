@@ -764,10 +764,11 @@ export const StorageService = {
       const existingProperties = await this.getProperties();
       const existingProfiles = await this.getRoommateProfiles();
       const existingGroups = await this.getGroups();
+      const existingUsers = await this.getUsers();
       
       const hasWalkScores = existingProperties.length > 0 && existingProperties.every(p => p.walkScore !== undefined);
       
-      if (existingProperties.length > 0 && existingProfiles.length > 0 && existingGroups.length > 0 && hasWalkScores) {
+      if (existingProperties.length > 0 && existingProfiles.length > 0 && existingGroups.length > 0 && existingUsers.length > 0 && hasWalkScores) {
         console.log('[StorageService] Data already initialized, skipping mock data load');
         return;
       }
@@ -788,13 +789,16 @@ export const StorageService = {
       await this.setGroups(mockGroups);
       console.log(`[StorageService] ✓ Loaded ${mockGroups.length} groups`);
       
-      // Force reload profile users to ensure new fields (age, profilePicture) are included
-      await AsyncStorage.removeItem(STORAGE_KEYS.USERS);
-      console.log('[StorageService] Cleared users to force reload with new fields');
-      for (const profileUser of mockProfileUsers) {
-        await this.addOrUpdateUser(profileUser);
+      // Only seed users if they don't exist yet
+      if (existingUsers.length === 0) {
+        console.log('[StorageService] No existing users found, seeding profile users...');
+        for (const profileUser of mockProfileUsers) {
+          await this.addOrUpdateUser(profileUser);
+        }
+        console.log(`[StorageService] ✓ Seeded ${mockProfileUsers.length} profile users`);
+      } else {
+        console.log('[StorageService] Users already exist, preserving user data');
       }
-      console.log(`[StorageService] ✓ Seeded ${mockProfileUsers.length} profile users`);
       
       console.log('[StorageService] Mock data initialization complete!');
     } catch (error) {

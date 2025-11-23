@@ -1,14 +1,124 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Pressable, Alert, TextInput, ScrollView, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import { ScreenKeyboardAwareScrollView } from '../../components/ScreenKeyboardAwareScrollView';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
 import { Spacing, BorderRadius, Typography } from '../../constants/theme';
+
+const DraggablePhoto = ({ photo, index, photos, theme, onRemove, onMoveLeft, onMoveRight, onReorder }: any) => {
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const scale = useSharedValue(1);
+  const isDragging = useSharedValue(false);
+
+  const handleReorder = (fromIndex: number, toIndex: number) => {
+    const newPhotos = [...photos];
+    const [removed] = newPhotos.splice(fromIndex, 1);
+    newPhotos.splice(toIndex, 0, removed);
+    onReorder(newPhotos);
+  };
+
+  const longPress = Gesture.LongPress()
+    .minDuration(200)
+    .onStart(() => {
+      isDragging.value = true;
+      scale.value = withSpring(1.1);
+      runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Medium);
+    });
+
+  const pan = Gesture.Pan()
+    .onChange((event) => {
+      if (isDragging.value) {
+        translateX.value = event.translationX;
+        translateY.value = event.translationY;
+      }
+    })
+    .onEnd((event) => {
+      if (isDragging.value) {
+        const photoWidth = 120 + Spacing.md;
+        const movedBy = Math.round(event.translationX / photoWidth);
+        const newIndex = index + movedBy;
+        
+        if (newIndex >= 0 && newIndex < photos.length && movedBy !== 0) {
+          runOnJS(handleReorder)(index, newIndex);
+        }
+      }
+      
+      translateX.value = withSpring(0);
+      translateY.value = withSpring(0);
+      scale.value = withSpring(1);
+      isDragging.value = false;
+    });
+
+  const gesture = Gesture.Simultaneous(longPress, pan);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+      { scale: scale.value },
+    ],
+    zIndex: isDragging.value ? 999 : 1,
+    opacity: isDragging.value ? 0.9 : 1,
+  }));
+
+  return (
+    <GestureDetector gesture={gesture}>
+      <Animated.View style={[styles.photoWrapper, animatedStyle]}>
+        <Image source={{ uri: photo }} style={styles.photoPreview} />
+        {index === 0 ? (
+          <View style={[styles.mainBadge, { backgroundColor: theme.primary }]}>
+            <ThemedText style={[Typography.caption, { color: '#FFFFFF', fontWeight: '600' }]}>
+              Main
+            </ThemedText>
+          </View>
+        ) : null}
+        <Pressable
+          style={[styles.removePhotoButton, { backgroundColor: theme.error }]}
+          onPress={() => {
+            console.log('[DraggablePhoto] Remove button clicked, index:', index);
+            onRemove(index);
+          }}
+        >
+          <Feather name="x" size={16} color="#FFFFFF" />
+        </Pressable>
+        
+        <View style={styles.reorderButtons} pointerEvents="box-none">
+          {index > 0 ? (
+            <Pressable
+              style={[styles.reorderButton, { backgroundColor: 'rgba(0, 0, 0, 0.6)' }]}
+              onPress={() => {
+                console.log('[DraggablePhoto] Left arrow clicked, index:', index);
+                onMoveLeft(index);
+              }}
+            >
+              <Feather name="chevron-left" size={20} color="#FFFFFF" />
+            </Pressable>
+          ) : null}
+          {index < photos.length - 1 ? (
+            <Pressable
+              style={[styles.reorderButton, { backgroundColor: 'rgba(0, 0, 0, 0.6)' }]}
+              onPress={() => {
+                console.log('[DraggablePhoto] Right arrow clicked, index:', index);
+                onMoveRight(index);
+              }}
+            >
+              <Feather name="chevron-right" size={20} color="#FFFFFF" />
+            </Pressable>
+          ) : null}
+        </View>
+      </Animated.View>
+    </GestureDetector>
+  );
+};
 
 export const EditProfileScreen = () => {
   const { theme } = useTheme();
@@ -18,6 +128,14 @@ export const EditProfileScreen = () => {
   const [photos, setPhotos] = useState<string[]>(user?.photos || [user?.profilePicture].filter(Boolean) as string[] || []);
   const [name, setName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
+  
+  useEffect(() => {
+    if (user?.photos && user.photos.length > 0) {
+      setPhotos(user.photos);
+    } else if (user?.profilePicture) {
+      setPhotos([user.profilePicture]);
+    }
+  }, [user?.photos, user?.profilePicture]);
   const [bio, setBio] = useState(user?.profileData?.bio || '');
   const [budget, setBudget] = useState(user?.profileData?.budget?.toString() || '');
   const [location, setLocation] = useState(user?.profileData?.location || '');
@@ -112,6 +230,24 @@ export const EditProfileScreen = () => {
 
   const removePhoto = (index: number) => {
     setPhotos(photos.filter((_, i) => i !== index));
+  };
+
+  const movePhotoLeft = (index: number) => {
+    console.log('[EditProfile] movePhotoLeft called, index:', index, 'photos length:', photos.length);
+    if (index === 0) return;
+    const newPhotos = [...photos];
+    [newPhotos[index - 1], newPhotos[index]] = [newPhotos[index], newPhotos[index - 1]];
+    console.log('[EditProfile] New photo order:', newPhotos.map((p, i) => `${i}: ${p.substring(p.length - 10)}`));
+    setPhotos(newPhotos);
+  };
+
+  const movePhotoRight = (index: number) => {
+    console.log('[EditProfile] movePhotoRight called, index:', index, 'photos length:', photos.length);
+    if (index === photos.length - 1) return;
+    const newPhotos = [...photos];
+    [newPhotos[index], newPhotos[index + 1]] = [newPhotos[index + 1], newPhotos[index]];
+    console.log('[EditProfile] New photo order:', newPhotos.map((p, i) => `${i}: ${p.substring(p.length - 10)}`));
+    setPhotos(newPhotos);
   };
 
   const toggleLifestyle = (item: 'active_gym' | 'homebody' | 'nightlife_social' | 'quiet_introverted' | 'creative_artistic' | 'professional_focused') => {
@@ -239,7 +375,7 @@ export const EditProfileScreen = () => {
         <View style={styles.section}>
           <ThemedText style={[Typography.h3, styles.sectionTitle]}>Profile Photos</ThemedText>
           <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.md }]}>
-            Add up to 6 photos. Your first photo will be your main profile picture.
+            Add up to 6 photos. Long press and drag to reorder, or use arrow buttons. Your first photo will be your main profile picture.
           </ThemedText>
           
           <ScrollView 
@@ -249,22 +385,17 @@ export const EditProfileScreen = () => {
             contentContainerStyle={styles.photosContainer}
           >
             {photos.map((photo, index) => (
-              <View key={index} style={styles.photoWrapper}>
-                <Image source={{ uri: photo }} style={styles.photoPreview} />
-                {index === 0 ? (
-                  <View style={[styles.mainBadge, { backgroundColor: theme.primary }]}>
-                    <ThemedText style={[Typography.tiny, { color: '#FFFFFF', fontWeight: '600' }]}>
-                      Main
-                    </ThemedText>
-                  </View>
-                ) : null}
-                <Pressable
-                  style={[styles.removePhotoButton, { backgroundColor: theme.error }]}
-                  onPress={() => removePhoto(index)}
-                >
-                  <Feather name="x" size={16} color="#FFFFFF" />
-                </Pressable>
-              </View>
+              <DraggablePhoto
+                key={photo}
+                photo={photo}
+                index={index}
+                photos={photos}
+                theme={theme}
+                onRemove={removePhoto}
+                onMoveLeft={movePhotoLeft}
+                onMoveRight={movePhotoRight}
+                onReorder={setPhotos}
+              />
             ))}
             
             {photos.length < 6 ? (
@@ -621,6 +752,22 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.medium,
     borderWidth: 2,
     borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reorderButtons: {
+    position: 'absolute',
+    bottom: Spacing.xs,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+  },
+  reorderButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
