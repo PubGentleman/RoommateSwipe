@@ -701,9 +701,18 @@ export const GroupsScreen = () => {
             placeholder="e.g., 3"
             placeholderTextColor={theme.textSecondary}
             value={groupBedrooms}
-            onChangeText={setGroupBedrooms}
+            onChangeText={(value) => {
+              setGroupBedrooms(value);
+              // Auto-set max members to match bedrooms
+              if (value.trim() && !isNaN(parseInt(value))) {
+                setGroupMaxMembers(value);
+              }
+            }}
             keyboardType="numeric"
           />
+          <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
+            Maximum members will automatically match the number of bedrooms
+          </ThemedText>
         </View>
 
         <View style={styles.inputGroup}>
@@ -722,10 +731,12 @@ export const GroupsScreen = () => {
         </View>
 
         <View style={styles.inputGroup}>
-          <ThemedText style={[Typography.body, { marginBottom: Spacing.xs }]}>Maximum Members (2-10) *</ThemedText>
+          <ThemedText style={[Typography.body, { marginBottom: Spacing.xs }]}>
+            Maximum Members (2-10) {groupBedrooms.trim() ? '(Auto-set from bedrooms)' : '*'}
+          </ThemedText>
           <TextInput
             style={[styles.input, { 
-              backgroundColor: theme.backgroundDefault, 
+              backgroundColor: groupBedrooms.trim() ? theme.backgroundSecondary : theme.backgroundDefault, 
               color: theme.text,
               borderColor: theme.border
             }]}
@@ -734,7 +745,13 @@ export const GroupsScreen = () => {
             value={groupMaxMembers}
             onChangeText={setGroupMaxMembers}
             keyboardType="numeric"
+            editable={!groupBedrooms.trim()}
           />
+          {groupBedrooms.trim() ? (
+            <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
+              Automatically set to match number of bedrooms
+            </ThemedText>
+          ) : null}
         </View>
 
         <Pressable
