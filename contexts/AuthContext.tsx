@@ -191,7 +191,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             profileData: {
               ...currentUser.profileData,
               neighborhood: 'Williamsburg',
-              city: 'Brooklyn',
+              city: 'New York',
               state: 'NY',
               coordinates: { lat: 40.7081, lng: -73.9571 },
             },
@@ -230,7 +230,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         messageCount: 0,
         profileData: role === 'renter' ? {
           neighborhood: 'Williamsburg',
-          city: 'Brooklyn',
+          city: 'New York',
           state: 'NY',
           coordinates: { lat: 40.7081, lng: -73.9571 },
         } : undefined,
@@ -242,7 +242,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         profileData: {
           ...mockUser.profileData,
           neighborhood: 'Williamsburg',
-          city: 'Brooklyn',
+          city: 'New York',
           state: 'NY',
           coordinates: { lat: 40.7081, lng: -73.9571 },
         },
@@ -271,7 +271,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       messageCount: 0,
       profileData: role === 'renter' ? {
         neighborhood: 'Williamsburg',
-        city: 'Brooklyn',
+        city: 'New York',
         state: 'NY',
         coordinates: { lat: 40.7081, lng: -73.9571 },
       } : undefined,
