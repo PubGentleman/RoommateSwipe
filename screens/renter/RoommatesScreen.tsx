@@ -335,19 +335,19 @@ export const RoommatesScreen = () => {
                 <View style={styles.badges}>
                   <View style={[styles.badge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
                     <Feather name="dollar-sign" size={14} color="#FFFFFF" />
-                    <ThemedText style={[Typography.small, { color: '#FFFFFF', marginLeft: Spacing.xs }]}>
+                    <ThemedText style={[Typography.small, { color: '#FFFFFF', marginLeft: Spacing.xs }]} numberOfLines={1}>
                       ${currentProfile.budget}/mo
                     </ThemedText>
                   </View>
                   <View style={[styles.badge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
                     <Feather name="map-pin" size={14} color="#FFFFFF" />
-                    <ThemedText style={[Typography.small, { color: '#FFFFFF', marginLeft: Spacing.xs }]}>
+                    <ThemedText style={[Typography.small, { color: '#FFFFFF', marginLeft: Spacing.xs, flex: 1 }]} numberOfLines={1}>
                       {currentProfile.preferences.location}
                     </ThemedText>
                   </View>
                   <View style={[styles.badge, { backgroundColor: getMatchQualityColor(currentProfile.compatibility || 50) }]}>
                     <Feather name="heart" size={14} color="#FFFFFF" />
-                    <ThemedText style={[Typography.small, { color: '#FFFFFF', marginLeft: Spacing.xs, fontWeight: '600' }]}>
+                    <ThemedText style={[Typography.small, { color: '#FFFFFF', marginLeft: Spacing.xs, fontWeight: '600' }]} numberOfLines={1}>
                       {currentProfile.compatibility || 50}% Match
                     </ThemedText>
                   </View>
@@ -647,6 +647,7 @@ const styles = StyleSheet.create({
   },
   badges: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: Spacing.sm,
     marginTop: Spacing.md,
   },
@@ -656,6 +657,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.small,
+    flexShrink: 1,
+    maxWidth: CARD_WIDTH - (Spacing.xxl * 2),
   },
   actions: {
     flexDirection: 'row',
