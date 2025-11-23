@@ -772,6 +772,25 @@ export const ExploreScreen = () => {
                     </ThemedText>
                   </View>
 
+                  {selectedProperty.hostProfileId && hostProfiles.get(selectedProperty.hostProfileId) ? (
+                    <View style={styles.detailSection}>
+                      <View style={styles.detailRow}>
+                        <ThemedText style={{ fontSize: 24 }}>
+                          {(() => {
+                            const hostUser = hostProfiles.get(selectedProperty.hostProfileId!);
+                            return hostUser?.profileData?.gender ? getGenderSymbol(hostUser.profileData.gender) : '';
+                          })()}
+                        </ThemedText>
+                        <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Host</ThemedText>
+                          <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
+                            {selectedProperty.hostName}
+                          </ThemedText>
+                        </View>
+                      </View>
+                    </View>
+                  ) : null}
+
                   <View style={styles.detailSection}>
                     <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Description</ThemedText>
                     <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
@@ -916,15 +935,6 @@ export const ExploreScreen = () => {
                     </View>
                   </View>
 
-                  <View style={[styles.detailSection, { paddingBottom: Spacing.xxl }]}>
-                    <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Host</ThemedText>
-                    <View style={styles.detailRow}>
-                      <Feather name="user" size={20} color={theme.primary} />
-                      <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                        <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{selectedProperty.hostName}</ThemedText>
-                      </View>
-                    </View>
-                  </View>
                 </>
               ) : null}
             </ScrollView>

@@ -46,8 +46,8 @@ The system supports mock authentication with email/password and planned SSO (App
 The current implementation uses mock data and TypeScript interfaces for data models such as `RoommateProfile`, `Property`, `Group`, `Conversation`, `Message`, `Match`, and `Application`. The User model tracks `messageCount` and `boostData`. It implements reciprocal matching, automatic conversation creation, and enforces message limits. Group management includes swipeable discovery and a request-to-join workflow. Property management handles featured status, host listing filtering, room type differentiation (room vs entire apartment), existing roommate gender tracking, and host profile linking for compatibility calculations. The architecture is designed for future integration with a SQL database.
 
 **Property Model Enhancements:**
-- `roomType`: Distinguishes between 'room' (single room in shared apartment) and 'entire' (entire apartment)
-- `existingRoommateGender`: Tracks gender ('male' or 'female') of existing roommate for room listings
+- `roomType`: Distinguishes between 'room' (single room in shared apartment) and 'entire' (entire apartment). **Note:** Studios should be listed as 'entire' unless the host is sharing the bedroom with another person (2+ people in same bedroom).
+- `existingRoommates`: Array tracking all current household members with fields for gender, onApp status, and userId for those with accounts
 - `hostProfileId`: Links to host's User profile for compatibility score calculation using the matching algorithm
 - `propertyType`: Distinguishes between 'lease' (long-term) and 'sublet' (short-term) arrangements
 
