@@ -24,6 +24,9 @@ interface AuthContextType {
   purchaseBoost: () => Promise<{ success: boolean; message: string }>;
   purchaseUndoPass: () => Promise<{ success: boolean; message: string }>;
   hasActiveUndoPass: () => boolean;
+  getActiveChatLimit: () => number;
+  canStartNewChat: (conversationId: string) => Promise<{ canStart: boolean; limit: number; current: number; reason?: string }>;
+  incrementActiveChatCount: (conversationId: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -588,8 +591,80 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return expiresAt ? expiresAt > now : false;
   };
 
+  const getActiveChatLimit = (): number => {
+    if (!user) return 3;
+    
+    const userPlan = user.subscription?.plan || 'basic';
+    const userStatus = user.subscription?.status || 'active';
+    
+    if (userStatus !== 'active') return 3;
+    
+    if (userPlan === 'elite') return Infinity;
+    if (userPlan === 'plus') return 10;
+    return 3;
+  };
+
+  const canStartNewChat = async (conversationId: string): Promise<{ canStart: boolean; limit: number; current: number; reason?: string }> => {
+    if (!user) {
+      return { canStart: false, limit: 3, current: 0, reason: 'Not logged in' };
+    }
+
+    const limit = getActiveChatLimit();
+    
+    if (limit === Infinity) {
+      return { canStart: true, limit, current: user.activeChatsCount || 0 };
+    }
+
+    const conversations = await StorageService.getConversations();
+    const activeChats = conversations.filter(conv => {
+      if (!conv.messages || conv.messages.length === 0) return false;
+      
+      const userSentMessage = conv.messages.some(msg => msg.senderId === user.id);
+      return userSentMessage;
+    });
+
+    const current = activeChats.length;
+    const isCurrentChatActive = activeChats.some(conv => conv.id === conversationId);
+    
+    if (isCurrentChatActive || current < limit) {
+      return { canStart: true, limit, current };
+    }
+
+    const userPlan = user.subscription?.plan || 'basic';
+    const planName = userPlan.charAt(0).toUpperCase() + userPlan.slice(1);
+    return { 
+      canStart: false, 
+      limit, 
+      current,
+      reason: `You've reached your active chat limit (${current}/${limit}). Upgrade to ${userPlan === 'basic' ? 'Plus (10 chats)' : 'Elite (unlimited)'} for more!` 
+    };
+  };
+
+  const incrementActiveChatCount = async (conversationId: string): Promise<void> => {
+    if (!user) return;
+
+    const conversations = await StorageService.getConversations();
+    const activeChats = conversations.filter(conv => {
+      if (!conv.messages || conv.messages.length === 0) return false;
+      return conv.messages.some(msg => msg.senderId === user.id);
+    });
+
+    const newCount = activeChats.length;
+    
+    const updatedUser: User = {
+      ...user,
+      activeChatsCount: newCount,
+    };
+    
+    await StorageService.setCurrentUser(updatedUser);
+    await StorageService.addOrUpdateUser(updatedUser);
+    setUser(updatedUser);
+    
+    console.log('[Auth] Active chats updated:', newCount);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, reactivateSubscription, updateUser, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, reactivateSubscription, updateUser, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount }}>
       {children}
     </AuthContext.Provider>
   );

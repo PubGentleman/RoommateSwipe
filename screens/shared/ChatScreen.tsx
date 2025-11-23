@@ -23,7 +23,7 @@ type ChatScreenProps = {
 export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const { conversationId, otherUser: routeOtherUser } = route.params;
   const { theme } = useTheme();
-  const { user, incrementMessageCount, canSendMessage } = useAuth();
+  const { user, incrementMessageCount, canSendMessage, canStartNewChat, incrementActiveChatCount } = useAuth();
   const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
@@ -87,17 +87,40 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       return;
     }
 
-    const newMessage: Message = {
-      id: `msg_${Date.now()}`,
-      senderId: user.id,
-      text: inputText.trim(),
-      timestamp: new Date(),
-    };
-
     const conversations = await StorageService.getConversations();
     const conversationIndex = conversations.findIndex(c => c.id === conversationId);
     
     if (conversationIndex >= 0) {
+      const isFirstMessageFromUser = !conversations[conversationIndex].messages?.some(
+        msg => msg.senderId === user.id
+      );
+
+      if (isFirstMessageFromUser) {
+        const chatCheck = await canStartNewChat(conversationId);
+        
+        if (!chatCheck.canStart) {
+          Alert.alert(
+            'Active Chat Limit Reached',
+            chatCheck.reason || 'Cannot start a new chat',
+            [
+              { text: 'Maybe Later', style: 'cancel' },
+              {
+                text: 'View Plans',
+                onPress: () => navigation.navigate('Profile', { screen: 'Payment' }),
+              },
+            ]
+          );
+          return;
+        }
+      }
+
+      const newMessage: Message = {
+        id: `msg_${Date.now()}`,
+        senderId: user.id,
+        text: inputText.trim(),
+        timestamp: new Date(),
+      };
+      
       if (!conversations[conversationIndex].messages) {
         conversations[conversationIndex].messages = [];
       }
@@ -106,6 +129,11 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       conversations[conversationIndex].lastMessage = newMessage.text || '';
       await StorageService.setConversations(conversations);
       await incrementMessageCount();
+      
+      if (isFirstMessageFromUser) {
+        await incrementActiveChatCount(conversationId);
+      }
+      
       setMessages([...conversations[conversationIndex].messages]);
       setInputText('');
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
