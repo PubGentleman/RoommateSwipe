@@ -613,8 +613,8 @@ const styles = StyleSheet.create({
   },
   boostBadgeLeft: {
     position: 'absolute',
-    top: Spacing.lg,
-    left: Spacing.lg,
+    top: Spacing.md,
+    right: Spacing.lg,
     zIndex: 2,
   },
   boostBadge: {
