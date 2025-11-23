@@ -35,6 +35,8 @@ export const RoommatesScreen = () => {
   const [showVIPModal, setShowVIPModal] = useState(false);
   const [showPurchaseBoostModal, setShowPurchaseBoostModal] = useState(false);
   const [processingBoost, setProcessingBoost] = useState(false);
+  const [lastSwipedProfile, setLastSwipedProfile] = useState<{ profile: RoommateProfile; action: 'like' | 'nope' | 'superlike' } | null>(null);
+  const [showUndoUpgradeModal, setShowUndoUpgradeModal] = useState(false);
 
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -145,6 +147,8 @@ export const RoommatesScreen = () => {
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     
+    setLastSwipedProfile({ profile: currentProfile, action });
+    
     const direction = action === 'like' ? 1 : action === 'nope' ? -1 : 0;
     const toX = direction * SCREEN_WIDTH * 1.5;
     const toY = action === 'superlike' ? -SCREEN_HEIGHT : 0;
@@ -161,6 +165,37 @@ export const RoommatesScreen = () => {
     }, 300);
 
     processSwipeAsync(action, currentProfile.id, user.id);
+  };
+
+  const handleUndo = () => {
+    const userPlan = user?.subscription?.plan || 'basic';
+    
+    if (userPlan === 'basic') {
+      setShowUndoUpgradeModal(true);
+      return;
+    }
+    
+    if (!lastSwipedProfile) return;
+    
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
+    undoLastSwipeAsync(lastSwipedProfile.profile.id, lastSwipedProfile.action);
+    
+    setCurrentIndex(currentIndex - 1);
+    setLastSwipedProfile(null);
+  };
+
+  const undoLastSwipeAsync = async (profileId: string, action: 'like' | 'nope' | 'superlike') => {
+    try {
+      await StorageService.removeFromSwipeHistory(profileId);
+      
+      if (action === 'like' || action === 'superlike') {
+        await StorageService.removeLike(user!.id, profileId);
+        await StorageService.removeMatch(user!.id, profileId);
+      }
+    } catch (error) {
+      console.error('[RoommatesScreen] Error undoing swipe:', error);
+    }
   };
 
   const processSwipeAsync = async (action: 'like' | 'nope' | 'superlike', profileId: string, userId: string) => {
@@ -360,6 +395,19 @@ export const RoommatesScreen = () => {
 
       <View style={[styles.actions, { paddingBottom: 90 }]}>
         <Pressable
+          style={[
+            styles.actionButtonSmall, 
+            { 
+              backgroundColor: '#FFFFFF', 
+              borderColor: lastSwipedProfile ? Colors.warning : theme.textSecondary,
+              opacity: lastSwipedProfile ? 1 : 0.4,
+            }
+          ]}
+          onPress={handleUndo}
+        >
+          <Feather name="rotate-ccw" size={24} color={lastSwipedProfile ? Colors.warning : theme.textSecondary} />
+        </Pressable>
+        <Pressable
           style={[styles.actionButton, { backgroundColor: '#FFFFFF', borderColor: theme.error }]}
           onPress={() => handleSwipeAction('nope')}
         >
@@ -522,6 +570,73 @@ export const RoommatesScreen = () => {
               >
                 <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
                   Cancel
+                </ThemedText>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showUndoUpgradeModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowUndoUpgradeModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.vipModalContainer, { backgroundColor: theme.backgroundSecondary }]}>
+            <View style={[styles.vipModalHeader, { backgroundColor: Colors.warning }]}>
+              <Feather name="rotate-ccw" size={32} color="#FFFFFF" />
+            </View>
+            
+            <View style={styles.vipModalContent}>
+              <ThemedText style={[Typography.h2, { textAlign: 'center', marginBottom: Spacing.sm }]}>
+                Undo Swipe
+              </ThemedText>
+              <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary, marginBottom: Spacing.xl }]}>
+                Take back your last swipe and get a second chance! This feature is available for Plus and Priority members.
+              </ThemedText>
+              
+              <View style={styles.vipFeaturesList}>
+                <View style={styles.vipFeatureItem}>
+                  <Feather name="check-circle" size={20} color={theme.success} />
+                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
+                    Undo your last swipe anytime
+                  </ThemedText>
+                </View>
+                <View style={styles.vipFeatureItem}>
+                  <Feather name="check-circle" size={20} color={theme.success} />
+                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
+                    Unlimited messaging
+                  </ThemedText>
+                </View>
+                <View style={styles.vipFeatureItem}>
+                  <Feather name="check-circle" size={20} color={theme.success} />
+                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
+                    Advanced filters and more
+                  </ThemedText>
+                </View>
+              </View>
+            </View>
+            
+            <View style={styles.vipModalActions}>
+              <Pressable
+                style={[styles.vipModalButton, { backgroundColor: theme.primary }]}
+                onPress={() => {
+                  setShowUndoUpgradeModal(false);
+                  navigation.navigate('Settings' as never);
+                }}
+              >
+                <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
+                  Upgrade to Plus
+                </ThemedText>
+              </Pressable>
+              <Pressable
+                style={[styles.vipModalButtonSecondary, { borderColor: theme.border }]}
+                onPress={() => setShowUndoUpgradeModal(false)}
+              >
+                <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
+                  Maybe Later
                 </ThemedText>
               </Pressable>
             </View>

@@ -349,6 +349,19 @@ export const StorageService = {
     }
   },
 
+  async removeMatch(userId1: string, userId2: string): Promise<void> {
+    try {
+      const matches = await this.getMatches();
+      const filteredMatches = matches.filter(
+        m => !((m.userId1 === userId1 && m.userId2 === userId2) || 
+               (m.userId1 === userId2 && m.userId2 === userId1))
+      );
+      await AsyncStorage.setItem(STORAGE_KEYS.MATCHES, JSON.stringify(filteredMatches));
+    } catch (error) {
+      console.error('Error removing match:', error);
+    }
+  },
+
   async getApplications(): Promise<Application[]> {
     try {
       const data = await AsyncStorage.getItem(STORAGE_KEYS.APPLICATIONS);
@@ -407,6 +420,16 @@ export const StorageService = {
     }
   },
 
+  async removeFromSwipeHistory(profileId: string): Promise<void> {
+    try {
+      const history = await this.getSwipeHistory();
+      history.delete(profileId);
+      await AsyncStorage.setItem(STORAGE_KEYS.SWIPE_HISTORY, JSON.stringify(Array.from(history)));
+    } catch (error) {
+      console.error('Error removing from swipe history:', error);
+    }
+  },
+
   async getLikes(): Promise<Record<string, string[]>> {
     try {
       const data = await AsyncStorage.getItem(STORAGE_KEYS.LIKES);
@@ -429,6 +452,18 @@ export const StorageService = {
       }
     } catch (error) {
       console.error('Error adding like:', error);
+    }
+  },
+
+  async removeLike(userId: string, likedProfileId: string): Promise<void> {
+    try {
+      const likes = await this.getLikes();
+      if (likes[userId]) {
+        likes[userId] = likes[userId].filter(id => id !== likedProfileId);
+        await AsyncStorage.setItem(STORAGE_KEYS.LIKES, JSON.stringify(likes));
+      }
+    } catch (error) {
+      console.error('Error removing like:', error);
     }
   },
 
