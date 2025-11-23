@@ -7,6 +7,7 @@ import { PaymentScreen } from '../screens/shared/PaymentScreen';
 import { PlansScreen } from '../screens/shared/PlansScreen';
 import { EditProfileScreen } from '../screens/shared/EditProfileScreen';
 import { NotificationsScreen } from '../screens/shared/NotificationsScreen';
+import { PrivacySecurityScreen } from '../screens/shared/PrivacySecurityScreen';
 
 export type ProfileStackParamList = {
   ProfileMain: undefined;
@@ -14,6 +15,7 @@ export type ProfileStackParamList = {
   Plans: undefined;
   EditProfile: undefined;
   Notifications: undefined;
+  PrivacySecurity: undefined;
 };
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
@@ -67,6 +69,22 @@ export const ProfileStackNavigator = () => {
         options={{
           headerShown: false,
         }}
+      />
+      <Stack.Screen 
+        name="PrivacySecurity" 
+        component={PrivacySecurityScreen}
+        options={({ navigation }) => ({
+          headerShown: true,
+          headerTransparent: true,
+          headerTitle: 'Privacy & Security',
+          headerBlurEffect: 'regular',
+          headerBackVisible: true,
+          headerLeft: () => (
+            <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
+              <Feather name="chevron-left" size={28} color="#007AFF" />
+            </Pressable>
+          ),
+        })}
       />
     </Stack.Navigator>
   );
