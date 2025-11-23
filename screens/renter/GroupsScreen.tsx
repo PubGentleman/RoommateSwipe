@@ -13,6 +13,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { mockRoommateProfiles } from '../../utils/mockData';
+import { getGenderSymbol } from '../../utils/matchingAlgorithm';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - Spacing.xxl;
@@ -461,7 +462,7 @@ export const GroupsScreen = () => {
             {memberProfiles.map(profile => (
               <View key={profile.id} style={styles.memberRow}>
                 <ThemedText style={Typography.body}>
-                  {profile.name || 'Unknown'}{profile.age ? `, ${profile.age}` : ''}{profile.gender ? `, ${profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1)}` : ''}
+                  {profile.name || 'Unknown'}{profile.age ? `, ${profile.age}` : ''} {getGenderSymbol(profile.gender)}
                 </ThemedText>
                 {isCreator && profile.id !== user?.id ? (
                   <Pressable onPress={() => handleRemoveMember(group.id, profile.id, profile.name || 'Member')}>
@@ -481,7 +482,7 @@ export const GroupsScreen = () => {
             {pendingProfiles.map(profile => (
               <View key={profile.id} style={styles.pendingRow}>
                 <ThemedText style={Typography.body}>
-                  {profile.name || 'Unknown'}{profile.age ? `, ${profile.age}` : ''}{profile.gender ? `, ${profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1)}` : ''}
+                  {profile.name || 'Unknown'}{profile.age ? `, ${profile.age}` : ''} {getGenderSymbol(profile.gender)}
                 </ThemedText>
                 <View style={styles.pendingActions}>
                   <Pressable
@@ -1104,7 +1105,7 @@ export const GroupsScreen = () => {
                       return profile ? (
                         <View key={memberId} style={styles.memberRow}>
                           <ThemedText style={Typography.body}>
-                            {profile.name}{profile.age ? `, ${profile.age}` : ''}{profile.gender ? `, ${profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1)}` : ''}
+                            {profile.name}{profile.age ? `, ${profile.age}` : ''} {getGenderSymbol(profile.gender)}
                           </ThemedText>
                         </View>
                       ) : null;
