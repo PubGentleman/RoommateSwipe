@@ -2,6 +2,42 @@ import { User, RoommateProfile } from '../types/models';
 import { isNearbyNeighborhood, isSameCity } from './locationData';
 
 /**
+ * Format location for display with privacy in mind
+ * Shows neighborhood and city instead of full street address
+ * @param location - Object containing neighborhood, city, state, and address
+ * @returns Formatted location string (e.g., "Williamsburg, New York")
+ */
+export const formatLocation = (location: {
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  address?: string;
+}): string => {
+  // Priority 1: Neighborhood + City
+  if (location.neighborhood && location.city) {
+    return `${location.neighborhood}, ${location.city}`;
+  }
+  
+  // Priority 2: Just neighborhood (if available)
+  if (location.neighborhood) {
+    return location.neighborhood;
+  }
+  
+  // Priority 3: City + State
+  if (location.city && location.state) {
+    return `${location.city}, ${location.state}`;
+  }
+  
+  // Priority 4: Just city
+  if (location.city) {
+    return location.city;
+  }
+  
+  // Fallback: Use address (should be avoided for privacy, but better than nothing)
+  return location.address || 'Location not specified';
+};
+
+/**
  * Comprehensive points-based matching algorithm for roommate compatibility
  * 
  * Uses ALL profile data with weighted scoring (Total: 100 points):

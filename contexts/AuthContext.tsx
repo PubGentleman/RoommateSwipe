@@ -178,6 +178,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
 
+        if (currentUser.role === 'renter' && !currentUser.profileData?.city) {
+          currentUser = {
+            ...currentUser,
+            profileData: {
+              ...currentUser.profileData,
+              neighborhood: 'Williamsburg',
+              city: 'Brooklyn',
+              state: 'NY',
+              coordinates: { lat: 40.7081, lng: -73.9571 },
+            },
+          };
+          await StorageService.setCurrentUser(currentUser);
+          await StorageService.addOrUpdateUser(currentUser);
+        }
+
         currentUser = await checkAndApplyScheduledChanges(currentUser);
         
         setUser(currentUser);
@@ -204,6 +219,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           status: 'active',
         },
         messageCount: 0,
+        profileData: role === 'renter' ? {
+          neighborhood: 'Williamsburg',
+          city: 'Brooklyn',
+          state: 'NY',
+          coordinates: { lat: 40.7081, lng: -73.9571 },
+        } : undefined,
+      };
+      await StorageService.addOrUpdateUser(mockUser);
+    } else if (role === 'renter' && !mockUser.profileData?.city) {
+      mockUser = {
+        ...mockUser,
+        profileData: {
+          ...mockUser.profileData,
+          neighborhood: 'Williamsburg',
+          city: 'Brooklyn',
+          state: 'NY',
+          coordinates: { lat: 40.7081, lng: -73.9571 },
+        },
       };
       await StorageService.addOrUpdateUser(mockUser);
     }
@@ -226,6 +259,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         status: 'active',
       },
       messageCount: 0,
+      profileData: role === 'renter' ? {
+        neighborhood: 'Williamsburg',
+        city: 'Brooklyn',
+        state: 'NY',
+        coordinates: { lat: 40.7081, lng: -73.9571 },
+      } : undefined,
     };
     await StorageService.setCurrentUser(mockUser);
     await StorageService.addOrUpdateUser(mockUser);

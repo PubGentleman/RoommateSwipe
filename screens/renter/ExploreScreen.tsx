@@ -11,7 +11,7 @@ import { StorageService } from '../../utils/storage';
 import { Property, PropertyFilter, User, RoommateProfile } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { formatMoveInDate, calculateCompatibility, getMatchQualityColor, getGenderSymbol } from '../../utils/matchingAlgorithm';
+import { formatMoveInDate, calculateCompatibility, getMatchQualityColor, getGenderSymbol, formatLocation } from '../../utils/matchingAlgorithm';
 import { NEIGHBORHOODS, getAllCities } from '../../utils/locationData';
 
 const COMMON_AMENITIES = [
@@ -380,7 +380,7 @@ export const ExploreScreen = () => {
             <View style={styles.location}>
               <Feather name="map-pin" size={14} color={theme.textSecondary} />
               <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
-                {item.city}, {item.state}
+                {formatLocation(item)}
               </ThemedText>
             </View>
             {compatibility !== null ? (
@@ -966,13 +966,8 @@ export const ExploreScreen = () => {
                       <View style={{ flex: 1, marginLeft: Spacing.md }}>
                         <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Location</ThemedText>
                         <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
-                          {selectedProperty.city}, {selectedProperty.state}
+                          {formatLocation(selectedProperty)}
                         </ThemedText>
-                        {selectedProperty.neighborhood ? (
-                          <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginTop: 2 }]}>
-                            {selectedProperty.neighborhood}
-                          </ThemedText>
-                        ) : null}
                       </View>
                     </View>
                     {selectedProperty.availableDate ? (
