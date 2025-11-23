@@ -338,7 +338,7 @@ export const RoommatesScreen = () => {
         </GestureDetector>
       </View>
 
-      <View style={[styles.actions, { paddingBottom: insets.bottom + 100 }]}>
+      <View style={[styles.actions, { paddingBottom: 90 }]}>
         <Pressable
           style={[styles.actionButton, { backgroundColor: '#FFFFFF', borderColor: theme.error }]}
           onPress={() => handleSwipeAction('nope')}
@@ -474,13 +474,13 @@ const styles = StyleSheet.create({
   },
   cardContainer: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     alignItems: 'center',
-    marginTop: Spacing.xxl,
+    paddingTop: Spacing.md,
   },
   card: {
     width: CARD_WIDTH,
-    height: SCREEN_HEIGHT * 0.65,
+    height: SCREEN_HEIGHT * 0.58,
     borderRadius: BorderRadius.large,
     overflow: 'hidden',
     backgroundColor: '#FFFFFF',
