@@ -34,6 +34,7 @@ export const GroupsScreen = () => {
   const [lastSwipedGroup, setLastSwipedGroup] = useState<{ group: Group; action: 'like' | 'skip' } | null>(null);
   const [showUndoUpgradeModal, setShowUndoUpgradeModal] = useState(false);
   const [processingUndoPass, setProcessingUndoPass] = useState(false);
+  const [showGroupDetail, setShowGroupDetail] = useState(false);
   
   const [groupName, setGroupName] = useState('');
   const [groupDescription, setGroupDescription] = useState('');
@@ -560,7 +561,8 @@ export const GroupsScreen = () => {
                 animatedCardStyle,
               ]}
             >
-              <View style={styles.cardContent}>
+              <Pressable onPress={() => setShowGroupDetail(true)} style={{ flex: 1 }}>
+                <View style={styles.cardContent}>
                 <View style={[styles.groupIconLarge, { backgroundColor: theme.primary }]}>
                   <Feather name="users" size={32} color="#FFFFFF" />
                 </View>
@@ -638,6 +640,7 @@ export const GroupsScreen = () => {
                   </View>
                 ) : null}
               </View>
+              </Pressable>
             </Animated.View>
           </GestureDetector>
 
@@ -1014,6 +1017,99 @@ export const GroupsScreen = () => {
           </View>
         </View>
       </Modal>
+
+      <Modal
+        visible={showGroupDetail && currentGroup != null}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowGroupDetail(false)}
+      >
+        <View style={styles.detailModalOverlay}>
+          <View style={[styles.detailModalContainer, { backgroundColor: theme.backgroundSecondary }]}>
+            <View style={styles.detailHeader}>
+              <ThemedText style={[Typography.h2]}>Group Details</ThemedText>
+              <Pressable onPress={() => setShowGroupDetail(false)}>
+                <Feather name="x" size={24} color={theme.text} />
+              </Pressable>
+            </View>
+            <ScrollView style={styles.detailContent} showsVerticalScrollIndicator={false}>
+              {currentGroup ? (
+                <>
+                  <View style={[styles.detailSection, { alignItems: 'center' }]}>
+                    <View style={[styles.groupIconLarge, { backgroundColor: theme.primary }]}>
+                      <Feather name="users" size={32} color="#FFFFFF" />
+                    </View>
+                    <ThemedText style={[Typography.h2, { marginTop: Spacing.md }]}>{currentGroup.name}</ThemedText>
+                    <View style={styles.membersInfo}>
+                      <Feather name="users" size={16} color={theme.textSecondary} />
+                      <ThemedText style={[Typography.body, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
+                        {currentGroup.members.length}/{currentGroup.maxMembers} members • {currentGroup.maxMembers - currentGroup.members.length} spots left
+                      </ThemedText>
+                    </View>
+                  </View>
+
+                  {currentGroup.description ? (
+                    <View style={styles.detailSection}>
+                      <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>About</ThemedText>
+                      <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
+                        {currentGroup.description}
+                      </ThemedText>
+                    </View>
+                  ) : null}
+
+                  <View style={styles.detailSection}>
+                    <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Group Details</ThemedText>
+                    <View style={styles.detailRow}>
+                      <Feather name="dollar-sign" size={20} color={theme.primary} />
+                      <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                        <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Minimum Budget (per person)</ThemedText>
+                        <ThemedText style={[Typography.body, { fontWeight: '600' }]}>${currentGroup.budget}/month</ThemedText>
+                      </View>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Feather name="map-pin" size={20} color={theme.primary} />
+                      <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                        <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Preferred Location</ThemedText>
+                        <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{currentGroup.preferredLocation}</ThemedText>
+                      </View>
+                    </View>
+                    {currentGroup.apartmentPrice ? (
+                      <View style={styles.detailRow}>
+                        <Feather name="home" size={20} color={theme.primary} />
+                        <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Total Apartment Price</ThemedText>
+                          <ThemedText style={[Typography.body, { fontWeight: '600' }]}>${currentGroup.apartmentPrice}</ThemedText>
+                        </View>
+                      </View>
+                    ) : null}
+                    {currentGroup.bedrooms ? (
+                      <View style={styles.detailRow}>
+                        <Feather name="grid" size={20} color={theme.primary} />
+                        <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Bedrooms</ThemedText>
+                          <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{currentGroup.bedrooms}</ThemedText>
+                        </View>
+                      </View>
+                    ) : null}
+                  </View>
+
+                  <View style={[styles.detailSection, { paddingBottom: Spacing.xxl }]}>
+                    <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Members</ThemedText>
+                    {currentGroup.members.map((memberId) => {
+                      const profile = mockRoommateProfiles.find(p => p.id === memberId);
+                      return profile ? (
+                        <View key={memberId} style={styles.memberRow}>
+                          <ThemedText style={Typography.body}>{profile.name}</ThemedText>
+                        </View>
+                      ) : null;
+                    })}
+                  </View>
+                </>
+              ) : null}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -1279,5 +1375,37 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.medium,
     alignItems: 'center',
     borderWidth: 1,
+  },
+  detailModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  detailModalContainer: {
+    height: '90%',
+    borderTopLeftRadius: BorderRadius.large,
+    borderTopRightRadius: BorderRadius.large,
+    overflow: 'hidden',
+  },
+  detailHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: Spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  detailContent: {
+    flex: 1,
+  },
+  detailSection: {
+    padding: Spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
   },
 });

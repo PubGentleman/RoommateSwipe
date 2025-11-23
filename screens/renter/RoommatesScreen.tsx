@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, Image, Pressable, Dimensions, Modal, useWindowDimensions, Platform } from 'react-native';
+import { View, StyleSheet, Image, Pressable, Dimensions, Modal, useWindowDimensions, Platform, ScrollView } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS, interpolate } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
@@ -38,6 +38,7 @@ export const RoommatesScreen = () => {
   const [lastSwipedProfile, setLastSwipedProfile] = useState<{ profile: RoommateProfile; action: 'like' | 'nope' | 'superlike' } | null>(null);
   const [showUndoUpgradeModal, setShowUndoUpgradeModal] = useState(false);
   const [processingUndoPass, setProcessingUndoPass] = useState(false);
+  const [showProfileDetail, setShowProfileDetail] = useState(false);
 
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -355,7 +356,8 @@ export const RoommatesScreen = () => {
           <Animated.View
             style={[styles.card, animatedCardStyle]}
           >
-            <Image source={{ uri: currentProfile.photos[0] }} style={styles.cardImage} />
+            <Pressable onPress={() => setShowProfileDetail(true)} style={{ flex: 1 }}>
+              <Image source={{ uri: currentProfile.photos[0] }} style={styles.cardImage} />
             {canSeeOnlineStatus() && isProfileOnline ? (
               <View style={styles.onlineIndicatorContainer}>
                 <View style={[styles.onlineIndicator, { backgroundColor: theme.success }]} />
@@ -404,6 +406,7 @@ export const RoommatesScreen = () => {
                 </View>
               </View>
             </View>
+            </Pressable>
           </Animated.View>
         </GestureDetector>
       </View>
@@ -673,6 +676,121 @@ export const RoommatesScreen = () => {
           </View>
         </View>
       </Modal>
+
+      <Modal
+        visible={showProfileDetail}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowProfileDetail(false)}
+      >
+        <View style={styles.detailModalOverlay}>
+          <View style={[styles.detailModalContainer, { backgroundColor: theme.backgroundSecondary }]}>
+            <View style={styles.detailHeader}>
+              <ThemedText style={[Typography.h2]}>Profile Details</ThemedText>
+              <Pressable onPress={() => setShowProfileDetail(false)}>
+                <Feather name="x" size={24} color={theme.text} />
+              </Pressable>
+            </View>
+            <ScrollView style={styles.detailContent} showsVerticalScrollIndicator={false}>
+              <Image source={{ uri: currentProfile.photos[0] }} style={styles.detailImage} />
+              
+              <View style={styles.detailSection}>
+                <ThemedText style={[Typography.h2]}>{currentProfile.name}, {currentProfile.age}</ThemedText>
+                <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
+                  {currentProfile.occupation}
+                </ThemedText>
+              </View>
+
+              <View style={styles.detailSection}>
+                <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>About</ThemedText>
+                <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
+                  {currentProfile.bio}
+                </ThemedText>
+              </View>
+
+              <View style={styles.detailSection}>
+                <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Preferences</ThemedText>
+                <View style={styles.detailRow}>
+                  <Feather name="dollar-sign" size={20} color={theme.primary} />
+                  <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                    <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Budget</ThemedText>
+                    <ThemedText style={[Typography.body, { fontWeight: '600' }]}>${currentProfile.budget}/month</ThemedText>
+                  </View>
+                </View>
+                <View style={styles.detailRow}>
+                  <Feather name="map-pin" size={20} color={theme.primary} />
+                  <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                    <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Preferred Location</ThemedText>
+                    <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{currentProfile.preferences.location}</ThemedText>
+                  </View>
+                </View>
+                <View style={styles.detailRow}>
+                  <Feather name="calendar" size={20} color={theme.primary} />
+                  <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                    <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Move-in Date</ThemedText>
+                    <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{currentProfile.preferences.moveInDate}</ThemedText>
+                  </View>
+                </View>
+                <View style={styles.detailRow}>
+                  <Feather name="home" size={20} color={theme.primary} />
+                  <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                    <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Bedrooms Needed</ThemedText>
+                    <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{currentProfile.preferences.bedrooms}</ThemedText>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.detailSection}>
+                <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Lifestyle</ThemedText>
+                <View style={styles.detailRow}>
+                  <Feather name="droplet" size={20} color={theme.primary} />
+                  <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                    <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Cleanliness</ThemedText>
+                    <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{currentProfile.lifestyle.cleanliness}/10</ThemedText>
+                  </View>
+                </View>
+                <View style={styles.detailRow}>
+                  <Feather name="users" size={20} color={theme.primary} />
+                  <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                    <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Social Level</ThemedText>
+                    <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{currentProfile.lifestyle.socialLevel}/10</ThemedText>
+                  </View>
+                </View>
+                <View style={styles.detailRow}>
+                  <Feather name="briefcase" size={20} color={theme.primary} />
+                  <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                    <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Work Schedule</ThemedText>
+                    <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{currentProfile.lifestyle.workSchedule}</ThemedText>
+                  </View>
+                </View>
+                <View style={styles.detailRow}>
+                  <Feather name={currentProfile.lifestyle.pets ? 'check-circle' : 'x-circle'} size={20} color={currentProfile.lifestyle.pets ? theme.success : theme.error} />
+                  <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                    <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Pets</ThemedText>
+                    <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{currentProfile.lifestyle.pets ? 'Yes' : 'No'}</ThemedText>
+                  </View>
+                </View>
+                <View style={styles.detailRow}>
+                  <Feather name={currentProfile.lifestyle.smoking ? 'check-circle' : 'x-circle'} size={20} color={currentProfile.lifestyle.smoking ? theme.error : theme.success} />
+                  <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                    <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Smoking</ThemedText>
+                    <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{currentProfile.lifestyle.smoking ? 'Yes' : 'No'}</ThemedText>
+                  </View>
+                </View>
+              </View>
+
+              <View style={[styles.detailSection, { paddingBottom: Spacing.xxl }]}>
+                <View style={[styles.matchBadge, { backgroundColor: getMatchQualityColor(currentProfile.compatibility || 50) + '20' }]}>
+                  <Feather name="heart" size={24} color={getMatchQualityColor(currentProfile.compatibility || 50)} />
+                  <ThemedText style={[Typography.h1, { color: getMatchQualityColor(currentProfile.compatibility || 50), marginLeft: Spacing.md }]}>
+                    {currentProfile.compatibility || 50}% Match
+                  </ThemedText>
+                </View>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -917,5 +1035,49 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: Spacing.xl,
     borderWidth: 1,
+  },
+  detailModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  detailModalContainer: {
+    height: '90%',
+    borderTopLeftRadius: BorderRadius.large,
+    borderTopRightRadius: BorderRadius.large,
+    overflow: 'hidden',
+  },
+  detailHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: Spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  detailContent: {
+    flex: 1,
+  },
+  detailImage: {
+    width: '100%',
+    height: 300,
+    resizeMode: 'cover',
+  },
+  detailSection: {
+    padding: Spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  matchBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.medium,
   },
 });

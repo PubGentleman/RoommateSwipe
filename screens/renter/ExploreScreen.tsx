@@ -31,6 +31,8 @@ export const ExploreScreen = () => {
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
   const [filters, setFilters] = useState<PropertyFilter>({});
   const [tempFilters, setTempFilters] = useState<PropertyFilter>({});
+  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+  const [showPropertyDetail, setShowPropertyDetail] = useState(false);
 
   useEffect(() => {
     loadProperties();
@@ -149,7 +151,10 @@ export const ExploreScreen = () => {
   const renderProperty = ({ item }: { item: Property }) => (
     <Pressable
       style={[styles.propertyCard, { backgroundColor: theme.backgroundDefault }]}
-      onPress={() => {}}
+      onPress={() => {
+        setSelectedProperty(item);
+        setShowPropertyDetail(true);
+      }}
     >
       <Image source={{ uri: item.photos[0] }} style={styles.propertyImage} />
       {item.featured ? (
@@ -498,6 +503,113 @@ export const ExploreScreen = () => {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <Modal
+        visible={showPropertyDetail && selectedProperty != null}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowPropertyDetail(false)}
+      >
+        <View style={styles.detailModalOverlay}>
+          <View style={[styles.detailModalContainer, { backgroundColor: theme.backgroundSecondary }]}>
+            <View style={styles.detailHeader}>
+              <ThemedText style={[Typography.h2]}>Property Details</ThemedText>
+              <Pressable onPress={() => setShowPropertyDetail(false)}>
+                <Feather name="x" size={24} color={theme.text} />
+              </Pressable>
+            </View>
+            <ScrollView style={styles.detailContent} showsVerticalScrollIndicator={false}>
+              {selectedProperty ? (
+                <>
+                  <Image source={{ uri: selectedProperty.photos[0] }} style={styles.detailImage} />
+                  
+                  <View style={styles.detailSection}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <ThemedText style={[Typography.h1]}>${selectedProperty.price}/mo</ThemedText>
+                      {selectedProperty.featured ? (
+                        <View style={[styles.featuredBadge, { backgroundColor: theme.primary }]}>
+                          <Feather name="star" size={12} color="#FFFFFF" />
+                          <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '700', marginLeft: 4 }]}>
+                            FEATURED
+                          </ThemedText>
+                        </View>
+                      ) : null}
+                    </View>
+                    <ThemedText style={[Typography.h3, { marginTop: Spacing.sm }]}>
+                      {selectedProperty.title}
+                    </ThemedText>
+                  </View>
+
+                  <View style={styles.detailSection}>
+                    <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Description</ThemedText>
+                    <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
+                      {selectedProperty.description}
+                    </ThemedText>
+                  </View>
+
+                  <View style={styles.detailSection}>
+                    <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Details</ThemedText>
+                    <View style={styles.detailRow}>
+                      <Feather name="home" size={20} color={theme.primary} />
+                      <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                        <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Bedrooms</ThemedText>
+                        <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{selectedProperty.bedrooms}</ThemedText>
+                      </View>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Feather name="droplet" size={20} color={theme.primary} />
+                      <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                        <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Bathrooms</ThemedText>
+                        <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{selectedProperty.bathrooms}</ThemedText>
+                      </View>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Feather name="maximize" size={20} color={theme.primary} />
+                      <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                        <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Square Feet</ThemedText>
+                        <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{selectedProperty.sqft} sqft</ThemedText>
+                      </View>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Feather name="map-pin" size={20} color={theme.primary} />
+                      <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                        <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Location</ThemedText>
+                        <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
+                          {selectedProperty.address}, {selectedProperty.city}, {selectedProperty.state}
+                        </ThemedText>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={styles.detailSection}>
+                    <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Amenities</ThemedText>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm }}>
+                      {selectedProperty.amenities.map((amenity, index) => (
+                        <View
+                          key={index}
+                          style={[styles.amenityChip, { backgroundColor: theme.primary + '20', borderColor: theme.primary }]}
+                        >
+                          <ThemedText style={[Typography.small, { color: theme.primary }]}>{amenity}</ThemedText>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+
+                  <View style={[styles.detailSection, { paddingBottom: Spacing.xxl }]}>
+                    <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Host</ThemedText>
+                    <View style={styles.detailRow}>
+                      <Feather name="user" size={20} color={theme.primary} />
+                      <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                        <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{selectedProperty.hostName}</ThemedText>
+                      </View>
+                    </View>
+                  </View>
+                </>
+              ) : null}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -731,5 +843,42 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.full,
     alignItems: 'center',
     marginTop: Spacing.xl,
+  },
+  detailModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  detailModalContainer: {
+    height: '90%',
+    borderTopLeftRadius: BorderRadius.large,
+    borderTopRightRadius: BorderRadius.large,
+    overflow: 'hidden',
+  },
+  detailHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: Spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  detailContent: {
+    flex: 1,
+  },
+  detailImage: {
+    width: '100%',
+    height: 300,
+    resizeMode: 'cover',
+  },
+  detailSection: {
+    padding: Spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
   },
 });
