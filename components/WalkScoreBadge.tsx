@@ -21,9 +21,9 @@ export const WalkScoreBadge = ({ score, size = 'medium' }: WalkScoreBadgeProps) 
   const { theme } = useTheme();
 
   const dimensions = {
-    small: { size: 50, fontSize: 14 },
-    medium: { size: 65, fontSize: 18 },
-    large: { size: 80, fontSize: 22 },
+    small: { size: 50, fontSize: 12 },
+    medium: { size: 65, fontSize: 16 },
+    large: { size: 80, fontSize: 20 },
   };
 
   const dim = dimensions[size];
@@ -63,6 +63,6 @@ const styles = StyleSheet.create({
   score: {
     fontWeight: '700',
     position: 'absolute',
-    bottom: '18%',
+    bottom: '12%',
   },
 });
