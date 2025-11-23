@@ -390,6 +390,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     await StorageService.setCurrentUser(updatedUser);
     await StorageService.addOrUpdateUser(updatedUser);
+    
+    // Sync photos and profile data with RoommateProfile if user is a renter
+    if (updatedUser.role === 'renter' && (updates.photos || updates.profileData)) {
+      const roommateProfiles = await StorageService.getRoommateProfiles();
+      const profileIndex = roommateProfiles.findIndex(p => p.id === updatedUser.id);
+      
+      if (profileIndex >= 0) {
+        console.log('[Auth] Syncing User photos with RoommateProfile for user:', updatedUser.id);
+        const updatedProfile = {
+          ...roommateProfiles[profileIndex],
+          ...(updates.photos && { photos: updates.photos }),
+          ...(updates.profileData?.bio && { bio: updates.profileData.bio }),
+          ...(updates.profileData?.budget && { budget: updates.profileData.budget }),
+          ...(updates.profileData?.occupation && { occupation: updates.profileData.occupation }),
+          ...(updates.profileData?.preferences?.location && { 
+            preferences: {
+              ...roommateProfiles[profileIndex].preferences,
+              location: updates.profileData.preferences.location,
+            }
+          }),
+        };
+        roommateProfiles[profileIndex] = updatedProfile;
+        await StorageService.setRoommateProfiles(roommateProfiles);
+        console.log('[Auth] RoommateProfile photos synced. Photos count:', updatedProfile.photos.length);
+      }
+    }
+    
     setUser(updatedUser);
   };
 

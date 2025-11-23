@@ -4,7 +4,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS, interpolate } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { ThemedText } from '../../components/ThemedText';
 import { ThemedView } from '../../components/ThemedView';
 import { useTheme } from '../../hooks/useTheme';
@@ -61,6 +61,13 @@ export const RoommatesScreen = () => {
   useEffect(() => {
     loadProfiles();
   }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('[RoommatesScreen] Screen focused, reloading profiles to get latest photos');
+      loadProfiles();
+    }, [])
+  );
 
   const loadProfiles = async () => {
     try {
@@ -1010,7 +1017,45 @@ export const RoommatesScreen = () => {
               </Pressable>
             </View>
             <ScrollView style={styles.detailContent} showsVerticalScrollIndicator={false}>
-              <Image source={{ uri: currentProfile.photos[0] }} style={styles.detailImage} />
+              {(() => {
+                console.log('[RoommatesScreen] Profile Detail - currentProfile.photos:', currentProfile.photos);
+                console.log('[RoommatesScreen] Profile Detail - photos type:', typeof currentProfile.photos);
+                console.log('[RoommatesScreen] Profile Detail - photos length:', currentProfile.photos?.length);
+                
+                const photosArray = Array.isArray(currentProfile.photos) 
+                  ? currentProfile.photos 
+                  : currentProfile.photos 
+                    ? [currentProfile.photos]
+                    : [currentProfile.photos && currentProfile.photos[0]].filter(Boolean);
+                
+                console.log('[RoommatesScreen] Profile Detail - photosArray:', photosArray);
+                
+                return (
+                  <>
+                    <ScrollView 
+                      horizontal 
+                      pagingEnabled 
+                      showsHorizontalScrollIndicator={false}
+                      style={styles.photosScrollContainer}
+                    >
+                      {photosArray.map((photo, index) => (
+                        <Image 
+                          key={`photo-${index}`} 
+                          source={{ uri: photo }} 
+                          style={styles.detailImage} 
+                        />
+                      ))}
+                    </ScrollView>
+                    {photosArray.length > 1 ? (
+                      <View style={styles.photoIndicatorContainer}>
+                        <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
+                          {photosArray.length} photos • Swipe to view more
+                        </ThemedText>
+                      </View>
+                    ) : null}
+                  </>
+                );
+              })()}
               
               <View style={styles.detailSection}>
                 <ThemedText style={[Typography.h2]}>{currentProfile.name}, {currentProfile.age}</ThemedText>
@@ -1391,10 +1436,19 @@ const styles = StyleSheet.create({
   detailContent: {
     flex: 1,
   },
-  detailImage: {
+  photosScrollContainer: {
     width: '100%',
+  },
+  detailImage: {
+    width: SCREEN_WIDTH,
     height: 300,
     resizeMode: 'cover',
+  },
+  photoIndicatorContainer: {
+    padding: Spacing.md,
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
   },
   detailSection: {
     padding: Spacing.lg,

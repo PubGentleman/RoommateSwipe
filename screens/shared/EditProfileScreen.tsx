@@ -94,7 +94,9 @@ const DraggablePhoto = ({ photo, index, photos, theme, onRemove, onMoveLeft, onM
         <View style={styles.reorderButtons} pointerEvents="box-none">
           {index > 0 ? (
             <Pressable
-              style={[styles.reorderButton, { backgroundColor: 'rgba(0, 0, 0, 0.6)' }]}
+              pointerEvents="auto"
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={[styles.reorderButton, { backgroundColor: 'rgba(0, 0, 0, 0.6)', zIndex: 100 }]}
               onPress={() => {
                 console.log('[DraggablePhoto] Left arrow clicked, index:', index);
                 onMoveLeft(index);
@@ -105,7 +107,9 @@ const DraggablePhoto = ({ photo, index, photos, theme, onRemove, onMoveLeft, onM
           ) : null}
           {index < photos.length - 1 ? (
             <Pressable
-              style={[styles.reorderButton, { backgroundColor: 'rgba(0, 0, 0, 0.6)' }]}
+              pointerEvents="auto"
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={[styles.reorderButton, { backgroundColor: 'rgba(0, 0, 0, 0.6)', zIndex: 100 }]}
               onPress={() => {
                 console.log('[DraggablePhoto] Right arrow clicked, index:', index);
                 onMoveRight(index);
@@ -782,7 +786,6 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    pointerEvents: 'auto',
   },
   inputGroup: {
     marginBottom: Spacing.lg,
