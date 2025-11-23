@@ -362,11 +362,20 @@ export const ExploreScreen = () => {
               </ThemedText>
             </View>
           </View>
-          <View style={styles.location}>
-            <Feather name="map-pin" size={14} color={theme.textSecondary} />
-            <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
-              {item.city}, {item.state}
-            </ThemedText>
+          <View style={styles.locationRow}>
+            <View style={styles.location}>
+              <Feather name="map-pin" size={14} color={theme.textSecondary} />
+              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
+                {item.city}, {item.state}
+              </ThemedText>
+            </View>
+            {compatibility !== null ? (
+              <View style={[styles.matchBadge, { backgroundColor: getMatchQualityColor(compatibility) + '20' }]}>
+                <ThemedText style={[Typography.caption, { color: getMatchQualityColor(compatibility), fontWeight: '700' }]}>
+                  {compatibility}% Match
+                </ThemedText>
+              </View>
+            ) : null}
           </View>
         </View>
       </Pressable>
@@ -1120,7 +1129,17 @@ const styles = StyleSheet.create({
   location: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginTop: Spacing.sm,
+  },
+  matchBadge: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
   },
   emptyState: {
     flex: 1,
