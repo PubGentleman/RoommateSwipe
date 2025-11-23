@@ -609,3 +609,62 @@ export const getMatchQualityColor = (score: number): string => {
   if (score >= 60) return '#F59E0B'; // Orange
   return '#EF4444'; // Red
 };
+
+/**
+ * Convert numeric cleanliness value to descriptive text
+ * Scale: 1-5 where 5 = Very Clean, 1 = Very Relaxed
+ */
+export const getCleanlinessLabel = (value: number): string => {
+  if (value >= 4.5) return 'Very Clean';
+  if (value >= 3.5) return 'Clean';
+  if (value >= 2.5) return 'Moderate';
+  if (value >= 1.5) return 'Relaxed';
+  return 'Very Relaxed';
+};
+
+/**
+ * Convert numeric social level value to descriptive text
+ * Scale: 1-5 where 5 = Very Social, 1 = Very Quiet
+ */
+export const getSocialLevelLabel = (value: number): string => {
+  if (value >= 4.5) return 'Very Social';
+  if (value >= 3.5) return 'Social';
+  if (value >= 2.5) return 'Moderate';
+  if (value >= 1.5) return 'Quiet';
+  return 'Very Quiet';
+};
+
+/**
+ * Format work schedule for display
+ */
+export const getWorkScheduleLabel = (schedule: string): string => {
+  const map: Record<string, string> = {
+    'wfh': 'Work from Home',
+    'office': 'In Office',
+    'hybrid': 'Hybrid',
+    'irregular': 'Irregular Hours',
+    'night_shift': 'Night Shift',
+    'flexible': 'Flexible Schedule',
+  };
+  return map[schedule] || schedule;
+};
+
+/**
+ * Format move-in date for display
+ */
+export const formatMoveInDate = (dateString: string): string => {
+  if (!dateString) return 'Flexible';
+  
+  const date = new Date(dateString);
+  const today = new Date();
+  const diffTime = date.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  if (diffDays < 0) return 'ASAP';
+  if (diffDays <= 7) return 'This Week';
+  if (diffDays <= 14) return 'Next Week';
+  if (diffDays <= 30) return 'This Month';
+  
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${months[date.getMonth()]} ${date.getFullYear()}`;
+};
