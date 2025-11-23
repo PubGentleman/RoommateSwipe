@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, Image, Pressable, Dimensions, Animated, Modal, useWindowDimensions } from 'react-native';
+import { View, StyleSheet, Image, Pressable, Dimensions, Modal, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { scheduleOnRN } from 'react-native-worklets';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS, interpolate } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useNavigation } from '@react-navigation/native';
@@ -31,9 +31,9 @@ export const RoommatesScreen = () => {
   const [profileUsers, setProfileUsers] = useState<Map<string, any>>(new Map());
   const [showVIPModal, setShowVIPModal] = useState(false);
 
-  const translateX = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(0)).current;
-  const rotation = useRef(new Animated.Value(0)).current;
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const rotation = useSharedValue(0);
 
   useEffect(() => {
     loadProfiles();
@@ -125,29 +125,14 @@ export const RoommatesScreen = () => {
     const toX = direction * SCREEN_WIDTH * 1.5;
     const toY = action === 'superlike' ? -SCREEN_HEIGHT : 0;
 
-    Animated.parallel([
-      Animated.spring(translateX, {
-        toValue: toX,
-        useNativeDriver: true,
-        speed: 20,
-        bounciness: 0,
-      }),
-      Animated.spring(translateY, {
-        toValue: toY,
-        useNativeDriver: true,
-        speed: 20,
-        bounciness: 0,
-      }),
-      Animated.spring(rotation, {
-        toValue: direction * 15,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      translateX.setValue(0);
-      translateY.setValue(0);
-      rotation.setValue(0);
-      setCurrentIndex(currentIndex + 1);
+    translateX.value = withSpring(toX, { damping: 20, stiffness: 90 }, () => {
+      translateX.value = 0;
+      translateY.value = 0;
+      rotation.value = 0;
+      runOnJS(setCurrentIndex)(currentIndex + 1);
     });
+    translateY.value = withSpring(toY, { damping: 20, stiffness: 90 });
+    rotation.value = withSpring(direction * 15, { damping: 20, stiffness: 90 });
 
     processSwipeAsync(action, currentProfile.id, user.id);
   };
@@ -179,31 +164,20 @@ export const RoommatesScreen = () => {
 
   const pan = Gesture.Pan()
     .onChange((event) => {
-      translateX.setValue(event.translationX);
-      translateY.setValue(event.translationY);
-      rotation.setValue(event.translationX / 20);
+      translateX.value = event.translationX;
+      translateY.value = event.translationY;
+      rotation.value = event.translationX / 20;
     })
     .onEnd((event) => {
-      'worklet';
       if (Math.abs(event.translationX) > 120) {
         const action = event.translationX > 0 ? 'like' : 'nope';
-        scheduleOnRN(() => handleSwipeAction(action));
+        runOnJS(handleSwipeAction)(action);
       } else if (event.translationY < -120) {
-        scheduleOnRN(() => handleSwipeAction('superlike'));
+        runOnJS(handleSwipeAction)('superlike');
       } else {
-
-        Animated.spring(translateX, {
-          toValue: 0,
-          useNativeDriver: true,
-        }).start();
-        Animated.spring(translateY, {
-          toValue: 0,
-          useNativeDriver: true,
-        }).start();
-        Animated.spring(rotation, {
-          toValue: 0,
-          useNativeDriver: true,
-        }).start();
+        translateX.value = withSpring(0);
+        translateY.value = withSpring(0);
+        rotation.value = withSpring(0);
       }
     });
 
@@ -241,9 +215,15 @@ export const RoommatesScreen = () => {
     );
   }
 
-  const rotate = rotation.interpolate({
-    inputRange: [-15, 15],
-    outputRange: ['-15deg', '15deg'],
+  const animatedCardStyle = useAnimatedStyle(() => {
+    const rotate = `${rotation.value}deg`;
+    return {
+      transform: [
+        { translateX: translateX.value },
+        { translateY: translateY.value },
+        { rotate },
+      ],
+    };
   });
 
   const handleOpenAIAssistant = async () => {
@@ -288,16 +268,7 @@ export const RoommatesScreen = () => {
       <View style={styles.cardContainer}>
         <GestureDetector gesture={pan}>
           <Animated.View
-            style={[
-              styles.card,
-              {
-                transform: [
-                  { translateX },
-                  { translateY },
-                  { rotate },
-                ],
-              },
-            ]}
+            style={[styles.card, animatedCardStyle]}
           >
             <Image source={{ uri: currentProfile.photos[0] }} style={styles.cardImage} />
             <View style={styles.gradient}>
