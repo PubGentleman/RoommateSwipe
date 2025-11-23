@@ -6,12 +6,14 @@ import { ProfileScreen } from '../screens/shared/ProfileScreen';
 import { PaymentScreen } from '../screens/shared/PaymentScreen';
 import { PlansScreen } from '../screens/shared/PlansScreen';
 import { EditProfileScreen } from '../screens/shared/EditProfileScreen';
+import { NotificationsScreen } from '../screens/shared/NotificationsScreen';
 
 export type ProfileStackParamList = {
   ProfileMain: undefined;
   Payment: undefined;
   Plans: undefined;
   EditProfile: undefined;
+  Notifications: undefined;
 };
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
@@ -55,6 +57,13 @@ export const ProfileStackNavigator = () => {
       <Stack.Screen 
         name="EditProfile" 
         component={EditProfileScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen 
+        name="Notifications" 
+        component={NotificationsScreen}
         options={{
           headerShown: false,
         }}

@@ -185,3 +185,23 @@ export interface User {
     };
   };
 }
+
+export interface Notification {
+  id: string;
+  userId: string;
+  type: 'match' | 'message' | 'group_invite' | 'group_accepted' | 'property_update' | 'application_status';
+  title: string;
+  body: string;
+  isRead: boolean;
+  createdAt: Date;
+  data?: {
+    matchId?: string;
+    conversationId?: string;
+    groupId?: string;
+    propertyId?: string;
+    applicationId?: string;
+    fromUserId?: string;
+    fromUserName?: string;
+    fromUserPhoto?: string;
+  };
+}

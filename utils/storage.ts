@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { User, RoommateProfile, Property, Group, Conversation, Message, Match, Application } from '../types/models';
+import { User, RoommateProfile, Property, Group, Conversation, Message, Match, Application, Notification } from '../types/models';
 
 const STORAGE_KEYS = {
   CURRENT_USER: '@roommate_finder/current_user',
@@ -13,6 +13,7 @@ const STORAGE_KEYS = {
   SWIPE_HISTORY: '@roommate_finder/swipe_history',
   LIKES: '@roommate_finder/likes',
   SAVED_PROPERTIES: '@roommate_finder/saved_properties',
+  NOTIFICATIONS: '@roommate_finder/notifications',
 };
 
 export const StorageService = {
@@ -640,6 +641,81 @@ export const StorageService = {
       console.log('[StorageService] Mock data reload complete!');
     } catch (error) {
       console.error('Error force reloading mock data:', error);
+    }
+  },
+
+  async getNotifications(userId: string): Promise<Notification[]> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
+      const allNotifications: Notification[] = data ? JSON.parse(data) : [];
+      return allNotifications
+        .filter(n => n.userId === userId)
+        .map(n => ({ ...n, createdAt: new Date(n.createdAt) }))
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    } catch (error) {
+      console.error('Error getting notifications:', error);
+      return [];
+    }
+  },
+
+  async addNotification(notification: Notification): Promise<void> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
+      const notifications: Notification[] = data ? JSON.parse(data) : [];
+      notifications.push(notification);
+      await AsyncStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(notifications));
+    } catch (error) {
+      console.error('Error adding notification:', error);
+    }
+  },
+
+  async markNotificationAsRead(notificationId: string): Promise<void> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
+      const notifications: Notification[] = data ? JSON.parse(data) : [];
+      const notification = notifications.find(n => n.id === notificationId);
+      if (notification) {
+        notification.isRead = true;
+        await AsyncStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(notifications));
+      }
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  },
+
+  async markAllNotificationsAsRead(userId: string): Promise<void> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
+      const notifications: Notification[] = data ? JSON.parse(data) : [];
+      notifications.forEach(n => {
+        if (n.userId === userId) {
+          n.isRead = true;
+        }
+      });
+      await AsyncStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(notifications));
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+    }
+  },
+
+  async deleteNotification(notificationId: string): Promise<void> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
+      const notifications: Notification[] = data ? JSON.parse(data) : [];
+      const filtered = notifications.filter(n => n.id !== notificationId);
+      await AsyncStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(filtered));
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+    }
+  },
+
+  async getUnreadNotificationCount(userId: string): Promise<number> {
+    try {
+      const notifications = await this.getNotifications(userId);
+      return notifications.filter(n => !n.isRead).length;
+    } catch (error) {
+      console.error('Error getting unread notification count:', error);
+      return 0;
     }
   },
 };
