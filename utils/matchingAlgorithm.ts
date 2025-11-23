@@ -1,4 +1,5 @@
 import { User, RoommateProfile } from '../types/models';
+import { isNearbyNeighborhood, isSameCity } from './locationData';
 
 /**
  * Comprehensive points-based matching algorithm for roommate compatibility
@@ -48,58 +49,6 @@ export interface MatchScore {
 }
 
 /**
- * Neighborhood proximity mapping
- * Defines which neighborhoods are close to each other for location scoring
- */
-const NEIGHBORHOOD_PROXIMITY: Record<string, { close: string[]; medium: string[]; far: string[] }> = {
-  'Downtown': {
-    close: ['Midtown', 'Financial District'],
-    medium: ['Westside', 'Eastside', 'Uptown'],
-    far: ['Suburbs', 'North End', 'South End'],
-  },
-  'Midtown': {
-    close: ['Downtown', 'Uptown'],
-    medium: ['Westside', 'Eastside', 'Financial District'],
-    far: ['Suburbs', 'North End', 'South End'],
-  },
-  'Westside': {
-    close: ['Eastside', 'Downtown'],
-    medium: ['Midtown', 'Uptown'],
-    far: ['Suburbs', 'North End', 'South End', 'Financial District'],
-  },
-  'Eastside': {
-    close: ['Westside', 'Downtown'],
-    medium: ['Midtown', 'Uptown'],
-    far: ['Suburbs', 'North End', 'South End', 'Financial District'],
-  },
-  'Uptown': {
-    close: ['Midtown', 'North End'],
-    medium: ['Downtown', 'Westside', 'Eastside'],
-    far: ['Suburbs', 'South End', 'Financial District'],
-  },
-  'Suburbs': {
-    close: ['North End', 'South End'],
-    medium: ['Uptown'],
-    far: ['Downtown', 'Midtown', 'Westside', 'Eastside', 'Financial District'],
-  },
-  'North End': {
-    close: ['Uptown', 'Suburbs'],
-    medium: ['Midtown'],
-    far: ['Downtown', 'Westside', 'Eastside', 'South End', 'Financial District'],
-  },
-  'South End': {
-    close: ['Suburbs'],
-    medium: ['Downtown', 'Eastside'],
-    far: ['Midtown', 'Westside', 'Uptown', 'North End', 'Financial District'],
-  },
-  'Financial District': {
-    close: ['Downtown'],
-    medium: ['Midtown', 'Eastside'],
-    far: ['Westside', 'Uptown', 'Suburbs', 'North End', 'South End'],
-  },
-};
-
-/**
  * Calculate compatibility score between current user and a roommate profile
  */
 export const calculateCompatibility = (
@@ -147,25 +96,38 @@ export const calculateDetailedCompatibility = (
 
   // ========================================
   // 1. LOCATION (18 points) - MAJOR FACTOR
+  // Priority: Same neighborhood > Nearby > Same city > Different city
   // ========================================
-  if (userProfile.location && roommateProfile.preferences?.location) {
+  if (userProfile.neighborhood && roommateProfile.preferences?.location) {
+    const userNeighborhood = userProfile.neighborhood;
+    const roommateNeighborhood = roommateProfile.preferences.location;
+    
+    if (userNeighborhood === roommateNeighborhood) {
+      // Same neighborhood - highest score
+      breakdown.location = 18;
+      reasons.strengths.push(`Both in ${userNeighborhood} - perfect location match`);
+    } else if (isNearbyNeighborhood(userNeighborhood, roommateNeighborhood)) {
+      // Nearby/adjacent neighborhoods - high score
+      breakdown.location = 14;
+      reasons.strengths.push(`${userNeighborhood} and ${roommateNeighborhood} are nearby neighborhoods`);
+    } else if (isSameCity(userNeighborhood, roommateNeighborhood)) {
+      // Same city but different area - good score
+      breakdown.location = 9;
+      reasons.notes.push(`Same city (${userProfile.city}), different neighborhoods`);
+    } else {
+      // Different city - 0 score unless actively searching
+      breakdown.location = 0;
+      reasons.concerns.push(`Different cities - not compatible for local roommate matching`);
+    }
+  } else if (userProfile.location && roommateProfile.preferences?.location) {
+    // Fallback to old location field if neighborhood not set
     const userLocation = userProfile.location;
     const roommateLocation = roommateProfile.preferences.location;
     
     if (userLocation === roommateLocation) {
       breakdown.location = 18;
       reasons.strengths.push(`Both prefer ${userLocation} - perfect location match`);
-    } else if (NEIGHBORHOOD_PROXIMITY[userLocation]?.close.includes(roommateLocation)) {
-      breakdown.location = 14;
-      reasons.strengths.push(`${userLocation} and ${roommateLocation} are close neighborhoods`);
-    } else if (NEIGHBORHOOD_PROXIMITY[userLocation]?.medium.includes(roommateLocation)) {
-      breakdown.location = 9;
-      reasons.notes.push(`${userLocation} and ${roommateLocation} are moderately close`);
-    } else if (NEIGHBORHOOD_PROXIMITY[userLocation]?.far.includes(roommateLocation)) {
-      breakdown.location = 4;
-      reasons.concerns.push(`${userLocation} and ${roommateLocation} are far apart`);
     } else {
-      // Unknown neighborhoods - give neutral score
       breakdown.location = 9;
       reasons.notes.push(`Different preferred locations`);
     }
