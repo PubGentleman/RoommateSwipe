@@ -211,7 +211,7 @@ export const PrivacySecurityScreen = () => {
         <MenuItem
           icon="download"
           label="Download My Data"
-          onPress={() => {}}
+          onPress={() => navigation.navigate('DownloadData')}
         />
 
         <MenuItem

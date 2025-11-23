@@ -10,6 +10,7 @@ import { NotificationsScreen } from '../screens/shared/NotificationsScreen';
 import { PrivacySecurityScreen } from '../screens/shared/PrivacySecurityScreen';
 import { ProfileViewsScreen } from '../screens/renter/ProfileViewsScreen';
 import PrivacyPolicyScreen from '../screens/shared/PrivacyPolicyScreen';
+import { DownloadDataScreen } from '../screens/shared/DownloadDataScreen';
 
 export type ProfileStackParamList = {
   ProfileMain: undefined;
@@ -20,6 +21,7 @@ export type ProfileStackParamList = {
   PrivacySecurity: undefined;
   ProfileViews: undefined;
   PrivacyPolicy: undefined;
+  DownloadData: undefined;
 };
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
@@ -113,6 +115,22 @@ export const ProfileStackNavigator = () => {
           headerShown: true,
           headerTransparent: true,
           headerTitle: 'Privacy Policy',
+          headerBlurEffect: 'regular',
+          headerBackVisible: true,
+          headerLeft: () => (
+            <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
+              <Feather name="chevron-left" size={28} color="#007AFF" />
+            </Pressable>
+          ),
+        })}
+      />
+      <Stack.Screen 
+        name="DownloadData" 
+        component={DownloadDataScreen}
+        options={({ navigation }) => ({
+          headerShown: true,
+          headerTransparent: true,
+          headerTitle: 'Download My Data',
           headerBlurEffect: 'regular',
           headerBackVisible: true,
           headerLeft: () => (
