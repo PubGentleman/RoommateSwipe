@@ -99,7 +99,7 @@ export const PrivacySecurityScreen = () => {
   );
 
   return (
-    <ScreenScrollView contentContainerStyle={{ paddingTop: 80 }}>
+    <ScreenScrollView contentContainerStyle={{ paddingTop: 0 }}>
       <View style={styles.section}>
         <ThemedText style={[Typography.h3, { marginBottom: Spacing.md, color: theme.textSecondary }]}>
           Account Security
