@@ -54,10 +54,12 @@ The current implementation uses mock data and TypeScript interfaces for data mod
 - `rentedDate`: Date when property was marked as rented, used for record keeping
 
 **Property Rental Status System:**
-- Hosts and agents can mark properties as rented via swipe actions in their listing screens
+- Hosts and agents can mark properties as rented via action buttons in their listing screens
 - Marking a property as rented sets `available: false`, records `rentedDate`, and removes it from ExploreScreen
 - Automatically sends `property_rented` notifications to all users who saved the property
-- Rented status persists across app restarts via improved data initialization guards
+- Hosts and agents can mark rented properties back as available, restoring them to ExploreScreen
+- Marking as available sets `available: true`, clears `rentedDate`, and makes property visible again
+- Rental status persists across app restarts via improved data initialization guards
 
 **Data Persistence & Initialization:**
 - `initializeWithMockData()` checks for existing data before overwriting, preserving modifications like rental status
