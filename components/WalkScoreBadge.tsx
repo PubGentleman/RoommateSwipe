@@ -41,6 +41,7 @@ export const WalkScoreBadge = ({ score, size = 'medium' }: WalkScoreBadgeProps) 
             borderWidth: dim.borderWidth,
             borderColor: green,
             borderRadius: dim.size / 2,
+            backgroundColor: theme.backgroundDefault,
           },
         ]}
       >
@@ -71,7 +72,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   circle: {
-    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
   },
