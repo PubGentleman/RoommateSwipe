@@ -8,14 +8,19 @@ import { Conversation, Match, RoommateProfile } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StorageService } from '../../utils/storage';
 import { useAuth } from '../../contexts/AuthContext';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { MessagesStackParamList } from '../../navigation/MessagesStackNavigator';
 import { Image } from 'expo-image';
 
+type MessagesScreenNavigationProp = NativeStackNavigationProp<MessagesStackParamList, 'MessagesList'>;
+
 type MessagesScreenProps = {
-  navigation: any;
+  navigation: MessagesScreenNavigationProp;
 };
 
-export const MessagesScreen = ({ navigation }: MessagesScreenProps) => {
+export const MessagesScreen = () => {
+  const navigation = useNavigation<MessagesScreenNavigationProp>();
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
@@ -103,18 +108,22 @@ export const MessagesScreen = ({ navigation }: MessagesScreenProps) => {
     return (userPlan === 'plus' || userPlan === 'priority') && userStatus === 'active';
   };
 
-  const renderConversation = ({ item }: { item: Conversation }) => (
+  const renderConversation = ({ item }: { item: Conversation }) => {
+    const handlePress = () => {
+      console.log('[MessagesScreen] Navigating to Chat:', item.participant.name);
+      navigation.navigate('Chat', {
+        conversationId: item.id,
+        otherUser: item.participant as unknown as RoommateProfile,
+      });
+    };
+
+    return (
     <Pressable
       style={[
         styles.conversationItem,
         { backgroundColor: item.unread > 0 ? theme.backgroundSecondary : theme.backgroundRoot },
       ]}
-      onPress={() => {
-        navigation.navigate('Chat', {
-          conversationId: item.id,
-          otherUser: item.participant,
-        });
-      }}
+      onPress={handlePress}
     >
       <View style={styles.avatarContainer}>
         <Image source={{ uri: item.participant.photo }} style={styles.avatar} />
@@ -155,7 +164,8 @@ export const MessagesScreen = ({ navigation }: MessagesScreenProps) => {
         </View>
       </View>
     </Pressable>
-  );
+    );
+  };
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
