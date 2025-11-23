@@ -279,7 +279,6 @@ export const ProfileScreen = () => {
         <View style={styles.section}>
           <ThemedText style={[Typography.h3, styles.sectionTitle]}>Support</ThemedText>
           <MenuItem icon="help-circle" label="Help Center" onPress={() => {}} />
-          <MenuItem icon="shield" label="Privacy Policy" onPress={() => navigation.navigate('PrivacyPolicy')} />
           <MenuItem icon="file-text" label="Terms & Conditions" onPress={() => {}} />
           <MenuItem icon="info" label="About" onPress={() => {}} />
         </View>

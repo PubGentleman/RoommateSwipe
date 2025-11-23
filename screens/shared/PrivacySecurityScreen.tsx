@@ -2,16 +2,20 @@ import React, { useState } from 'react';
 import { View, StyleSheet, Pressable, TextInput, Switch, Modal } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { ProfileStackParamList } from '../../navigation/ProfileStackNavigator';
 import { ScreenScrollView } from '../../components/ScreenScrollView';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
 import { Spacing, BorderRadius, Typography } from '../../constants/theme';
 
+type PrivacySecurityScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'PrivacySecurity'>;
+
 export const PrivacySecurityScreen = () => {
   const { theme } = useTheme();
   const { user, logout } = useAuth();
-  const navigation = useNavigation();
+  const navigation = useNavigation<PrivacySecurityScreenNavigationProp>();
   
   const [showPasswordSection, setShowPasswordSection] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
@@ -89,7 +93,7 @@ export const PrivacySecurityScreen = () => {
         value={value}
         onValueChange={onValueChange}
         trackColor={{ false: theme.border, true: theme.primary }}
-        thumbColor={theme.card}
+        thumbColor={theme.backgroundSecondary}
       />
     </View>
   );
@@ -118,7 +122,7 @@ export const PrivacySecurityScreen = () => {
               </View>
             ) : null}
             <TextInput
-              style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
+              style={[styles.input, { backgroundColor: theme.backgroundDefault, color: theme.text, borderColor: theme.border }]}
               placeholder="Current Password"
               placeholderTextColor={theme.textSecondary}
               value={currentPassword}
@@ -130,7 +134,7 @@ export const PrivacySecurityScreen = () => {
               autoCapitalize="none"
             />
             <TextInput
-              style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
+              style={[styles.input, { backgroundColor: theme.backgroundDefault, color: theme.text, borderColor: theme.border }]}
               placeholder="New Password"
               placeholderTextColor={theme.textSecondary}
               value={newPassword}
@@ -142,7 +146,7 @@ export const PrivacySecurityScreen = () => {
               autoCapitalize="none"
             />
             <TextInput
-              style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
+              style={[styles.input, { backgroundColor: theme.backgroundDefault, color: theme.text, borderColor: theme.border }]}
               placeholder="Confirm New Password"
               placeholderTextColor={theme.textSecondary}
               value={confirmPassword}
@@ -157,7 +161,7 @@ export const PrivacySecurityScreen = () => {
               style={[styles.changePasswordButton, { backgroundColor: theme.primary }]}
               onPress={handleChangePassword}
             >
-              <ThemedText style={[Typography.bodyBold, { color: '#FFFFFF' }]}>
+              <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>
                 Update Password
               </ThemedText>
             </Pressable>
@@ -213,7 +217,7 @@ export const PrivacySecurityScreen = () => {
         <MenuItem
           icon="file-text"
           label="Privacy Policy"
-          onPress={() => {}}
+          onPress={() => navigation.navigate('PrivacyPolicy')}
         />
 
         <MenuItem
@@ -233,7 +237,7 @@ export const PrivacySecurityScreen = () => {
           onPress={handleDeleteAccount}
         >
           <Feather name="trash-2" size={20} color="#DC2626" />
-          <ThemedText style={[Typography.bodyBold, { marginLeft: Spacing.md, color: '#DC2626' }]}>
+          <ThemedText style={[Typography.body, { marginLeft: Spacing.md, color: '#DC2626', fontWeight: '600' }]}>
             Delete Account
           </ThemedText>
         </Pressable>
@@ -246,7 +250,7 @@ export const PrivacySecurityScreen = () => {
         onRequestClose={() => setShowDeleteModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContainer, { backgroundColor: theme.card }]}>
+          <View style={[styles.modalContainer, { backgroundColor: theme.backgroundSecondary }]}>
             <View style={styles.modalHeader}>
               <Feather name="alert-triangle" size={32} color="#DC2626" />
             </View>
@@ -264,7 +268,7 @@ export const PrivacySecurityScreen = () => {
                   style={[styles.modalButton, { backgroundColor: theme.backgroundSecondary }]}
                   onPress={() => setShowDeleteModal(false)}
                 >
-                  <ThemedText style={[Typography.bodyBold, { color: theme.text }]}>
+                  <ThemedText style={[Typography.body, { color: theme.text, fontWeight: '600' }]}>
                     Cancel
                   </ThemedText>
                 </Pressable>
@@ -273,7 +277,7 @@ export const PrivacySecurityScreen = () => {
                   style={[styles.modalButton, { backgroundColor: '#DC2626' }]}
                   onPress={confirmDeleteAccount}
                 >
-                  <ThemedText style={[Typography.bodyBold, { color: '#FFFFFF' }]}>
+                  <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>
                     Delete Account
                   </ThemedText>
                 </Pressable>
@@ -290,7 +294,7 @@ export const PrivacySecurityScreen = () => {
         onRequestClose={() => setShowPasswordSuccessModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContainer, { backgroundColor: theme.card }]}>
+          <View style={[styles.modalContainer, { backgroundColor: theme.backgroundSecondary }]}>
             <View style={styles.modalHeader}>
               <Feather name="check-circle" size={32} color="#10B981" />
             </View>
@@ -307,7 +311,7 @@ export const PrivacySecurityScreen = () => {
                 style={[styles.modalButton, { backgroundColor: theme.primary }]}
                 onPress={() => setShowPasswordSuccessModal(false)}
               >
-                <ThemedText style={[Typography.bodyBold, { color: '#FFFFFF' }]}>
+                <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>
                   OK
                 </ThemedText>
               </Pressable>
@@ -328,7 +332,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: Spacing.lg,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.medium,
     borderWidth: 1,
     marginBottom: Spacing.sm,
   },
@@ -339,21 +343,21 @@ const styles = StyleSheet.create({
   },
   passwordSection: {
     padding: Spacing.lg,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.medium,
     borderWidth: 1,
     marginTop: Spacing.sm,
     marginBottom: Spacing.sm,
   },
   input: {
     borderWidth: 1,
-    borderRadius: BorderRadius.sm,
+    borderRadius: BorderRadius.small,
     padding: Spacing.md,
     marginBottom: Spacing.md,
     fontSize: 16,
   },
   changePasswordButton: {
     padding: Spacing.md,
-    borderRadius: BorderRadius.sm,
+    borderRadius: BorderRadius.small,
     alignItems: 'center',
     marginTop: Spacing.sm,
   },
@@ -362,14 +366,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: Spacing.lg,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.medium,
     borderWidth: 2,
   },
   errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: Spacing.md,
-    borderRadius: BorderRadius.sm,
+    borderRadius: BorderRadius.small,
     borderWidth: 1,
     marginBottom: Spacing.md,
   },
@@ -383,7 +387,7 @@ const styles = StyleSheet.create({
   modalContainer: {
     width: '100%',
     maxWidth: 400,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.large,
     overflow: 'hidden',
   },
   modalHeader: {
@@ -401,7 +405,7 @@ const styles = StyleSheet.create({
   modalButton: {
     flex: 1,
     padding: Spacing.md,
-    borderRadius: BorderRadius.sm,
+    borderRadius: BorderRadius.small,
     alignItems: 'center',
   },
 });
