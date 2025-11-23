@@ -1,0 +1,96 @@
+Here is the **exact prompt** you can paste into **Replit (Ghostwriter)** to build your **point-based roommate matching algorithm + adaptive AI refinement system** based on your platform’s roles (roommate, host, group, user).
+
+This prompt is specifically engineered so Replit will generate **clean backend logic**, **SQL-compatible**, **expandable**, and works with your stack.
+
+---
+
+# ✅ **REPLIT PROMPT — COPY & PASTE**
+
+**“Build a full point-based roommate matching algorithm for my app.
+The algorithm must read data from a user’s profile and generate compatibility scores for:
+
+* Roommates
+* Hosts
+* Groups
+* General users
+
+### **Profile Information Source**
+
+Pull all matchable attributes from the profile screen.
+When a new user signs up, they answer **10 core matching questions** that establish their baseline match score.
+
+### **Point System Requirements**
+
+Create a flexible scoring system where:
+
+* Every question has weighted points
+* A match score is calculated out of 100
+* Overlapping preferences increase the score
+* Deal-breakers or conflicts lower the score
+* Missing data should not break the logic
+* Scores update automatically whenever users edit their profile
+
+### **Adaptive AI Refinement**
+
+Add an AI-driven refinement assistant:
+
+* Over time, the algorithm should ask the user **1–2 follow-up questions**
+* These questions must be based on *gaps* or *uncertainties* in the match data
+* Answers should adjust weights and refine future matches
+* The refinement engine must run periodically or when new match patterns emerge
+
+### **Matching Output**
+
+Produce structured JSON results:
+{
+user_id: “…”,
+top_matches: [ { match_id, score, reason_summary } ],
+group_matches: [ … ],
+host_matches: [ … ],
+roommate_matches: [ … ]
+}
+
+### **Technical Requirements**
+
+* Use Python for backend logic
+* Use SQL queries (PostgreSQL or MySQL style) to pull profile data
+* Create a reusable function: get_match_score(userA, userB)
+* Create a refinement engine function that identifies missing or unclear attributes
+* Use clean modular code with comments
+* Build the system so future questions can be added easily without rewriting the algorithm
+
+### **Deliverables**
+
+1. Matching engine code (Python)
+2. Data model for storing profile answers & weights (SQL)
+3. Point-based scoring logic
+4. Refinement engine logic
+5. Example output JSON
+6. Instructions for integrating with my app
+
+Generate the full algorithm, database structure, and sample code now.”**
+
+---
+
+# 🔥 WHAT THIS PROMPT WILL PRODUCE
+
+Replit will generate:
+
+* Python matching engine
+* SQL profile answer tables
+* Weighted scoring system
+* Functions for match scoring
+* AI-driven question refinement logic
+* JSON API output you can plug directly into your app
+* Clean reusable code
+
+---
+
+If you want, I can also create:
+
+✅ The **10 best core matching questions**
+✅ The **follow-up micro-questions**
+✅ The **scoring weights**
+✅ The **database schema**
+
+Just say **“Give me the 10 profile questions”** or **“Create the DB schema.”**
