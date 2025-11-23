@@ -601,13 +601,13 @@ export const StorageService = {
       await this.setGroups(mockGroups);
       console.log(`[StorageService] ✓ Loaded ${mockGroups.length} groups`);
       
-      const existingUsers = await this.getUsers();
-      if (existingUsers.length === 0 || !existingUsers.some(u => u.id === '1')) {
-        for (const profileUser of mockProfileUsers) {
-          await this.addOrUpdateUser(profileUser);
-        }
-        console.log(`[StorageService] ✓ Seeded ${mockProfileUsers.length} profile users`);
+      // Force reload profile users to ensure new fields (age, profilePicture) are included
+      await AsyncStorage.removeItem(STORAGE_KEYS.USERS);
+      console.log('[StorageService] Cleared users to force reload with new fields');
+      for (const profileUser of mockProfileUsers) {
+        await this.addOrUpdateUser(profileUser);
       }
+      console.log(`[StorageService] ✓ Seeded ${mockProfileUsers.length} profile users`);
       
       console.log('[StorageService] Mock data initialization complete!');
     } catch (error) {
