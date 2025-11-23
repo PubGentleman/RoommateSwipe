@@ -1,6 +1,5 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { View, StyleSheet, Image } from 'react-native';
 import { ThemedText } from './ThemedText';
 import { useTheme } from '../hooks/useTheme';
 
@@ -45,11 +44,10 @@ export const WalkScoreBadge = ({ score, size = 'medium' }: WalkScoreBadgeProps) 
           },
         ]}
       >
-        <Feather 
-          name="user" 
-          size={dim.iconSize} 
-          color={green}
-          style={styles.icon}
+        <Image
+          source={require('../assets/images/walking-person-green.png')}
+          style={[styles.icon, { width: dim.iconSize, height: dim.iconSize }]}
+          resizeMode="contain"
         />
         <ThemedText
           style={[
