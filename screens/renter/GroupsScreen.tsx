@@ -114,9 +114,9 @@ export const GroupsScreen = () => {
 
   const MemberAvatarStack = ({ group }: { group: Group }) => {
     const MAX_VISIBLE = 4;
-    const AVATAR_SIZE = 56;
-    const OVERLAP = 16;
-    const EXPANDED_SPACING = 70;
+    const AVATAR_SIZE = 70;
+    const OVERLAP = 20;
+    const EXPANDED_SPACING = 85;
 
     const memberProfiles = (group.members || [])
       .map(id => mockRoommateProfiles.find(p => p.id === id))
@@ -1823,7 +1823,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   avatarStackContainer: {
-    height: 70,
+    height: 85,
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'center',
@@ -1833,9 +1833,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
   },
   avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
     borderWidth: 3,
   },
   avatarPlaceholder: {
