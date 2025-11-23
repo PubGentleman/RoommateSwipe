@@ -377,7 +377,32 @@ export const ExploreScreen = () => {
               </View>
             </View>
             {item.walkScore ? (
-              <WalkScoreBadge score={item.walkScore} size="small" />
+              (() => {
+                const userPlan = user?.subscription?.plan || 'basic';
+                const hasWalkScoreAccess = userPlan === 'plus' || userPlan === 'priority';
+                
+                return hasWalkScoreAccess ? (
+                  <WalkScoreBadge score={item.walkScore} size="small" />
+                ) : (
+                  <Pressable
+                    style={{
+                      width: 50,
+                      height: 50,
+                      borderRadius: 25,
+                      borderWidth: 2,
+                      borderColor: theme.textSecondary + '40',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setShowUpgradePrompt(true);
+                    }}
+                  >
+                    <Feather name="lock" size={20} color={theme.textSecondary} />
+                  </Pressable>
+                );
+              })()
             ) : null}
           </View>
           <View style={styles.locationRow}>
@@ -718,32 +743,32 @@ export const ExploreScreen = () => {
             style={[styles.upgradeModal, { backgroundColor: theme.backgroundDefault }]}
             onPress={e => e.stopPropagation()}
           >
-            <View style={[styles.upgradeIconContainer, { backgroundColor: theme.primary + '20' }]}>
-              <Feather name="filter" size={32} color={theme.primary} />
+            <View style={[styles.upgradeIconContainer, { backgroundColor: '#4CAF50' + '20' }]}>
+              <Feather name="user" size={32} color="#4CAF50" />
             </View>
             <ThemedText style={[Typography.h2, { textAlign: 'center', marginTop: Spacing.lg }]}>
-              Advanced Filters
+              Walk Score Feature
             </ThemedText>
             <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary, marginTop: Spacing.sm }]}>
-              Upgrade to Plus or Priority to unlock advanced property filters and find your perfect match faster.
+              Upgrade to Plus or Priority to see walkability ratings for all properties and make informed decisions about neighborhood accessibility.
             </ThemedText>
             <View style={styles.upgradeFeatures}>
               <View style={styles.upgradeFeature}>
                 <Feather name="check" size={20} color={theme.success} />
                 <ThemedText style={[Typography.body, { marginLeft: Spacing.md }]}>
-                  Budget range filters
+                  See Walk Scores for all properties
                 </ThemedText>
               </View>
               <View style={styles.upgradeFeature}>
                 <Feather name="check" size={20} color={theme.success} />
                 <ThemedText style={[Typography.body, { marginLeft: Spacing.md }]}>
-                  Bedroom & bathroom filters
+                  Understand neighborhood walkability
                 </ThemedText>
               </View>
               <View style={styles.upgradeFeature}>
                 <Feather name="check" size={20} color={theme.success} />
                 <ThemedText style={[Typography.body, { marginLeft: Spacing.md }]}>
-                  Amenity preferences
+                  Make informed housing decisions
                 </ThemedText>
               </View>
             </View>
@@ -977,22 +1002,56 @@ export const ExploreScreen = () => {
                       </View>
                     </View>
                     {selectedProperty.walkScore ? (
-                      <View style={styles.detailRow}>
-                        <WalkScoreBadge score={selectedProperty.walkScore} size="large" />
-                        <View style={{ flex: 1, marginLeft: Spacing.lg }}>
-                          <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
-                            {
-                              selectedProperty.walkScore >= 90 ? "Walker's Paradise" :
-                              selectedProperty.walkScore >= 70 ? "Very Walkable" :
-                              selectedProperty.walkScore >= 50 ? "Somewhat Walkable" :
-                              "Car-Dependent"
-                            }
-                          </ThemedText>
-                          <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
-                            Daily errands do not require a car
-                          </ThemedText>
-                        </View>
-                      </View>
+                      (() => {
+                        const userPlan = user?.subscription?.plan || 'basic';
+                        const hasWalkScoreAccess = userPlan === 'plus' || userPlan === 'priority';
+                        
+                        return hasWalkScoreAccess ? (
+                          <View style={styles.detailRow}>
+                            <WalkScoreBadge score={selectedProperty.walkScore} size="large" />
+                            <View style={{ flex: 1, marginLeft: Spacing.lg }}>
+                              <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
+                                {
+                                  selectedProperty.walkScore >= 90 ? "Walker's Paradise" :
+                                  selectedProperty.walkScore >= 70 ? "Very Walkable" :
+                                  selectedProperty.walkScore >= 50 ? "Somewhat Walkable" :
+                                  "Car-Dependent"
+                                }
+                              </ThemedText>
+                              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
+                                Daily errands do not require a car
+                              </ThemedText>
+                            </View>
+                          </View>
+                        ) : (
+                          <Pressable
+                            style={styles.detailRow}
+                            onPress={() => {
+                              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                              setShowPropertyDetail(false);
+                              setShowUpgradePrompt(true);
+                            }}
+                          >
+                            <View style={{
+                              width: 80,
+                              height: 80,
+                              borderRadius: 40,
+                              borderWidth: 4,
+                              borderColor: theme.textSecondary + '40',
+                              justifyContent: 'center',
+                              alignItems: 'center',
+                            }}>
+                              <Feather name="lock" size={32} color={theme.textSecondary} />
+                            </View>
+                            <View style={{ flex: 1, marginLeft: Spacing.lg }}>
+                              <ThemedText style={[Typography.body, { fontWeight: '600' }]}>Walk Score</ThemedText>
+                              <ThemedText style={[Typography.caption, { color: theme.primary, marginTop: Spacing.xs }]}>
+                                Upgrade to Plus to see walkability ratings
+                              </ThemedText>
+                            </View>
+                          </Pressable>
+                        );
+                      })()
                     ) : null}
                     {selectedProperty.availableDate ? (
                       <View style={styles.detailRow}>
