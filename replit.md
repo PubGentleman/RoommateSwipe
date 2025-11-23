@@ -22,6 +22,23 @@ Preferred communication style: Simple, everyday language.
 
 # System Architecture
 
+## Matching Algorithm
+
+**Points-Based Compatibility System:**
+- Calculates compatibility scores (0-100) between users based on profile preferences
+- 10 core matching factors with weighted scoring:
+  1. **Sleep Schedule** (15 points): Early/Late/Flexible
+  2. **Cleanliness** (15 points): Very Clean/Clean/Moderate
+  3. **Guest Policy** (10 points): Frequent/Occasional/Rarely
+  4. **Smoking & Drinking** (15 points): Lifestyle compatibility
+  5. **Pet Friendly** (10 points): Pet preferences
+  6. **Budget** (15 points): Monthly budget alignment (within 10%/25%/50%)
+  7. **Location** (10 points): Preferred location matching
+  8. **Occupation** (10 points): Student/Professional alignment
+- Dynamic color coding: Green (80%+), Blue (70%+), Orange (60%+), Red (<60%)
+- Real-time calculation when profiles load
+- Compatibility percentages displayed on profile cards
+
 ## Frontend Architecture
 
 **Framework & Platform:**

@@ -14,6 +14,7 @@ import { StorageService } from '../../utils/storage';
 import { RoommateProfile, Match } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scaleFont, moderateScale, getResponsiveSpacing } from '../../utils/responsive';
+import { calculateCompatibility, getMatchQualityColor } from '../../utils/matchingAlgorithm';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Limit card size for web/desktop viewing
@@ -67,7 +68,15 @@ export const RoommatesScreen = () => {
       
       const unseen = allProfiles.filter(p => !history.has(p.id) && p.id !== user?.id);
       
-      const sortedProfiles = unseen.sort((a, b) => {
+      const profilesWithCompatibility = unseen.map(profile => {
+        const compatibility = user ? calculateCompatibility(user, profile) : 50;
+        return {
+          ...profile,
+          compatibility,
+        };
+      });
+      
+      const sortedProfiles = profilesWithCompatibility.sort((a, b) => {
         const userA = userMap.get(a.id);
         const userB = userMap.get(b.id);
         
@@ -314,9 +323,9 @@ export const RoommatesScreen = () => {
                 </View>
               ) : null}
               <View style={styles.topBadges}>
-                <View style={[styles.compatibilityBadge, { backgroundColor: theme.success }]}>
+                <View style={[styles.compatibilityBadge, { backgroundColor: getMatchQualityColor(currentProfile.compatibility || 50) }]}>
                   <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '600' }]}>
-                    {currentProfile.compatibility}% Match
+                    {currentProfile.compatibility || 50}% Match
                   </ThemedText>
                 </View>
               </View>
