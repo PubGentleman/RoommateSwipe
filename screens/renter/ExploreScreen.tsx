@@ -96,15 +96,15 @@ export const ExploreScreen = () => {
     return {
       id: user.id,
       name: user.name,
-      age: profile.age || 0,
+      age: 25,
       bio: profile.bio || '',
       occupation: profile.occupation || '',
       budget: profile.budget || 0,
-      photos: profile.photos || [],
+      photos: user.profilePicture ? [user.profilePicture] : [],
       lifestyle: {
         cleanliness: profile.preferences?.cleanliness ? cleanlinessToNumber(profile.preferences.cleanliness) : 5,
-        socialLevel: profile.lifestyle?.socialLevel || 5,
-        workSchedule: profile.lifestyle?.workSchedule || '',
+        socialLevel: 5,
+        workSchedule: profile.preferences?.workLocation || '',
         pets: profile.preferences?.pets === 'have_pets',
         smoking: profile.preferences?.smoking === 'yes',
       },
@@ -314,7 +314,7 @@ export const ExploreScreen = () => {
             {item.title}
           </ThemedText>
           {item.roomType === 'room' && (hostUser || (item.existingRoommates && item.existingRoommates.length > 0)) ? (
-            <View style={[styles.roommateInfo, { backgroundColor: theme.background, marginTop: Spacing.sm }]}>
+            <View style={[styles.roommateInfo, { backgroundColor: theme.backgroundDefault, marginTop: Spacing.sm }]}>
               <View style={styles.roommateGenderContainer}>
                 <Feather 
                   name="users" 
@@ -815,13 +815,31 @@ export const ExploreScreen = () => {
                         </View>
                       </View>
                     ) : null}
-                    {selectedProperty.roomType === 'room' && selectedProperty.existingRoommates && selectedProperty.existingRoommates.length > 0 ? (
+                    {selectedProperty.roomType === 'room' && selectedProperty.existingRoommates && selectedProperty.existingRoommates.filter(rm => rm.onApp && rm.userId).length > 0 ? (
                       <View style={styles.detailRow}>
                         <Feather name="users" size={20} color={theme.primary} />
                         <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Roommates on App</ThemedText>
+                          {selectedProperty.existingRoommates.filter(rm => rm.onApp && rm.userId).map((rm, idx) => {
+                            const roommateUser = hostProfiles.get(rm.userId!);
+                            return (
+                              <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginTop: idx > 0 ? Spacing.xs : 0 }}>
+                                <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
+                                  {getGenderSymbol(rm.gender)} {roommateUser?.name || 'User'}
+                                </ThemedText>
+                              </View>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    ) : null}
+                    {selectedProperty.roomType === 'room' && selectedProperty.existingRoommates && selectedProperty.existingRoommates.filter(rm => !rm.onApp).length > 0 ? (
+                      <View style={styles.detailRow}>
+                        <Feather name="user-x" size={20} color={theme.primary} />
+                        <View style={{ flex: 1, marginLeft: Spacing.md }}>
                           <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Other Roommates (Not on App)</ThemedText>
                           <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
-                            {selectedProperty.existingRoommates.filter(rm => !rm.onApp).map((rm) => getGenderSymbol(rm.gender)).join('') || 'None'}
+                            {selectedProperty.existingRoommates.filter(rm => !rm.onApp).map((rm) => getGenderSymbol(rm.gender)).join('')}
                           </ThemedText>
                         </View>
                       </View>
