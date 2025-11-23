@@ -35,6 +35,17 @@ export const RoommatesScreen = () => {
   const translateY = useSharedValue(0);
   const rotation = useSharedValue(0);
 
+  const animatedCardStyle = useAnimatedStyle(() => {
+    const rotate = `${rotation.value}deg`;
+    return {
+      transform: [
+        { translateX: translateX.value },
+        { translateY: translateY.value },
+        { rotate },
+      ],
+    };
+  });
+
   useEffect(() => {
     loadProfiles();
   }, []);
@@ -214,17 +225,6 @@ export const RoommatesScreen = () => {
       </View>
     );
   }
-
-  const animatedCardStyle = useAnimatedStyle(() => {
-    const rotate = `${rotation.value}deg`;
-    return {
-      transform: [
-        { translateX: translateX.value },
-        { translateY: translateY.value },
-        { rotate },
-      ],
-    };
-  });
 
   const handleOpenAIAssistant = async () => {
     console.log('[AI Assistant] Button clicked');
