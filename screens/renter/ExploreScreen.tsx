@@ -8,10 +8,10 @@ import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { StorageService } from '../../utils/storage';
-import { Property, PropertyFilter } from '../../types/models';
+import { Property, PropertyFilter, User, RoommateProfile } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { formatMoveInDate } from '../../utils/matchingAlgorithm';
+import { formatMoveInDate, calculateCompatibility, getMatchQualityColor } from '../../utils/matchingAlgorithm';
 
 const COMMON_AMENITIES = [
   'Parking', 'Gym', 'Pool', 'Laundry', 'Pet Friendly',
@@ -36,10 +36,12 @@ export const ExploreScreen = () => {
   const [showPropertyDetail, setShowPropertyDetail] = useState(false);
   const [viewMode, setViewMode] = useState<'all' | 'saved'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [hostProfiles, setHostProfiles] = useState<Map<string, User>>(new Map());
 
   useEffect(() => {
     loadProperties();
     loadSavedProperties();
+    loadHostProfiles();
   }, []);
 
   useEffect(() => {
@@ -69,6 +71,21 @@ export const ExploreScreen = () => {
       setSaved(new Set(savedIds));
     } catch (err) {
       console.error('Error loading saved properties:', err);
+    }
+  };
+
+  const loadHostProfiles = async () => {
+    try {
+      const users = await StorageService.getUsers();
+      const profileMap = new Map<string, User>();
+      users.forEach(u => {
+        if (u.role === 'renter' && u.profileData) {
+          profileMap.set(u.id, u);
+        }
+      });
+      setHostProfiles(profileMap);
+    } catch (err) {
+      console.error('Error loading host profiles:', err);
     }
   };
 
@@ -200,80 +217,135 @@ export const ExploreScreen = () => {
     }
   };
 
-  const renderProperty = ({ item }: { item: Property }) => (
-    <Pressable
-      style={[styles.propertyCard, { backgroundColor: theme.backgroundDefault }]}
-      onPress={() => {
-        setSelectedProperty(item);
-        setShowPropertyDetail(true);
-      }}
-    >
-      <Image source={{ uri: item.photos[0] }} style={styles.propertyImage} />
-      <View style={styles.badgeContainer}>
-        {item.propertyType ? (
+  const renderProperty = ({ item }: { item: Property }) => {
+    const compatibility = item.hostProfileId && hostProfiles.get(item.hostProfileId) && user
+      ? calculateCompatibility(user, {
+          id: item.hostProfileId,
+          name: item.hostName,
+          age: 0,
+          bio: '',
+          occupation: hostProfiles.get(item.hostProfileId)?.profileData?.occupation || '',
+          budget: hostProfiles.get(item.hostProfileId)?.profileData?.budget || 0,
+          photos: [],
+          lifestyle: {
+            cleanliness: 0,
+            socialLevel: 0,
+            workSchedule: '',
+            pets: false,
+            smoking: false,
+          },
+          preferences: {
+            location: hostProfiles.get(item.hostProfileId)?.profileData?.location || '',
+            moveInDate: '',
+            bedrooms: 1,
+          },
+        } as RoommateProfile)
+      : null;
+
+    return (
+      <Pressable
+        style={[styles.propertyCard, { backgroundColor: theme.backgroundDefault }]}
+        onPress={() => {
+          setSelectedProperty(item);
+          setShowPropertyDetail(true);
+        }}
+      >
+        <Image source={{ uri: item.photos[0] }} style={styles.propertyImage} />
+        <View style={styles.badgeContainer}>
+          {item.propertyType ? (
+            <View style={[
+              styles.propertyTypeBadge,
+              { backgroundColor: item.propertyType === 'lease' ? theme.primary : theme.success }
+            ]}>
+              <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '700' }]}>
+                {item.propertyType.toUpperCase()}
+              </ThemedText>
+            </View>
+          ) : null}
           <View style={[
-            styles.propertyTypeBadge,
-            { backgroundColor: item.propertyType === 'lease' ? theme.primary : theme.success }
+            styles.roomTypeBadge,
+            { backgroundColor: item.roomType === 'room' ? '#9333EA' : '#0EA5E9' }
           ]}>
             <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '700' }]}>
-              {item.propertyType.toUpperCase()}
+              {item.roomType === 'room' ? 'ROOM' : 'ENTIRE'}
             </ThemedText>
           </View>
-        ) : null}
-        {item.featured ? (
-          <View style={[styles.featuredBadge, { backgroundColor: theme.primary }]}>
-            <Feather name="star" size={12} color="#FFFFFF" />
-            <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '700', marginLeft: 4 }]}>
-              FEATURED
-            </ThemedText>
-          </View>
-        ) : null}
-      </View>
-      <Pressable
-        style={[styles.saveButton, { backgroundColor: theme.backgroundDefault }]}
-        onPress={() => toggleSave(item.id)}
-      >
-        <Feather
-          name={saved.has(item.id) ? 'heart' : 'heart'}
-          size={20}
-          color={saved.has(item.id) ? theme.error : theme.text}
-          fill={saved.has(item.id) ? theme.error : 'none'}
-        />
-      </Pressable>
-      <View style={styles.propertyInfo}>
-        <ThemedText style={[Typography.h3]}>${item.price}/mo</ThemedText>
-        <ThemedText style={[Typography.body, { marginTop: Spacing.xs }]} numberOfLines={1}>
-          {item.title}
-        </ThemedText>
-        <View style={styles.details}>
-          <View style={styles.detail}>
-            <Feather name="home" size={16} color={theme.textSecondary} />
-            <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
-              {item.bedrooms} bd
-            </ThemedText>
-          </View>
-          <View style={styles.detail}>
-            <Feather name="droplet" size={16} color={theme.textSecondary} />
-            <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
-              {item.bathrooms} ba
-            </ThemedText>
-          </View>
-          <View style={styles.detail}>
-            <Feather name="maximize" size={16} color={theme.textSecondary} />
-            <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
-              {item.sqft} sqft
-            </ThemedText>
-          </View>
+          {item.featured ? (
+            <View style={[styles.featuredBadge, { backgroundColor: theme.primary }]}>
+              <Feather name="star" size={12} color="#FFFFFF" />
+              <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '700', marginLeft: 4 }]}>
+                FEATURED
+              </ThemedText>
+            </View>
+          ) : null}
         </View>
-        <View style={styles.location}>
-          <Feather name="map-pin" size={14} color={theme.textSecondary} />
-          <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
-            {item.city}, {item.state}
+        <Pressable
+          style={[styles.saveButton, { backgroundColor: theme.backgroundDefault }]}
+          onPress={() => toggleSave(item.id)}
+        >
+          <Feather
+            name={saved.has(item.id) ? 'heart' : 'heart'}
+            size={20}
+            color={saved.has(item.id) ? theme.error : theme.text}
+            fill={saved.has(item.id) ? theme.error : 'none'}
+          />
+        </Pressable>
+        <View style={styles.propertyInfo}>
+          <ThemedText style={[Typography.h3]}>${item.price}/mo</ThemedText>
+          <ThemedText style={[Typography.body, { marginTop: Spacing.xs }]} numberOfLines={1}>
+            {item.title}
           </ThemedText>
+          {item.roomType === 'room' && item.existingRoommateGender ? (
+            <View style={[styles.roommateInfo, { backgroundColor: theme.background, marginTop: Spacing.sm }]}>
+              <View style={styles.roommateGenderContainer}>
+                <Feather 
+                  name="user" 
+                  size={14} 
+                  color={theme.textSecondary} 
+                />
+                <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
+                  {item.existingRoommateGender === 'male' ? '♂ Male' : '♀ Female'} roommate
+                </ThemedText>
+              </View>
+              {compatibility !== null ? (
+                <View style={[styles.compatibilityBadge, { backgroundColor: getMatchQualityColor(compatibility) }]}>
+                  <ThemedText style={[Typography.caption, { color: '#FFFFFF', fontWeight: '700' }]}>
+                    {compatibility}% Match
+                  </ThemedText>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+          <View style={styles.details}>
+            <View style={styles.detail}>
+              <Feather name="home" size={16} color={theme.textSecondary} />
+              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
+                {item.bedrooms} bd
+              </ThemedText>
+            </View>
+            <View style={styles.detail}>
+              <Feather name="droplet" size={16} color={theme.textSecondary} />
+              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
+                {item.bathrooms} ba
+              </ThemedText>
+            </View>
+            <View style={styles.detail}>
+              <Feather name="maximize" size={16} color={theme.textSecondary} />
+              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
+                {item.sqft} sqft
+              </ThemedText>
+            </View>
+          </View>
+          <View style={styles.location}>
+            <Feather name="map-pin" size={14} color={theme.textSecondary} />
+            <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
+              {item.city}, {item.state}
+            </ThemedText>
+          </View>
         </View>
-      </View>
-    </Pressable>
-  );
+      </Pressable>
+    );
+  };
 
   if (error) {
     return (
@@ -879,6 +951,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.small,
+  },
+  roomTypeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.small,
+  },
+  roommateInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.small,
+  },
+  roommateGenderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  compatibilityBadge: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 4,
     borderRadius: BorderRadius.small,
   },
   propertyInfo: {
