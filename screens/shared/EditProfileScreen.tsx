@@ -192,17 +192,17 @@ export const EditProfileScreen = () => {
           </View>
         </View>
 
-        {/* Matching Questions */}
+        {/* About You */}
         <View style={styles.section}>
-          <ThemedText style={[Typography.h3, styles.sectionTitle]}>Matching Questions</ThemedText>
+          <ThemedText style={[Typography.h3, styles.sectionTitle]}>About You</ThemedText>
           <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.lg }]}>
-            Answer these questions to find your best roommate matches
+            Tell us a bit more about yourself
           </ThemedText>
 
-          {/* Q1: Sleep Schedule */}
+          {/* Sleep Schedule */}
           <View style={styles.inputGroup}>
             <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
-              1. What is your sleep schedule?
+              What is your sleep schedule?
             </ThemedText>
             <View style={styles.optionsRow}>
               <OptionButton label="Early Sleeper / Early Riser" value="early_sleeper" isSelected={sleepSchedule === 'early_sleeper'} onPress={() => setSleepSchedule('early_sleeper')} />
@@ -212,10 +212,10 @@ export const EditProfileScreen = () => {
             </View>
           </View>
 
-          {/* Q2: Cleanliness */}
+          {/* Cleanliness */}
           <View style={styles.inputGroup}>
             <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
-              2. How clean/tidy are you on a daily basis?
+              How clean/tidy are you on a daily basis?
             </ThemedText>
             <View style={styles.optionsRow}>
               <OptionButton label="Very Tidy" value="very_tidy" isSelected={cleanliness === 'very_tidy'} onPress={() => setCleanliness('very_tidy')} />
@@ -224,10 +224,10 @@ export const EditProfileScreen = () => {
             </View>
           </View>
 
-          {/* Q3: Guests */}
+          {/* Guests */}
           <View style={styles.inputGroup}>
             <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
-              3. How often do you have guests over?
+              How often do you have guests over?
             </ThemedText>
             <View style={styles.optionsRow}>
               <OptionButton label="Rarely" value="rarely" isSelected={guestPolicy === 'rarely'} onPress={() => setGuestPolicy('rarely')} />
@@ -237,10 +237,10 @@ export const EditProfileScreen = () => {
             </View>
           </View>
 
-          {/* Q4: Noise Tolerance */}
+          {/* Noise Tolerance */}
           <View style={styles.inputGroup}>
             <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
-              4. What is your noise tolerance?
+              What is your noise tolerance?
             </ThemedText>
             <View style={styles.optionsRow}>
               <OptionButton label="Prefer Quiet" value="prefer_quiet" isSelected={noiseTolerance === 'prefer_quiet'} onPress={() => setNoiseTolerance('prefer_quiet')} />
@@ -249,10 +249,10 @@ export const EditProfileScreen = () => {
             </View>
           </View>
 
-          {/* Q5: Smoking */}
+          {/* Smoking */}
           <View style={styles.inputGroup}>
             <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
-              5. Do you smoke, vape, or use recreational substances?
+              Do you smoke, vape, or use recreational substances?
             </ThemedText>
             <View style={styles.optionsRow}>
               <OptionButton label="Yes" value="yes" isSelected={smoking === 'yes'} onPress={() => setSmoking('yes')} />
@@ -261,10 +261,10 @@ export const EditProfileScreen = () => {
             </View>
           </View>
 
-          {/* Q6: Work Location */}
+          {/* Work Location */}
           <View style={styles.inputGroup}>
             <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
-              6. Do you work from home, office, or hybrid?
+              Do you work from home, office, or hybrid?
             </ThemedText>
             <View style={styles.optionsRow}>
               <OptionButton label="Work From Home Full-time" value="wfh_fulltime" isSelected={workLocation === 'wfh_fulltime'} onPress={() => setWorkLocation('wfh_fulltime')} />
@@ -274,10 +274,10 @@ export const EditProfileScreen = () => {
             </View>
           </View>
 
-          {/* Q7: Roommate Relationship */}
+          {/* Roommate Relationship */}
           <View style={styles.inputGroup}>
             <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
-              7. What is your ideal roommate relationship?
+              What is your ideal roommate relationship?
             </ThemedText>
             <View style={styles.optionsRow}>
               <OptionButton label="Just Respectful Co-living" value="respectful_coliving" isSelected={roommateRelationship === 'respectful_coliving'} onPress={() => setRoommateRelationship('respectful_coliving')} />
@@ -287,10 +287,10 @@ export const EditProfileScreen = () => {
             </View>
           </View>
 
-          {/* Q8: Budget */}
+          {/* Budget */}
           <View style={styles.inputGroup}>
             <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
-              8. What is your monthly budget range?
+              What is your monthly budget range?
             </ThemedText>
             <TextInput
               style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
@@ -302,10 +302,10 @@ export const EditProfileScreen = () => {
             />
           </View>
 
-          {/* Q9: Pets */}
+          {/* Pets */}
           <View style={styles.inputGroup}>
             <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
-              9. Do you have pets, or are you open to living with pets?
+              Do you have pets, or are you open to living with pets?
             </ThemedText>
             <View style={styles.optionsRow}>
               <OptionButton label="I Have Pets" value="have_pets" isSelected={pets === 'have_pets'} onPress={() => setPets('have_pets')} />
@@ -314,10 +314,10 @@ export const EditProfileScreen = () => {
             </View>
           </View>
 
-          {/* Q10: Lifestyle */}
+          {/* Lifestyle */}
           <View style={styles.inputGroup}>
             <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
-              10. What describes your lifestyle best? (Choose up to 3)
+              What describes your lifestyle best? (Choose up to 3)
             </ThemedText>
             <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.sm }]}>
               Selected: {lifestyle.length}/3
