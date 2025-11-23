@@ -9,6 +9,7 @@ import { EditProfileScreen } from '../screens/shared/EditProfileScreen';
 import { NotificationsScreen } from '../screens/shared/NotificationsScreen';
 import { PrivacySecurityScreen } from '../screens/shared/PrivacySecurityScreen';
 import { ProfileViewsScreen } from '../screens/renter/ProfileViewsScreen';
+import PrivacyPolicyScreen from '../screens/shared/PrivacyPolicyScreen';
 
 export type ProfileStackParamList = {
   ProfileMain: undefined;
@@ -18,6 +19,7 @@ export type ProfileStackParamList = {
   Notifications: undefined;
   PrivacySecurity: undefined;
   ProfileViews: undefined;
+  PrivacyPolicy: undefined;
 };
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
@@ -95,6 +97,22 @@ export const ProfileStackNavigator = () => {
           headerShown: true,
           headerTransparent: true,
           headerTitle: 'Profile Views',
+          headerBlurEffect: 'regular',
+          headerBackVisible: true,
+          headerLeft: () => (
+            <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
+              <Feather name="chevron-left" size={28} color="#007AFF" />
+            </Pressable>
+          ),
+        })}
+      />
+      <Stack.Screen 
+        name="PrivacyPolicy" 
+        component={PrivacyPolicyScreen}
+        options={({ navigation }) => ({
+          headerShown: true,
+          headerTransparent: true,
+          headerTitle: 'Privacy Policy',
           headerBlurEffect: 'regular',
           headerBackVisible: true,
           headerLeft: () => (
