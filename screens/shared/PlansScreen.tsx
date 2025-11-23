@@ -14,14 +14,20 @@ type PlansScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList
 
 export const PlansScreen = () => {
   const { theme } = useTheme();
-  const { user, upgradeToPlus, upgradeToPriority } = useAuth();
+  const { user, upgradeToPlus, upgradeToPriority, downgradeToPlan, cancelSubscription, reactivateSubscription } = useAuth();
   const navigation = useNavigation<PlansScreenNavigationProp>();
   
   const [showUpgradeConfirm, setShowUpgradeConfirm] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [showDowngradeConfirm, setShowDowngradeConfirm] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<'plus' | 'priority' | null>(null);
+  const [downgradeTo, setDowngradeTo] = useState<'basic' | 'plus' | null>(null);
   const [processing, setProcessing] = useState(false);
 
   const currentPlan = user?.subscription?.plan || 'basic';
+  const subscriptionStatus = user?.subscription?.status || 'active';
+  const scheduledPlan = user?.subscription?.scheduledPlan;
+  const scheduledChangeDate = user?.subscription?.scheduledChangeDate;
   const isPlus = currentPlan === 'plus';
   const isPriority = currentPlan === 'priority';
   
@@ -85,6 +91,58 @@ export const PlansScreen = () => {
     setSelectedPlan(null);
   };
 
+  const handleDowngrade = (targetPlan: 'basic' | 'plus') => {
+    setDowngradeTo(targetPlan);
+    setShowDowngradeConfirm(true);
+  };
+
+  const confirmDowngrade = async () => {
+    if (!downgradeTo) {
+      setShowDowngradeConfirm(false);
+      return;
+    }
+
+    setShowDowngradeConfirm(false);
+    setProcessing(true);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    await downgradeToPlan(downgradeTo);
+    
+    const expiryDate = user?.subscription?.expiresAt 
+      ? new Date(user.subscription.expiresAt).toLocaleDateString()
+      : 'the end of your billing period';
+    
+    const targetPlanName = downgradeTo.charAt(0).toUpperCase() + downgradeTo.slice(1);
+    Alert.alert(
+      'Downgrade Scheduled',
+      `Your plan will change to ${targetPlanName} on ${expiryDate}. You'll keep your current ${currentPlan === 'plus' ? 'Plus' : 'Priority'} features until then.`,
+      [{ text: 'OK' }]
+    );
+    
+    setProcessing(false);
+    setDowngradeTo(null);
+  };
+
+  const confirmCancellation = async () => {
+    setShowCancelConfirm(false);
+    setProcessing(true);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    await cancelSubscription();
+    
+    const expiryDate = user?.subscription?.expiresAt 
+      ? new Date(user.subscription.expiresAt).toLocaleDateString()
+      : 'the end of your billing period';
+    
+    Alert.alert(
+      'Subscription Cancelled',
+      `Your subscription has been cancelled. You'll keep your current ${currentPlan === 'plus' ? 'Plus' : 'Priority'} features until ${expiryDate}.`,
+      [{ text: 'OK' }]
+    );
+    
+    setProcessing(false);
+  };
+
   const renderPlanCard = (
     planType: 'basic' | 'plus' | 'priority',
     price: string,
@@ -127,12 +185,60 @@ export const PlansScreen = () => {
         </View>
 
         {isCurrentPlan ? (
-          <View style={[styles.activeSubscription, { backgroundColor: planType === 'basic' ? theme.primary + '20' : 'rgba(255, 255, 255, 0.2)' }]}>
-            <Feather name="check-circle" size={18} color={planType === 'basic' ? theme.primary : '#FFFFFF'} />
-            <ThemedText style={[Typography.small, { color: planType === 'basic' ? theme.primary : '#FFFFFF', marginLeft: Spacing.sm, fontWeight: '600' }]}>
-              Current Plan
-            </ThemedText>
-          </View>
+          <>
+            <View style={[styles.activeSubscription, { backgroundColor: planType === 'basic' ? theme.primary + '20' : 'rgba(255, 255, 255, 0.2)' }]}>
+              <Feather name="check-circle" size={18} color={planType === 'basic' ? theme.primary : '#FFFFFF'} />
+              <ThemedText style={[Typography.small, { color: planType === 'basic' ? theme.primary : '#FFFFFF', marginLeft: Spacing.sm, fontWeight: '600' }]}>
+                Current Plan
+              </ThemedText>
+            </View>
+            
+            {planType !== 'basic' && subscriptionStatus === 'active' && !scheduledPlan ? (
+              <View style={{ marginTop: Spacing.md, gap: Spacing.sm }}>
+                {planType === 'priority' ? (
+                  <>
+                    <Pressable
+                      style={[styles.downgradeButton, { borderColor: 'rgba(255,255,255,0.3)' }]}
+                      onPress={() => handleDowngrade('plus')}
+                      disabled={processing}
+                    >
+                      <ThemedText style={[Typography.small, { color: textColor }]}>
+                        Downgrade to Plus
+                      </ThemedText>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.downgradeButton, { borderColor: 'rgba(255,255,255,0.3)' }]}
+                      onPress={() => handleDowngrade('basic')}
+                      disabled={processing}
+                    >
+                      <ThemedText style={[Typography.small, { color: textColor }]}>
+                        Downgrade to Basic
+                      </ThemedText>
+                    </Pressable>
+                  </>
+                ) : planType === 'plus' ? (
+                  <Pressable
+                    style={[styles.downgradeButton, { borderColor: 'rgba(255,255,255,0.3)' }]}
+                    onPress={() => handleDowngrade('basic')}
+                    disabled={processing}
+                  >
+                    <ThemedText style={[Typography.small, { color: textColor }]}>
+                      Downgrade to Basic
+                    </ThemedText>
+                  </Pressable>
+                ) : null}
+                <Pressable
+                  style={[styles.cancelButton, { borderColor: '#EF4444' }]}
+                  onPress={() => setShowCancelConfirm(true)}
+                  disabled={processing}
+                >
+                  <ThemedText style={[Typography.small, { color: '#EF4444' }]}>
+                    Cancel Subscription
+                  </ThemedText>
+                </Pressable>
+              </View>
+            ) : null}
+          </>
         ) : planType !== 'basic' ? (
           <Pressable
             style={[styles.upgradeButton, { backgroundColor: planType === 'plus' ? theme.primary : '#7C3AED', opacity: (planType === 'plus' && isPriority) ? 0.5 : 1 }]}
@@ -181,6 +287,39 @@ export const PlansScreen = () => {
           ],
           currentPlan === 'priority'
         )}
+
+        {scheduledPlan && scheduledChangeDate ? (
+          <View style={[styles.section, styles.scheduledChangeBanner, { backgroundColor: subscriptionStatus === 'cancelled' ? '#FEF2F2' : '#FFF7ED', borderColor: subscriptionStatus === 'cancelled' ? '#EF4444' : '#F97316' }]}>
+            <Feather name="info" size={20} color={subscriptionStatus === 'cancelled' ? '#EF4444' : '#F97316'} />
+            <View style={{ flex: 1, marginLeft: Spacing.md }}>
+              <ThemedText style={[Typography.body, { fontWeight: '600', color: subscriptionStatus === 'cancelled' ? '#DC2626' : '#EA580C' }]}>
+                {subscriptionStatus === 'cancelled' ? 'Subscription Cancelled' : 'Plan Change Scheduled'}
+              </ThemedText>
+              <ThemedText style={[Typography.small, { color: subscriptionStatus === 'cancelled' ? '#991B1B' : '#9A3412', marginBottom: Spacing.sm }]}>
+                {subscriptionStatus === 'cancelled' 
+                  ? `Your subscription will end on ${new Date(scheduledChangeDate).toLocaleDateString()}. You'll keep your current features until then.`
+                  : `Your plan will change to ${scheduledPlan.charAt(0).toUpperCase() + scheduledPlan.slice(1)} on ${new Date(scheduledChangeDate).toLocaleDateString()}.`
+                }
+              </ThemedText>
+              <Pressable
+                style={[styles.reactivateButton, { backgroundColor: theme.primary }]}
+                onPress={async () => {
+                  await reactivateSubscription();
+                  Alert.alert(
+                    'Subscription Reactivated',
+                    'Your subscription will continue on the current plan.',
+                    [{ text: 'OK' }]
+                  );
+                }}
+                disabled={processing}
+              >
+                <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '600' }]}>
+                  {subscriptionStatus === 'cancelled' ? 'Reactivate Subscription' : 'Cancel Scheduled Change'}
+                </ThemedText>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
 
         {(isPlus || isPriority) ? (
           <View style={styles.section}>
@@ -235,6 +374,81 @@ export const PlansScreen = () => {
               >
                 <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>
                   Upgrade
+                </ThemedText>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showDowngradeConfirm}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDowngradeConfirm(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.backgroundRoot }]}>
+            <ThemedText style={[Typography.h2, { marginBottom: Spacing.md }]}>
+              Downgrade to {downgradeTo === 'basic' ? 'Basic' : 'Plus'}
+            </ThemedText>
+            <ThemedText style={[Typography.body, { color: theme.textSecondary, marginBottom: Spacing.xl }]}>
+              Your plan will change to {downgradeTo === 'basic' ? 'Basic' : 'Plus'} at the end of your current billing period. 
+              {'\n\n'}You'll keep your current {currentPlan === 'plus' ? 'Plus' : 'Priority'} features until {user?.subscription?.expiresAt ? new Date(user.subscription.expiresAt).toLocaleDateString() : 'the end of your billing period'}.
+              {'\n\n'}Continue with downgrade?
+            </ThemedText>
+            <View style={styles.modalActions}>
+              <Pressable
+                style={[styles.modalButton, { borderColor: theme.border }]}
+                onPress={() => {
+                  setShowDowngradeConfirm(false);
+                  setDowngradeTo(null);
+                }}
+              >
+                <ThemedText style={[Typography.body]}>Cancel</ThemedText>
+              </Pressable>
+              <Pressable
+                style={[styles.modalButton, styles.modalButtonPrimary, { backgroundColor: '#F97316' }]}
+                onPress={confirmDowngrade}
+              >
+                <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>
+                  Downgrade
+                </ThemedText>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showCancelConfirm}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowCancelConfirm(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.backgroundRoot }]}>
+            <ThemedText style={[Typography.h2, { marginBottom: Spacing.md }]}>
+              Cancel Subscription
+            </ThemedText>
+            <ThemedText style={[Typography.body, { color: theme.textSecondary, marginBottom: Spacing.xl }]}>
+              Are you sure you want to cancel your {currentPlan === 'plus' ? 'Plus' : 'Priority'} subscription?
+              {'\n\n'}You'll keep your current features until {user?.subscription?.expiresAt ? new Date(user.subscription.expiresAt).toLocaleDateString() : 'the end of your billing period'}, then your plan will revert to Basic.
+              {'\n\n'}You can re-subscribe at any time.
+            </ThemedText>
+            <View style={styles.modalActions}>
+              <Pressable
+                style={[styles.modalButton, { borderColor: theme.border }]}
+                onPress={() => setShowCancelConfirm(false)}
+              >
+                <ThemedText style={[Typography.body]}>Keep Plan</ThemedText>
+              </Pressable>
+              <Pressable
+                style={[styles.modalButton, styles.modalButtonPrimary, { backgroundColor: '#EF4444' }]}
+                onPress={confirmCancellation}
+              >
+                <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>
+                  Cancel Subscription
                 </ThemedText>
               </Pressable>
             </View>
@@ -312,5 +526,30 @@ const styles = StyleSheet.create({
   },
   modalButtonPrimary: {
     borderWidth: 0,
+  },
+  downgradeButton: {
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.small,
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  cancelButton: {
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.small,
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  scheduledChangeBanner: {
+    flexDirection: 'row',
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.medium,
+    borderWidth: 1,
+    marginBottom: Spacing.lg,
+  },
+  reactivateButton: {
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.small,
+    alignItems: 'center',
+    marginTop: Spacing.sm,
   },
 });

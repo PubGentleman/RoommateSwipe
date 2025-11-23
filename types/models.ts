@@ -117,6 +117,8 @@ export interface User {
     plan: 'basic' | 'plus' | 'priority';
     status: 'active' | 'cancelled' | 'expired';
     expiresAt?: Date;
+    scheduledPlan?: 'basic' | 'plus' | 'priority';
+    scheduledChangeDate?: Date;
   };
   paymentMethods?: Array<{
     id: string;
