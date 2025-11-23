@@ -31,7 +31,7 @@ RoomieMatch utilizes a comprehensive points-based compatibility system (0-100 sc
 The application is built with React Native and Expo, using TypeScript and leveraging React's experimental features for performance. It employs React Navigation for a role-based navigation structure (Renter, Host, Agent/Landlord) with nested navigators. UI/UX follows a theme system supporting light/dark modes and uses reusable, themed components.
 
 **Core Features by Role:**
-- **Renter:** Swipe-based matching with priority placement, 1-on-1 messaging (with limits for Basic users), comprehensive group management, property exploration with advanced filters (Plus/Priority only), saved properties, and an AI Match Assistant (Plus/Priority). Boost feature available for profile visibility.
+- **Renter:** Swipe-based matching with priority placement, 1-on-1 messaging (with limits for Basic users), Priority messaging (Priority users can message without matching; Basic users can pay $0.99 for single message), comprehensive group management, property exploration with advanced filters (Plus/Priority only), saved properties, and an AI Match Assistant (Plus/Priority). Boost feature available for profile visibility. Gender displayed using modern Unicode symbols (♂♀⚧).
 - **Host:** Property listing management (CRUD), application review, listing status control, and featured listings (Priority only).
 - **Agent:** Multi-property portfolio management, document verification, legal template library, and professional credential verification.
 
