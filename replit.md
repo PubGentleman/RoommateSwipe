@@ -50,6 +50,19 @@ The current implementation uses mock data and TypeScript interfaces for data mod
 - `existingRoommates`: Array tracking all current household members with fields for gender, onApp status, and userId for those with accounts
 - `hostProfileId`: Links to host's User profile for compatibility score calculation using the matching algorithm
 - `propertyType`: Distinguishes between 'lease' (long-term) and 'sublet' (short-term) arrangements
+- `available`: Boolean indicating if property is available for rent (false when marked as rented)
+- `rentedDate`: Date when property was marked as rented, used for record keeping
+
+**Property Rental Status System:**
+- Hosts and agents can mark properties as rented via swipe actions in their listing screens
+- Marking a property as rented sets `available: false`, records `rentedDate`, and removes it from ExploreScreen
+- Automatically sends `property_rented` notifications to all users who saved the property
+- Rented status persists across app restarts via improved data initialization guards
+
+**Data Persistence & Initialization:**
+- `initializeWithMockData()` checks for existing data before overwriting, preserving modifications like rental status
+- `forceReloadMockData()` available for intentional reset of all mock data
+- Notification ID generation uses `generateNotificationId()` with timestamp + counter + random component for collision resistance
 
 **User Model Location Data:**
 - Renter users automatically receive `profileData` with location fields (neighborhood, city, state, coordinates) on registration, login, and app load
