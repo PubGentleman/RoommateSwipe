@@ -204,6 +204,19 @@ export const StorageService = {
     }
   },
 
+  async unlikeGroup(groupId: string, userId: string): Promise<void> {
+    try {
+      const groups = await this.getGroups();
+      const group = groups.find(g => g.id === groupId);
+      if (group) {
+        group.pendingMembers = group.pendingMembers.filter(id => id !== userId);
+        await this.setGroups(groups);
+      }
+    } catch (error) {
+      console.error('Error unliking group:', error);
+    }
+  },
+
   async acceptGroupMember(groupId: string, userId: string): Promise<boolean> {
     try {
       const groups = await this.getGroups();

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Pressable, Dimensions, ActivityIndicator, TextInput, ScrollView, Alert } from 'react-native';
+import { View, StyleSheet, Pressable, Dimensions, ActivityIndicator, TextInput, ScrollView, Alert, Modal } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
@@ -21,7 +21,7 @@ type Tab = 'my-groups' | 'discover' | 'create';
 
 export const GroupsScreen = () => {
   const { theme } = useTheme();
-  const { user } = useAuth();
+  const { user, purchaseUndoPass, hasActiveUndoPass } = useAuth();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const [activeTab, setActiveTab] = useState<Tab>('discover');
@@ -31,6 +31,9 @@ export const GroupsScreen = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [showLikedNotification, setShowLikedNotification] = useState(false);
   const [likedGroupName, setLikedGroupName] = useState('');
+  const [lastSwipedGroup, setLastSwipedGroup] = useState<{ group: Group; action: 'like' | 'skip' } | null>(null);
+  const [showUndoUpgradeModal, setShowUndoUpgradeModal] = useState(false);
+  const [processingUndoPass, setProcessingUndoPass] = useState(false);
   
   const [groupName, setGroupName] = useState('');
   const [groupDescription, setGroupDescription] = useState('');
@@ -129,6 +132,8 @@ export const GroupsScreen = () => {
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
+    setLastSwipedGroup({ group: currentGroup, action });
+
     const direction = action === 'like' ? 1 : -1;
     const toX = direction * SCREEN_WIDTH * 1.5;
 
@@ -152,6 +157,48 @@ export const GroupsScreen = () => {
       // Advance to next card for both like and skip
       setCurrentIndex(currentIndex + 1);
     }, resetDelay);
+  };
+
+  const handleUndo = () => {
+    if (!hasActiveUndoPass()) {
+      setShowUndoUpgradeModal(true);
+      return;
+    }
+    
+    if (!lastSwipedGroup) return;
+    
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
+    undoLastSwipeAsync(lastSwipedGroup.group.id, lastSwipedGroup.action);
+    
+    setCurrentIndex(currentIndex - 1);
+    setLastSwipedGroup(null);
+  };
+
+  const undoLastSwipeAsync = async (groupId: string, action: 'like' | 'skip') => {
+    try {
+      if (action === 'like') {
+        await StorageService.unlikeGroup(groupId, user!.id);
+      }
+    } catch (error) {
+      console.error('[GroupsScreen] Error undoing swipe:', error);
+    }
+  };
+
+  const handlePurchaseUndoPass = async () => {
+    setProcessingUndoPass(true);
+    const result = await purchaseUndoPass();
+    setProcessingUndoPass(false);
+    
+    if (result.success) {
+      setShowUndoUpgradeModal(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } else {
+      if (result.message.includes('payment method')) {
+        navigation.navigate('Profile', { screen: 'Payment' });
+        setShowUndoUpgradeModal(false);
+      }
+    }
   };
 
   const pan = Gesture.Pan()
@@ -596,6 +643,20 @@ export const GroupsScreen = () => {
 
           <View style={styles.actionButtons}>
             <Pressable
+              style={[
+                styles.actionButtonSmall, 
+                { 
+                  backgroundColor: '#FFFFFF', 
+                  borderColor: lastSwipedGroup ? theme.warning : theme.textSecondary,
+                  opacity: lastSwipedGroup ? 1 : 0.4,
+                  borderWidth: 2,
+                }
+              ]}
+              onPress={handleUndo}
+            >
+              <Feather name="rotate-ccw" size={24} color={lastSwipedGroup ? theme.warning : theme.textSecondary} />
+            </Pressable>
+            <Pressable
               style={[styles.actionButton, { backgroundColor: '#FFFFFF', borderColor: theme.error, borderWidth: 2 }]}
               onPress={() => handleSwipeAction('skip')}
             >
@@ -871,6 +932,88 @@ export const GroupsScreen = () => {
           </ThemedText>
         </View>
       ) : null}
+
+      <Modal
+        visible={showUndoUpgradeModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowUndoUpgradeModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.vipModalContainer, { backgroundColor: theme.backgroundSecondary }]}>
+            <View style={[styles.vipModalHeader, { backgroundColor: theme.warning }]}>
+              <Feather name="rotate-ccw" size={32} color="#FFFFFF" />
+            </View>
+            
+            <View style={styles.vipModalContent}>
+              <ThemedText style={[Typography.h2, { textAlign: 'center', marginBottom: Spacing.sm }]}>
+                Undo Swipe
+              </ThemedText>
+              <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary, marginBottom: Spacing.xl }]}>
+                Take back your last swipe and get a second chance!
+              </ThemedText>
+              
+              <View style={[styles.priceCard, { backgroundColor: theme.backgroundDefault, borderColor: theme.border, marginBottom: Spacing.lg }]}>
+                <ThemedText style={[Typography.h3, { marginBottom: Spacing.xs }]}>
+                  24-Hour Undo Pass
+                </ThemedText>
+                <ThemedText style={[Typography.h1, { color: theme.warning, marginBottom: Spacing.xs }]}>
+                  $1.99
+                </ThemedText>
+                <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+                  Undo swipes for 24 hours
+                </ThemedText>
+              </View>
+              
+              <View style={styles.vipFeaturesList}>
+                <View style={styles.vipFeatureItem}>
+                  <Feather name="check-circle" size={20} color={theme.success} />
+                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
+                    Take back your last swipe
+                  </ThemedText>
+                </View>
+                <View style={styles.vipFeatureItem}>
+                  <Feather name="check-circle" size={20} color={theme.success} />
+                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
+                    24-hour unlimited undo access
+                  </ThemedText>
+                </View>
+              </View>
+            </View>
+            
+            <View style={styles.vipModalActions}>
+              <Pressable
+                style={[styles.vipModalButton, { backgroundColor: theme.warning, opacity: processingUndoPass ? 0.7 : 1 }]}
+                onPress={handlePurchaseUndoPass}
+                disabled={processingUndoPass}
+              >
+                <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
+                  {processingUndoPass ? 'Processing...' : 'Get 24hr Pass - $1.99'}
+                </ThemedText>
+              </Pressable>
+              <Pressable
+                style={[styles.vipModalButton, { backgroundColor: theme.primary, marginTop: Spacing.md }]}
+                onPress={() => {
+                  setShowUndoUpgradeModal(false);
+                  navigation.navigate('Settings');
+                }}
+              >
+                <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
+                  Upgrade to Plus
+                </ThemedText>
+              </Pressable>
+              <Pressable
+                style={[styles.vipModalButtonSecondary, { borderColor: theme.border }]}
+                onPress={() => setShowUndoUpgradeModal(false)}
+              >
+                <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
+                  Maybe Later
+                </ThemedText>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -1027,6 +1170,18 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  actionButtonSmall: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
   swipeHint: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1074,5 +1229,54 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: Spacing.xl,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  vipModalContainer: {
+    borderTopLeftRadius: BorderRadius.large,
+    borderTopRightRadius: BorderRadius.large,
+    paddingBottom: Spacing.xl,
+  },
+  vipModalHeader: {
+    paddingVertical: Spacing.xl,
+    alignItems: 'center',
+    borderTopLeftRadius: BorderRadius.large,
+    borderTopRightRadius: BorderRadius.large,
+  },
+  vipModalContent: {
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.xl,
+  },
+  vipModalActions: {
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.xl,
+    gap: Spacing.md,
+  },
+  vipModalButton: {
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.medium,
+    alignItems: 'center',
+  },
+  vipModalButtonSecondary: {
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.medium,
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  vipFeaturesList: {
+    gap: Spacing.md,
+  },
+  vipFeatureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  priceCard: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.medium,
+    alignItems: 'center',
+    borderWidth: 1,
   },
 });
