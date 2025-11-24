@@ -491,13 +491,22 @@ export const RoommatesScreen = () => {
           <Animated.View
             style={[styles.card, animatedCardStyle]}
           >
-            <Image source={{ uri: currentProfile.photos[0] }} style={styles.cardImage} />
-            {canSeeOnlineStatus() && isProfileOnline ? (
-              <View style={styles.onlineIndicatorContainer}>
-                <View style={[styles.onlineIndicator, { backgroundColor: theme.success }]} />
-              </View>
-            ) : null}
-            <View style={styles.gradient}>
+            <Pressable 
+              onPress={() => {
+                setShowProfileDetail(true);
+                if (currentProfile && user && currentProfile.id !== user.id) {
+                  StorageService.addProfileView(currentProfile.id, user.id);
+                }
+              }}
+              style={StyleSheet.absoluteFill}
+            >
+              <Image source={{ uri: currentProfile.photos[0] }} style={styles.cardImage} />
+              {canSeeOnlineStatus() && isProfileOnline ? (
+                <View style={styles.onlineIndicatorContainer}>
+                  <View style={[styles.onlineIndicator, { backgroundColor: theme.success }]} />
+                </View>
+              ) : null}
+              <View style={styles.gradient} pointerEvents="none">
               {isBoosted ? (
                 <View style={styles.boostBadgeLeft}>
                   <View style={[styles.boostBadge, { backgroundColor: '#FFD700' }]}>
@@ -540,6 +549,7 @@ export const RoommatesScreen = () => {
                 </View>
               </View>
             </View>
+            </Pressable>
           </Animated.View>
         </GestureDetector>
       </View>
@@ -1041,7 +1051,8 @@ export const RoommatesScreen = () => {
                         <Image 
                           key={`photo-${index}`} 
                           source={{ uri: photo }} 
-                          style={styles.detailImage} 
+                          style={styles.detailImage}
+                          resizeMode="cover"
                         />
                       ))}
                     </ScrollView>
@@ -1441,7 +1452,6 @@ const styles = StyleSheet.create({
   detailImage: {
     width: SCREEN_WIDTH,
     height: 300,
-    resizeMode: 'cover',
   },
   photoIndicatorContainer: {
     padding: Spacing.md,
