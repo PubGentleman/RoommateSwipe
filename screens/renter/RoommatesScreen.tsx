@@ -1018,53 +1018,46 @@ export const RoommatesScreen = () => {
                 <Feather name="x" size={24} color={theme.text} />
               </Pressable>
             </View>
-            <ScrollView style={styles.detailContent} showsVerticalScrollIndicator={false}>
-              {(() => {
-                console.log('[RoommatesScreen] Profile Detail - currentProfile.photos:', currentProfile.photos);
-                console.log('[RoommatesScreen] Profile Detail - photos type:', typeof currentProfile.photos);
-                console.log('[RoommatesScreen] Profile Detail - photos length:', currentProfile.photos?.length);
-                
-                const photosArray = Array.isArray(currentProfile.photos) 
-                  ? currentProfile.photos 
-                  : currentProfile.photos 
-                    ? [currentProfile.photos]
-                    : [currentProfile.photos && currentProfile.photos[0]].filter(Boolean);
-                
-                console.log('[RoommatesScreen] Profile Detail - photosArray:', photosArray);
-                
-                return (
-                  <>
-                    <ScrollView 
-                      horizontal 
-                      pagingEnabled 
-                      showsHorizontalScrollIndicator={false}
-                      scrollEnabled={true}
-                      directionalLockEnabled={true}
-                      snapToInterval={SCREEN_WIDTH}
-                      decelerationRate="fast"
-                      style={styles.photosScrollContainer}
-                      contentContainerStyle={{ flexDirection: 'row' }}
-                    >
-                      {photosArray.map((photo, index) => (
-                        <View key={`photo-container-${index}`} style={{ width: SCREEN_WIDTH, height: 400 }}>
-                          <Image 
-                            source={{ uri: photo }} 
-                            style={styles.detailImage}
-                            resizeMode="contain"
-                          />
-                        </View>
-                      ))}
-                    </ScrollView>
-                    {photosArray.length > 1 ? (
-                      <View style={styles.photoIndicatorContainer}>
-                        <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
-                          {photosArray.length} photos • Swipe to view more
-                        </ThemedText>
+            
+            {/* Photo gallery outside vertical ScrollView */}
+            {(() => {
+              const photosArray = Array.isArray(currentProfile.photos) 
+                ? currentProfile.photos 
+                : currentProfile.photos 
+                  ? [currentProfile.photos]
+                  : [currentProfile.photos && currentProfile.photos[0]].filter(Boolean);
+              
+              return (
+                <>
+                  <ScrollView 
+                    horizontal 
+                    pagingEnabled 
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.photosScrollContainer}
+                    scrollEnabled={true}
+                  >
+                    {photosArray.map((photo, index) => (
+                      <View key={`photo-${index}`} style={styles.photoPage}>
+                        <Image 
+                          source={{ uri: photo }} 
+                          style={styles.detailImage}
+                          resizeMode="contain"
+                        />
                       </View>
-                    ) : null}
-                  </>
-                );
-              })()}
+                    ))}
+                  </ScrollView>
+                  {photosArray.length > 1 ? (
+                    <View style={styles.photoIndicatorContainer}>
+                      <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
+                        {photosArray.length} photos • Swipe to view more
+                      </ThemedText>
+                    </View>
+                  ) : null}
+                </>
+              );
+            })()}
+            
+            <ScrollView style={styles.detailContent} showsVerticalScrollIndicator={false}>
               
               <View style={styles.detailSection}>
                 <ThemedText style={[Typography.h2]}>{currentProfile.name}, {currentProfile.age}</ThemedText>
@@ -1449,8 +1442,14 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 400,
   },
+  photoPage: {
+    width: '100%',
+    height: 400,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   detailImage: {
-    width: SCREEN_WIDTH,
+    width: '100%',
     height: 400,
   },
   photoIndicatorContainer: {
