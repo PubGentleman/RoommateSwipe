@@ -1,7 +1,7 @@
 import { RoommateProfile, Property, Group, Conversation, Application, User } from '../types/models';
 import { getCityFromNeighborhood, getStateFromNeighborhood, getCoordinatesFromNeighborhood } from './locationData';
 
-export const MOCK_DATA_VERSION = '1.3.0';
+export const MOCK_DATA_VERSION = '1.4.0';
 
 export const mockProfileUsers: User[] = [
   {
