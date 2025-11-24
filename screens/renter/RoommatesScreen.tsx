@@ -515,7 +515,7 @@ export const RoommatesScreen = () => {
                 </View>
               ) : null}
               <View style={styles.cardInfo}>
-                <ThemedText style={[Typography.hero, { color: '#FFFFFF', textShadowColor: 'rgba(0, 0, 0, 0.75)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 }]}>
+                <ThemedText style={[Typography.hero, { fontSize: 30, color: '#FFFFFF', textShadowColor: 'rgba(0, 0, 0, 0.75)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 }]}>
                   {currentProfile.name}, {currentProfile.age}{currentProfile.zodiacSign ? ` ${getZodiacSymbol(currentProfile.zodiacSign)}` : ''} {getGenderSymbol(currentProfile.gender)}
                 </ThemedText>
                 <ThemedText style={[Typography.body, { color: '#FFFFFF', marginTop: Spacing.sm, textShadowColor: 'rgba(0, 0, 0, 0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }]}>
