@@ -1,7 +1,7 @@
 import { RoommateProfile, Property, Group, Conversation, Application, User } from '../types/models';
 import { getCityFromNeighborhood, getStateFromNeighborhood, getCoordinatesFromNeighborhood } from './locationData';
 
-export const MOCK_DATA_VERSION = '1.2.0';
+export const MOCK_DATA_VERSION = '1.3.0';
 
 export const mockProfileUsers: User[] = [
   {
@@ -777,7 +777,12 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     bio: 'Attorney with a busy schedule but loves to unwind with wine and good books. Organized and respectful.',
     occupation: 'Attorney',
     budget: 1700,
-    photos: ['https://picsum.photos/400/500?random=15'],
+    photos: [
+      'https://picsum.photos/400/500?random=15',
+      'https://picsum.photos/400/500?random=151',
+      'https://picsum.photos/400/500?random=152',
+      'https://picsum.photos/400/500?random=153',
+    ],
     lifestyle: {
       cleanliness: 9,
       socialLevel: 5,
@@ -800,7 +805,13 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     bio: 'Software engineering intern learning and growing. Gamer, coder, and pizza connoisseur.',
     occupation: 'Software Engineering Intern',
     budget: 900,
-    photos: ['https://picsum.photos/400/500?random=16'],
+    photos: [
+      'https://picsum.photos/400/500?random=16',
+      'https://picsum.photos/400/500?random=161',
+      'https://picsum.photos/400/500?random=162',
+      'https://picsum.photos/400/500?random=163',
+      'https://picsum.photos/400/500?random=164',
+    ],
     lifestyle: {
       cleanliness: 6,
       socialLevel: 6,
@@ -823,7 +834,11 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     bio: 'Social media manager who works from cafes. Love plants, journaling, and afternoon yoga sessions.',
     occupation: 'Social Media Manager',
     budget: 1150,
-    photos: ['https://picsum.photos/400/500?random=17'],
+    photos: [
+      'https://picsum.photos/400/500?random=17',
+      'https://picsum.photos/400/500?random=171',
+      'https://picsum.photos/400/500?random=172',
+    ],
     lifestyle: {
       cleanliness: 8,
       socialLevel: 7,
