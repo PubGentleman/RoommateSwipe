@@ -11,10 +11,6 @@ export default function TermsOfServiceScreen() {
   return (
     <ScreenScrollView style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <View style={styles.content}>
-        <ThemedText style={[Typography.h1, { marginBottom: Spacing.xl }]}>
-          Terms of Service
-        </ThemedText>
-
         <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.xxl }]}>
           Last Updated: November 23, 2025
         </ThemedText>

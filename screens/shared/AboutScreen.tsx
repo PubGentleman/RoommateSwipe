@@ -11,10 +11,6 @@ export default function AboutScreen() {
   return (
     <ScreenScrollView style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <View style={styles.content}>
-        <ThemedText style={[Typography.h1, { marginBottom: Spacing.xl }]}>
-          About Roomdr
-        </ThemedText>
-
         <ThemedText style={[Typography.body, { marginBottom: Spacing.lg, lineHeight: 24 }]}>
           Roomdr was built to solve one of the biggest problems in city living: finding a roommate you actually get along with. Traditional listing sites only show photos and prices. Roomdr goes deeper — matching people by lifestyle, habits, budget, neighborhood preference, and personality fit.
         </ThemedText>
@@ -95,6 +91,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
+    padding: Spacing.lg,
     paddingBottom: Spacing.xxl,
   },
   bulletContainer: {
