@@ -127,12 +127,27 @@ export interface Match {
   superLiker?: string;
 }
 
+export type ZodiacSign = 
+  | 'Aries' 
+  | 'Taurus' 
+  | 'Gemini' 
+  | 'Cancer' 
+  | 'Leo' 
+  | 'Virgo' 
+  | 'Libra' 
+  | 'Scorpio' 
+  | 'Sagittarius' 
+  | 'Capricorn' 
+  | 'Aquarius' 
+  | 'Pisces';
+
 export interface User {
   id: string;
   email: string;
   password?: string;
   name: string;
   age?: number;
+  zodiacSign?: ZodiacSign;
   role: 'renter' | 'host' | 'agent';
   profilePicture?: string;
   photos?: string[];

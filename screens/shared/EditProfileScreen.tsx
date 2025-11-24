@@ -12,6 +12,8 @@ import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
 import { Spacing, BorderRadius, Typography } from '../../constants/theme';
+import type { ZodiacSign } from '../../types/models';
+import { ZODIAC_SIGNS } from '../../utils/zodiacUtils';
 
 const DraggablePhoto = ({ photo, index, photos, theme, onRemove, onReorder }: any) => {
   const translateX = useSharedValue(0);
@@ -103,6 +105,7 @@ export const EditProfileScreen = () => {
   const [photos, setPhotos] = useState<string[]>(user?.photos || [user?.profilePicture].filter(Boolean) as string[] || []);
   const [name, setName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
+  const [zodiacSign, setZodiacSign] = useState<ZodiacSign | undefined>(user?.zodiacSign);
   
   useEffect(() => {
     console.log('[EditProfileScreen] User object changed:', {
@@ -252,6 +255,7 @@ export const EditProfileScreen = () => {
     await updateUser({
       name: name.trim(),
       email: email.trim(),
+      zodiacSign,
       photos,
       profilePicture: photos[0] || undefined,
       profileData: {
@@ -408,6 +412,51 @@ export const EditProfileScreen = () => {
               keyboardType="email-address"
               autoCapitalize="none"
             />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>
+              Zodiac Sign (optional)
+            </ThemedText>
+            <View style={styles.zodiacOptions}>
+              <Pressable
+                style={[
+                  styles.optionButton,
+                  { 
+                    backgroundColor: !zodiacSign ? theme.primary : theme.backgroundSecondary,
+                    borderColor: !zodiacSign ? theme.primary : theme.border,
+                  }
+                ]}
+                onPress={() => setZodiacSign(undefined)}
+              >
+                <ThemedText style={[
+                  Typography.small,
+                  { color: !zodiacSign ? '#FFFFFF' : theme.text, fontWeight: !zodiacSign ? '600' : '400' }
+                ]}>
+                  None
+                </ThemedText>
+              </Pressable>
+              {ZODIAC_SIGNS.map((zodiac) => (
+                <Pressable
+                  key={zodiac.name}
+                  style={[
+                    styles.optionButton,
+                    { 
+                      backgroundColor: zodiacSign === zodiac.name ? theme.primary : theme.backgroundSecondary,
+                      borderColor: zodiacSign === zodiac.name ? theme.primary : theme.border,
+                    }
+                  ]}
+                  onPress={() => setZodiacSign(zodiac.name)}
+                >
+                  <ThemedText style={[
+                    Typography.small,
+                    { color: zodiacSign === zodiac.name ? '#FFFFFF' : theme.text, fontWeight: zodiacSign === zodiac.name ? '600' : '400' }
+                  ]}>
+                    {zodiac.symbol} {zodiac.name}
+                  </ThemedText>
+                </Pressable>
+              ))}
+            </View>
           </View>
 
           <View style={styles.inputGroup}>
@@ -755,6 +804,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing.sm,
     flexWrap: 'wrap',
+  },
+  zodiacOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
   },
   optionButton: {
     paddingHorizontal: Spacing.md,
