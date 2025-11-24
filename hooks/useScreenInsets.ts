@@ -15,8 +15,12 @@ export function useScreenInsets() {
   
   const tabBarHeight = isInsideTabNavigator ? 80 : insets.bottom;
 
+  const paddingTop = headerHeight > 0 
+    ? headerHeight + Spacing.xl 
+    : insets.top + Spacing.xl;
+
   return {
-    paddingTop: headerHeight + Spacing.xl,
+    paddingTop,
     paddingBottom: tabBarHeight + Spacing.xl,
     scrollInsetBottom: insets.bottom + 16,
   };
