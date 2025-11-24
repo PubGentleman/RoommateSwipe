@@ -58,8 +58,10 @@ export const formatLocation = (location: {
  * 
  * LOWER PRIORITY (Relationship & Interests):
  * 10. Roommate Relationship: 4 points - Social expectations
- * 11. Lifestyle Tags: 3 points - Shared interests/activities
- * 12. Occupation: 1 point - Minimal tie-breaker for similar fields
+ * 11. Lifestyle Tags: 2 points - Shared interests/activities (reduced from 3 to accommodate zodiac, baseline 1 pt)
+ * 12. Zodiac Sign: 2 points - Optional fun factor, element-based compatibility (only if both users have it)
+ * 
+ * Note: Occupation scoring was removed (previously 1 point) to accommodate zodiac while maintaining 100-point total
  */
 
 export interface MatchScore {
@@ -76,7 +78,6 @@ export interface MatchScore {
     pets: number;
     roommateRelationship: number;
     lifestyle: number;
-    occupation: number;
     zodiac: number;
   };
   reasons: {
@@ -115,8 +116,7 @@ export const calculateDetailedCompatibility = (
     noiseTolerance: 0,
     pets: 0,
     roommateRelationship: 0,
-    lifestyle: 0,
-    occupation: 0,
+    lifestyle: 1, // Default 1-point baseline for backward compatibility
     zodiac: 0,
   };
 
@@ -130,7 +130,26 @@ export const calculateDetailedCompatibility = (
   const userProfile = currentUser.profileData;
   
   if (!userPrefs || !userProfile) {
-    return { totalScore: 50, breakdown, reasons };
+    // Return neutral baseline score (60-65%) to maintain backward compatibility
+    // When user data is missing, default to a neutral compatibility level
+    // This preserves historical color thresholds (60-65% = orange/blue range)
+    const neutralBreakdown = {
+      ...breakdown,
+      location: 12, // Neutral location (nearby neighborhoods)
+      budget: 8,  // Neutral budget compatibility
+      sleepSchedule: 8, // Neutral sleep schedule
+      cleanliness: 8, // Neutral cleanliness
+      smoking: 7, // Neutral smoking/substances
+      workLocation: 5, // Neutral work location
+      guestPolicy: 5, // Neutral guest policy
+      noiseTolerance: 4, // Neutral noise tolerance
+      pets: 4, // Neutral pets
+      roommateRelationship: 3, // Neutral relationship preference
+      lifestyle: 1, // Baseline lifestyle
+      zodiac: 0, // No zodiac data
+    };
+    const neutralScore = Object.values(neutralBreakdown).reduce((sum, score) => sum + score, 0);
+    return { totalScore: neutralScore, breakdown: neutralBreakdown, reasons };
   }
 
   // ========================================
@@ -399,7 +418,9 @@ export const calculateDetailedCompatibility = (
   }
 
   // ========================================
-  // 11. LIFESTYLE TAGS (3 points) - Shared Interests
+  // 11. LIFESTYLE TAGS (2 points) - Shared Interests
+  // Max reduced from 3 to 2 points to accommodate zodiac sign (2 pts)
+  // Baseline maintained at 1 point for compatibility with pre-zodiac scoring
   // ========================================
   if (userPrefs.lifestyle && userPrefs.lifestyle.length > 0) {
     const userLifestyles = userPrefs.lifestyle;
@@ -408,10 +429,10 @@ export const calculateDetailedCompatibility = (
     const overlaps = userLifestyles.filter(tag => roommateLifestyles.includes(tag));
     
     if (overlaps.length >= 2) {
-      breakdown.lifestyle = 3;
+      breakdown.lifestyle = 2;
       reasons.strengths.push(`Shared interests: ${overlaps.join(', ')}`);
     } else if (overlaps.length === 1) {
-      breakdown.lifestyle = 2;
+      breakdown.lifestyle = 1;
       reasons.notes.push(`Some shared interests: ${overlaps.join(', ')}`);
     } else {
       breakdown.lifestyle = 1;
@@ -422,30 +443,9 @@ export const calculateDetailedCompatibility = (
   }
 
   // ========================================
-  // 12. OCCUPATION (1 point) - Minor Tie-Breaker
-  // ========================================
-  if (userProfile.occupation && roommateProfile.occupation) {
-    const userOcc = userProfile.occupation.toLowerCase();
-    const roommateOcc = roommateProfile.occupation.toLowerCase();
-    
-    // Check for similar professional fields
-    const fields = ['engineer', 'design', 'marketing', 'sales', 'teacher', 'nurse', 'developer', 'analyst', 'manager'];
-    const userField = fields.find(f => userOcc.includes(f));
-    const roommateField = fields.find(f => roommateOcc.includes(f));
-    
-    if (userField && userField === roommateField) {
-      breakdown.occupation = 1;
-      reasons.notes.push(`Similar professional fields`);
-    } else {
-      breakdown.occupation = 0;
-    }
-  } else {
-    breakdown.occupation = 0;
-  }
-
-  // ========================================
-  // 13. ZODIAC SIGN (2 points max) - Fun Factor, Very Light Weight
+  // 12. ZODIAC SIGN (2 points max) - Fun Factor, Very Light Weight
   // Only applies if BOTH users have zodiac signs selected
+  // Replaces previous occupation scoring (removed)
   // ========================================
   if (currentUser.zodiacSign && roommateProfile.zodiacSign) {
     const zodiacScore = getZodiacCompatibilityScore(currentUser.zodiacSign, roommateProfile.zodiacSign);

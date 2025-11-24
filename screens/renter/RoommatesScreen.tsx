@@ -15,7 +15,7 @@ import { RoommateProfile, Match } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scaleFont, moderateScale, getResponsiveSpacing } from '../../utils/responsive';
 import { calculateCompatibility, getMatchQualityColor, getCleanlinessLabel, getSocialLevelLabel, getWorkScheduleLabel, formatMoveInDate, getGenderSymbol } from '../../utils/matchingAlgorithm';
-import { getZodiacSymbol } from '../../utils/zodiacUtils';
+import { getZodiacSymbol, getZodiacCompatibilityLevel } from '../../utils/zodiacUtils';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Limit card size for web/desktop viewing
@@ -1181,6 +1181,27 @@ export const RoommatesScreen = () => {
                 </View>
               </View>
 
+              {/* Premium Zodiac Compatibility Insight - Only for Plus/Elite users when both have zodiac signs */}
+              {user && currentProfile.zodiacSign && user.zodiacSign && (user.subscription?.plan === 'plus' || user.subscription?.plan === 'elite') ? (
+                <View style={styles.detailSection}>
+                  <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Zodiac Compatibility</ThemedText>
+                  <View style={[styles.zodiacInsightCard, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.sm }}>
+                      <ThemedText style={[Typography.h2, { marginRight: Spacing.sm }]}>
+                        {getZodiacSymbol(user.zodiacSign)}
+                      </ThemedText>
+                      <Feather name="heart" size={16} color={theme.primary} />
+                      <ThemedText style={[Typography.h2, { marginLeft: Spacing.sm }]}>
+                        {getZodiacSymbol(currentProfile.zodiacSign)}
+                      </ThemedText>
+                    </View>
+                    <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
+                      {getZodiacCompatibilityLevel(user.zodiacSign, currentProfile.zodiacSign)}
+                    </ThemedText>
+                  </View>
+                </View>
+              ) : null}
+
               <View style={[styles.detailSection, { paddingBottom: Spacing.xxl }]}>
                 <Pressable
                   style={[styles.detailActionButton, { backgroundColor: theme.primary }]}
@@ -1536,6 +1557,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: Spacing.lg,
     borderRadius: BorderRadius.medium,
+  },
+  zodiacInsightCard: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
   },
   detailActionButton: {
     flexDirection: 'row',
