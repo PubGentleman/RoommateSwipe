@@ -958,7 +958,7 @@ export const RoommatesScreen = () => {
                 {canSuperLike().message}
               </ThemedText>
               
-              <View style={styles.vipFeatureList}>
+              <View style={styles.vipFeaturesList}>
                 <View style={styles.vipFeatureItem}>
                   <Feather name="star" size={20} color={theme.info} />
                   <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
@@ -1467,6 +1467,17 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.medium,
     alignItems: 'center',
     borderWidth: 1,
+  },
+  vipCancelButton: {
+    paddingVertical: Spacing.lg,
+    borderRadius: BorderRadius.medium,
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  vipUpgradeButton: {
+    paddingVertical: Spacing.lg,
+    borderRadius: BorderRadius.medium,
+    alignItems: 'center',
   },
   priceCard: {
     padding: Spacing.xl,
