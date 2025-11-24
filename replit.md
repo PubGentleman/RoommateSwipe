@@ -136,6 +136,18 @@ The current implementation uses mock data and TypeScript interfaces for data mod
 - Default location set to Williamsburg, Brooklyn for new renters
 - Location data is backfilled for existing users on app load to ensure city-based filtering works across all sessions
 
+**AI Match Assistant Micro-Questions:**
+- Intelligent system that asks occasional micro-questions to refine user matching profiles
+- Only asks ONE question per session with 24-hour cooldown between questions
+- 12 question types covering privacy, cooking, cleaning, furnishing, guests, work schedule, sleep patterns, noise tolerance, cleanliness, smoking, stay length, and roommate vibe preferences
+- Automatically parses user responses using natural language processing to extract preferences
+- Updates both `aiAssistantData.microQuestionPreferences` and `profileData.preferences` fields
+- Syncs answers with existing matching algorithm fields (sleepSchedule, cleanliness, guestPolicy, noiseTolerance, smoking, workLocation, roommateRelationship)
+- Tracks questions asked via `aiAssistantData.questionsAsked` to avoid repetition
+- Questions appear naturally in conversation flow, non-intrusive and optional
+- Provides confirmation feedback when preferences are updated
+- System designed to improve matching accuracy over time through conversational profile building
+
 ## Location Privacy & Filtering
 
 **Location Privacy Enforcement:**

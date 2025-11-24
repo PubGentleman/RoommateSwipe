@@ -240,6 +240,24 @@ export interface User {
       bedrooms?: number;
     };
   };
+  aiAssistantData?: {
+    lastMicroQuestionDate?: Date;
+    questionsAsked?: string[];
+    microQuestionPreferences?: {
+      privacyImportance?: string;
+      cookingFrequency?: string;
+      cleaningPreference?: string;
+      furnishedPreference?: string;
+      guestFrequency?: string;
+      workSchedule?: string;
+      sleepSchedule?: string;
+      noisePreference?: string;
+      cleanlinessImportance?: string;
+      smokingPreference?: string;
+      stayLength?: string;
+      roommateVibe?: string;
+    };
+  };
 }
 
 export interface Notification {

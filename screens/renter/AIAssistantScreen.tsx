@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StorageService } from '../../utils/storage';
 import { RoommateProfile } from '../../types/models';
 import { getZodiacSymbol, getZodiacCompatibilityScore, getZodiacCompatibilityLevel, getZodiacElement } from '../../utils/zodiacUtils';
+import { shouldAskMicroQuestion, getNextMicroQuestion, parseAnswerAndUpdatePreferences, markQuestionAsAsked, MicroQuestion } from '../../utils/aiMicroQuestions';
 
 type AIMessage = {
   id: string;
@@ -16,6 +17,8 @@ type AIMessage = {
   isUser: boolean;
   timestamp: Date;
   suggestions?: string[];
+  isMicroQuestion?: boolean;
+  microQuestionData?: MicroQuestion;
 };
 
 type AIAssistantScreenProps = {
@@ -24,11 +27,12 @@ type AIAssistantScreenProps = {
 
 export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
   const { theme } = useTheme();
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<AIMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [pendingMicroQuestion, setPendingMicroQuestion] = useState<MicroQuestion | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -283,6 +287,7 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
   const handleSend = async (text?: string) => {
     const messageText = text || inputText.trim();
     if (!messageText) return;
+    if (!user) return;
 
     const userMessage: AIMessage = {
       id: `user_${Date.now()}`,
@@ -296,10 +301,56 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
     setIsTyping(true);
 
     setTimeout(async () => {
-      const aiResponse = await generateAIResponse(messageText);
-      setMessages(prev => [...prev, aiResponse]);
-      setIsTyping(false);
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+      if (pendingMicroQuestion) {
+        const updatedUser = await parseAnswerAndUpdatePreferences(
+          user,
+          messageText,
+          pendingMicroQuestion.category
+        );
+        updateUser(updatedUser);
+        
+        const confirmationResponse: AIMessage = {
+          id: `ai_${Date.now()}`,
+          text: `Got it! I've updated your preferences based on your answer. Your match suggestions will be more accurate now!`,
+          isUser: false,
+          timestamp: new Date(),
+          suggestions: ['Find my matches', 'What else can you help with?'],
+        };
+        
+        setMessages(prev => [...prev, confirmationResponse]);
+        setPendingMicroQuestion(null);
+        setIsTyping(false);
+        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+      } else {
+        const aiResponse = await generateAIResponse(messageText);
+        setMessages(prev => [...prev, aiResponse]);
+        
+        if (user && shouldAskMicroQuestion(user)) {
+          const microQuestion = getNextMicroQuestion(user);
+          if (microQuestion) {
+            setTimeout(async () => {
+              const updatedUser = await markQuestionAsAsked(user, microQuestion.id);
+              updateUser(updatedUser);
+              
+              const microQuestionMessage: AIMessage = {
+                id: `ai_micro_${Date.now()}`,
+                text: `Quick question to help improve your matches: ${microQuestion.question}`,
+                isUser: false,
+                timestamp: new Date(),
+                isMicroQuestion: true,
+                microQuestionData: microQuestion,
+              };
+              
+              setMessages(prev => [...prev, microQuestionMessage]);
+              setPendingMicroQuestion(microQuestion);
+              setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+            }, 2000);
+          }
+        }
+        
+        setIsTyping(false);
+        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+      }
     }, 1000);
   };
 
