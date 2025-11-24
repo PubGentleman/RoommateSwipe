@@ -9,7 +9,10 @@ export default function AboutScreen() {
   const { theme } = useTheme();
 
   return (
-    <ScreenScrollView style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+    <ScreenScrollView 
+      style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
+      contentContainerStyle={{ paddingTop: Spacing.xl }}
+    >
       <View style={styles.content}>
         <ThemedText style={[Typography.body, { marginBottom: Spacing.lg, lineHeight: 24 }]}>
           Roomdr was built to solve one of the biggest problems in city living: finding a roommate you actually get along with. Traditional listing sites only show photos and prices. Roomdr goes deeper — matching people by lifestyle, habits, budget, neighborhood preference, and personality fit.

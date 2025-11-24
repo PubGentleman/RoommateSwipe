@@ -9,7 +9,10 @@ export default function TermsOfServiceScreen() {
   const { theme } = useTheme();
 
   return (
-    <ScreenScrollView style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+    <ScreenScrollView 
+      style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
+      contentContainerStyle={{ paddingTop: Spacing.xl }}
+    >
       <View style={styles.content}>
         <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.xxl }]}>
           Last Updated: November 23, 2025
