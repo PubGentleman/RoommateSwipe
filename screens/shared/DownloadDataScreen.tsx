@@ -98,7 +98,7 @@ export const DownloadDataScreen = () => {
   );
 
   return (
-    <ScreenScrollView>
+    <ScreenScrollView contentContainerStyle={{ paddingTop: Spacing.xl }}>
       <View style={styles.header}>
         <View style={[styles.headerIcon, { backgroundColor: theme.primary + '20' }]}>
           <Feather name="download" size={32} color={theme.primary} />
