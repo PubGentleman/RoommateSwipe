@@ -892,7 +892,7 @@ export const GroupsScreen = () => {
                         const profile = mockRoommateProfiles.find(p => p.id === memberId);
                         return profile ? (
                           <ThemedText key={memberId} style={[Typography.body, { color: theme.text, marginRight: index < currentGroup.members.length - 1 ? Spacing.sm : 0 }]}>
-                            {profile.name.split(' ')[0]} {getGenderSymbol(profile.gender)}
+                            {profile.name.split(' ')[0]}{profile.zodiacSign ? ` ${getZodiacSymbol(profile.zodiacSign)}` : ''} {getGenderSymbol(profile.gender)}
                           </ThemedText>
                         ) : null;
                       })}
