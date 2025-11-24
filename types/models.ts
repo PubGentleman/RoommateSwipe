@@ -7,6 +7,7 @@ export interface RoommateProfile {
   bio: string;
   occupation: string;
   budget: number;
+  lookingFor?: 'room' | 'entire_apartment';
   photos: string[];
   lifestyle: {
     cleanliness: number;
@@ -215,6 +216,7 @@ export interface User {
   profileData?: {
     bio?: string;
     budget?: number;
+    lookingFor?: 'room' | 'entire_apartment';
     location?: string;
     neighborhood?: string;
     city?: string;

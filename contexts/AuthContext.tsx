@@ -423,11 +423,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           ...(updates.zodiacSign !== undefined && { zodiacSign: updates.zodiacSign }),
           ...(updates.profileData?.bio && { bio: updates.profileData.bio }),
           ...(updates.profileData?.budget && { budget: updates.profileData.budget }),
+          ...(updates.profileData?.lookingFor !== undefined && { lookingFor: updates.profileData.lookingFor }),
           ...(updates.profileData?.occupation && { occupation: updates.profileData.occupation }),
-          ...(updates.profileData?.preferences?.location && { 
+          ...(updates.profileData?.location && { 
             preferences: {
               ...roommateProfiles[profileIndex].preferences,
-              location: updates.profileData.preferences.location,
+              location: updates.profileData.location,
             }
           }),
         };

@@ -124,6 +124,7 @@ export const EditProfileScreen = () => {
   }, [user?.photos, user?.profilePicture]);
   const [bio, setBio] = useState(user?.profileData?.bio || '');
   const [budget, setBudget] = useState(user?.profileData?.budget?.toString() || '');
+  const [lookingFor, setLookingFor] = useState<'room' | 'entire_apartment'>(user?.profileData?.lookingFor || 'room');
   const [location, setLocation] = useState(user?.profileData?.location || '');
   const [occupation, setOccupation] = useState(user?.profileData?.occupation || '');
   const [interests, setInterests] = useState(user?.profileData?.interests || '');
@@ -261,6 +262,7 @@ export const EditProfileScreen = () => {
       profileData: {
         bio: bio.trim() || undefined,
         budget: budget.trim() ? parseInt(budget) : undefined,
+        lookingFor,
         location: location.trim() || undefined,
         occupation: occupation.trim() || undefined,
         interests: interests.trim() || undefined,
@@ -634,6 +636,17 @@ export const EditProfileScreen = () => {
               onChangeText={setBudget}
               keyboardType="numeric"
             />
+          </View>
+
+          {/* Looking For */}
+          <View style={styles.inputGroup}>
+            <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
+              What are you looking for?
+            </ThemedText>
+            <View style={styles.optionRow}>
+              <OptionButton label="Room" value="room" isSelected={lookingFor === 'room'} onPress={() => setLookingFor('room')} />
+              <OptionButton label="Entire Apartment" value="entire_apartment" isSelected={lookingFor === 'entire_apartment'} onPress={() => setLookingFor('entire_apartment')} />
+            </View>
           </View>
 
           {/* Move-in Date */}

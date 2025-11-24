@@ -536,6 +536,14 @@ export const RoommatesScreen = () => {
                       ${currentProfile.budget}/mo
                     </ThemedText>
                   </View>
+                  {currentProfile.lookingFor ? (
+                    <View style={[styles.badge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                      <Feather name={currentProfile.lookingFor === 'room' ? 'home' : 'key'} size={14} color="#FFFFFF" />
+                      <ThemedText style={[Typography.small, { color: '#FFFFFF', marginLeft: Spacing.xs }]} numberOfLines={1}>
+                        {currentProfile.lookingFor === 'room' ? 'Room' : 'Entire Apt'}
+                      </ThemedText>
+                    </View>
+                  ) : null}
                   <View style={[styles.badge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
                     <Feather name="map-pin" size={14} color="#FFFFFF" />
                     <ThemedText style={[Typography.small, { color: '#FFFFFF', marginLeft: Spacing.xs }]} numberOfLines={1}>
@@ -1115,6 +1123,15 @@ export const RoommatesScreen = () => {
                     <ThemedText style={[Typography.body, { fontWeight: '600' }]}>${currentProfile.budget}/month</ThemedText>
                   </View>
                 </View>
+                {currentProfile.lookingFor ? (
+                  <View style={styles.detailRow}>
+                    <Feather name={currentProfile.lookingFor === 'room' ? 'home' : 'key'} size={20} color={theme.primary} />
+                    <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                      <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Looking For</ThemedText>
+                      <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{currentProfile.lookingFor === 'room' ? 'Room' : 'Entire Apartment'}</ThemedText>
+                    </View>
+                  </View>
+                ) : null}
                 <View style={styles.detailRow}>
                   <Feather name="map-pin" size={20} color={theme.primary} />
                   <View style={{ flex: 1, marginLeft: Spacing.md }}>

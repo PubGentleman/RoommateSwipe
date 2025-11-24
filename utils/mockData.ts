@@ -394,6 +394,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     bio: 'Software engineer who loves hiking, cooking, and quiet evenings. Looking for a clean and respectful roommate.',
     occupation: 'Software Engineer',
     budget: 1200,
+    lookingFor: 'room',
     photos: [
       'https://picsum.photos/400/500?random=1',
       'https://picsum.photos/400/500?random=11',
@@ -422,6 +423,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     bio: 'Marketing professional, gym enthusiast, and weekend adventurer. Love to host small gatherings!',
     occupation: 'Marketing Manager',
     budget: 1400,
+    lookingFor: 'entire_apartment',
     photos: [
       'https://picsum.photos/400/500?random=2',
       'https://picsum.photos/400/500?random=21',
@@ -451,6 +453,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     bio: 'Graphic designer working from home. Cat mom, plant lover, and yoga enthusiast.',
     occupation: 'Graphic Designer',
     budget: 1000,
+    lookingFor: 'room',
     photos: [
       'https://picsum.photos/400/500?random=3',
       'https://picsum.photos/400/500?random=31',
@@ -481,6 +484,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     bio: 'Teacher by day, musician by night. Looking for a chill roommate who appreciates good music and great conversations.',
     occupation: 'High School Teacher',
     budget: 1100,
+    lookingFor: 'entire_apartment',
     photos: [
       'https://picsum.photos/400/500?random=4',
       'https://picsum.photos/400/500?random=41',
