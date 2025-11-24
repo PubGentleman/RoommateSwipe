@@ -12,8 +12,7 @@ import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
 import { Spacing, BorderRadius, Typography } from '../../constants/theme';
-import type { ZodiacSign } from '../../types/models';
-import { ZODIAC_SIGNS } from '../../utils/zodiacUtils';
+import { calculateZodiacFromBirthday } from '../../utils/zodiacUtils';
 
 const DraggablePhoto = ({ photo, index, photos, theme, onRemove, onReorder }: any) => {
   const translateX = useSharedValue(0);
@@ -105,7 +104,7 @@ export const EditProfileScreen = () => {
   const [photos, setPhotos] = useState<string[]>(user?.photos || [user?.profilePicture].filter(Boolean) as string[] || []);
   const [name, setName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
-  const [zodiacSign, setZodiacSign] = useState<ZodiacSign | undefined>(user?.zodiacSign);
+  const [birthday, setBirthday] = useState(user?.birthday || '');
   
   useEffect(() => {
     console.log('[EditProfileScreen] User object changed:', {
@@ -252,10 +251,15 @@ export const EditProfileScreen = () => {
     setIsSaving(true);
     await new Promise(resolve => setTimeout(resolve, 500));
 
+    const zodiacSign = birthday ? calculateZodiacFromBirthday(birthday) : undefined;
+    
     console.log('[EditProfileScreen] Saving profile with photos:', photos);
+    console.log('[EditProfileScreen] Calculated zodiac sign from birthday:', { birthday, zodiacSign });
+    
     await updateUser({
       name: name.trim(),
       email: email.trim(),
+      birthday: birthday.trim() || undefined,
       zodiacSign,
       photos,
       profilePicture: photos[0] || undefined,
@@ -417,48 +421,19 @@ export const EditProfileScreen = () => {
           </View>
 
           <View style={styles.inputGroup}>
-            <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>
-              Zodiac Sign (optional)
+            <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
+              Birthday (optional)
             </ThemedText>
-            <View style={styles.zodiacOptions}>
-              <Pressable
-                style={[
-                  styles.optionButton,
-                  { 
-                    backgroundColor: !zodiacSign ? theme.primary : theme.backgroundSecondary,
-                    borderColor: !zodiacSign ? theme.primary : theme.border,
-                  }
-                ]}
-                onPress={() => setZodiacSign(undefined)}
-              >
-                <ThemedText style={[
-                  Typography.small,
-                  { color: !zodiacSign ? '#FFFFFF' : theme.text, fontWeight: !zodiacSign ? '600' : '400' }
-                ]}>
-                  None
-                </ThemedText>
-              </Pressable>
-              {ZODIAC_SIGNS.map((zodiac) => (
-                <Pressable
-                  key={zodiac.name}
-                  style={[
-                    styles.optionButton,
-                    { 
-                      backgroundColor: zodiacSign === zodiac.name ? theme.primary : theme.backgroundSecondary,
-                      borderColor: zodiacSign === zodiac.name ? theme.primary : theme.border,
-                    }
-                  ]}
-                  onPress={() => setZodiacSign(zodiac.name)}
-                >
-                  <ThemedText style={[
-                    Typography.small,
-                    { color: zodiacSign === zodiac.name ? '#FFFFFF' : theme.text, fontWeight: zodiacSign === zodiac.name ? '600' : '400' }
-                  ]}>
-                    {zodiac.symbol} {zodiac.name}
-                  </ThemedText>
-                </Pressable>
-              ))}
-            </View>
+            <TextInput
+              style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
+              placeholder="YYYY-MM-DD (e.g., 1995-08-15)"
+              placeholderTextColor={theme.textSecondary}
+              value={birthday}
+              onChangeText={setBirthday}
+            />
+            <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
+              Your zodiac sign will be calculated automatically from your birthday
+            </ThemedText>
           </View>
 
           <View style={styles.inputGroup}>

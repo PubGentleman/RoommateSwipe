@@ -149,6 +149,7 @@ export interface User {
   password?: string;
   name: string;
   age?: number;
+  birthday?: string;
   zodiacSign?: ZodiacSign;
   role: 'renter' | 'host' | 'agent';
   profilePicture?: string;
