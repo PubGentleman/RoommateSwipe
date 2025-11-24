@@ -1,7 +1,7 @@
 import { RoommateProfile, Property, Group, Conversation, Application, User } from '../types/models';
 import { getCityFromNeighborhood, getStateFromNeighborhood, getCoordinatesFromNeighborhood } from './locationData';
 
-export const MOCK_DATA_VERSION = '1.5.0';
+export const MOCK_DATA_VERSION = '1.6.0';
 
 export const mockProfileUsers: User[] = [
   {
@@ -9,6 +9,7 @@ export const mockProfileUsers: User[] = [
     email: 'sarah.johnson@email.com',
     name: 'Sarah Johnson',
     age: 28,
+    zodiacSign: 'Virgo',
     role: 'renter',
     profilePicture: 'https://picsum.photos/400/500?random=1',
     photos: [
@@ -47,6 +48,7 @@ export const mockProfileUsers: User[] = [
     email: 'michael.chen@email.com',
     name: 'Michael Chen',
     age: 31,
+    zodiacSign: 'Leo',
     role: 'renter',
     profilePicture: 'https://picsum.photos/400/500?random=2',
     photos: [
@@ -86,6 +88,7 @@ export const mockProfileUsers: User[] = [
     email: 'emily.rodriguez@email.com',
     name: 'Emily Rodriguez',
     age: 26,
+    zodiacSign: 'Pisces',
     role: 'renter',
     profilePicture: 'https://picsum.photos/400/500?random=3',
     photos: [
@@ -125,6 +128,8 @@ export const mockProfileUsers: User[] = [
     id: '4',
     email: 'bob.anderson@email.com',
     name: 'Bob Anderson',
+    age: 27,
+    zodiacSign: 'Taurus',
     role: 'renter',
     profilePicture: 'https://picsum.photos/400/500?random=4',
     photos: [
@@ -163,6 +168,8 @@ export const mockProfileUsers: User[] = [
     id: '5',
     email: 'jessica.park@email.com',
     name: 'Jessica Park',
+    age: 25,
+    zodiacSign: 'Cancer',
     role: 'renter',
     profilePicture: 'https://picsum.photos/400/500?random=5',
     photos: [
@@ -203,6 +210,8 @@ export const mockProfileUsers: User[] = [
     id: '6',
     email: 'david.martinez@email.com',
     name: 'David Martinez',
+    age: 29,
+    zodiacSign: 'Capricorn',
     role: 'renter',
     profilePicture: 'https://picsum.photos/400/500?random=6',
     photos: [
@@ -240,6 +249,8 @@ export const mockProfileUsers: User[] = [
     id: '7',
     email: 'lisa.thompson@email.com',
     name: 'Lisa Thompson',
+    age: 24,
+    zodiacSign: 'Aries',
     role: 'renter',
     profilePicture: 'https://picsum.photos/400/500?random=7',
     photos: [
@@ -278,6 +289,8 @@ export const mockProfileUsers: User[] = [
     id: '8',
     email: 'james.wilson@email.com',
     name: 'James Wilson',
+    age: 28,
+    zodiacSign: 'Gemini',
     role: 'renter',
     profilePicture: 'https://picsum.photos/400/500?random=8',
     photos: [
