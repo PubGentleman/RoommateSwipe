@@ -1015,14 +1015,16 @@ export const RoommatesScreen = () => {
       >
         <View style={styles.detailModalOverlay}>
           <View style={[styles.detailModalContainer, { backgroundColor: theme.backgroundSecondary }]}>
-            <View style={styles.detailHeader}>
-              <ThemedText style={[Typography.h2]}>Profile Details</ThemedText>
-              <Pressable onPress={() => setShowProfileDetail(false)}>
-                <Feather name="x" size={24} color={theme.text} />
-              </Pressable>
-            </View>
-            
-            {/* Photo gallery */}
+            <ScrollView 
+              style={{ flex: 1 }} 
+              showsVerticalScrollIndicator={false}
+              bounces={true}
+            >
+              <View style={styles.detailHeader}>
+                <ThemedText style={[Typography.h2]}>Profile Details</ThemedText>
+              </View>
+              
+              {/* Photo gallery */}
             {(() => {
               const photosArray = Array.isArray(currentProfile.photos) 
                 ? currentProfile.photos 
@@ -1084,8 +1086,6 @@ export const RoommatesScreen = () => {
                 </>
               );
             })()}
-            
-            <ScrollView style={styles.detailContent} showsVerticalScrollIndicator={false}>
               
               <View style={styles.detailSection}>
                 <ThemedText style={[Typography.h2]}>{currentProfile.name}, {currentProfile.age}{currentProfile.zodiacSign ? ` · ${getZodiacSymbol(currentProfile.zodiacSign)} ${currentProfile.zodiacSign}` : ''}</ThemedText>
@@ -1185,7 +1185,7 @@ export const RoommatesScreen = () => {
               {user && currentProfile.zodiacSign && user.zodiacSign && (user.subscription?.plan === 'plus' || user.subscription?.plan === 'elite') ? (
                 <View style={styles.detailSection}>
                   <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Zodiac Compatibility</ThemedText>
-                  <View style={[styles.zodiacInsightCard, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                  <View style={[styles.zodiacInsightCard, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.sm }}>
                       <ThemedText style={[Typography.h2, { marginRight: Spacing.sm }]}>
                         {getZodiacSymbol(user.zodiacSign)}
@@ -1217,6 +1217,16 @@ export const RoommatesScreen = () => {
                 </Pressable>
               </View>
             </ScrollView>
+            
+            {/* Floating close button */}
+            <Pressable 
+              onPress={() => setShowProfileDetail(false)}
+              style={styles.detailCloseButton}
+            >
+              <View style={[styles.detailCloseButtonInner, { backgroundColor: theme.backgroundSecondary }]}>
+                <Feather name="x" size={24} color={theme.text} />
+              </View>
+            </Pressable>
           </View>
         </View>
       </Modal>
@@ -1478,11 +1488,10 @@ const styles = StyleSheet.create({
   },
   detailHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
     padding: Spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+    paddingTop: Spacing.xl,
   },
   detailContent: {
     flex: 1,
@@ -1560,7 +1569,7 @@ const styles = StyleSheet.create({
   },
   zodiacInsightCard: {
     padding: Spacing.lg,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.medium,
     borderWidth: 1,
   },
   detailActionButton: {
@@ -1585,5 +1594,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
+  },
+  detailCloseButton: {
+    position: 'absolute',
+    top: Spacing.lg,
+    right: Spacing.lg,
+    zIndex: 100,
+  },
+  detailCloseButtonInner: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
   },
 });
