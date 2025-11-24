@@ -1038,15 +1038,21 @@ export const RoommatesScreen = () => {
                       horizontal 
                       pagingEnabled 
                       showsHorizontalScrollIndicator={false}
+                      scrollEnabled={true}
+                      directionalLockEnabled={true}
+                      snapToInterval={SCREEN_WIDTH}
+                      decelerationRate="fast"
                       style={styles.photosScrollContainer}
+                      contentContainerStyle={{ flexDirection: 'row' }}
                     >
                       {photosArray.map((photo, index) => (
-                        <Image 
-                          key={`photo-${index}`} 
-                          source={{ uri: photo }} 
-                          style={styles.detailImage}
-                          resizeMode="contain"
-                        />
+                        <View key={`photo-container-${index}`} style={{ width: SCREEN_WIDTH, height: 400 }}>
+                          <Image 
+                            source={{ uri: photo }} 
+                            style={styles.detailImage}
+                            resizeMode="contain"
+                          />
+                        </View>
                       ))}
                     </ScrollView>
                     {photosArray.length > 1 ? (
