@@ -39,6 +39,7 @@ export const RoommatesScreen = () => {
   const [showUndoUpgradeModal, setShowUndoUpgradeModal] = useState(false);
   const [processingUndoPass, setProcessingUndoPass] = useState(false);
   const [showProfileDetail, setShowProfileDetail] = useState(false);
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [showMessageModal, setShowMessageModal] = useState(false);
   const [processingMessagePurchase, setProcessingMessagePurchase] = useState(false);
   const [showSuperLikeUpgradeModal, setShowSuperLikeUpgradeModal] = useState(false);
@@ -292,6 +293,7 @@ export const RoommatesScreen = () => {
     .maxDuration(200)
     .requireExternalGestureToFail(pan)
     .onEnd(() => {
+      runOnJS(setCurrentPhotoIndex)(0);
       runOnJS(setShowProfileDetail)(true);
       if (currentProfile && user && currentProfile.id !== user.id) {
         runOnJS(StorageService.addProfileView)(currentProfile.id, user.id);
@@ -1027,37 +1029,57 @@ export const RoommatesScreen = () => {
                   ? [currentProfile.photos]
                   : [];
               
+              const handlePrevPhoto = () => {
+                setCurrentPhotoIndex(prev => (prev > 0 ? prev - 1 : photosArray.length - 1));
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              };
+              
+              const handleNextPhoto = () => {
+                setCurrentPhotoIndex(prev => (prev < photosArray.length - 1 ? prev + 1 : 0));
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              };
+              
               return (
                 <>
-                  <FlatList
-                    data={photosArray}
-                    horizontal
-                    pagingEnabled
-                    showsHorizontalScrollIndicator={false}
-                    style={styles.photosScrollContainer}
-                    keyExtractor={(item, index) => `photo-${index}`}
-                    renderItem={({ item }) => (
-                      <View style={styles.photoPage}>
-                        <Image 
-                          source={{ uri: item }} 
-                          style={styles.detailImage}
-                          resizeMode="contain"
-                        />
-                      </View>
-                    )}
-                    getItemLayout={(data, index) => ({
-                      length: SCREEN_WIDTH,
-                      offset: SCREEN_WIDTH * index,
-                      index,
-                    })}
-                  />
-                  {photosArray.length > 1 ? (
-                    <View style={styles.photoIndicatorContainer}>
-                      <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
-                        {photosArray.length} photos • Swipe to view more
-                      </ThemedText>
-                    </View>
-                  ) : null}
+                  <View style={styles.photoGalleryContainer}>
+                    <Image 
+                      source={{ uri: photosArray[currentPhotoIndex] || photosArray[0] }} 
+                      style={styles.detailImage}
+                      resizeMode="cover"
+                    />
+                    {photosArray.length > 1 ? (
+                      <>
+                        <Pressable 
+                          style={[styles.photoNavButton, styles.photoNavLeft]} 
+                          onPress={handlePrevPhoto}
+                        >
+                          <Feather name="chevron-left" size={28} color="#FFFFFF" />
+                        </Pressable>
+                        <Pressable 
+                          style={[styles.photoNavButton, styles.photoNavRight]} 
+                          onPress={handleNextPhoto}
+                        >
+                          <Feather name="chevron-right" size={28} color="#FFFFFF" />
+                        </Pressable>
+                        <View style={styles.photoDotsContainer}>
+                          {photosArray.map((_, index) => (
+                            <View 
+                              key={`dot-${index}`}
+                              style={[
+                                styles.photoDot,
+                                currentPhotoIndex === index && styles.photoDotActive
+                              ]}
+                            />
+                          ))}
+                        </View>
+                      </>
+                    ) : null}
+                  </View>
+                  <View style={styles.photoIndicatorContainer}>
+                    <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
+                      {photosArray.length} {photosArray.length === 1 ? 'photo' : 'photos'}
+                    </ThemedText>
+                  </View>
                 </>
               );
             })()}
@@ -1443,19 +1465,53 @@ const styles = StyleSheet.create({
   detailContent: {
     flex: 1,
   },
-  photosScrollContainer: {
+  photoGalleryContainer: {
+    width: '100%',
+    height: 400,
+    position: 'relative',
+    backgroundColor: '#000',
+  },
+  detailImage: {
     width: '100%',
     height: 400,
   },
-  photoPage: {
-    width: SCREEN_WIDTH,
-    height: 400,
+  photoNavButton: {
+    position: 'absolute',
+    top: '50%',
+    marginTop: -24,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 10,
   },
-  detailImage: {
-    width: SCREEN_WIDTH,
-    height: 400,
+  photoNavLeft: {
+    left: 16,
+  },
+  photoNavRight: {
+    right: 16,
+  },
+  photoDotsContainer: {
+    position: 'absolute',
+    bottom: 16,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  photoDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+  },
+  photoDotActive: {
+    backgroundColor: '#FFFFFF',
+    width: 24,
   },
   photoIndicatorContainer: {
     padding: Spacing.md,
