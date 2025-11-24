@@ -39,13 +39,22 @@ Animations use React Native Reanimated, and gestures are handled by React Native
 
 ## Authentication & Authorization
 
+**⚠️ DEMO AUTHENTICATION ONLY**: This app uses mock authentication with plaintext passwords stored in AsyncStorage. This is **for demonstration purposes only** and provides no real security. Production deployment would require a proper backend server with secure credential hashing, salting, and validation.
+
 The system implements mock authentication with email/password (simple string comparison, no hashing - for demonstration only) and has planned SSO (Apple/Google) integration. Password persistence and privacy settings are fully functional and persist across sessions. Users have defined roles (`renter`, `host`, `agent`) with role-based navigation and conditional screen access. Three subscription tiers are implemented via Stripe integration: Basic (Free), Plus ($14.99/month), and Elite ($49.99-$99/month). Subscription management includes full lifecycle support for cancellation, downgrades, and reactivation with prorated access and clear UI indicators.
 
-**Privacy & Security Features:**
-- Password management: Users can change passwords with validation (8+ character minimum, confirmation matching)
+**Privacy & Security Features (Demo Implementation):**
+- Password management: Users can change passwords with validation (8+ character minimum, confirmation matching). Passwords stored in plaintext in AsyncStorage.
 - Privacy settings: Profile visibility, online status display, last active time display (all persist to storage)
 - Two-factor authentication toggle (UI-only, persists preference but no OTP implementation)
 - Account deletion: Comprehensive cleanup of all user data from AsyncStorage (users, profiles, conversations, matches, likes, notifications, groups, etc.)
+
+**Future Backend Requirements:**
+- Secure password hashing (bcrypt/argon2) and salting
+- Server-side credential validation
+- Real OTP generation for 2FA
+- Secure session management with JWT tokens
+- API-based authentication flow
 
 **Subscription Tiers:**
 
