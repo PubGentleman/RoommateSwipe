@@ -50,6 +50,8 @@ export const mockProfileUsers: User[] = [
     photos: [
       'https://picsum.photos/400/500?random=2',
       'https://picsum.photos/400/500?random=21',
+      'https://picsum.photos/400/500?random=22',
+      'https://picsum.photos/400/500?random=23',
     ],
     subscription: { plan: 'plus', status: 'active' },
     boostData: { boostsUsed: 1, isBoosted: true, boostExpiresAt: new Date(Date.now() + 10 * 60 * 60 * 1000), lastBoostDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) },
@@ -86,6 +88,10 @@ export const mockProfileUsers: User[] = [
     profilePicture: 'https://picsum.photos/400/500?random=3',
     photos: [
       'https://picsum.photos/400/500?random=3',
+      'https://picsum.photos/400/500?random=31',
+      'https://picsum.photos/400/500?random=32',
+      'https://picsum.photos/400/500?random=33',
+      'https://picsum.photos/400/500?random=34',
     ],
     subscription: { plan: 'basic', status: 'active' },
     boostData: { boostsUsed: 0, isBoosted: false },
@@ -118,6 +124,13 @@ export const mockProfileUsers: User[] = [
     email: 'bob.anderson@email.com',
     name: 'Bob Anderson',
     role: 'renter',
+    profilePicture: 'https://picsum.photos/400/500?random=4',
+    photos: [
+      'https://picsum.photos/400/500?random=4',
+      'https://picsum.photos/400/500?random=41',
+      'https://picsum.photos/400/500?random=42',
+      'https://picsum.photos/400/500?random=43',
+    ],
     subscription: { plan: 'elite', status: 'active' },
     boostData: { boostsUsed: 5, isBoosted: false },
     profileData: {
@@ -150,6 +163,14 @@ export const mockProfileUsers: User[] = [
     name: 'Jessica Park',
     role: 'renter',
     profilePicture: 'https://picsum.photos/400/500?random=5',
+    photos: [
+      'https://picsum.photos/400/500?random=5',
+      'https://picsum.photos/400/500?random=51',
+      'https://picsum.photos/400/500?random=52',
+      'https://picsum.photos/400/500?random=53',
+      'https://picsum.photos/400/500?random=54',
+      'https://picsum.photos/400/500?random=55',
+    ],
     subscription: { plan: 'plus', status: 'active' },
     boostData: { boostsUsed: 0, isBoosted: false },
     profileData: {
@@ -181,6 +202,12 @@ export const mockProfileUsers: User[] = [
     email: 'david.martinez@email.com',
     name: 'David Martinez',
     role: 'renter',
+    profilePicture: 'https://picsum.photos/400/500?random=6',
+    photos: [
+      'https://picsum.photos/400/500?random=6',
+      'https://picsum.photos/400/500?random=61',
+      'https://picsum.photos/400/500?random=62',
+    ],
     subscription: { plan: 'basic', status: 'active' },
     boostData: { boostsUsed: 0, isBoosted: false },
     profileData: {
@@ -212,6 +239,13 @@ export const mockProfileUsers: User[] = [
     email: 'lisa.thompson@email.com',
     name: 'Lisa Thompson',
     role: 'renter',
+    profilePicture: 'https://picsum.photos/400/500?random=7',
+    photos: [
+      'https://picsum.photos/400/500?random=7',
+      'https://picsum.photos/400/500?random=71',
+      'https://picsum.photos/400/500?random=72',
+      'https://picsum.photos/400/500?random=73',
+    ],
     subscription: { plan: 'plus', status: 'active' },
     boostData: { boostsUsed: 1, isBoosted: true, boostExpiresAt: new Date(Date.now() + 5 * 60 * 60 * 1000), lastBoostDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000) },
     profileData: {
@@ -243,6 +277,14 @@ export const mockProfileUsers: User[] = [
     email: 'james.wilson@email.com',
     name: 'James Wilson',
     role: 'renter',
+    profilePicture: 'https://picsum.photos/400/500?random=8',
+    photos: [
+      'https://picsum.photos/400/500?random=8',
+      'https://picsum.photos/400/500?random=81',
+      'https://picsum.photos/400/500?random=82',
+      'https://picsum.photos/400/500?random=83',
+      'https://picsum.photos/400/500?random=84',
+    ],
     subscription: { plan: 'elite', status: 'active' },
     boostData: { boostsUsed: 3, isBoosted: false },
     profileData: {
@@ -336,7 +378,11 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     bio: 'Software engineer who loves hiking, cooking, and quiet evenings. Looking for a clean and respectful roommate.',
     occupation: 'Software Engineer',
     budget: 1200,
-    photos: ['https://picsum.photos/400/500?random=1'],
+    photos: [
+      'https://picsum.photos/400/500?random=1',
+      'https://picsum.photos/400/500?random=11',
+      'https://picsum.photos/400/500?random=12',
+    ],
     lifestyle: {
       cleanliness: 9,
       socialLevel: 6,
@@ -359,7 +405,12 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     bio: 'Marketing professional, gym enthusiast, and weekend adventurer. Love to host small gatherings!',
     occupation: 'Marketing Manager',
     budget: 1400,
-    photos: ['https://picsum.photos/400/500?random=2'],
+    photos: [
+      'https://picsum.photos/400/500?random=2',
+      'https://picsum.photos/400/500?random=21',
+      'https://picsum.photos/400/500?random=22',
+      'https://picsum.photos/400/500?random=23',
+    ],
     lifestyle: {
       cleanliness: 7,
       socialLevel: 9,
@@ -382,7 +433,13 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     bio: 'Graphic designer working from home. Cat mom, plant lover, and yoga enthusiast.',
     occupation: 'Graphic Designer',
     budget: 1000,
-    photos: ['https://picsum.photos/400/500?random=3'],
+    photos: [
+      'https://picsum.photos/400/500?random=3',
+      'https://picsum.photos/400/500?random=31',
+      'https://picsum.photos/400/500?random=32',
+      'https://picsum.photos/400/500?random=33',
+      'https://picsum.photos/400/500?random=34',
+    ],
     lifestyle: {
       cleanliness: 8,
       socialLevel: 5,
@@ -405,7 +462,12 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     bio: 'Teacher by day, musician by night. Looking for a chill roommate who appreciates good music and great conversations.',
     occupation: 'High School Teacher',
     budget: 1100,
-    photos: ['https://picsum.photos/400/500?random=4'],
+    photos: [
+      'https://picsum.photos/400/500?random=4',
+      'https://picsum.photos/400/500?random=41',
+      'https://picsum.photos/400/500?random=42',
+      'https://picsum.photos/400/500?random=43',
+    ],
     lifestyle: {
       cleanliness: 7,
       socialLevel: 7,
@@ -428,7 +490,14 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     bio: 'Data analyst with a passion for reading and meditation. Enjoys peaceful mornings and weekend brunches.',
     occupation: 'Data Analyst',
     budget: 1300,
-    photos: ['https://picsum.photos/400/500?random=5'],
+    photos: [
+      'https://picsum.photos/400/500?random=5',
+      'https://picsum.photos/400/500?random=51',
+      'https://picsum.photos/400/500?random=52',
+      'https://picsum.photos/400/500?random=53',
+      'https://picsum.photos/400/500?random=54',
+      'https://picsum.photos/400/500?random=55',
+    ],
     lifestyle: {
       cleanliness: 9,
       socialLevel: 4,
@@ -451,7 +520,11 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     bio: 'Finance professional who loves running, cooking, and trying new restaurants. Early riser and weekend explorer.',
     occupation: 'Financial Analyst',
     budget: 1600,
-    photos: ['https://picsum.photos/400/500?random=6'],
+    photos: [
+      'https://picsum.photos/400/500?random=6',
+      'https://picsum.photos/400/500?random=61',
+      'https://picsum.photos/400/500?random=62',
+    ],
     lifestyle: {
       cleanliness: 8,
       socialLevel: 7,
@@ -474,7 +547,12 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     bio: 'Veterinary assistant and dog lover. Looking for a pet-friendly home with outdoor space.',
     occupation: 'Veterinary Assistant',
     budget: 1050,
-    photos: ['https://picsum.photos/400/500?random=7'],
+    photos: [
+      'https://picsum.photos/400/500?random=7',
+      'https://picsum.photos/400/500?random=71',
+      'https://picsum.photos/400/500?random=72',
+      'https://picsum.photos/400/500?random=73',
+    ],
     lifestyle: {
       cleanliness: 8,
       socialLevel: 6,
@@ -497,7 +575,13 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     bio: 'Web developer working remotely. Coffee enthusiast, gamer, and tech geek. Quiet and focused during work hours.',
     occupation: 'Web Developer',
     budget: 1250,
-    photos: ['https://picsum.photos/400/500?random=8'],
+    photos: [
+      'https://picsum.photos/400/500?random=8',
+      'https://picsum.photos/400/500?random=81',
+      'https://picsum.photos/400/500?random=82',
+      'https://picsum.photos/400/500?random=83',
+      'https://picsum.photos/400/500?random=84',
+    ],
     lifestyle: {
       cleanliness: 6,
       socialLevel: 5,
@@ -520,7 +604,12 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     bio: 'Environmental scientist passionate about sustainability. Vegan, minimalist, and nature lover.',
     occupation: 'Environmental Scientist',
     budget: 950,
-    photos: ['https://picsum.photos/400/500?random=9'],
+    photos: [
+      'https://picsum.photos/400/500?random=9',
+      'https://picsum.photos/400/500?random=91',
+      'https://picsum.photos/400/500?random=92',
+      'https://picsum.photos/400/500?random=93',
+    ],
     lifestyle: {
       cleanliness: 9,
       socialLevel: 6,
@@ -543,7 +632,13 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     bio: 'Music producer and DJ. Night owl who loves creative projects and collaborative energy.',
     occupation: 'Music Producer',
     budget: 1150,
-    photos: ['https://picsum.photos/400/500?random=10'],
+    photos: [
+      'https://picsum.photos/400/500?random=10',
+      'https://picsum.photos/400/500?random=101',
+      'https://picsum.photos/400/500?random=102',
+      'https://picsum.photos/400/500?random=103',
+      'https://picsum.photos/400/500?random=104',
+    ],
     lifestyle: {
       cleanliness: 6,
       socialLevel: 8,
@@ -566,7 +661,12 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     bio: 'Graduate student studying architecture. Looking for quiet study space and friendly conversation.',
     occupation: 'Graduate Student',
     budget: 800,
-    photos: ['https://picsum.photos/400/500?random=11'],
+    photos: [
+      'https://picsum.photos/400/500?random=11',
+      'https://picsum.photos/400/500?random=111',
+      'https://picsum.photos/400/500?random=112',
+      'https://picsum.photos/400/500?random=113',
+    ],
     lifestyle: {
       cleanliness: 8,
       socialLevel: 5,
@@ -589,7 +689,13 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     bio: 'Personal trainer and nutrition coach. Active lifestyle, early bird, and meal prep enthusiast.',
     occupation: 'Personal Trainer',
     budget: 1200,
-    photos: ['https://picsum.photos/400/500?random=12'],
+    photos: [
+      'https://picsum.photos/400/500?random=12',
+      'https://picsum.photos/400/500?random=121',
+      'https://picsum.photos/400/500?random=122',
+      'https://picsum.photos/400/500?random=123',
+      'https://picsum.photos/400/500?random=124',
+    ],
     lifestyle: {
       cleanliness: 8,
       socialLevel: 7,
@@ -612,7 +718,11 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     bio: 'Nurse working rotating shifts. Looking for understanding roommate who respects varied schedules.',
     occupation: 'Registered Nurse',
     budget: 1100,
-    photos: ['https://picsum.photos/400/500?random=13'],
+    photos: [
+      'https://picsum.photos/400/500?random=13',
+      'https://picsum.photos/400/500?random=131',
+      'https://picsum.photos/400/500?random=132',
+    ],
     lifestyle: {
       cleanliness: 9,
       socialLevel: 6,
@@ -635,7 +745,14 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     bio: 'Freelance photographer and travel blogger. Adventurous spirit looking for creative and open-minded roommate.',
     occupation: 'Photographer',
     budget: 1000,
-    photos: ['https://picsum.photos/400/500?random=14'],
+    photos: [
+      'https://picsum.photos/400/500?random=14',
+      'https://picsum.photos/400/500?random=141',
+      'https://picsum.photos/400/500?random=142',
+      'https://picsum.photos/400/500?random=143',
+      'https://picsum.photos/400/500?random=144',
+      'https://picsum.photos/400/500?random=145',
+    ],
     lifestyle: {
       cleanliness: 7,
       socialLevel: 8,
