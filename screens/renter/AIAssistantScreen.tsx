@@ -8,6 +8,7 @@ import { Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StorageService } from '../../utils/storage';
 import { RoommateProfile } from '../../types/models';
+import { getZodiacSymbol, getZodiacCompatibilityScore, getZodiacCompatibilityLevel, getZodiacElement } from '../../utils/zodiacUtils';
 
 type AIMessage = {
   id: string;
@@ -35,17 +36,27 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
   }, []);
 
   const sendWelcomeMessage = () => {
+    const userPlan = user?.subscription?.plan || 'basic';
+    const isPremium = userPlan === 'plus' || userPlan === 'elite';
+    
     const welcomeMessage: AIMessage = {
       id: 'welcome',
-      text: `Hi ${user?.name?.split(' ')[0]}! I'm your AI Match Assistant. I can help you find roommates, discover great neighborhoods, recommend restaurants, suggest activities, and give home decor tips. What would you like to explore?`,
+      text: `Hi ${user?.name?.split(' ')[0]}! I'm your AI Match Assistant. I can help you find roommates, discover great neighborhoods, recommend restaurants, suggest activities${isPremium ? ', analyze zodiac compatibility,' : ''} and give home decor tips. What would you like to explore?`,
       isUser: false,
       timestamp: new Date(),
-      suggestions: [
-        'Find roommates in my budget',
-        'Best neighborhoods for me',
-        'What to do around here',
-        'Restaurant recommendations',
-      ],
+      suggestions: isPremium 
+        ? [
+            'Find roommates in my budget',
+            'Zodiac compatibility',
+            'Best neighborhoods for me',
+            'Restaurant recommendations',
+          ]
+        : [
+            'Find roommates in my budget',
+            'Best neighborhoods for me',
+            'What to do around here',
+            'Restaurant recommendations',
+          ],
     };
     setMessages([welcomeMessage]);
   };
@@ -156,12 +167,75 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
       responseText += `• Define personal vs shared spaces clearly\n\n`;
       responseText += `A well-decorated home = happy roommates!`;
       suggestions = ['Budget furniture ideas', 'Plant recommendations', 'Storage solutions'];
+    } else if (lowerMessage.includes('zodiac') || lowerMessage.includes('astrology') || lowerMessage.includes('star sign') || lowerMessage.includes('horoscope')) {
+      const userPlan = user?.subscription?.plan || 'basic';
+      const isPremium = userPlan === 'plus' || userPlan === 'elite';
+      
+      if (!isPremium) {
+        responseText = `Zodiac compatibility insights are available for Plus and Elite members!\n\n`;
+        responseText += `Upgrade to unlock:\n`;
+        responseText += `✨ Detailed zodiac compatibility analysis\n`;
+        responseText += `✨ Element-based matching explanations\n`;
+        responseText += `✨ Personalized astrological insights\n`;
+        responseText += `✨ See zodiac signs on all profiles\n\n`;
+        responseText += `Plus members get full access to these premium features!`;
+        suggestions = ['Upgrade to Plus', 'Tell me about compatibility', 'Find roommates'];
+      } else {
+        const zodiacProfiles = profiles.filter(p => p.zodiacSign).slice(0, 3);
+        responseText = `Let me analyze zodiac compatibility for you!\n\n`;
+        
+        if (user?.zodiacSign) {
+          const userSign = user.zodiacSign;
+          const userElement = getZodiacElement(userSign);
+          responseText += `You're ${getZodiacSymbol(userSign)} ${userSign} (${userElement} sign)\n\n`;
+          
+          if (zodiacProfiles.length > 0) {
+            responseText += `Top zodiac-compatible matches:\n\n`;
+            zodiacProfiles.forEach((p, i) => {
+              if (p.zodiacSign) {
+                const score = getZodiacCompatibilityScore(userSign, p.zodiacSign);
+                const explanation = getZodiacCompatibilityLevel(userSign, p.zodiacSign);
+                const compatLevel = score === 2 ? 'Excellent' : score === 1 ? 'Good' : 'Neutral';
+                responseText += `${i + 1}. ${p.name} ${getZodiacSymbol(p.zodiacSign)} ${p.zodiacSign}\n`;
+                responseText += `   ${compatLevel} - ${explanation}\n\n`;
+              }
+            });
+          }
+          responseText += `Zodiac signs add an extra dimension to roommate compatibility!`;
+        } else {
+          responseText += `You haven't set your zodiac sign yet!\n\n`;
+          responseText += `Add your zodiac sign to unlock:\n`;
+          responseText += `✨ Personalized zodiac compatibility scores\n`;
+          responseText += `✨ Element-based matching insights\n`;
+          responseText += `✨ See how your sign aligns with others\n\n`;
+          responseText += `Go to your profile to add your zodiac sign!`;
+        }
+        
+        suggestions = ['Find compatible roommates', 'Tell me about elements', 'Profile tips'];
+      }
+    } else if (lowerMessage.includes('element') && (lowerMessage.includes('fire') || lowerMessage.includes('earth') || lowerMessage.includes('air') || lowerMessage.includes('water') || lowerMessage.includes('zodiac'))) {
+      responseText = `Zodiac elements explain compatibility patterns:\n\n`;
+      responseText += `🔥 Fire Signs (Aries, Leo, Sagittarius):\n`;
+      responseText += `   Passionate, energetic, spontaneous\n`;
+      responseText += `   Best with: Fire & Air signs\n\n`;
+      responseText += `🌍 Earth Signs (Taurus, Virgo, Capricorn):\n`;
+      responseText += `   Practical, stable, grounded\n`;
+      responseText += `   Best with: Earth & Water signs\n\n`;
+      responseText += `💨 Air Signs (Gemini, Libra, Aquarius):\n`;
+      responseText += `   Social, intellectual, communicative\n`;
+      responseText += `   Best with: Air & Fire signs\n\n`;
+      responseText += `💧 Water Signs (Cancer, Scorpio, Pisces):\n`;
+      responseText += `   Emotional, intuitive, empathetic\n`;
+      responseText += `   Best with: Water & Earth signs\n\n`;
+      responseText += `Elements that complement each other create harmonious living environments!`;
+      suggestions = ['Find zodiac matches', 'What\'s my compatibility?', 'Profile tips'];
     } else {
       responseText = `I can help you with:\n\n`;
       responseText += `🏠 Roommate Matching:\n`;
       responseText += `• Find compatible roommates\n`;
       responseText += `• Budget-based recommendations\n`;
-      responseText += `• Lifestyle compatibility analysis\n\n`;
+      responseText += `• Lifestyle compatibility analysis\n`;
+      responseText += `• Zodiac compatibility insights (Plus/Elite)\n\n`;
       responseText += `📍 Location & Living:\n`;
       responseText += `• Best neighborhoods for your occupation\n`;
       responseText += `• Apartment hunting tips\n`;
@@ -195,6 +269,14 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
       'Shared interests and lifestyle values',
       'Aligned budget and location preferences',
     ];
+    
+    if (profile.zodiacSign && user?.zodiacSign) {
+      const zodiacScore = getZodiacCompatibilityScore(user.zodiacSign, profile.zodiacSign);
+      if (zodiacScore === 2) {
+        reasons.push('Excellent zodiac compatibility with aligned energies');
+      }
+    }
+    
     return reasons[Math.floor(Math.random() * reasons.length)];
   };
 
