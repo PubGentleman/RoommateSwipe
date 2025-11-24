@@ -46,6 +46,7 @@ export const ProfileStackNavigator = () => {
             fontSize: 17,
             fontWeight: '600',
           },
+          headerShadowVisible: true,
           headerBlurEffect: 'regular',
           headerBackVisible: false,
           headerLeft: () => (
@@ -67,6 +68,7 @@ export const ProfileStackNavigator = () => {
             fontSize: 17,
             fontWeight: '600',
           },
+          headerShadowVisible: true,
           headerBlurEffect: 'regular',
           headerBackVisible: false,
           headerLeft: () => (
@@ -124,6 +126,7 @@ export const ProfileStackNavigator = () => {
             fontSize: 17,
             fontWeight: '600',
           },
+          headerShadowVisible: true,
           headerBlurEffect: 'regular',
           headerBackVisible: false,
           headerLeft: () => (
@@ -145,6 +148,7 @@ export const ProfileStackNavigator = () => {
             fontSize: 17,
             fontWeight: '600',
           },
+          headerShadowVisible: true,
           headerBlurEffect: 'regular',
           headerBackVisible: false,
           headerLeft: () => (
@@ -166,6 +170,7 @@ export const ProfileStackNavigator = () => {
             fontSize: 17,
             fontWeight: '600',
           },
+          headerShadowVisible: true,
           headerBlurEffect: 'regular',
           headerBackVisible: false,
           headerLeft: () => (
@@ -187,6 +192,7 @@ export const ProfileStackNavigator = () => {
             fontSize: 17,
             fontWeight: '600',
           },
+          headerShadowVisible: true,
           headerBlurEffect: 'regular',
           headerBackVisible: false,
           headerLeft: () => (
@@ -208,6 +214,7 @@ export const ProfileStackNavigator = () => {
             fontSize: 17,
             fontWeight: '600',
           },
+          headerShadowVisible: true,
           headerBlurEffect: 'regular',
           headerBackVisible: false,
           headerLeft: () => (
