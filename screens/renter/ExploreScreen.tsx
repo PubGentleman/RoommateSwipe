@@ -868,7 +868,7 @@ export const ExploreScreen = () => {
                               const age = hostUser?.age;
                               const zodiacSign = hostUser?.zodiacSign;
                               const ageText = age ? `, ${age}` : '';
-                              const zodiacText = zodiacSign ? ` · ${getZodiacSymbol(zodiacSign)} ${zodiacSign}` : '';
+                              const zodiacText = zodiacSign ? ` ${getZodiacSymbol(zodiacSign)}` : '';
                               return `${selectedProperty.hostName}${ageText}${zodiacText}`;
                             }
                             return selectedProperty.hostName;

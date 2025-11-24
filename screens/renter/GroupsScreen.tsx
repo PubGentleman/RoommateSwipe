@@ -682,7 +682,7 @@ export const GroupsScreen = () => {
             {memberProfiles.map(profile => (
               <View key={profile.id} style={styles.memberRow}>
                 <ThemedText style={Typography.body}>
-                  {profile.name || 'Unknown'}{profile.age ? `, ${profile.age}` : ''}{profile.zodiacSign ? ` · ${getZodiacSymbol(profile.zodiacSign)} ${profile.zodiacSign}` : ''} {getGenderSymbol(profile.gender)}
+                  {profile.name || 'Unknown'}{profile.age ? `, ${profile.age}` : ''}{profile.zodiacSign ? ` ${getZodiacSymbol(profile.zodiacSign)}` : ''} {getGenderSymbol(profile.gender)}
                 </ThemedText>
                 {isCreator && profile.id !== user?.id ? (
                   <Pressable onPress={() => handleRemoveMember(group.id, profile.id, profile.name || 'Member')}>
@@ -702,7 +702,7 @@ export const GroupsScreen = () => {
             {pendingProfiles.map(profile => (
               <View key={profile.id} style={styles.pendingRow}>
                 <ThemedText style={Typography.body}>
-                  {profile.name || 'Unknown'}{profile.age ? `, ${profile.age}` : ''}{profile.zodiacSign ? ` · ${getZodiacSymbol(profile.zodiacSign)} ${profile.zodiacSign}` : ''} {getGenderSymbol(profile.gender)}
+                  {profile.name || 'Unknown'}{profile.age ? `, ${profile.age}` : ''}{profile.zodiacSign ? ` ${getZodiacSymbol(profile.zodiacSign)}` : ''} {getGenderSymbol(profile.gender)}
                 </ThemedText>
                 <View style={styles.pendingActions}>
                   <Pressable
@@ -1360,7 +1360,7 @@ export const GroupsScreen = () => {
                       return profile ? (
                         <View key={memberId} style={styles.memberRow}>
                           <ThemedText style={Typography.body}>
-                            {profile.name}{profile.age ? `, ${profile.age}` : ''}{profile.zodiacSign ? ` · ${getZodiacSymbol(profile.zodiacSign)} ${profile.zodiacSign}` : ''} {getGenderSymbol(profile.gender)}
+                            {profile.name}{profile.age ? `, ${profile.age}` : ''}{profile.zodiacSign ? ` ${getZodiacSymbol(profile.zodiacSign)}` : ''} {getGenderSymbol(profile.gender)}
                           </ThemedText>
                         </View>
                       ) : null;
@@ -1488,7 +1488,7 @@ export const GroupsScreen = () => {
                 ) : null}
                 
                 <View style={styles.memberProfileSection}>
-                  <ThemedText style={[Typography.h2]}>{selectedMember.name}, {selectedMember.age}{selectedMember.zodiacSign ? ` · ${getZodiacSymbol(selectedMember.zodiacSign)} ${selectedMember.zodiacSign}` : ''}</ThemedText>
+                  <ThemedText style={[Typography.h2]}>{selectedMember.name}, {selectedMember.age}{selectedMember.zodiacSign ? ` ${getZodiacSymbol(selectedMember.zodiacSign)}` : ''}</ThemedText>
                   <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
                     {selectedMember.occupation}
                   </ThemedText>
