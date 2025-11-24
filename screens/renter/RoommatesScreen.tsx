@@ -268,6 +268,14 @@ export const RoommatesScreen = () => {
     }
   };
 
+  const tap = Gesture.Tap()
+    .onEnd(() => {
+      runOnJS(setShowProfileDetail)(true);
+      if (currentProfile && user && currentProfile.id !== user.id) {
+        runOnJS(StorageService.addProfileView)(currentProfile.id, user.id);
+      }
+    });
+
   const pan = Gesture.Pan()
     .onChange((event) => {
       translateX.value = event.translationX;
@@ -286,6 +294,8 @@ export const RoommatesScreen = () => {
         rotation.value = withSpring(0);
       }
     });
+
+  const composedGesture = Gesture.Race(tap, pan);
 
   if (isLoading) {
     return (
@@ -477,7 +487,7 @@ export const RoommatesScreen = () => {
       </View>
 
       <View style={styles.cardContainer}>
-        <GestureDetector gesture={pan}>
+        <GestureDetector gesture={composedGesture}>
           <Animated.View
             style={[styles.card, animatedCardStyle]}
           >
@@ -487,17 +497,6 @@ export const RoommatesScreen = () => {
                 <View style={[styles.onlineIndicator, { backgroundColor: theme.success }]} />
               </View>
             ) : null}
-            <Pressable 
-              onPress={() => {
-                setShowProfileDetail(true);
-                if (currentProfile && user && currentProfile.id !== user.id) {
-                  StorageService.addProfileView(currentProfile.id, user.id);
-                }
-              }}
-              style={[styles.infoButton, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
-            >
-              <Feather name="info" size={20} color="#FFFFFF" />
-            </Pressable>
             <View style={styles.gradient}>
               {isBoosted ? (
                 <View style={styles.boostBadgeLeft}>

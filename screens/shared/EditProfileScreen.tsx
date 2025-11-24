@@ -82,8 +82,9 @@ const DraggablePhoto = ({ photo, index, photos, theme, onRemove, onMoveLeft, onM
           </View>
         ) : null}
         <Pressable
-          style={[styles.removePhotoButton, { backgroundColor: theme.error }]}
-          onPress={() => {
+          style={[styles.removePhotoButton, { backgroundColor: theme.error, zIndex: 1 }]}
+          onPress={(e) => {
+            e.stopPropagation();
             console.log('[DraggablePhoto] Remove button clicked, index:', index);
             onRemove(index);
           }}
@@ -91,31 +92,33 @@ const DraggablePhoto = ({ photo, index, photos, theme, onRemove, onMoveLeft, onM
           <Feather name="x" size={16} color="#FFFFFF" />
         </Pressable>
         
-        <View style={styles.reorderButtons} pointerEvents="box-none">
+        <View style={[styles.reorderButtons, { zIndex: 1000 }]} pointerEvents="box-none">
           {index > 0 ? (
             <Pressable
               pointerEvents="auto"
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              style={[styles.reorderButton, { backgroundColor: 'rgba(0, 0, 0, 0.6)', zIndex: 100 }]}
-              onPress={() => {
+              hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+              style={[styles.reorderButton, { backgroundColor: 'rgba(0, 0, 0, 0.7)' }]}
+              onPress={(e) => {
+                e.stopPropagation();
                 console.log('[DraggablePhoto] Left arrow clicked, index:', index);
                 onMoveLeft(index);
               }}
             >
-              <Feather name="chevron-left" size={20} color="#FFFFFF" />
+              <Feather name="chevron-left" size={22} color="#FFFFFF" />
             </Pressable>
           ) : null}
           {index < photos.length - 1 ? (
             <Pressable
               pointerEvents="auto"
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              style={[styles.reorderButton, { backgroundColor: 'rgba(0, 0, 0, 0.6)', zIndex: 100 }]}
-              onPress={() => {
+              hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+              style={[styles.reorderButton, { backgroundColor: 'rgba(0, 0, 0, 0.7)' }]}
+              onPress={(e) => {
+                e.stopPropagation();
                 console.log('[DraggablePhoto] Right arrow clicked, index:', index);
                 onMoveRight(index);
               }}
             >
-              <Feather name="chevron-right" size={20} color="#FFFFFF" />
+              <Feather name="chevron-right" size={22} color="#FFFFFF" />
             </Pressable>
           ) : null}
         </View>
