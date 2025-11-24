@@ -2,6 +2,7 @@ export interface RoommateProfile {
   id: string;
   name: string;
   age: number;
+  zodiacSign?: ZodiacSign;
   gender?: 'male' | 'female' | 'other';
   bio: string;
   occupation: string;

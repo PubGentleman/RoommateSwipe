@@ -1,5 +1,6 @@
 import { User, RoommateProfile } from '../types/models';
 import { isNearbyNeighborhood, isSameCity } from './locationData';
+import { getZodiacCompatibilityScore } from './zodiacUtils';
 
 /**
  * Format location for display with privacy in mind
@@ -76,6 +77,7 @@ export interface MatchScore {
     roommateRelationship: number;
     lifestyle: number;
     occupation: number;
+    zodiac: number;
   };
   reasons: {
     strengths: string[];
@@ -115,6 +117,7 @@ export const calculateDetailedCompatibility = (
     roommateRelationship: 0,
     lifestyle: 0,
     occupation: 0,
+    zodiac: 0,
   };
 
   const reasons = {
@@ -438,6 +441,18 @@ export const calculateDetailedCompatibility = (
     }
   } else {
     breakdown.occupation = 0;
+  }
+
+  // ========================================
+  // 13. ZODIAC SIGN (2 points max) - Fun Factor, Very Light Weight
+  // Only applies if BOTH users have zodiac signs selected
+  // ========================================
+  if (currentUser.zodiacSign && roommateProfile.zodiacSign) {
+    const zodiacScore = getZodiacCompatibilityScore(currentUser.zodiacSign, roommateProfile.zodiacSign);
+    breakdown.zodiac = zodiacScore;
+    // Note: No reason added - this is a fun factor, not a deal-breaker
+  } else {
+    breakdown.zodiac = 0;
   }
 
   // Calculate total score
