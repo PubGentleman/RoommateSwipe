@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
 import { ThemedText } from '../../components/ThemedText';
 import { ScreenScrollView } from '../../components/ScreenScrollView';
@@ -8,13 +7,9 @@ import { Typography, Spacing } from '../../constants/theme';
 
 export default function TermsOfServiceScreen() {
   const { theme } = useTheme();
-  const insets = useSafeAreaInsets();
 
   return (
-    <ScreenScrollView 
-      style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
-      contentContainerStyle={{ paddingTop: insets.top + 100 }}
-    >
+    <ScreenScrollView style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <View style={styles.content}>
         <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.xxl }]}>
           Last Updated: November 23, 2025

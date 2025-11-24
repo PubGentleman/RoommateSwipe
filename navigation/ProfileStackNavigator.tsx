@@ -163,19 +163,17 @@ export const ProfileStackNavigator = () => {
         component={TermsOfServiceScreen}
         options={({ navigation }) => ({
           headerShown: true,
-          headerTransparent: true,
+          headerTransparent: false,
           headerTitle: 'Terms of Service',
-          headerTintColor: '#FFFFFF',
           headerTitleStyle: {
             fontSize: 17,
             fontWeight: '600',
           },
           headerShadowVisible: true,
-          headerBlurEffect: 'regular',
           headerBackVisible: false,
           headerLeft: () => (
             <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
-              <Feather name="chevron-left" size={28} color="#FFFFFF" />
+              <Feather name="chevron-left" size={28} />
             </Pressable>
           ),
         })}
@@ -185,19 +183,17 @@ export const ProfileStackNavigator = () => {
         component={AboutScreen}
         options={({ navigation }) => ({
           headerShown: true,
-          headerTransparent: true,
+          headerTransparent: false,
           headerTitle: 'About Roomdr',
-          headerTintColor: '#FFFFFF',
           headerTitleStyle: {
             fontSize: 17,
             fontWeight: '600',
           },
           headerShadowVisible: true,
-          headerBlurEffect: 'regular',
           headerBackVisible: false,
           headerLeft: () => (
             <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
-              <Feather name="chevron-left" size={28} color="#FFFFFF" />
+              <Feather name="chevron-left" size={28} />
             </Pressable>
           ),
         })}
