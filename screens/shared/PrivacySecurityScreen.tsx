@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Pressable, TextInput, Switch, Modal } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -9,12 +9,13 @@ import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
 import { Spacing, BorderRadius, Typography } from '../../constants/theme';
+import { StorageService } from '../../utils/storage';
 
 type PrivacySecurityScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'PrivacySecurity'>;
 
 export const PrivacySecurityScreen = () => {
   const { theme } = useTheme();
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const navigation = useNavigation<PrivacySecurityScreenNavigationProp>();
   
   const [showPasswordSection, setShowPasswordSection] = useState(false);
@@ -31,10 +32,47 @@ export const PrivacySecurityScreen = () => {
   const [showPasswordSuccessModal, setShowPasswordSuccessModal] = useState(false);
   const [passwordError, setPasswordError] = useState('');
 
-  const handleChangePassword = () => {
-    if (!currentPassword || !newPassword || !confirmPassword) {
+  useEffect(() => {
+    if (user?.privacySettings) {
+      setProfileVisible(user.privacySettings.profileVisible ?? true);
+      setShowOnlineStatus(user.privacySettings.showOnlineStatus ?? true);
+      setShowLastActive(user.privacySettings.showLastActive ?? false);
+      setTwoFactorAuth(user.privacySettings.twoFactorEnabled ?? false);
+    }
+  }, [user]);
+
+  const updatePrivacySettings = async (settings: Partial<NonNullable<typeof user.privacySettings>>) => {
+    if (!user) return;
+
+    const updatedSettings = {
+      profileVisible: settings.profileVisible ?? profileVisible,
+      showOnlineStatus: settings.showOnlineStatus ?? showOnlineStatus,
+      showLastActive: settings.showLastActive ?? showLastActive,
+      twoFactorEnabled: settings.twoFactorEnabled ?? twoFactorAuth,
+    };
+
+    await updateUser({
+      privacySettings: updatedSettings,
+    });
+  };
+
+  const handleChangePassword = async () => {
+    if (!user) return;
+
+    if (!newPassword || !confirmPassword) {
       setPasswordError('Please fill in all password fields');
       return;
+    }
+
+    if (user.password) {
+      if (!currentPassword) {
+        setPasswordError('Please enter your current password');
+        return;
+      }
+      if (currentPassword !== user.password) {
+        setPasswordError('Current password is incorrect');
+        return;
+      }
     }
 
     if (newPassword.length < 8) {
@@ -46,6 +84,10 @@ export const PrivacySecurityScreen = () => {
       setPasswordError('New passwords do not match');
       return;
     }
+
+    await updateUser({
+      password: newPassword,
+    });
 
     setPasswordError('');
     setCurrentPassword('');
@@ -59,8 +101,13 @@ export const PrivacySecurityScreen = () => {
     setShowDeleteModal(true);
   };
 
-  const confirmDeleteAccount = () => {
+  const confirmDeleteAccount = async () => {
+    if (!user) return;
+
     setShowDeleteModal(false);
+
+    await StorageService.deleteUser(user.id);
+
     logout();
   };
 
@@ -172,7 +219,10 @@ export const PrivacySecurityScreen = () => {
           icon="shield"
           label="Two-Factor Authentication"
           value={twoFactorAuth}
-          onValueChange={setTwoFactorAuth}
+          onValueChange={async (value: boolean) => {
+            setTwoFactorAuth(value);
+            await updatePrivacySettings({ twoFactorEnabled: value });
+          }}
         />
       </View>
 
@@ -185,21 +235,30 @@ export const PrivacySecurityScreen = () => {
           icon="eye"
           label="Profile Visible to Others"
           value={profileVisible}
-          onValueChange={setProfileVisible}
+          onValueChange={async (value: boolean) => {
+            setProfileVisible(value);
+            await updatePrivacySettings({ profileVisible: value });
+          }}
         />
 
         <SwitchItem
           icon="circle"
           label="Show Online Status"
           value={showOnlineStatus}
-          onValueChange={setShowOnlineStatus}
+          onValueChange={async (value: boolean) => {
+            setShowOnlineStatus(value);
+            await updatePrivacySettings({ showOnlineStatus: value });
+          }}
         />
 
         <SwitchItem
           icon="clock"
           label="Show Last Active Time"
           value={showLastActive}
-          onValueChange={setShowLastActive}
+          onValueChange={async (value: boolean) => {
+            setShowLastActive(value);
+            await updatePrivacySettings({ showLastActive: value });
+          }}
         />
       </View>
 
@@ -274,11 +333,11 @@ export const PrivacySecurityScreen = () => {
                 </Pressable>
                 
                 <Pressable
-                  style={[styles.modalButton, { backgroundColor: '#DC2626' }]}
+                  style={[styles.modalButton, styles.deleteModalButton]}
                   onPress={confirmDeleteAccount}
                 >
                   <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>
-                    Delete Account
+                    Delete
                   </ThemedText>
                 </Pressable>
               </View>
@@ -301,10 +360,10 @@ export const PrivacySecurityScreen = () => {
             
             <View style={styles.modalContent}>
               <ThemedText style={[Typography.h2, { textAlign: 'center', marginBottom: Spacing.sm }]}>
-                Password Changed
+                Password Updated
               </ThemedText>
               <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary, marginBottom: Spacing.xl }]}>
-                Your password has been changed successfully.
+                Your password has been successfully changed.
               </ThemedText>
               
               <Pressable
@@ -331,10 +390,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.medium,
-    borderWidth: 1,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
     marginBottom: Spacing.sm,
+    borderWidth: 1,
   },
   menuItemLeft: {
     flexDirection: 'row',
@@ -342,40 +401,40 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   passwordSection: {
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.medium,
-    borderWidth: 1,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
     marginTop: Spacing.sm,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.md,
+    borderWidth: 1,
   },
   input: {
     borderWidth: 1,
-    borderRadius: BorderRadius.small,
+    borderRadius: BorderRadius.sm,
     padding: Spacing.md,
     marginBottom: Spacing.md,
     fontSize: 16,
   },
   changePasswordButton: {
     padding: Spacing.md,
-    borderRadius: BorderRadius.small,
+    borderRadius: BorderRadius.sm,
     alignItems: 'center',
     marginTop: Spacing.sm,
+  },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    marginBottom: Spacing.md,
+    borderWidth: 1,
   },
   deleteButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.medium,
-    borderWidth: 2,
-  },
-  errorBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
     padding: Spacing.md,
-    borderRadius: BorderRadius.small,
-    borderWidth: 1,
-    marginBottom: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 2,
   },
   modalOverlay: {
     flex: 1,
@@ -385,27 +444,32 @@ const styles = StyleSheet.create({
     padding: Spacing.xl,
   },
   modalContainer: {
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.xl,
     width: '100%',
     maxWidth: 400,
-    borderRadius: BorderRadius.large,
-    overflow: 'hidden',
   },
   modalHeader: {
     alignItems: 'center',
-    paddingTop: Spacing.xl,
-    paddingBottom: Spacing.lg,
+    marginBottom: Spacing.lg,
   },
   modalContent: {
-    padding: Spacing.xl,
+    alignItems: 'center',
   },
   modalButtons: {
     flexDirection: 'row',
     gap: Spacing.md,
+    width: '100%',
   },
   modalButton: {
     flex: 1,
     padding: Spacing.md,
-    borderRadius: BorderRadius.small,
+    borderRadius: BorderRadius.md,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  deleteModalButton: {
+    backgroundColor: '#DC2626',
   },
 });

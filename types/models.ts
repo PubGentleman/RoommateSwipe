@@ -130,6 +130,7 @@ export interface Match {
 export interface User {
   id: string;
   email: string;
+  password?: string;
   name: string;
   age?: number;
   role: 'renter' | 'host' | 'agent';
@@ -150,6 +151,12 @@ export interface User {
     expiryMonth: number;
     expiryYear: number;
   }>;
+  privacySettings?: {
+    profileVisible: boolean;
+    showOnlineStatus: boolean;
+    showLastActive: boolean;
+    twoFactorEnabled: boolean;
+  };
   messageCount?: number;
   boostData?: {
     boostsUsed: number;

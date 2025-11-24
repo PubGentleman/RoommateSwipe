@@ -1073,4 +1073,91 @@ export const StorageService = {
       console.error('Error seeding mock notifications:', error);
     }
   },
+
+  async deleteUser(userId: string): Promise<void> {
+    try {
+      const users = await this.getUsers();
+      const filteredUsers = users.filter(u => u.id !== userId);
+      await AsyncStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(filteredUsers));
+
+      const profiles = await this.getRoommateProfiles();
+      const filteredProfiles = profiles.filter(p => p.id !== userId);
+      await this.setRoommateProfiles(filteredProfiles);
+
+      const conversations = await this.getConversations();
+      const filteredConversations = conversations.filter(c => c.participant.id !== userId);
+      await this.setConversations(filteredConversations);
+
+      const matches = await this.getMatches();
+      const filteredMatches = matches.filter(m => m.userId1 !== userId && m.userId2 !== userId);
+      await this.setMatches(filteredMatches);
+
+      const applications = await this.getApplications();
+      const filteredApplications = applications.filter(a => a.applicantId !== userId);
+      await this.setApplications(filteredApplications);
+
+      const groups = await this.getGroups();
+      const updatedGroups = groups.map(g => ({
+        ...g,
+        members: g.members.filter(id => id !== userId),
+        pendingMembers: g.pendingMembers.filter(id => id !== userId),
+      })).filter(g => g.createdBy !== userId);
+      await this.setGroups(updatedGroups);
+
+      const swipeHistoryData = await AsyncStorage.getItem(STORAGE_KEYS.SWIPE_HISTORY);
+      if (swipeHistoryData) {
+        const swipeHistory = JSON.parse(swipeHistoryData);
+        const filteredHistory = Array.isArray(swipeHistory)
+          ? swipeHistory.filter((id: string) => id !== userId)
+          : swipeHistory;
+        await AsyncStorage.setItem(STORAGE_KEYS.SWIPE_HISTORY, JSON.stringify(filteredHistory));
+      }
+
+      const likesData = await AsyncStorage.getItem(STORAGE_KEYS.LIKES);
+      if (likesData) {
+        const likes: Record<string, string[]> = JSON.parse(likesData);
+        delete likes[userId];
+        Object.keys(likes).forEach(uid => {
+          likes[uid] = likes[uid].filter(likedId => likedId !== userId);
+        });
+        await AsyncStorage.setItem(STORAGE_KEYS.LIKES, JSON.stringify(likes));
+      }
+
+      const savedPropsData = await AsyncStorage.getItem(STORAGE_KEYS.SAVED_PROPERTIES);
+      if (savedPropsData) {
+        const savedProperties: Record<string, string[]> = JSON.parse(savedPropsData);
+        delete savedProperties[userId];
+        await AsyncStorage.setItem(STORAGE_KEYS.SAVED_PROPERTIES, JSON.stringify(savedProperties));
+      }
+
+      const notificationsData = await AsyncStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
+      if (notificationsData) {
+        const notifications = JSON.parse(notificationsData);
+        const filteredNotifications = notifications.filter((n: any) => n.userId !== userId);
+        await AsyncStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(filteredNotifications));
+      }
+
+      const remainingUsers = await this.getUsers();
+      const updatedRemainingUsers = remainingUsers.map(u => {
+        if (u.profileViews) {
+          u.profileViews = u.profileViews.filter(v => v.viewerId !== userId);
+        }
+        if (u.receivedLikes) {
+          u.receivedLikes = u.receivedLikes.filter(l => l.likerId !== userId);
+        }
+        if (u.receivedSuperLikes) {
+          u.receivedSuperLikes = u.receivedSuperLikes.filter(sl => sl.superLikerId !== userId);
+        }
+        return u;
+      });
+      await AsyncStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(updatedRemainingUsers));
+
+      await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+
+      console.log('[StorageService] Successfully deleted user:', userId);
+    } catch (error) {
+      console.error('[StorageService] Error deleting user:', error);
+      throw error;
+    }
+  },
 };

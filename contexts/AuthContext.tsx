@@ -166,6 +166,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       mockUser = {
         id: Math.random().toString(36).substr(2, 9),
         email,
+        password,
         name: email.split('@')[0],
         role,
         subscription: {
@@ -181,18 +182,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } : undefined,
       };
       await StorageService.addOrUpdateUser(mockUser);
-    } else if (role === 'renter' && !mockUser.profileData?.city) {
-      mockUser = {
-        ...mockUser,
-        profileData: {
-          ...mockUser.profileData,
-          neighborhood: 'Williamsburg',
-          city: 'New York',
-          state: 'NY',
-          coordinates: { lat: 40.7081, lng: -73.9571 },
-        },
-      };
-      await StorageService.addOrUpdateUser(mockUser);
+    } else {
+      if (mockUser.password && mockUser.password !== password) {
+        throw new Error('Invalid password');
+      }
+      
+      let needsUpdate = false;
+      if (!mockUser.password) {
+        mockUser = {
+          ...mockUser,
+          password,
+        };
+        needsUpdate = true;
+      }
+      if (role === 'renter' && !mockUser.profileData?.city) {
+        mockUser = {
+          ...mockUser,
+          profileData: {
+            ...mockUser.profileData,
+            neighborhood: 'Williamsburg',
+            city: 'New York',
+            state: 'NY',
+            coordinates: { lat: 40.7081, lng: -73.9571 },
+          },
+        };
+        needsUpdate = true;
+      }
+      if (needsUpdate) {
+        await StorageService.addOrUpdateUser(mockUser);
+      }
     }
     
     await StorageService.setCurrentUser(mockUser);
@@ -207,6 +225,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const mockUser: User = {
       id: Math.random().toString(36).substr(2, 9),
       email,
+      password,
       name,
       role,
       subscription: {
