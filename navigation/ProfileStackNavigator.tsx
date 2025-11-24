@@ -139,19 +139,17 @@ export const ProfileStackNavigator = () => {
         component={PrivacyPolicyScreen}
         options={({ navigation }) => ({
           headerShown: true,
-          headerTransparent: true,
+          headerTransparent: false,
           headerTitle: 'Privacy Policy',
-          headerTintColor: '#FFFFFF',
           headerTitleStyle: {
             fontSize: 17,
             fontWeight: '600',
           },
           headerShadowVisible: true,
-          headerBlurEffect: 'regular',
           headerBackVisible: false,
           headerLeft: () => (
             <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
-              <Feather name="chevron-left" size={28} color="#FFFFFF" />
+              <Feather name="chevron-left" size={28} />
             </Pressable>
           ),
         })}

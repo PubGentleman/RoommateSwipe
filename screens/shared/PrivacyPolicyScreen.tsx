@@ -9,7 +9,10 @@ export default function PrivacyPolicyScreen() {
   const { theme } = useTheme();
 
   return (
-    <ScreenScrollView style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+    <ScreenScrollView 
+      style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
+      contentContainerStyle={{ paddingTop: Spacing.xl }}
+    >
       <View style={styles.content}>
         <ThemedText style={[Typography.h1, { marginBottom: Spacing.xl }]}>
           Privacy Policy
