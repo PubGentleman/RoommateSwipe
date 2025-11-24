@@ -1021,7 +1021,7 @@ export const RoommatesScreen = () => {
               </Pressable>
             </View>
             
-            {/* Photo gallery outside vertical ScrollView */}
+            {/* Photo gallery */}
             {(() => {
               const photosArray = Array.isArray(currentProfile.photos) 
                 ? currentProfile.photos 
