@@ -13,6 +13,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
 import { Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { calculateZodiacFromBirthday } from '../../utils/zodiacUtils';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 const DraggablePhoto = ({ photo, index, photos, theme, onRemove, onReorder }: any) => {
   const translateX = useSharedValue(0);
@@ -105,6 +106,20 @@ export const EditProfileScreen = () => {
   const [name, setName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
   const [birthday, setBirthday] = useState(user?.birthday || '');
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [datePickerDate, setDatePickerDate] = useState(() => {
+    if (user?.birthday) {
+      const parts = user.birthday.includes('-') ? user.birthday.split('-') : [];
+      if (parts.length === 3) {
+        if (parts[0].length === 4) {
+          return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+        } else {
+          return new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
+        }
+      }
+    }
+    return new Date(2000, 0, 1);
+  });
   
   useEffect(() => {
     console.log('[EditProfileScreen] User object changed:', {
@@ -231,6 +246,20 @@ export const EditProfileScreen = () => {
     }
   };
 
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(Platform.OS === 'ios');
+    
+    if (selectedDate) {
+      setDatePickerDate(selectedDate);
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const day = String(selectedDate.getDate()).padStart(2, '0');
+      const year = selectedDate.getFullYear();
+      const formattedDate = `${month}-${day}-${year}`;
+      setBirthday(formattedDate);
+      console.log('[EditProfileScreen] Birthday set:', formattedDate);
+    }
+  };
+
   const handleSave = async () => {
     if (!name.trim()) {
       Alert.alert('Error', 'Please enter your name');
@@ -245,6 +274,11 @@ export const EditProfileScreen = () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       Alert.alert('Error', 'Please enter a valid email address');
+      return;
+    }
+
+    if (!birthday.trim()) {
+      Alert.alert('Error', 'Please enter your birthday');
       return;
     }
 
@@ -422,15 +456,35 @@ export const EditProfileScreen = () => {
 
           <View style={styles.inputGroup}>
             <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
-              Birthday (optional)
+              Birthday *
             </ThemedText>
-            <TextInput
-              style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
-              placeholder="YYYY-MM-DD (e.g., 1995-08-15)"
-              placeholderTextColor={theme.textSecondary}
-              value={birthday}
-              onChangeText={setBirthday}
-            />
+            <View style={styles.birthdayInputContainer}>
+              <TextInput
+                style={[styles.birthdayInput, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
+                placeholder="MM-DD-YYYY (e.g., 08-15-1995)"
+                placeholderTextColor={theme.textSecondary}
+                value={birthday}
+                onChangeText={setBirthday}
+              />
+              {Platform.OS !== 'web' && (
+                <Pressable
+                  style={[styles.calendarButton, { backgroundColor: theme.primary }]}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Feather name="calendar" size={20} color="#FFFFFF" />
+                </Pressable>
+              )}
+            </View>
+            {Platform.OS !== 'web' && showDatePicker && (
+              <DateTimePicker
+                value={datePickerDate}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={handleDateChange}
+                maximumDate={new Date()}
+                minimumDate={new Date(1900, 0, 1)}
+              />
+            )}
             <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
               Your zodiac sign will be calculated automatically from your birthday
             </ThemedText>
@@ -817,5 +871,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: Spacing.lg,
     marginBottom: Spacing.xxl,
+  },
+  birthdayInputContainer: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    alignItems: 'center',
+  },
+  birthdayInput: {
+    flex: 1,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.small,
+    fontSize: 16,
+    borderWidth: 1,
+  },
+  calendarButton: {
+    width: 48,
+    height: 48,
+    borderRadius: BorderRadius.small,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

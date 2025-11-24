@@ -26,13 +26,17 @@ Preferred communication style: Simple, everyday language.
 
 Roomdr utilizes a comprehensive points-based compatibility system (0-100 score) across 12 weighted factors, with location being a major determinant through neighborhood proximity mapping. It provides detailed breakdowns with strengths, concerns, and notes for each match. Key factors include Location, Budget, Sleep Schedule, Cleanliness, Smoking/Substances, Work Location, Guest Policy, Noise Tolerance, Pets, Roommate Relationship, Lifestyle Tags, and Zodiac Sign (optional). The system calculates scores in real-time and dynamically color-codes compatibility (Green 80%+, Blue 70%+, Orange 60%+, Red <60%). Note: Occupation scoring was removed to accommodate zodiac while maintaining the 100-point total.
 
-**Zodiac Sign Matching:**
-- Optional field allowing users to select from 12 Western zodiac signs (Aries through Pisces)
-- Light weight in compatibility algorithm (2 points max, ~1-2% of total score)
-- Only applies when both users have zodiac signs selected
-- Element-based compatibility: Fire, Earth, Air, Water
+**Birthday & Zodiac Sign System:**
+- Birthday is a REQUIRED field for all users (mandatory validation before profile save)
+- Format: MM-DD-YYYY (e.g., 08-15-1995)
+- Calendar picker available on iOS/Android (native DateTimePicker component from @react-native-community/datetimepicker)
+- Web version uses text input only (DateTimePicker not supported on web)
+- Zodiac sign automatically calculated from birthday using calculateZodiacFromBirthday utility
+- Supports both MM-DD-YYYY and YYYY-MM-DD formats for backward compatibility
+- Zodiac matching: Light weight in compatibility algorithm (2 points max, ~1-2% of total score)
+- Element-based compatibility: Fire, Earth, Air, Water (12 Western zodiac signs)
 - Premium feature: Plus/Elite users see detailed zodiac compatibility insights in profile detail view
-- Displays as "Age · ♌ Leo" format in profile cards when present
+- Displays as "Age · ♌ Leo" format in profile cards when zodiac present
 
 ## Frontend Architecture
 

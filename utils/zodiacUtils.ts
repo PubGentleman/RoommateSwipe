@@ -126,7 +126,23 @@ export const getZodiacCompatibilityLevel = (
 export const calculateZodiacFromBirthday = (birthday: string): ZodiacSign | undefined => {
   if (!birthday) return undefined;
   
-  const date = new Date(birthday);
+  let date: Date;
+  
+  if (birthday.includes('-')) {
+    const parts = birthday.split('-');
+    if (parts.length === 3) {
+      if (parts[0].length === 4) {
+        date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      } else {
+        date = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
+      }
+    } else {
+      return undefined;
+    }
+  } else {
+    date = new Date(birthday);
+  }
+  
   if (isNaN(date.getTime())) return undefined;
   
   const month = date.getMonth() + 1;
