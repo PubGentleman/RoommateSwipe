@@ -13,6 +13,7 @@ import { Property, PropertyFilter, User, RoommateProfile } from '../../types/mod
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { formatMoveInDate, calculateCompatibility, getMatchQualityColor, getGenderSymbol, formatLocation } from '../../utils/matchingAlgorithm';
+import { getZodiacSymbol } from '../../utils/zodiacUtils';
 import { NEIGHBORHOODS, getAllCities } from '../../utils/locationData';
 
 const COMMON_AMENITIES = [
@@ -865,7 +866,10 @@ export const ExploreScreen = () => {
                             if (selectedProperty.hostProfileId) {
                               const hostUser = hostProfiles.get(selectedProperty.hostProfileId);
                               const age = hostUser?.age;
-                              return age ? `${selectedProperty.hostName}, ${age}` : selectedProperty.hostName;
+                              const zodiacSign = hostUser?.zodiacSign;
+                              const ageText = age ? `, ${age}` : '';
+                              const zodiacText = zodiacSign ? ` · ${getZodiacSymbol(zodiacSign)} ${zodiacSign}` : '';
+                              return `${selectedProperty.hostName}${ageText}${zodiacText}`;
                             }
                             return selectedProperty.hostName;
                           })()}
