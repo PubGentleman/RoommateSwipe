@@ -268,14 +268,6 @@ export const RoommatesScreen = () => {
     }
   };
 
-  const tap = Gesture.Tap()
-    .onEnd(() => {
-      runOnJS(setShowProfileDetail)(true);
-      if (currentProfile && user && currentProfile.id !== user.id) {
-        runOnJS(StorageService.addProfileView)(currentProfile.id, user.id);
-      }
-    });
-
   const pan = Gesture.Pan()
     .onChange((event) => {
       translateX.value = event.translationX;
@@ -295,7 +287,18 @@ export const RoommatesScreen = () => {
       }
     });
 
-  const composedGesture = Gesture.Race(tap, pan);
+  const tap = Gesture.Tap()
+    .maxDistance(10)
+    .maxDuration(200)
+    .requireExternalGestureToFail(pan)
+    .onEnd(() => {
+      runOnJS(setShowProfileDetail)(true);
+      if (currentProfile && user && currentProfile.id !== user.id) {
+        runOnJS(StorageService.addProfileView)(currentProfile.id, user.id);
+      }
+    });
+
+  const composedGesture = Gesture.Exclusive(tap, pan);
 
   if (isLoading) {
     return (
@@ -491,22 +494,13 @@ export const RoommatesScreen = () => {
           <Animated.View
             style={[styles.card, animatedCardStyle]}
           >
-            <Pressable 
-              onPress={() => {
-                setShowProfileDetail(true);
-                if (currentProfile && user && currentProfile.id !== user.id) {
-                  StorageService.addProfileView(currentProfile.id, user.id);
-                }
-              }}
-              style={StyleSheet.absoluteFill}
-            >
-              <Image source={{ uri: currentProfile.photos[0] }} style={styles.cardImage} />
-              {canSeeOnlineStatus() && isProfileOnline ? (
-                <View style={styles.onlineIndicatorContainer}>
-                  <View style={[styles.onlineIndicator, { backgroundColor: theme.success }]} />
-                </View>
-              ) : null}
-              <View style={styles.gradient} pointerEvents="none">
+            <Image source={{ uri: currentProfile.photos[0] }} resizeMode="cover" style={styles.cardImage} />
+            {canSeeOnlineStatus() && isProfileOnline ? (
+              <View style={styles.onlineIndicatorContainer}>
+                <View style={[styles.onlineIndicator, { backgroundColor: theme.success }]} />
+              </View>
+            ) : null}
+            <View style={styles.gradient} pointerEvents="none">
               {isBoosted ? (
                 <View style={styles.boostBadgeLeft}>
                   <View style={[styles.boostBadge, { backgroundColor: '#FFD700' }]}>
@@ -549,7 +543,6 @@ export const RoommatesScreen = () => {
                 </View>
               </View>
             </View>
-            </Pressable>
           </Animated.View>
         </GestureDetector>
       </View>

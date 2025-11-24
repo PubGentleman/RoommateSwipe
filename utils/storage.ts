@@ -14,6 +14,7 @@ const STORAGE_KEYS = {
   LIKES: '@roomdr/likes',
   SAVED_PROPERTIES: '@roomdr/saved_properties',
   NOTIFICATIONS: '@roomdr/notifications',
+  MOCK_DATA_VERSION: '@roomdr/mock_data_version',
 };
 
 let notificationIdCounter = 0;
@@ -761,6 +762,27 @@ export const StorageService = {
 
   async initializeWithMockData(): Promise<void> {
     try {
+      const { MOCK_DATA_VERSION, mockRoommateProfiles, mockProperties, mockGroups, mockProfileUsers } = await import('./mockData');
+      
+      const storedVersion = await AsyncStorage.getItem(STORAGE_KEYS.MOCK_DATA_VERSION);
+      const versionChanged = storedVersion !== MOCK_DATA_VERSION;
+      
+      if (versionChanged) {
+        console.log(`[StorageService] Mock data version changed (${storedVersion} → ${MOCK_DATA_VERSION}), reloading...`);
+        await this.setRoommateProfiles(mockRoommateProfiles);
+        await this.setProperties(mockProperties);
+        await this.setGroups(mockGroups);
+        
+        await AsyncStorage.removeItem(STORAGE_KEYS.USERS);
+        for (const profileUser of mockProfileUsers) {
+          await this.addOrUpdateUser(profileUser);
+        }
+        
+        await AsyncStorage.setItem(STORAGE_KEYS.MOCK_DATA_VERSION, MOCK_DATA_VERSION);
+        console.log('[StorageService] ✓ Mock data reloaded due to version change');
+        return;
+      }
+      
       const existingProperties = await this.getProperties();
       const existingProfiles = await this.getRoommateProfiles();
       const existingGroups = await this.getGroups();
@@ -776,8 +798,6 @@ export const StorageService = {
       if (existingProperties.length > 0 && !hasWalkScores) {
         console.log('[StorageService] Detected missing walkScore data, reloading properties...');
       }
-      
-      const { mockRoommateProfiles, mockProperties, mockGroups, mockProfileUsers } = await import('./mockData');
       
       console.log('[StorageService] Loading fresh mock data...');
       await this.setRoommateProfiles(mockRoommateProfiles);
@@ -800,6 +820,7 @@ export const StorageService = {
         console.log('[StorageService] Users already exist, preserving user data');
       }
       
+      await AsyncStorage.setItem(STORAGE_KEYS.MOCK_DATA_VERSION, MOCK_DATA_VERSION);
       console.log('[StorageService] Mock data initialization complete!');
     } catch (error) {
       console.error('Error initializing with mock data:', error);
