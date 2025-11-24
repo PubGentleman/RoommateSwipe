@@ -105,11 +105,21 @@ export const EditProfileScreen = () => {
   const [photos, setPhotos] = useState<string[]>(user?.photos || [user?.profilePicture].filter(Boolean) as string[] || []);
   const [name, setName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
-  const [birthday, setBirthday] = useState(user?.birthday || '');
+  const [birthday, setBirthday] = useState(() => {
+    if (user?.birthday) {
+      const parts = user.birthday.split('-');
+      if (parts.length === 3 && parts[0].length === 4) {
+        return `${parts[1]}/${parts[2]}/${parts[0]}`;
+      }
+      return user.birthday.replace(/-/g, '/');
+    }
+    return '';
+  });
+  const [birthdayError, setBirthdayError] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [datePickerDate, setDatePickerDate] = useState(() => {
     if (user?.birthday) {
-      const parts = user.birthday.includes('-') ? user.birthday.split('-') : [];
+      const parts = user.birthday.split('-');
       if (parts.length === 3) {
         if (parts[0].length === 4) {
           return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
@@ -246,6 +256,58 @@ export const EditProfileScreen = () => {
     }
   };
 
+  const validateBirthday = (dateString: string): { valid: boolean; error: string; date?: Date } => {
+    if (!dateString.trim()) {
+      return { valid: false, error: 'Please enter your date of birth' };
+    }
+
+    const dateRegex = /^(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])\/\d{4}$/;
+    if (!dateRegex.test(dateString)) {
+      return { valid: false, error: 'Invalid format. Use MM/DD/YYYY (e.g., 08/15/1995)' };
+    }
+
+    const [month, day, year] = dateString.split('/').map(num => parseInt(num));
+    const date = new Date(year, month - 1, day);
+
+    if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+      return { valid: false, error: 'Invalid date. Please check the day and month' };
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (date > today) {
+      return { valid: false, error: 'Date of birth cannot be in the future' };
+    }
+
+    const age = Math.floor((today.getTime() - date.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+    if (age < 18) {
+      return { valid: false, error: 'You must be at least 18 years old' };
+    }
+
+    return { valid: true, error: '', date };
+  };
+
+  const convertToStorageFormat = (dateString: string): string => {
+    const [month, day, year] = dateString.split('/');
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  };
+
+  const handleBirthdayChange = (text: string) => {
+    setBirthday(text);
+    if (birthdayError) {
+      setBirthdayError('');
+    }
+  };
+
+  const handleBirthdayBlur = () => {
+    if (birthday.trim()) {
+      const validation = validateBirthday(birthday);
+      if (!validation.valid) {
+        setBirthdayError(validation.error);
+      }
+    }
+  };
+
   const handleDateChange = (event: any, selectedDate?: Date) => {
     setShowDatePicker(Platform.OS === 'ios');
     
@@ -254,8 +316,14 @@ export const EditProfileScreen = () => {
       const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
       const day = String(selectedDate.getDate()).padStart(2, '0');
       const year = selectedDate.getFullYear();
-      const formattedDate = `${month}-${day}-${year}`;
+      const formattedDate = `${month}/${day}/${year}`;
       setBirthday(formattedDate);
+      setBirthdayError('');
+      
+      const validation = validateBirthday(formattedDate);
+      if (!validation.valid) {
+        setBirthdayError(validation.error);
+      }
       console.log('[EditProfileScreen] Birthday set:', formattedDate);
     }
   };
@@ -277,23 +345,26 @@ export const EditProfileScreen = () => {
       return;
     }
 
-    if (!birthday.trim()) {
-      Alert.alert('Error', 'Please enter your birthday');
+    const birthdayValidation = validateBirthday(birthday);
+    if (!birthdayValidation.valid) {
+      setBirthdayError(birthdayValidation.error);
+      Alert.alert('Error', birthdayValidation.error);
       return;
     }
 
     setIsSaving(true);
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    const zodiacSign = birthday ? calculateZodiacFromBirthday(birthday) : undefined;
+    const birthdayStorageFormat = convertToStorageFormat(birthday);
+    const zodiacSign = birthdayStorageFormat ? calculateZodiacFromBirthday(birthdayStorageFormat) : undefined;
     
     console.log('[EditProfileScreen] Saving profile with photos:', photos);
-    console.log('[EditProfileScreen] Calculated zodiac sign from birthday:', { birthday, zodiacSign });
+    console.log('[EditProfileScreen] Calculated zodiac sign from birthday:', { birthday: birthdayStorageFormat, zodiacSign });
     
     await updateUser({
       name: name.trim(),
       email: email.trim(),
-      birthday: birthday.trim() || undefined,
+      birthday: birthdayStorageFormat,
       zodiacSign,
       photos,
       profilePicture: photos[0] || undefined,
@@ -456,15 +527,22 @@ export const EditProfileScreen = () => {
 
           <View style={styles.inputGroup}>
             <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
-              Birthday *
+              Date of Birth *
             </ThemedText>
             <View style={styles.birthdayInputContainer}>
               <TextInput
-                style={[styles.birthdayInput, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
-                placeholder="MM-DD-YYYY (e.g., 08-15-1995)"
+                style={[styles.birthdayInput, { 
+                  backgroundColor: theme.backgroundSecondary, 
+                  color: theme.text, 
+                  borderColor: birthdayError ? theme.error : theme.border,
+                  borderWidth: birthdayError ? 2 : 1
+                }]}
+                placeholder="MM/DD/YYYY (e.g., 08/15/1995)"
                 placeholderTextColor={theme.textSecondary}
                 value={birthday}
-                onChangeText={setBirthday}
+                onChangeText={handleBirthdayChange}
+                onBlur={handleBirthdayBlur}
+                keyboardType="numbers-and-punctuation"
               />
               {Platform.OS !== 'web' && (
                 <Pressable
@@ -485,9 +563,15 @@ export const EditProfileScreen = () => {
                 minimumDate={new Date(1900, 0, 1)}
               />
             )}
-            <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
-              Your zodiac sign will be calculated automatically from your birthday
-            </ThemedText>
+            {birthdayError ? (
+              <ThemedText style={[Typography.caption, { color: theme.error, marginTop: Spacing.xs }]}>
+                {birthdayError}
+              </ThemedText>
+            ) : (
+              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
+                Must be 18+ years old. Format: MM/DD/YYYY
+              </ThemedText>
+            )}
           </View>
 
           <View style={styles.inputGroup}>
@@ -672,7 +756,7 @@ export const EditProfileScreen = () => {
             <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
               What are you looking for?
             </ThemedText>
-            <View style={styles.optionRow}>
+            <View style={styles.optionsRow}>
               <OptionButton label="Room" value="room" isSelected={lookingFor === 'room'} onPress={() => setLookingFor('room')} />
               <OptionButton label="Entire Apartment" value="entire_apartment" isSelected={lookingFor === 'entire_apartment'} onPress={() => setLookingFor('entire_apartment')} />
             </View>

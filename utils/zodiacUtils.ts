@@ -139,6 +139,17 @@ export const calculateZodiacFromBirthday = (birthday: string): ZodiacSign | unde
     } else {
       return undefined;
     }
+  } else if (birthday.includes('/')) {
+    const parts = birthday.split('/');
+    if (parts.length === 3) {
+      if (parts[2].length === 4) {
+        date = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
+      } else {
+        date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      }
+    } else {
+      return undefined;
+    }
   } else {
     date = new Date(birthday);
   }
