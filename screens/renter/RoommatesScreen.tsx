@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, Image, Pressable, Dimensions, Modal, useWindowDimensions, Platform, ScrollView } from 'react-native';
+import { View, StyleSheet, Image, Pressable, Dimensions, Modal, useWindowDimensions, Platform, ScrollView, FlatList } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS, interpolate } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
@@ -1025,27 +1025,32 @@ export const RoommatesScreen = () => {
                 ? currentProfile.photos 
                 : currentProfile.photos 
                   ? [currentProfile.photos]
-                  : [currentProfile.photos && currentProfile.photos[0]].filter(Boolean);
+                  : [];
               
               return (
                 <>
-                  <ScrollView 
-                    horizontal 
-                    pagingEnabled 
+                  <FlatList
+                    data={photosArray}
+                    horizontal
+                    pagingEnabled
                     showsHorizontalScrollIndicator={false}
                     style={styles.photosScrollContainer}
-                    scrollEnabled={true}
-                  >
-                    {photosArray.map((photo, index) => (
-                      <View key={`photo-${index}`} style={styles.photoPage}>
+                    keyExtractor={(item, index) => `photo-${index}`}
+                    renderItem={({ item }) => (
+                      <View style={styles.photoPage}>
                         <Image 
-                          source={{ uri: photo }} 
+                          source={{ uri: item }} 
                           style={styles.detailImage}
                           resizeMode="contain"
                         />
                       </View>
-                    ))}
-                  </ScrollView>
+                    )}
+                    getItemLayout={(data, index) => ({
+                      length: SCREEN_WIDTH,
+                      offset: SCREEN_WIDTH * index,
+                      index,
+                    })}
+                  />
                   {photosArray.length > 1 ? (
                     <View style={styles.photoIndicatorContainer}>
                       <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
