@@ -97,19 +97,17 @@ export const ProfileStackNavigator = () => {
         component={PrivacySecurityScreen}
         options={({ navigation }) => ({
           headerShown: true,
-          headerTransparent: true,
+          headerTransparent: false,
           headerTitle: 'Privacy & Security',
-          headerTintColor: '#FFFFFF',
           headerTitleStyle: {
             fontSize: 17,
             fontWeight: '600',
           },
-          headerShadowVisible: false,
-          headerBlurEffect: 'regular',
+          headerShadowVisible: true,
           headerBackVisible: false,
           headerLeft: () => (
-            <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={{ marginLeft: 8 }}>
-              <Feather name="chevron-left" size={28} color="#FFFFFF" />
+            <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
+              <Feather name="chevron-left" size={28} />
             </Pressable>
           ),
         })}
