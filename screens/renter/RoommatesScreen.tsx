@@ -1443,13 +1443,13 @@ const styles = StyleSheet.create({
     height: 400,
   },
   photoPage: {
-    width: '100%',
+    width: SCREEN_WIDTH,
     height: 400,
     justifyContent: 'center',
     alignItems: 'center',
   },
   detailImage: {
-    width: '100%',
+    width: SCREEN_WIDTH,
     height: 400,
   },
   photoIndicatorContainer: {
