@@ -1045,7 +1045,7 @@ export const RoommatesScreen = () => {
                           key={`photo-${index}`} 
                           source={{ uri: photo }} 
                           style={styles.detailImage}
-                          resizeMode="cover"
+                          resizeMode="contain"
                         />
                       ))}
                     </ScrollView>
@@ -1441,10 +1441,11 @@ const styles = StyleSheet.create({
   },
   photosScrollContainer: {
     width: '100%',
+    height: 400,
   },
   detailImage: {
     width: SCREEN_WIDTH,
-    height: 300,
+    height: 400,
   },
   photoIndicatorContainer: {
     padding: Spacing.md,
