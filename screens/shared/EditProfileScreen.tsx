@@ -13,7 +13,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
 import { Spacing, BorderRadius, Typography } from '../../constants/theme';
 
-const DraggablePhoto = ({ photo, index, photos, theme, onRemove, onMoveLeft, onMoveRight, onReorder }: any) => {
+const DraggablePhoto = ({ photo, index, photos, theme, onRemove, onReorder }: any) => {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const scale = useSharedValue(1);
@@ -82,46 +82,14 @@ const DraggablePhoto = ({ photo, index, photos, theme, onRemove, onMoveLeft, onM
           </View>
         ) : null}
         <Pressable
-          style={[styles.removePhotoButton, { backgroundColor: theme.error, zIndex: 1 }]}
-          onPress={(e) => {
-            e.stopPropagation();
+          style={[styles.removePhotoButton, { backgroundColor: theme.error }]}
+          onPress={() => {
             console.log('[DraggablePhoto] Remove button clicked, index:', index);
             onRemove(index);
           }}
         >
           <Feather name="x" size={16} color="#FFFFFF" />
         </Pressable>
-        
-        <View style={[styles.reorderButtons, { zIndex: 1000 }]} pointerEvents="box-none">
-          {index > 0 ? (
-            <Pressable
-              pointerEvents="auto"
-              hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-              style={[styles.reorderButton, { backgroundColor: 'rgba(0, 0, 0, 0.7)' }]}
-              onPress={(e) => {
-                e.stopPropagation();
-                console.log('[DraggablePhoto] Left arrow clicked, index:', index);
-                onMoveLeft(index);
-              }}
-            >
-              <Feather name="chevron-left" size={22} color="#FFFFFF" />
-            </Pressable>
-          ) : null}
-          {index < photos.length - 1 ? (
-            <Pressable
-              pointerEvents="auto"
-              hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-              style={[styles.reorderButton, { backgroundColor: 'rgba(0, 0, 0, 0.7)' }]}
-              onPress={(e) => {
-                e.stopPropagation();
-                console.log('[DraggablePhoto] Right arrow clicked, index:', index);
-                onMoveRight(index);
-              }}
-            >
-              <Feather name="chevron-right" size={22} color="#FFFFFF" />
-            </Pressable>
-          ) : null}
-        </View>
       </Animated.View>
     </GestureDetector>
   );
@@ -247,23 +215,6 @@ export const EditProfileScreen = () => {
     setPhotos(photos.filter((_, i) => i !== index));
   };
 
-  const movePhotoLeft = (index: number) => {
-    console.log('[EditProfile] movePhotoLeft called, index:', index, 'photos length:', photos.length);
-    if (index === 0) return;
-    const newPhotos = [...photos];
-    [newPhotos[index - 1], newPhotos[index]] = [newPhotos[index], newPhotos[index - 1]];
-    console.log('[EditProfile] New photo order:', newPhotos.map((p, i) => `${i}: ${p.substring(p.length - 10)}`));
-    setPhotos(newPhotos);
-  };
-
-  const movePhotoRight = (index: number) => {
-    console.log('[EditProfile] movePhotoRight called, index:', index, 'photos length:', photos.length);
-    if (index === photos.length - 1) return;
-    const newPhotos = [...photos];
-    [newPhotos[index], newPhotos[index + 1]] = [newPhotos[index + 1], newPhotos[index]];
-    console.log('[EditProfile] New photo order:', newPhotos.map((p, i) => `${i}: ${p.substring(p.length - 10)}`));
-    setPhotos(newPhotos);
-  };
 
   const toggleLifestyle = (item: 'active_gym' | 'homebody' | 'nightlife_social' | 'quiet_introverted' | 'creative_artistic' | 'professional_focused') => {
     if (lifestyle.includes(item)) {
@@ -392,7 +343,7 @@ export const EditProfileScreen = () => {
         <View style={styles.section}>
           <ThemedText style={[Typography.h3, styles.sectionTitle]}>Profile Photos</ThemedText>
           <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.md }]}>
-            Add up to 6 photos. Long press and drag to reorder, or use arrow buttons. Your first photo will be your main profile picture.
+            Add up to 6 photos. Long press and drag to reorder. Your first photo will be your main profile picture.
           </ThemedText>
           
           <ScrollView 
@@ -409,8 +360,6 @@ export const EditProfileScreen = () => {
                 photos={photos}
                 theme={theme}
                 onRemove={removePhoto}
-                onMoveLeft={movePhotoLeft}
-                onMoveRight={movePhotoRight}
                 onReorder={setPhotos}
               />
             ))}
