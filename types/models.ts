@@ -248,14 +248,14 @@ export interface User {
       cookingFrequency?: string;
       cleaningPreference?: string;
       furnishedPreference?: string;
-      guestFrequency?: string;
-      workSchedule?: string;
-      sleepSchedule?: string;
-      noisePreference?: string;
-      cleanlinessImportance?: string;
-      smokingPreference?: string;
       stayLength?: string;
-      roommateVibe?: string;
+      morningRoutine?: string;
+      temperaturePreference?: string;
+      kitchenSharing?: string;
+      parkingNeed?: string;
+      commonAreaUsage?: string;
+      communicationStyle?: string;
+      allergiesRestrictions?: string;
     };
   };
 }

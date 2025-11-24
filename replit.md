@@ -139,10 +139,22 @@ The current implementation uses mock data and TypeScript interfaces for data mod
 **AI Match Assistant Micro-Questions:**
 - Intelligent system that asks occasional micro-questions to refine user matching profiles
 - Only asks ONE question per session with 24-hour cooldown between questions
-- 12 question types covering privacy, cooking, cleaning, furnishing, guests, work schedule, sleep patterns, noise tolerance, cleanliness, smoking, stay length, and roommate vibe preferences
+- 12 unique question types that complement (not duplicate) the Edit Profile screen:
+  - Privacy importance and alone time preferences
+  - Cooking frequency at home
+  - Cleaning schedule preferences (scheduled vs flexible)
+  - Furnished vs unfurnished preference
+  - Short-term vs long-term stay plans
+  - Morning bathroom routine duration
+  - Temperature preferences (warmer vs cooler)
+  - Kitchen sharing comfort level
+  - Parking/vehicle needs
+  - Common area vs room usage patterns
+  - Communication style (in-person vs text)
+  - Allergies and dietary restrictions
 - Automatically parses user responses using natural language processing to extract preferences
-- Updates both `aiAssistantData.microQuestionPreferences` and `profileData.preferences` fields
-- Syncs answers with existing matching algorithm fields (sleepSchedule, cleanliness, guestPolicy, noiseTolerance, smoking, workLocation, roommateRelationship)
+- Updates `aiAssistantData.microQuestionPreferences` with conversation-based insights
+- Does NOT duplicate questions already available in Edit Profile (sleep schedule, cleanliness, guests, noise, smoking, work location, roommate vibe, pets)
 - Tracks questions asked via `aiAssistantData.questionsAsked` to avoid repetition
 - Questions appear naturally in conversation flow, non-intrusive and optional
 - Provides confirmation feedback when preferences are updated

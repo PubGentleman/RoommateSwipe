@@ -11,75 +11,75 @@ export interface MicroQuestion {
 export const MICRO_QUESTIONS: MicroQuestion[] = [
   {
     id: 'privacy',
-    question: 'How important is privacy to you?',
+    question: 'How important is personal privacy and alone time to you?',
     category: 'privacyImportance',
     keywords: ['privacy', 'private', 'alone', 'personal space'],
   },
   {
     id: 'cooking',
-    question: 'Do you cook at home often?',
+    question: 'How often do you cook at home?',
     category: 'cookingFrequency',
     keywords: ['cook', 'cooking', 'kitchen', 'meals', 'food'],
   },
   {
     id: 'cleaning_schedule',
-    question: 'How do you feel about shared cleaning schedules?',
+    question: 'Do you prefer a set cleaning schedule or a more flexible approach?',
     category: 'cleaningPreference',
     keywords: ['clean', 'cleaning', 'schedule', 'chores', 'tidy'],
   },
   {
     id: 'furnished',
-    question: 'Do you prefer a furnished or unfurnished room?',
+    question: 'Would you prefer a furnished or unfurnished place?',
     category: 'furnishedPreference',
     keywords: ['furnished', 'furniture', 'unfurnished', 'room'],
   },
   {
-    id: 'guests',
-    question: 'Do you host guests often?',
-    category: 'guestFrequency',
-    keywords: ['guests', 'visitors', 'friends over', 'host'],
-  },
-  {
-    id: 'work',
-    question: 'Do you work from home or outside the home?',
-    category: 'workSchedule',
-    keywords: ['work', 'wfh', 'office', 'remote', 'home'],
-  },
-  {
-    id: 'sleep',
-    question: 'Are you an early bird or night owl?',
-    category: 'sleepSchedule',
-    keywords: ['sleep', 'early', 'late', 'night', 'morning'],
-  },
-  {
-    id: 'noise',
-    question: 'How quiet do you prefer your home environment to be?',
-    category: 'noisePreference',
-    keywords: ['quiet', 'noise', 'loud', 'sound', 'music'],
-  },
-  {
-    id: 'cleanliness_importance',
-    question: 'How important is apartment cleanliness to you?',
-    category: 'cleanlinessImportance',
-    keywords: ['cleanliness', 'clean', 'messy', 'tidy', 'organized'],
-  },
-  {
-    id: 'smoking',
-    question: 'Do you smoke or prefer non-smoking roommates?',
-    category: 'smokingPreference',
-    keywords: ['smoke', 'smoking', 'cigarette', 'vape'],
-  },
-  {
     id: 'stay_length',
-    question: 'How long do you plan to stay in your next room?',
+    question: 'Are you looking for a short-term or long-term living situation?',
     category: 'stayLength',
-    keywords: ['stay', 'length', 'duration', 'months', 'years', 'lease'],
+    keywords: ['stay', 'length', 'duration', 'months', 'years', 'lease', 'short', 'long'],
   },
   {
-    id: 'vibe',
-    question: 'What is your ideal roommate\'s vibe — outgoing or more reserved?',
-    category: 'roommateVibe',
-    keywords: ['vibe', 'outgoing', 'reserved', 'social', 'introverted', 'extroverted'],
+    id: 'morning_routine',
+    question: 'Do you have a morning bathroom routine that takes a while?',
+    category: 'morningRoutine',
+    keywords: ['morning', 'bathroom', 'routine', 'shower', 'ready'],
+  },
+  {
+    id: 'temperature',
+    question: 'Do you prefer a warmer or cooler apartment temperature?',
+    category: 'temperaturePreference',
+    keywords: ['temperature', 'warm', 'cool', 'heat', 'ac', 'thermostat'],
+  },
+  {
+    id: 'kitchen_sharing',
+    question: 'How do you feel about sharing kitchen space and appliances?',
+    category: 'kitchenSharing',
+    keywords: ['kitchen', 'cooking', 'share', 'appliances', 'fridge'],
+  },
+  {
+    id: 'parking',
+    question: 'Do you need parking or own a vehicle?',
+    category: 'parkingNeed',
+    keywords: ['parking', 'car', 'vehicle', 'garage', 'street'],
+  },
+  {
+    id: 'common_area',
+    question: 'How much time do you spend in common areas versus your room?',
+    category: 'commonAreaUsage',
+    keywords: ['common', 'living room', 'shared space', 'hang out'],
+  },
+  {
+    id: 'communication',
+    question: 'Do you prefer to communicate about house matters in person or via text?',
+    category: 'communicationStyle',
+    keywords: ['communication', 'text', 'talk', 'message', 'discuss'],
+  },
+  {
+    id: 'allergies',
+    question: 'Do you have any allergies or dietary restrictions we should know about?',
+    category: 'allergiesRestrictions',
+    keywords: ['allergies', 'dietary', 'restrictions', 'food', 'sensitivities'],
   },
 ];
 
@@ -166,120 +166,6 @@ export const parseAnswerAndUpdatePreferences = async (
       }
       break;
       
-    case 'guestFrequency':
-      if (lowerAnswer.includes('often') || lowerAnswer.includes('frequently') || lowerAnswer.includes('yes')) {
-        updatedUser.aiAssistantData.microQuestionPreferences.guestFrequency = 'frequently';
-        if (updatedUser.profileData?.preferences) {
-          updatedUser.profileData.preferences.guestPolicy = 'frequently';
-        }
-      } else if (lowerAnswer.includes('sometimes') || lowerAnswer.includes('occasionally')) {
-        updatedUser.aiAssistantData.microQuestionPreferences.guestFrequency = 'occasionally';
-        if (updatedUser.profileData?.preferences) {
-          updatedUser.profileData.preferences.guestPolicy = 'occasionally';
-        }
-      } else {
-        updatedUser.aiAssistantData.microQuestionPreferences.guestFrequency = 'rarely';
-        if (updatedUser.profileData?.preferences) {
-          updatedUser.profileData.preferences.guestPolicy = 'rarely';
-        }
-      }
-      break;
-      
-    case 'workSchedule':
-      if (lowerAnswer.includes('home') || lowerAnswer.includes('wfh') || lowerAnswer.includes('remote')) {
-        updatedUser.aiAssistantData.microQuestionPreferences.workSchedule = 'work_from_home';
-        if (updatedUser.profileData?.preferences) {
-          updatedUser.profileData.preferences.workLocation = 'wfh_fulltime';
-        }
-      } else if (lowerAnswer.includes('hybrid') || lowerAnswer.includes('both')) {
-        updatedUser.aiAssistantData.microQuestionPreferences.workSchedule = 'hybrid';
-        if (updatedUser.profileData?.preferences) {
-          updatedUser.profileData.preferences.workLocation = 'hybrid';
-        }
-      } else {
-        updatedUser.aiAssistantData.microQuestionPreferences.workSchedule = 'office';
-        if (updatedUser.profileData?.preferences) {
-          updatedUser.profileData.preferences.workLocation = 'office_fulltime';
-        }
-      }
-      break;
-      
-    case 'sleepSchedule':
-      if (lowerAnswer.includes('early') || lowerAnswer.includes('morning')) {
-        updatedUser.aiAssistantData.microQuestionPreferences.sleepSchedule = 'early_bird';
-        if (updatedUser.profileData?.preferences) {
-          updatedUser.profileData.preferences.sleepSchedule = 'early_sleeper';
-        }
-      } else if (lowerAnswer.includes('night') || lowerAnswer.includes('late')) {
-        updatedUser.aiAssistantData.microQuestionPreferences.sleepSchedule = 'night_owl';
-        if (updatedUser.profileData?.preferences) {
-          updatedUser.profileData.preferences.sleepSchedule = 'late_sleeper';
-        }
-      } else {
-        updatedUser.aiAssistantData.microQuestionPreferences.sleepSchedule = 'flexible';
-        if (updatedUser.profileData?.preferences) {
-          updatedUser.profileData.preferences.sleepSchedule = 'flexible';
-        }
-      }
-      break;
-      
-    case 'noisePreference':
-      if (lowerAnswer.includes('very quiet') || lowerAnswer.includes('quiet') || lowerAnswer.includes('silent')) {
-        updatedUser.aiAssistantData.microQuestionPreferences.noisePreference = 'very_quiet';
-        if (updatedUser.profileData?.preferences) {
-          updatedUser.profileData.preferences.noiseTolerance = 'prefer_quiet';
-        }
-      } else if (lowerAnswer.includes('loud') || lowerAnswer.includes('noisy')) {
-        updatedUser.aiAssistantData.microQuestionPreferences.noisePreference = 'okay_with_noise';
-        if (updatedUser.profileData?.preferences) {
-          updatedUser.profileData.preferences.noiseTolerance = 'loud_environments';
-        }
-      } else {
-        updatedUser.aiAssistantData.microQuestionPreferences.noisePreference = 'moderate';
-        if (updatedUser.profileData?.preferences) {
-          updatedUser.profileData.preferences.noiseTolerance = 'normal_noise';
-        }
-      }
-      break;
-      
-    case 'cleanlinessImportance':
-      if (lowerAnswer.includes('very') || lowerAnswer.includes('extremely') || lowerAnswer.includes('important')) {
-        updatedUser.aiAssistantData.microQuestionPreferences.cleanlinessImportance = 'very_important';
-        if (updatedUser.profileData?.preferences) {
-          updatedUser.profileData.preferences.cleanliness = 'very_tidy';
-        }
-      } else if (lowerAnswer.includes('somewhat') || lowerAnswer.includes('moderately')) {
-        updatedUser.aiAssistantData.microQuestionPreferences.cleanlinessImportance = 'moderately_important';
-        if (updatedUser.profileData?.preferences) {
-          updatedUser.profileData.preferences.cleanliness = 'moderately_tidy';
-        }
-      } else {
-        updatedUser.aiAssistantData.microQuestionPreferences.cleanlinessImportance = 'not_important';
-        if (updatedUser.profileData?.preferences) {
-          updatedUser.profileData.preferences.cleanliness = 'relaxed';
-        }
-      }
-      break;
-      
-    case 'smokingPreference':
-      if (lowerAnswer.includes('yes') || lowerAnswer.includes('smoke')) {
-        updatedUser.aiAssistantData.microQuestionPreferences.smokingPreference = 'yes';
-        if (updatedUser.profileData?.preferences) {
-          updatedUser.profileData.preferences.smoking = 'yes';
-        }
-      } else if (lowerAnswer.includes('outside') || lowerAnswer.includes('outdoor')) {
-        updatedUser.aiAssistantData.microQuestionPreferences.smokingPreference = 'outside_only';
-        if (updatedUser.profileData?.preferences) {
-          updatedUser.profileData.preferences.smoking = 'only_outside';
-        }
-      } else {
-        updatedUser.aiAssistantData.microQuestionPreferences.smokingPreference = 'no';
-        if (updatedUser.profileData?.preferences) {
-          updatedUser.profileData.preferences.smoking = 'no';
-        }
-      }
-      break;
-      
     case 'stayLength':
       if (lowerAnswer.includes('year') || lowerAnswer.includes('long')) {
         updatedUser.aiAssistantData.microQuestionPreferences.stayLength = 'long_term';
@@ -290,22 +176,69 @@ export const parseAnswerAndUpdatePreferences = async (
       }
       break;
       
-    case 'roommateVibe':
-      if (lowerAnswer.includes('outgoing') || lowerAnswer.includes('social') || lowerAnswer.includes('extroverted')) {
-        updatedUser.aiAssistantData.microQuestionPreferences.roommateVibe = 'outgoing';
-        if (updatedUser.profileData?.preferences) {
-          updatedUser.profileData.preferences.roommateRelationship = 'prefer_friends';
-        }
-      } else if (lowerAnswer.includes('reserved') || lowerAnswer.includes('quiet') || lowerAnswer.includes('introverted')) {
-        updatedUser.aiAssistantData.microQuestionPreferences.roommateVibe = 'reserved';
-        if (updatedUser.profileData?.preferences) {
-          updatedUser.profileData.preferences.roommateRelationship = 'respectful_coliving';
-        }
+    case 'morningRoutine':
+      if (lowerAnswer.includes('yes') || lowerAnswer.includes('long') || lowerAnswer.includes('while')) {
+        updatedUser.aiAssistantData.microQuestionPreferences.morningRoutine = 'takes_time';
+      } else if (lowerAnswer.includes('quick') || lowerAnswer.includes('short')) {
+        updatedUser.aiAssistantData.microQuestionPreferences.morningRoutine = 'quick';
       } else {
-        updatedUser.aiAssistantData.microQuestionPreferences.roommateVibe = 'balanced';
-        if (updatedUser.profileData?.preferences) {
-          updatedUser.profileData.preferences.roommateRelationship = 'occasional_hangouts';
-        }
+        updatedUser.aiAssistantData.microQuestionPreferences.morningRoutine = 'moderate';
+      }
+      break;
+      
+    case 'temperaturePreference':
+      if (lowerAnswer.includes('warm') || lowerAnswer.includes('hot') || lowerAnswer.includes('heat')) {
+        updatedUser.aiAssistantData.microQuestionPreferences.temperaturePreference = 'warmer';
+      } else if (lowerAnswer.includes('cool') || lowerAnswer.includes('cold') || lowerAnswer.includes('ac')) {
+        updatedUser.aiAssistantData.microQuestionPreferences.temperaturePreference = 'cooler';
+      } else {
+        updatedUser.aiAssistantData.microQuestionPreferences.temperaturePreference = 'moderate';
+      }
+      break;
+      
+    case 'kitchenSharing':
+      if (lowerAnswer.includes('great') || lowerAnswer.includes('fine') || lowerAnswer.includes('okay') || lowerAnswer.includes('yes')) {
+        updatedUser.aiAssistantData.microQuestionPreferences.kitchenSharing = 'comfortable';
+      } else if (lowerAnswer.includes('prefer') || lowerAnswer.includes('careful')) {
+        updatedUser.aiAssistantData.microQuestionPreferences.kitchenSharing = 'cautious';
+      } else {
+        updatedUser.aiAssistantData.microQuestionPreferences.kitchenSharing = 'neutral';
+      }
+      break;
+      
+    case 'parkingNeed':
+      if (lowerAnswer.includes('yes') || lowerAnswer.includes('need') || lowerAnswer.includes('car') || lowerAnswer.includes('vehicle')) {
+        updatedUser.aiAssistantData.microQuestionPreferences.parkingNeed = 'yes_need';
+      } else {
+        updatedUser.aiAssistantData.microQuestionPreferences.parkingNeed = 'no_need';
+      }
+      break;
+      
+    case 'commonAreaUsage':
+      if (lowerAnswer.includes('lot') || lowerAnswer.includes('often') || lowerAnswer.includes('much')) {
+        updatedUser.aiAssistantData.microQuestionPreferences.commonAreaUsage = 'frequently';
+      } else if (lowerAnswer.includes('sometimes') || lowerAnswer.includes('occasionally')) {
+        updatedUser.aiAssistantData.microQuestionPreferences.commonAreaUsage = 'occasionally';
+      } else {
+        updatedUser.aiAssistantData.microQuestionPreferences.commonAreaUsage = 'rarely';
+      }
+      break;
+      
+    case 'communicationStyle':
+      if (lowerAnswer.includes('person') || lowerAnswer.includes('face') || lowerAnswer.includes('talk')) {
+        updatedUser.aiAssistantData.microQuestionPreferences.communicationStyle = 'in_person';
+      } else if (lowerAnswer.includes('text') || lowerAnswer.includes('message') || lowerAnswer.includes('chat')) {
+        updatedUser.aiAssistantData.microQuestionPreferences.communicationStyle = 'text';
+      } else {
+        updatedUser.aiAssistantData.microQuestionPreferences.communicationStyle = 'either';
+      }
+      break;
+      
+    case 'allergiesRestrictions':
+      if (lowerAnswer.includes('yes') || lowerAnswer.includes('have') || (!lowerAnswer.includes('no') && !lowerAnswer.includes('none'))) {
+        updatedUser.aiAssistantData.microQuestionPreferences.allergiesRestrictions = lowerAnswer;
+      } else {
+        updatedUser.aiAssistantData.microQuestionPreferences.allergiesRestrictions = 'none';
       }
       break;
   }
