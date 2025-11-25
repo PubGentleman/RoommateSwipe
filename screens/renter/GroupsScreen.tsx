@@ -423,7 +423,17 @@ export const GroupsScreen = () => {
     navigation.navigate('Profile', { screen: 'Payment' });
   };
 
+  const openGroupDetail = () => {
+    setShowGroupDetail(true);
+  };
+
+  const tap = Gesture.Tap()
+    .onEnd(() => {
+      runOnJS(openGroupDetail)();
+    });
+
   const pan = Gesture.Pan()
+    .minDistance(10)
     .onChange((event) => {
       translateX.value = event.translationX;
       rotation.value = event.translationX / 20;
@@ -437,6 +447,8 @@ export const GroupsScreen = () => {
         rotation.value = withSpring(0);
       }
     });
+
+  const cardGesture = Gesture.Race(pan, tap);
 
   const animatedCardStyle = useAnimatedStyle(() => {
     const rotate = `${rotation.value}deg`;
@@ -778,7 +790,7 @@ export const GroupsScreen = () => {
 
       return (
         <View style={styles.cardContainer}>
-          <GestureDetector gesture={pan}>
+          <GestureDetector gesture={cardGesture}>
             <Animated.View
               style={[
                 styles.card,
@@ -786,12 +798,11 @@ export const GroupsScreen = () => {
                 animatedCardStyle,
               ]}
             >
-              <Pressable onPress={() => setShowGroupDetail(true)} style={{ flex: 1 }}>
-                <ScrollView 
-                  style={{ flex: 1 }}
-                  contentContainerStyle={styles.cardContent}
-                  showsVerticalScrollIndicator={false}
-                >
+              <ScrollView 
+                style={{ flex: 1 }}
+                contentContainerStyle={styles.cardContent}
+                showsVerticalScrollIndicator={false}
+              >
                 <View style={{ marginTop: Spacing.md, alignItems: 'center' }}>
                   <MemberAvatarStack group={currentGroup} />
                   
@@ -900,7 +911,6 @@ export const GroupsScreen = () => {
                   </View>
                 ) : null}
                 </ScrollView>
-              </Pressable>
             </Animated.View>
           </GestureDetector>
 
