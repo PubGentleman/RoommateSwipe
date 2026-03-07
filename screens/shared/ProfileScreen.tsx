@@ -129,7 +129,7 @@ export const ProfileScreen = () => {
                 <Text style={styles.sectionAction}>View all</Text>
               </Pressable>
             </View>
-            <ProfileCompletionCard user={user} onEditProfile={() => navigation.navigate('ProfileQuestionnaire')} />
+            <ProfileCompletionCard user={user} onEditProfile={(step) => navigation.navigate('ProfileQuestionnaire', step ? { initialStep: step } : undefined)} />
           </View>
         ) : null}
 

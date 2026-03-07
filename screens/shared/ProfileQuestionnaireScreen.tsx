@@ -12,7 +12,7 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
 import Animated, {
@@ -108,9 +108,12 @@ export const ProfileQuestionnaireScreen = () => {
   const { theme } = useTheme();
   const { user, updateUser } = useAuth();
   const navigation = useNavigation();
+  const route = useRoute();
   const insets = useSafeAreaInsets();
 
-  const [currentStep, setCurrentStep] = useState(0);
+  const initialStepParam = (route.params as any)?.initialStep;
+  const initialStepIndex = initialStepParam ? STEP_ORDER.indexOf(initialStepParam as StepId) : -1;
+  const [currentStep, setCurrentStep] = useState(initialStepIndex >= 0 ? initialStepIndex : 0);
   const [direction, setDirection] = useState<'forward' | 'back'>('forward');
   const [isSaving, setIsSaving] = useState(false);
 

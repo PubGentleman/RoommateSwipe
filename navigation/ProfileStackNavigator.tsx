@@ -23,7 +23,7 @@ export type ProfileStackParamList = {
   Payment: undefined;
   Plans: undefined;
   EditProfile: undefined;
-  ProfileQuestionnaire: undefined;
+  ProfileQuestionnaire: { initialStep?: string } | undefined;
   Notifications: undefined;
   PrivacySecurity: undefined;
   ProfileViews: undefined;

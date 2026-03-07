@@ -125,9 +125,22 @@ function getCompletionData(user: User) {
   return { percentage, missing, completed, total: PROFILE_FIELDS.length, completedCount: completed.length };
 }
 
+const FIELD_TO_STEP: Record<string, string> = {
+  photo: 'photos',
+  bio: 'bio',
+  birthday: 'basicInfo',
+  budget: 'expenses',
+  location: 'locationOccupation',
+  occupation: 'locationOccupation',
+  interests: 'lifestyle',
+  sleepSchedule: 'sleepSchedule',
+  cleanliness: 'cleanliness',
+  smoking: 'smoking',
+};
+
 interface ProfileCompletionCardProps {
   user: User;
-  onEditProfile: () => void;
+  onEditProfile: (step?: string) => void;
 }
 
 export const ProfileCompletionCard = ({ user, onEditProfile }: ProfileCompletionCardProps) => {
@@ -185,7 +198,7 @@ export const ProfileCompletionCard = ({ user, onEditProfile }: ProfileCompletion
         <Text style={styles.progressHint}>Complete your profile to unlock better matches</Text>
 
         {topMissing.map((field) => (
-          <Pressable key={field.key} style={styles.completionItem} onPress={onEditProfile}>
+          <Pressable key={field.key} style={styles.completionItem} onPress={() => onEditProfile(FIELD_TO_STEP[field.key])}>
             <View style={styles.completionIcon}>
               <Feather name={field.icon} size={17} color="#ff6b5b" />
             </View>
