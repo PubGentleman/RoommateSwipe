@@ -414,6 +414,11 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       moveInDate: '01/01/2025',
       bedrooms: 2,
     },
+    verification: {
+      phone: { verified: true, verifiedAt: new Date('2024-11-01') },
+      government_id: { verified: true, verifiedAt: new Date('2024-11-05') },
+      social_media: { verified: true, verifiedAt: new Date('2024-11-02'), platform: 'linkedin' },
+    },
     compatibility: 92,
   },
   {
@@ -443,6 +448,9 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       location: 'Bushwick',
       moveInDate: '02/01/2025',
       bedrooms: 2,
+    },
+    verification: {
+      phone: { verified: true, verifiedAt: new Date('2024-10-15') },
     },
     compatibility: 85,
   },
@@ -474,6 +482,10 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       location: 'Park Slope',
       moveInDate: '01/15/2025',
       bedrooms: 2,
+    },
+    verification: {
+      phone: { verified: true, verifiedAt: new Date('2024-12-01') },
+      social_media: { verified: true, verifiedAt: new Date('2024-12-03'), platform: 'instagram' },
     },
     compatibility: 78,
   },

@@ -27,6 +27,7 @@ export interface RoommateProfile {
       cleaning?: 'split_equally' | 'take_turns' | 'hire_cleaner';
     };
   };
+  verification?: VerificationStatus;
   compatibility?: number;
 }
 
@@ -149,6 +150,24 @@ export type ZodiacSign =
   | 'Aquarius' 
   | 'Pisces';
 
+export type VerificationType = 'phone' | 'government_id' | 'social_media';
+
+export interface VerificationStatus {
+  phone?: {
+    verified: boolean;
+    verifiedAt?: Date;
+  };
+  government_id?: {
+    verified: boolean;
+    verifiedAt?: Date;
+  };
+  social_media?: {
+    verified: boolean;
+    verifiedAt?: Date;
+    platform?: 'instagram' | 'linkedin' | 'facebook';
+  };
+}
+
 export interface User {
   id: string;
   email: string;
@@ -159,6 +178,7 @@ export interface User {
   zodiacSign?: ZodiacSign;
   role: 'renter' | 'host' | 'agent';
   profilePicture?: string;
+  verification?: VerificationStatus;
   photos?: string[];
   subscription?: {
     plan: 'basic' | 'plus' | 'elite';

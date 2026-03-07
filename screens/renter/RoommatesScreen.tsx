@@ -19,6 +19,7 @@ import { getZodiacSymbol, getZodiacCompatibilityLevel } from '../../utils/zodiac
 import { AdBanner, RewardedAdButton } from '../../components/AdBanner';
 import { ReportBlockModal } from '../../components/ReportBlockModal';
 import { MatchCelebrationModal } from '../../components/MatchCelebrationModal';
+import { VerificationBadgeInline, getVerificationLevel } from '../../components/VerificationBadge';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Limit card size for web/desktop viewing
@@ -591,6 +592,14 @@ export const RoommatesScreen = () => {
                   {currentProfile.bio}
                 </ThemedText>
                 <View style={styles.badges}>
+                  {getVerificationLevel(currentProfile.verification) > 0 ? (
+                    <View style={[styles.badge, { backgroundColor: '#2563EB' }]}>
+                      <Feather name="check-circle" size={14} color="#FFFFFF" />
+                      <ThemedText style={[Typography.small, { color: '#FFFFFF', marginLeft: Spacing.xs, fontWeight: '700' }]} numberOfLines={1}>
+                        {getVerificationLevel(currentProfile.verification) >= 3 ? 'Fully Verified' : getVerificationLevel(currentProfile.verification) >= 2 ? 'Verified' : 'Partially Verified'}
+                      </ThemedText>
+                    </View>
+                  ) : null}
                   <View style={[styles.badge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
                     <Feather name="dollar-sign" size={14} color="#FFFFFF" />
                     <ThemedText style={[Typography.small, { color: '#FFFFFF', marginLeft: Spacing.xs }]} numberOfLines={1}>
@@ -1213,7 +1222,17 @@ export const RoommatesScreen = () => {
             })()}
               
               <View style={styles.detailSection}>
-                <ThemedText style={[Typography.h2]}>{currentProfile.name}, {currentProfile.age}{currentProfile.zodiacSign ? ` ${getZodiacSymbol(currentProfile.zodiacSign)}` : ''}</ThemedText>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <ThemedText style={[Typography.h2]}>{currentProfile.name}, {currentProfile.age}{currentProfile.zodiacSign ? ` ${getZodiacSymbol(currentProfile.zodiacSign)}` : ''}</ThemedText>
+                  {getVerificationLevel(currentProfile.verification) > 0 ? (
+                    <View style={{ marginLeft: Spacing.sm, flexDirection: 'row', alignItems: 'center', backgroundColor: '#2563EB20', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 }}>
+                      <Feather name="check-circle" size={14} color="#2563EB" />
+                      <ThemedText style={[Typography.small, { color: '#2563EB', fontWeight: '600', marginLeft: 4 }]}>
+                        {getVerificationLevel(currentProfile.verification) >= 3 ? 'Fully Verified' : getVerificationLevel(currentProfile.verification) >= 2 ? 'Verified' : 'Partially Verified'}
+                      </ThemedText>
+                    </View>
+                  ) : null}
+                </View>
                 <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
                   {currentProfile.occupation}
                 </ThemedText>

@@ -12,6 +12,7 @@ import type { ProfileStackParamList } from '../../navigation/ProfileStackNavigat
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { ProfileCompletionCard } from '../../components/ProfileCompletionCard';
+import { VerificationBadge, getVerificationLevel, getVerificationLabel } from '../../components/VerificationBadge';
 
 type ProfileScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'ProfileMain'>;
 
@@ -129,7 +130,17 @@ export const ProfileScreen = () => {
               </ThemedText>
             </View>
           </View>
-          <ThemedText style={[Typography.h1, styles.name]}>{user?.name || 'User'}</ThemedText>
+          <View style={styles.nameRow}>
+            <ThemedText style={[Typography.h1, styles.name]}>{user?.name || 'User'}</ThemedText>
+            {getVerificationLevel(user?.verification) > 0 ? (
+              <VerificationBadge
+                verification={user?.verification}
+                size="small"
+                showLabel
+                onPress={() => navigation.navigate('Verification')}
+              />
+            ) : null}
+          </View>
           <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
             {user?.email}
           </ThemedText>
@@ -296,6 +307,11 @@ export const ProfileScreen = () => {
         <View style={styles.section}>
           <ThemedText style={[Typography.h3, styles.sectionTitle]}>Account</ThemedText>
           <MenuItem icon="edit-3" label="Edit Profile" onPress={() => navigation.navigate('EditProfile')} />
+          <MenuItem
+            icon="check-circle"
+            label={getVerificationLevel(user?.verification) > 0 ? `Verification (${getVerificationLevel(user?.verification)}/3)` : 'Verify Your Identity'}
+            onPress={() => navigation.navigate('Verification')}
+          />
           <MenuItem icon="bell" label="Notifications" onPress={() => navigation.navigate('Notifications')} badge={unreadCount} />
           <MenuItem icon="sliders" label="Notification Preferences" onPress={() => navigation.navigate('NotificationPreferences')} />
           {(user?.subscription?.plan === 'plus' || user?.subscription?.plan === 'elite') ? (
@@ -428,6 +444,12 @@ const styles = StyleSheet.create({
   },
   name: {
     marginBottom: Spacing.xs,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
   },
   section: {
     marginBottom: Spacing.xxl,

@@ -15,6 +15,7 @@ import AboutScreen from '../screens/shared/AboutScreen';
 import { DownloadDataScreen } from '../screens/shared/DownloadDataScreen';
 import { BlockedUsersScreen } from '../screens/shared/BlockedUsersScreen';
 import { NotificationPreferencesScreen } from '../screens/shared/NotificationPreferencesScreen';
+import { VerificationScreen } from '../screens/shared/VerificationScreen';
 
 export type ProfileStackParamList = {
   ProfileMain: undefined;
@@ -30,6 +31,7 @@ export type ProfileStackParamList = {
   DownloadData: undefined;
   BlockedUsers: undefined;
   NotificationPreferences: undefined;
+  Verification: undefined;
 };
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
@@ -241,6 +243,13 @@ export const ProfileStackNavigator = () => {
       <Stack.Screen 
         name="NotificationPreferences" 
         component={NotificationPreferencesScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen 
+        name="Verification" 
+        component={VerificationScreen}
         options={{
           headerShown: false,
         }}

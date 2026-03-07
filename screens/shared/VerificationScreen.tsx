@@ -1,0 +1,382 @@
+import React, { useState } from 'react';
+import { View, StyleSheet, Pressable, TextInput, Alert } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { ScreenKeyboardAwareScrollView } from '../../components/ScreenKeyboardAwareScrollView';
+import { ThemedText } from '../../components/ThemedText';
+import { useTheme } from '../../hooks/useTheme';
+import { useAuth } from '../../contexts/AuthContext';
+import { Typography, Spacing } from '../../constants/theme';
+import { getVerificationLevel, getVerificationLabel } from '../../components/VerificationBadge';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { ProfileStackParamList } from '../../navigation/ProfileStackNavigator';
+
+type Props = NativeStackScreenProps<ProfileStackParamList, 'Verification'>;
+
+export function VerificationScreen({ navigation }: Props) {
+  const { theme } = useTheme();
+  const { user, updateUser } = useAuth();
+  const verification = user?.verification;
+  const level = getVerificationLevel(verification);
+
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [phoneCode, setPhoneCode] = useState('');
+  const [phoneSent, setPhoneSent] = useState(false);
+  const [idUploading, setIdUploading] = useState(false);
+  const [socialPlatform, setSocialPlatform] = useState<'instagram' | 'linkedin' | 'facebook' | null>(null);
+
+  const handleSendPhoneCode = () => {
+    if (phoneNumber.length < 10) {
+      Alert.alert('Invalid Number', 'Please enter a valid phone number.');
+      return;
+    }
+    setPhoneSent(true);
+    Alert.alert('Code Sent', 'A verification code has been sent to your phone number.');
+  };
+
+  const handleVerifyPhone = async () => {
+    if (phoneCode.length < 4) {
+      Alert.alert('Invalid Code', 'Please enter the verification code.');
+      return;
+    }
+    await updateUser({
+      verification: {
+        ...verification,
+        phone: { verified: true, verifiedAt: new Date() },
+      },
+    });
+    setPhoneSent(false);
+    setPhoneNumber('');
+    setPhoneCode('');
+    Alert.alert('Phone Verified', 'Your phone number has been verified successfully.');
+  };
+
+  const handleVerifyId = async () => {
+    setIdUploading(true);
+    setTimeout(async () => {
+      await updateUser({
+        verification: {
+          ...verification,
+          government_id: { verified: true, verifiedAt: new Date() },
+        },
+      });
+      setIdUploading(false);
+      Alert.alert('ID Verified', 'Your government ID has been verified successfully.');
+    }, 1500);
+  };
+
+  const handleVerifySocial = async (platform: 'instagram' | 'linkedin' | 'facebook') => {
+    setSocialPlatform(platform);
+    setTimeout(async () => {
+      await updateUser({
+        verification: {
+          ...verification,
+          social_media: { verified: true, verifiedAt: new Date(), platform },
+        },
+      });
+      setSocialPlatform(null);
+      Alert.alert('Social Media Verified', `Your ${platform.charAt(0).toUpperCase() + platform.slice(1)} account has been linked and verified.`);
+    }, 1200);
+  };
+
+  const progressPercent = Math.round((level / 3) * 100);
+  const progressColor = level >= 3 ? '#2563EB' : level >= 2 ? '#2563EB' : level >= 1 ? '#F59E0B' : theme.textSecondary;
+
+  return (
+    <ScreenKeyboardAwareScrollView>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={styles.backButton}>
+            <Feather name="chevron-left" size={28} color={theme.text} />
+          </Pressable>
+          <ThemedText style={[Typography.h2]}>Identity Verification</ThemedText>
+        </View>
+
+        <View style={[styles.statusCard, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+          <View style={styles.statusHeader}>
+            <View style={[styles.statusIconContainer, { backgroundColor: progressColor + '20' }]}>
+              <Feather name="shield" size={28} color={progressColor} />
+            </View>
+            <View style={{ flex: 1, marginLeft: Spacing.md }}>
+              <ThemedText style={[Typography.h3]}>{getVerificationLabel(level)}</ThemedText>
+              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginTop: 2 }]}>
+                {level}/3 verifications completed
+              </ThemedText>
+            </View>
+          </View>
+          <View style={[styles.progressBarBackground, { backgroundColor: theme.border }]}>
+            <View style={[styles.progressBarFill, { width: `${progressPercent}%`, backgroundColor: progressColor }]} />
+          </View>
+          <ThemedText style={[Typography.small, { color: theme.textSecondary, marginTop: Spacing.sm }]}>
+            Verified profiles get up to 3x more matches and appear more trustworthy to other users.
+          </ThemedText>
+        </View>
+
+        <View style={[styles.verificationItem, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+          <View style={styles.verificationHeader}>
+            <View style={[styles.verificationIcon, { backgroundColor: verification?.phone?.verified ? '#2563EB20' : theme.backgroundSecondary }]}>
+              <Feather name="phone" size={22} color={verification?.phone?.verified ? '#2563EB' : theme.textSecondary} />
+            </View>
+            <View style={{ flex: 1, marginLeft: Spacing.md }}>
+              <ThemedText style={[Typography.body, { fontWeight: '600' }]}>Phone Number</ThemedText>
+              <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+                Verify your phone number via SMS code
+              </ThemedText>
+            </View>
+            {verification?.phone?.verified ? (
+              <View style={[styles.verifiedTag, { backgroundColor: '#2563EB20' }]}>
+                <Feather name="check" size={14} color="#2563EB" />
+                <ThemedText style={[Typography.small, { color: '#2563EB', fontWeight: '600', marginLeft: 4 }]}>Verified</ThemedText>
+              </View>
+            ) : null}
+          </View>
+          {!verification?.phone?.verified ? (
+            <View style={styles.verificationAction}>
+              {!phoneSent ? (
+                <>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
+                    placeholder="Enter phone number"
+                    placeholderTextColor={theme.textSecondary}
+                    value={phoneNumber}
+                    onChangeText={setPhoneNumber}
+                    keyboardType="phone-pad"
+                  />
+                  <Pressable
+                    style={[styles.actionButton, { backgroundColor: theme.primary }]}
+                    onPress={handleSendPhoneCode}
+                  >
+                    <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>Send Code</ThemedText>
+                  </Pressable>
+                </>
+              ) : (
+                <>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
+                    placeholder="Enter verification code"
+                    placeholderTextColor={theme.textSecondary}
+                    value={phoneCode}
+                    onChangeText={setPhoneCode}
+                    keyboardType="number-pad"
+                    maxLength={6}
+                  />
+                  <Pressable
+                    style={[styles.actionButton, { backgroundColor: theme.primary }]}
+                    onPress={handleVerifyPhone}
+                  >
+                    <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>Verify</ThemedText>
+                  </Pressable>
+                </>
+              )}
+            </View>
+          ) : null}
+        </View>
+
+        <View style={[styles.verificationItem, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+          <View style={styles.verificationHeader}>
+            <View style={[styles.verificationIcon, { backgroundColor: verification?.government_id?.verified ? '#2563EB20' : theme.backgroundSecondary }]}>
+              <Feather name="credit-card" size={22} color={verification?.government_id?.verified ? '#2563EB' : theme.textSecondary} />
+            </View>
+            <View style={{ flex: 1, marginLeft: Spacing.md }}>
+              <ThemedText style={[Typography.body, { fontWeight: '600' }]}>Government ID</ThemedText>
+              <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+                Upload a government-issued photo ID for review
+              </ThemedText>
+            </View>
+            {verification?.government_id?.verified ? (
+              <View style={[styles.verifiedTag, { backgroundColor: '#2563EB20' }]}>
+                <Feather name="check" size={14} color="#2563EB" />
+                <ThemedText style={[Typography.small, { color: '#2563EB', fontWeight: '600', marginLeft: 4 }]}>Verified</ThemedText>
+              </View>
+            ) : null}
+          </View>
+          {!verification?.government_id?.verified ? (
+            <View style={styles.verificationAction}>
+              <Pressable
+                style={[styles.actionButton, { backgroundColor: theme.primary, opacity: idUploading ? 0.6 : 1 }]}
+                onPress={handleVerifyId}
+                disabled={idUploading}
+              >
+                <Feather name="upload" size={16} color="#FFFFFF" style={{ marginRight: Spacing.xs }} />
+                <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>
+                  {idUploading ? 'Verifying...' : 'Upload ID'}
+                </ThemedText>
+              </Pressable>
+            </View>
+          ) : null}
+        </View>
+
+        <View style={[styles.verificationItem, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+          <View style={styles.verificationHeader}>
+            <View style={[styles.verificationIcon, { backgroundColor: verification?.social_media?.verified ? '#2563EB20' : theme.backgroundSecondary }]}>
+              <Feather name="globe" size={22} color={verification?.social_media?.verified ? '#2563EB' : theme.textSecondary} />
+            </View>
+            <View style={{ flex: 1, marginLeft: Spacing.md }}>
+              <ThemedText style={[Typography.body, { fontWeight: '600' }]}>Social Media</ThemedText>
+              <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+                Link a social media account to verify your identity
+              </ThemedText>
+            </View>
+            {verification?.social_media?.verified ? (
+              <View style={[styles.verifiedTag, { backgroundColor: '#2563EB20' }]}>
+                <Feather name="check" size={14} color="#2563EB" />
+                <ThemedText style={[Typography.small, { color: '#2563EB', fontWeight: '600', marginLeft: 4 }]}>
+                  {verification.social_media.platform ? verification.social_media.platform.charAt(0).toUpperCase() + verification.social_media.platform.slice(1) : 'Verified'}
+                </ThemedText>
+              </View>
+            ) : null}
+          </View>
+          {!verification?.social_media?.verified ? (
+            <View style={styles.verificationAction}>
+              <View style={styles.socialButtons}>
+                <Pressable
+                  style={[styles.socialButton, { backgroundColor: '#E1306C20', borderColor: '#E1306C' }]}
+                  onPress={() => handleVerifySocial('instagram')}
+                  disabled={socialPlatform !== null}
+                >
+                  <Feather name="instagram" size={18} color="#E1306C" />
+                  <ThemedText style={[Typography.small, { color: '#E1306C', fontWeight: '600', marginLeft: 6 }]}>
+                    {socialPlatform === 'instagram' ? 'Linking...' : 'Instagram'}
+                  </ThemedText>
+                </Pressable>
+                <Pressable
+                  style={[styles.socialButton, { backgroundColor: '#0A66C220', borderColor: '#0A66C2' }]}
+                  onPress={() => handleVerifySocial('linkedin')}
+                  disabled={socialPlatform !== null}
+                >
+                  <Feather name="linkedin" size={18} color="#0A66C2" />
+                  <ThemedText style={[Typography.small, { color: '#0A66C2', fontWeight: '600', marginLeft: 6 }]}>
+                    {socialPlatform === 'linkedin' ? 'Linking...' : 'LinkedIn'}
+                  </ThemedText>
+                </Pressable>
+                <Pressable
+                  style={[styles.socialButton, { backgroundColor: '#1877F220', borderColor: '#1877F2' }]}
+                  onPress={() => handleVerifySocial('facebook')}
+                  disabled={socialPlatform !== null}
+                >
+                  <Feather name="facebook" size={18} color="#1877F2" />
+                  <ThemedText style={[Typography.small, { color: '#1877F2', fontWeight: '600', marginLeft: 6 }]}>
+                    {socialPlatform === 'facebook' ? 'Linking...' : 'Facebook'}
+                  </ThemedText>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
+        </View>
+
+        <View style={[styles.infoCard, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+          <Feather name="info" size={18} color={theme.textSecondary} />
+          <ThemedText style={[Typography.small, { color: theme.textSecondary, flex: 1, marginLeft: Spacing.sm }]}>
+            Your verification data is securely stored and only used to confirm your identity. 
+            Personal documents are not shared with other users.
+          </ThemedText>
+        </View>
+      </View>
+    </ScreenKeyboardAwareScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    padding: Spacing.lg,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.xl,
+  },
+  backButton: {
+    marginRight: Spacing.md,
+  },
+  statusCard: {
+    padding: Spacing.lg,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: Spacing.lg,
+  },
+  statusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  statusIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  progressBarBackground: {
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  verificationItem: {
+    padding: Spacing.lg,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: Spacing.md,
+  },
+  verificationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  verificationIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  verifiedTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  verificationAction: {
+    marginTop: Spacing.md,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(128,128,128,0.15)',
+  },
+  input: {
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: Spacing.md,
+    fontSize: 16,
+    marginBottom: Spacing.sm,
+  },
+  actionButton: {
+    height: 44,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  socialButtons: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  socialButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  infoCard: {
+    flexDirection: 'row',
+    padding: Spacing.md,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: Spacing.sm,
+  },
+});
