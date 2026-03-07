@@ -11,6 +11,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { ProfileStackParamList } from '../../navigation/ProfileStackNavigator';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { useNotificationContext } from '../../contexts/NotificationContext';
+import { ProfileCompletionCard } from '../../components/ProfileCompletionCard';
 
 type ProfileScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'ProfileMain'>;
 
@@ -133,6 +134,16 @@ export const ProfileScreen = () => {
             {user?.email}
           </ThemedText>
         </View>
+
+        {user?.role === 'renter' ? (
+          <View style={styles.section}>
+            <ThemedText style={[Typography.h3, styles.sectionTitle]}>Profile Strength</ThemedText>
+            <ProfileCompletionCard
+              user={user}
+              onEditProfile={() => navigation.navigate('EditProfile')}
+            />
+          </View>
+        ) : null}
 
         <View style={styles.section}>
           <ThemedText style={[Typography.h3, styles.sectionTitle]}>Subscription</ThemedText>

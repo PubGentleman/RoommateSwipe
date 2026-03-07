@@ -31,7 +31,7 @@ Roomdr utilizes a comprehensive points-based compatibility system (0-100 score) 
 The application is built with React Native and Expo, using TypeScript and leveraging React Navigation for role-based navigation (Renter, Host, Agent/Landlord). It features a theme system for light/dark modes and reusable UI components.
 
 **Core Features by Role:**
-- **Renter:** Swipe-based matching, 1-on-1 messaging, group management, property exploration with advanced filters and list/map toggle view, saved properties, rewind functionality, profile views tracking, an AI Match Assistant, animated match celebration modal, report/block system, and notification feed with badge. Includes "room type" and "existing roommate gender" for listings, and compatibility scores with hosts.
+- **Renter:** Swipe-based matching, 1-on-1 messaging, group management, property exploration with advanced filters and list/map toggle view, saved properties, rewind functionality, profile views tracking, an AI Match Assistant, animated match celebration modal, report/block system, notification feed with badge, and profile completion indicator. Includes "room type" and "existing roommate gender" for listings, and compatibility scores with hosts.
 - **Host:** Property listing management (CRUD), including room type and existing roommate gender tracking, application review, and listing status control.
 - **Agent:** Multi-property portfolio management, document verification, and legal template library.
 
@@ -40,6 +40,8 @@ The application is built with React Native and Expo, using TypeScript and levera
 **Report/Block System:** Users can report (with reasons: Inappropriate, Fake profile, Harassment, Spam, Other) or block other users from swipe cards and chat screens (`components/ReportBlockModal.tsx`). Blocked users are filtered from the swipe deck, messages list, and notifications. A "Blocked Users" management screen is accessible from Privacy & Security settings (`screens/shared/BlockedUsersScreen.tsx`).
 
 **Notification System:** The `NotificationContext` (`contexts/NotificationContext.tsx`) provides app-wide notification state with unread count, real-time toast alerts, and automatic polling every 5 seconds. Red badges appear on both Messages and Profile tabs across all roles (Renter, Host, Agent). The `NotificationToast` component (`components/NotificationToast.tsx`) shows animated slide-down banners with haptic feedback for new notifications. The Profile screen's Notifications menu item shows a badge count. Notifications are generated for matches, super likes, messages, group events, and property updates. Tapping a notification navigates to the relevant screen (chat, groups, explore). Blocked user notifications are filtered out.
+
+**Profile Completion Indicator:** The `ProfileCompletionCard` component (`components/ProfileCompletionCard.tsx`) displays on the renter's Profile screen under a "Profile Strength" section. It tracks 10 weighted fields (photo, bio, birthday, budget, location, occupation, interests, sleep schedule, cleanliness, smoking) and shows an animated progress bar, percentage badge, encouragement text, and up to 3 actionable missing-field suggestions with tips (e.g., "Add a photo to get 3x more matches"). Tapping a suggestion navigates to Edit Profile. When 100% complete, it shows a compact "Profile Complete" confirmation.
 
 Animations are handled by React Native Reanimated, and gestures by React Native Gesture Handler. State management uses React Context API and AsyncStorage for persistence.
 
