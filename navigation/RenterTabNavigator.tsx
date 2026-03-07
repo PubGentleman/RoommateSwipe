@@ -62,6 +62,7 @@ export const RenterTabNavigator = () => {
         name="Roommates"
         component={RoommatesStackNavigator}
         options={{
+          tabBarLabel: 'Match',
           tabBarIcon: ({ color, size }) => <Feather name="users" size={size} color={color} />,
         }}
       />
@@ -76,6 +77,7 @@ export const RenterTabNavigator = () => {
         name="Messages"
         component={MessagesStackNavigator}
         options={{
+          tabBarLabel: 'Chat',
           tabBarIcon: ({ color, size }) => <Feather name="message-circle" size={size} color={color} />,
         }}
       />
