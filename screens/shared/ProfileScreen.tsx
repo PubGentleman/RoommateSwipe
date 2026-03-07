@@ -163,6 +163,15 @@ export const ProfileScreen = () => {
           </View>
           <View style={styles.settingsCard}>
             <SettingsItem
+              iconName="user"
+              iconColor="#667eea"
+              iconBgColor="rgba(102,126,234,0.15)"
+              iconBorderColor="rgba(102,126,234,0.2)"
+              title="Edit Profile"
+              subtitle="Name, bio, photos, preferences"
+              onPress={() => navigation.navigate('ProfileQuestionnaire')}
+            />
+            <SettingsItem
               iconName="bell"
               iconColor="#2ecc71"
               iconBgColor="rgba(46,204,113,0.12)"
