@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { formatMoveInDate, calculateCompatibility, getMatchQualityColor, getGenderSymbol, formatLocation } from '../../utils/matchingAlgorithm';
 import { getZodiacSymbol } from '../../utils/zodiacUtils';
-import { NEIGHBORHOODS, getAllCities, getCitiesByState, getStatesWithData, US_STATES } from '../../utils/locationData';
+import { getAllCities } from '../../utils/locationData';
 import { PropertyMapView } from '../../components/PropertyMapView';
 
 const COMMON_AMENITIES = [
@@ -41,6 +41,7 @@ export const ExploreScreen = () => {
   const [viewMode, setViewMode] = useState<'all' | 'saved'>('all');
   const [displayMode, setDisplayMode] = useState<'list' | 'map'>('list');
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeCity, setActiveCity] = useState<string | null>(user?.profileData?.city || null);
   const [hostProfiles, setHostProfiles] = useState<Map<string, User>>(new Map());
 
   useEffect(() => {
@@ -51,7 +52,7 @@ export const ExploreScreen = () => {
 
   useEffect(() => {
     applyFilters();
-  }, [properties, filters, viewMode, saved, searchQuery]);
+  }, [properties, filters, viewMode, saved, searchQuery, activeCity]);
 
   const loadProperties = async () => {
     try {
@@ -146,34 +147,13 @@ export const ExploreScreen = () => {
       filtered = filtered.filter(p => saved.has(p.id));
     }
 
-    const userCity = user?.profileData?.city;
-    const query = searchQuery.toLowerCase().trim();
-    
-    const allCities = getAllCities();
-    const allNeighborhoods = Object.keys(NEIGHBORHOODS);
-    const allStatesData = getStatesWithData();
-    const allStateNames = allStatesData.map(s => s.name.toLowerCase());
-    const allStateCodes = allStatesData.map(s => s.code.toLowerCase());
-    const isSearchingLocation = filters.city || (query && (
-      allCities.some(city => city.toLowerCase().includes(query) || query.includes(city.toLowerCase())) ||
-      allNeighborhoods.some(n => n.toLowerCase().includes(query) || query.includes(n.toLowerCase())) ||
-      allStateNames.some(name => name.includes(query) || query.includes(name)) ||
-      allStateCodes.some(code => code === query)
-    ));
-    
-    if (userCity && !isSearchingLocation) {
-      filtered = filtered.filter(p => p.city === userCity);
+    if (activeCity) {
+      filtered = filtered.filter(p => p.city === activeCity);
     }
 
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
-      const matchingStateCodes = US_STATES
-        .filter(s => s.name.toLowerCase().includes(query) || s.code.toLowerCase() === query)
-        .map(s => s.code);
       filtered = filtered.filter(p => 
-        p.city.toLowerCase().includes(query) ||
-        p.state.toLowerCase().includes(query) ||
-        matchingStateCodes.includes(p.state) ||
         p.title.toLowerCase().includes(query) ||
         p.address.toLowerCase().includes(query) ||
         p.neighborhood?.toLowerCase().includes(query)
@@ -185,11 +165,6 @@ export const ExploreScreen = () => {
     }
     if (filters.maxPrice !== undefined) {
       filtered = filtered.filter(p => p.price <= filters.maxPrice!);
-    }
-    if (filters.city) {
-      filtered = filtered.filter(p => 
-        p.city.toLowerCase().includes(filters.city!.toLowerCase())
-      );
     }
     if (filters.minBedrooms !== undefined) {
       filtered = filtered.filter(p => p.bedrooms >= filters.minBedrooms!);
@@ -468,7 +443,7 @@ export const ExploreScreen = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
-      <View style={[styles.header, { paddingTop: insets.top + Spacing.lg }]}>
+      <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
         <View style={[styles.searchBar, { backgroundColor: theme.backgroundDefault }]}>
           <Feather name="search" size={20} color={theme.textSecondary} />
           <TextInput
@@ -481,7 +456,7 @@ export const ExploreScreen = () => {
                 paddingVertical: 0,
               }
             ]}
-            placeholder="Search location..."
+            placeholder={activeCity ? `Search in ${activeCity}...` : 'Search all properties...'}
             placeholderTextColor={theme.textSecondary}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -511,6 +486,96 @@ export const ExploreScreen = () => {
           ) : null}
         </Pressable>
       </View>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.cityRow}
+        contentContainerStyle={styles.cityRowContent}
+      >
+        <Pressable
+          style={[
+            styles.cityPill,
+            activeCity === (user?.profileData?.city || null) && {
+              backgroundColor: theme.primary,
+              borderColor: theme.primary,
+            },
+            activeCity !== (user?.profileData?.city || null) && {
+              backgroundColor: theme.backgroundDefault,
+              borderColor: theme.border,
+            },
+          ]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setActiveCity(user?.profileData?.city || null);
+          }}
+        >
+          <Feather
+            name="navigation"
+            size={14}
+            color={activeCity === (user?.profileData?.city || null) ? '#fff' : theme.primary}
+          />
+          <ThemedText
+            style={[
+              Typography.caption,
+              {
+                fontWeight: '600',
+                color: activeCity === (user?.profileData?.city || null) ? '#fff' : theme.text,
+              },
+            ]}
+          >
+            {user?.profileData?.city || 'Near You'}
+          </ThemedText>
+        </Pressable>
+        <Pressable
+          style={[
+            styles.cityPill,
+            !activeCity
+              ? { backgroundColor: theme.primary, borderColor: theme.primary }
+              : { backgroundColor: theme.backgroundDefault, borderColor: theme.border },
+          ]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setActiveCity(null);
+          }}
+        >
+          <Feather name="globe" size={14} color={!activeCity ? '#fff' : theme.textSecondary} />
+          <ThemedText
+            style={[
+              Typography.caption,
+              { fontWeight: '600', color: !activeCity ? '#fff' : theme.text },
+            ]}
+          >
+            All Cities
+          </ThemedText>
+        </Pressable>
+        {getAllCities()
+          .filter(city => city !== (user?.profileData?.city || ''))
+          .map(city => (
+            <Pressable
+              key={city}
+              style={[
+                styles.cityPill,
+                activeCity === city
+                  ? { backgroundColor: theme.primary, borderColor: theme.primary }
+                  : { backgroundColor: theme.backgroundDefault, borderColor: theme.border },
+              ]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setActiveCity(city);
+              }}
+            >
+              <ThemedText
+                style={[
+                  Typography.caption,
+                  { fontWeight: '600', color: activeCity === city ? '#fff' : theme.text },
+                ]}
+              >
+                {city}
+              </ThemedText>
+            </Pressable>
+          ))}
+      </ScrollView>
       
       <View style={styles.viewToggleContainer}>
         <Pressable
@@ -565,7 +630,7 @@ export const ExploreScreen = () => {
           <View style={styles.filterBannerContent}>
             <Feather name="filter" size={16} color={theme.primary} />
             <ThemedText style={[Typography.small, { color: theme.primary, marginLeft: Spacing.xs }]}>
-              {filteredProperties.length} properties match your filters
+              {filteredProperties.length} {filteredProperties.length === 1 ? 'property matches' : 'properties match'} your filters
             </ThemedText>
           </View>
           <Pressable onPress={handleClearFilters}>
@@ -602,13 +667,15 @@ export const ExploreScreen = () => {
             <View style={styles.emptyStateInline}>
               <Feather name={viewMode === 'saved' ? 'heart' : 'home'} size={64} color={theme.textSecondary} />
               <ThemedText style={[Typography.h2, { marginTop: Spacing.xl, textAlign: 'center' }]}>
-                {viewMode === 'saved' ? 'No Saved Properties' : 'No Properties Available'}
+                {viewMode === 'saved' ? 'No Saved Properties' : activeCity ? `No Properties in ${activeCity}` : 'No Properties Available'}
               </ThemedText>
-              {viewMode === 'saved' ? (
-                <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.sm, textAlign: 'center' }]}>
-                  Save properties by tapping the heart icon
-                </ThemedText>
-              ) : null}
+              <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.sm, textAlign: 'center' }]}>
+                {viewMode === 'saved'
+                  ? 'Save properties by tapping the heart icon'
+                  : activeCity
+                    ? 'Try browsing All Cities or a different city'
+                    : 'Check back later for new listings'}
+              </ThemedText>
             </View>
           }
         />
@@ -659,55 +726,6 @@ export const ExploreScreen = () => {
                   />
                 </View>
               </View>
-            </View>
-
-            <View style={styles.filterSection}>
-              <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Location</ThemedText>
-              {tempFilters.city ? (
-                <Pressable
-                  style={[styles.selectedCityChip, { backgroundColor: theme.primary + '15', borderColor: theme.primary }]}
-                  onPress={() => setTempFilters({ ...tempFilters, city: undefined })}
-                >
-                  <Feather name="map-pin" size={14} color={theme.primary} />
-                  <ThemedText style={[Typography.body, { color: theme.primary, fontWeight: '600' }]}>
-                    {tempFilters.city}
-                  </ThemedText>
-                  <Feather name="x" size={16} color={theme.primary} />
-                </Pressable>
-              ) : null}
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.cityScrollRow}>
-                <Pressable
-                  style={[
-                    styles.cityChip,
-                    {
-                      backgroundColor: !tempFilters.city ? theme.primary : theme.backgroundDefault,
-                      borderColor: !tempFilters.city ? theme.primary : theme.border,
-                    },
-                  ]}
-                  onPress={() => setTempFilters({ ...tempFilters, city: undefined })}
-                >
-                  <ThemedText style={[Typography.caption, { color: !tempFilters.city ? '#fff' : theme.text }]}>
-                    All Cities
-                  </ThemedText>
-                </Pressable>
-                {getAllCities().map(city => (
-                  <Pressable
-                    key={city}
-                    style={[
-                      styles.cityChip,
-                      {
-                        backgroundColor: tempFilters.city === city ? theme.primary : theme.backgroundDefault,
-                        borderColor: tempFilters.city === city ? theme.primary : theme.border,
-                      },
-                    ]}
-                    onPress={() => setTempFilters({ ...tempFilters, city })}
-                  >
-                    <ThemedText style={[Typography.caption, { color: tempFilters.city === city ? '#fff' : theme.text }]}>
-                      {city}
-                    </ThemedText>
-                  </Pressable>
-                ))}
-              </ScrollView>
             </View>
 
             <View style={styles.filterSection}>
@@ -1384,25 +1402,23 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.medium,
     fontSize: 16,
   },
-  cityScrollRow: {
-    marginTop: Spacing.sm,
+  cityRow: {
+    flexGrow: 0,
+    flexShrink: 0,
   },
-  cityChip: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.full,
-    borderWidth: 1,
-    marginRight: Spacing.sm,
+  cityRowContent: {
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.sm,
+    gap: Spacing.sm,
   },
-  selectedCityChip: {
+  cityPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
+    gap: 6,
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.md,
+    paddingVertical: 8,
+    borderRadius: BorderRadius.full,
     borderWidth: 1,
-    alignSelf: 'flex-start',
   },
   roomsRow: {
     flexDirection: 'row',
