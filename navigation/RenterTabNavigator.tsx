@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Feather } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { Platform, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ExploreScreen } from '../screens/renter/ExploreScreen';
 import { RoommatesStackNavigator } from './RoommatesStackNavigator';
 import { GroupsScreen } from '../screens/renter/GroupsScreen';
@@ -22,10 +23,12 @@ const Tab = createBottomTabNavigator<RenterTabParamList>();
 
 export const RenterTabNavigator = () => {
   const { theme, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
 
   return (
     <Tab.Navigator
       initialRouteName="Roommates"
+      safeAreaInsets={{ left: 0, right: 0 }}
       screenOptions={{
         tabBarActiveTintColor: theme.tabIconSelected,
         tabBarInactiveTintColor: theme.tabIconDefault,
@@ -48,15 +51,13 @@ export const RenterTabNavigator = () => {
           borderTopWidth: 0,
           elevation: 0,
           paddingHorizontal: 0,
-          marginHorizontal: 0,
-          left: 0,
-          right: 0,
         },
         tabBarBackground: () =>
           Platform.OS === 'ios' ? (
             <BlurView intensity={100} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
           ) : null,
         headerShown: false,
+        sceneStyle: { flex: 1 },
       }}
     >
       <Tab.Screen
