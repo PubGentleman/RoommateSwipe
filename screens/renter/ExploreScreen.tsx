@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { formatMoveInDate, calculateCompatibility, getMatchQualityColor, getGenderSymbol, formatLocation } from '../../utils/matchingAlgorithm';
 import { getZodiacSymbol } from '../../utils/zodiacUtils';
-import { NEIGHBORHOODS, getAllCities } from '../../utils/locationData';
+import { NEIGHBORHOODS, getAllCities, getCitiesByState, getStatesWithData, US_STATES } from '../../utils/locationData';
 import { PropertyMapView } from '../../components/PropertyMapView';
 
 const COMMON_AMENITIES = [
@@ -151,11 +151,14 @@ export const ExploreScreen = () => {
     
     const allCities = getAllCities();
     const allNeighborhoods = Object.keys(NEIGHBORHOODS);
-    const allStates = ['NY'];
+    const allStatesData = getStatesWithData();
+    const allStateNames = allStatesData.map(s => s.name.toLowerCase());
+    const allStateCodes = allStatesData.map(s => s.code.toLowerCase());
     const isSearchingLocation = filters.city || (query && (
       allCities.some(city => city.toLowerCase().includes(query) || query.includes(city.toLowerCase())) ||
       allNeighborhoods.some(n => n.toLowerCase().includes(query) || query.includes(n.toLowerCase())) ||
-      allStates.some(state => state.toLowerCase() === query)
+      allStateNames.some(name => name.includes(query) || query.includes(name)) ||
+      allStateCodes.some(code => code === query)
     ));
     
     if (userCity && !isSearchingLocation) {
@@ -164,9 +167,13 @@ export const ExploreScreen = () => {
 
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
+      const matchingStateCodes = US_STATES
+        .filter(s => s.name.toLowerCase().includes(query) || s.code.toLowerCase() === query)
+        .map(s => s.code);
       filtered = filtered.filter(p => 
         p.city.toLowerCase().includes(query) ||
         p.state.toLowerCase().includes(query) ||
+        matchingStateCodes.includes(p.state) ||
         p.title.toLowerCase().includes(query) ||
         p.address.toLowerCase().includes(query) ||
         p.neighborhood?.toLowerCase().includes(query)
@@ -656,13 +663,51 @@ export const ExploreScreen = () => {
 
             <View style={styles.filterSection}>
               <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Location</ThemedText>
-              <TextInput
-                style={[styles.locationInput, { backgroundColor: theme.backgroundDefault, color: theme.text }]}
-                placeholder="Enter city..."
-                placeholderTextColor={theme.textSecondary}
-                value={tempFilters.city || ''}
-                onChangeText={text => setTempFilters({ ...tempFilters, city: text })}
-              />
+              {tempFilters.city ? (
+                <Pressable
+                  style={[styles.selectedCityChip, { backgroundColor: theme.primary + '15', borderColor: theme.primary }]}
+                  onPress={() => setTempFilters({ ...tempFilters, city: undefined })}
+                >
+                  <Feather name="map-pin" size={14} color={theme.primary} />
+                  <ThemedText style={[Typography.body, { color: theme.primary, fontWeight: '600' }]}>
+                    {tempFilters.city}
+                  </ThemedText>
+                  <Feather name="x" size={16} color={theme.primary} />
+                </Pressable>
+              ) : null}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.cityScrollRow}>
+                <Pressable
+                  style={[
+                    styles.cityChip,
+                    {
+                      backgroundColor: !tempFilters.city ? theme.primary : theme.backgroundDefault,
+                      borderColor: !tempFilters.city ? theme.primary : theme.border,
+                    },
+                  ]}
+                  onPress={() => setTempFilters({ ...tempFilters, city: undefined })}
+                >
+                  <ThemedText style={[Typography.caption, { color: !tempFilters.city ? '#fff' : theme.text }]}>
+                    All Cities
+                  </ThemedText>
+                </Pressable>
+                {getAllCities().map(city => (
+                  <Pressable
+                    key={city}
+                    style={[
+                      styles.cityChip,
+                      {
+                        backgroundColor: tempFilters.city === city ? theme.primary : theme.backgroundDefault,
+                        borderColor: tempFilters.city === city ? theme.primary : theme.border,
+                      },
+                    ]}
+                    onPress={() => setTempFilters({ ...tempFilters, city })}
+                  >
+                    <ThemedText style={[Typography.caption, { color: tempFilters.city === city ? '#fff' : theme.text }]}>
+                      {city}
+                    </ThemedText>
+                  </Pressable>
+                ))}
+              </ScrollView>
             </View>
 
             <View style={styles.filterSection}>
@@ -1338,6 +1383,26 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     borderRadius: BorderRadius.medium,
     fontSize: 16,
+  },
+  cityScrollRow: {
+    marginTop: Spacing.sm,
+  },
+  cityChip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    marginRight: Spacing.sm,
+  },
+  selectedCityChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    alignSelf: 'flex-start',
   },
   roomsRow: {
     flexDirection: 'row',

@@ -35,6 +35,8 @@ import { Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { calculateZodiacFromBirthday } from '../../utils/zodiacUtils';
 import { ProgressBar } from '../../components/questionnaire/ProgressBar';
 import { SelectionCard } from '../../components/questionnaire/SelectionCard';
+import { LocationPicker } from '../../components/LocationPicker';
+import { getCoordinatesFromNeighborhood } from '../../utils/locationData';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TOTAL_STEPS = 13;
@@ -130,6 +132,9 @@ export const ProfileQuestionnaireScreen = () => {
   const [budget, setBudget] = useState(user?.profileData?.budget?.toString() || '');
   const [lookingFor, setLookingFor] = useState<'room' | 'entire_apartment'>(user?.profileData?.lookingFor || 'room');
   const [location, setLocation] = useState(user?.profileData?.location || '');
+  const [selectedState, setSelectedState] = useState(user?.profileData?.state || '');
+  const [selectedCity, setSelectedCity] = useState(user?.profileData?.city || '');
+  const [selectedNeighborhood, setSelectedNeighborhood] = useState(user?.profileData?.neighborhood || '');
   const [occupation, setOccupation] = useState(user?.profileData?.occupation || '');
   const [interests, setInterests] = useState(user?.profileData?.interests || '');
   const [gender, setGender] = useState<'male' | 'female' | 'other' | undefined>(user?.profileData?.gender);
@@ -297,7 +302,11 @@ export const ProfileQuestionnaireScreen = () => {
         bio: bio.trim() || undefined,
         budget: budget.trim() ? parseInt(budget) : undefined,
         lookingFor,
-        location: location.trim() || undefined,
+        location: selectedNeighborhood || selectedCity || location.trim() || undefined,
+        neighborhood: selectedNeighborhood || undefined,
+        city: selectedCity || undefined,
+        state: selectedState || undefined,
+        coordinates: selectedNeighborhood ? getCoordinatesFromNeighborhood(selectedNeighborhood) || undefined : undefined,
         occupation: occupation.trim() || undefined,
         interests: interests.trim() || undefined,
         gender,
@@ -432,17 +441,15 @@ export const ProfileQuestionnaireScreen = () => {
       case 'locationOccupation':
         return (
           <View style={styles.stepInner}>
-            <View style={styles.inputGroup}>
-              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>Location</ThemedText>
-              <TextInput
-                style={[styles.textInput, { backgroundColor: theme.backgroundDefault, borderColor: theme.border, color: theme.text }]}
-                value={location}
-                onChangeText={setLocation}
-                placeholder="Downtown, Brooklyn"
-                placeholderTextColor={theme.textSecondary}
-              />
-            </View>
-            <View style={styles.inputGroup}>
+            <LocationPicker
+              selectedState={selectedState}
+              selectedCity={selectedCity}
+              selectedNeighborhood={selectedNeighborhood}
+              onStateChange={setSelectedState}
+              onCityChange={setSelectedCity}
+              onNeighborhoodChange={setSelectedNeighborhood}
+            />
+            <View style={[styles.inputGroup, { marginTop: Spacing.lg }]}>
               <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>Occupation</ThemedText>
               <TextInput
                 style={[styles.textInput, { backgroundColor: theme.backgroundDefault, borderColor: theme.border, color: theme.text }]}
