@@ -7,6 +7,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { useAuth, UserRole } from '../../contexts/AuthContext';
 import { Feather } from '@expo/vector-icons';
+import { RoomdrLogo } from '../../components/RoomdrLogo';
 
 export const LoginScreen = () => {
   const { theme } = useTheme();
@@ -71,6 +72,9 @@ export const LoginScreen = () => {
   return (
     <ScreenKeyboardAwareScrollView contentContainerStyle={styles.container}>
       <View style={[styles.header, { marginTop: insets.top + Spacing.xl }]}>
+        <View style={{ marginBottom: Spacing.xl }}>
+          <RoomdrLogo variant="horizontal" size="md" />
+        </View>
         <ThemedText style={[Typography.hero, styles.title]}>
           {isSignUp ? 'Create Account' : 'Welcome Back'}
         </ThemedText>

@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Roomdr – Sign In</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0a0a0a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .phone {
+      width: 375px;
+      height: 812px;
+      background: #111;
+      border-radius: 50px;
+      box-shadow: 0 0 0 10px #222, 0 40px 100px rgba(0,0,0,0.85);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    /* Subtle top glow */
+    .phone::before {
+      content: '';
+      position: absolute;
+      top: -60px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 260px;
+      height: 260px;
+      background: radial-gradient(circle, rgba(255,80,60,0.1) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Status bar */
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 28px 0;
+      font-size: 12px;
+      font-weight: 600;
+      color: #fff;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── HEADER ── */
+    .header {
+      padding: 24px 28px 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Logo lockup — matches welcome screen */
+    .logo-lockup {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      margin-bottom: 32px;
+    }
+
+    .logo-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 15px;
+      background: linear-gradient(145deg, #ff6b5b, #e83a2a);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow:
+        0 8px 24px rgba(255,80,60,0.45),
+        0 0 0 1px rgba(255,255,255,0.08) inset;
+    }
+
+    .logo-wordmark {
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: -1px;
+      color: #fff;
+    }
+
+    .logo-wordmark .accent {
+      color: #ff6b5b;
+    }
+
+    /* Heading block */
+    .heading {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    .heading h1 {
+      font-size: 26px;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -0.5px;
+      line-height: 1.15;
+      margin-bottom: 6px;
+    }
+
+    .heading p {
+      font-size: 13.5px;
+      color: rgba(255,255,255,0.35);
+      font-weight: 400;
+      line-height: 1.5;
+    }
+
+    /* ── CONTENT ── */
+    .content {
+      flex: 1;
+      padding: 0 24px 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      position: relative;
+      z-index: 1;
+      gap: 0;
+    }
+
+    /* Role selector */
+    .role-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.3);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 9px;
+    }
+
+    .role-selector {
+      display: flex;
+      gap: 7px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 16px;
+      padding: 5px;
+      margin-bottom: 22px;
+    }
+
+    .role-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 6px;
+      border-radius: 12px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.35);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .role-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+    .role-btn.active {
+      background: linear-gradient(135deg, #ff6b5b, #e83a2a);
+      color: #fff;
+      box-shadow: 0 4px 16px rgba(255,80,60,0.38);
+    }
+
+    /* Thin divider */
+    .divider {
+      height: 1px;
+      background: rgba(255,255,255,0.07);
+      margin-bottom: 22px;
+    }
+
+    /* Form fields */
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 13px;
+      margin-bottom: 10px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .field label {
+      font-size: 11px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.4);
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+    }
+
+    .input-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .input-icon {
+      position: absolute;
+      left: 14px;
+      width: 16px;
+      height: 16px;
+      color: rgba(255,255,255,0.22);
+      pointer-events: none;
+      flex-shrink: 0;
+    }
+
+    .input-wrap input {
+      width: 100%;
+      background: rgba(255,255,255,0.055);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      padding: 14px 14px 14px 42px;
+      font-size: 14px;
+      font-family: 'Inter', sans-serif;
+      font-weight: 400;
+      color: rgba(255,255,255,0.85);
+      outline: none;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .input-wrap input::placeholder { color: rgba(255,255,255,0.18); }
+
+    .input-wrap input:focus {
+      border-color: rgba(255,107,91,0.5);
+      background: rgba(255,107,91,0.05);
+    }
+
+    .eye-icon {
+      position: absolute;
+      right: 14px;
+      width: 16px;
+      height: 16px;
+      color: rgba(255,255,255,0.22);
+      cursor: pointer;
+    }
+
+    /* Forgot password */
+    .forgot-row {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 9px;
+      margin-bottom: 20px;
+    }
+
+    .forgot-row a {
+      font-size: 12px;
+      font-weight: 600;
+      color: #ff6b5b;
+      text-decoration: none;
+    }
+
+    /* Sign in button */
+    .signin-btn {
+      width: 100%;
+      height: 54px;
+      background: linear-gradient(135deg, #ff6b5b, #e83a2a);
+      border: none;
+      border-radius: 16px;
+      color: white;
+      font-size: 15px;
+      font-weight: 700;
+      font-family: 'Inter', sans-serif;
+      letter-spacing: 0.2px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow:
+        0 8px 26px rgba(255,80,60,0.4),
+        0 0 0 1px rgba(255,255,255,0.08) inset;
+      margin-bottom: 20px;
+    }
+
+    /* OR divider */
+    .or-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .or-line { flex: 1; height: 1px; background: rgba(255,255,255,0.07); }
+
+    .or-text {
+      font-size: 10.5px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.2);
+      letter-spacing: 0.6px;
+    }
+
+    /* Social buttons */
+    .social-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 26px;
+    }
+
+    .social-btn {
+      flex: 1;
+      height: 48px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.055);
+      border: 1px solid rgba(255,255,255,0.09);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.75);
+      cursor: pointer;
+    }
+
+    /* Sign up */
+    .signup-row {
+      text-align: center;
+      font-size: 13px;
+      color: rgba(255,255,255,0.3);
+    }
+
+    .signup-row a {
+      color: #ff6b5b;
+      font-weight: 700;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+<div class="phone">
+
+  <!-- Status bar -->
+  <div class="status-bar">
+    <span>9:41</span>
+    <div style="display:flex;gap:5px;align-items:center;">
+      <svg width="16" height="11" viewBox="0 0 16 11" fill="white"><rect x="0" y="4" width="3" height="7" rx="1"/><rect x="4.5" y="2.5" width="3" height="8.5" rx="1"/><rect x="9" y="0.5" width="3" height="10.5" rx="1"/><rect x="13.5" y="0" width="2.5" height="11" rx="1" opacity="0.3"/></svg>
+      <svg width="16" height="12" viewBox="0 0 16 12" fill="white"><path d="M8 2.4C10.3 2.4 12.4 3.4 13.8 5L15.5 3.3C13.6 1.3 11 0 8 0C5 0 2.4 1.3.5 3.3L2.2 5C3.6 3.4 5.7 2.4 8 2.4Z" opacity="0.4"/><path d="M8 5.2C9.5 5.2 10.9 5.8 11.9 6.8L13.6 5.1C12.1 3.8 10.1 3 8 3C5.9 3 3.9 3.8 2.4 5.1L4.1 6.8C5.1 5.8 6.5 5.2 8 5.2Z" opacity="0.7"/><circle cx="8" cy="10" r="2"/></svg>
+      <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x="0.5" y="0.5" width="21" height="11" rx="3.5" stroke="white" stroke-opacity="0.35"/><rect x="2" y="2" width="16" height="8" rx="2" fill="white"/><path d="M23 4.5V7.5C23.8 7.2 24.5 6.5 24.5 6C24.5 5.5 23.8 4.8 23 4.5Z" fill="white" fill-opacity="0.4"/></svg>
+    </div>
+  </div>
+
+  <!-- Header: logo + heading -->
+  <div class="header">
+
+    <!-- Logo lockup -->
+    <div class="logo-lockup">
+      <div class="logo-icon">
+        <svg width="26" height="26" viewBox="0 0 38 38" fill="none">
+          <path d="M5 17L19 4L33 17V34C33 34.6 32.5 35 32 35H25V25H13V35H6C5.5 35 5 34.6 5 34V17Z" fill="white"/>
+          <rect x="15" y="25" width="8" height="10" rx="1.5" fill="rgba(255,107,91,0.55)"/>
+        </svg>
+      </div>
+      <span class="logo-wordmark">room<span class="accent">dr</span></span>
+    </div>
+
+    <!-- Heading -->
+    <div class="heading">
+      <h1>Welcome back 👋</h1>
+      <p>Sign in to continue finding your<br/>perfect roommate</p>
+    </div>
+
+  </div>
+
+  <!-- Form content -->
+  <div class="content">
+
+    <!-- Role selector -->
+    <div class="role-label">I am a</div>
+    <div class="role-selector">
+      <div class="role-btn active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        Renter
+      </div>
+      <div class="role-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+        </svg>
+        Host
+      </div>
+      <div class="role-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="7" width="20" height="14" rx="2"/>
+          <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+        </svg>
+        Agent
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Fields -->
+    <div class="field-group">
+      <div class="field">
+        <label>Email</label>
+        <div class="input-wrap">
+          <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+            <polyline points="22,6 12,13 2,6"/>
+          </svg>
+          <input type="email" placeholder="you@example.com"/>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Password</label>
+        <div class="input-wrap">
+          <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+          <input type="password" placeholder="••••••••"/>
+          <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- Forgot password -->
+    <div class="forgot-row">
+      <a href="#">Forgot password?</a>
+    </div>
+
+    <!-- Sign in -->
+    <button class="signin-btn">
+      Sign In
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+        <path d="M5 12h14M12 5l7 7-7 7" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+
+    <!-- OR -->
+    <div class="or-row">
+      <div class="or-line"></div>
+      <span class="or-text">OR CONTINUE WITH</span>
+      <div class="or-line"></div>
+    </div>
+
+    <!-- Social -->
+    <div class="social-row">
+      <div class="social-btn">
+        <svg width="16" height="16" viewBox="0 0 814 1000" fill="rgba(255,255,255,0.75)">
+          <path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76 0-103.7 40.8-165.9 40.8s-105-42.8-165.9-109.3S79.3 571.2 79.3 510.5c0-170.1 111.9-260.1 221.8-260.1 58.8 0 107.7 38.8 143.8 38.8 34.5 0 88.3-41.5 157.6-41.5 25.2 0 108.2 2.6 168.1 73.7zm-56.7-173.8c27.2-32.7 46.8-78.1 46.8-123.5 0-6.3-.6-12.7-1.9-18.4-43.9 1.6-96.5 29.2-128.3 65.8-24.6 27.9-48.1 72.7-48.1 118.7 0 7.1 1.3 14.2 1.9 16.5 2.6.4 6.5.9 10.4.9 39.5 0 88.2-26.5 119.2-60z"/>
+        </svg>
+        Apple
+      </div>
+      <div class="social-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24">
+          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+        </svg>
+        Google
+      </div>
+    </div>
+
+    <!-- Sign up link -->
+    <div class="signup-row">
+      Don't have an account? <a href="#">Sign Up</a>
+    </div>
+
+  </div>
+
+</div>
+</body>
+</html>

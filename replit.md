@@ -31,7 +31,7 @@ Roomdr utilizes a comprehensive points-based compatibility system (0-100 score) 
 The application is built with React Native and Expo, using TypeScript and leveraging React Navigation for role-based navigation (Renter, Host, Agent/Landlord). It features a theme system for light/dark modes and reusable UI components.
 
 **Core Features by Role:**
-- **Renter:** Swipe-based matching, 1-on-1 messaging, group management, property exploration with advanced filters and list/map toggle view, saved properties, rewind functionality, profile views tracking, an AI Match Assistant, animated match celebration modal, report/block system, notification feed with badge, and profile completion indicator. Includes "room type" and "existing roommate gender" for listings, and compatibility scores with hosts. The Match screen uses a dark Tinder-style design (#141414 background) with centered "roomdr" wordmark, full-height card with LinearGradient overlay, horizontal photo bar indicators, dark glass pill tags (budget, work type, location) + coral match % tag, native-style sponsored ad banner, and 5 transparent-background action buttons with colored borders (undo, pass/red, message/pink, star/blue, like/green).
+- **Renter:** Swipe-based matching, 1-on-1 messaging, group management, property exploration with advanced filters and list/map toggle view, saved properties, rewind functionality, profile views tracking, an AI Match Assistant, animated match celebration modal, report/block system, notification feed with badge, and profile completion indicator. Includes "room type" and "existing roommate gender" for listings, and compatibility scores with hosts. The Match screen uses a dark Tinder-style design (#141414 background) with the `RoomdrLogo` component (horizontal, small) in the header, full-height card with LinearGradient overlay, horizontal photo bar indicators, dark glass pill tags (budget, work type, location) + coral match % tag, native-style sponsored ad banner, and 5 transparent-background action buttons with colored borders (undo, pass/red, message/pink, star/blue, like/green).
 - **Host:** Property listing management (CRUD), including room type and existing roommate gender tracking, application review, and listing status control.
 - **Agent:** Multi-property portfolio management, document verification, and legal template library.
 
@@ -58,6 +58,10 @@ The current implementation uses mock authentication with email/password stored i
 ## Data Layer
 
 The current data layer uses mock data and TypeScript interfaces for models such as `RoommateProfile`, `Property`, `Group`, `Conversation`, `Message`, `Match`, and `Application`. It supports reciprocal matching, automatic conversation creation, and message limits. Property management includes distinguishing between 'room' and 'entire' room types, tracking existing roommates, linking to host profiles for compatibility, and managing property rental status. Location data for renters automatically includes neighborhood, city, state, and coordinates. An AI Match Assistant uses micro-questions to refine user profiles, parsing natural language responses to update preferences.
+
+## Branding & Logo
+
+The `RoomdrLogo` component (`components/RoomdrLogo.tsx`) renders the brand logo using `react-native-svg` for the house icon and `expo-linear-gradient` for the icon background. Supports three variants: `horizontal` (icon + wordmark side by side), `stacked` (icon above wordmark with optional tagline), and `icon-only`. Three sizes: `sm`, `md`, `lg`. Brand colors: coral-red gradient `#ff6b5b` to `#e83a2a` for icon box, white house silhouette, wordmark in white with "dr" in coral `#ff6b5b`. Used in: Match screen header (horizontal/sm), Onboarding welcome page (stacked/lg with tagline), Login screen (horizontal/md). App icon, favicon, and splash icon are AI-generated with matching coral-red gradient + white house. Splash background: `#141414`.
 
 ## Location Privacy & Filtering
 

@@ -21,6 +21,7 @@ import { ReportBlockModal } from '../../components/ReportBlockModal';
 import { MatchCelebrationModal } from '../../components/MatchCelebrationModal';
 import { VerificationBadgeInline, getVerificationLevel } from '../../components/VerificationBadge';
 import { LinearGradient } from 'expo-linear-gradient';
+import { RoomdrLogo } from '../../components/RoomdrLogo';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Limit card size for web/desktop viewing
@@ -533,7 +534,7 @@ export const RoommatesScreen = () => {
             <Feather name="cpu" size={18} color="#FFFFFF" />
           </View>
         </Pressable>
-        <ThemedText style={styles.wordmark}>roomdr</ThemedText>
+        <RoomdrLogo variant="horizontal" size="sm" />
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {(user?.subscription?.plan || 'basic') === 'basic' && !user?.boostData?.isBoosted ? (
             <Pressable onPress={() => setShowPurchaseBoostModal(true)} style={styles.navIconBtn}>
@@ -1409,12 +1410,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  wordmark: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: -0.3,
-  },
+  
   cardArea: {
     flex: 1,
     paddingHorizontal: 16,

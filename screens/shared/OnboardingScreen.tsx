@@ -16,6 +16,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { RoomdrLogo } from '../../components/RoomdrLogo';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -151,15 +152,21 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
   const renderPage = ({ item }: { item: OnboardingPage }) => (
     <View style={[styles.page, { width: SCREEN_WIDTH }]}>
       <View style={styles.pageContent}>
-        <Animated.View
-          entering={FadeIn.delay(150).duration(350)}
-          style={[styles.appIcon, {
-            backgroundColor: item.accentBg,
-            borderColor: `${item.accentColor}30`,
-          }]}
-        >
-          <Feather name={item.icon} size={36} color={item.accentColor} />
-        </Animated.View>
+        {item.id === 'welcome' ? (
+          <Animated.View entering={FadeIn.delay(150).duration(350)}>
+            <RoomdrLogo variant="stacked" size="lg" showTagline />
+          </Animated.View>
+        ) : (
+          <Animated.View
+            entering={FadeIn.delay(150).duration(350)}
+            style={[styles.appIcon, {
+              backgroundColor: item.accentBg,
+              borderColor: `${item.accentColor}30`,
+            }]}
+          >
+            <Feather name={item.icon} size={36} color={item.accentColor} />
+          </Animated.View>
+        )}
 
         <Text style={styles.title}>{item.title}</Text>
         <Text style={styles.subtitle}>{item.subtitle}</Text>
