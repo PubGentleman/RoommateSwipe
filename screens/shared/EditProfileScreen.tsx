@@ -163,6 +163,10 @@ export const EditProfileScreen = () => {
   const [roommateRelationship, setRoommateRelationship] = useState<'respectful_coliving' | 'occasional_hangouts' | 'prefer_friends' | 'minimal_interaction'>(user?.profileData?.preferences?.roommateRelationship || 'respectful_coliving');
   const [pets, setPets] = useState<'have_pets' | 'open_to_pets' | 'no_pets'>(user?.profileData?.preferences?.pets || 'open_to_pets');
   const [lifestyle, setLifestyle] = useState<Array<'active_gym' | 'homebody' | 'nightlife_social' | 'quiet_introverted' | 'creative_artistic' | 'professional_focused'>>(user?.profileData?.preferences?.lifestyle || []);
+  const [expenseUtilities, setExpenseUtilities] = useState<'split_equally' | 'usage_based' | 'included_in_rent'>(user?.profileData?.preferences?.sharedExpenses?.utilities || 'split_equally');
+  const [expenseGroceries, setExpenseGroceries] = useState<'split_equally' | 'buy_own' | 'shared_basics'>(user?.profileData?.preferences?.sharedExpenses?.groceries || 'buy_own');
+  const [expenseInternet, setExpenseInternet] = useState<'split_equally' | 'one_pays' | 'included_in_rent'>(user?.profileData?.preferences?.sharedExpenses?.internet || 'split_equally');
+  const [expenseCleaning, setExpenseCleaning] = useState<'split_equally' | 'take_turns' | 'hire_cleaner'>(user?.profileData?.preferences?.sharedExpenses?.cleaning || 'split_equally');
   const [moveInDate, setMoveInDate] = useState(() => {
     const raw = user?.profileData?.preferences?.moveInDate || '';
     if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
@@ -395,6 +399,12 @@ export const EditProfileScreen = () => {
           lifestyle,
           moveInDate: moveInDate.trim() || undefined,
           bedrooms: bedrooms.trim() ? parseInt(bedrooms) : undefined,
+          sharedExpenses: {
+            utilities: expenseUtilities,
+            groceries: expenseGroceries,
+            internet: expenseInternet,
+            cleaning: expenseCleaning,
+          },
         },
       },
     });
@@ -825,6 +835,58 @@ export const EditProfileScreen = () => {
               <OptionButton label="Quiet / Introverted" value="quiet_introverted" isSelected={lifestyle.includes('quiet_introverted')} onPress={() => toggleLifestyle('quiet_introverted')} />
               <OptionButton label="Creative / Artistic" value="creative_artistic" isSelected={lifestyle.includes('creative_artistic')} onPress={() => toggleLifestyle('creative_artistic')} />
               <OptionButton label="Professional-focused" value="professional_focused" isSelected={lifestyle.includes('professional_focused')} onPress={() => toggleLifestyle('professional_focused')} />
+            </View>
+          </View>
+        </View>
+
+        {/* Shared Expenses */}
+        <View style={styles.section}>
+          <ThemedText style={[Typography.h3, styles.sectionTitle]}>Shared Expense Expectations</ThemedText>
+          <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.lg }]}>
+            Set your expectations for splitting household costs
+          </ThemedText>
+
+          <View style={styles.inputGroup}>
+            <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
+              How should utilities (electric, gas, water) be handled?
+            </ThemedText>
+            <View style={styles.optionsRow}>
+              <OptionButton label="Split Equally" value="split_equally" isSelected={expenseUtilities === 'split_equally'} onPress={() => setExpenseUtilities('split_equally')} />
+              <OptionButton label="Based on Usage" value="usage_based" isSelected={expenseUtilities === 'usage_based'} onPress={() => setExpenseUtilities('usage_based')} />
+              <OptionButton label="Included in Rent" value="included_in_rent" isSelected={expenseUtilities === 'included_in_rent'} onPress={() => setExpenseUtilities('included_in_rent')} />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
+              How should groceries be handled?
+            </ThemedText>
+            <View style={styles.optionsRow}>
+              <OptionButton label="Split Equally" value="split_equally" isSelected={expenseGroceries === 'split_equally'} onPress={() => setExpenseGroceries('split_equally')} />
+              <OptionButton label="Everyone Buys Their Own" value="buy_own" isSelected={expenseGroceries === 'buy_own'} onPress={() => setExpenseGroceries('buy_own')} />
+              <OptionButton label="Share Basics, Buy Own Extras" value="shared_basics" isSelected={expenseGroceries === 'shared_basics'} onPress={() => setExpenseGroceries('shared_basics')} />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
+              How should internet / WiFi be handled?
+            </ThemedText>
+            <View style={styles.optionsRow}>
+              <OptionButton label="Split Equally" value="split_equally" isSelected={expenseInternet === 'split_equally'} onPress={() => setExpenseInternet('split_equally')} />
+              <OptionButton label="One Person Pays" value="one_pays" isSelected={expenseInternet === 'one_pays'} onPress={() => setExpenseInternet('one_pays')} />
+              <OptionButton label="Included in Rent" value="included_in_rent" isSelected={expenseInternet === 'included_in_rent'} onPress={() => setExpenseInternet('included_in_rent')} />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
+              How should cleaning supplies be handled?
+            </ThemedText>
+            <View style={styles.optionsRow}>
+              <OptionButton label="Split Equally" value="split_equally" isSelected={expenseCleaning === 'split_equally'} onPress={() => setExpenseCleaning('split_equally')} />
+              <OptionButton label="Take Turns Buying" value="take_turns" isSelected={expenseCleaning === 'take_turns'} onPress={() => setExpenseCleaning('take_turns')} />
+              <OptionButton label="Hire a Cleaner" value="hire_cleaner" isSelected={expenseCleaning === 'hire_cleaner'} onPress={() => setExpenseCleaning('hire_cleaner')} />
             </View>
           </View>
         </View>

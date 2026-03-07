@@ -20,6 +20,12 @@ export interface RoommateProfile {
     location: string;
     moveInDate: string;
     bedrooms: number;
+    sharedExpenses?: {
+      utilities?: 'split_equally' | 'usage_based' | 'included_in_rent';
+      groceries?: 'split_equally' | 'buy_own' | 'shared_basics';
+      internet?: 'split_equally' | 'one_pays' | 'included_in_rent';
+      cleaning?: 'split_equally' | 'take_turns' | 'hire_cleaner';
+    };
   };
   compatibility?: number;
 }
@@ -249,6 +255,12 @@ export interface User {
       lifestyle?: Array<'active_gym' | 'homebody' | 'nightlife_social' | 'quiet_introverted' | 'creative_artistic' | 'professional_focused'>;
       moveInDate?: string;
       bedrooms?: number;
+      sharedExpenses?: {
+        utilities?: 'split_equally' | 'usage_based' | 'included_in_rent';
+        groceries?: 'split_equally' | 'buy_own' | 'shared_basics';
+        internet?: 'split_equally' | 'one_pays' | 'included_in_rent';
+        cleaning?: 'split_equally' | 'take_turns' | 'hire_cleaner';
+      };
     };
   };
   notificationPreferences?: {

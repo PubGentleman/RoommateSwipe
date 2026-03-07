@@ -24,7 +24,7 @@ Preferred communication style: Simple, everyday language.
 
 ## Matching Algorithm
 
-Roomdr utilizes a comprehensive points-based compatibility system (0-100 score) across 13 weighted factors, including location (neighborhood proximity), budget, sleep schedule, cleanliness, move-in timeline alignment, and lifestyle tags. It provides detailed breakdowns with strengths, concerns, and notes for each match, dynamically color-coding compatibility. Date of Birth is a required field for all users, driving an automatic Zodiac sign calculation, which contributes a minor weight to compatibility. Move-in timeline matching (6 points) penalizes or rewards based on how closely two renters' dates align: within 2 weeks = 6pts, within a month = 5pts, 2 months = 3pts, 3 months = 1pt, 3+ months = 0pts.
+Roomdr utilizes a comprehensive points-based compatibility system (0-100 score) across 14 weighted factors, including location (neighborhood proximity), budget, sleep schedule, cleanliness, move-in timeline alignment, shared expense expectations, and lifestyle tags. It provides detailed breakdowns with strengths, concerns, and notes for each match, dynamically color-coding compatibility. Date of Birth is a required field for all users, driving an automatic Zodiac sign calculation, which contributes a minor weight to compatibility. Move-in timeline matching (6 points) penalizes or rewards based on how closely two renters' dates align: within 2 weeks = 6pts, within a month = 5pts, 2 months = 3pts, 3 months = 1pt, 3+ months = 0pts. Shared expense expectations (2 points) compare preferences on utilities, groceries, internet, and cleaning supplies splitting — 75%+ match = 2pts, 50%+ = 1pt, below 50% = 0pts.
 
 ## Frontend Architecture
 

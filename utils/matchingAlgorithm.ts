@@ -58,9 +58,10 @@ export const formatLocation = (location: {
  * 10. Pets: 4 points - Prevents allergies/preferences conflicts
  * 
  * LOWER PRIORITY (Relationship & Interests):
- * 11. Roommate Relationship: 4 points - Social expectations
- * 12. Lifestyle Tags: 2 points - Shared interests/activities (reduced from 3 to accommodate zodiac, baseline 1 pt)
- * 13. Zodiac Sign: 2 points - Optional fun factor, element-based compatibility (only if both users have it)
+ * 11. Roommate Relationship: 2 points - Social expectations
+ * 12. Shared Expenses: 2 points - Alignment on splitting utilities, groceries, internet, cleaning
+ * 13. Lifestyle Tags: 2 points - Shared interests/activities (reduced from 3 to accommodate zodiac, baseline 1 pt)
+ * 14. Zodiac Sign: 2 points - Optional fun factor, element-based compatibility (only if both users have it)
  */
 
 export interface MatchScore {
@@ -77,6 +78,7 @@ export interface MatchScore {
     noiseTolerance: number;
     pets: number;
     roommateRelationship: number;
+    sharedExpenses: number;
     lifestyle: number;
     zodiac: number;
   };
@@ -117,6 +119,7 @@ export const calculateDetailedCompatibility = (
     noiseTolerance: 0,
     pets: 0,
     roommateRelationship: 0,
+    sharedExpenses: 0,
     lifestyle: 1,
     zodiac: 0,
   };
@@ -146,7 +149,8 @@ export const calculateDetailedCompatibility = (
       guestPolicy: 5,
       noiseTolerance: 3,
       pets: 3,
-      roommateRelationship: 3,
+      roommateRelationship: 1,
+      sharedExpenses: 1,
       lifestyle: 1,
       zodiac: 0,
     };
@@ -422,33 +426,71 @@ export const calculateDetailedCompatibility = (
   }
 
   // ========================================
-  // 10. ROOMMATE RELATIONSHIP (4 points) - Social Expectations
+  // 11. ROOMMATE RELATIONSHIP (2 points) - Social Expectations
   // ========================================
   if (userPrefs.roommateRelationship) {
     const userRel = userPrefs.roommateRelationship;
     const roommateRel = inferRelationshipPreference(roommateProfile);
     
     if (userRel === roommateRel) {
-      breakdown.roommateRelationship = 4;
+      breakdown.roommateRelationship = 2;
       reasons.strengths.push(`Matching social expectations`);
     } else if (userRel === 'respectful_coliving' || roommateRel === 'respectful_coliving') {
-      breakdown.roommateRelationship = 3;
+      breakdown.roommateRelationship = 1;
       reasons.notes.push(`Respectful coexistence baseline met`);
     } else if (
       (userRel === 'minimal_interaction' && roommateRel === 'prefer_friends') ||
       (userRel === 'prefer_friends' && roommateRel === 'minimal_interaction')
     ) {
-      breakdown.roommateRelationship = 1;
+      breakdown.roommateRelationship = 0;
       reasons.concerns.push(`Different social expectations`);
     } else {
-      breakdown.roommateRelationship = 2;
+      breakdown.roommateRelationship = 1;
     }
   } else {
-    breakdown.roommateRelationship = 2;
+    breakdown.roommateRelationship = 1;
   }
 
   // ========================================
-  // 11. LIFESTYLE TAGS (2 points) - Shared Interests
+  // 12. SHARED EXPENSES (2 points) - Financial Friction Prevention
+  // ========================================
+  if (userPrefs.sharedExpenses) {
+    const userExp = userPrefs.sharedExpenses;
+    const roommateExp = roommateProfile.preferences?.sharedExpenses;
+    if (roommateExp) {
+      let matches = 0;
+      let total = 0;
+      const categories: Array<keyof typeof userExp> = ['utilities', 'groceries', 'internet', 'cleaning'];
+      for (const cat of categories) {
+        if (userExp[cat] && roommateExp[cat]) {
+          total++;
+          if (userExp[cat] === roommateExp[cat]) matches++;
+        }
+      }
+      if (total > 0) {
+        const ratio = matches / total;
+        if (ratio >= 0.75) {
+          breakdown.sharedExpenses = 2;
+          reasons.strengths.push(`Aligned on shared expense expectations`);
+        } else if (ratio >= 0.5) {
+          breakdown.sharedExpenses = 1;
+          reasons.notes.push(`Mostly aligned on shared expenses`);
+        } else {
+          breakdown.sharedExpenses = 0;
+          reasons.concerns.push(`Different expectations for splitting household costs`);
+        }
+      } else {
+        breakdown.sharedExpenses = 1;
+      }
+    } else {
+      breakdown.sharedExpenses = 1;
+    }
+  } else {
+    breakdown.sharedExpenses = 1;
+  }
+
+  // ========================================
+  // 13. LIFESTYLE TAGS (2 points) - Shared Interests
   // Max reduced from 3 to 2 points to accommodate zodiac sign (2 pts)
   // Baseline maintained at 1 point for compatibility with pre-zodiac scoring
   // ========================================
@@ -473,7 +515,7 @@ export const calculateDetailedCompatibility = (
   }
 
   // ========================================
-  // 12. ZODIAC SIGN (2 points max) - Fun Factor, Very Light Weight
+  // 14. ZODIAC SIGN (2 points max) - Fun Factor, Very Light Weight
   // Only applies if BOTH users have zodiac signs selected
   // Replaces previous occupation scoring (removed)
   // ========================================
