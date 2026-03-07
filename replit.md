@@ -31,7 +31,7 @@ Roomdr utilizes a comprehensive points-based compatibility system (0-100 score) 
 The application is built with React Native and Expo, using TypeScript and leveraging React Navigation for role-based navigation (Renter, Host, Agent/Landlord). It features a theme system for light/dark modes and reusable UI components.
 
 **Core Features by Role:**
-- **Renter:** Swipe-based matching, 1-on-1 messaging, group management, property exploration with advanced filters, saved properties, rewind functionality, profile views tracking, an AI Match Assistant, animated match celebration modal, report/block system, and notification feed with badge. Includes "room type" and "existing roommate gender" for listings, and compatibility scores with hosts.
+- **Renter:** Swipe-based matching, 1-on-1 messaging, group management, property exploration with advanced filters and list/map toggle view, saved properties, rewind functionality, profile views tracking, an AI Match Assistant, animated match celebration modal, report/block system, and notification feed with badge. Includes "room type" and "existing roommate gender" for listings, and compatibility scores with hosts.
 - **Host:** Property listing management (CRUD), including room type and existing roommate gender tracking, application review, and listing status control.
 - **Agent:** Multi-property portfolio management, document verification, and legal template library.
 
@@ -82,6 +82,9 @@ Key technical decisions include Babel module resolver for simplified imports, pl
 
 **Storage & State:**
 - `@react-native-async-storage/async-storage`
+
+**Maps:**
+- `react-native-maps` (iOS/Android native maps; web shows fallback property list)
 
 **Utilities:**
 - `expo-linking`

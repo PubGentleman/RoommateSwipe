@@ -15,6 +15,7 @@ import * as Haptics from 'expo-haptics';
 import { formatMoveInDate, calculateCompatibility, getMatchQualityColor, getGenderSymbol, formatLocation } from '../../utils/matchingAlgorithm';
 import { getZodiacSymbol } from '../../utils/zodiacUtils';
 import { NEIGHBORHOODS, getAllCities } from '../../utils/locationData';
+import { PropertyMapView } from '../../components/PropertyMapView';
 
 const COMMON_AMENITIES = [
   'Parking', 'Gym', 'Pool', 'Laundry', 'Pet Friendly',
@@ -38,6 +39,7 @@ export const ExploreScreen = () => {
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [showPropertyDetail, setShowPropertyDetail] = useState(false);
   const [viewMode, setViewMode] = useState<'all' | 'saved'>('all');
+  const [displayMode, setDisplayMode] = useState<'list' | 'map'>('list');
   const [searchQuery, setSearchQuery] = useState('');
   const [hostProfiles, setHostProfiles] = useState<Map<string, User>>(new Map());
 
@@ -486,6 +488,15 @@ export const ExploreScreen = () => {
             </Pressable>
           ) : null}
         </View>
+        <Pressable
+          style={[styles.filterButton, displayMode === 'map' && { backgroundColor: theme.primary + '15', borderRadius: BorderRadius.medium }]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setDisplayMode(displayMode === 'list' ? 'map' : 'list');
+          }}
+        >
+          <Feather name={displayMode === 'list' ? 'map' : 'list'} size={22} color={displayMode === 'map' ? theme.primary : theme.text} />
+        </Pressable>
         <Pressable style={styles.filterButton} onPress={handleFilterPress}>
           <Feather name="sliders" size={24} color={theme.text} />
           {hasActiveFilters() ? (
@@ -557,29 +568,44 @@ export const ExploreScreen = () => {
           </Pressable>
         </View>
       ) : null}
-      <FlatList
-        data={filteredProperties}
-        renderItem={renderProperty}
-        keyExtractor={item => item.id}
-        contentContainerStyle={[
-          styles.list,
-          { paddingBottom: insets.bottom + 100, paddingTop: Spacing.lg },
-        ]}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.emptyStateInline}>
-            <Feather name={viewMode === 'saved' ? 'heart' : 'home'} size={64} color={theme.textSecondary} />
-            <ThemedText style={[Typography.h2, { marginTop: Spacing.xl, textAlign: 'center' }]}>
-              {viewMode === 'saved' ? 'No Saved Properties' : 'No Properties Available'}
-            </ThemedText>
-            {viewMode === 'saved' ? (
-              <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.sm, textAlign: 'center' }]}>
-                Save properties by tapping the heart icon
+      {displayMode === 'map' ? (
+        <PropertyMapView
+          properties={filteredProperties}
+          saved={saved}
+          hostProfiles={hostProfiles}
+          currentUser={user || null}
+          onPropertyPress={(property) => {
+            setSelectedProperty(property);
+            setShowPropertyDetail(true);
+          }}
+          onToggleSave={toggleSave}
+          bottomInset={insets.bottom}
+        />
+      ) : (
+        <FlatList
+          data={filteredProperties}
+          renderItem={renderProperty}
+          keyExtractor={item => item.id}
+          contentContainerStyle={[
+            styles.list,
+            { paddingBottom: insets.bottom + 100, paddingTop: Spacing.lg },
+          ]}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={styles.emptyStateInline}>
+              <Feather name={viewMode === 'saved' ? 'heart' : 'home'} size={64} color={theme.textSecondary} />
+              <ThemedText style={[Typography.h2, { marginTop: Spacing.xl, textAlign: 'center' }]}>
+                {viewMode === 'saved' ? 'No Saved Properties' : 'No Properties Available'}
               </ThemedText>
-            ) : null}
-          </View>
-        }
-      />
+              {viewMode === 'saved' ? (
+                <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.sm, textAlign: 'center' }]}>
+                  Save properties by tapping the heart icon
+                </ThemedText>
+              ) : null}
+            </View>
+          }
+        />
+      )}
 
       <Modal
         visible={showFilterModal}
