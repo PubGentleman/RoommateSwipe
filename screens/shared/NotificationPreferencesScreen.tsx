@@ -145,7 +145,7 @@ export const NotificationPreferencesScreen = () => {
     .every(([_, v]) => !v);
 
   return (
-    <ScreenScrollView>
+    <ScreenScrollView style={{ backgroundColor: '#111111' }} contentContainerStyle={{ backgroundColor: '#111111' }}>
       <View style={styles.container}>
         <View style={styles.header}>
           <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={styles.backButton}>
@@ -157,7 +157,7 @@ export const NotificationPreferencesScreen = () => {
 
         <View style={styles.quickActions}>
           <Pressable
-            style={[styles.quickActionButton, { backgroundColor: theme.backgroundDefault }]}
+            style={[styles.quickActionButton, { backgroundColor: '#1a1a1a' }]}
             onPress={handleEnableAll}
             disabled={allEnabled}
           >
@@ -171,7 +171,7 @@ export const NotificationPreferencesScreen = () => {
             </ThemedText>
           </Pressable>
           <Pressable
-            style={[styles.quickActionButton, { backgroundColor: theme.backgroundDefault }]}
+            style={[styles.quickActionButton, { backgroundColor: '#1a1a1a' }]}
             onPress={handleDisableAll}
             disabled={allDisabledExceptSystem}
           >
@@ -191,7 +191,7 @@ export const NotificationPreferencesScreen = () => {
             <ThemedText style={[Typography.h3, styles.sectionTitle]}>
               {section.title}
             </ThemedText>
-            <View style={[styles.sectionCard, { backgroundColor: theme.backgroundDefault }]}>
+            <View style={[styles.sectionCard, { backgroundColor: '#1a1a1a' }]}>
               {section.items.map((item, index) => {
                 const isEnabled = preferences[item.key as keyof typeof preferences];
                 const isSystemAlert = item.key === 'systemAlerts';

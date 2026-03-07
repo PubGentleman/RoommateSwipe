@@ -75,12 +75,12 @@ export const BlockedUsersScreen = () => {
   };
 
   const renderItem = ({ item }: { item: BlockedUserInfo }) => (
-    <View style={[styles.userRow, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
+    <View style={[styles.userRow, { backgroundColor: '#1a1a1a', borderColor: '#333333' }]}>
       <View style={styles.userInfo}>
         {item.photo ? (
           <Image source={{ uri: item.photo }} style={styles.avatar} />
         ) : (
-          <View style={[styles.avatarPlaceholder, { backgroundColor: theme.backgroundDefault }]}>
+          <View style={[styles.avatarPlaceholder, { backgroundColor: '#222222' }]}>
             <Feather name="user" size={20} color={theme.textSecondary} />
           </View>
         )}
@@ -100,7 +100,7 @@ export const BlockedUsersScreen = () => {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+    <View style={[styles.container, { backgroundColor: '#111111' }]}>
       {blockedUsers.length === 0 && !isLoading ? (
         <View style={styles.emptyState}>
           <Feather name="shield" size={64} color={theme.textSecondary} />

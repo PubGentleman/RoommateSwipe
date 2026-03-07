@@ -54,6 +54,19 @@ The system uses mock authentication for demonstration, supporting role-based nav
 
 The data layer uses mock data and TypeScript interfaces for models like `RoommateProfile`, `Property`, `Group`, `Conversation`, `Message`, `Match`, and `Application`. There are 126 total demo roommate profiles spread across 11 major US cities (New York, Los Angeles, Chicago, Miami, San Francisco, Austin, Seattle, Denver, Boston, Houston, Atlanta). The base 26 profiles are in `utils/mockData.ts` and 100 additional profiles are in `utils/additionalProfiles.ts`, merged via spread operator. It supports reciprocal matching, automatic conversation creation, and message limits. Property management includes distinguishing room types and tracking existing roommates. An AI Match Assistant refines user profiles through natural language interactions.
 
+## Dark Theme UI
+
+All screens use a consistent dark theme with hardcoded colors:
+- Root background: `#111` (near-black)
+- Card backgrounds: `#1a1a1a` (dark gray)
+- Accent/CTA: coral `#ff6b5b` with gradient to `#e83a2a`
+- Text: white `#fff` with opacity variants for secondary text (`rgba(255,255,255,0.35)`)
+- Section titles: uppercase, `rgba(255,255,255,0.5)`, 13px, 700 weight
+- Settings items: colored icon boxes (purple, green, orange, red) with rounded backgrounds
+- All profile sub-screens (Payment, Plans, Notifications, Privacy, Verification, etc.) use matching dark backgrounds
+
+The ProfileScreen uses a custom ScrollView layout with manual safe area insets (matching other main screens like RoommatesScreen and MessagesScreen). Sub-screens use either ScreenScrollView or custom layouts with dark background overrides.
+
 ## Branding
 
 The `RoomdrLogo` component renders the brand logo using `react-native-svg` and `expo-linear-gradient`, with variants for horizontal, stacked, and icon-only layouts in `sm`, `md`, `lg` sizes. Brand colors are coral-red gradients and white.

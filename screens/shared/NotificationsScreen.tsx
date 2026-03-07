@@ -153,7 +153,7 @@ export const NotificationsScreen = () => {
       style={[
         styles.notificationCard,
         {
-          backgroundColor: item.isRead ? theme.backgroundDefault : theme.backgroundSecondary,
+          backgroundColor: item.isRead ? '#1a1a1a' : '#222222',
           borderColor: theme.border,
         },
       ]}
@@ -197,7 +197,7 @@ export const NotificationsScreen = () => {
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
   return (
-    <ThemedView style={styles.container}>
+    <ThemedView style={[styles.container, { backgroundColor: '#111111' }]}>
       <View style={[styles.header, { paddingTop: insets.top + Spacing.md }]}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={styles.backButton}>
           <Feather name="chevron-left" size={28} color={theme.primary} />

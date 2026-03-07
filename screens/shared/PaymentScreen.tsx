@@ -103,7 +103,7 @@ export const PaymentScreen = () => {
   };
 
   return (
-    <ScreenKeyboardAwareScrollView>
+    <ScreenKeyboardAwareScrollView style={{ backgroundColor: '#111111' }} contentContainerStyle={{ backgroundColor: '#111111' }}>
       <View style={styles.container}>
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -122,7 +122,7 @@ export const PaymentScreen = () => {
           </ThemedText>
 
           {showAddCard ? (
-            <View style={[styles.addCardForm, { backgroundColor: theme.backgroundDefault }]}>
+            <View style={[styles.addCardForm, { backgroundColor: '#1a1a1a' }]}>
               <ThemedText style={[Typography.h3, { marginBottom: Spacing.lg }]}>Add New Card</ThemedText>
               
               <View style={styles.inputGroup}>
@@ -130,7 +130,7 @@ export const PaymentScreen = () => {
                   Card Number
                 </ThemedText>
                 <TextInput
-                  style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text }]}
+                  style={[styles.input, { backgroundColor: '#222222', color: '#FFFFFF' }]}
                   placeholder="1234 5678 9012 3456"
                   placeholderTextColor={theme.textSecondary}
                   value={cardNumber}
@@ -146,7 +146,7 @@ export const PaymentScreen = () => {
                     Expiry Date
                   </ThemedText>
                   <TextInput
-                    style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text }]}
+                    style={[styles.input, { backgroundColor: '#222222', color: '#FFFFFF' }]}
                     placeholder="MM/YY"
                     placeholderTextColor={theme.textSecondary}
                     value={expiryDate}
@@ -161,7 +161,7 @@ export const PaymentScreen = () => {
                     CVV
                   </ThemedText>
                   <TextInput
-                    style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text }]}
+                    style={[styles.input, { backgroundColor: '#222222', color: '#FFFFFF' }]}
                     placeholder="123"
                     placeholderTextColor={theme.textSecondary}
                     value={cvv}
@@ -175,7 +175,7 @@ export const PaymentScreen = () => {
 
               <View style={styles.formActions}>
                 <Pressable
-                  style={[styles.button, styles.cancelButton, { borderColor: theme.border }]}
+                  style={[styles.button, styles.cancelButton, { borderColor: '#333333' }]}
                   onPress={() => {
                     setShowAddCard(false);
                     setCardNumber('');
@@ -204,7 +204,7 @@ export const PaymentScreen = () => {
             user.paymentMethods.map((method) => (
               <View
                 key={method.id}
-                style={[styles.paymentMethod, { backgroundColor: theme.backgroundDefault }]}
+                style={[styles.paymentMethod, { backgroundColor: '#1a1a1a' }]}
               >
                 <View style={styles.cardInfo}>
                   <Feather name="credit-card" size={24} color={theme.text} />
@@ -225,7 +225,7 @@ export const PaymentScreen = () => {
               </View>
             ))
           ) : !showAddCard ? (
-            <View style={[styles.emptyState, { backgroundColor: theme.backgroundDefault }]}>
+            <View style={[styles.emptyState, { backgroundColor: '#1a1a1a' }]}>
               <Feather name="credit-card" size={48} color={theme.textSecondary} />
               <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.md }]}>
                 No payment methods added

@@ -1,16 +1,13 @@
 import React from 'react';
-import { View, StyleSheet, Pressable } from 'react-native';
+import { View, StyleSheet, Pressable, Text } from 'react-native';
 import Animated, {
   useAnimatedStyle,
-  withTiming,
-  useSharedValue,
   withDelay,
   withSpring,
+  useSharedValue,
 } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import { ThemedText } from './ThemedText';
-import { useTheme } from '../hooks/useTheme';
-import { Spacing, BorderRadius, Typography } from '../constants/theme';
 import type { User } from '../types/models';
 
 interface ProfileField {
@@ -18,6 +15,7 @@ interface ProfileField {
   label: string;
   icon: keyof typeof Feather.glyphMap;
   tip: string;
+  boostText?: string;
   weight: number;
   check: (user: User) => boolean;
 }
@@ -25,57 +23,59 @@ interface ProfileField {
 const PROFILE_FIELDS: ProfileField[] = [
   {
     key: 'photo',
-    label: 'Profile Photo',
+    label: 'Add a Profile Photo',
     icon: 'camera',
-    tip: 'Add a photo to get 3x more matches',
+    tip: 'with a photo',
+    boostText: '3x more matches',
     weight: 20,
     check: (u) => !!(u.photos?.length || u.profilePicture),
   },
   {
     key: 'bio',
-    label: 'Bio',
+    label: 'Write a Bio',
     icon: 'edit-2',
-    tip: 'Write a bio to get 20% more matches',
+    tip: 'with a bio',
+    boostText: '20% more messages',
     weight: 15,
     check: (u) => !!(u.profileData?.bio && u.profileData.bio.trim().length > 0),
   },
   {
     key: 'birthday',
-    label: 'Date of Birth',
+    label: 'Add Your Age',
     icon: 'calendar',
-    tip: 'Add your birthday for zodiac compatibility',
+    tip: 'Builds trust and improves match accuracy',
     weight: 10,
     check: (u) => !!u.birthday,
   },
   {
     key: 'budget',
-    label: 'Budget',
+    label: 'Set Your Budget',
     icon: 'dollar-sign',
-    tip: 'Set your budget for better financial matches',
+    tip: 'Better financial compatibility',
     weight: 10,
     check: (u) => !!(u.profileData?.budget && u.profileData.budget > 0),
   },
   {
     key: 'location',
-    label: 'Location',
+    label: 'Add Location',
     icon: 'map-pin',
-    tip: 'Add your location to find nearby roommates',
+    tip: 'Find nearby roommates',
     weight: 10,
     check: (u) => !!(u.profileData?.city || u.profileData?.neighborhood || u.profileData?.location),
   },
   {
     key: 'occupation',
-    label: 'Occupation',
+    label: 'Add Occupation',
     icon: 'briefcase',
-    tip: 'Share your occupation to build trust',
+    tip: 'Build trust with potential matches',
     weight: 5,
     check: (u) => !!(u.profileData?.occupation && u.profileData.occupation.trim().length > 0),
   },
   {
     key: 'interests',
-    label: 'Interests',
+    label: 'Add Interests',
     icon: 'heart',
-    tip: 'Add interests to connect over shared hobbies',
+    tip: 'Connect over shared hobbies',
     weight: 5,
     check: (u) => !!(u.profileData?.interests && u.profileData.interests.trim().length > 0),
   },
@@ -83,7 +83,7 @@ const PROFILE_FIELDS: ProfileField[] = [
     key: 'sleepSchedule',
     label: 'Sleep Schedule',
     icon: 'moon',
-    tip: 'Set your sleep schedule for lifestyle compatibility',
+    tip: 'Lifestyle compatibility matching',
     weight: 10,
     check: (u) => !!u.profileData?.preferences?.sleepSchedule,
   },
@@ -91,7 +91,7 @@ const PROFILE_FIELDS: ProfileField[] = [
     key: 'cleanliness',
     label: 'Cleanliness Level',
     icon: 'droplet',
-    tip: 'Set cleanliness to avoid 40% of roommate conflicts',
+    tip: 'Avoid 40% of roommate conflicts',
     weight: 10,
     check: (u) => !!u.profileData?.preferences?.cleanliness,
   },
@@ -99,7 +99,7 @@ const PROFILE_FIELDS: ProfileField[] = [
     key: 'smoking',
     label: 'Smoking Preference',
     icon: 'wind',
-    tip: 'Set smoking preference for deal-breaker matching',
+    tip: 'Deal-breaker matching',
     weight: 5,
     check: (u) => !!u.profileData?.preferences?.smoking,
   },
@@ -125,28 +125,13 @@ function getCompletionData(user: User) {
   return { percentage, missing, completed, total: PROFILE_FIELDS.length, completedCount: completed.length };
 }
 
-function getProgressColor(pct: number, theme: any): string {
-  if (pct >= 80) return theme.success;
-  if (pct >= 50) return theme.warning;
-  return theme.error;
-}
-
-function getEncouragementText(pct: number): string {
-  if (pct === 100) return 'Your profile is complete! You are getting the best matches.';
-  if (pct >= 80) return 'Almost there! Complete a few more fields for the best results.';
-  if (pct >= 50) return 'Good progress! Fill in more details to improve your matches.';
-  return 'Complete your profile to start getting better matches.';
-}
-
 interface ProfileCompletionCardProps {
   user: User;
   onEditProfile: () => void;
 }
 
 export const ProfileCompletionCard = ({ user, onEditProfile }: ProfileCompletionCardProps) => {
-  const { theme } = useTheme();
   const { percentage, missing, completedCount, total } = getCompletionData(user);
-  const progressColor = getProgressColor(percentage, theme);
 
   const progressWidth = useSharedValue(0);
 
@@ -160,18 +145,17 @@ export const ProfileCompletionCard = ({ user, onEditProfile }: ProfileCompletion
 
   if (percentage === 100) {
     return (
-      <View style={[styles.card, { backgroundColor: theme.backgroundDefault }]}>
-        <View style={styles.completeRow}>
-          <View style={[styles.checkCircle, { backgroundColor: theme.success }]}>
-            <Feather name="check" size={16} color="#FFFFFF" />
-          </View>
-          <View style={styles.completeTextContainer}>
-            <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
-              Profile Complete
-            </ThemedText>
-            <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
-              You are getting the best possible matches
-            </ThemedText>
+      <View style={styles.card}>
+        <View style={styles.topBar} />
+        <View style={styles.cardContent}>
+          <View style={styles.completeRow}>
+            <View style={styles.checkCircle}>
+              <Feather name="check" size={16} color="#FFFFFF" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.completeTitle}>Profile Complete</Text>
+              <Text style={styles.completeSubtitle}>You are getting the best possible matches</Text>
+            </View>
           </View>
         </View>
       </View>
@@ -181,118 +165,160 @@ export const ProfileCompletionCard = ({ user, onEditProfile }: ProfileCompletion
   const topMissing = missing.slice(0, 3);
 
   return (
-    <View style={[styles.card, { backgroundColor: theme.backgroundDefault }]}>
-      <View style={styles.headerRow}>
-        <View style={styles.headerLeft}>
-          <ThemedText style={[Typography.h3]}>Profile Completion</ThemedText>
-          <ThemedText style={[Typography.small, { color: theme.textSecondary, marginTop: 2 }]}>
-            {completedCount}/{total} fields completed
-          </ThemedText>
+    <View style={styles.card}>
+      <LinearGradient colors={['#ff6b5b', '#ffaa80']} style={styles.topBar} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} />
+      <View style={styles.cardContent}>
+        <View style={styles.strengthTop}>
+          <View style={styles.strengthLeft}>
+            <Text style={styles.strengthTitle}>Profile Completion</Text>
+            <Text style={styles.strengthSubtitle}>{completedCount} of {total} fields completed</Text>
+          </View>
+          <Text style={styles.strengthPct}>{percentage}%</Text>
         </View>
-        <View style={[styles.percentBadge, { backgroundColor: progressColor + '20' }]}>
-          <ThemedText style={[Typography.h3, { color: progressColor }]}>
-            {percentage}%
-          </ThemedText>
+
+        <View style={styles.progressTrack}>
+          <Animated.View style={progressBarStyle}>
+            <LinearGradient colors={['#ff6b5b', '#ffaa80']} style={styles.progressFill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} />
+          </Animated.View>
         </View>
-      </View>
 
-      <View style={[styles.progressTrack, { backgroundColor: theme.backgroundSecondary }]}>
-        <Animated.View style={[styles.progressFill, { backgroundColor: progressColor }, progressBarStyle]} />
-      </View>
+        <Text style={styles.progressHint}>Complete your profile to unlock better matches</Text>
 
-      <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.md }]}>
-        {getEncouragementText(percentage)}
-      </ThemedText>
-
-      <View style={styles.missingList}>
         {topMissing.map((field) => (
-          <Pressable
-            key={field.key}
-            style={[styles.missingItem, { backgroundColor: theme.backgroundSecondary }]}
-            onPress={onEditProfile}
-          >
-            <View style={[styles.missingIcon, { backgroundColor: progressColor + '15' }]}>
-              <Feather name={field.icon} size={16} color={progressColor} />
+          <Pressable key={field.key} style={styles.completionItem} onPress={onEditProfile}>
+            <View style={styles.completionIcon}>
+              <Feather name={field.icon} size={17} color="#ff6b5b" />
             </View>
-            <View style={styles.missingTextContainer}>
-              <ThemedText style={[Typography.body, { fontWeight: '500' }]} numberOfLines={1}>
-                {field.label}
-              </ThemedText>
-              <ThemedText style={[Typography.small, { color: theme.textSecondary }]} numberOfLines={1}>
-                {field.tip}
-              </ThemedText>
+            <View style={styles.completionText}>
+              <Text style={styles.completionTitle}>{field.label}</Text>
+              <Text style={styles.completionSubtitle}>
+                {field.boostText ? (
+                  <><Text style={styles.boostText}>{field.boostText}</Text> {field.tip}</>
+                ) : field.tip}
+              </Text>
             </View>
-            <Feather name="chevron-right" size={16} color={theme.textSecondary} />
+            <Feather name="chevron-right" size={14} color="rgba(255,255,255,0.2)" />
           </Pressable>
         ))}
-      </View>
 
-      {missing.length > 3 ? (
-        <Pressable style={styles.seeAllButton} onPress={onEditProfile}>
-          <ThemedText style={[Typography.small, { color: theme.primary, fontWeight: '600' }]}>
-            +{missing.length - 3} more to complete
-          </ThemedText>
-        </Pressable>
-      ) : null}
+        {missing.length > 3 ? (
+          <Pressable style={styles.moreLink} onPress={onEditProfile}>
+            <Text style={styles.moreLinkText}>+{missing.length - 3} more to complete</Text>
+          </Pressable>
+        ) : null}
+      </View>
     </View>
   );
 };
 
+export { getCompletionData, PROFILE_FIELDS };
+
 const styles = StyleSheet.create({
   card: {
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.medium,
-    marginBottom: Spacing.sm,
+    backgroundColor: '#1a1a1a',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 20,
+    overflow: 'hidden',
+    position: 'relative',
   },
-  headerRow: {
+  topBar: {
+    height: 3,
+    width: '100%',
+  },
+  cardContent: {
+    padding: 18,
+  },
+  strengthTop: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: Spacing.md,
+    marginBottom: 10,
   },
-  headerLeft: {
+  strengthLeft: {
     flex: 1,
   },
-  percentBadge: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.small,
+  strengthTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 2,
+  },
+  strengthSubtitle: {
+    fontSize: 11.5,
+    color: 'rgba(255,255,255,0.35)',
+  },
+  strengthPct: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: '#ff6b5b',
+    letterSpacing: -1,
   },
   progressTrack: {
-    height: 8,
-    borderRadius: 4,
-    marginBottom: Spacing.md,
+    height: 6,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 3,
+    marginBottom: 6,
     overflow: 'hidden',
   },
   progressFill: {
-    height: '100%',
-    borderRadius: 4,
+    height: 6,
+    borderRadius: 3,
   },
-  missingList: {
-    gap: Spacing.sm,
+  progressHint: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.3)',
+    marginBottom: 14,
+    fontStyle: 'italic',
   },
-  missingItem: {
+  completionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: Spacing.md,
-    borderRadius: BorderRadius.small,
+    gap: 12,
+    paddingVertical: 11,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 14,
+    marginBottom: 8,
   },
-  missingIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  completionIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    backgroundColor: 'rgba(255,107,91,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.18)',
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: Spacing.md,
   },
-  missingTextContainer: {
+  completionText: {
     flex: 1,
-    marginRight: Spacing.sm,
   },
-  seeAllButton: {
+  completionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 2,
+  },
+  completionSubtitle: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.35)',
+  },
+  boostText: {
+    color: '#ff8070',
+    fontWeight: '600',
+  },
+  moreLink: {
     alignItems: 'center',
-    paddingVertical: Spacing.md,
-    marginTop: Spacing.sm,
+    paddingTop: 8,
+    paddingBottom: 2,
+  },
+  moreLinkText: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#ff6b5b',
   },
   completeRow: {
     flexDirection: 'row',
@@ -302,11 +328,18 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    justifyContent: 'center',
+    backgroundColor: '#3ECF8E',
     alignItems: 'center',
-    marginRight: Spacing.md,
+    justifyContent: 'center',
+    marginRight: 12,
   },
-  completeTextContainer: {
-    flex: 1,
+  completeTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  completeSubtitle: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.35)',
   },
 });

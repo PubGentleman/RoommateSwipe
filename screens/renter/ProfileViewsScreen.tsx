@@ -64,7 +64,7 @@ export const ProfileViewsScreen = () => {
 
   const renderViewItem = ({ item }: { item: ProfileView }) => (
     <Pressable
-      style={[styles.viewItem, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}
+      style={[styles.viewItem, { backgroundColor: '#1a1a1a', borderColor: '#333333' }]}
       onPress={() => {
         // TODO: Navigate to viewer's profile
         console.log('[ProfileViewsScreen] View profile:', item.viewerId);
@@ -76,7 +76,7 @@ export const ProfileViewsScreen = () => {
           style={styles.avatar}
         />
       ) : (
-        <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: theme.border }]}>
+        <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: '#222222' }]}>
           <Feather name="user" size={32} color={theme.textSecondary} />
         </View>
       )}
@@ -93,7 +93,7 @@ export const ProfileViewsScreen = () => {
   );
 
   const renderUpgradePrompt = () => (
-    <View style={[styles.upgradeContainer, { backgroundColor: theme.backgroundSecondary }]}>
+    <View style={[styles.upgradeContainer, { backgroundColor: '#1a1a1a' }]}>
       <View style={[styles.upgradeIcon, { backgroundColor: theme.primary }]}>
         <Feather name="eye" size={32} color="#FFFFFF" />
       </View>
@@ -151,14 +151,14 @@ export const ProfileViewsScreen = () => {
 
   if (!canSeeProfileViews) {
     return (
-      <ScreenScrollView>
+      <ScreenScrollView style={{ backgroundColor: '#111111' }} contentContainerStyle={{ backgroundColor: '#111111' }}>
         {renderUpgradePrompt()}
       </ScreenScrollView>
     );
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.backgroundDefault }]}>
+    <View style={[styles.container, { backgroundColor: '#111111' }]}>
       <FlatList
         data={profileViews}
         renderItem={renderViewItem}

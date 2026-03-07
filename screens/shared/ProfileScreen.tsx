@@ -1,26 +1,24 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Pressable, Image, Alert, Modal } from 'react-native';
+import React, { useState } from 'react';
+import { View, StyleSheet, Pressable, Image, Alert, Modal, ScrollView, Text } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { ScreenScrollView } from '../../components/ScreenScrollView';
-import { ThemedText } from '../../components/ThemedText';
-import { useTheme } from '../../hooks/useTheme';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { ProfileStackParamList } from '../../navigation/ProfileStackNavigator';
-import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { ProfileCompletionCard } from '../../components/ProfileCompletionCard';
-import { VerificationBadge, getVerificationLevel, getVerificationLabel } from '../../components/VerificationBadge';
+import { getVerificationLevel } from '../../components/VerificationBadge';
 
 type ProfileScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'ProfileMain'>;
 
 export const ProfileScreen = () => {
-  const { theme } = useTheme();
   const { user, logout, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost } = useAuth();
   const { unreadCount } = useNotificationContext();
   const navigation = useNavigation<ProfileScreenNavigationProp>();
+  const insets = useSafeAreaInsets();
   const [showPurchaseBoostModal, setShowPurchaseBoostModal] = useState(false);
   const [processingBoost, setProcessingBoost] = useState(false);
 
@@ -32,17 +30,14 @@ export const ProfileScreen = () => {
 
   const handleBoost = async () => {
     const boostStatus = canBoost();
-    
     if (user?.subscription?.plan === 'basic' && boostStatus.requiresPayment) {
       setShowPurchaseBoostModal(true);
       return;
     }
-    
     if (!boostStatus.canBoost) {
       Alert.alert('Cannot Boost', boostStatus.reason || 'Boost is currently unavailable');
       return;
     }
-    
     const result = await activateBoost();
     if (result.success) {
       Alert.alert('Boost Activated!', result.message);
@@ -55,7 +50,6 @@ export const ProfileScreen = () => {
     setProcessingBoost(true);
     const result = await purchaseBoost();
     setProcessingBoost(false);
-    
     if (result.success) {
       setShowPurchaseBoostModal(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -70,529 +64,567 @@ export const ProfileScreen = () => {
     }
   };
 
-  const getRoleBadgeColor = () => {
-    if (!user) return theme.primary;
-    switch (user.role) {
-      case 'renter':
-        return theme.renterBadge;
-      case 'host':
-        return theme.hostBadge;
-      case 'agent':
-        return theme.agentBadge;
-      default:
-        return theme.primary;
-    }
-  };
-
   const getRoleLabel = () => {
     if (!user) return 'User';
     return user.role.charAt(0).toUpperCase() + user.role.slice(1);
   };
 
-  const MenuItem = ({ icon, label, onPress, danger, badge }: any) => (
-    <Pressable
-      style={[styles.menuItem, { backgroundColor: theme.backgroundDefault }]}
-      onPress={onPress}
-    >
-      <Feather name={icon} size={20} color={danger ? theme.error : theme.text} />
-      <ThemedText style={[Typography.body, { flex: 1, marginLeft: Spacing.lg, color: danger ? theme.error : theme.text }]}>
-        {label}
-      </ThemedText>
-      {badge > 0 ? (
-        <View style={styles.menuBadge}>
-          <ThemedText style={styles.menuBadgeText}>
-            {badge > 99 ? '99+' : badge}
-          </ThemedText>
-        </View>
-      ) : null}
-      <Feather name="chevron-right" size={20} color={theme.textSecondary} />
-    </Pressable>
-  );
+  const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : 'U';
+  const matchCount = 12;
+  const profileViewCount = 84;
+  const likesCount = 7;
 
   return (
-    <ScreenScrollView>
-      <View style={styles.container}>
-        <View style={styles.profileHeader}>
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              {(user?.photos?.[0] || user?.profilePicture) ? (
-                <Image 
-                  source={{ uri: user?.photos?.[0] || user?.profilePicture }} 
-                  style={styles.avatarImage}
-                />
-              ) : (
-                <Feather name="user" size={64} color={theme.textSecondary} />
-              )}
-            </View>
-            <View style={[styles.roleBadge, { backgroundColor: getRoleBadgeColor() }]}>
-              <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '600' }]}>
-                {getRoleLabel()}
-              </ThemedText>
-            </View>
-          </View>
-          <View style={styles.nameRow}>
-            <ThemedText style={[Typography.h1, styles.name]}>{user?.name || 'User'}</ThemedText>
-            {getVerificationLevel(user?.verification) > 0 ? (
-              <VerificationBadge
-                verification={user?.verification}
-                size="small"
-                showLabel
-                onPress={() => navigation.navigate('Verification')}
-              />
-            ) : null}
-          </View>
-          <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
-            {user?.email}
-          </ThemedText>
-        </View>
-
-        {user?.role === 'renter' ? (
-          <View style={styles.section}>
-            <ThemedText style={[Typography.h3, styles.sectionTitle]}>Profile Strength</ThemedText>
-            <ProfileCompletionCard
-              user={user}
-              onEditProfile={() => navigation.navigate('ProfileQuestionnaire')}
-            />
-          </View>
-        ) : null}
-
-        <View style={styles.section}>
-          <ThemedText style={[Typography.h3, styles.sectionTitle]}>Subscription</ThemedText>
-          <View style={[styles.subscriptionCard, { backgroundColor: theme.backgroundDefault }]}>
-            <View style={styles.subscriptionHeader}>
-              <View style={styles.subscriptionInfo}>
-                <ThemedText style={[Typography.h3, { textTransform: 'capitalize' }]}>
-                  {user?.subscription?.plan || 'Basic'} Plan
-                </ThemedText>
-                {user?.subscription?.plan === 'plus' ? (
-                  <View style={[styles.badge, { backgroundColor: theme.primary }]}>
-                    <Feather name="star" size={12} color="#FFFFFF" />
-                    <ThemedText style={[Typography.small, { color: '#FFFFFF', marginLeft: 4, fontWeight: '600' }]}>
-                      Plus
-                    </ThemedText>
-                  </View>
-                ) : user?.subscription?.plan === 'elite' ? (
-                  <View style={[styles.badge, { backgroundColor: '#7C3AED' }]}>
-                    <Feather name="award" size={12} color="#FFD700" />
-                    <ThemedText style={[Typography.small, { color: '#FFFFFF', marginLeft: 4, fontWeight: '600' }]}>
-                      Elite
-                    </ThemedText>
-                  </View>
-                ) : null}
-              </View>
-              {user?.subscription?.plan === 'basic' ? (
-                <Pressable
-                  style={[styles.upgradeButton, { backgroundColor: theme.primary }]}
-                  onPress={() => navigation.navigate('Plans')}
-                >
-                  <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>
-                    Upgrade
-                  </ThemedText>
-                </Pressable>
-              ) : null}
-            </View>
-            
-            {user?.subscription?.plan !== 'basic' && (
-              <View style={styles.benefitsList}>
-                <View style={styles.benefitItem}>
-                  <Feather name="check" size={16} color={theme.primary} />
-                  <ThemedText style={[Typography.body, { marginLeft: Spacing.sm }]}>
-                    Unlimited group creation
-                  </ThemedText>
-                </View>
-                <View style={styles.benefitItem}>
-                  <Feather name="check" size={16} color={theme.primary} />
-                  <ThemedText style={[Typography.body, { marginLeft: Spacing.sm }]}>
-                    Unlimited group joining
-                  </ThemedText>
-                </View>
-                {user?.subscription?.expiresAt ? (
-                  <ThemedText style={[Typography.small, { color: theme.textSecondary, marginTop: Spacing.md }]}>
-                    Renews on {(() => { const d = new Date(user.subscription.expiresAt); return `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}/${d.getFullYear()}`; })()}
-                  </ThemedText>
-                ) : null}
-              </View>
-            )}
-          </View>
-          
-          <MenuItem 
-            icon="package" 
-            label="Subscription Plans" 
-            onPress={() => navigation.navigate('Plans')} 
-          />
-          <MenuItem 
-            icon="credit-card" 
-            label="Payment Methods" 
-            onPress={() => navigation.navigate('Payment')} 
-          />
-        </View>
-
-        {user?.role === 'renter' ? (
-          <View style={styles.section}>
-            <ThemedText style={[Typography.h3, styles.sectionTitle]}>Profile Boost</ThemedText>
-            <View style={[styles.boostCard, { backgroundColor: theme.backgroundDefault }]}>
-              {user.boostData?.isBoosted ? (
-                <View style={styles.boostActive}>
-                  <View style={[styles.boostBadge, { backgroundColor: '#10B981' }]}>
-                    <Feather name="zap" size={16} color="#FFFFFF" />
-                    <ThemedText style={[Typography.small, { color: '#FFFFFF', marginLeft: 4, fontWeight: '600' }]}>
-                      Active
-                    </ThemedText>
-                  </View>
-                  <ThemedText style={[Typography.body, { marginTop: Spacing.sm }]}>
-                    Your profile is currently boosted!
-                  </ThemedText>
-                  {user.boostData.boostExpiresAt ? (
-                    <ThemedText style={[Typography.small, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
-                      Expires: {new Date(user.boostData.boostExpiresAt).toLocaleString()}
-                    </ThemedText>
-                  ) : null}
-                </View>
-              ) : (
-                <>
-                  <ThemedText style={[Typography.body, { color: theme.textSecondary, marginBottom: Spacing.md }]}>
-                    Boost your profile to appear first in roommate searches for 24 hours
-                  </ThemedText>
-                  <View style={styles.boostInfo}>
-                    <View style={styles.boostFeature}>
-                      <Feather name="trending-up" size={16} color={theme.primary} />
-                      <ThemedText style={[Typography.small, { marginLeft: Spacing.sm }]}>
-                        Priority placement
-                      </ThemedText>
-                    </View>
-                    <View style={styles.boostFeature}>
-                      <Feather name="clock" size={16} color={theme.primary} />
-                      <ThemedText style={[Typography.small, { marginLeft: Spacing.sm }]}>
-                        24 hour duration
-                      </ThemedText>
-                    </View>
-                  </View>
-                  {user.subscription?.plan === 'plus' && user.boostData?.lastBoostDate ? (
-                    <ThemedText style={[Typography.small, { color: theme.textSecondary, marginTop: Spacing.md }]}>
-                      {(() => {
-                        const boostStatus = canBoost();
-                        if (!boostStatus.canBoost && boostStatus.reason) {
-                          return boostStatus.reason;
-                        }
-                        return 'Boost available!';
-                      })()}
-                    </ThemedText>
-                  ) : null}
-                  <Pressable
-                    style={[styles.boostButton, { 
-                      backgroundColor: canBoost().canBoost ? theme.primary : theme.backgroundSecondary 
-                    }]}
-                    onPress={handleBoost}
-                    disabled={!canBoost().canBoost && user.subscription?.plan !== 'basic'}
-                  >
-                    <Feather name="zap" size={20} color={canBoost().canBoost ? '#FFFFFF' : theme.textSecondary} />
-                    <ThemedText style={[Typography.body, { 
-                      color: canBoost().canBoost ? '#FFFFFF' : theme.textSecondary, 
-                      fontWeight: '600', 
-                      marginLeft: Spacing.sm 
-                    }]}>
-                      {user.subscription?.plan === 'basic' 
-                        ? 'Purchase Boost - $3' 
-                        : canBoost().canBoost 
-                          ? 'Activate Boost' 
-                          : 'Boost Unavailable'}
-                    </ThemedText>
-                  </Pressable>
-                </>
-              )}
-            </View>
-          </View>
-        ) : null}
-
-        <View style={styles.section}>
-          <ThemedText style={[Typography.h3, styles.sectionTitle]}>Account</ThemedText>
-          <MenuItem icon="edit-3" label="Edit Profile" onPress={() => navigation.navigate('ProfileQuestionnaire')} />
-          <MenuItem
-            icon="check-circle"
-            label={getVerificationLevel(user?.verification) > 0 ? `Verification (${getVerificationLevel(user?.verification)}/3)` : 'Verify Your Identity'}
-            onPress={() => navigation.navigate('Verification')}
-          />
-          <MenuItem icon="bell" label="Notifications" onPress={() => navigation.navigate('Notifications')} badge={unreadCount} />
-          <MenuItem icon="sliders" label="Notification Preferences" onPress={() => navigation.navigate('NotificationPreferences')} />
-          {(user?.subscription?.plan === 'plus' || user?.subscription?.plan === 'elite') ? (
-            <MenuItem icon="eye" label="Profile Views" onPress={() => navigation.navigate('ProfileViews')} />
-          ) : null}
-          <MenuItem icon="shield" label="Privacy & Security" onPress={() => navigation.navigate('PrivacySecurity')} />
-        </View>
-
-        <View style={styles.section}>
-          <ThemedText style={[Typography.h3, styles.sectionTitle]}>Support</ThemedText>
-          <MenuItem icon="help-circle" label="Help Center" onPress={() => {}} />
-          <MenuItem icon="file-text" label="Terms & Conditions" onPress={() => navigation.navigate('TermsOfService')} />
-          <MenuItem icon="info" label="About" onPress={() => navigation.navigate('About')} />
-        </View>
-
-        <View style={styles.section}>
-          <MenuItem icon="log-out" label="Log Out" onPress={logout} danger />
-        </View>
+    <View style={[styles.root, { paddingTop: insets.top }]}>
+      <View style={styles.topNav}>
+        <Text style={styles.topNavTitle}>My Profile</Text>
+        <Pressable style={styles.iconBtn} onPress={() => navigation.navigate('PrivacySecurity')}>
+          <Feather name="settings" size={16} color="rgba(255,255,255,0.7)" />
+        </Pressable>
       </View>
 
-      <Modal
-        visible={showPurchaseBoostModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowPurchaseBoostModal(false)}
-      >
+      <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}>
+        <View style={styles.profileHeader}>
+          <View style={styles.avatarWrap}>
+            {(user?.photos?.[0] || user?.profilePicture) ? (
+              <Image source={{ uri: user?.photos?.[0] || user?.profilePicture }} style={styles.avatarImage} />
+            ) : (
+              <LinearGradient colors={['#667eea', '#764ba2']} style={styles.avatarCircle} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                <Text style={styles.avatarInitial}>{userInitial}</Text>
+              </LinearGradient>
+            )}
+            <Pressable style={styles.cameraBtn} onPress={() => navigation.navigate('ProfileQuestionnaire')}>
+              <Feather name="camera" size={13} color="#fff" />
+            </Pressable>
+          </View>
+
+          <View style={styles.roleBadge}>
+            <Text style={styles.roleBadgeText}>{getRoleLabel()}</Text>
+          </View>
+
+          <Text style={styles.profileName}>{user?.name || 'User'}</Text>
+          <Text style={styles.profileEmail}>{user?.email || ''}</Text>
+
+          <View style={styles.statsRow}>
+            <View style={styles.statBox}>
+              <Text style={[styles.statValue, styles.statCoral]}>{matchCount}</Text>
+              <Text style={styles.statLabel}>Matches</Text>
+            </View>
+            <View style={styles.statBox}>
+              <Text style={styles.statValue}>{profileViewCount}</Text>
+              <Text style={styles.statLabel}>Profile Views</Text>
+            </View>
+            <View style={styles.statBox}>
+              <Text style={[styles.statValue, styles.statCoral]}>{likesCount}</Text>
+              <Text style={styles.statLabel}>Likes</Text>
+            </View>
+          </View>
+        </View>
+
+        {user?.role === 'renter' ? (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Profile Strength</Text>
+              <Pressable onPress={() => navigation.navigate('ProfileQuestionnaire')}>
+                <Text style={styles.sectionAction}>View all</Text>
+              </Pressable>
+            </View>
+            <ProfileCompletionCard user={user} onEditProfile={() => navigation.navigate('ProfileQuestionnaire')} />
+          </View>
+        ) : null}
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Subscription</Text>
+          </View>
+          <Pressable style={styles.subCard} onPress={() => navigation.navigate('Plans')}>
+            <View style={styles.subLeft}>
+              <Text style={styles.subLabel}>Current Plan</Text>
+              <Text style={styles.subPlan}>
+                {user?.subscription?.plan === 'basic' ? 'Basic' : user?.subscription?.plan === 'plus' ? 'Plus' : user?.subscription?.plan === 'elite' ? 'Elite' : 'Basic'} {user?.subscription?.plan === 'basic' ? '· Free' : ''}
+              </Text>
+              <Text style={styles.subDesc}>
+                {user?.subscription?.plan === 'basic' ? 'Upgrade to unlock unlimited matches' : 'You have full access'}
+              </Text>
+            </View>
+            {user?.subscription?.plan === 'basic' ? (
+              <Pressable onPress={() => navigation.navigate('Plans')}>
+                <LinearGradient colors={['#ff6b5b', '#e83a2a']} style={styles.upgradeBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                  <Text style={styles.upgradeBtnText}>Upgrade</Text>
+                </LinearGradient>
+              </Pressable>
+            ) : null}
+          </Pressable>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Settings</Text>
+          </View>
+          <View style={styles.settingsCard}>
+            <SettingsItem
+              iconName="user"
+              iconColor="#667eea"
+              iconBgColor="rgba(102,126,234,0.15)"
+              iconBorderColor="rgba(102,126,234,0.2)"
+              title="Edit Profile"
+              subtitle="Name, bio, photos, preferences"
+              onPress={() => navigation.navigate('ProfileQuestionnaire')}
+            />
+            <SettingsItem
+              iconName="bell"
+              iconColor="#2ecc71"
+              iconBgColor="rgba(46,204,113,0.12)"
+              iconBorderColor="rgba(46,204,113,0.18)"
+              title="Notifications"
+              subtitle="Matches, messages, activity"
+              onPress={() => navigation.navigate('Notifications')}
+              badge={unreadCount}
+            />
+            <SettingsItem
+              iconName="lock"
+              iconColor="orange"
+              iconBgColor="rgba(255,165,0,0.12)"
+              iconBorderColor="rgba(255,165,0,0.18)"
+              title="Privacy & Safety"
+              subtitle="Blocked users, data, visibility"
+              onPress={() => navigation.navigate('PrivacySecurity')}
+            />
+            <SettingsItem
+              iconName="settings"
+              iconColor="#ff6b5b"
+              iconBgColor="rgba(255,77,77,0.12)"
+              iconBorderColor="rgba(255,77,77,0.18)"
+              title="Account Settings"
+              subtitle="Email, password, connected apps"
+              onPress={() => navigation.navigate('About')}
+              isLast
+            />
+          </View>
+
+          <Pressable style={styles.signoutBtn} onPress={logout}>
+            <Feather name="log-out" size={16} color="#ff4d4d" />
+            <Text style={styles.signoutText}>Sign Out</Text>
+          </Pressable>
+        </View>
+
+        <View style={{ height: 20 }} />
+      </ScrollView>
+
+      <Modal visible={showPurchaseBoostModal} animationType="slide" transparent onRequestClose={() => setShowPurchaseBoostModal(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContainer, { backgroundColor: theme.backgroundSecondary }]}>
-            <View style={[styles.modalHeader, { backgroundColor: '#FFD700' }]}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
               <Feather name="zap" size={32} color="#000000" />
             </View>
-            
             <View style={styles.modalContent}>
-              <ThemedText style={[Typography.h2, { textAlign: 'center', marginBottom: Spacing.sm }]}>
-                Purchase Boost
-              </ThemedText>
-              <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary, marginBottom: Spacing.xl }]}>
-                Boost your profile for 24 hours and get prioritized placement in the swipe deck!
-              </ThemedText>
-              
-              <View style={[styles.priceCard, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
-                <ThemedText style={[Typography.h1, { color: theme.primary, marginBottom: Spacing.xs }]}>
-                  $3.00
-                </ThemedText>
-                <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
-                  24 hours of priority placement
-                </ThemedText>
+              <Text style={styles.modalTitle}>Purchase Boost</Text>
+              <Text style={styles.modalDesc}>Boost your profile for 24 hours and get prioritized placement in the swipe deck!</Text>
+              <View style={styles.priceCard}>
+                <Text style={styles.priceText}>$3.00</Text>
+                <Text style={styles.priceSubtext}>24 hours of priority placement</Text>
               </View>
-              
               <View style={styles.featuresList}>
-                <View style={styles.featureItem}>
-                  <Feather name="check-circle" size={20} color={theme.success} />
-                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
-                    Priority placement in swipe deck
-                  </ThemedText>
-                </View>
-                <View style={styles.featureItem}>
-                  <Feather name="check-circle" size={20} color={theme.success} />
-                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
-                    Visible BOOSTED badge on profile
-                  </ThemedText>
-                </View>
-                <View style={styles.featureItem}>
-                  <Feather name="check-circle" size={20} color={theme.success} />
-                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
-                    Instant activation
-                  </ThemedText>
-                </View>
+                {['Priority placement in swipe deck', 'Visible BOOSTED badge on profile', 'Instant activation'].map((feat) => (
+                  <View key={feat} style={styles.featureItem}>
+                    <Feather name="check-circle" size={20} color="#3ECF8E" />
+                    <Text style={styles.featureText}>{feat}</Text>
+                  </View>
+                ))}
               </View>
             </View>
-            
             <View style={styles.modalActions}>
-              <Pressable
-                style={[styles.modalButton, { backgroundColor: '#FFD700', opacity: processingBoost ? 0.7 : 1 }]}
-                onPress={handlePurchaseBoost}
-                disabled={processingBoost}
-              >
-                <ThemedText style={[Typography.h3, { color: '#000000' }]}>
-                  {processingBoost ? 'Processing...' : 'Purchase for $3'}
-                </ThemedText>
+              <Pressable style={[styles.modalButton, { opacity: processingBoost ? 0.7 : 1 }]} onPress={handlePurchaseBoost} disabled={processingBoost}>
+                <Text style={styles.modalButtonText}>{processingBoost ? 'Processing...' : 'Purchase for $3'}</Text>
               </Pressable>
-              <Pressable
-                style={[styles.modalButtonSecondary, { borderColor: theme.border }]}
-                onPress={() => setShowPurchaseBoostModal(false)}
-                disabled={processingBoost}
-              >
-                <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
-                  Cancel
-                </ThemedText>
+              <Pressable style={styles.modalButtonSecondary} onPress={() => setShowPurchaseBoostModal(false)} disabled={processingBoost}>
+                <Text style={styles.modalButtonSecondaryText}>Cancel</Text>
               </Pressable>
             </View>
           </View>
         </View>
       </Modal>
-    </ScreenScrollView>
+    </View>
   );
 };
 
+const SettingsItem = ({ iconName, iconColor, iconBgColor, iconBorderColor, title, subtitle, onPress, badge, isLast }: any) => (
+  <Pressable style={[styles.settingsItem, isLast ? null : styles.settingsItemBorder]} onPress={onPress}>
+    <View style={[styles.settingsIcon, { backgroundColor: iconBgColor, borderColor: iconBorderColor, borderWidth: 1 }]}>
+      <Feather name={iconName} size={16} color={iconColor} />
+    </View>
+    <View style={styles.settingsTextWrap}>
+      <Text style={styles.settingsTitle}>{title}</Text>
+      <Text style={styles.settingsSubtitle}>{subtitle}</Text>
+    </View>
+    {badge > 0 ? (
+      <View style={styles.navBadge}>
+        <Text style={styles.navBadgeText}>{badge > 99 ? '99+' : badge}</Text>
+      </View>
+    ) : null}
+    <Feather name="chevron-right" size={14} color="rgba(255,255,255,0.2)" />
+  </Pressable>
+);
+
 const styles = StyleSheet.create({
-  container: {
-    padding: Spacing.lg,
+  root: {
+    flex: 1,
+    backgroundColor: '#111',
+  },
+  topNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 22,
+    paddingTop: 12,
+    paddingBottom: 10,
+  },
+  topNavTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#fff',
+    letterSpacing: -0.4,
+  },
+  iconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scrollContent: {
+    flex: 1,
   },
   profileHeader: {
     alignItems: 'center',
-    marginBottom: Spacing.xxl,
+    paddingHorizontal: 22,
+    paddingTop: 8,
+    paddingBottom: 20,
   },
-  avatarContainer: {
+  avatarWrap: {
     position: 'relative',
-    marginBottom: Spacing.lg,
+    marginBottom: 14,
   },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    justifyContent: 'center',
+  avatarCircle: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
     alignItems: 'center',
-    overflow: 'hidden',
+    justifyContent: 'center',
   },
   avatarImage: {
-    width: '100%',
-    height: '100%',
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+  },
+  avatarInitial: {
+    fontSize: 36,
+    fontWeight: '900',
+    color: '#fff',
+  },
+  cameraBtn: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#ff6b5b',
+    borderWidth: 2.5,
+    borderColor: '#111',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   roleBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.small,
+    backgroundColor: 'rgba(255,107,91,0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.35)',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+    marginBottom: 10,
   },
-  name: {
-    marginBottom: Spacing.xs,
+  roleBadgeText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#ff8070',
   },
-  nameRow: {
+  profileName: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#fff',
+    letterSpacing: -0.3,
+    marginBottom: 3,
+  },
+  profileEmail: {
+    fontSize: 12.5,
+    color: 'rgba(255,255,255,0.35)',
+    fontWeight: '400',
+    marginBottom: 18,
+  },
+  statsRow: {
     flexDirection: 'row',
+    gap: 10,
+    width: '100%',
+  },
+  statBox: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
+    gap: 3,
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#fff',
+    letterSpacing: -0.5,
+  },
+  statCoral: {
+    color: '#ff6b5b',
+  },
+  statLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.3)',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    textAlign: 'center',
   },
   section: {
-    marginBottom: Spacing.xxl,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
   },
   sectionTitle: {
-    marginBottom: Spacing.md,
-    marginLeft: Spacing.sm,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.medium,
-    marginBottom: Spacing.sm,
-  },
-  menuBadge: {
-    backgroundColor: '#FF4757',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 6,
-    marginRight: Spacing.sm,
-  },
-  menuBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
+    color: 'rgba(255,255,255,0.5)',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
-  subscriptionCard: {
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.medium,
-    marginBottom: Spacing.sm,
+  sectionAction: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#ff6b5b',
   },
-  subscriptionHeader: {
+  subCard: {
+    backgroundColor: '#1a1a2e',
+    borderWidth: 1,
+    borderColor: 'rgba(91,140,255,0.2)',
+    borderRadius: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.lg,
+    gap: 12,
+    overflow: 'hidden',
   },
-  subscriptionInfo: {
+  subLeft: {
+    flex: 1,
+  },
+  subLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.3)',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 3,
+  },
+  subPlan: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  subDesc: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.3)',
+  },
+  upgradeBtn: {
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+  },
+  upgradeBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  settingsCard: {
+    backgroundColor: '#1a1a1a',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  settingsItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
+    gap: 13,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
   },
-  badge: {
-    flexDirection: 'row',
+  settingsItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  settingsIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     alignItems: 'center',
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 4,
-    borderRadius: BorderRadius.small,
+    justifyContent: 'center',
   },
-  upgradeButton: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.medium,
+  settingsTextWrap: {
+    flex: 1,
   },
-  benefitsList: {
-    gap: Spacing.sm,
+  settingsTitle: {
+    fontSize: 13.5,
+    fontWeight: '600',
+    color: '#fff',
   },
-  benefitItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  settingsSubtitle: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.3)',
+    marginTop: 1,
   },
-  boostCard: {
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.medium,
-    marginBottom: Spacing.sm,
-  },
-  boostActive: {
-    alignItems: 'flex-start',
-  },
-  boostBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 4,
-    borderRadius: BorderRadius.small,
-  },
-  boostInfo: {
-    gap: Spacing.sm,
-    marginBottom: Spacing.md,
-  },
-  boostFeature: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  boostButton: {
+  signoutBtn: {
+    marginTop: 14,
+    height: 48,
+    backgroundColor: 'rgba(255,77,77,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,77,77,0.18)',
+    borderRadius: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.medium,
-    marginTop: Spacing.md,
+    gap: 8,
+  },
+  signoutText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#ff4d4d',
+  },
+  navBadge: {
+    backgroundColor: '#ff4d4d',
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    marginRight: 4,
+  },
+  navBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#fff',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: 'rgba(0,0,0,0.75)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: Spacing.xl,
+    padding: 24,
   },
   modalContainer: {
     width: '100%',
     maxWidth: 400,
-    borderRadius: BorderRadius.large,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 20,
     overflow: 'hidden',
   },
   modalHeader: {
-    padding: Spacing.xxl,
+    padding: 32,
     alignItems: 'center',
+    backgroundColor: '#FFD700',
   },
   modalContent: {
-    padding: Spacing.xl,
+    padding: 24,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  modalDesc: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.5)',
+    textAlign: 'center',
+    marginBottom: 24,
   },
   priceCard: {
-    padding: Spacing.xl,
-    borderRadius: BorderRadius.medium,
+    padding: 24,
+    borderRadius: 12,
     borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
     alignItems: 'center',
-    marginBottom: Spacing.xl,
+    marginBottom: 24,
+  },
+  priceText: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#ff6b5b',
+    marginBottom: 4,
+  },
+  priceSubtext: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.5)',
   },
   featuresList: {
-    gap: Spacing.md,
+    gap: 12,
   },
   featureItem: {
     flexDirection: 'row',
     alignItems: 'center',
   },
+  featureText: {
+    fontSize: 16,
+    color: '#fff',
+    marginLeft: 12,
+    flex: 1,
+  },
   modalActions: {
-    padding: Spacing.xl,
-    gap: Spacing.md,
+    padding: 24,
+    gap: 12,
   },
   modalButton: {
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.medium,
+    padding: 16,
+    borderRadius: 12,
     alignItems: 'center',
+    backgroundColor: '#FFD700',
+  },
+  modalButtonText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000',
   },
   modalButtonSecondary: {
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.medium,
+    padding: 16,
+    borderRadius: 12,
     borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center',
+  },
+  modalButtonSecondaryText: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.5)',
   },
 });

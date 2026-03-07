@@ -113,11 +113,11 @@ export const PrivacySecurityScreen = () => {
 
   const MenuItem = ({ icon, label, onPress, showArrow = true, rightElement }: any) => (
     <Pressable
-      style={[styles.menuItem, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}
+      style={[styles.menuItem, { backgroundColor: '#1a1a1a', borderColor: '#333333' }]}
       onPress={onPress}
     >
       <View style={styles.menuItemLeft}>
-        <Feather name={icon} size={20} color={theme.textSecondary} />
+        <Feather name={icon} size={20} color="#A0A0A0" />
         <ThemedText style={[Typography.body, { marginLeft: Spacing.md }]}>
           {label}
         </ThemedText>
@@ -129,9 +129,9 @@ export const PrivacySecurityScreen = () => {
   );
 
   const SwitchItem = ({ icon, label, value, onValueChange }: any) => (
-    <View style={[styles.menuItem, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
+    <View style={[styles.menuItem, { backgroundColor: '#1a1a1a', borderColor: '#333333' }]}>
       <View style={styles.menuItemLeft}>
-        <Feather name={icon} size={20} color={theme.textSecondary} />
+        <Feather name={icon} size={20} color="#A0A0A0" />
         <ThemedText style={[Typography.body, { marginLeft: Spacing.md }]}>
           {label}
         </ThemedText>
@@ -146,7 +146,7 @@ export const PrivacySecurityScreen = () => {
   );
 
   return (
-    <ScreenScrollView contentContainerStyle={{ paddingTop: Spacing.lg }}>
+    <ScreenScrollView style={{ backgroundColor: '#111111' }} contentContainerStyle={{ paddingTop: Spacing.lg, backgroundColor: '#111111' }}>
       <View style={styles.section}>
         <ThemedText style={[Typography.h3, { marginBottom: Spacing.md, color: theme.textSecondary }]}>
           Account Security
@@ -159,7 +159,7 @@ export const PrivacySecurityScreen = () => {
         />
 
         {showPasswordSection && (
-          <View style={[styles.passwordSection, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
+          <View style={[styles.passwordSection, { backgroundColor: '#1a1a1a', borderColor: '#333333' }]}>
             {passwordError ? (
               <View style={[styles.errorBox, { backgroundColor: '#FEE2E2', borderColor: '#DC2626' }]}>
                 <Feather name="alert-circle" size={16} color="#DC2626" />
@@ -169,7 +169,7 @@ export const PrivacySecurityScreen = () => {
               </View>
             ) : null}
             <TextInput
-              style={[styles.input, { backgroundColor: theme.backgroundDefault, color: theme.text, borderColor: theme.border }]}
+              style={[styles.input, { backgroundColor: '#222222', color: '#FFFFFF', borderColor: '#333333' }]}
               placeholder="Current Password"
               placeholderTextColor={theme.textSecondary}
               value={currentPassword}
@@ -181,7 +181,7 @@ export const PrivacySecurityScreen = () => {
               autoCapitalize="none"
             />
             <TextInput
-              style={[styles.input, { backgroundColor: theme.backgroundDefault, color: theme.text, borderColor: theme.border }]}
+              style={[styles.input, { backgroundColor: '#222222', color: '#FFFFFF', borderColor: '#333333' }]}
               placeholder="New Password"
               placeholderTextColor={theme.textSecondary}
               value={newPassword}
@@ -193,7 +193,7 @@ export const PrivacySecurityScreen = () => {
               autoCapitalize="none"
             />
             <TextInput
-              style={[styles.input, { backgroundColor: theme.backgroundDefault, color: theme.text, borderColor: theme.border }]}
+              style={[styles.input, { backgroundColor: '#222222', color: '#FFFFFF', borderColor: '#333333' }]}
               placeholder="Confirm New Password"
               placeholderTextColor={theme.textSecondary}
               value={confirmPassword}
@@ -304,7 +304,7 @@ export const PrivacySecurityScreen = () => {
         </ThemedText>
         
         <Pressable
-          style={[styles.deleteButton, { backgroundColor: theme.backgroundSecondary, borderColor: '#DC2626' }]}
+          style={[styles.deleteButton, { backgroundColor: '#1a1a1a', borderColor: '#DC2626' }]}
           onPress={handleDeleteAccount}
         >
           <Feather name="trash-2" size={20} color="#DC2626" />
@@ -321,7 +321,7 @@ export const PrivacySecurityScreen = () => {
         onRequestClose={() => setShowDeleteModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContainer, { backgroundColor: theme.backgroundSecondary }]}>
+          <View style={[styles.modalContainer, { backgroundColor: '#1a1a1a' }]}>
             <View style={styles.modalHeader}>
               <Feather name="alert-triangle" size={32} color="#DC2626" />
             </View>
@@ -336,7 +336,7 @@ export const PrivacySecurityScreen = () => {
               
               <View style={styles.modalButtons}>
                 <Pressable
-                  style={[styles.modalButton, { backgroundColor: theme.backgroundSecondary }]}
+                  style={[styles.modalButton, { backgroundColor: '#222222' }]}
                   onPress={() => setShowDeleteModal(false)}
                 >
                   <ThemedText style={[Typography.body, { color: theme.text, fontWeight: '600' }]}>
@@ -365,7 +365,7 @@ export const PrivacySecurityScreen = () => {
         onRequestClose={() => setShowPasswordSuccessModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContainer, { backgroundColor: theme.backgroundSecondary }]}>
+          <View style={[styles.modalContainer, { backgroundColor: '#1a1a1a' }]}>
             <View style={styles.modalHeader}>
               <Feather name="check-circle" size={32} color="#10B981" />
             </View>

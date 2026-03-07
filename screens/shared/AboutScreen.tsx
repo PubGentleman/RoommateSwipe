@@ -10,7 +10,7 @@ export default function AboutScreen() {
 
   return (
     <ScreenScrollView 
-      style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
+      style={[styles.container, { backgroundColor: '#111111' }]}
       contentContainerStyle={{ paddingTop: Spacing.xl }}
     >
       <View style={styles.content}>

@@ -82,7 +82,7 @@ export function VerificationScreen({ navigation }: Props) {
   const progressColor = level >= 3 ? '#2563EB' : level >= 2 ? '#2563EB' : level >= 1 ? '#F59E0B' : theme.textSecondary;
 
   return (
-    <ScreenKeyboardAwareScrollView>
+    <ScreenKeyboardAwareScrollView style={{ backgroundColor: '#111111' }} contentContainerStyle={{ backgroundColor: '#111111' }}>
       <View style={styles.container}>
         <View style={styles.header}>
           <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={styles.backButton}>
@@ -91,7 +91,7 @@ export function VerificationScreen({ navigation }: Props) {
           <ThemedText style={[Typography.h2]}>Identity Verification</ThemedText>
         </View>
 
-        <View style={[styles.statusCard, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+        <View style={[styles.statusCard, { backgroundColor: '#1a1a1a', borderColor: '#333333' }]}>
           <View style={styles.statusHeader}>
             <View style={[styles.statusIconContainer, { backgroundColor: progressColor + '20' }]}>
               <Feather name="shield" size={28} color={progressColor} />
@@ -111,9 +111,9 @@ export function VerificationScreen({ navigation }: Props) {
           </ThemedText>
         </View>
 
-        <View style={[styles.verificationItem, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+        <View style={[styles.verificationItem, { backgroundColor: '#1a1a1a', borderColor: '#333333' }]}>
           <View style={styles.verificationHeader}>
-            <View style={[styles.verificationIcon, { backgroundColor: verification?.phone?.verified ? '#2563EB20' : theme.backgroundSecondary }]}>
+            <View style={[styles.verificationIcon, { backgroundColor: verification?.phone?.verified ? '#2563EB20' : '#222222' }]}>
               <Feather name="phone" size={22} color={verification?.phone?.verified ? '#2563EB' : theme.textSecondary} />
             </View>
             <View style={{ flex: 1, marginLeft: Spacing.md }}>
@@ -134,7 +134,7 @@ export function VerificationScreen({ navigation }: Props) {
               {!phoneSent ? (
                 <>
                   <TextInput
-                    style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
+                    style={[styles.input, { backgroundColor: '#222222', color: '#FFFFFF', borderColor: '#333333' }]}
                     placeholder="Enter phone number"
                     placeholderTextColor={theme.textSecondary}
                     value={phoneNumber}
@@ -151,7 +151,7 @@ export function VerificationScreen({ navigation }: Props) {
               ) : (
                 <>
                   <TextInput
-                    style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
+                    style={[styles.input, { backgroundColor: '#222222', color: '#FFFFFF', borderColor: '#333333' }]}
                     placeholder="Enter verification code"
                     placeholderTextColor={theme.textSecondary}
                     value={phoneCode}
@@ -171,9 +171,9 @@ export function VerificationScreen({ navigation }: Props) {
           ) : null}
         </View>
 
-        <View style={[styles.verificationItem, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+        <View style={[styles.verificationItem, { backgroundColor: '#1a1a1a', borderColor: '#333333' }]}>
           <View style={styles.verificationHeader}>
-            <View style={[styles.verificationIcon, { backgroundColor: verification?.government_id?.verified ? '#2563EB20' : theme.backgroundSecondary }]}>
+            <View style={[styles.verificationIcon, { backgroundColor: verification?.government_id?.verified ? '#2563EB20' : '#222222' }]}>
               <Feather name="credit-card" size={22} color={verification?.government_id?.verified ? '#2563EB' : theme.textSecondary} />
             </View>
             <View style={{ flex: 1, marginLeft: Spacing.md }}>
@@ -205,9 +205,9 @@ export function VerificationScreen({ navigation }: Props) {
           ) : null}
         </View>
 
-        <View style={[styles.verificationItem, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+        <View style={[styles.verificationItem, { backgroundColor: '#1a1a1a', borderColor: '#333333' }]}>
           <View style={styles.verificationHeader}>
-            <View style={[styles.verificationIcon, { backgroundColor: verification?.social_media?.verified ? '#2563EB20' : theme.backgroundSecondary }]}>
+            <View style={[styles.verificationIcon, { backgroundColor: verification?.social_media?.verified ? '#2563EB20' : '#222222' }]}>
               <Feather name="globe" size={22} color={verification?.social_media?.verified ? '#2563EB' : theme.textSecondary} />
             </View>
             <View style={{ flex: 1, marginLeft: Spacing.md }}>
@@ -263,7 +263,7 @@ export function VerificationScreen({ navigation }: Props) {
           ) : null}
         </View>
 
-        <View style={[styles.infoCard, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+        <View style={[styles.infoCard, { backgroundColor: '#1a1a1a', borderColor: '#333333' }]}>
           <Feather name="info" size={18} color={theme.textSecondary} />
           <ThemedText style={[Typography.small, { color: theme.textSecondary, flex: 1, marginLeft: Spacing.sm }]}>
             Your verification data is securely stored and only used to confirm your identity. 

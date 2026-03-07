@@ -38,6 +38,17 @@ export type ProfileStackParamList = {
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
 
+const darkHeaderOptions = {
+  headerStyle: { backgroundColor: '#111111' },
+  headerTintColor: '#FFFFFF',
+  headerTitleStyle: {
+    fontSize: 17,
+    fontWeight: '600' as const,
+    color: '#FFFFFF',
+  },
+  headerShadowVisible: false,
+};
+
 export const ProfileStackNavigator = () => {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -47,15 +58,8 @@ export const ProfileStackNavigator = () => {
         component={PaymentScreen}
         options={({ navigation }) => ({
           headerShown: true,
-          headerTransparent: true,
+          ...darkHeaderOptions,
           headerTitle: 'Payment Methods',
-          headerTintColor: '#FFFFFF',
-          headerTitleStyle: {
-            fontSize: 17,
-            fontWeight: '600',
-          },
-          headerShadowVisible: true,
-          headerBlurEffect: 'regular',
           headerBackVisible: false,
           headerLeft: () => (
             <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
@@ -69,15 +73,8 @@ export const ProfileStackNavigator = () => {
         component={PlansScreen}
         options={({ navigation }) => ({
           headerShown: true,
-          headerTransparent: true,
+          ...darkHeaderOptions,
           headerTitle: 'Subscription Plans',
-          headerTintColor: '#FFFFFF',
-          headerTitleStyle: {
-            fontSize: 17,
-            fontWeight: '600',
-          },
-          headerShadowVisible: true,
-          headerBlurEffect: 'regular',
           headerBackVisible: false,
           headerLeft: () => (
             <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
@@ -112,17 +109,12 @@ export const ProfileStackNavigator = () => {
         component={PrivacySecurityScreen}
         options={({ navigation }) => ({
           headerShown: true,
-          headerTransparent: false,
+          ...darkHeaderOptions,
           headerTitle: 'Privacy & Security',
-          headerTitleStyle: {
-            fontSize: 17,
-            fontWeight: '600',
-          },
-          headerShadowVisible: true,
           headerBackVisible: false,
           headerLeft: () => (
             <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
-              <Feather name="chevron-left" size={28} />
+              <Feather name="chevron-left" size={28} color="#FFFFFF" />
             </Pressable>
           ),
         })}
@@ -132,15 +124,8 @@ export const ProfileStackNavigator = () => {
         component={ProfileViewsScreen}
         options={({ navigation }) => ({
           headerShown: true,
-          headerTransparent: true,
+          ...darkHeaderOptions,
           headerTitle: 'Profile Views',
-          headerTintColor: '#FFFFFF',
-          headerTitleStyle: {
-            fontSize: 17,
-            fontWeight: '600',
-          },
-          headerShadowVisible: true,
-          headerBlurEffect: 'regular',
           headerBackVisible: false,
           headerLeft: () => (
             <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
@@ -154,17 +139,12 @@ export const ProfileStackNavigator = () => {
         component={PrivacyPolicyScreen}
         options={({ navigation }) => ({
           headerShown: true,
-          headerTransparent: false,
+          ...darkHeaderOptions,
           headerTitle: 'Privacy Policy',
-          headerTitleStyle: {
-            fontSize: 17,
-            fontWeight: '600',
-          },
-          headerShadowVisible: true,
           headerBackVisible: false,
           headerLeft: () => (
             <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
-              <Feather name="chevron-left" size={28} />
+              <Feather name="chevron-left" size={28} color="#FFFFFF" />
             </Pressable>
           ),
         })}
@@ -174,17 +154,12 @@ export const ProfileStackNavigator = () => {
         component={TermsOfServiceScreen}
         options={({ navigation }) => ({
           headerShown: true,
-          headerTransparent: false,
+          ...darkHeaderOptions,
           headerTitle: 'Terms of Service',
-          headerTitleStyle: {
-            fontSize: 17,
-            fontWeight: '600',
-          },
-          headerShadowVisible: true,
           headerBackVisible: false,
           headerLeft: () => (
             <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
-              <Feather name="chevron-left" size={28} />
+              <Feather name="chevron-left" size={28} color="#FFFFFF" />
             </Pressable>
           ),
         })}
@@ -194,17 +169,12 @@ export const ProfileStackNavigator = () => {
         component={AboutScreen}
         options={({ navigation }) => ({
           headerShown: true,
-          headerTransparent: false,
+          ...darkHeaderOptions,
           headerTitle: 'About Roomdr',
-          headerTitleStyle: {
-            fontSize: 17,
-            fontWeight: '600',
-          },
-          headerShadowVisible: true,
           headerBackVisible: false,
           headerLeft: () => (
             <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
-              <Feather name="chevron-left" size={28} />
+              <Feather name="chevron-left" size={28} color="#FFFFFF" />
             </Pressable>
           ),
         })}
@@ -214,17 +184,12 @@ export const ProfileStackNavigator = () => {
         component={DownloadDataScreen}
         options={({ navigation }) => ({
           headerShown: true,
-          headerTransparent: false,
+          ...darkHeaderOptions,
           headerTitle: 'Download My Data',
-          headerTitleStyle: {
-            fontSize: 17,
-            fontWeight: '600',
-          },
-          headerShadowVisible: true,
           headerBackVisible: false,
           headerLeft: () => (
             <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
-              <Feather name="chevron-left" size={28} />
+              <Feather name="chevron-left" size={28} color="#FFFFFF" />
             </Pressable>
           ),
         })}
@@ -234,17 +199,12 @@ export const ProfileStackNavigator = () => {
         component={BlockedUsersScreen}
         options={({ navigation }) => ({
           headerShown: true,
-          headerTransparent: false,
+          ...darkHeaderOptions,
           headerTitle: 'Blocked Users',
-          headerTitleStyle: {
-            fontSize: 17,
-            fontWeight: '600',
-          },
-          headerShadowVisible: true,
           headerBackVisible: false,
           headerLeft: () => (
             <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
-              <Feather name="chevron-left" size={28} />
+              <Feather name="chevron-left" size={28} color="#FFFFFF" />
             </Pressable>
           ),
         })}

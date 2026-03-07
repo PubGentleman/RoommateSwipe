@@ -82,7 +82,7 @@ export const DownloadDataScreen = () => {
   };
 
   const DataItem = ({ icon, title, description }: { icon: string; title: string; description: string }) => (
-    <View style={[styles.dataItem, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
+    <View style={[styles.dataItem, { backgroundColor: '#1a1a1a', borderColor: '#333333' }]}>
       <View style={[styles.iconContainer, { backgroundColor: theme.primary + '20' }]}>
         <Feather name={icon as any} size={20} color={theme.primary} />
       </View>
@@ -98,7 +98,7 @@ export const DownloadDataScreen = () => {
   );
 
   return (
-    <ScreenScrollView contentContainerStyle={{ paddingTop: Spacing.xl }}>
+    <ScreenScrollView style={{ backgroundColor: '#111111' }} contentContainerStyle={{ paddingTop: Spacing.xl, backgroundColor: '#111111' }}>
       <View style={styles.header}>
         <View style={[styles.headerIcon, { backgroundColor: theme.primary + '20' }]}>
           <Feather name="download" size={32} color={theme.primary} />
@@ -165,21 +165,21 @@ export const DownloadDataScreen = () => {
           Privacy & Security
         </ThemedText>
         
-        <View style={[styles.privacyItem, { backgroundColor: theme.backgroundSecondary }]}>
+        <View style={[styles.privacyItem, { backgroundColor: '#1a1a1a' }]}>
           <Feather name="lock" size={16} color={theme.success} />
           <ThemedText style={[Typography.small, { marginLeft: Spacing.sm, flex: 1 }]}>
             Your data is securely packaged and never shared with third parties
           </ThemedText>
         </View>
         
-        <View style={[styles.privacyItem, { backgroundColor: theme.backgroundSecondary }]}>
+        <View style={[styles.privacyItem, { backgroundColor: '#1a1a1a' }]}>
           <Feather name="shield" size={16} color={theme.success} />
           <ThemedText style={[Typography.small, { marginLeft: Spacing.sm, flex: 1 }]}>
             Exports are generated on-demand and not stored on our servers
           </ThemedText>
         </View>
         
-        <View style={[styles.privacyItem, { backgroundColor: theme.backgroundSecondary }]}>
+        <View style={[styles.privacyItem, { backgroundColor: '#1a1a1a' }]}>
           <Feather name="file-text" size={16} color={theme.success} />
           <ThemedText style={[Typography.small, { marginLeft: Spacing.sm, flex: 1 }]}>
             All personal information is included as per GDPR requirements

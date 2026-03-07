@@ -158,11 +158,11 @@ export const PlansScreen = () => {
     isCurrentPlan: boolean
   ) => {
     const planColors = {
-      basic: theme.backgroundDefault,
+      basic: '#1a1a1a',
       plus: theme.primary,
       elite: '#7C3AED',
     };
-    const bgColor = isCurrentPlan ? planColors[planType] : theme.backgroundDefault;
+    const bgColor = isCurrentPlan ? planColors[planType] : '#1a1a1a';
     const textColor = isCurrentPlan && planType !== 'basic' ? '#FFFFFF' : theme.text;
 
     return (
@@ -263,7 +263,7 @@ export const PlansScreen = () => {
   };
 
   return (
-    <ScreenScrollView>
+    <ScreenScrollView style={{ backgroundColor: '#111111' }} contentContainerStyle={{ backgroundColor: '#111111' }}>
       <View style={styles.container}>
         <ThemedText style={[Typography.h2, { marginBottom: Spacing.lg }]}>Choose Your Plan</ThemedText>
         
@@ -342,7 +342,7 @@ export const PlansScreen = () => {
         {(isPlus || isElite) ? (
           <View style={styles.section}>
             <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Billing History</ThemedText>
-            <View style={[styles.billingItem, { backgroundColor: theme.backgroundDefault }]}>
+            <View style={[styles.billingItem, { backgroundColor: '#1a1a1a' }]}>
               <View>
                 <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
                   {isElite ? 'Elite' : 'Plus'} Subscription
@@ -366,8 +366,8 @@ export const PlansScreen = () => {
         onRequestClose={() => setShowUpgradeConfirm(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: theme.backgroundRoot }]}>
-            <ThemedText style={[Typography.h2, { marginBottom: Spacing.md }]}>
+          <View style={[styles.modalContent, { backgroundColor: '#1a1a1a' }]}>
+            <ThemedText style={[Typography.h2, { marginBottom: Spacing.md, color: '#FFFFFF' }]}>
               Upgrade to {selectedPlan === 'plus' ? 'Plus' : 'Elite'}
             </ThemedText>
             <ThemedText style={[Typography.body, { color: theme.textSecondary, marginBottom: Spacing.xl }]}>
@@ -406,8 +406,8 @@ export const PlansScreen = () => {
         onRequestClose={() => setShowDowngradeConfirm(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: theme.backgroundRoot }]}>
-            <ThemedText style={[Typography.h2, { marginBottom: Spacing.md }]}>
+          <View style={[styles.modalContent, { backgroundColor: '#1a1a1a' }]}>
+            <ThemedText style={[Typography.h2, { marginBottom: Spacing.md, color: '#FFFFFF' }]}>
               Downgrade to {downgradeTo === 'basic' ? 'Basic' : 'Plus'}
             </ThemedText>
             <ThemedText style={[Typography.body, { color: theme.textSecondary, marginBottom: Spacing.xl }]}>
@@ -445,8 +445,8 @@ export const PlansScreen = () => {
         onRequestClose={() => setShowCancelConfirm(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: theme.backgroundRoot }]}>
-            <ThemedText style={[Typography.h2, { marginBottom: Spacing.md }]}>
+          <View style={[styles.modalContent, { backgroundColor: '#1a1a1a' }]}>
+            <ThemedText style={[Typography.h2, { marginBottom: Spacing.md, color: '#FFFFFF' }]}>
               Cancel Subscription
             </ThemedText>
             <ThemedText style={[Typography.body, { color: theme.textSecondary, marginBottom: Spacing.xl }]}>
