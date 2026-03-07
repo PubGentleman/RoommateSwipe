@@ -150,6 +150,28 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       if (isFirstMessageFromUser) {
         await incrementActiveChatCount(conversationId);
       }
+
+      const otherParticipantId = conversations[conversationIndex].participants?.find(
+        (p: string) => p !== user.id
+      );
+      const blockedIds = user.blockedUsers || [];
+      if (otherParticipantId && !blockedIds.includes(otherParticipantId)) {
+        await StorageService.addNotification({
+          id: `notif_msg_${Date.now()}`,
+          userId: otherParticipantId,
+          type: 'message',
+          title: 'New Message',
+          body: `${user.name || 'Someone'}: ${inputText.trim().substring(0, 80)}${inputText.trim().length > 80 ? '...' : ''}`,
+          isRead: false,
+          createdAt: new Date(),
+          data: {
+            conversationId,
+            fromUserId: user.id,
+            fromUserName: user.name,
+            fromUserPhoto: user.profilePicture,
+          },
+        });
+      }
       
       setMessages([...conversations[conversationIndex].messages]);
       setInputText('');

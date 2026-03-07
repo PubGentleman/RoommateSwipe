@@ -10,12 +10,14 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { ProfileStackParamList } from '../../navigation/ProfileStackNavigator';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
+import { useNotificationContext } from '../../contexts/NotificationContext';
 
 type ProfileScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'ProfileMain'>;
 
 export const ProfileScreen = () => {
   const { theme } = useTheme();
   const { user, logout, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost } = useAuth();
+  const { unreadCount } = useNotificationContext();
   const navigation = useNavigation<ProfileScreenNavigationProp>();
   const [showPurchaseBoostModal, setShowPurchaseBoostModal] = useState(false);
   const [processingBoost, setProcessingBoost] = useState(false);
@@ -85,7 +87,7 @@ export const ProfileScreen = () => {
     return user.role.charAt(0).toUpperCase() + user.role.slice(1);
   };
 
-  const MenuItem = ({ icon, label, onPress, danger }: any) => (
+  const MenuItem = ({ icon, label, onPress, danger, badge }: any) => (
     <Pressable
       style={[styles.menuItem, { backgroundColor: theme.backgroundDefault }]}
       onPress={onPress}
@@ -94,6 +96,13 @@ export const ProfileScreen = () => {
       <ThemedText style={[Typography.body, { flex: 1, marginLeft: Spacing.lg, color: danger ? theme.error : theme.text }]}>
         {label}
       </ThemedText>
+      {badge > 0 ? (
+        <View style={styles.menuBadge}>
+          <ThemedText style={styles.menuBadgeText}>
+            {badge > 99 ? '99+' : badge}
+          </ThemedText>
+        </View>
+      ) : null}
       <Feather name="chevron-right" size={20} color={theme.textSecondary} />
     </Pressable>
   );
@@ -276,7 +285,7 @@ export const ProfileScreen = () => {
         <View style={styles.section}>
           <ThemedText style={[Typography.h3, styles.sectionTitle]}>Account</ThemedText>
           <MenuItem icon="edit-3" label="Edit Profile" onPress={() => navigation.navigate('EditProfile')} />
-          <MenuItem icon="bell" label="Notifications" onPress={() => navigation.navigate('Notifications')} />
+          <MenuItem icon="bell" label="Notifications" onPress={() => navigation.navigate('Notifications')} badge={unreadCount} />
           {(user?.subscription?.plan === 'plus' || user?.subscription?.plan === 'elite') ? (
             <MenuItem icon="eye" label="Profile Views" onPress={() => navigation.navigate('ProfileViews')} />
           ) : null}
@@ -421,6 +430,21 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     borderRadius: BorderRadius.medium,
     marginBottom: Spacing.sm,
+  },
+  menuBadge: {
+    backgroundColor: '#FF4757',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    marginRight: Spacing.sm,
+  },
+  menuBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
   },
   subscriptionCard: {
     padding: Spacing.lg,

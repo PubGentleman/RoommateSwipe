@@ -39,7 +39,7 @@ The application is built with React Native and Expo, using TypeScript and levera
 
 **Report/Block System:** Users can report (with reasons: Inappropriate, Fake profile, Harassment, Spam, Other) or block other users from swipe cards and chat screens (`components/ReportBlockModal.tsx`). Blocked users are filtered from the swipe deck, messages list, and notifications. A "Blocked Users" management screen is accessible from Privacy & Security settings (`screens/shared/BlockedUsersScreen.tsx`).
 
-**Notification Feed:** The `useNotifications` hook (`hooks/useNotifications.ts`) polls for unread count every 10 seconds and displays a red badge on the Profile tab. Notifications are generated for matches, super likes, and other events. Tapping a notification navigates to the relevant screen (chat, groups, explore). Blocked user notifications are filtered out.
+**Notification System:** The `NotificationContext` (`contexts/NotificationContext.tsx`) provides app-wide notification state with unread count, real-time toast alerts, and automatic polling every 5 seconds. Red badges appear on both Messages and Profile tabs across all roles (Renter, Host, Agent). The `NotificationToast` component (`components/NotificationToast.tsx`) shows animated slide-down banners with haptic feedback for new notifications. The Profile screen's Notifications menu item shows a badge count. Notifications are generated for matches, super likes, messages, group events, and property updates. Tapping a notification navigates to the relevant screen (chat, groups, explore). Blocked user notifications are filtered out.
 
 Animations are handled by React Native Reanimated, and gestures by React Native Gesture Handler. State management uses React Context API and AsyncStorage for persistence.
 

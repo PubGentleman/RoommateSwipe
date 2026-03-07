@@ -10,12 +10,14 @@ import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme
 import { StorageService } from '../../utils/storage';
 import { Notification } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNotificationContext } from '../../contexts/NotificationContext';
 
 export const NotificationsScreen = () => {
   const { theme } = useTheme();
   const { user } = useAuth();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const { refreshUnreadCount } = useNotificationContext();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -52,6 +54,7 @@ export const NotificationsScreen = () => {
     if (!notification.isRead) {
       await StorageService.markNotificationAsRead(notification.id);
       setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, isRead: true } : n));
+      refreshUnreadCount();
     }
 
     switch (notification.type) {
@@ -97,12 +100,14 @@ export const NotificationsScreen = () => {
   const handleDelete = async (notificationId: string) => {
     await StorageService.deleteNotification(notificationId);
     setNotifications(prev => prev.filter(n => n.id !== notificationId));
+    refreshUnreadCount();
   };
 
   const handleMarkAllAsRead = async () => {
     if (!user?.id) return;
     await StorageService.markAllNotificationsAsRead(user.id);
     setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    refreshUnreadCount();
   };
 
   const getNotificationIcon = (type: Notification['type']) => {

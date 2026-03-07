@@ -10,7 +10,7 @@ import { GroupsScreen } from '../screens/renter/GroupsScreen';
 import { MessagesStackNavigator } from './MessagesStackNavigator';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
 import { useTheme } from '../hooks/useTheme';
-import { useNotifications } from '../hooks/useNotifications';
+import { useNotificationContext } from '../contexts/NotificationContext';
 
 export type RenterTabParamList = {
   Explore: undefined;
@@ -33,7 +33,7 @@ const TAB_CONFIG: Record<string, { icon: string; label: string }> = {
 function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const { theme, isDark } = useTheme();
   const insets = useSafeAreaInsets();
-  const { unreadCount } = useNotifications();
+  const { unreadCount } = useNotificationContext();
 
   return (
     <View style={[tabStyles.wrapper, { paddingBottom: insets.bottom }]}>
@@ -47,7 +47,7 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
           const isFocused = state.index === index;
           const config = TAB_CONFIG[route.name] || { icon: 'circle', label: route.name };
           const color = isFocused ? theme.tabIconSelected : theme.tabIconDefault;
-          const showBadge = route.name === 'Profile' && unreadCount > 0;
+          const showBadge = (route.name === 'Profile' || route.name === 'Messages') && unreadCount > 0;
 
           const onPress = () => {
             const event = navigation.emit({
