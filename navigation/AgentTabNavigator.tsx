@@ -29,6 +29,12 @@ export const AgentTabNavigator = () => {
       screenOptions={{
         tabBarActiveTintColor: theme.tabIconSelected,
         tabBarInactiveTintColor: theme.tabIconDefault,
+        tabBarLabelStyle: {
+          fontSize: 10,
+        },
+        tabBarItemStyle: {
+          paddingHorizontal: 2,
+        },
         tabBarStyle: {
           position: 'absolute',
           backgroundColor: Platform.select({
