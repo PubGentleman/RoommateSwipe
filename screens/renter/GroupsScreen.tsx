@@ -14,11 +14,13 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { mockRoommateProfiles } from '../../utils/mockData';
 import { getGenderSymbol, calculateCompatibility } from '../../utils/matchingAlgorithm';
-import { getCityFromNeighborhood, getAllCities } from '../../utils/locationData';
+import { getCityFromNeighborhood } from '../../utils/locationData';
 import { getVerificationLevel } from '../../components/VerificationBadge';
 import { getZodiacSymbol } from '../../utils/zodiacUtils';
 import { AdBanner } from '../../components/AdBanner';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useCityContext } from '../../contexts/CityContext';
+import { CityPickerModal, CityPillButton } from '../../components/CityPickerModal';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - Spacing.xxl;
@@ -47,7 +49,8 @@ export const GroupsScreen = () => {
   const [showMemberProfile, setShowMemberProfile] = useState(false);
   const [selectedMember, setSelectedMember] = useState<RoommateProfile | null>(null);
   const [avatarsExpanded, setAvatarsExpanded] = useState(false);
-  const [activeCity, setActiveCity] = useState<string | null>(user?.profileData?.city || null);
+  const { activeCity, recentCities, setActiveCity } = useCityContext();
+  const [showCityPicker, setShowCityPicker] = useState(false);
   
   const [groupName, setGroupName] = useState('');
   const [groupDescription, setGroupDescription] = useState('');
@@ -1184,68 +1187,9 @@ export const GroupsScreen = () => {
       </View>
 
       {activeTab === 'discover' ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.cityRow}
-          contentContainerStyle={styles.cityRowContent}
-        >
-          <Pressable
-            style={[
-              styles.cityPill,
-              activeCity === (user?.profileData?.city || null)
-                ? { backgroundColor: '#ff4d4d', borderColor: '#ff4d4d' }
-                : { backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.15)' },
-            ]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setActiveCity(user?.profileData?.city || null);
-            }}
-          >
-            <Feather
-              name="navigation"
-              size={14}
-              color={activeCity === (user?.profileData?.city || null) ? '#fff' : '#ff4d4d'}
-            />
-            <Text style={[styles.cityPillText, { color: '#fff' }]}>
-              {user?.profileData?.city || 'Near You'}
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[
-              styles.cityPill,
-              !activeCity
-                ? { backgroundColor: '#ff4d4d', borderColor: '#ff4d4d' }
-                : { backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.15)' },
-            ]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setActiveCity(null);
-            }}
-          >
-            <Feather name="globe" size={14} color="#fff" />
-            <Text style={[styles.cityPillText, { color: '#fff' }]}>All Cities</Text>
-          </Pressable>
-          {getAllCities()
-            .filter(city => city !== (user?.profileData?.city || ''))
-            .map(city => (
-              <Pressable
-                key={city}
-                style={[
-                  styles.cityPill,
-                  activeCity === city
-                    ? { backgroundColor: '#ff4d4d', borderColor: '#ff4d4d' }
-                    : { backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.15)' },
-                ]}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setActiveCity(city);
-                }}
-              >
-                <Text style={[styles.cityPillText, { color: '#fff' }]}>{city}</Text>
-              </Pressable>
-            ))}
-        </ScrollView>
+        <View style={styles.citySelectorRow}>
+          <CityPillButton activeCity={activeCity} onPress={() => setShowCityPicker(true)} />
+        </View>
       ) : null}
 
       <View style={styles.content}>
@@ -1540,6 +1484,14 @@ export const GroupsScreen = () => {
         </View>
       </Modal>
 
+      <CityPickerModal
+        visible={showCityPicker}
+        activeCity={activeCity}
+        recentCities={recentCities}
+        onCitySelect={(city) => { setActiveCity(city); setShowCityPicker(false); }}
+        onClose={() => setShowCityPicker(false)}
+      />
+
       <Modal
         visible={showMemberProfile}
         animationType="slide"
@@ -1632,27 +1584,11 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     zIndex: 1,
   },
-  cityRow: {
-    flexGrow: 0,
-    flexShrink: 0,
-  },
-  cityRowContent: {
-    paddingHorizontal: 24,
-    paddingVertical: Spacing.sm,
-    gap: Spacing.sm,
-  },
-  cityPill: {
+  citySelectorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  cityPillText: {
-    fontSize: 12,
-    fontWeight: '600',
+    paddingHorizontal: 24,
+    paddingVertical: Spacing.sm,
   },
   content: {
     flex: 1,

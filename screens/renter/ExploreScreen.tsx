@@ -7,6 +7,8 @@ import { ThemedView } from '../../components/ThemedView';
 import { WalkScoreBadge } from '../../components/WalkScoreBadge';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
+import { useCityContext } from '../../contexts/CityContext';
+import { CityPickerModal, CityPillButton } from '../../components/CityPickerModal';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { StorageService } from '../../utils/storage';
 import { Property, PropertyFilter, User, RoommateProfile } from '../../types/models';
@@ -14,7 +16,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { formatMoveInDate, calculateCompatibility, getMatchQualityColor, getGenderSymbol, formatLocation } from '../../utils/matchingAlgorithm';
 import { getZodiacSymbol } from '../../utils/zodiacUtils';
-import { getAllCities } from '../../utils/locationData';
 import { PropertyMapView } from '../../components/PropertyMapView';
 
 const COMMON_AMENITIES = [
@@ -41,7 +42,8 @@ export const ExploreScreen = () => {
   const [viewMode, setViewMode] = useState<'all' | 'saved'>('all');
   const [displayMode, setDisplayMode] = useState<'list' | 'map'>('list');
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeCity, setActiveCity] = useState<string | null>(user?.profileData?.city || null);
+  const [showCityPicker, setShowCityPicker] = useState(false);
+  const { activeCity, recentCities, setActiveCity } = useCityContext();
   const [hostProfiles, setHostProfiles] = useState<Map<string, User>>(new Map());
 
   useEffect(() => {
@@ -487,95 +489,9 @@ export const ExploreScreen = () => {
         </Pressable>
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.cityRow}
-        contentContainerStyle={styles.cityRowContent}
-      >
-        <Pressable
-          style={[
-            styles.cityPill,
-            activeCity === (user?.profileData?.city || null) && {
-              backgroundColor: theme.primary,
-              borderColor: theme.primary,
-            },
-            activeCity !== (user?.profileData?.city || null) && {
-              backgroundColor: theme.backgroundDefault,
-              borderColor: theme.border,
-            },
-          ]}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setActiveCity(user?.profileData?.city || null);
-          }}
-        >
-          <Feather
-            name="navigation"
-            size={14}
-            color={activeCity === (user?.profileData?.city || null) ? '#fff' : theme.primary}
-          />
-          <ThemedText
-            style={[
-              Typography.caption,
-              {
-                fontWeight: '600',
-                color: activeCity === (user?.profileData?.city || null) ? '#fff' : theme.text,
-              },
-            ]}
-          >
-            {user?.profileData?.city || 'Near You'}
-          </ThemedText>
-        </Pressable>
-        <Pressable
-          style={[
-            styles.cityPill,
-            !activeCity
-              ? { backgroundColor: theme.primary, borderColor: theme.primary }
-              : { backgroundColor: theme.backgroundDefault, borderColor: theme.border },
-          ]}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setActiveCity(null);
-          }}
-        >
-          <Feather name="globe" size={14} color={!activeCity ? '#fff' : theme.textSecondary} />
-          <ThemedText
-            style={[
-              Typography.caption,
-              { fontWeight: '600', color: !activeCity ? '#fff' : theme.text },
-            ]}
-          >
-            All Cities
-          </ThemedText>
-        </Pressable>
-        {getAllCities()
-          .filter(city => city !== (user?.profileData?.city || ''))
-          .map(city => (
-            <Pressable
-              key={city}
-              style={[
-                styles.cityPill,
-                activeCity === city
-                  ? { backgroundColor: theme.primary, borderColor: theme.primary }
-                  : { backgroundColor: theme.backgroundDefault, borderColor: theme.border },
-              ]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setActiveCity(city);
-              }}
-            >
-              <ThemedText
-                style={[
-                  Typography.caption,
-                  { fontWeight: '600', color: activeCity === city ? '#fff' : theme.text },
-                ]}
-              >
-                {city}
-              </ThemedText>
-            </Pressable>
-          ))}
-      </ScrollView>
+      <View style={styles.citySelectorRow}>
+        <CityPillButton activeCity={activeCity} onPress={() => setShowCityPicker(true)} />
+      </View>
       
       <View style={styles.viewToggleContainer}>
         <Pressable
@@ -1179,6 +1095,13 @@ export const ExploreScreen = () => {
           </View>
         </View>
       </Modal>
+      <CityPickerModal
+        visible={showCityPicker}
+        activeCity={activeCity}
+        recentCities={recentCities}
+        onCitySelect={(city) => { setActiveCity(city); setShowCityPicker(false); }}
+        onClose={() => setShowCityPicker(false)}
+      />
     </View>
   );
 };
@@ -1402,23 +1325,11 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.medium,
     fontSize: 16,
   },
-  cityRow: {
-    flexGrow: 0,
-    flexShrink: 0,
-  },
-  cityRowContent: {
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.sm,
-    gap: Spacing.sm,
-  },
-  cityPill: {
+  citySelectorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 8,
-    borderRadius: BorderRadius.full,
-    borderWidth: 1,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.sm,
   },
   roomsRow: {
     flexDirection: 'row',

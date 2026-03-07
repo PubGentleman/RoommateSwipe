@@ -10,6 +10,7 @@ import { RootNavigator } from "./navigation/RootNavigator";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { AuthProvider } from "./contexts/AuthContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
+import { CityProvider } from "./contexts/CityContext";
 import { StorageService } from "./utils/storage";
 
 export default function App() {
@@ -29,12 +30,14 @@ export default function App() {
         <GestureHandlerRootView style={styles.root}>
           <KeyboardProvider>
             <AuthProvider>
-              <NotificationProvider>
-                <NavigationContainer>
-                  <RootNavigator />
-                </NavigationContainer>
-                <StatusBar style="auto" />
-              </NotificationProvider>
+              <CityProvider>
+                <NotificationProvider>
+                  <NavigationContainer>
+                    <RootNavigator />
+                  </NavigationContainer>
+                  <StatusBar style="auto" />
+                </NotificationProvider>
+              </CityProvider>
             </AuthProvider>
           </KeyboardProvider>
         </GestureHandlerRootView>

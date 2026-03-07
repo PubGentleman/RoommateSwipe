@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, Image, Pressable, Dimensions, Modal, ScrollView, TextInput, FlatList } from 'react-native';
+import { View, StyleSheet, Image, Pressable, Dimensions, Modal, ScrollView } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, runOnJS, interpolate } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
@@ -15,8 +15,9 @@ import { RoommateProfile, Match } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scaleFont, moderateScale, getResponsiveSpacing } from '../../utils/responsive';
 import { calculateCompatibility, getMatchQualityColor, getCleanlinessLabel, getSocialLevelLabel, getWorkScheduleLabel, formatMoveInDate, getGenderSymbol } from '../../utils/matchingAlgorithm';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getCityFromNeighborhood, getAllCities } from '../../utils/locationData';
+import { getCityFromNeighborhood } from '../../utils/locationData';
+import { useCityContext } from '../../contexts/CityContext';
+import { CityPickerModal, CityPillButton } from '../../components/CityPickerModal';
 import { getZodiacSymbol, getZodiacCompatibilityLevel } from '../../utils/zodiacUtils';
 import { RewardedAdButton } from '../../components/AdBanner';
 import { ReportBlockModal } from '../../components/ReportBlockModal';
@@ -55,10 +56,8 @@ export const RoommatesScreen = () => {
   const [showSuperLikeUpgradeModal, setShowSuperLikeUpgradeModal] = useState(false);
   const [showReportBlockModal, setShowReportBlockModal] = useState(false);
   const [matchedProfileData, setMatchedProfileData] = useState<{ profile: RoommateProfile; compatibility: number } | null>(null);
-  const [activeCity, setActiveCity] = useState<string | null>(user?.profileData?.city || null);
+  const { activeCity, recentCities, setActiveCity, initialized: cityInitialized } = useCityContext();
   const [showCityPicker, setShowCityPicker] = useState(false);
-  const [citySearch, setCitySearch] = useState('');
-  const [recentCities, setRecentCities] = useState<string[]>([]);
   const [showCityPrompt, setShowCityPrompt] = useState(false);
   const [showFilterSheet, setShowFilterSheet] = useState(false);
   const [matchFilters, setMatchFilters] = useState<MatchFilters>({ ...DEFAULT_FILTERS });
@@ -80,35 +79,23 @@ export const RoommatesScreen = () => {
     };
   });
 
-  const RECENT_CITIES_KEY = 'roomdr_recent_cities';
-  const SELECTED_CITY_KEY = 'roomdr_selected_city';
-
-  const POPULAR_CITIES = ['New York', 'Los Angeles', 'Chicago', 'Miami', 'Austin', 'Atlanta', 'Seattle', 'Boston'];
-
   useEffect(() => {
     const init = async () => {
       try {
-        const [savedCity, savedRecent, savedFilters] = await Promise.all([
-          AsyncStorage.getItem(SELECTED_CITY_KEY),
-          AsyncStorage.getItem(RECENT_CITIES_KEY),
-          loadSavedFilters(),
-        ]);
-        if (savedRecent) {
-          setRecentCities(JSON.parse(savedRecent));
-        }
+        const savedFilters = await loadSavedFilters();
         setMatchFilters(savedFilters);
-        const userCity = user?.profileData?.city;
-        if (savedCity) {
-          setActiveCity(savedCity);
-        } else if (userCity) {
-          setActiveCity(userCity);
-        } else {
-          setShowCityPrompt(true);
-        }
       } catch {}
     };
     init();
   }, []);
+
+  useEffect(() => {
+    if (cityInitialized && !activeCity) {
+      setShowCityPrompt(true);
+    } else if (activeCity) {
+      setShowCityPrompt(false);
+    }
+  }, [cityInitialized, activeCity]);
 
   useEffect(() => {
     loadProfiles();
@@ -433,32 +420,12 @@ export const RoommatesScreen = () => {
 
   const activeFilterChips = getActiveFilterChips(matchFilters);
 
-  const handleCityChange = async (city: string | null) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  const handleCityChange = (city: string | null) => {
     setActiveCity(city);
     setCurrentPhotoIndex(0);
     setShowCityPicker(false);
     setShowCityPrompt(false);
-    setCitySearch('');
-    if (city) {
-      try {
-        await AsyncStorage.setItem(SELECTED_CITY_KEY, city);
-        const updated = [city, ...recentCities.filter(c => c !== city)].slice(0, 3);
-        setRecentCities(updated);
-        await AsyncStorage.setItem(RECENT_CITIES_KEY, JSON.stringify(updated));
-      } catch {}
-    } else {
-      await AsyncStorage.removeItem(SELECTED_CITY_KEY);
-    }
   };
-
-  const userHomeCity = user?.profileData?.city || null;
-
-  const allCitiesForSearch = getAllCities();
-
-  const filteredSearchCities = citySearch.trim()
-    ? allCitiesForSearch.filter(c => c.toLowerCase().includes(citySearch.trim().toLowerCase()))
-    : [];
 
   const handleOpenAIAssistant = async () => {
     console.log('[AI Assistant] Button clicked');
@@ -483,19 +450,7 @@ export const RoommatesScreen = () => {
 
   const renderCitySelector = () => (
     <View style={styles.citySelectorRow}>
-      <Pressable
-        style={styles.cityPillButton}
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          setShowCityPicker(true);
-        }}
-      >
-        <Feather name="map-pin" size={16} color="#ff4d4d" />
-        <ThemedText style={styles.cityPillText} numberOfLines={1}>
-          {activeCity || 'All Cities'}
-        </ThemedText>
-        <Feather name="chevron-down" size={16} color="rgba(255,255,255,0.6)" />
-      </Pressable>
+      <CityPillButton activeCity={activeCity} onPress={() => setShowCityPicker(true)} />
       <Pressable
         style={[styles.filterIconButton, getActiveFilterCount(matchFilters) > 0 ? { borderColor: '#ff6b5b' } : null]}
         onPress={() => {
@@ -513,111 +468,6 @@ export const RoommatesScreen = () => {
     </View>
   );
 
-  const renderCityPickerModal = () => (
-    <Modal
-      visible={showCityPicker}
-      transparent
-      animationType="slide"
-      onRequestClose={() => { setShowCityPicker(false); setCitySearch(''); }}
-    >
-      <Pressable
-        style={styles.cityModalOverlay}
-        onPress={() => { setShowCityPicker(false); setCitySearch(''); }}
-      />
-      <View style={styles.cityModalSheet}>
-        <View style={styles.cityModalHandle} />
-        <ThemedText style={styles.cityModalTitle}>Choose a City</ThemedText>
-
-        {recentCities.length > 0 ? (
-          <View style={styles.citySection}>
-            <ThemedText style={styles.citySectionLabel}>Recently Viewed</ThemedText>
-            <View style={styles.citySectionChips}>
-              {recentCities.map(city => (
-                <Pressable
-                  key={`recent-${city}`}
-                  style={[styles.cityChip, activeCity === city ? styles.cityChipActive : null]}
-                  onPress={() => handleCityChange(city)}
-                >
-                  <Feather name="clock" size={13} color={activeCity === city ? '#fff' : 'rgba(255,255,255,0.5)'} />
-                  <ThemedText style={[styles.cityChipText, activeCity === city ? styles.cityChipTextActive : null]}>
-                    {city}
-                  </ThemedText>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        ) : null}
-
-        <View style={styles.citySection}>
-          <ThemedText style={styles.citySectionLabel}>Popular Cities</ThemedText>
-          <View style={styles.citySectionChips}>
-            {POPULAR_CITIES.map(city => (
-              <Pressable
-                key={`popular-${city}`}
-                style={[styles.cityChip, activeCity === city ? styles.cityChipActive : null]}
-                onPress={() => handleCityChange(city)}
-              >
-                <ThemedText style={[styles.cityChipText, activeCity === city ? styles.cityChipTextActive : null]}>
-                  {city}
-                </ThemedText>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.citySection}>
-          <ThemedText style={styles.citySectionLabel}>Search</ThemedText>
-          <View style={styles.citySearchContainer}>
-            <Feather name="search" size={16} color="rgba(255,255,255,0.4)" />
-            <TextInput
-              style={styles.citySearchInput}
-              placeholder="Type any city..."
-              placeholderTextColor="rgba(255,255,255,0.3)"
-              value={citySearch}
-              onChangeText={setCitySearch}
-              autoCorrect={false}
-            />
-            {citySearch.length > 0 ? (
-              <Pressable onPress={() => setCitySearch('')}>
-                <Feather name="x" size={16} color="rgba(255,255,255,0.4)" />
-              </Pressable>
-            ) : null}
-          </View>
-          {filteredSearchCities.length > 0 ? (
-            <ScrollView style={styles.citySearchResults} keyboardShouldPersistTaps="handled">
-              {filteredSearchCities.map(city => (
-                <Pressable
-                  key={`search-${city}`}
-                  style={styles.citySearchResultItem}
-                  onPress={() => handleCityChange(city)}
-                >
-                  <Feather name="map-pin" size={14} color="rgba(255,255,255,0.5)" />
-                  <ThemedText style={styles.citySearchResultText}>{city}</ThemedText>
-                  {activeCity === city ? (
-                    <Feather name="check" size={16} color="#ff4d4d" />
-                  ) : null}
-                </Pressable>
-              ))}
-            </ScrollView>
-          ) : citySearch.trim().length > 0 ? (
-            <View style={styles.citySearchEmpty}>
-              <ThemedText style={styles.citySearchEmptyText}>
-                No cities found for "{citySearch}"
-              </ThemedText>
-            </View>
-          ) : null}
-        </View>
-
-        <Pressable
-          style={styles.cityAllCitiesBtn}
-          onPress={() => handleCityChange(null)}
-        >
-          <Feather name="globe" size={16} color="#ff4d4d" />
-          <ThemedText style={styles.cityAllCitiesBtnText}>Show All Cities</ThemedText>
-        </Pressable>
-      </View>
-    </Modal>
-  );
 
   if (showCityPrompt && !activeCity) {
     return (
@@ -635,43 +485,23 @@ export const RoommatesScreen = () => {
           <ThemedText style={[Typography.body, { color: 'rgba(255,255,255,0.5)', textAlign: 'center', marginBottom: Spacing.xl }]}>
             Pick a city to start finding roommates near you
           </ThemedText>
-          <View style={styles.citySectionChips}>
-            {POPULAR_CITIES.map(city => (
-              <Pressable
-                key={city}
-                style={[styles.cityChip, { borderColor: 'rgba(255,255,255,0.2)' }]}
-                onPress={() => handleCityChange(city)}
-              >
-                <ThemedText style={styles.cityChipText}>{city}</ThemedText>
-              </Pressable>
-            ))}
-          </View>
-          <View style={[styles.citySearchContainer, { marginTop: Spacing.lg, marginHorizontal: Spacing.xl }]}>
-            <Feather name="search" size={16} color="rgba(255,255,255,0.4)" />
-            <TextInput
-              style={styles.citySearchInput}
-              placeholder="Search for a city..."
-              placeholderTextColor="rgba(255,255,255,0.3)"
-              value={citySearch}
-              onChangeText={setCitySearch}
-              autoCorrect={false}
-            />
-          </View>
-          {filteredSearchCities.length > 0 ? (
-            <ScrollView style={[styles.citySearchResults, { marginHorizontal: Spacing.xl }]} keyboardShouldPersistTaps="handled">
-              {filteredSearchCities.map(city => (
-                <Pressable
-                  key={city}
-                  style={styles.citySearchResultItem}
-                  onPress={() => handleCityChange(city)}
-                >
-                  <Feather name="map-pin" size={14} color="rgba(255,255,255,0.5)" />
-                  <ThemedText style={styles.citySearchResultText}>{city}</ThemedText>
-                </Pressable>
-              ))}
-            </ScrollView>
-          ) : null}
+          <Pressable
+            style={[styles.resetButton, { backgroundColor: '#ff4d4d' }]}
+            onPress={() => setShowCityPicker(true)}
+          >
+            <Feather name="map-pin" size={20} color="#FFFFFF" />
+            <ThemedText style={[Typography.body, { color: '#FFFFFF', marginLeft: Spacing.sm, fontWeight: '600' }]}>
+              Choose a City
+            </ThemedText>
+          </Pressable>
         </View>
+        <CityPickerModal
+          visible={showCityPicker}
+          activeCity={activeCity}
+          recentCities={recentCities}
+          onCitySelect={handleCityChange}
+          onClose={() => setShowCityPicker(false)}
+        />
       </View>
     );
   }
@@ -689,7 +519,13 @@ export const RoommatesScreen = () => {
           <Feather name="loader" size={64} color="rgba(255,255,255,0.35)" />
           <ThemedText style={[Typography.h2, styles.emptyTitle, { color: '#FFFFFF' }]}>Loading...</ThemedText>
         </View>
-        {renderCityPickerModal()}
+        <CityPickerModal
+          visible={showCityPicker}
+          activeCity={activeCity}
+          recentCities={recentCities}
+          onCitySelect={handleCityChange}
+          onClose={() => setShowCityPicker(false)}
+        />
       </View>
     );
   }
@@ -750,7 +586,13 @@ export const RoommatesScreen = () => {
             </ThemedText>
           </Pressable>
         </View>
-        {renderCityPickerModal()}
+        <CityPickerModal
+          visible={showCityPicker}
+          activeCity={activeCity}
+          recentCities={recentCities}
+          onCitySelect={handleCityChange}
+          onClose={() => setShowCityPicker(false)}
+        />
         <RoommateFilterSheet
           visible={showFilterSheet}
           onClose={() => setShowFilterSheet(false)}
@@ -1775,7 +1617,13 @@ export const RoommatesScreen = () => {
         </View>
       </Modal>
 
-      {renderCityPickerModal()}
+      <CityPickerModal
+        visible={showCityPicker}
+        activeCity={activeCity}
+        recentCities={recentCities}
+        onCitySelect={handleCityChange}
+        onClose={() => setShowCityPicker(false)}
+      />
 
       <RoommateFilterSheet
         visible={showFilterSheet}
@@ -1820,24 +1668,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: Spacing.sm,
     gap: Spacing.sm,
-  },
-  cityPillButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: BorderRadius.full,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-  },
-  cityPillText: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#FFFFFF',
   },
   filterIconButton: {
     width: 42,
@@ -1908,134 +1738,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#FFD700',
     fontWeight: '500',
-  },
-  cityModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  cityModalSheet: {
-    backgroundColor: '#1e1e1e',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-    maxHeight: '75%',
-  },
-  cityModalHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignSelf: 'center',
-    marginTop: 12,
-    marginBottom: 16,
-  },
-  cityModalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 20,
-  },
-  citySection: {
-    marginBottom: 20,
-  },
-  citySectionLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.45)',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: 10,
-  },
-  citySectionChips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  cityChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: BorderRadius.full,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  cityChipActive: {
-    backgroundColor: '#ff4d4d',
-    borderColor: '#ff4d4d',
-  },
-  cityChipText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: 'rgba(255,255,255,0.8)',
-  },
-  cityChipTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  citySearchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    paddingHorizontal: 12,
-    height: 44,
-    gap: 8,
-  },
-  citySearchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: '#FFFFFF',
-    height: '100%',
-  },
-  citySearchResults: {
-    maxHeight: 160,
-    marginTop: 8,
-    borderRadius: BorderRadius.lg,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-  },
-  citySearchResultItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
-  },
-  citySearchResultText: {
-    flex: 1,
-    fontSize: 15,
-    color: '#FFFFFF',
-  },
-  citySearchEmpty: {
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  citySearchEmptyText: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.4)',
-  },
-  cityAllCitiesBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(255,77,77,0.3)',
-    backgroundColor: 'rgba(255,77,77,0.08)',
-  },
-  cityAllCitiesBtnText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#ff4d4d',
   },
   cardArea: {
     flex: 1,
