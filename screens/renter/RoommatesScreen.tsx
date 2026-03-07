@@ -697,9 +697,16 @@ export const RoommatesScreen = () => {
             ) : null}
 
             <View style={styles.cardInfo}>
-              <ThemedText style={styles.cardName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
-                {currentProfile.name}, {currentProfile.age}
-              </ThemedText>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <ThemedText style={styles.cardName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                  {currentProfile.name}, {currentProfile.age}
+                </ThemedText>
+                {getVerificationLevel(currentProfile.verification) >= 2 ? (
+                  <View style={styles.verifiedCheckCard}>
+                    <Feather name="check-circle" size={16} color="#2563EB" />
+                  </View>
+                ) : null}
+              </View>
               <ThemedText style={styles.cardJob} numberOfLines={1}>
                 {currentProfile.occupation} {currentProfile.preferences?.location ? `\u00B7 ${currentProfile.preferences.location}` : ''}
               </ThemedText>
@@ -1634,6 +1641,12 @@ const styles = StyleSheet.create({
     padding: 18,
     paddingTop: 24,
   },
+  verifiedCheckCard: {
+    marginLeft: 6,
+    backgroundColor: 'rgba(37, 99, 235, 0.2)',
+    borderRadius: 10,
+    padding: 2,
+  },
   cardName: {
     fontSize: 26,
     fontWeight: '800',
@@ -1641,6 +1654,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
     lineHeight: 30,
     marginBottom: 3,
+    flexShrink: 1,
   },
   cardJob: {
     fontSize: 13,

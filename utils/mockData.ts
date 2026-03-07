@@ -517,6 +517,10 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       moveInDate: '01/10/2025',
       bedrooms: 2,
     },
+    verification: {
+      phone: { verified: true, verifiedAt: new Date('2024-11-20') },
+      government_id: { verified: true, verifiedAt: new Date('2024-11-25') },
+    },
     compatibility: 88,
   },
   {
@@ -548,6 +552,10 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       moveInDate: '01/20/2025',
       bedrooms: 1,
     },
+    verification: {
+      phone: { verified: true, verifiedAt: new Date('2024-12-10') },
+      social_media: { verified: true, verifiedAt: new Date('2024-12-12'), platform: 'instagram' },
+    },
     compatibility: 81,
   },
   {
@@ -575,6 +583,11 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       location: 'Financial District',
       moveInDate: '02/15/2025',
       bedrooms: 2,
+    },
+    verification: {
+      phone: { verified: true, verifiedAt: new Date('2024-10-01') },
+      government_id: { verified: true, verifiedAt: new Date('2024-10-05') },
+      social_media: { verified: true, verifiedAt: new Date('2024-10-03'), platform: 'linkedin' },
     },
     compatibility: 90,
   },

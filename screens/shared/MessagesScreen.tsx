@@ -12,6 +12,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MessagesStackParamList } from '../../navigation/MessagesStackNavigator';
 import { Image } from 'expo-image';
+import { getVerificationLevel } from '../../components/VerificationBadge';
 
 type MessagesScreenNavigationProp = NativeStackNavigationProp<MessagesStackParamList, 'MessagesList'>;
 
@@ -25,6 +26,7 @@ export const MessagesScreen = () => {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [profilesMap, setProfilesMap] = useState<Map<string, RoommateProfile>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
 
   useFocusEffect(
@@ -41,6 +43,7 @@ export const MessagesScreen = () => {
       let existingConversations = await StorageService.getConversations();
       const matches = await StorageService.getMatches();
       const profiles = await StorageService.getRoommateProfiles();
+      setProfilesMap(new Map(profiles.map(p => [p.id, p])));
 
       for (const match of matches) {
         if (match.userId1 !== user.id && match.userId2 !== user.id) {
@@ -134,9 +137,17 @@ export const MessagesScreen = () => {
       </View>
       <View style={styles.conversationContent}>
         <View style={styles.conversationHeader}>
-          <ThemedText style={[Typography.body, { fontWeight: item.unread > 0 ? '600' : '400' }]}>
-            {item.participant.name}
-          </ThemedText>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+            <ThemedText style={[Typography.body, { fontWeight: item.unread > 0 ? '600' : '400' }]} numberOfLines={1}>
+              {item.participant.name}
+            </ThemedText>
+            {(() => {
+              const profile = profilesMap.get(item.participant.id);
+              return profile && getVerificationLevel(profile.verification) >= 2 ? (
+                <Feather name="check-circle" size={14} color="#2563EB" style={{ marginLeft: 4 }} />
+              ) : null;
+            })()}
+          </View>
           <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
             {formatTime(item.timestamp)}
           </ThemedText>

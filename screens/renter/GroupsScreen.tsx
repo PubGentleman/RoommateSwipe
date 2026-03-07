@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { mockRoommateProfiles } from '../../utils/mockData';
 import { getGenderSymbol, calculateCompatibility } from '../../utils/matchingAlgorithm';
 import { getCityFromNeighborhood, getAllCities } from '../../utils/locationData';
+import { getVerificationLevel } from '../../components/VerificationBadge';
 import { getZodiacSymbol } from '../../utils/zodiacUtils';
 import { AdBanner } from '../../components/AdBanner';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -694,9 +695,14 @@ export const GroupsScreen = () => {
             </ThemedText>
             {memberProfiles.map(profile => (
               <View key={profile.id} style={styles.memberRow}>
-                <ThemedText style={Typography.body}>
-                  {profile.name || 'Unknown'}{profile.age ? `, ${profile.age}` : ''}{profile.zodiacSign ? ` ${getZodiacSymbol(profile.zodiacSign)}` : ''} {getGenderSymbol(profile.gender)}
-                </ThemedText>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                  <ThemedText style={Typography.body}>
+                    {profile.name || 'Unknown'}{profile.age ? `, ${profile.age}` : ''}{profile.zodiacSign ? ` ${getZodiacSymbol(profile.zodiacSign)}` : ''} {getGenderSymbol(profile.gender)}
+                  </ThemedText>
+                  {getVerificationLevel(profile.verification) >= 2 ? (
+                    <Feather name="check-circle" size={14} color="#2563EB" style={{ marginLeft: 4 }} />
+                  ) : null}
+                </View>
                 {isCreator && profile.id !== user?.id ? (
                   <Pressable onPress={() => handleRemoveMember(group.id, profile.id, profile.name || 'Member')}>
                     <Feather name="x-circle" size={20} color={theme.error} />
@@ -714,9 +720,14 @@ export const GroupsScreen = () => {
             </ThemedText>
             {pendingProfiles.map(profile => (
               <View key={profile.id} style={styles.pendingRow}>
-                <ThemedText style={Typography.body}>
-                  {profile.name || 'Unknown'}{profile.age ? `, ${profile.age}` : ''}{profile.zodiacSign ? ` ${getZodiacSymbol(profile.zodiacSign)}` : ''} {getGenderSymbol(profile.gender)}
-                </ThemedText>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                  <ThemedText style={Typography.body}>
+                    {profile.name || 'Unknown'}{profile.age ? `, ${profile.age}` : ''}{profile.zodiacSign ? ` ${getZodiacSymbol(profile.zodiacSign)}` : ''} {getGenderSymbol(profile.gender)}
+                  </ThemedText>
+                  {getVerificationLevel(profile.verification) >= 2 ? (
+                    <Feather name="check-circle" size={14} color="#2563EB" style={{ marginLeft: 4 }} />
+                  ) : null}
+                </View>
                 <View style={styles.pendingActions}>
                   <Pressable
                     style={[styles.pendingButton, { backgroundColor: theme.primary }]}
@@ -898,7 +909,12 @@ export const GroupsScreen = () => {
                               </LinearGradient>
                             )}
                             <View>
-                              <Text style={styles.dkMemberName}>{profile.name.split(' ')[0]}</Text>
+                              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <Text style={styles.dkMemberName}>{profile.name.split(' ')[0]}</Text>
+                                {getVerificationLevel(profile.verification) >= 2 ? (
+                                  <Feather name="check-circle" size={12} color="#2563EB" style={{ marginLeft: 3 }} />
+                                ) : null}
+                              </View>
                               <Text style={styles.dkMemberMeta}>
                                 {profile.occupation?.split(' ')[0] || 'Member'} {getGenderSymbol(profile.gender)}
                               </Text>
@@ -1411,9 +1427,14 @@ export const GroupsScreen = () => {
                       const profile = mockRoommateProfiles.find(p => p.id === memberId);
                       return profile ? (
                         <View key={memberId} style={styles.memberRow}>
-                          <ThemedText style={Typography.body}>
-                            {profile.name}{profile.age ? `, ${profile.age}` : ''}{profile.zodiacSign ? ` ${getZodiacSymbol(profile.zodiacSign)}` : ''} {getGenderSymbol(profile.gender)}
-                          </ThemedText>
+                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <ThemedText style={Typography.body}>
+                              {profile.name}{profile.age ? `, ${profile.age}` : ''}{profile.zodiacSign ? ` ${getZodiacSymbol(profile.zodiacSign)}` : ''} {getGenderSymbol(profile.gender)}
+                            </ThemedText>
+                            {getVerificationLevel(profile.verification) >= 2 ? (
+                              <Feather name="check-circle" size={14} color="#2563EB" style={{ marginLeft: 4 }} />
+                            ) : null}
+                          </View>
                         </View>
                       ) : null;
                     })}
