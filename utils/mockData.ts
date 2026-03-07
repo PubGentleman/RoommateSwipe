@@ -1,5 +1,6 @@
 import { RoommateProfile, Property, Group, Conversation, Application, User } from '../types/models';
 import { getCityFromNeighborhood, getStateFromNeighborhood, getCoordinatesFromNeighborhood } from './locationData';
+import { additionalProfiles } from './additionalProfiles';
 
 export const MOCK_DATA_VERSION = '1.7.0';
 
@@ -654,7 +655,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-05') },
-      social_media: { verified: true, verifiedAt: new Date('2024-12-06'), platform: 'github' },
+      social_media: { verified: true, verifiedAt: new Date('2024-12-06'), platform: 'linkedin' },
       government_id: { verified: true, verifiedAt: new Date('2024-12-08') },
     },
     compatibility: 83,
@@ -1193,6 +1194,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     },
     compatibility: 82,
   },
+  ...additionalProfiles,
 ];
 
 export const mockProperties: Property[] = [

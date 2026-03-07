@@ -52,7 +52,7 @@ The system uses mock authentication for demonstration, supporting role-based nav
 
 ## Data Layer
 
-The data layer uses mock data and TypeScript interfaces for models like `RoommateProfile`, `Property`, `Group`, `Conversation`, `Message`, `Match`, and `Application`. It supports reciprocal matching, automatic conversation creation, and message limits. Property management includes distinguishing room types and tracking existing roommates. An AI Match Assistant refines user profiles through natural language interactions.
+The data layer uses mock data and TypeScript interfaces for models like `RoommateProfile`, `Property`, `Group`, `Conversation`, `Message`, `Match`, and `Application`. There are 126 total demo roommate profiles spread across 11 major US cities (New York, Los Angeles, Chicago, Miami, San Francisco, Austin, Seattle, Denver, Boston, Houston, Atlanta). The base 26 profiles are in `utils/mockData.ts` and 100 additional profiles are in `utils/additionalProfiles.ts`, merged via spread operator. It supports reciprocal matching, automatic conversation creation, and message limits. Property management includes distinguishing room types and tracking existing roommates. An AI Match Assistant refines user profiles through natural language interactions.
 
 ## Branding
 
