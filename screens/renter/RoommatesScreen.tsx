@@ -15,7 +15,7 @@ import { RoommateProfile, Match } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scaleFont, moderateScale, getResponsiveSpacing } from '../../utils/responsive';
 import { calculateCompatibility, getMatchQualityColor, getCleanlinessLabel, getSocialLevelLabel, getWorkScheduleLabel, formatMoveInDate, getGenderSymbol } from '../../utils/matchingAlgorithm';
-import { getCityFromNeighborhood } from '../../utils/locationData';
+import { getCityFromNeighborhood, getAllCities } from '../../utils/locationData';
 import { getZodiacSymbol, getZodiacCompatibilityLevel } from '../../utils/zodiacUtils';
 import { RewardedAdButton } from '../../components/AdBanner';
 import { ReportBlockModal } from '../../components/ReportBlockModal';
@@ -53,6 +53,7 @@ export const RoommatesScreen = () => {
   const [showSuperLikeUpgradeModal, setShowSuperLikeUpgradeModal] = useState(false);
   const [showReportBlockModal, setShowReportBlockModal] = useState(false);
   const [matchedProfileData, setMatchedProfileData] = useState<{ profile: RoommateProfile; compatibility: number } | null>(null);
+  const [activeCity, setActiveCity] = useState<string | null>(user?.profileData?.city || null);
 
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -71,13 +72,13 @@ export const RoommatesScreen = () => {
 
   useEffect(() => {
     loadProfiles();
-  }, []);
+  }, [activeCity]);
 
   useFocusEffect(
     React.useCallback(() => {
       console.log('[RoommatesScreen] Screen focused, reloading profiles to get latest photos');
       loadProfiles();
-    }, [])
+    }, [activeCity])
   );
 
   const loadProfiles = async () => {
@@ -92,16 +93,16 @@ export const RoommatesScreen = () => {
       setProfileUsers(userMap);
       
       const blockedIds = new Set(user?.blockedUsers || []);
-      const userCity = user?.profileData?.city;
+      const filterCity = activeCity;
       const unseen = allProfiles.filter(p => {
         if (history.has(p.id) || p.id === user?.id || blockedIds.has(p.id)) return false;
-        if (userCity) {
+        if (filterCity) {
           const profileUser = userMap.get(p.id);
           const profileUserCity = profileUser?.profileData?.city;
-          if (profileUserCity && profileUserCity !== userCity) return false;
+          if (profileUserCity && profileUserCity !== filterCity) return false;
           if (!profileUserCity && p.preferences?.location) {
             const profileCity = getCityFromNeighborhood(p.preferences.location);
-            if (profileCity && profileCity !== userCity) return false;
+            if (profileCity && profileCity !== filterCity) return false;
           }
         }
         return true;
@@ -365,39 +366,13 @@ export const RoommatesScreen = () => {
 
   const composedGesture = Gesture.Exclusive(tap, pan);
 
-  if (isLoading) {
-    return (
-      <View style={[styles.container, { backgroundColor: '#141414' }]}>
-        <View style={styles.emptyState}>
-          <Feather name="loader" size={64} color="rgba(255,255,255,0.35)" />
-          <ThemedText style={[Typography.h2, styles.emptyTitle, { color: '#FFFFFF' }]}>Loading...</ThemedText>
-        </View>
-      </View>
-    );
-  }
+  const handleCityChange = (city: string | null) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setActiveCity(city);
+    setCurrentPhotoIndex(0);
+  };
 
-  if (!currentProfile) {
-    return (
-      <View style={[styles.container, { backgroundColor: '#141414' }]}>
-        <View style={styles.emptyState}>
-          <Feather name="users" size={64} color="rgba(255,255,255,0.35)" />
-          <ThemedText style={[Typography.h2, styles.emptyTitle, { color: '#FFFFFF' }]}>No More Profiles</ThemedText>
-          <ThemedText style={[Typography.body, { color: 'rgba(255,255,255,0.5)', textAlign: 'center', marginBottom: Spacing.xl }]}>
-            You've seen all available roommates
-          </ThemedText>
-          <Pressable
-            style={[styles.resetButton, { backgroundColor: '#ff4d4d' }]}
-            onPress={resetSwipeHistory}
-          >
-            <Feather name="refresh-cw" size={20} color="#FFFFFF" />
-            <ThemedText style={[Typography.body, { color: '#FFFFFF', marginLeft: Spacing.sm, fontWeight: '600' }]}>
-              Start Over
-            </ThemedText>
-          </Pressable>
-        </View>
-      </View>
-    );
-  }
+  const userHomeCity = user?.profileData?.city || null;
 
   const handleOpenAIAssistant = async () => {
     console.log('[AI Assistant] Button clicked');
@@ -419,6 +394,122 @@ export const RoommatesScreen = () => {
     console.log('[AI Assistant] Navigating to AI Assistant screen');
     (navigation as any).navigate('AIAssistant');
   };
+
+  const renderCityRow = () => (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.cityRow}
+      contentContainerStyle={styles.cityRowContent}
+    >
+      <Pressable
+        style={[
+          styles.cityPill,
+          activeCity === userHomeCity
+            ? { backgroundColor: '#ff4d4d', borderColor: '#ff4d4d' }
+            : { backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.15)' },
+        ]}
+        onPress={() => handleCityChange(userHomeCity)}
+      >
+        <Feather name="navigation" size={14} color={activeCity === userHomeCity ? '#fff' : '#ff4d4d'} />
+        <ThemedText style={[Typography.caption, { fontWeight: '600', color: '#fff' }]}>
+          {userHomeCity || 'Near You'}
+        </ThemedText>
+      </Pressable>
+      <Pressable
+        style={[
+          styles.cityPill,
+          !activeCity
+            ? { backgroundColor: '#ff4d4d', borderColor: '#ff4d4d' }
+            : { backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.15)' },
+        ]}
+        onPress={() => handleCityChange(null)}
+      >
+        <Feather name="globe" size={14} color="#fff" />
+        <ThemedText style={[Typography.caption, { fontWeight: '600', color: '#fff' }]}>
+          All Cities
+        </ThemedText>
+      </Pressable>
+      {getAllCities()
+        .filter(city => city !== userHomeCity)
+        .map(city => (
+          <Pressable
+            key={city}
+            style={[
+              styles.cityPill,
+              activeCity === city
+                ? { backgroundColor: '#ff4d4d', borderColor: '#ff4d4d' }
+                : { backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.15)' },
+            ]}
+            onPress={() => handleCityChange(city)}
+          >
+            <ThemedText style={[Typography.caption, { fontWeight: '600', color: '#fff' }]}>
+              {city}
+            </ThemedText>
+          </Pressable>
+        ))}
+    </ScrollView>
+  );
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { backgroundColor: '#141414' }]}>
+        <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
+          <View style={{ width: 42 }} />
+          <RoomdrLogo variant="horizontal" size="sm" />
+          <View style={{ width: 42 }} />
+        </View>
+        {renderCityRow()}
+        <View style={styles.emptyState}>
+          <Feather name="loader" size={64} color="rgba(255,255,255,0.35)" />
+          <ThemedText style={[Typography.h2, styles.emptyTitle, { color: '#FFFFFF' }]}>Loading...</ThemedText>
+        </View>
+      </View>
+    );
+  }
+
+  if (!currentProfile) {
+    return (
+      <View style={[styles.container, { backgroundColor: '#141414' }]}>
+        <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
+          <Pressable onPress={handleOpenAIAssistant} style={styles.navIconBtn}>
+            <View style={[styles.navIconBtnInner, { backgroundColor: '#ff4d4d' }]}>
+              <Feather name="cpu" size={18} color="#FFFFFF" />
+            </View>
+          </Pressable>
+          <RoomdrLogo variant="horizontal" size="sm" />
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Pressable onPress={() => (navigation as any).navigate('Profile', { screen: 'Notifications' })} style={styles.navIconBtn}>
+              <View style={[styles.navIconBtnInner, { backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }]}>
+                <Feather name="bell" size={18} color="#FFFFFF" />
+              </View>
+            </Pressable>
+          </View>
+        </View>
+        {renderCityRow()}
+        <View style={styles.emptyState}>
+          <Feather name="users" size={64} color="rgba(255,255,255,0.35)" />
+          <ThemedText style={[Typography.h2, styles.emptyTitle, { color: '#FFFFFF' }]}>
+            {activeCity ? `No Profiles in ${activeCity}` : 'No More Profiles'}
+          </ThemedText>
+          <ThemedText style={[Typography.body, { color: 'rgba(255,255,255,0.5)', textAlign: 'center', marginBottom: Spacing.xl }]}>
+            {activeCity
+              ? 'Try browsing All Cities or switch to a different city'
+              : "You've seen all available roommates"}
+          </ThemedText>
+          <Pressable
+            style={[styles.resetButton, { backgroundColor: '#ff4d4d' }]}
+            onPress={resetSwipeHistory}
+          >
+            <Feather name="refresh-cw" size={20} color="#FFFFFF" />
+            <ThemedText style={[Typography.body, { color: '#FFFFFF', marginLeft: Spacing.sm, fontWeight: '600' }]}>
+              Start Over
+            </ThemedText>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
 
   const handleUpgradeToPaid = () => {
     setShowVIPModal(false);
@@ -563,6 +654,8 @@ export const RoommatesScreen = () => {
           </Pressable>
         </View>
       </View>
+
+      {renderCityRow()}
 
       <View style={styles.cardArea}>
         <GestureDetector gesture={composedGesture}>
@@ -1424,6 +1517,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   
+  cityRow: {
+    flexGrow: 0,
+    flexShrink: 0,
+  },
+  cityRowContent: {
+    paddingHorizontal: 20,
+    paddingBottom: Spacing.sm,
+    gap: Spacing.sm,
+  },
+  cityPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 8,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+  },
   cardArea: {
     flex: 1,
     paddingHorizontal: 16,

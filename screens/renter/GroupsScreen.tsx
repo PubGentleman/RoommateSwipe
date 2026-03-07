@@ -14,7 +14,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { mockRoommateProfiles } from '../../utils/mockData';
 import { getGenderSymbol, calculateCompatibility } from '../../utils/matchingAlgorithm';
-import { getCityFromNeighborhood } from '../../utils/locationData';
+import { getCityFromNeighborhood, getAllCities } from '../../utils/locationData';
 import { getZodiacSymbol } from '../../utils/zodiacUtils';
 import { AdBanner } from '../../components/AdBanner';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -46,6 +46,7 @@ export const GroupsScreen = () => {
   const [showMemberProfile, setShowMemberProfile] = useState(false);
   const [selectedMember, setSelectedMember] = useState<RoommateProfile | null>(null);
   const [avatarsExpanded, setAvatarsExpanded] = useState(false);
+  const [activeCity, setActiveCity] = useState<string | null>(user?.profileData?.city || null);
   
   const [groupName, setGroupName] = useState('');
   const [groupDescription, setGroupDescription] = useState('');
@@ -62,7 +63,7 @@ export const GroupsScreen = () => {
   useFocusEffect(
     React.useCallback(() => {
       loadGroups();
-    }, [user])
+    }, [user, activeCity])
   );
 
   const loadGroups = async () => {
@@ -72,12 +73,12 @@ export const GroupsScreen = () => {
       setIsLoading(true);
       const groups = await StorageService.getGroups();
       const userGroups = groups.filter(g => g.members.includes(user.id));
-      const userCity = user?.profileData?.city;
+      const filterCity = activeCity;
       const otherGroups = groups.filter(g => {
         if (g.members.includes(user.id) || g.pendingMembers.includes(user.id)) return false;
-        if (userCity && g.preferredLocation) {
+        if (filterCity && g.preferredLocation) {
           const groupCity = getCityFromNeighborhood(g.preferredLocation);
-          if (groupCity && groupCity !== userCity) return false;
+          if (groupCity && groupCity !== filterCity) return false;
         }
         return true;
       });
@@ -779,10 +780,12 @@ export const GroupsScreen = () => {
           <View style={styles.emptyState}>
             <Feather name="users" size={64} color={theme.textSecondary} />
             <ThemedText style={[Typography.h3, { color: theme.textSecondary, marginTop: Spacing.lg }]}>
-              No More Groups
+              {activeCity ? `No Groups in ${activeCity}` : 'No More Groups'}
             </ThemedText>
             <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.sm, textAlign: 'center' }]}>
-              You've seen all available groups.{'\n'}Check back later for new groups!
+              {activeCity
+                ? 'Try browsing All Cities or switch to a different city'
+                : "You've seen all available groups.\nCheck back later for new groups!"}
             </ThemedText>
           </View>
         );
@@ -1164,6 +1167,71 @@ export const GroupsScreen = () => {
         <View style={styles.tabBarLine} />
       </View>
 
+      {activeTab === 'discover' ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.cityRow}
+          contentContainerStyle={styles.cityRowContent}
+        >
+          <Pressable
+            style={[
+              styles.cityPill,
+              activeCity === (user?.profileData?.city || null)
+                ? { backgroundColor: '#ff4d4d', borderColor: '#ff4d4d' }
+                : { backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.15)' },
+            ]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setActiveCity(user?.profileData?.city || null);
+            }}
+          >
+            <Feather
+              name="navigation"
+              size={14}
+              color={activeCity === (user?.profileData?.city || null) ? '#fff' : '#ff4d4d'}
+            />
+            <Text style={[styles.cityPillText, { color: '#fff' }]}>
+              {user?.profileData?.city || 'Near You'}
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[
+              styles.cityPill,
+              !activeCity
+                ? { backgroundColor: '#ff4d4d', borderColor: '#ff4d4d' }
+                : { backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.15)' },
+            ]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setActiveCity(null);
+            }}
+          >
+            <Feather name="globe" size={14} color="#fff" />
+            <Text style={[styles.cityPillText, { color: '#fff' }]}>All Cities</Text>
+          </Pressable>
+          {getAllCities()
+            .filter(city => city !== (user?.profileData?.city || ''))
+            .map(city => (
+              <Pressable
+                key={city}
+                style={[
+                  styles.cityPill,
+                  activeCity === city
+                    ? { backgroundColor: '#ff4d4d', borderColor: '#ff4d4d' }
+                    : { backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.15)' },
+                ]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setActiveCity(city);
+                }}
+              >
+                <Text style={[styles.cityPillText, { color: '#fff' }]}>{city}</Text>
+              </Pressable>
+            ))}
+        </ScrollView>
+      ) : null}
+
       <View style={styles.content}>
         {renderTabContent()}
       </View>
@@ -1542,6 +1610,28 @@ const styles = StyleSheet.create({
     height: 2.5,
     borderRadius: 2,
     zIndex: 1,
+  },
+  cityRow: {
+    flexGrow: 0,
+    flexShrink: 0,
+  },
+  cityRowContent: {
+    paddingHorizontal: 24,
+    paddingVertical: Spacing.sm,
+    gap: Spacing.sm,
+  },
+  cityPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  cityPillText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   content: {
     flex: 1,

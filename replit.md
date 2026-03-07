@@ -62,6 +62,8 @@ The `RoomdrLogo` component renders the brand logo using `react-native-svg` and `
 
 The application supports over 10 US cities across multiple states, centralizing location data. A `LocationPicker` component provides a cascading State → City → Neighborhood selection. Location filtering is applied to roommate profiles, groups, and property searches. Public property displays enforce location privacy by showing only neighborhood and city.
 
+**Airbnb-Style City Selector:** All three main screens (Roommates, Groups Discover, Explore) feature a horizontal scrollable city pill row for easy city switching. The first pill shows the user's home city with a navigation icon, followed by "All Cities" and then all other available cities. Active pills are highlighted (red on dark screens, primary on light). Selecting a city filters content to that city; "All Cities" removes the city filter. Each screen manages its own `activeCity` state that defaults to the user's `profileData.city`.
+
 ## Technical Decisions
 
 Key technical decisions include Babel module resolver for simplified imports, platform-specific UI adaptations, performance optimizations via React Native's New Architecture, React Compiler, and Reanimated, and error handling through an error boundary component.
