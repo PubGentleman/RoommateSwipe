@@ -44,24 +44,23 @@ export const formatLocation = (location: {
  * Uses ALL profile data with weighted scoring (Total: 100 points):
  * 
  * HIGH PRIORITY (Deal-breakers & Critical Factors):
- * 1. Location: 18 points - Geographic compatibility (same/close neighborhoods prioritized)
+ * 1. Location: 16 points - Geographic compatibility (same/close neighborhoods prioritized)
  * 2. Budget: 12 points - Financial alignment (realistic matches)
  * 3. Sleep Schedule: 12 points - #1 reported conflict factor
  * 4. Cleanliness: 12 points - 40% of roommate issues
  * 5. Smoking/Substances: 10 points - Major deal-breaker
+ * 6. Move-in Timeline: 6 points - Penalizes mismatched timelines (Jan vs June)
  * 
  * MEDIUM PRIORITY (Lifestyle Compatibility):
- * 6. Work Location: 8 points - WFH needs quiet, Office needs flexibility
- * 7. Guest Policy: 8 points - Social behavior alignment
- * 8. Noise Tolerance: 6 points - Daily comfort predictor
- * 9. Pets: 6 points - Prevents allergies/preferences conflicts
+ * 7. Work Location: 8 points - WFH needs quiet, Office needs flexibility
+ * 8. Guest Policy: 8 points - Social behavior alignment
+ * 9. Noise Tolerance: 4 points - Daily comfort predictor
+ * 10. Pets: 4 points - Prevents allergies/preferences conflicts
  * 
  * LOWER PRIORITY (Relationship & Interests):
- * 10. Roommate Relationship: 4 points - Social expectations
- * 11. Lifestyle Tags: 2 points - Shared interests/activities (reduced from 3 to accommodate zodiac, baseline 1 pt)
- * 12. Zodiac Sign: 2 points - Optional fun factor, element-based compatibility (only if both users have it)
- * 
- * Note: Occupation scoring was removed (previously 1 point) to accommodate zodiac while maintaining 100-point total
+ * 11. Roommate Relationship: 4 points - Social expectations
+ * 12. Lifestyle Tags: 2 points - Shared interests/activities (reduced from 3 to accommodate zodiac, baseline 1 pt)
+ * 13. Zodiac Sign: 2 points - Optional fun factor, element-based compatibility (only if both users have it)
  */
 
 export interface MatchScore {
@@ -72,6 +71,7 @@ export interface MatchScore {
     sleepSchedule: number;
     cleanliness: number;
     smoking: number;
+    moveInTimeline: number;
     workLocation: number;
     guestPolicy: number;
     noiseTolerance: number;
@@ -111,12 +111,13 @@ export const calculateDetailedCompatibility = (
     sleepSchedule: 0,
     cleanliness: 0,
     smoking: 0,
+    moveInTimeline: 0,
     workLocation: 0,
     guestPolicy: 0,
     noiseTolerance: 0,
     pets: 0,
     roommateRelationship: 0,
-    lifestyle: 1, // Default 1-point baseline for backward compatibility
+    lifestyle: 1,
     zodiac: 0,
   };
 
@@ -135,25 +136,26 @@ export const calculateDetailedCompatibility = (
     // This preserves historical color thresholds (60-65% = orange/blue range)
     const neutralBreakdown = {
       ...breakdown,
-      location: 12, // Neutral location (nearby neighborhoods)
-      budget: 8,  // Neutral budget compatibility
-      sleepSchedule: 8, // Neutral sleep schedule
-      cleanliness: 8, // Neutral cleanliness
-      smoking: 7, // Neutral smoking/substances
-      workLocation: 5, // Neutral work location
-      guestPolicy: 5, // Neutral guest policy
-      noiseTolerance: 4, // Neutral noise tolerance
-      pets: 4, // Neutral pets
-      roommateRelationship: 3, // Neutral relationship preference
-      lifestyle: 1, // Baseline lifestyle
-      zodiac: 0, // No zodiac data
+      location: 10,
+      budget: 8,
+      sleepSchedule: 8,
+      cleanliness: 8,
+      smoking: 7,
+      moveInTimeline: 3,
+      workLocation: 5,
+      guestPolicy: 5,
+      noiseTolerance: 3,
+      pets: 3,
+      roommateRelationship: 3,
+      lifestyle: 1,
+      zodiac: 0,
     };
     const neutralScore = Object.values(neutralBreakdown).reduce((sum, score) => sum + score, 0);
     return { totalScore: neutralScore, breakdown: neutralBreakdown, reasons };
   }
 
   // ========================================
-  // 1. LOCATION (18 points) - MAJOR FACTOR
+  // 1. LOCATION (16 points) - MAJOR FACTOR
   // Priority: Same neighborhood > Nearby > Same city > Different city
   // ========================================
   if (userProfile.neighborhood && roommateProfile.preferences?.location) {
@@ -161,36 +163,31 @@ export const calculateDetailedCompatibility = (
     const roommateNeighborhood = roommateProfile.preferences.location;
     
     if (userNeighborhood === roommateNeighborhood) {
-      // Same neighborhood - highest score
-      breakdown.location = 18;
+      breakdown.location = 16;
       reasons.strengths.push(`Both in ${userNeighborhood} - perfect location match`);
     } else if (isNearbyNeighborhood(userNeighborhood, roommateNeighborhood)) {
-      // Nearby/adjacent neighborhoods - high score
-      breakdown.location = 14;
+      breakdown.location = 12;
       reasons.strengths.push(`${userNeighborhood} and ${roommateNeighborhood} are nearby neighborhoods`);
     } else if (isSameCity(userNeighborhood, roommateNeighborhood)) {
-      // Same city but different area - good score
-      breakdown.location = 9;
+      breakdown.location = 8;
       reasons.notes.push(`Same city (${userProfile.city}), different neighborhoods`);
     } else {
-      // Different city - 0 score unless actively searching
       breakdown.location = 0;
       reasons.concerns.push(`Different cities - not compatible for local roommate matching`);
     }
   } else if (userProfile.location && roommateProfile.preferences?.location) {
-    // Fallback to old location field if neighborhood not set
     const userLocation = userProfile.location;
     const roommateLocation = roommateProfile.preferences.location;
     
     if (userLocation === roommateLocation) {
-      breakdown.location = 18;
+      breakdown.location = 16;
       reasons.strengths.push(`Both prefer ${userLocation} - perfect location match`);
     } else {
-      breakdown.location = 9;
+      breakdown.location = 8;
       reasons.notes.push(`Different preferred locations`);
     }
   } else {
-    breakdown.location = 9; // Neutral if data missing
+    breakdown.location = 8;
   }
 
   // ========================================
@@ -295,7 +292,40 @@ export const calculateDetailedCompatibility = (
   }
 
   // ========================================
-  // 6. WORK LOCATION (8 points) - Home/Office Balance
+  // 6. MOVE-IN TIMELINE (6 points) - Scheduling Alignment
+  // ========================================
+  const userMoveIn = userPrefs.moveInDate;
+  const roommateMoveIn = roommateProfile.preferences?.moveInDate;
+  if (userMoveIn && roommateMoveIn) {
+    const userDate = parseMoveInDate(userMoveIn);
+    const roommateDate = parseMoveInDate(roommateMoveIn);
+    if (userDate && roommateDate) {
+      const daysDiff = Math.abs(Math.round((userDate.getTime() - roommateDate.getTime()) / (1000 * 60 * 60 * 24)));
+      if (daysDiff <= 14) {
+        breakdown.moveInTimeline = 6;
+        reasons.strengths.push(`Move-in dates within 2 weeks of each other`);
+      } else if (daysDiff <= 30) {
+        breakdown.moveInTimeline = 5;
+        reasons.strengths.push(`Move-in dates within a month`);
+      } else if (daysDiff <= 60) {
+        breakdown.moveInTimeline = 3;
+        reasons.notes.push(`Move-in dates about ${Math.round(daysDiff / 30)} months apart`);
+      } else if (daysDiff <= 90) {
+        breakdown.moveInTimeline = 1;
+        reasons.concerns.push(`Move-in dates are ${Math.round(daysDiff / 30)} months apart`);
+      } else {
+        breakdown.moveInTimeline = 0;
+        reasons.concerns.push(`Move-in timelines don't align (${Math.round(daysDiff / 30)}+ months apart)`);
+      }
+    } else {
+      breakdown.moveInTimeline = 3;
+    }
+  } else {
+    breakdown.moveInTimeline = 3;
+  }
+
+  // ========================================
+  // 7. WORK LOCATION (8 points) - Home/Office Balance
   // ========================================
   if (userPrefs.workLocation) {
     const userWork = userPrefs.workLocation;
@@ -345,50 +375,50 @@ export const calculateDetailedCompatibility = (
   }
 
   // ========================================
-  // 8. NOISE TOLERANCE (6 points) - Daily Comfort
+  // 9. NOISE TOLERANCE (4 points) - Daily Comfort
   // ========================================
   if (userPrefs.noiseTolerance) {
     const userNoise = userPrefs.noiseTolerance;
     const roommateNoise = inferNoiseTolerance(roommateProfile);
     
     if (userNoise === roommateNoise) {
-      breakdown.noiseTolerance = 6;
+      breakdown.noiseTolerance = 4;
       reasons.strengths.push(`Same noise tolerance level`);
     } else if (userNoise === 'normal_noise' || roommateNoise === 'normal_noise') {
-      breakdown.noiseTolerance = 4;
+      breakdown.noiseTolerance = 3;
       reasons.notes.push(`Moderate noise tolerance may work`);
     } else {
       breakdown.noiseTolerance = 1;
       reasons.concerns.push(`Noise tolerance mismatch`);
     }
   } else {
-    breakdown.noiseTolerance = 3;
+    breakdown.noiseTolerance = 2;
   }
 
   // ========================================
-  // 9. PETS (6 points) - Allergies & Preferences
+  // 10. PETS (4 points) - Allergies & Preferences
   // ========================================
   if (userPrefs.pets) {
     const userPets = userPrefs.pets;
     const roommatePets = roommateProfile.lifestyle?.pets || false;
     
     if (userPets === 'have_pets' && roommatePets) {
-      breakdown.pets = 6;
+      breakdown.pets = 4;
       reasons.strengths.push(`Both have pets - pet-friendly match`);
     } else if (userPets === 'open_to_pets') {
-      breakdown.pets = 6;
+      breakdown.pets = 4;
       reasons.notes.push(`Open to pets - flexible on this`);
     } else if (userPets === 'no_pets' && !roommatePets) {
-      breakdown.pets = 6;
+      breakdown.pets = 4;
       reasons.strengths.push(`Both prefer pet-free living`);
     } else if (userPets === 'no_pets' && roommatePets) {
       breakdown.pets = 0;
       reasons.concerns.push(`Pet incompatibility - they have pets`);
     } else {
-      breakdown.pets = 3;
+      breakdown.pets = 2;
     }
   } else {
-    breakdown.pets = 3;
+    breakdown.pets = 2;
   }
 
   // ========================================
@@ -468,6 +498,28 @@ export const calculateDetailedCompatibility = (
 // ========================================
 // HELPER FUNCTIONS
 // ========================================
+
+/**
+ * Parse a move-in date string (supports MM/DD/YYYY and YYYY-MM-DD)
+ */
+const parseMoveInDate = (dateStr: string): Date | null => {
+  if (!dateStr) return null;
+  if (dateStr.includes('/')) {
+    const parts = dateStr.split('/');
+    if (parts.length === 3) {
+      const month = parseInt(parts[0], 10) - 1;
+      const day = parseInt(parts[1], 10);
+      const year = parseInt(parts[2], 10);
+      const d = new Date(year, month, day);
+      if (!isNaN(d.getTime())) return d;
+    }
+  }
+  if (dateStr.includes('-')) {
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) return d;
+  }
+  return null;
+};
 
 /**
  * Infer sleep schedule from roommate profile
