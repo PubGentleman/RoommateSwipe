@@ -24,6 +24,7 @@ import { MatchCelebrationModal } from '../../components/MatchCelebrationModal';
 import { VerificationBadgeInline, getVerificationLevel } from '../../components/VerificationBadge';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RoomdrLogo } from '../../components/RoomdrLogo';
+import { RoommateFilterSheet, MatchFilters, DEFAULT_FILTERS, getActiveFilterCount, getActiveFilterChips, removeFilterChip, loadSavedFilters, saveFilters, applyFiltersToProfiles } from '../../components/RoommateFilterSheet';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Limit card size for web/desktop viewing
@@ -59,6 +60,10 @@ export const RoommatesScreen = () => {
   const [citySearch, setCitySearch] = useState('');
   const [recentCities, setRecentCities] = useState<string[]>([]);
   const [showCityPrompt, setShowCityPrompt] = useState(false);
+  const [showFilterSheet, setShowFilterSheet] = useState(false);
+  const [matchFilters, setMatchFilters] = useState<MatchFilters>({ ...DEFAULT_FILTERS });
+  const [unfilteredCount, setUnfilteredCount] = useState(0);
+  const [unfilteredProfiles, setUnfilteredProfiles] = useState<RoommateProfile[]>([]);
 
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -81,15 +86,17 @@ export const RoommatesScreen = () => {
   const POPULAR_CITIES = ['New York', 'Los Angeles', 'Chicago', 'Miami', 'Austin', 'Atlanta', 'Seattle', 'Boston'];
 
   useEffect(() => {
-    const initCity = async () => {
+    const init = async () => {
       try {
-        const [savedCity, savedRecent] = await Promise.all([
+        const [savedCity, savedRecent, savedFilters] = await Promise.all([
           AsyncStorage.getItem(SELECTED_CITY_KEY),
           AsyncStorage.getItem(RECENT_CITIES_KEY),
+          loadSavedFilters(),
         ]);
         if (savedRecent) {
           setRecentCities(JSON.parse(savedRecent));
         }
+        setMatchFilters(savedFilters);
         const userCity = user?.profileData?.city;
         if (savedCity) {
           setActiveCity(savedCity);
@@ -100,12 +107,12 @@ export const RoommatesScreen = () => {
         }
       } catch {}
     };
-    initCity();
+    init();
   }, []);
 
   useEffect(() => {
     loadProfiles();
-  }, [activeCity]);
+  }, [activeCity, matchFilters]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -149,7 +156,12 @@ export const RoommatesScreen = () => {
         };
       });
       
-      const sortedProfiles = profilesWithCompatibility.sort((a, b) => {
+      setUnfilteredCount(profilesWithCompatibility.length);
+      setUnfilteredProfiles(profilesWithCompatibility);
+
+      const filteredProfiles = applyFiltersToProfiles(profilesWithCompatibility, matchFilters);
+
+      const sortedProfiles = filteredProfiles.sort((a, b) => {
         const userA = userMap.get(a.id);
         const userB = userMap.get(b.id);
         
@@ -399,6 +411,28 @@ export const RoommatesScreen = () => {
 
   const composedGesture = Gesture.Exclusive(tap, pan);
 
+  const handleApplyFilters = async (newFilters: MatchFilters) => {
+    setMatchFilters(newFilters);
+    setShowFilterSheet(false);
+    await saveFilters(newFilters);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
+  const handleRemoveFilterChip = async (key: string) => {
+    const updated = removeFilterChip(matchFilters, key);
+    setMatchFilters(updated);
+    await saveFilters(updated);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const handleRelaxFilters = async () => {
+    setMatchFilters({ ...DEFAULT_FILTERS });
+    await saveFilters({ ...DEFAULT_FILTERS });
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
+  const activeFilterChips = getActiveFilterChips(matchFilters);
+
   const handleCityChange = async (city: string | null) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setActiveCity(city);
@@ -463,12 +497,18 @@ export const RoommatesScreen = () => {
         <Feather name="chevron-down" size={16} color="rgba(255,255,255,0.6)" />
       </Pressable>
       <Pressable
-        style={styles.filterIconButton}
+        style={[styles.filterIconButton, getActiveFilterCount(matchFilters) > 0 ? { borderColor: '#ff6b5b' } : null]}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          setShowFilterSheet(true);
         }}
       >
-        <Feather name="sliders" size={18} color="#FFFFFF" />
+        <Feather name="sliders" size={18} color={getActiveFilterCount(matchFilters) > 0 ? '#ff6b5b' : '#FFFFFF'} />
+        {getActiveFilterCount(matchFilters) > 0 ? (
+          <View style={styles.filterBadge}>
+            <ThemedText style={styles.filterBadgeText}>{getActiveFilterCount(matchFilters)}</ThemedText>
+          </View>
+        ) : null}
       </Pressable>
     </View>
   );
@@ -676,17 +716,32 @@ export const RoommatesScreen = () => {
         </View>
         {renderCitySelector()}
         <View style={styles.emptyState}>
-          <Feather name="users" size={64} color="rgba(255,255,255,0.35)" />
+          <Feather name={getActiveFilterCount(matchFilters) > 0 ? 'filter' : 'users'} size={64} color="rgba(255,255,255,0.35)" />
           <ThemedText style={[Typography.h2, styles.emptyTitle, { color: '#FFFFFF' }]}>
-            {activeCity ? `No Profiles in ${activeCity}` : 'No More Profiles'}
+            {getActiveFilterCount(matchFilters) > 0
+              ? 'No matches with these filters'
+              : activeCity ? `No Profiles in ${activeCity}` : 'No More Profiles'}
           </ThemedText>
           <ThemedText style={[Typography.body, { color: 'rgba(255,255,255,0.5)', textAlign: 'center', marginBottom: Spacing.xl }]}>
-            {activeCity
-              ? 'Try browsing All Cities or switch to a different city'
-              : "You've seen all available roommates"}
+            {getActiveFilterCount(matchFilters) > 0
+              ? `${unfilteredCount} roommate${unfilteredCount !== 1 ? 's' : ''} available — try relaxing your filters`
+              : activeCity
+                ? 'Try browsing All Cities or switch to a different city'
+                : "You've seen all available roommates"}
           </ThemedText>
+          {getActiveFilterCount(matchFilters) > 0 ? (
+            <Pressable
+              style={[styles.resetButton, { backgroundColor: '#ff6b5b' }]}
+              onPress={handleRelaxFilters}
+            >
+              <Feather name="x-circle" size={20} color="#FFFFFF" />
+              <ThemedText style={[Typography.body, { color: '#FFFFFF', marginLeft: Spacing.sm, fontWeight: '600' }]}>
+                Relax Filters
+              </ThemedText>
+            </Pressable>
+          ) : null}
           <Pressable
-            style={[styles.resetButton, { backgroundColor: '#ff4d4d' }]}
+            style={[styles.resetButton, { backgroundColor: '#ff4d4d', marginTop: getActiveFilterCount(matchFilters) > 0 ? Spacing.sm : 0 }]}
             onPress={resetSwipeHistory}
           >
             <Feather name="refresh-cw" size={20} color="#FFFFFF" />
@@ -696,6 +751,13 @@ export const RoommatesScreen = () => {
           </Pressable>
         </View>
         {renderCityPickerModal()}
+        <RoommateFilterSheet
+          visible={showFilterSheet}
+          onClose={() => setShowFilterSheet(false)}
+          onApply={handleApplyFilters}
+          currentFilters={matchFilters}
+          allProfiles={unfilteredProfiles}
+        />
       </View>
     );
   }
@@ -845,6 +907,26 @@ export const RoommatesScreen = () => {
       </View>
 
       {renderCitySelector()}
+
+      {activeFilterChips.length > 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.filterChipsRow}
+          contentContainerStyle={styles.filterChipsContent}
+        >
+          {activeFilterChips.map(chip => (
+            <Pressable
+              key={chip.key}
+              style={styles.filterChipDismissible}
+              onPress={() => handleRemoveFilterChip(chip.key)}
+            >
+              <ThemedText style={styles.filterChipDismissibleText}>{chip.label}</ThemedText>
+              <Feather name="x" size={12} color="rgba(255,255,255,0.6)" />
+            </Pressable>
+          ))}
+        </ScrollView>
+      ) : null}
 
       {lowProfileCount ? (
         <View style={styles.lowProfileBanner}>
@@ -1694,6 +1776,14 @@ export const RoommatesScreen = () => {
       </Modal>
 
       {renderCityPickerModal()}
+
+      <RoommateFilterSheet
+        visible={showFilterSheet}
+        onClose={() => setShowFilterSheet(false)}
+        onApply={handleApplyFilters}
+        currentFilters={matchFilters}
+        allProfiles={unfilteredProfiles}
+      />
     </View>
   );
 };
@@ -1758,6 +1848,47 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.12)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  filterBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#ff6b5b',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  filterBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  filterChipsRow: {
+    flexGrow: 0,
+    flexShrink: 0,
+  },
+  filterChipsContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 6,
+    gap: 6,
+  },
+  filterChipDismissible: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.full,
+    backgroundColor: 'rgba(255,107,91,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.3)',
+  },
+  filterChipDismissibleText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#ff6b5b',
   },
   lowProfileBanner: {
     flexDirection: 'row',
