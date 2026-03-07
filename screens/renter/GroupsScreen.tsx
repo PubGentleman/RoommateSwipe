@@ -14,6 +14,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { mockRoommateProfiles } from '../../utils/mockData';
 import { getGenderSymbol, calculateCompatibility } from '../../utils/matchingAlgorithm';
+import { getCityFromNeighborhood } from '../../utils/locationData';
 import { getZodiacSymbol } from '../../utils/zodiacUtils';
 import { AdBanner } from '../../components/AdBanner';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -71,9 +72,15 @@ export const GroupsScreen = () => {
       setIsLoading(true);
       const groups = await StorageService.getGroups();
       const userGroups = groups.filter(g => g.members.includes(user.id));
-      const otherGroups = groups.filter(
-        g => !g.members.includes(user.id) && !g.pendingMembers.includes(user.id)
-      );
+      const userCity = user?.profileData?.city;
+      const otherGroups = groups.filter(g => {
+        if (g.members.includes(user.id) || g.pendingMembers.includes(user.id)) return false;
+        if (userCity && g.preferredLocation) {
+          const groupCity = getCityFromNeighborhood(g.preferredLocation);
+          if (groupCity && groupCity !== userCity) return false;
+        }
+        return true;
+      });
       setMyGroups(userGroups);
       setAllGroups(otherGroups);
       setCurrentIndex(0);

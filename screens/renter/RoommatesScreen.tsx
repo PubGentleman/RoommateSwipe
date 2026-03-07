@@ -15,6 +15,7 @@ import { RoommateProfile, Match } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scaleFont, moderateScale, getResponsiveSpacing } from '../../utils/responsive';
 import { calculateCompatibility, getMatchQualityColor, getCleanlinessLabel, getSocialLevelLabel, getWorkScheduleLabel, formatMoveInDate, getGenderSymbol } from '../../utils/matchingAlgorithm';
+import { getCityFromNeighborhood } from '../../utils/locationData';
 import { getZodiacSymbol, getZodiacCompatibilityLevel } from '../../utils/zodiacUtils';
 import { RewardedAdButton } from '../../components/AdBanner';
 import { ReportBlockModal } from '../../components/ReportBlockModal';
@@ -91,7 +92,20 @@ export const RoommatesScreen = () => {
       setProfileUsers(userMap);
       
       const blockedIds = new Set(user?.blockedUsers || []);
-      const unseen = allProfiles.filter(p => !history.has(p.id) && p.id !== user?.id && !blockedIds.has(p.id));
+      const userCity = user?.profileData?.city;
+      const unseen = allProfiles.filter(p => {
+        if (history.has(p.id) || p.id === user?.id || blockedIds.has(p.id)) return false;
+        if (userCity) {
+          const profileUser = userMap.get(p.id);
+          const profileUserCity = profileUser?.profileData?.city;
+          if (profileUserCity && profileUserCity !== userCity) return false;
+          if (!profileUserCity && p.preferences?.location) {
+            const profileCity = getCityFromNeighborhood(p.preferences.location);
+            if (profileCity && profileCity !== userCity) return false;
+          }
+        }
+        return true;
+      });
       
       const profilesWithCompatibility = unseen.map(profile => {
         const compatibility = user ? calculateCompatibility(user, profile) : 50;

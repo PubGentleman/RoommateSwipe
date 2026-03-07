@@ -128,6 +128,10 @@ export const PropertyMapView = ({
 
   const initialRegion = useMemo(() => {
     if (propertiesWithCoords.length === 0) {
+      const userCoords = currentUser?.profileData?.coordinates;
+      if (userCoords) {
+        return { latitude: userCoords.lat, longitude: userCoords.lng, latitudeDelta: 0.1, longitudeDelta: 0.1 };
+      }
       return { latitude: 40.7128, longitude: -74.006, latitudeDelta: 0.1, longitudeDelta: 0.1 };
     }
     const lats = propertiesWithCoords.map(p => p.coordinates!.lat);
@@ -144,7 +148,7 @@ export const PropertyMapView = ({
       latitudeDelta: maxLat - minLat + padLat,
       longitudeDelta: maxLng - minLng + padLng,
     };
-  }, [propertiesWithCoords]);
+  }, [propertiesWithCoords, currentUser]);
 
   const mapMarkers = useMemo(() => {
     return propertiesWithCoords.map(property => {
