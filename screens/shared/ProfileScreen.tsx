@@ -197,7 +197,7 @@ export const ProfileScreen = () => {
               iconBorderColor="rgba(255,77,77,0.18)"
               title="Account Settings"
               subtitle="Email, password, connected apps"
-              onPress={() => navigation.navigate('About')}
+              onPress={() => navigation.navigate('Payment')}
               isLast
             />
           </View>

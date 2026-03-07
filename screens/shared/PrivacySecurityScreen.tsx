@@ -296,6 +296,12 @@ export const PrivacySecurityScreen = () => {
           label="Terms of Service"
           onPress={() => navigation.navigate('TermsOfService')}
         />
+
+        <MenuItem
+          icon="info"
+          label="About Roomdr"
+          onPress={() => navigation.navigate('About')}
+        />
       </View>
 
       <View style={styles.section}>
