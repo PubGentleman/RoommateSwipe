@@ -618,6 +618,10 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       moveInDate: '01/25/2025',
       bedrooms: 2,
     },
+    verification: {
+      phone: { verified: true, verifiedAt: new Date('2024-11-10') },
+      government_id: { verified: true, verifiedAt: new Date('2024-11-15') },
+    },
     compatibility: 76,
   },
   {
@@ -648,6 +652,11 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       moveInDate: '02/01/2025',
       bedrooms: 1,
     },
+    verification: {
+      phone: { verified: true, verifiedAt: new Date('2024-12-05') },
+      social_media: { verified: true, verifiedAt: new Date('2024-12-06'), platform: 'github' },
+      government_id: { verified: true, verifiedAt: new Date('2024-12-08') },
+    },
     compatibility: 83,
   },
   {
@@ -676,6 +685,10 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       location: 'Park Slope',
       moveInDate: '01/30/2025',
       bedrooms: 2,
+    },
+    verification: {
+      phone: { verified: true, verifiedAt: new Date('2024-11-28') },
+      social_media: { verified: true, verifiedAt: new Date('2024-11-30'), platform: 'instagram' },
     },
     compatibility: 79,
   },
@@ -707,6 +720,9 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       moveInDate: '02/10/2025',
       bedrooms: 2,
     },
+    verification: {
+      phone: { verified: true, verifiedAt: new Date('2024-10-20') },
+    },
     compatibility: 72,
   },
   {
@@ -735,6 +751,11 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       location: 'Upper East Side',
       moveInDate: '01/05/2025',
       bedrooms: 1,
+    },
+    verification: {
+      phone: { verified: true, verifiedAt: new Date('2024-12-15') },
+      government_id: { verified: true, verifiedAt: new Date('2024-12-18') },
+      social_media: { verified: true, verifiedAt: new Date('2024-12-16'), platform: 'linkedin' },
     },
     compatibility: 85,
   },
@@ -766,6 +787,10 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       moveInDate: '02/20/2025',
       bedrooms: 2,
     },
+    verification: {
+      phone: { verified: true, verifiedAt: new Date('2024-11-05') },
+      government_id: { verified: true, verifiedAt: new Date('2024-11-10') },
+    },
     compatibility: 87,
   },
   {
@@ -793,6 +818,10 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       location: 'East Williamsburg',
       moveInDate: '01/15/2025',
       bedrooms: 2,
+    },
+    verification: {
+      phone: { verified: true, verifiedAt: new Date('2024-12-20') },
+      social_media: { verified: true, verifiedAt: new Date('2024-12-22'), platform: 'instagram' },
     },
     compatibility: 82,
   },
@@ -825,6 +854,11 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       moveInDate: '02/05/2025',
       bedrooms: 1,
     },
+    verification: {
+      phone: { verified: true, verifiedAt: new Date('2024-12-01') },
+      government_id: { verified: true, verifiedAt: new Date('2024-12-03') },
+      social_media: { verified: true, verifiedAt: new Date('2024-12-02'), platform: 'instagram' },
+    },
     compatibility: 80,
   },
   {
@@ -853,6 +887,10 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       location: 'Upper West Side',
       moveInDate: '03/01/2025',
       bedrooms: 2,
+    },
+    verification: {
+      phone: { verified: true, verifiedAt: new Date('2024-11-20') },
+      government_id: { verified: true, verifiedAt: new Date('2024-11-25') },
     },
     compatibility: 91,
   },
