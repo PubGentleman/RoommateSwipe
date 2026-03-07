@@ -12,11 +12,17 @@ import { StorageService } from '../utils/storage';
 
 export type RootStackParamList = {
   Login: undefined;
-  Onboarding: undefined;
   Main: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+
+function RenterMain() { return <RenterTabNavigator />; }
+RenterMain.displayName = 'RenterMain';
+function HostMain() { return <HostTabNavigator />; }
+HostMain.displayName = 'HostMain';
+function AgentMain() { return <AgentTabNavigator />; }
+AgentMain.displayName = 'AgentMain';
 
 export const RootNavigator = () => {
   const { user, isLoading } = useAuth();
@@ -63,22 +69,15 @@ export const RootNavigator = () => {
     return <OnboardingScreen onComplete={handleOnboardingComplete} />;
   }
 
-  const MainNavigator = () => {
-    switch (user.role) {
-      case 'renter':
-        return <RenterTabNavigator />;
-      case 'host':
-        return <HostTabNavigator />;
-      case 'agent':
-        return <AgentTabNavigator />;
-      default:
-        return <RenterTabNavigator />;
-    }
-  };
+  const MainComponent = user.role === 'host'
+    ? HostMain
+    : user.role === 'agent'
+      ? AgentMain
+      : RenterMain;
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Main" component={MainNavigator} />
+      <Stack.Screen name="Main" component={MainComponent} />
     </Stack.Navigator>
   );
 };
