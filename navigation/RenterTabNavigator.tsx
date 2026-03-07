@@ -47,6 +47,10 @@ export const RenterTabNavigator = () => {
           }),
           borderTopWidth: 0,
           elevation: 0,
+          paddingHorizontal: 0,
+          marginHorizontal: 0,
+          left: 0,
+          right: 0,
         },
         tabBarBackground: () =>
           Platform.OS === 'ios' ? (
@@ -59,7 +63,7 @@ export const RenterTabNavigator = () => {
         name="Explore"
         component={ExploreScreen}
         options={{
-          tabBarIcon: ({ color, size }) => <Feather name="search" size={size} color={color} />,
+          tabBarIcon: ({ color }) => <Feather name="search" size={22} color={color} />,
         }}
       />
       <Tab.Screen
@@ -67,14 +71,14 @@ export const RenterTabNavigator = () => {
         component={RoommatesStackNavigator}
         options={{
           tabBarLabel: 'Match',
-          tabBarIcon: ({ color, size }) => <Feather name="users" size={size} color={color} />,
+          tabBarIcon: ({ color }) => <Feather name="users" size={22} color={color} />,
         }}
       />
       <Tab.Screen
         name="Groups"
         component={GroupsScreen}
         options={{
-          tabBarIcon: ({ color, size }) => <Feather name="grid" size={size} color={color} />,
+          tabBarIcon: ({ color }) => <Feather name="grid" size={22} color={color} />,
         }}
       />
       <Tab.Screen
@@ -82,14 +86,14 @@ export const RenterTabNavigator = () => {
         component={MessagesStackNavigator}
         options={{
           tabBarLabel: 'Chat',
-          tabBarIcon: ({ color, size }) => <Feather name="message-circle" size={size} color={color} />,
+          tabBarIcon: ({ color }) => <Feather name="message-circle" size={22} color={color} />,
         }}
       />
       <Tab.Screen
         name="Profile"
         component={ProfileStackNavigator}
         options={{
-          tabBarIcon: ({ color, size }) => <Feather name="user" size={size} color={color} />,
+          tabBarIcon: ({ color }) => <Feather name="user" size={22} color={color} />,
         }}
       />
     </Tab.Navigator>
