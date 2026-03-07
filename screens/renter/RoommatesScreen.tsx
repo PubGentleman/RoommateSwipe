@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, StyleSheet, Image, Pressable, Dimensions, Modal, ScrollView } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS, interpolate } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, runOnJS, interpolate } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -184,17 +184,16 @@ export const RoommatesScreen = () => {
     const direction = action === 'like' ? 1 : action === 'nope' ? -1 : 0;
     const toX = direction * SCREEN_WIDTH * 1.5;
     const toY = action === 'superlike' ? -SCREEN_HEIGHT : 0;
+    const exitDuration = 200;
 
-    translateX.value = withSpring(toX, { damping: 15, stiffness: 100 });
-    translateY.value = withSpring(toY, { damping: 15, stiffness: 100 });
-    rotation.value = withSpring(direction * 15, { damping: 15, stiffness: 100 });
-
-    setTimeout(() => {
+    translateX.value = withTiming(toX, { duration: exitDuration });
+    translateY.value = withTiming(toY, { duration: exitDuration });
+    rotation.value = withTiming(direction * 15, { duration: exitDuration }, () => {
       translateX.value = 0;
       translateY.value = 0;
       rotation.value = 0;
-      setCurrentIndex(currentIndex + 1);
-    }, 300);
+      runOnJS(setCurrentIndex)(currentIndex + 1);
+    });
 
     await processSwipeAsync(action, currentProfile.id, user.id);
   };

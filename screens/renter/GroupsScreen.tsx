@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, Dimensions, ActivityIndicator, TextInput, ScrollView, Alert, Modal, Image } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, runOnJS } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { ThemedText } from '../../components/ThemedText';
@@ -270,27 +270,18 @@ export const GroupsScreen = () => {
 
     const direction = action === 'like' ? 1 : -1;
     const toX = direction * SCREEN_WIDTH * 1.5;
+    const exitDuration = 200;
 
-    // Animate card off screen
-    translateX.value = withSpring(toX, { 
-      damping: 15,
-      stiffness: 120 
+    translateX.value = withTiming(toX, { duration: exitDuration });
+    rotation.value = withTiming(direction * 15, { duration: exitDuration }, () => {
+      translateX.value = 0;
+      rotation.value = 0;
+      runOnJS(setCurrentIndex)(currentIndex + 1);
     });
-    rotation.value = withSpring(direction * 15);
 
-    // Handle like action after starting animation
     if (action === 'like') {
       await handleLikeGroup(currentGroup);
     }
-
-    // Show next card faster
-    const resetDelay = action === 'like' ? 1100 : 300;
-    setTimeout(() => {
-      translateX.value = 0;
-      rotation.value = 0;
-      // Advance to next card for both like and skip
-      setCurrentIndex(currentIndex + 1);
-    }, resetDelay);
   };
 
   const handleUndo = () => {
