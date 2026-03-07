@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, TextInput, StyleSheet, Pressable } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenKeyboardAwareScrollView } from '../../components/ScreenKeyboardAwareScrollView';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
@@ -9,6 +10,7 @@ import { useAuth, UserRole } from '../../contexts/AuthContext';
 export const LoginScreen = () => {
   const { theme } = useTheme();
   const { login } = useAuth();
+  const insets = useSafeAreaInsets();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [selectedRole, setSelectedRole] = useState<UserRole>('renter');
@@ -34,7 +36,7 @@ export const LoginScreen = () => {
 
   return (
     <ScreenKeyboardAwareScrollView contentContainerStyle={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { marginTop: insets.top + Spacing.lg }]}>
         <ThemedText style={[Typography.hero, styles.title]}>Welcome Back</ThemedText>
         <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
           Sign in to continue
