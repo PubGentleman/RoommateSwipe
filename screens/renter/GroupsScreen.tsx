@@ -1164,7 +1164,7 @@ export const GroupsScreen = () => {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: '#111111', paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+    <View style={[styles.container, { backgroundColor: '#111111', paddingTop: insets.top, paddingBottom: insets.bottom + 80 }]}>
       <View style={styles.tabBar}>
         {(['my-groups', 'discover', 'create'] as Tab[]).map((tab) => {
           const isActive = activeTab === tab;
