@@ -132,7 +132,7 @@ export const LoginScreen = () => {
 
 const styles = StyleSheet.create({
   container: {
-    padding: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
   },
   header: {
     marginBottom: Spacing.xxl,
