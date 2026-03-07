@@ -251,6 +251,16 @@ export interface User {
       bedrooms?: number;
     };
   };
+  notificationPreferences?: {
+    matches: boolean;
+    superLikes: boolean;
+    messages: boolean;
+    groupInvites: boolean;
+    groupUpdates: boolean;
+    propertyUpdates: boolean;
+    boostReminders: boolean;
+    systemAlerts: boolean;
+  };
   blockedUsers?: string[];
   reportedUsers?: Array<{
     userId: string;

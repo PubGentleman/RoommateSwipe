@@ -873,6 +873,42 @@ export const StorageService = {
 
   async addNotification(notification: Notification): Promise<void> {
     try {
+      const typeToPreference: Record<string, string> = {
+        match: 'matches',
+        super_like: 'superLikes',
+        message: 'messages',
+        group_invite: 'groupInvites',
+        group_accepted: 'groupUpdates',
+        property_update: 'propertyUpdates',
+        property_rented: 'propertyUpdates',
+        application_status: 'systemAlerts',
+        system: 'systemAlerts',
+      };
+      const prefKey = typeToPreference[notification.type];
+      if (prefKey) {
+        let recipientPrefs = null;
+        const currentUserData = await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+        const currentUser = currentUserData ? JSON.parse(currentUserData) : null;
+        if (currentUser && currentUser.id === notification.userId) {
+          recipientPrefs = currentUser.notificationPreferences;
+        } else {
+          const usersData = await AsyncStorage.getItem(STORAGE_KEYS.USERS);
+          if (usersData) {
+            const users = JSON.parse(usersData);
+            const recipient = users.find((u: any) => u.id === notification.userId);
+            if (recipient) {
+              recipientPrefs = recipient.notificationPreferences;
+            }
+          }
+        }
+        if (recipientPrefs) {
+          const defaultPrefs = { matches: true, superLikes: true, messages: true, groupInvites: true, groupUpdates: true, propertyUpdates: true, boostReminders: true, systemAlerts: true };
+          const merged = { ...defaultPrefs, ...recipientPrefs };
+          if (merged[prefKey as keyof typeof merged] === false) {
+            return;
+          }
+        }
+      }
       const data = await AsyncStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
       const notifications: Notification[] = data ? JSON.parse(data) : [];
       notifications.push(notification);

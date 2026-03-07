@@ -14,6 +14,7 @@ import TermsOfServiceScreen from '../screens/shared/TermsOfServiceScreen';
 import AboutScreen from '../screens/shared/AboutScreen';
 import { DownloadDataScreen } from '../screens/shared/DownloadDataScreen';
 import { BlockedUsersScreen } from '../screens/shared/BlockedUsersScreen';
+import { NotificationPreferencesScreen } from '../screens/shared/NotificationPreferencesScreen';
 
 export type ProfileStackParamList = {
   ProfileMain: undefined;
@@ -28,6 +29,7 @@ export type ProfileStackParamList = {
   About: undefined;
   DownloadData: undefined;
   BlockedUsers: undefined;
+  NotificationPreferences: undefined;
 };
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
@@ -235,6 +237,13 @@ export const ProfileStackNavigator = () => {
             </Pressable>
           ),
         })}
+      />
+      <Stack.Screen 
+        name="NotificationPreferences" 
+        component={NotificationPreferencesScreen}
+        options={{
+          headerShown: false,
+        }}
       />
     </Stack.Navigator>
   );
