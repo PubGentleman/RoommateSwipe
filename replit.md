@@ -85,6 +85,13 @@ Key technical decisions include Babel module resolver for simplified imports, pl
 - `expo-image`
 - `react-native-keyboard-controller`
 
+**Monetization:**
+- `AdBanner` component (`components/AdBanner.tsx`) - Placeholder ad system ready for Google AdMob
+- Currently shows dashed placeholder boxes in development
+- To activate: Install `react-native-google-mobile-ads`, replace placeholders with real BannerAd components
+- Ad placements: Between swipe card and action buttons on Match screen and Groups discover screen
+- Supported sizes: banner (320x50), largeBanner (320x100), mediumRectangle (300x250), fullBanner (468x60), leaderboard (728x90)
+
 **Development Tools:**
 - `typescript`
 - `eslint`

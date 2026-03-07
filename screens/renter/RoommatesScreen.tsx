@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scaleFont, moderateScale, getResponsiveSpacing } from '../../utils/responsive';
 import { calculateCompatibility, getMatchQualityColor, getCleanlinessLabel, getSocialLevelLabel, getWorkScheduleLabel, formatMoveInDate, getGenderSymbol } from '../../utils/matchingAlgorithm';
 import { getZodiacSymbol, getZodiacCompatibilityLevel } from '../../utils/zodiacUtils';
+import { AdBanner } from '../../components/AdBanner';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Limit card size for web/desktop viewing
@@ -562,6 +563,8 @@ export const RoommatesScreen = () => {
           </Animated.View>
         </GestureDetector>
       </View>
+
+      <AdBanner size="banner" />
 
       <View style={[styles.actions, { paddingBottom: 90 }]}>
         <Pressable

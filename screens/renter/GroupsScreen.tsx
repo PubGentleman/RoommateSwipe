@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { mockRoommateProfiles } from '../../utils/mockData';
 import { getGenderSymbol, calculateCompatibility } from '../../utils/matchingAlgorithm';
 import { getZodiacSymbol } from '../../utils/zodiacUtils';
+import { AdBanner } from '../../components/AdBanner';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - Spacing.xxl;
@@ -913,6 +914,8 @@ export const GroupsScreen = () => {
                 </ScrollView>
             </Animated.View>
           </GestureDetector>
+
+          <AdBanner size="banner" />
 
           <View style={styles.actionButtons}>
             <Pressable
