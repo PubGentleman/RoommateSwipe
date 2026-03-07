@@ -67,17 +67,17 @@ export const RoommatesScreen = () => {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const rotation = useSharedValue(0);
+  const cardOpacity = useSharedValue(1);
+  const isAnimatingSwipe = useSharedValue(false);
 
-  const animatedCardStyle = useAnimatedStyle(() => {
-    const rotate = `${rotation.value}deg`;
-    return {
-      transform: [
-        { translateX: translateX.value },
-        { translateY: translateY.value },
-        { rotate },
-      ],
-    };
-  });
+  const animatedCardStyle = useAnimatedStyle(() => ({
+    opacity: cardOpacity.value,
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+      { rotate: `${rotation.value}deg` },
+    ],
+  }));
 
   useEffect(() => {
     const init = async () => {
@@ -212,8 +212,20 @@ export const RoommatesScreen = () => {
   
   const isProfileOnline = currentProfile ? Math.random() > 0.5 : false;
 
+  const advanceCard = () => {
+    translateX.value = 0;
+    translateY.value = 0;
+    rotation.value = 0;
+    cardOpacity.value = 0;
+    isAnimatingSwipe.value = false;
+    setCurrentIndex(prev => prev + 1);
+    requestAnimationFrame(() => {
+      cardOpacity.value = withTiming(1, { duration: 150 });
+    });
+  };
+
   const handleSwipeAction = async (action: 'like' | 'nope' | 'superlike') => {
-    if (!currentProfile || !user) return;
+    if (!currentProfile || !user || isAnimatingSwipe.value) return;
 
     if (action === 'superlike') {
       const superLikeCheck = canSuperLike();
@@ -224,6 +236,7 @@ export const RoommatesScreen = () => {
       await useSuperLike();
     }
 
+    isAnimatingSwipe.value = true;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     
     setLastSwipedProfile({ profile: currentProfile, action });
@@ -231,18 +244,15 @@ export const RoommatesScreen = () => {
     const direction = action === 'like' ? 1 : action === 'nope' ? -1 : 0;
     const toX = direction * SCREEN_WIDTH * 1.5;
     const toY = action === 'superlike' ? -SCREEN_HEIGHT : 0;
-    const exitDuration = 200;
+    const exitDuration = 250;
 
     translateX.value = withTiming(toX, { duration: exitDuration });
     translateY.value = withTiming(toY, { duration: exitDuration });
     rotation.value = withTiming(direction * 15, { duration: exitDuration }, () => {
-      translateX.value = 0;
-      translateY.value = 0;
-      rotation.value = 0;
-      runOnJS(setCurrentIndex)(currentIndex + 1);
+      runOnJS(advanceCard)();
     });
 
-    await processSwipeAsync(action, currentProfile.id, user.id);
+    processSwipeAsync(action, currentProfile.id, user.id);
   };
 
   const handleUndo = async () => {
@@ -261,7 +271,7 @@ export const RoommatesScreen = () => {
     
     await useRewind();
     
-    setCurrentIndex(currentIndex - 1);
+    setCurrentIndex(prev => prev - 1);
     setLastSwipedProfile(null);
   };
 
@@ -367,20 +377,22 @@ export const RoommatesScreen = () => {
 
   const pan = Gesture.Pan()
     .onChange((event) => {
+      if (isAnimatingSwipe.value) return;
       translateX.value = event.translationX;
       translateY.value = event.translationY;
       rotation.value = event.translationX / 20;
     })
     .onEnd((event) => {
+      if (isAnimatingSwipe.value) return;
       if (Math.abs(event.translationX) > 120) {
         const action = event.translationX > 0 ? 'like' : 'nope';
         runOnJS(handleSwipeAction)(action);
       } else if (event.translationY < -120) {
         runOnJS(handleSwipeAction)('superlike');
       } else {
-        translateX.value = withSpring(0);
-        translateY.value = withSpring(0);
-        rotation.value = withSpring(0);
+        translateX.value = withSpring(0, { damping: 20, stiffness: 200 });
+        translateY.value = withSpring(0, { damping: 20, stiffness: 200 });
+        rotation.value = withSpring(0, { damping: 20, stiffness: 200 });
       }
     });
 
