@@ -96,7 +96,9 @@ Key technical decisions include Babel module resolver for simplified imports, pl
 - `@react-native-async-storage/async-storage`
 
 **Maps:**
-- `react-native-maps` (iOS/Android native maps; web shows fallback property list)
+- `react-native-maps` (iOS/Android native maps)
+- Web map: Leaflet/OpenStreetMap via iframe with `srcDoc` (no native dependency needed)
+- `react-native-webview` (installed for potential native WebView usage)
 
 **Utilities:**
 - `expo-linking`

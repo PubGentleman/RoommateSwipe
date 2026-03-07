@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { View, StyleSheet, Pressable, Image, Platform, ScrollView } from 'react-native';
+import React, { useMemo, useRef } from 'react';
+import { View, StyleSheet, Pressable, Image, Platform } from 'react-native';
 import { ThemedText } from './ThemedText';
 import { useTheme } from '../hooks/useTheme';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
@@ -47,6 +47,69 @@ function getUserAsRoommateProfile(user: User): RoommateProfile {
   };
 }
 
+function buildLeafletHtml(
+  properties: { id: string; lat: number; lng: number; price: number; title: string; beds: number; baths: number; photo: string; matchPct: number | null; matchColor: string; isSaved: boolean }[],
+  center: { lat: number; lng: number },
+  zoom: number,
+  isDark: boolean
+): string {
+  const markersJson = JSON.stringify(properties);
+  const tileUrl = isDark
+    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+    : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+
+  return `<!DOCTYPE html>
+<html><head>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body,#map{width:100%;height:100%}
+.popup-card{font-family:-apple-system,system-ui,sans-serif;width:220px;overflow:hidden;border-radius:12px;background:${isDark ? '#1a1a1a' : '#fff'};box-shadow:0 4px 20px rgba(0,0,0,0.3)}
+.popup-card img{width:100%;height:110px;object-fit:cover;display:block}
+.popup-info{padding:10px 12px}
+.popup-price{font-size:15px;font-weight:700;color:${isDark ? '#fff' : '#111'}}
+.popup-title{font-size:11px;color:${isDark ? 'rgba(255,255,255,0.5)' : '#888'};margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.popup-meta{display:flex;align-items:center;justify-content:space-between;margin-top:6px}
+.popup-beds{font-size:11px;color:${isDark ? 'rgba(255,255,255,0.5)' : '#888'}}
+.popup-match{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px}
+.leaflet-popup-content-wrapper{padding:0!important;border-radius:12px!important;background:transparent!important;box-shadow:none!important}
+.leaflet-popup-content{margin:0!important;width:auto!important}
+.leaflet-popup-tip{display:none}
+</style>
+</head><body>
+<div id="map"></div>
+<script>
+var map=L.map('map',{zoomControl:false}).setView([${center.lat},${center.lng}],${zoom});
+L.tileLayer('${tileUrl}',{attribution:'',maxZoom:19}).addTo(map);
+L.control.zoom({position:'bottomright'}).addTo(map);
+var markers=${markersJson};
+markers.forEach(function(m){
+  var icon=L.divIcon({
+    className:'',
+    html:'<div style="background:linear-gradient(135deg,#ff6b5b,#e83a2a);color:#fff;font-weight:700;font-size:11px;font-family:-apple-system,system-ui,sans-serif;padding:4px 10px;border-radius:20px;white-space:nowrap;box-shadow:0 2px 8px rgba(255,80,60,0.5);border:2px solid rgba(255,255,255,0.3)">$'+m.price+'</div>',
+    iconSize:[0,0],
+    iconAnchor:[30,15]
+  });
+  var popup='<div class="popup-card" onclick="window.parent.postMessage(JSON.stringify({type:\\'propertyTap\\',id:\\''+m.id+'\\',token:\\'__MSG_TOKEN__\\'}),\\'*\\')">'
+    +'<img src="'+m.photo+'"/>'
+    +'<div class="popup-info">'
+    +'<div class="popup-price">$'+m.price+'/mo</div>'
+    +'<div class="popup-title">'+m.title+'</div>'
+    +'<div class="popup-meta"><span class="popup-beds">'+m.beds+'bd '+m.baths+'ba</span>'
+    +(m.matchPct!==null?'<span class="popup-match" style="background:'+m.matchColor+'20;color:'+m.matchColor+'">'+m.matchPct+'%</span>':'')
+    +'</div></div></div>';
+  L.marker([m.lat,m.lng],{icon:icon}).addTo(map).bindPopup(popup,{maxWidth:240,minWidth:220});
+});
+if(markers.length>1){
+  var bounds=L.latLngBounds(markers.map(function(m){return[m.lat,m.lng]}));
+  map.fitBounds(bounds,{padding:[40,40]});
+}
+</script>
+</body></html>`;
+}
+
 export const PropertyMapView = ({
   properties,
   saved,
@@ -56,7 +119,7 @@ export const PropertyMapView = ({
   onToggleSave,
   bottomInset,
 }: PropertyMapViewProps) => {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
 
   const propertiesWithCoords = useMemo(
     () => properties.filter(p => p.coordinates?.lat && p.coordinates?.lng),
@@ -83,56 +146,65 @@ export const PropertyMapView = ({
     };
   }, [propertiesWithCoords]);
 
+  const mapMarkers = useMemo(() => {
+    return propertiesWithCoords.map(property => {
+      const hostUser = property.hostProfileId ? hostProfiles.get(property.hostProfileId) : null;
+      const hostProfile = hostUser ? getUserAsRoommateProfile(hostUser) : null;
+      const compatibility = hostProfile && currentUser ? calculateCompatibility(currentUser, hostProfile) : null;
+      return {
+        id: property.id,
+        lat: property.coordinates!.lat,
+        lng: property.coordinates!.lng,
+        price: property.price,
+        title: property.title,
+        beds: property.bedrooms,
+        baths: property.bathrooms,
+        photo: property.photos[0] || '',
+        matchPct: compatibility,
+        matchColor: compatibility !== null ? getMatchQualityColor(compatibility) : '',
+        isSaved: saved.has(property.id),
+      };
+    });
+  }, [propertiesWithCoords, hostProfiles, currentUser, saved]);
+
   if (Platform.OS === 'web') {
+    const htmlContent = buildLeafletHtml(
+      mapMarkers,
+      { lat: initialRegion.latitude, lng: initialRegion.longitude },
+      12,
+      isDark
+    );
+
+    const messageToken = React.useRef(`roomdr_map_${Date.now()}_${Math.random().toString(36).slice(2)}`).current;
+    const htmlWithToken = htmlContent.replace('__MSG_TOKEN__', messageToken);
+
+    React.useEffect(() => {
+      const handleMessage = (event: MessageEvent) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'propertyTap' && data.token === messageToken) {
+            const property = properties.find(p => p.id === data.id);
+            if (property) onPropertyPress(property);
+          }
+        } catch {}
+      };
+      window.addEventListener('message', handleMessage);
+      return () => window.removeEventListener('message', handleMessage);
+    }, [properties, messageToken, onPropertyPress]);
+
     return (
-      <ScrollView
-        style={styles.webFallbackScroll}
-        contentContainerStyle={[styles.webFallback, { paddingBottom: bottomInset + 100 }]}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.webBanner}>
-          <Feather name="map" size={24} color={theme.primary} />
-          <ThemedText style={[Typography.body, { color: theme.textSecondary, marginLeft: Spacing.md, flex: 1 }]}>
-            Map view is available on iOS and Android. Showing properties as a list.
+      <View style={[styles.mapContainer, { paddingBottom: bottomInset }]}>
+        <iframe
+          srcDoc={htmlWithToken}
+          style={{ width: '100%', height: '100%', border: 'none' } as any}
+        />
+        <View style={[styles.propertyCount, { backgroundColor: theme.backgroundDefault }]}>
+          <Feather name="map-pin" size={14} color={theme.primary} />
+          <ThemedText style={[Typography.caption, { color: theme.text, marginLeft: Spacing.xs, fontWeight: '600' }]}>
+            {propertiesWithCoords.length} {propertiesWithCoords.length === 1 ? 'property' : 'properties'}
           </ThemedText>
         </View>
-        {properties.map(property => {
-          const hostUser = property.hostProfileId ? hostProfiles.get(property.hostProfileId) : null;
-          const hostProfile = hostUser ? getUserAsRoommateProfile(hostUser) : null;
-          const compatibility = hostProfile && currentUser ? calculateCompatibility(currentUser, hostProfile) : null;
-
-          return (
-            <Pressable
-              key={property.id}
-              style={[styles.webPropertyCard, { backgroundColor: theme.backgroundRoot, borderColor: theme.border }]}
-              onPress={() => onPropertyPress(property)}
-            >
-              <Image source={{ uri: property.photos[0] }} style={styles.webPropertyImage} />
-              <View style={styles.webPropertyInfo}>
-                <ThemedText style={[Typography.body, { fontWeight: '700' }]}>${property.price}/mo</ThemedText>
-                <ThemedText style={[Typography.caption, { color: theme.textSecondary }]} numberOfLines={1}>
-                  {formatLocation(property)}
-                </ThemedText>
-                <View style={styles.webPropertyMeta}>
-                  <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
-                    {property.bedrooms}bd {property.bathrooms}ba
-                  </ThemedText>
-                  {compatibility !== null ? (
-                    <View style={[styles.miniMatchBadge, { backgroundColor: getMatchQualityColor(compatibility) + '20' }]}>
-                      <ThemedText style={[Typography.caption, { color: getMatchQualityColor(compatibility), fontWeight: '700', fontSize: 11 }]}>
-                        {compatibility}%
-                      </ThemedText>
-                    </View>
-                  ) : null}
-                </View>
-              </View>
-              <Pressable style={styles.webSaveBtn} onPress={() => onToggleSave(property.id)}>
-                <Feather name="heart" size={16} color={saved.has(property.id) ? '#EF4444' : theme.textSecondary} />
-              </Pressable>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+      </View>
     );
   }
 
@@ -269,46 +341,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm,
     paddingVertical: 2,
     borderRadius: BorderRadius.full,
-  },
-  webFallbackScroll: {
-    flex: 1,
-  },
-  webFallback: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-    gap: Spacing.md,
-  },
-  webBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.medium,
-    backgroundColor: 'rgba(0,0,0,0.03)',
-  },
-  webPropertyCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: BorderRadius.medium,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  webPropertyImage: {
-    width: 80,
-    height: 80,
-    resizeMode: 'cover',
-  },
-  webPropertyInfo: {
-    flex: 1,
-    padding: Spacing.md,
-  },
-  webPropertyMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: Spacing.xs,
-  },
-  webSaveBtn: {
-    padding: Spacing.md,
   },
 });
