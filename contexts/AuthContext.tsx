@@ -31,6 +31,10 @@ interface AuthContextType {
   getActiveChatLimit: () => number;
   canStartNewChat: (conversationId: string) => Promise<{ canStart: boolean; limit: number; current: number; reason?: string }>;
   incrementActiveChatCount: (conversationId: string) => Promise<void>;
+  watchAdForCredit: (creditType: 'rewinds' | 'superLikes' | 'boosts' | 'messages') => Promise<{ success: boolean; message: string }>;
+  getAdCredits: () => { rewinds: number; superLikes: number; boosts: number; messages: number };
+  useAdCredit: (creditType: 'rewinds' | 'superLikes' | 'boosts' | 'messages') => Promise<boolean>;
+  isBasicUser: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -445,6 +449,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) return;
     
     const currentCount = user.messageCount || 0;
+    const plan = user.subscription?.plan || 'basic';
+
+    if (plan === 'basic' && currentCount >= 50 && user.adCredits && user.adCredits.messages > 0) {
+      const updatedUser: User = {
+        ...user,
+        messageCount: currentCount + 1,
+        adCredits: {
+          ...user.adCredits,
+          messages: user.adCredits.messages - 1,
+        },
+      };
+      
+      await StorageService.setCurrentUser(updatedUser);
+      await StorageService.addOrUpdateUser(updatedUser);
+      setUser(updatedUser);
+      console.log('[Auth] Ad credit message consumed. Remaining:', updatedUser.adCredits!.messages);
+      return;
+    }
+
     const updatedUser: User = {
       ...user,
       messageCount: currentCount + 1,
@@ -464,7 +487,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     
     const messageCount = user.messageCount || 0;
-    return messageCount < 50;
+    if (messageCount < 50) return true;
+
+    if (user.adCredits && user.adCredits.messages > 0) {
+      return true;
+    }
+
+    return false;
   };
 
   const canBoost = (): { canBoost: boolean; reason?: string; requiresPayment?: boolean } => {
@@ -783,11 +812,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
+      if (user.adCredits && user.adCredits.rewinds > 0) {
+        return { canRewind: true, remaining: user.adCredits.rewinds, limit };
+      }
+
       return { 
         canRewind: false, 
         remaining: 0, 
         limit,
-        message: 'Daily rewind used (1/1). Purchase a 24h undo pass for more or upgrade to Plus (5 rewinds/day)!'
+        message: 'Daily rewind used (1/1). Watch an ad, purchase a 24h undo pass, or upgrade to Plus (5 rewinds/day)!'
       };
     }
 
@@ -885,6 +918,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         setUser(updatedUser);
         console.log('[Auth] 24h undo pass consumed');
+        return;
+      }
+
+      if (user.adCredits && user.adCredits.rewinds > 0) {
+        const updatedUser: User = {
+          ...user,
+          adCredits: {
+            ...user.adCredits,
+            rewinds: user.adCredits.rewinds - 1,
+          },
+        };
+        
+        await StorageService.setCurrentUser(updatedUser);
+        await StorageService.addOrUpdateUser(updatedUser);
+        setUser(updatedUser);
+        console.log('[Auth] Ad credit rewind consumed. Remaining:', updatedUser.adCredits!.rewinds);
       }
     }
   };
@@ -918,12 +967,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (remaining > 0) {
       return { canSuperLike: true, remaining, limit };
     }
+
+    if (userPlan === 'basic' && user.adCredits && user.adCredits.superLikes > 0) {
+      return { canSuperLike: true, remaining: user.adCredits.superLikes, limit };
+    }
     
     return { 
       canSuperLike: false, 
       remaining: 0, 
       limit,
-      message: `You've used all ${limit} Super Like${limit > 1 ? 's' : ''} today. ${userPlan === 'basic' ? 'Upgrade to Plus for 3/day or Elite for unlimited!' : 'Upgrade to Elite for unlimited!'}` 
+      message: `You've used all ${limit} Super Like${limit > 1 ? 's' : ''} today. ${userPlan === 'basic' ? 'Watch an ad, upgrade to Plus for 3/day, or Elite for unlimited!' : 'Upgrade to Elite for unlimited!'}` 
     };
   };
 
@@ -947,28 +1000,129 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!lastReset || !isSameDay(lastReset, now)) {
       superLikesUsed = 0;
     }
+
+    const dailyLimit = userPlan === 'plus' && userStatus === 'active' ? 3 : 1;
+
+    if (superLikesUsed < dailyLimit) {
+      const updatedUser: User = {
+        ...user,
+        superLikeData: {
+          superLikesUsedToday: superLikesUsed + 1,
+          lastSuperLikeReset: now,
+        },
+      };
+      
+      await StorageService.setCurrentUser(updatedUser);
+      await StorageService.addOrUpdateUser(updatedUser);
+      setUser(updatedUser);
+      
+      console.log('[Auth] Super Like used:', { plan: userPlan, used: superLikesUsed + 1, limit: dailyLimit });
+      return;
+    }
+
+    if (userPlan === 'basic' && user.adCredits && user.adCredits.superLikes > 0) {
+      const updatedUser: User = {
+        ...user,
+        adCredits: {
+          ...user.adCredits,
+          superLikes: user.adCredits.superLikes - 1,
+        },
+      };
+      
+      await StorageService.setCurrentUser(updatedUser);
+      await StorageService.addOrUpdateUser(updatedUser);
+      setUser(updatedUser);
+      
+      console.log('[Auth] Ad credit super like consumed. Remaining:', updatedUser.adCredits!.superLikes);
+    }
+  };
+
+  const isBasicUser = (): boolean => {
+    const plan = user?.subscription?.plan || 'basic';
+    const status = user?.subscription?.status || 'active';
+    return plan === 'basic' || status !== 'active';
+  };
+
+  const getAdCredits = (): { rewinds: number; superLikes: number; boosts: number; messages: number } => {
+    return {
+      rewinds: user?.adCredits?.rewinds || 0,
+      superLikes: user?.adCredits?.superLikes || 0,
+      boosts: user?.adCredits?.boosts || 0,
+      messages: user?.adCredits?.messages || 0,
+    };
+  };
+
+  const watchAdForCredit = async (creditType: 'rewinds' | 'superLikes' | 'boosts' | 'messages'): Promise<{ success: boolean; message: string }> => {
+    if (!user) return { success: false, message: 'Not logged in' };
+
+    if (!isBasicUser()) {
+      return { success: false, message: 'Ad rewards are for Basic plan users only' };
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    const currentCredits = user.adCredits || { rewinds: 0, superLikes: 0, boosts: 0, messages: 0, totalAdsWatched: 0 };
     
+    const creditRewards: Record<string, number> = {
+      rewinds: 1,
+      superLikes: 1,
+      boosts: 1,
+      messages: 5,
+    };
+
+    const updatedCredits = {
+      ...currentCredits,
+      [creditType]: (currentCredits[creditType] || 0) + creditRewards[creditType],
+      totalAdsWatched: (currentCredits.totalAdsWatched || 0) + 1,
+      lastAdWatched: new Date(),
+    };
+
     const updatedUser: User = {
       ...user,
-      superLikeData: {
-        superLikesUsedToday: superLikesUsed + 1,
-        lastSuperLikeReset: now,
-      },
+      adCredits: updatedCredits,
     };
-    
+
     await StorageService.setCurrentUser(updatedUser);
     await StorageService.addOrUpdateUser(updatedUser);
     setUser(updatedUser);
+
+    const creditLabels: Record<string, string> = {
+      rewinds: `${creditRewards.rewinds} Rewind`,
+      superLikes: `${creditRewards.superLikes} Super Like`,
+      boosts: `${creditRewards.boosts} Boost`,
+      messages: `${creditRewards.messages} Messages`,
+    };
+
+    console.log('[Auth] Ad credit earned:', creditType, updatedCredits);
+    return { success: true, message: `You earned ${creditLabels[creditType]}!` };
+  };
+
+  const useAdCredit = async (creditType: 'rewinds' | 'superLikes' | 'boosts' | 'messages'): Promise<boolean> => {
+    if (!user) return false;
     
-    console.log('[Auth] Super Like used:', {
-      plan: userPlan,
-      used: superLikesUsed + 1,
-      limit: userPlan === 'plus' ? 3 : 1,
-    });
+    const currentCredits = user.adCredits || { rewinds: 0, superLikes: 0, boosts: 0, messages: 0, totalAdsWatched: 0 };
+    if ((currentCredits[creditType] || 0) <= 0) return false;
+
+    const updatedCredits = {
+      ...currentCredits,
+      [creditType]: currentCredits[creditType] - 1,
+    };
+
+    const updatedUser: User = {
+      ...user,
+      adCredits: updatedCredits,
+    };
+
+    await StorageService.setCurrentUser(updatedUser);
+    await StorageService.addOrUpdateUser(updatedUser);
+    setUser(updatedUser);
+
+    console.log('[Auth] Ad credit used:', creditType, updatedCredits);
+    return true;
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, reactivateSubscription, updateUser, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, reactivateSubscription, updateUser, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike, watchAdForCredit, getAdCredits, useAdCredit, isBasicUser }}>
       {children}
     </AuthContext.Provider>
   );

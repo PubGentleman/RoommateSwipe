@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scaleFont, moderateScale, getResponsiveSpacing } from '../../utils/responsive';
 import { calculateCompatibility, getMatchQualityColor, getCleanlinessLabel, getSocialLevelLabel, getWorkScheduleLabel, formatMoveInDate, getGenderSymbol } from '../../utils/matchingAlgorithm';
 import { getZodiacSymbol, getZodiacCompatibilityLevel } from '../../utils/zodiacUtils';
-import { AdBanner } from '../../components/AdBanner';
+import { AdBanner, RewardedAdButton } from '../../components/AdBanner';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Limit card size for web/desktop viewing
@@ -826,6 +826,7 @@ export const RoommatesScreen = () => {
             </View>
             
             <View style={styles.vipModalActions}>
+              <RewardedAdButton creditType="rewinds" style={{ marginBottom: Spacing.md, marginHorizontal: 0 }} />
               {user?.subscription?.plan !== 'plus' ? (
                 <>
                   <Pressable
@@ -997,6 +998,7 @@ export const RoommatesScreen = () => {
             </View>
             
             <View style={styles.vipModalActions}>
+              <RewardedAdButton creditType="superLikes" style={{ marginBottom: Spacing.md, marginHorizontal: 0 }} />
               <Pressable
                 style={[styles.vipCancelButton, { borderColor: theme.border }]}
                 onPress={() => setShowSuperLikeUpgradeModal(false)}

@@ -23,7 +23,7 @@ type ChatScreenProps = {
 export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const { conversationId, otherUser: routeOtherUser } = route.params;
   const { theme } = useTheme();
-  const { user, incrementMessageCount, canSendMessage, canStartNewChat, incrementActiveChatCount } = useAuth();
+  const { user, incrementMessageCount, canSendMessage, canStartNewChat, incrementActiveChatCount, watchAdForCredit, isBasicUser } = useAuth();
   const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
@@ -73,16 +73,31 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     if (!inputText.trim() || !user) return;
 
     if (!canSendMessage()) {
+      const alertButtons: any[] = [
+        { text: 'Maybe Later', style: 'cancel' },
+      ];
+
+      if (isBasicUser()) {
+        alertButtons.push({
+          text: 'Watch Ad (+5 Messages)',
+          onPress: async () => {
+            const success = await watchAdForCredit('messages');
+            if (success) {
+              Alert.alert('Messages Earned', 'You earned 5 bonus messages by watching an ad!');
+            }
+          },
+        });
+      }
+
+      alertButtons.push({
+        text: 'View Plans',
+        onPress: () => navigation.navigate('Profile', { screen: 'Payment' }),
+      });
+
       Alert.alert(
         'Message Limit Reached',
-        `You've reached your limit of 50 messages on the basic plan. Upgrade to Plus or Elite for unlimited messaging!`,
-        [
-          { text: 'Maybe Later', style: 'cancel' },
-          {
-            text: 'View Plans',
-            onPress: () => navigation.navigate('Profile', { screen: 'Payment' }),
-          },
-        ]
+        `You've reached your limit of 50 messages on the basic plan. Watch an ad for 5 bonus messages or upgrade for unlimited messaging!`,
+        alertButtons
       );
       return;
     }

@@ -214,6 +214,14 @@ export interface User {
     superLikerPhoto?: string;
     superLikedAt: Date;
   }>;
+  adCredits?: {
+    rewinds: number;
+    superLikes: number;
+    boosts: number;
+    messages: number;
+    totalAdsWatched: number;
+    lastAdWatched?: Date;
+  };
   profileData?: {
     bio?: string;
     budget?: number;
