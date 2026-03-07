@@ -1,16 +1,13 @@
 import React, { useState } from 'react';
-import { View, TextInput, StyleSheet, Pressable } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenKeyboardAwareScrollView } from '../../components/ScreenKeyboardAwareScrollView';
-import { ThemedText } from '../../components/ThemedText';
-import { useTheme } from '../../hooks/useTheme';
-import { Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { useAuth, UserRole } from '../../contexts/AuthContext';
 import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { RoomdrLogo } from '../../components/RoomdrLogo';
 
 export const LoginScreen = () => {
-  const { theme } = useTheme();
   const { login, register } = useAuth();
   const insets = useSafeAreaInsets();
   const [isSignUp, setIsSignUp] = useState(false);
@@ -21,29 +18,17 @@ export const LoginScreen = () => {
   const [selectedRole, setSelectedRole] = useState<UserRole>('renter');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handleSubmit = async () => {
     setError('');
-
     if (isSignUp) {
-      if (!name.trim()) {
-        setError('Please enter your name');
-        return;
-      }
-      if (!email.trim()) {
-        setError('Please enter your email');
-        return;
-      }
-      if (!password.trim() || password.length < 6) {
-        setError('Password must be at least 6 characters');
-        return;
-      }
-      if (password !== confirmPassword) {
-        setError('Passwords do not match');
-        return;
-      }
+      if (!name.trim()) { setError('Please enter your name'); return; }
+      if (!email.trim()) { setError('Please enter your email'); return; }
+      if (!password.trim() || password.length < 6) { setError('Password must be at least 6 characters'); return; }
+      if (password !== confirmPassword) { setError('Passwords do not match'); return; }
     }
-
     setIsLoading(true);
     try {
       if (isSignUp) {
@@ -58,249 +43,407 @@ export const LoginScreen = () => {
     }
   };
 
-  const toggleMode = () => {
-    setIsSignUp(!isSignUp);
-    setError('');
-  };
+  const toggleMode = () => { setIsSignUp(!isSignUp); setError(''); };
 
-  const roles: { value: UserRole; label: string; icon: keyof typeof Feather.glyphMap; color: string }[] = [
-    { value: 'renter', label: 'Renter', icon: 'search', color: theme.renterBadge },
-    { value: 'host', label: 'Host', icon: 'home', color: theme.hostBadge },
-    { value: 'agent', label: 'Agent', icon: 'briefcase', color: theme.agentBadge },
+  const roles: { value: UserRole; label: string; icon: keyof typeof Feather.glyphMap }[] = [
+    { value: 'renter', label: 'Renter', icon: 'search' },
+    { value: 'host', label: 'Host', icon: 'home' },
+    { value: 'agent', label: 'Agent', icon: 'briefcase' },
   ];
 
   return (
-    <ScreenKeyboardAwareScrollView contentContainerStyle={styles.container}>
-      <View style={[styles.header, { marginTop: insets.top + Spacing.xl }]}>
-        <View style={{ marginBottom: Spacing.xl }}>
-          <RoomdrLogo variant="horizontal" size="md" />
+    <ScreenKeyboardAwareScrollView
+      contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top }]}
+      style={{ backgroundColor: '#111111' }}
+    >
+        <View style={styles.header}>
+          <View style={styles.logoWrap}>
+            <RoomdrLogo variant="horizontal" size="md" />
+          </View>
+          <View style={styles.heading}>
+            <Text style={styles.headingTitle}>
+              {isSignUp ? 'Create Account' : 'Welcome back'}
+            </Text>
+            <Text style={styles.headingSub}>
+              {isSignUp
+                ? 'Sign up to start finding your\nperfect roommate'
+                : 'Sign in to continue finding your\nperfect roommate'}
+            </Text>
+          </View>
         </View>
-        <ThemedText style={[Typography.hero, styles.title]}>
-          {isSignUp ? 'Create Account' : 'Welcome Back'}
-        </ThemedText>
-        <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
-          {isSignUp ? 'Sign up to find your perfect roommate' : 'Sign in to continue'}
-        </ThemedText>
-      </View>
 
-      <View style={styles.form}>
-        <ThemedText style={[Typography.caption, styles.label]}>I am a...</ThemedText>
-        <View style={styles.roleContainer}>
-          {roles.map((role) => (
-            <Pressable
-              key={role.value}
-              style={[
-                styles.roleButton,
-                {
-                  backgroundColor: selectedRole === role.value ? role.color : theme.backgroundDefault,
-                  borderColor: selectedRole === role.value ? role.color : theme.border,
-                },
-              ]}
-              onPress={() => setSelectedRole(role.value)}
-            >
-              <Feather
-                name={role.icon}
-                size={16}
-                color={selectedRole === role.value ? '#FFFFFF' : theme.textSecondary}
-                style={{ marginBottom: 4 }}
+        <View style={styles.content}>
+          <Text style={styles.roleLabel}>I AM A</Text>
+          <View style={styles.roleSelector}>
+            {roles.map((role) => {
+              const isActive = selectedRole === role.value;
+              return (
+                <Pressable
+                  key={role.value}
+                  style={styles.roleBtnWrap}
+                  onPress={() => setSelectedRole(role.value)}
+                >
+                  {isActive ? (
+                    <LinearGradient
+                      colors={['#ff6b5b', '#e83a2a']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.roleBtn}
+                    >
+                      <Feather name={role.icon} size={14} color="#FFFFFF" />
+                      <Text style={[styles.roleBtnText, { color: '#FFFFFF' }]}>{role.label}</Text>
+                    </LinearGradient>
+                  ) : (
+                    <View style={styles.roleBtn}>
+                      <Feather name={role.icon} size={14} color="rgba(255,255,255,0.35)" />
+                      <Text style={styles.roleBtnText}>{role.label}</Text>
+                    </View>
+                  )}
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <View style={styles.divider} />
+
+          {isSignUp ? (
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>FULL NAME</Text>
+              <View style={styles.inputWrap}>
+                <Feather name="user" size={16} color="rgba(255,255,255,0.22)" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Your full name"
+                  placeholderTextColor="rgba(255,255,255,0.18)"
+                  value={name}
+                  onChangeText={setName}
+                  autoCapitalize="words"
+                />
+              </View>
+            </View>
+          ) : null}
+
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>EMAIL</Text>
+            <View style={styles.inputWrap}>
+              <Feather name="mail" size={16} color="rgba(255,255,255,0.22)" style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="you@example.com"
+                placeholderTextColor="rgba(255,255,255,0.18)"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
               />
-              <ThemedText
-                style={[
-                  Typography.caption,
-                  {
-                    color: selectedRole === role.value ? '#FFFFFF' : theme.text,
-                    fontWeight: selectedRole === role.value ? '600' : '400',
-                  },
-                ]}
-              >
-                {role.label}
-              </ThemedText>
-            </Pressable>
-          ))}
-        </View>
-
-        {isSignUp ? (
-          <View style={styles.inputGroup}>
-            <ThemedText style={[Typography.caption, styles.label]}>Full Name</ThemedText>
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  backgroundColor: theme.backgroundDefault,
-                  borderColor: theme.border,
-                  color: theme.text,
-                },
-              ]}
-              placeholder="Enter your full name"
-              placeholderTextColor={theme.textSecondary}
-              value={name}
-              onChangeText={setName}
-              autoCapitalize="words"
-            />
+            </View>
           </View>
-        ) : null}
 
-        <View style={styles.inputGroup}>
-          <ThemedText style={[Typography.caption, styles.label]}>Email</ThemedText>
-          <TextInput
-            style={[
-              styles.input,
-              {
-                backgroundColor: theme.backgroundDefault,
-                borderColor: theme.border,
-                color: theme.text,
-              },
-            ]}
-            placeholder="Enter your email"
-            placeholderTextColor={theme.textSecondary}
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <ThemedText style={[Typography.caption, styles.label]}>Password</ThemedText>
-          <TextInput
-            style={[
-              styles.input,
-              {
-                backgroundColor: theme.backgroundDefault,
-                borderColor: theme.border,
-                color: theme.text,
-              },
-            ]}
-            placeholder={isSignUp ? 'Create a password' : 'Enter your password'}
-            placeholderTextColor={theme.textSecondary}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
-        </View>
-
-        {isSignUp ? (
-          <View style={styles.inputGroup}>
-            <ThemedText style={[Typography.caption, styles.label]}>Confirm Password</ThemedText>
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  backgroundColor: theme.backgroundDefault,
-                  borderColor: theme.border,
-                  color: theme.text,
-                },
-              ]}
-              placeholder="Confirm your password"
-              placeholderTextColor={theme.textSecondary}
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry
-            />
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>PASSWORD</Text>
+            <View style={styles.inputWrap}>
+              <Feather name="lock" size={16} color="rgba(255,255,255,0.22)" style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder={isSignUp ? 'Create a password' : String.fromCharCode(8226).repeat(8)}
+                placeholderTextColor="rgba(255,255,255,0.18)"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+              />
+              <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn} hitSlop={8}>
+                <Feather name={showPassword ? 'eye-off' : 'eye'} size={16} color="rgba(255,255,255,0.22)" />
+              </Pressable>
+            </View>
           </View>
-        ) : null}
 
-        {error ? (
-          <View style={[styles.errorContainer, { backgroundColor: 'rgba(255, 71, 87, 0.1)' }]}>
-            <Feather name="alert-circle" size={16} color={theme.error} />
-            <ThemedText style={[Typography.caption, { color: theme.error, flex: 1 }]}>
-              {error}
-            </ThemedText>
-          </View>
-        ) : null}
+          {isSignUp ? (
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>CONFIRM PASSWORD</Text>
+              <View style={styles.inputWrap}>
+                <Feather name="lock" size={16} color="rgba(255,255,255,0.22)" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Confirm your password"
+                  placeholderTextColor="rgba(255,255,255,0.18)"
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry={!showConfirmPassword}
+                />
+                <Pressable onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeBtn} hitSlop={8}>
+                  <Feather name={showConfirmPassword ? 'eye-off' : 'eye'} size={16} color="rgba(255,255,255,0.22)" />
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
 
-        <Pressable
-          style={[
-            styles.button,
-            {
-              backgroundColor: theme.primary,
-              opacity: isLoading ? 0.5 : 1,
-            },
-          ]}
-          onPress={handleSubmit}
-          disabled={isLoading}
-        >
-          <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>
-            {isLoading
-              ? (isSignUp ? 'Creating Account...' : 'Signing in...')
-              : (isSignUp ? 'Create Account' : 'Sign In')}
-          </ThemedText>
-        </Pressable>
+          {!isSignUp ? (
+            <View style={styles.forgotRow}>
+              <Pressable hitSlop={8}>
+                <Text style={styles.forgotText}>Forgot password?</Text>
+              </Pressable>
+            </View>
+          ) : null}
 
-        <View style={styles.switchContainer}>
-          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
-            {isSignUp ? 'Already have an account?' : "Don't have an account?"}
-          </ThemedText>
-          <Pressable onPress={toggleMode} hitSlop={8}>
-            <ThemedText style={[Typography.caption, { color: theme.primary, fontWeight: '600' }]}>
-              {isSignUp ? 'Sign In' : 'Sign Up'}
-            </ThemedText>
+          {error ? (
+            <View style={styles.errorBox}>
+              <Feather name="alert-circle" size={14} color="#ff6b5b" />
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : null}
+
+          <Pressable onPress={handleSubmit} disabled={isLoading} style={{ opacity: isLoading ? 0.5 : 1 }}>
+            <LinearGradient
+              colors={['#ff6b5b', '#e83a2a']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.submitBtn}
+            >
+              <Text style={styles.submitBtnText}>
+                {isLoading
+                  ? (isSignUp ? 'Creating Account...' : 'Signing In...')
+                  : (isSignUp ? 'Create Account' : 'Sign In')}
+              </Text>
+              {!isLoading ? (
+                <Feather name="arrow-right" size={16} color="#FFFFFF" />
+              ) : null}
+            </LinearGradient>
           </Pressable>
+
+          <View style={styles.orRow}>
+            <View style={styles.orLine} />
+            <Text style={styles.orText}>OR CONTINUE WITH</Text>
+            <View style={styles.orLine} />
+          </View>
+
+          <View style={styles.socialRow}>
+            <Pressable style={styles.socialBtn}>
+              <Feather name="globe" size={16} color="rgba(255,255,255,0.75)" />
+              <Text style={styles.socialBtnText}>Google</Text>
+            </Pressable>
+            <Pressable style={styles.socialBtn}>
+              <Feather name="smartphone" size={16} color="rgba(255,255,255,0.75)" />
+              <Text style={styles.socialBtnText}>Apple</Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.switchRow}>
+            <Text style={styles.switchText}>
+              {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
+            </Text>
+            <Pressable onPress={toggleMode} hitSlop={8}>
+              <Text style={styles.switchLink}>{isSignUp ? 'Sign In' : 'Sign Up'}</Text>
+            </Pressable>
+          </View>
         </View>
-      </View>
     </ScreenKeyboardAwareScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.xxl,
+  scrollContent: {
+    paddingBottom: 40,
   },
   header: {
-    marginBottom: Spacing.xxl,
-  },
-  title: {
-    marginBottom: Spacing.sm,
-  },
-  form: {
-    gap: Spacing.lg,
-  },
-  roleContainer: {
-    flexDirection: 'row',
-    gap: Spacing.md,
-  },
-  roleButton: {
-    flex: 1,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.sm,
-    borderRadius: BorderRadius.medium,
-    borderWidth: 2,
+    paddingHorizontal: 28,
+    paddingTop: 24,
     alignItems: 'center',
   },
-  inputGroup: {
-    gap: Spacing.sm,
+  logoWrap: {
+    marginBottom: 32,
   },
-  label: {
+  heading: {
+    alignItems: 'center',
+    marginBottom: 28,
+  },
+  headingTitle: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -0.5,
+    lineHeight: 30,
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  headingSub: {
+    fontSize: 13.5,
+    fontWeight: '400',
+    color: 'rgba(255,255,255,0.35)',
+    lineHeight: 20,
+    textAlign: 'center',
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 24,
+  },
+  roleLabel: {
+    fontSize: 11,
     fontWeight: '600',
+    color: 'rgba(255,255,255,0.3)',
+    letterSpacing: 1,
+    marginBottom: 9,
+  },
+  roleSelector: {
+    flexDirection: 'row',
+    gap: 7,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 16,
+    padding: 5,
+    marginBottom: 22,
+  },
+  roleBtnWrap: {
+    flex: 1,
+  },
+  roleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    borderRadius: 12,
+  },
+  roleBtnText: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.35)',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    marginBottom: 22,
+  },
+  field: {
+    marginBottom: 13,
+  },
+  fieldLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.4)',
+    letterSpacing: 0.6,
+    marginBottom: 7,
+  },
+  inputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.055)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 14,
+  },
+  inputIcon: {
+    position: 'absolute',
+    left: 14,
+    zIndex: 1,
   },
   input: {
-    height: Spacing.inputHeight,
+    flex: 1,
+    paddingVertical: 14,
+    paddingLeft: 42,
+    paddingRight: 42,
+    fontSize: 14,
+    fontWeight: '400',
+    color: 'rgba(255,255,255,0.85)',
+  },
+  eyeBtn: {
+    position: 'absolute',
+    right: 14,
+    zIndex: 1,
+  },
+  forgotRow: {
+    alignItems: 'flex-end',
+    marginTop: 2,
+    marginBottom: 20,
+  },
+  forgotText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#ff6b5b',
+  },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255,107,91,0.1)',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 12,
+  },
+  errorText: {
+    fontSize: 12.5,
+    fontWeight: '500',
+    color: '#ff6b5b',
+    flex: 1,
+  },
+  submitBtn: {
+    height: 54,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 20,
+  },
+  submitBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
+  },
+  orRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 16,
+  },
+  orLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+  },
+  orText: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.2)',
+    letterSpacing: 0.6,
+  },
+  socialRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 26,
+  },
+  socialBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.055)',
     borderWidth: 1,
-    borderRadius: BorderRadius.medium,
-    paddingHorizontal: Spacing.lg,
-    fontSize: Typography.body.fontSize,
-  },
-  errorContainer: {
+    borderColor: 'rgba(255,255,255,0.09)',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    borderRadius: BorderRadius.medium,
-  },
-  button: {
-    height: Spacing.buttonHeight,
-    borderRadius: BorderRadius.medium,
-    alignItems: 'center',
     justifyContent: 'center',
-    marginTop: Spacing.sm,
+    gap: 8,
   },
-  switchContainer: {
+  socialBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.75)',
+  },
+  switchRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: Spacing.sm,
-    marginTop: Spacing.sm,
+  },
+  switchText: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.3)',
+  },
+  switchLink: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#ff6b5b',
   },
 });
