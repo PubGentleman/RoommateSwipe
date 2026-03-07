@@ -17,6 +17,8 @@ import { scaleFont, moderateScale, getResponsiveSpacing } from '../../utils/resp
 import { calculateCompatibility, getMatchQualityColor, getCleanlinessLabel, getSocialLevelLabel, getWorkScheduleLabel, formatMoveInDate, getGenderSymbol } from '../../utils/matchingAlgorithm';
 import { getZodiacSymbol, getZodiacCompatibilityLevel } from '../../utils/zodiacUtils';
 import { AdBanner, RewardedAdButton } from '../../components/AdBanner';
+import { ReportBlockModal } from '../../components/ReportBlockModal';
+import { MatchCelebrationModal } from '../../components/MatchCelebrationModal';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Limit card size for web/desktop viewing
@@ -25,7 +27,7 @@ const CARD_WIDTH = Math.min(SCREEN_WIDTH - Spacing.xxl, MAX_CARD_WIDTH);
 
 export const RoommatesScreen = () => {
   const { theme } = useTheme();
-  const { user, purchaseBoost, purchaseUndoPass, canRewind, useRewind, canSuperLike, useSuperLike } = useAuth();
+  const { user, purchaseBoost, purchaseUndoPass, canRewind, useRewind, canSuperLike, useSuperLike, blockUser, reportUser } = useAuth();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [profiles, setProfiles] = useState<RoommateProfile[]>([]);
@@ -45,6 +47,8 @@ export const RoommatesScreen = () => {
   const [showMessageModal, setShowMessageModal] = useState(false);
   const [processingMessagePurchase, setProcessingMessagePurchase] = useState(false);
   const [showSuperLikeUpgradeModal, setShowSuperLikeUpgradeModal] = useState(false);
+  const [showReportBlockModal, setShowReportBlockModal] = useState(false);
+  const [matchedProfileData, setMatchedProfileData] = useState<{ profile: RoommateProfile; compatibility: number } | null>(null);
 
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -83,7 +87,8 @@ export const RoommatesScreen = () => {
       const userMap = new Map(allUsers.map(u => [u.id, u]));
       setProfileUsers(userMap);
       
-      const unseen = allProfiles.filter(p => !history.has(p.id) && p.id !== user?.id);
+      const blockedIds = new Set(user?.blockedUsers || []);
+      const unseen = allProfiles.filter(p => !history.has(p.id) && p.id !== user?.id && !blockedIds.has(p.id));
       
       const profilesWithCompatibility = unseen.map(profile => {
         const compatibility = user ? calculateCompatibility(user, profile) : 50;
@@ -262,8 +267,48 @@ export const RoommatesScreen = () => {
             superLiker: isSuperLike ? userId : undefined,
           };
           await StorageService.addMatch(match);
+          const matchedProfile = profiles.find(p => p.id === profileId);
+          if (matchedProfile) {
+            setMatchedProfileData({
+              profile: matchedProfile,
+              compatibility: matchedProfile.compatibility || 50,
+            });
+          }
+
+          const matchedName = matchedProfile?.name || 'Someone';
+          await StorageService.addNotification({
+            id: `notification_match_${Date.now()}_${Math.random()}`,
+            userId: userId,
+            type: 'match',
+            title: 'New Match!',
+            body: `You and ${matchedName} are a match! Start a conversation.`,
+            isRead: false,
+            createdAt: new Date(),
+            data: {
+              matchId: match.id,
+              fromUserId: profileId,
+              fromUserName: matchedName,
+              fromUserPhoto: matchedProfile?.photos?.[0],
+            },
+          });
+
+          await StorageService.addNotification({
+            id: `notification_match_${Date.now()}_${Math.random()}_other`,
+            userId: profileId,
+            type: 'match',
+            title: 'New Match!',
+            body: `You and ${user?.name || 'Someone'} are a match! Start a conversation.`,
+            isRead: false,
+            createdAt: new Date(),
+            data: {
+              matchId: match.id,
+              fromUserId: userId,
+              fromUserName: user?.name,
+              fromUserPhoto: user?.profilePicture,
+            },
+          });
+
           setShowMatch(true);
-          setTimeout(() => setShowMatch(false), 3000);
         }
       }
     } catch (error) {
@@ -484,13 +529,20 @@ export const RoommatesScreen = () => {
             <Feather name="cpu" size={20} color="#FFFFFF" />
           </View>
         </Pressable>
-        {(user?.subscription?.plan || 'basic') === 'basic' && !user?.boostData?.isBoosted ? (
-          <Pressable onPress={() => setShowPurchaseBoostModal(true)} style={styles.aiButton}>
-            <View style={[styles.aiButtonInner, { backgroundColor: '#FFD700' }]}>
-              <Feather name="zap" size={20} color="#000000" />
+        <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+          {(user?.subscription?.plan || 'basic') === 'basic' && !user?.boostData?.isBoosted ? (
+            <Pressable onPress={() => setShowPurchaseBoostModal(true)} style={styles.aiButton}>
+              <View style={[styles.aiButtonInner, { backgroundColor: '#FFD700' }]}>
+                <Feather name="zap" size={20} color="#000000" />
+              </View>
+            </Pressable>
+          ) : null}
+          <Pressable onPress={() => (navigation as any).navigate('Profile', { screen: 'Notifications' })} style={styles.aiButton}>
+            <View style={[styles.aiButtonInner, { backgroundColor: theme.backgroundDefault }]}>
+              <Feather name="bell" size={20} color={theme.text} />
             </View>
           </Pressable>
-        ) : null}
+        </View>
       </View>
 
       <View style={styles.cardContainer}>
@@ -499,6 +551,14 @@ export const RoommatesScreen = () => {
             style={[styles.card, animatedCardStyle]}
           >
             <Image source={{ uri: currentProfile.photos[0] }} resizeMode="cover" style={styles.cardImage} />
+            <Pressable
+              style={styles.reportIconButton}
+              onPress={() => setShowReportBlockModal(true)}
+            >
+              <View style={styles.reportIconInner}>
+                <Feather name="flag" size={16} color="#FFFFFF" />
+              </View>
+            </Pressable>
             {canSeeOnlineStatus() && isProfileOnline ? (
               <View style={styles.onlineIndicatorContainer}>
                 <View style={[styles.onlineIndicator, { backgroundColor: theme.success }]} />
@@ -606,16 +666,47 @@ export const RoommatesScreen = () => {
         </Pressable>
       </View>
 
-      {showMatch ? (
-        <View style={styles.matchOverlay}>
-          <ThemedText style={[Typography.hero, { color: '#FFFFFF', fontSize: 48 }]}>
-            It's a Match!
-          </ThemedText>
-          <ThemedText style={[Typography.body, { color: '#FFFFFF', marginTop: Spacing.lg }]}>
-            You and {currentProfile.name} both liked each other
-          </ThemedText>
-        </View>
-      ) : null}
+      <MatchCelebrationModal
+        visible={showMatch}
+        currentUserPhoto={user?.profilePicture}
+        currentUserName={user?.name}
+        matchedUserPhoto={matchedProfileData?.profile?.photos?.[0]}
+        matchedUserName={matchedProfileData?.profile?.name}
+        compatibility={matchedProfileData?.compatibility}
+        onSendMessage={async () => {
+          setShowMatch(false);
+          setMatchedProfileData(null);
+          if (matchedProfileData?.profile) {
+            const conversations = await StorageService.getConversations();
+            const existingConversation = conversations.find(c =>
+              c.participant.id === matchedProfileData.profile.id
+            );
+            if (existingConversation) {
+              (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: existingConversation.id } });
+            } else {
+              const newConversation = {
+                id: `conv-${matchedProfileData.profile.id}-${Date.now()}`,
+                participant: {
+                  id: matchedProfileData.profile.id,
+                  name: matchedProfileData.profile.name,
+                  photo: matchedProfileData.profile.photos?.[0],
+                  online: false,
+                },
+                lastMessage: '',
+                timestamp: new Date(),
+                unread: 0,
+                messages: [],
+              };
+              await StorageService.addOrUpdateConversation(newConversation);
+              (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: newConversation.id } });
+            }
+          }
+        }}
+        onKeepSwiping={() => {
+          setShowMatch(false);
+          setMatchedProfileData(null);
+        }}
+      />
 
       <Modal
         visible={showVIPModal}
@@ -1024,6 +1115,22 @@ export const RoommatesScreen = () => {
           </View>
         </View>
       </Modal>
+
+      {currentProfile ? (
+        <ReportBlockModal
+          visible={showReportBlockModal}
+          onClose={() => setShowReportBlockModal(false)}
+          userName={currentProfile.name}
+          onReport={async (reason) => {
+            await reportUser(currentProfile.id, reason);
+          }}
+          onBlock={async () => {
+            await blockUser(currentProfile.id);
+            setShowReportBlockModal(false);
+            await loadProfiles();
+          }}
+        />
+      ) : null}
 
       <Modal
         visible={showProfileDetail}
@@ -1621,6 +1728,20 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 3,
+  },
+  reportIconButton: {
+    position: 'absolute',
+    top: Spacing.lg,
+    left: Spacing.lg,
+    zIndex: 20,
+  },
+  reportIconInner: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   infoButton: {
     position: 'absolute',

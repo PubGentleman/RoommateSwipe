@@ -31,9 +31,15 @@ Roomdr utilizes a comprehensive points-based compatibility system (0-100 score) 
 The application is built with React Native and Expo, using TypeScript and leveraging React Navigation for role-based navigation (Renter, Host, Agent/Landlord). It features a theme system for light/dark modes and reusable UI components.
 
 **Core Features by Role:**
-- **Renter:** Swipe-based matching, 1-on-1 messaging, group management, property exploration with advanced filters, saved properties, rewind functionality, profile views tracking, and an AI Match Assistant. Includes "room type" and "existing roommate gender" for listings, and compatibility scores with hosts.
+- **Renter:** Swipe-based matching, 1-on-1 messaging, group management, property exploration with advanced filters, saved properties, rewind functionality, profile views tracking, an AI Match Assistant, animated match celebration modal, report/block system, and notification feed with badge. Includes "room type" and "existing roommate gender" for listings, and compatibility scores with hosts.
 - **Host:** Property listing management (CRUD), including room type and existing roommate gender tracking, application review, and listing status control.
 - **Agent:** Multi-property portfolio management, document verification, and legal template library.
+
+**Match Celebration:** When two users mutually like each other, an animated full-screen "It's a Match!" overlay appears (`components/MatchCelebrationModal.tsx`) with both users' photos, compatibility %, confetti particles, and action buttons (Send Message / Keep Swiping).
+
+**Report/Block System:** Users can report (with reasons: Inappropriate, Fake profile, Harassment, Spam, Other) or block other users from swipe cards and chat screens (`components/ReportBlockModal.tsx`). Blocked users are filtered from the swipe deck, messages list, and notifications. A "Blocked Users" management screen is accessible from Privacy & Security settings (`screens/shared/BlockedUsersScreen.tsx`).
+
+**Notification Feed:** The `useNotifications` hook (`hooks/useNotifications.ts`) polls for unread count every 10 seconds and displays a red badge on the Profile tab. Notifications are generated for matches, super likes, and other events. Tapping a notification navigates to the relevant screen (chat, groups, explore). Blocked user notifications are filtered out.
 
 Animations are handled by React Native Reanimated, and gestures by React Native Gesture Handler. State management uses React Context API and AsyncStorage for persistence.
 

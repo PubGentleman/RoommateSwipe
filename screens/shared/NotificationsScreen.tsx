@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, Pressable, FlatList, RefreshControl } from 'react-native';
+import { View, StyleSheet, Pressable, FlatList, RefreshControl, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { ThemedText } from '../../components/ThemedText';
@@ -24,7 +24,11 @@ export const NotificationsScreen = () => {
     if (!user?.id) return;
     try {
       const userNotifications = await StorageService.getNotifications(user.id);
-      setNotifications(userNotifications);
+      const blockedIds = user.blockedUsers || [];
+      const filtered = userNotifications.filter(
+        n => !n.data?.fromUserId || !blockedIds.includes(n.data.fromUserId)
+      );
+      setNotifications(filtered);
     } catch (error) {
       console.error('Error loading notifications:', error);
     } finally {
@@ -49,6 +53,45 @@ export const NotificationsScreen = () => {
       await StorageService.markNotificationAsRead(notification.id);
       setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, isRead: true } : n));
     }
+
+    switch (notification.type) {
+      case 'match':
+      case 'super_like':
+        if (notification.data?.fromUserId && user?.id) {
+          const conversations = await StorageService.getConversations();
+          const fromId = notification.data.fromUserId;
+          const existingConversation = conversations.find(
+            c => c.participants.includes(user.id) && c.participants.includes(fromId)
+          );
+          if (existingConversation) {
+            (navigation as any).navigate('Messages', {
+              screen: 'Chat',
+              params: { conversationId: existingConversation.id },
+            });
+          } else {
+            (navigation as any).navigate('Messages');
+          }
+        }
+        break;
+      case 'message':
+        if (notification.data?.conversationId) {
+          (navigation as any).navigate('Messages', {
+            screen: 'Chat',
+            params: { conversationId: notification.data.conversationId },
+          });
+        }
+        break;
+      case 'group_invite':
+      case 'group_accepted':
+        (navigation as any).navigate('Groups');
+        break;
+      case 'property_update':
+      case 'property_rented':
+        (navigation as any).navigate('Explore');
+        break;
+      default:
+        break;
+    }
   };
 
   const handleDelete = async (notificationId: string) => {
@@ -66,6 +109,8 @@ export const NotificationsScreen = () => {
     switch (type) {
       case 'match':
         return 'heart';
+      case 'super_like':
+        return 'star';
       case 'message':
         return 'message-circle';
       case 'group_invite':
@@ -123,13 +168,16 @@ export const NotificationsScreen = () => {
           </ThemedText>
         </View>
 
-        <Pressable
-          style={styles.deleteButton}
-          onPress={() => handleDelete(item.id)}
-          hitSlop={8}
-        >
-          <Feather name="x" size={18} color={theme.textSecondary} />
-        </Pressable>
+        <View style={styles.actionContainer}>
+          <Feather name="chevron-right" size={16} color={theme.textSecondary} style={{ opacity: 0.5 }} />
+          <Pressable
+            style={styles.deleteButton}
+            onPress={() => handleDelete(item.id)}
+            hitSlop={8}
+          >
+            <Feather name="x" size={18} color={theme.textSecondary} />
+          </Pressable>
+        </View>
       </View>
 
       {!item.isRead ? (
@@ -236,6 +284,11 @@ const styles = StyleSheet.create({
   },
   textContainer: {
     flex: 1,
+  },
+  actionContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
   },
   deleteButton: {
     padding: Spacing.xs,

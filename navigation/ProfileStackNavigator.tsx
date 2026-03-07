@@ -13,6 +13,7 @@ import PrivacyPolicyScreen from '../screens/shared/PrivacyPolicyScreen';
 import TermsOfServiceScreen from '../screens/shared/TermsOfServiceScreen';
 import AboutScreen from '../screens/shared/AboutScreen';
 import { DownloadDataScreen } from '../screens/shared/DownloadDataScreen';
+import { BlockedUsersScreen } from '../screens/shared/BlockedUsersScreen';
 
 export type ProfileStackParamList = {
   ProfileMain: undefined;
@@ -26,6 +27,7 @@ export type ProfileStackParamList = {
   TermsOfService: undefined;
   About: undefined;
   DownloadData: undefined;
+  BlockedUsers: undefined;
 };
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
@@ -201,6 +203,26 @@ export const ProfileStackNavigator = () => {
           headerShown: true,
           headerTransparent: false,
           headerTitle: 'Download My Data',
+          headerTitleStyle: {
+            fontSize: 17,
+            fontWeight: '600',
+          },
+          headerShadowVisible: true,
+          headerBackVisible: false,
+          headerLeft: () => (
+            <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
+              <Feather name="chevron-left" size={28} />
+            </Pressable>
+          ),
+        })}
+      />
+      <Stack.Screen 
+        name="BlockedUsers" 
+        component={BlockedUsersScreen}
+        options={({ navigation }) => ({
+          headerShown: true,
+          headerTransparent: false,
+          headerTitle: 'Blocked Users',
           headerTitleStyle: {
             fontSize: 17,
             fontWeight: '600',

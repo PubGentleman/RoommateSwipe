@@ -1074,6 +1074,98 @@ export const StorageService = {
     }
   },
 
+  async blockUser(currentUserId: string, blockedUserId: string): Promise<void> {
+    try {
+      const users = await this.getUsers();
+      const currentUser = users.find(u => u.id === currentUserId);
+      if (!currentUser) return;
+
+      if (!currentUser.blockedUsers) {
+        currentUser.blockedUsers = [];
+      }
+      if (!currentUser.blockedUsers.includes(blockedUserId)) {
+        currentUser.blockedUsers.push(blockedUserId);
+        await this.addOrUpdateUser(currentUser);
+
+        const storedCurrentUser = await this.getCurrentUser();
+        if (storedCurrentUser && storedCurrentUser.id === currentUserId) {
+          storedCurrentUser.blockedUsers = currentUser.blockedUsers;
+          await this.setCurrentUser(storedCurrentUser);
+        }
+      }
+    } catch (error) {
+      console.error('Error blocking user:', error);
+    }
+  },
+
+  async unblockUser(currentUserId: string, blockedUserId: string): Promise<void> {
+    try {
+      const users = await this.getUsers();
+      const currentUser = users.find(u => u.id === currentUserId);
+      if (!currentUser || !currentUser.blockedUsers) return;
+
+      currentUser.blockedUsers = currentUser.blockedUsers.filter(id => id !== blockedUserId);
+      await this.addOrUpdateUser(currentUser);
+
+      const storedCurrentUser = await this.getCurrentUser();
+      if (storedCurrentUser && storedCurrentUser.id === currentUserId) {
+        storedCurrentUser.blockedUsers = currentUser.blockedUsers;
+        await this.setCurrentUser(storedCurrentUser);
+      }
+    } catch (error) {
+      console.error('Error unblocking user:', error);
+    }
+  },
+
+  async getBlockedUsers(userId: string): Promise<string[]> {
+    try {
+      const users = await this.getUsers();
+      const user = users.find(u => u.id === userId);
+      return user?.blockedUsers || [];
+    } catch (error) {
+      console.error('Error getting blocked users:', error);
+      return [];
+    }
+  },
+
+  async reportUser(currentUserId: string, reportedUserId: string, reason: string): Promise<void> {
+    try {
+      const users = await this.getUsers();
+      const currentUser = users.find(u => u.id === currentUserId);
+      if (!currentUser) return;
+
+      if (!currentUser.reportedUsers) {
+        currentUser.reportedUsers = [];
+      }
+      if (!currentUser.reportedUsers.some(r => r.userId === reportedUserId)) {
+        currentUser.reportedUsers.push({
+          userId: reportedUserId,
+          reason,
+          reportedAt: new Date(),
+        });
+        await this.addOrUpdateUser(currentUser);
+
+        const storedCurrentUser = await this.getCurrentUser();
+        if (storedCurrentUser && storedCurrentUser.id === currentUserId) {
+          storedCurrentUser.reportedUsers = currentUser.reportedUsers;
+          await this.setCurrentUser(storedCurrentUser);
+        }
+      }
+    } catch (error) {
+      console.error('Error reporting user:', error);
+    }
+  },
+
+  async isUserBlocked(currentUserId: string, otherUserId: string): Promise<boolean> {
+    try {
+      const blockedUsers = await this.getBlockedUsers(currentUserId);
+      return blockedUsers.includes(otherUserId);
+    } catch (error) {
+      console.error('Error checking if user is blocked:', error);
+      return false;
+    }
+  },
+
   async deleteUser(userId: string): Promise<void> {
     try {
       const users = await this.getUsers();

@@ -251,6 +251,12 @@ export interface User {
       bedrooms?: number;
     };
   };
+  blockedUsers?: string[];
+  reportedUsers?: Array<{
+    userId: string;
+    reason: string;
+    reportedAt: Date;
+  }>;
   aiAssistantData?: {
     lastMicroQuestionDate?: Date;
     questionsAsked?: string[];

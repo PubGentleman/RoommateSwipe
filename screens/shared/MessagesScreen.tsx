@@ -73,8 +73,9 @@ export const MessagesScreen = () => {
         }
       }
 
+      const blockedIds = user.blockedUsers || [];
       const userConversations = existingConversations.filter(
-        c => matches.some(match => 
+        c => !blockedIds.includes(c.participant.id) && matches.some(match => 
           (match.userId1 === user.id && match.userId2 === c.participant.id) ||
           (match.userId2 === user.id && match.userId1 === c.participant.id)
         )

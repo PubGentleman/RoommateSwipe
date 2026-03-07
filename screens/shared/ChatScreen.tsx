@@ -9,6 +9,7 @@ import { StorageService } from '../../utils/storage';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
+import { ReportBlockModal } from '../../components/ReportBlockModal';
 
 type ChatScreenProps = {
   route: {
@@ -23,7 +24,7 @@ type ChatScreenProps = {
 export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const { conversationId, otherUser: routeOtherUser } = route.params;
   const { theme } = useTheme();
-  const { user, incrementMessageCount, canSendMessage, canStartNewChat, incrementActiveChatCount, watchAdForCredit, isBasicUser } = useAuth();
+  const { user, incrementMessageCount, canSendMessage, canStartNewChat, incrementActiveChatCount, watchAdForCredit, isBasicUser, blockUser, reportUser } = useAuth();
   const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
@@ -31,6 +32,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [isOnline, setIsOnline] = useState(Math.random() > 0.5);
   const [otherUser, setOtherUser] = useState<RoommateProfile | null>(routeOtherUser || null);
   const flatListRef = useRef<FlatList>(null);
+  const [showReportBlockModal, setShowReportBlockModal] = useState(false);
 
   // Tab bar height for bottom padding
   const TAB_BAR_HEIGHT = 80;
@@ -230,7 +232,17 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             ) : null}
           </View>
         </View>
-        <Pressable onPress={handleCreateGroup} style={styles.moreButton}>
+        <Pressable onPress={() => {
+          Alert.alert(
+            'Options',
+            undefined,
+            [
+              { text: 'Create Group', onPress: handleCreateGroup },
+              { text: 'Report / Block', onPress: () => setShowReportBlockModal(true) },
+              { text: 'Cancel', style: 'cancel' },
+            ]
+          );
+        }} style={styles.moreButton}>
           <Feather name="more-vertical" size={24} color={theme.text} />
         </Pressable>
       </View>
@@ -306,6 +318,25 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           <Feather name="send" size={20} color="#FFFFFF" />
         </Pressable>
       </View>
+
+      {otherUser ? (
+        <ReportBlockModal
+          visible={showReportBlockModal}
+          onClose={() => setShowReportBlockModal(false)}
+          userName={otherUser.name}
+          onReport={async (reason) => {
+            if (otherUser) {
+              await reportUser(otherUser.id, reason);
+            }
+          }}
+          onBlock={async () => {
+            if (otherUser) {
+              await blockUser(otherUser.id);
+              navigation.goBack();
+            }
+          }}
+        />
+      ) : null}
     </KeyboardAvoidingView>
   );
 };

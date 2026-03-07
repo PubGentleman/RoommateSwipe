@@ -10,6 +10,7 @@ import { GroupsScreen } from '../screens/renter/GroupsScreen';
 import { MessagesStackNavigator } from './MessagesStackNavigator';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
 import { useTheme } from '../hooks/useTheme';
+import { useNotifications } from '../hooks/useNotifications';
 
 export type RenterTabParamList = {
   Explore: undefined;
@@ -32,6 +33,7 @@ const TAB_CONFIG: Record<string, { icon: string; label: string }> = {
 function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const { theme, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+  const { unreadCount } = useNotifications();
 
   return (
     <View style={[tabStyles.wrapper, { paddingBottom: insets.bottom }]}>
@@ -45,6 +47,7 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
           const isFocused = state.index === index;
           const config = TAB_CONFIG[route.name] || { icon: 'circle', label: route.name };
           const color = isFocused ? theme.tabIconSelected : theme.tabIconDefault;
+          const showBadge = route.name === 'Profile' && unreadCount > 0;
 
           const onPress = () => {
             const event = navigation.emit({
@@ -59,7 +62,16 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 
           return (
             <Pressable key={route.key} onPress={onPress} style={tabStyles.tab}>
-              <Feather name={config.icon as any} size={22} color={color} />
+              <View>
+                <Feather name={config.icon as any} size={22} color={color} />
+                {showBadge ? (
+                  <View style={tabStyles.badge}>
+                    <Text style={tabStyles.badgeText}>
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
               <Text style={[tabStyles.label, { color }]}>{config.label}</Text>
             </Pressable>
           );
@@ -91,6 +103,24 @@ const tabStyles = StyleSheet.create({
   },
   label: {
     fontSize: 10,
+    textAlign: 'center',
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -10,
+    backgroundColor: '#FF4757',
+    borderRadius: 9,
+    minWidth: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
     textAlign: 'center',
   },
 });

@@ -16,6 +16,10 @@ interface AuthContextType {
   cancelSubscription: () => Promise<void>;
   reactivateSubscription: () => Promise<void>;
   updateUser: (updates: Partial<User>) => Promise<void>;
+  blockUser: (blockedUserId: string) => Promise<void>;
+  unblockUser: (blockedUserId: string) => Promise<void>;
+  reportUser: (reportedUserId: string, reason: string) => Promise<void>;
+  isUserBlocked: (otherUserId: string) => boolean;
   incrementMessageCount: () => Promise<void>;
   canSendMessage: () => boolean;
   activateBoost: () => Promise<{ success: boolean; message: string }>;
@@ -1037,6 +1041,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const blockUserAction = async (blockedUserId: string) => {
+    if (!user) return;
+    await StorageService.blockUser(user.id, blockedUserId);
+    const updatedBlockedUsers = [...(user.blockedUsers || []), blockedUserId];
+    const updatedUser: User = { ...user, blockedUsers: updatedBlockedUsers };
+    await StorageService.setCurrentUser(updatedUser);
+    setUser(updatedUser);
+  };
+
+  const unblockUserAction = async (blockedUserId: string) => {
+    if (!user) return;
+    await StorageService.unblockUser(user.id, blockedUserId);
+    const updatedBlockedUsers = (user.blockedUsers || []).filter(id => id !== blockedUserId);
+    const updatedUser: User = { ...user, blockedUsers: updatedBlockedUsers };
+    await StorageService.setCurrentUser(updatedUser);
+    setUser(updatedUser);
+  };
+
+  const reportUserAction = async (reportedUserId: string, reason: string) => {
+    if (!user) return;
+    await StorageService.reportUser(user.id, reportedUserId, reason);
+    const updatedReportedUsers = [...(user.reportedUsers || []), { userId: reportedUserId, reason, reportedAt: new Date() }];
+    const updatedUser: User = { ...user, reportedUsers: updatedReportedUsers };
+    await StorageService.setCurrentUser(updatedUser);
+    setUser(updatedUser);
+  };
+
+  const isUserBlockedCheck = (otherUserId: string): boolean => {
+    if (!user) return false;
+    return (user.blockedUsers || []).includes(otherUserId);
+  };
+
   const isBasicUser = (): boolean => {
     const plan = user?.subscription?.plan || 'basic';
     const status = user?.subscription?.status || 'active';
@@ -1122,7 +1158,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, reactivateSubscription, updateUser, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike, watchAdForCredit, getAdCredits, useAdCredit, isBasicUser }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, reactivateSubscription, updateUser, blockUser: blockUserAction, unblockUser: unblockUserAction, reportUser: reportUserAction, isUserBlocked: isUserBlockedCheck, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike, watchAdForCredit, getAdCredits, useAdCredit, isBasicUser }}>
       {children}
     </AuthContext.Provider>
   );

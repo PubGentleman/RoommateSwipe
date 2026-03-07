@@ -264,6 +264,18 @@ export const PrivacySecurityScreen = () => {
 
       <View style={styles.section}>
         <ThemedText style={[Typography.h3, { marginBottom: Spacing.md, color: theme.textSecondary }]}>
+          Safety
+        </ThemedText>
+        
+        <MenuItem
+          icon="slash"
+          label="Blocked Users"
+          onPress={() => navigation.navigate('BlockedUsers' as any)}
+        />
+      </View>
+
+      <View style={styles.section}>
+        <ThemedText style={[Typography.h3, { marginBottom: Spacing.md, color: theme.textSecondary }]}>
           Data & Privacy
         </ThemedText>
         
