@@ -191,12 +191,12 @@ export const ProfileScreen = () => {
               onPress={() => navigation.navigate('PrivacySecurity')}
             />
             <SettingsItem
-              iconName="settings"
+              iconName="credit-card"
               iconColor="#ff6b5b"
               iconBgColor="rgba(255,77,77,0.12)"
               iconBorderColor="rgba(255,77,77,0.18)"
-              title="Account Settings"
-              subtitle="Email, password, connected apps"
+              title="Payment"
+              subtitle="Manage payment methods"
               onPress={() => navigation.navigate('Payment')}
               isLast
             />
