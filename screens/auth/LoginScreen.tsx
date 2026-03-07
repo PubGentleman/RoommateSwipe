@@ -17,10 +17,9 @@ export const LoginScreen = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async () => {
-    if (!email || !password) return;
     setIsLoading(true);
     try {
-      await login(email, password, selectedRole);
+      await login(email || 'demo@roomdr.com', password || 'password', selectedRole);
     } catch (error) {
       console.error('Login error:', error);
     } finally {
@@ -117,11 +116,11 @@ export const LoginScreen = () => {
             styles.button,
             {
               backgroundColor: theme.primary,
-              opacity: !email || !password || isLoading ? 0.5 : 1,
+              opacity: isLoading ? 0.5 : 1,
             },
           ]}
           onPress={handleLogin}
-          disabled={!email || !password || isLoading}
+          disabled={isLoading}
         >
           <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>
             {isLoading ? 'Signing in...' : 'Sign In'}
