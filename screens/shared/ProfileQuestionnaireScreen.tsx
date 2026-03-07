@@ -683,7 +683,7 @@ export const ProfileQuestionnaireScreen = () => {
         </Animated.View>
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, Spacing.lg) + Spacing.sm }]}>
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, Spacing.lg) + 80 }]}>
         {isLastStep ? (
           <Pressable
             style={[styles.primaryButton, { backgroundColor: theme.primary, opacity: isSaving ? 0.7 : 1 }]}
