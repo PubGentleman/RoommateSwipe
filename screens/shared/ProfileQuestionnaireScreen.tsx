@@ -113,6 +113,7 @@ export const ProfileQuestionnaireScreen = () => {
 
   const initialStepParam = (route.params as any)?.initialStep;
   const initialStepIndex = initialStepParam ? STEP_ORDER.indexOf(initialStepParam as StepId) : -1;
+  const isSingleStepMode = initialStepIndex >= 0;
   const [currentStep, setCurrentStep] = useState(initialStepIndex >= 0 ? initialStepIndex : 0);
   const [direction, setDirection] = useState<'forward' | 'back'>('forward');
   const [isSaving, setIsSaving] = useState(false);
@@ -279,7 +280,9 @@ export const ProfileQuestionnaireScreen = () => {
   };
 
   const goBack = () => {
-    if (currentStep > 0) {
+    if (isSingleStepMode) {
+      navigation.goBack();
+    } else if (currentStep > 0) {
       setDirection('back');
       setCurrentStep(currentStep - 1);
     } else {
@@ -659,7 +662,7 @@ export const ProfileQuestionnaireScreen = () => {
           </ThemedText>
           <View style={styles.navButton} />
         </View>
-        <ProgressBar currentStep={currentStep} totalSteps={TOTAL_STEPS} />
+        <ProgressBar currentStep={isSingleStepMode ? 0 : currentStep} totalSteps={isSingleStepMode ? 1 : TOTAL_STEPS} />
       </View>
 
       <ScrollView
@@ -684,7 +687,7 @@ export const ProfileQuestionnaireScreen = () => {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, Spacing.lg) + 80 }]}>
-        {isLastStep ? (
+        {isLastStep || isSingleStepMode ? (
           <Pressable
             style={[styles.primaryButton, { backgroundColor: theme.primary, opacity: isSaving ? 0.7 : 1 }]}
             onPress={handleSave}
@@ -694,7 +697,7 @@ export const ProfileQuestionnaireScreen = () => {
               <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
               <>
-                <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>Save Profile</ThemedText>
+                <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>{isSingleStepMode ? 'Save' : 'Save Profile'}</ThemedText>
                 <Feather name="check" size={20} color="#FFFFFF" />
               </>
             )}
