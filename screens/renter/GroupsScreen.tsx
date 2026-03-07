@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Pressable, Dimensions, ActivityIndicator, TextInput, ScrollView, Alert, Modal, Image } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Dimensions, ActivityIndicator, TextInput, ScrollView, Alert, Modal, Image } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
@@ -16,6 +16,7 @@ import { mockRoommateProfiles } from '../../utils/mockData';
 import { getGenderSymbol, calculateCompatibility } from '../../utils/matchingAlgorithm';
 import { getZodiacSymbol } from '../../utils/zodiacUtils';
 import { AdBanner } from '../../components/AdBanner';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - Spacing.xxl;
@@ -789,175 +790,173 @@ export const GroupsScreen = () => {
         );
       }
 
+      const compatibility = calculateGroupCompatibility(currentGroup);
+      const spotsLeft = currentGroup.maxMembers - currentGroup.members.length;
+      const memberProfiles = currentGroup.members
+        .map(id => mockRoommateProfiles.find(p => p.id === id))
+        .filter((p): p is NonNullable<typeof p> => !!p);
+
       return (
         <View style={styles.cardContainer}>
           <GestureDetector gesture={cardGesture}>
-            <Animated.View
-              style={[
-                styles.card,
-                { backgroundColor: theme.backgroundDefault },
-                animatedCardStyle,
-              ]}
-            >
+            <Animated.View style={[styles.card, animatedCardStyle]}>
               <ScrollView 
                 style={{ flex: 1 }}
                 contentContainerStyle={styles.cardContent}
                 showsVerticalScrollIndicator={false}
               >
-                <View style={{ marginTop: Spacing.md, alignItems: 'center' }}>
-                  <MemberAvatarStack group={currentGroup} />
-                  
-                  {(() => {
-                    const compatibility = calculateGroupCompatibility(currentGroup);
-                    const color = getCompatibilityColor(compatibility);
-                    
+                <View style={styles.dkAvatarCluster}>
+                  {memberProfiles.slice(0, 2).map((profile, i) => {
+                    const gradients: [string, string][] = [['#667eea', '#764ba2'], ['#f093fb', '#f5576c'], ['#11998e', '#38ef7d']];
                     return (
-                      <View style={[styles.compatibilityBadge, { backgroundColor: color, marginTop: Spacing.sm }]}>
-                        <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>
-                          {compatibility}% Match
-                        </ThemedText>
-                      </View>
+                      <Pressable
+                        key={profile.id}
+                        onPress={() => { setSelectedMember(profile); setShowMemberProfile(true); }}
+                        style={[styles.dkAvatar, i > 0 && { marginLeft: -18 }, { zIndex: 3 - i }]}
+                      >
+                        {profile.photos?.[0] ? (
+                          <Image source={{ uri: profile.photos[0] }} style={styles.dkAvatarImg} />
+                        ) : (
+                          <LinearGradient colors={gradients[i % 3]} style={styles.dkAvatarImg}>
+                            <Text style={styles.dkAvatarLetter}>{profile.name[0]}</Text>
+                          </LinearGradient>
+                        )}
+                      </Pressable>
                     );
-                  })()}
+                  })}
+                  {spotsLeft > 0 ? (
+                    <View style={[styles.dkAvatar, styles.dkAvatarEmpty, { marginLeft: -18, zIndex: 0 }]}>
+                      <Text style={styles.dkAvatarPlus}>+</Text>
+                    </View>
+                  ) : null}
                 </View>
-                
-                <ThemedText style={[Typography.h2, { marginTop: Spacing.md, marginBottom: Spacing.sm }]}>
-                  {currentGroup.name}
-                </ThemedText>
-                
-                <View style={styles.membersInfo}>
-                  <Feather name="users" size={16} color={theme.textSecondary} />
-                  <ThemedText style={[Typography.body, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
-                    {currentGroup.members.length}/{currentGroup.maxMembers} members • {currentGroup.maxMembers - currentGroup.members.length} spots left
-                  </ThemedText>
+
+                <View style={styles.dkMatchBadge}>
+                  <Feather name="heart" size={12} color="#ff8070" />
+                  <Text style={styles.dkMatchBadgeText}>{compatibility}% Group Match</Text>
+                </View>
+
+                <Text style={styles.dkGroupName}>{currentGroup.name}</Text>
+
+                <View style={styles.dkMembersCount}>
+                  <Feather name="users" size={13} color="rgba(255,255,255,0.4)" />
+                  <Text style={styles.dkMembersCountText}>
+                    {currentGroup.members.length} of {currentGroup.maxMembers} members filled
+                  </Text>
+                  {spotsLeft > 0 ? (
+                    <View style={styles.dkSpotPill}>
+                      <Text style={styles.dkSpotPillText}>{spotsLeft} left</Text>
+                    </View>
+                  ) : null}
                 </View>
 
                 {currentGroup.description ? (
-                  <ThemedText style={[Typography.body, { color: theme.text, marginTop: Spacing.lg, textAlign: 'center' }]}>
-                    {currentGroup.description}
-                  </ThemedText>
+                  <Text style={styles.dkGroupDesc}>{currentGroup.description}</Text>
                 ) : null}
 
-                <View style={styles.cardDetails}>
-                  <View style={styles.cardDetail}>
-                    <Feather name="dollar-sign" size={20} color={theme.primary} />
-                    <View style={styles.cardDetailText}>
-                      <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
-                        Min Budget
-                      </ThemedText>
-                      <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
-                        ${currentGroup.budget}/mo
-                      </ThemedText>
+                <View style={styles.dkStatsRow}>
+                  <View style={styles.dkStatCard}>
+                    <View style={styles.dkStatIcon}>
+                      <Feather name="dollar-sign" size={16} color="#ff6b5b" />
+                    </View>
+                    <View>
+                      <Text style={styles.dkStatLabel}>BUDGET</Text>
+                      <Text style={styles.dkStatValue}>${currentGroup.budget?.toLocaleString()}/mo</Text>
                     </View>
                   </View>
-                  <View style={styles.cardDetail}>
-                    <Feather name="map-pin" size={20} color={theme.primary} />
-                    <View style={styles.cardDetailText}>
-                      <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
-                        Location
-                      </ThemedText>
-                      <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
-                        {currentGroup.preferredLocation}
-                      </ThemedText>
+                  <View style={styles.dkStatCard}>
+                    <View style={styles.dkStatIcon}>
+                      <Feather name="map-pin" size={16} color="#ff6b5b" />
+                    </View>
+                    <View>
+                      <Text style={styles.dkStatLabel}>LOCATION</Text>
+                      <Text style={styles.dkStatValue} numberOfLines={1}>{currentGroup.preferredLocation}</Text>
                     </View>
                   </View>
                 </View>
 
-                {(currentGroup.apartmentPrice || currentGroup.bedrooms) ? (
-                  <View style={[styles.cardDetails, { marginTop: Spacing.md }]}>
-                    {currentGroup.apartmentPrice ? (
-                      <View style={styles.cardDetail}>
-                        <Feather name="home" size={20} color={theme.primary} />
-                        <View style={styles.cardDetailText}>
-                          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
-                            Total Price
-                          </ThemedText>
-                          <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
-                            ${currentGroup.apartmentPrice}
-                          </ThemedText>
-                        </View>
-                      </View>
-                    ) : null}
-                    {currentGroup.bedrooms ? (
-                      <View style={styles.cardDetail}>
-                        <Feather name="grid" size={20} color={theme.primary} />
-                        <View style={styles.cardDetailText}>
-                          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
-                            Bedrooms
-                          </ThemedText>
-                          <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
-                            {currentGroup.bedrooms}
-                          </ThemedText>
-                        </View>
-                      </View>
-                    ) : null}
-                  </View>
-                ) : null}
+                <View style={styles.dkDivider} />
 
-                {currentGroup.members.length > 0 ? (
-                  <View style={styles.cardMembersSection}>
-                    <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.sm }]}>
-                      Current Members
-                    </ThemedText>
-                    <View style={styles.cardMembersList}>
-                      {currentGroup.members.map((memberId, index) => {
-                        const profile = mockRoommateProfiles.find(p => p.id === memberId);
-                        return profile ? (
-                          <ThemedText key={memberId} style={[Typography.body, { color: theme.text, marginRight: index < currentGroup.members.length - 1 ? Spacing.sm : 0 }]}>
-                            {profile.name.split(' ')[0]}{profile.zodiacSign ? ` ${getZodiacSymbol(profile.zodiacSign)}` : ''} {getGenderSymbol(profile.gender)}
-                          </ThemedText>
-                        ) : null;
+                {memberProfiles.length > 0 ? (
+                  <View style={styles.dkMembersSection}>
+                    <Text style={styles.dkMembersLabel}>CURRENT MEMBERS</Text>
+                    <View style={styles.dkMembersList}>
+                      {memberProfiles.map((profile, i) => {
+                        const gradients: [string, string][] = [['#667eea', '#764ba2'], ['#f093fb', '#f5576c'], ['#11998e', '#38ef7d']];
+                        return (
+                          <Pressable
+                            key={profile.id}
+                            style={styles.dkMemberChip}
+                            onPress={() => { setSelectedMember(profile); setShowMemberProfile(true); }}
+                          >
+                            {profile.photos?.[0] ? (
+                              <Image source={{ uri: profile.photos[0] }} style={styles.dkMemberAvatar} />
+                            ) : (
+                              <LinearGradient colors={gradients[i % 3]} style={styles.dkMemberAvatar}>
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: '#fff' }}>{profile.name[0]}</Text>
+                              </LinearGradient>
+                            )}
+                            <View>
+                              <Text style={styles.dkMemberName}>{profile.name.split(' ')[0]}</Text>
+                              <Text style={styles.dkMemberMeta}>
+                                {profile.occupation?.split(' ')[0] || 'Member'} {getGenderSymbol(profile.gender)}
+                              </Text>
+                            </View>
+                          </Pressable>
+                        );
                       })}
                     </View>
                   </View>
                 ) : null}
-                </ScrollView>
+              </ScrollView>
             </Animated.View>
           </GestureDetector>
 
-          <AdBanner size="banner" />
+          <View style={styles.dkAdCard}>
+            <View style={styles.dkAdLeft}>
+              <LinearGradient colors={['#11998e', '#38ef7d']} style={styles.dkAdLogo}>
+                <Feather name="home" size={16} color="#fff" />
+              </LinearGradient>
+              <View>
+                <Text style={styles.dkAdSponsored}>SPONSORED</Text>
+                <Text style={styles.dkAdTitle}>List your room on Roomdr</Text>
+                <Text style={styles.dkAdSub}>Reach 50k+ renters in your area</Text>
+              </View>
+            </View>
+            <Pressable style={styles.dkAdBtn}>
+              <Text style={styles.dkAdBtnText}>View</Text>
+            </Pressable>
+          </View>
 
           <View style={styles.actionButtons}>
             <Pressable
-              style={[
-                styles.actionButtonSmall, 
-                { 
-                  backgroundColor: '#FFFFFF', 
-                  borderColor: lastSwipedGroup ? theme.warning : theme.textSecondary,
-                  opacity: lastSwipedGroup ? 1 : 0.4,
-                  borderWidth: 2,
-                }
-              ]}
+              style={[styles.dkActBtn, styles.dkActSm, styles.dkActUndo, { opacity: lastSwipedGroup ? 1 : 0.4 }]}
               onPress={handleUndo}
             >
-              <Feather name="rotate-ccw" size={24} color={lastSwipedGroup ? theme.warning : theme.textSecondary} />
+              <Feather name="rotate-ccw" size={18} color="rgba(255,255,255,0.4)" />
             </Pressable>
             <Pressable
-              style={[styles.actionButton, { backgroundColor: '#FFFFFF', borderColor: theme.error, borderWidth: 2 }]}
+              style={[styles.dkActBtn, styles.dkActLg, styles.dkActPass]}
               onPress={() => handleSwipeAction('skip')}
             >
-              <Feather name="x" size={32} color={theme.error} />
+              <Feather name="x" size={26} color="#ff4d4d" />
             </Pressable>
             <Pressable
-              style={[styles.actionButton, { backgroundColor: theme.primary }]}
+              style={[styles.dkActBtn, styles.dkActXl, styles.dkActJoin]}
               onPress={() => handleSwipeAction('like')}
             >
-              <Feather name="heart" size={32} color="#FFFFFF" />
+              <Feather name="heart" size={30} color="#2ecc71" />
             </Pressable>
           </View>
 
           <View style={styles.swipeHint}>
             <View style={styles.swipeHintItem}>
-              <Feather name="arrow-left" size={16} color={theme.textSecondary} />
-              <ThemedText style={[Typography.small, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
-                Skip
-              </ThemedText>
+              <Feather name="arrow-left" size={12} color="rgba(255,255,255,0.2)" />
+              <Text style={styles.dkHintText}>Skip</Text>
             </View>
             <View style={styles.swipeHintItem}>
-              <ThemedText style={[Typography.small, { color: theme.textSecondary, marginRight: Spacing.xs }]}>
-                Like
-              </ThemedText>
-              <Feather name="arrow-right" size={16} color={theme.textSecondary} />
+              <Text style={styles.dkHintText}>Request to Join</Text>
+              <Feather name="arrow-right" size={12} color="rgba(255,255,255,0.2)" />
             </View>
           </View>
         </View>
@@ -1145,52 +1144,26 @@ export const GroupsScreen = () => {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.backgroundRoot, paddingTop: insets.top + Spacing.xl, paddingBottom: insets.bottom + Spacing.xl }]}>
+    <View style={[styles.container, { backgroundColor: '#111111', paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <View style={styles.tabBar}>
-        <Pressable
-          style={[
-            styles.tab,
-            activeTab === 'my-groups' && { borderBottomColor: theme.primary, borderBottomWidth: 2 }
-          ]}
-          onPress={() => setActiveTab('my-groups')}
-        >
-          <ThemedText style={[
-            Typography.body,
-            { color: activeTab === 'my-groups' ? theme.primary : theme.textSecondary }
-          ]}>
-            My Groups
-          </ThemedText>
-        </Pressable>
-
-        <Pressable
-          style={[
-            styles.tab,
-            activeTab === 'discover' && { borderBottomColor: theme.primary, borderBottomWidth: 2 }
-          ]}
-          onPress={() => setActiveTab('discover')}
-        >
-          <ThemedText style={[
-            Typography.body,
-            { color: activeTab === 'discover' ? theme.primary : theme.textSecondary }
-          ]}>
-            Discover
-          </ThemedText>
-        </Pressable>
-
-        <Pressable
-          style={[
-            styles.tab,
-            activeTab === 'create' && { borderBottomColor: theme.primary, borderBottomWidth: 2 }
-          ]}
-          onPress={() => setActiveTab('create')}
-        >
-          <ThemedText style={[
-            Typography.body,
-            { color: activeTab === 'create' ? theme.primary : theme.textSecondary }
-          ]}>
-            Create
-          </ThemedText>
-        </Pressable>
+        {(['my-groups', 'discover', 'create'] as Tab[]).map((tab) => {
+          const isActive = activeTab === tab;
+          const label = tab === 'my-groups' ? 'My Groups' : tab === 'discover' ? 'Discover' : 'Create';
+          return (
+            <Pressable key={tab} style={styles.tab} onPress={() => setActiveTab(tab)}>
+              <Text style={[styles.tabText, isActive && styles.tabTextActive]}>{label}</Text>
+              {isActive ? (
+                <LinearGradient
+                  colors={['#ff6b5b', '#e83a2a']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.tabIndicator}
+                />
+              ) : null}
+            </Pressable>
+          );
+        })}
+        <View style={styles.tabBarLine} />
       </View>
 
       <View style={styles.content}>
@@ -1535,14 +1508,42 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     flexDirection: 'row',
-    paddingHorizontal: Spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.1)',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingTop: 14,
+    position: 'relative',
+  },
+  tabBarLine: {
+    position: 'absolute',
+    bottom: 0,
+    left: 24,
+    right: 24,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.07)',
   },
   tab: {
     flex: 1,
-    paddingVertical: Spacing.md,
     alignItems: 'center',
+    paddingBottom: 12,
+    position: 'relative',
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.3)',
+  },
+  tabTextActive: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  tabIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    left: '20%',
+    right: '20%',
+    height: 2.5,
+    borderRadius: 2,
+    zIndex: 1,
   },
   content: {
     flex: 1,
@@ -1622,103 +1623,317 @@ const styles = StyleSheet.create({
   cardContainer: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: Spacing.xl,
+    paddingHorizontal: 16,
+    gap: 10,
   },
   card: {
-    width: CARD_WIDTH,
-    height: SCREEN_HEIGHT * 0.55,
-    borderRadius: BorderRadius.large,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    flex: 1,
+    width: '100%',
+    backgroundColor: '#1a1a1a',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 24,
+    overflow: 'hidden',
   },
   cardContent: {
+    padding: 24,
+    paddingTop: 24,
+    paddingBottom: 20,
+    alignItems: 'center',
+  },
+  dkAvatarCluster: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  dkAvatar: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    borderWidth: 3,
+    borderColor: '#1a1a1a',
+    overflow: 'hidden',
+  },
+  dkAvatarImg: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 31,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dkAvatarLetter: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  dkAvatarEmpty: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
+    borderStyle: 'dashed',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dkAvatarPlus: {
+    fontSize: 18,
+    color: 'rgba(255,255,255,0.4)',
+    fontWeight: '700',
+  },
+  dkMatchBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(255,107,91,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.35)',
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    marginBottom: 12,
+  },
+  dkMatchBadgeText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#ff8070',
+  },
+  dkGroupName: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#fff',
+    letterSpacing: -0.3,
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  dkMembersCount: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 12,
+  },
+  dkMembersCountText: {
+    fontSize: 12.5,
+    color: 'rgba(255,255,255,0.4)',
+    fontWeight: '500',
+  },
+  dkSpotPill: {
+    backgroundColor: 'rgba(46,204,113,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(46,204,113,0.25)',
+    borderRadius: 10,
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+  },
+  dkSpotPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#2ecc71',
+  },
+  dkGroupDesc: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.45)',
+    textAlign: 'center',
+    lineHeight: 21,
+    marginBottom: 18,
+    maxWidth: 280,
+  },
+  dkStatsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    width: '100%',
+    marginBottom: 18,
+  },
+  dkStatCard: {
     flex: 1,
-    padding: Spacing.xl,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-start',
+    gap: 10,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 14,
+    padding: 12,
   },
-  groupIconLarge: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+  dkStatIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,107,91,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  membersInfo: {
+  dkStatLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.3)',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  dkStatValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  dkDivider: {
+    width: '100%',
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    marginBottom: 16,
+  },
+  dkMembersSection: {
+    width: '100%',
+  },
+  dkMembersLabel: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.25)',
+    letterSpacing: 0.8,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  dkMembersList: {
     flexDirection: 'row',
-    alignItems: 'center',
-  },
-  cardDetails: {
-    flexDirection: 'row',
-    gap: Spacing.xxl,
-    marginTop: Spacing.xxl,
-  },
-  cardDetail: {
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  cardDetailText: {
-    alignItems: 'center',
-  },
-  cardMembersSection: {
-    marginTop: Spacing.lg,
-    alignItems: 'center',
-  },
-  cardMembersList: {
-    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'center',
     flexWrap: 'wrap',
+  },
+  dkMemberChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 24,
+    paddingVertical: 6,
+    paddingRight: 12,
+    paddingLeft: 6,
+  },
+  dkMemberAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dkMemberName: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#fff',
+    lineHeight: 14,
+  },
+  dkMemberMeta: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.35)',
+    fontWeight: '500',
+  },
+  dkAdCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 16,
+    padding: 10,
+    paddingHorizontal: 14,
+  },
+  dkAdLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  dkAdLogo: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dkAdSponsored: {
+    fontSize: 9,
+    color: 'rgba(255,255,255,0.2)',
+    letterSpacing: 0.5,
+  },
+  dkAdTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  dkAdSub: {
+    fontSize: 10.5,
+    color: 'rgba(255,255,255,0.35)',
+  },
+  dkAdBtn: {
+    backgroundColor: 'rgba(255,255,255,0.09)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 10,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+  },
+  dkAdBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#fff',
   },
   actionButtons: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.xxl,
-    marginTop: Spacing.xl,
+    justifyContent: 'center',
+    gap: 18,
+    paddingVertical: 6,
   },
-  actionButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+  dkActBtn: {
+    borderRadius: 100,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 2.5,
+    backgroundColor: 'transparent',
   },
-  actionButtonSmall: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+  dkActSm: { width: 46, height: 46 },
+  dkActLg: { width: 62, height: 62 },
+  dkActXl: { width: 70, height: 70 },
+  dkActUndo: {
+    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  dkActPass: {
+    borderColor: '#ff4d4d',
+    backgroundColor: 'rgba(255,77,77,0.08)',
+  },
+  dkActJoin: {
+    borderColor: '#2ecc71',
+    backgroundColor: 'rgba(46,204,113,0.1)',
   },
   swipeHint: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    width: CARD_WIDTH,
-    marginTop: Spacing.lg,
-    paddingHorizontal: Spacing.xl,
+    paddingHorizontal: 28,
+    paddingBottom: 6,
   },
   swipeHintItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 5,
+  },
+  dkHintText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.2)',
   },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: Spacing.xl,
+    backgroundColor: '#111111',
   },
   createForm: {
     padding: Spacing.lg,
