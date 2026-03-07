@@ -31,30 +31,27 @@ export const RootNavigator = () => {
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      StorageService.isOnboardingCompleted(user.id).then((completed) => {
-        setShowOnboarding(!completed);
-        setOnboardingChecked(true);
-      });
-    } else {
+    StorageService.isOnboardingCompleted().then((completed) => {
+      setShowOnboarding(!completed);
       setOnboardingChecked(true);
-      setShowOnboarding(false);
-    }
-  }, [user]);
+    });
+  }, []);
 
   const handleOnboardingComplete = useCallback(() => {
-    if (user) {
-      StorageService.setOnboardingCompleted(user.id, true);
-    }
+    StorageService.setOnboardingCompleted(true);
     setShowOnboarding(false);
-  }, [user]);
+  }, []);
 
-  if (isLoading || (user && !onboardingChecked)) {
+  if (isLoading || !onboardingChecked) {
     return (
       <View style={[styles.loading, { backgroundColor: theme.backgroundRoot }]}>
         <ActivityIndicator size="large" color={theme.primary} />
       </View>
     );
+  }
+
+  if (showOnboarding) {
+    return <OnboardingScreen onComplete={handleOnboardingComplete} />;
   }
 
   if (!user) {
@@ -63,10 +60,6 @@ export const RootNavigator = () => {
         <Stack.Screen name="Login" component={LoginScreen} />
       </Stack.Navigator>
     );
-  }
-
-  if (showOnboarding) {
-    return <OnboardingScreen onComplete={handleOnboardingComplete} />;
   }
 
   const MainComponent = user.role === 'host'

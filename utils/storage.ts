@@ -1290,9 +1290,11 @@ export const StorageService = {
     }
   },
 
-  async isOnboardingCompleted(userId: string): Promise<boolean> {
+  async isOnboardingCompleted(userId?: string): Promise<boolean> {
     try {
-      const key = `${STORAGE_KEYS.ONBOARDING_COMPLETED}_${userId}`;
+      const key = userId
+        ? `${STORAGE_KEYS.ONBOARDING_COMPLETED}_${userId}`
+        : STORAGE_KEYS.ONBOARDING_COMPLETED;
       const value = await AsyncStorage.getItem(key);
       return value === 'true';
     } catch {
@@ -1300,9 +1302,11 @@ export const StorageService = {
     }
   },
 
-  async setOnboardingCompleted(userId: string, completed: boolean): Promise<void> {
+  async setOnboardingCompleted(completed: boolean, userId?: string): Promise<void> {
     try {
-      const key = `${STORAGE_KEYS.ONBOARDING_COMPLETED}_${userId}`;
+      const key = userId
+        ? `${STORAGE_KEYS.ONBOARDING_COMPLETED}_${userId}`
+        : STORAGE_KEYS.ONBOARDING_COMPLETED;
       await AsyncStorage.setItem(key, completed ? 'true' : 'false');
     } catch (error) {
       console.error('[StorageService] Error saving onboarding status:', error);
