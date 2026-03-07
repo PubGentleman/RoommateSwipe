@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, Image, Pressable, Dimensions, Modal, useWindowDimensions, Platform, ScrollView, FlatList } from 'react-native';
+import { View, StyleSheet, Image, Pressable, Dimensions, Modal, ScrollView } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS, interpolate } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
@@ -16,10 +16,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scaleFont, moderateScale, getResponsiveSpacing } from '../../utils/responsive';
 import { calculateCompatibility, getMatchQualityColor, getCleanlinessLabel, getSocialLevelLabel, getWorkScheduleLabel, formatMoveInDate, getGenderSymbol } from '../../utils/matchingAlgorithm';
 import { getZodiacSymbol, getZodiacCompatibilityLevel } from '../../utils/zodiacUtils';
-import { AdBanner, RewardedAdButton } from '../../components/AdBanner';
+import { RewardedAdButton } from '../../components/AdBanner';
 import { ReportBlockModal } from '../../components/ReportBlockModal';
 import { MatchCelebrationModal } from '../../components/MatchCelebrationModal';
 import { VerificationBadgeInline, getVerificationLevel } from '../../components/VerificationBadge';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Limit card size for web/desktop viewing
@@ -352,10 +353,10 @@ export const RoommatesScreen = () => {
 
   if (isLoading) {
     return (
-      <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+      <View style={[styles.container, { backgroundColor: '#141414' }]}>
         <View style={styles.emptyState}>
-          <Feather name="loader" size={64} color={theme.textSecondary} />
-          <ThemedText style={[Typography.h2, styles.emptyTitle]}>Loading...</ThemedText>
+          <Feather name="loader" size={64} color="rgba(255,255,255,0.35)" />
+          <ThemedText style={[Typography.h2, styles.emptyTitle, { color: '#FFFFFF' }]}>Loading...</ThemedText>
         </View>
       </View>
     );
@@ -363,15 +364,15 @@ export const RoommatesScreen = () => {
 
   if (!currentProfile) {
     return (
-      <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+      <View style={[styles.container, { backgroundColor: '#141414' }]}>
         <View style={styles.emptyState}>
-          <Feather name="users" size={64} color={theme.textSecondary} />
-          <ThemedText style={[Typography.h2, styles.emptyTitle]}>No More Profiles</ThemedText>
-          <ThemedText style={[Typography.body, { color: theme.textSecondary, textAlign: 'center', marginBottom: Spacing.xl }]}>
+          <Feather name="users" size={64} color="rgba(255,255,255,0.35)" />
+          <ThemedText style={[Typography.h2, styles.emptyTitle, { color: '#FFFFFF' }]}>No More Profiles</ThemedText>
+          <ThemedText style={[Typography.body, { color: 'rgba(255,255,255,0.5)', textAlign: 'center', marginBottom: Spacing.xl }]}>
             You've seen all available roommates
           </ThemedText>
           <Pressable
-            style={[styles.resetButton, { backgroundColor: theme.primary }]}
+            style={[styles.resetButton, { backgroundColor: '#ff4d4d' }]}
             onPress={resetSwipeHistory}
           >
             <Feather name="refresh-cw" size={20} color="#FFFFFF" />
@@ -522,156 +523,152 @@ export const RoommatesScreen = () => {
     (navigation as any).navigate('Profile', { screen: 'Payment' });
   };
 
+  const photosArray = Array.isArray(currentProfile.photos) ? currentProfile.photos : currentProfile.photos ? [currentProfile.photos] : [];
+
   return (
-    <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
-      <View style={[styles.header, { paddingTop: insets.top + Spacing.lg }]}>
-        <Pressable onPress={handleOpenAIAssistant} style={styles.aiButton}>
-          <View style={[styles.aiButtonInner, { backgroundColor: theme.primary }]}>
-            <Feather name="cpu" size={20} color="#FFFFFF" />
+    <View style={[styles.container, { backgroundColor: '#141414' }]}>
+      <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
+        <Pressable onPress={handleOpenAIAssistant} style={styles.navIconBtn}>
+          <View style={[styles.navIconBtnInner, { backgroundColor: '#ff4d4d' }]}>
+            <Feather name="cpu" size={18} color="#FFFFFF" />
           </View>
         </Pressable>
-        <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+        <ThemedText style={styles.wordmark}>roomdr</ThemedText>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
           {(user?.subscription?.plan || 'basic') === 'basic' && !user?.boostData?.isBoosted ? (
-            <Pressable onPress={() => setShowPurchaseBoostModal(true)} style={styles.aiButton}>
-              <View style={[styles.aiButtonInner, { backgroundColor: '#FFD700' }]}>
-                <Feather name="zap" size={20} color="#000000" />
+            <Pressable onPress={() => setShowPurchaseBoostModal(true)} style={styles.navIconBtn}>
+              <View style={[styles.navIconBtnInner, { backgroundColor: '#FFD700' }]}>
+                <Feather name="zap" size={18} color="#000000" />
               </View>
             </Pressable>
           ) : null}
-          <Pressable onPress={() => (navigation as any).navigate('Profile', { screen: 'Notifications' })} style={styles.aiButton}>
-            <View style={[styles.aiButtonInner, { backgroundColor: theme.backgroundDefault }]}>
-              <Feather name="bell" size={20} color={theme.text} />
+          <Pressable onPress={() => (navigation as any).navigate('Profile', { screen: 'Notifications' })} style={styles.navIconBtn}>
+            <View style={[styles.navIconBtnInner, { backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }]}>
+              <Feather name="bell" size={18} color="#FFFFFF" />
             </View>
           </Pressable>
         </View>
       </View>
 
-      <View style={styles.cardContainer}>
+      <View style={styles.cardArea}>
         <GestureDetector gesture={composedGesture}>
-          <Animated.View
-            style={[styles.card, animatedCardStyle]}
-          >
-            <Image source={{ uri: currentProfile.photos[0] }} resizeMode="cover" style={styles.cardImage} />
+          <Animated.View style={[styles.card, animatedCardStyle]}>
+            <Image source={{ uri: photosArray[0] }} resizeMode="cover" style={styles.cardImage} />
+
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.95)']}
+              locations={[0, 0.4, 1]}
+              style={[styles.cardGradient, { pointerEvents: 'none' }]}
+            />
+
             <Pressable
-              style={styles.reportIconButton}
+              style={styles.flagBtn}
               onPress={() => setShowReportBlockModal(true)}
             >
-              <View style={styles.reportIconInner}>
-                <Feather name="flag" size={16} color="#FFFFFF" />
-              </View>
+              <Feather name="flag" size={14} color="rgba(255,255,255,0.7)" />
             </Pressable>
-            {canSeeOnlineStatus() && isProfileOnline ? (
-              <View style={styles.onlineIndicatorContainer}>
-                <View style={[styles.onlineIndicator, { backgroundColor: theme.success }]} />
+
+            {photosArray.length > 1 ? (
+              <View style={styles.photoDots}>
+                {photosArray.map((_, idx) => (
+                  <View key={`dot-${idx}`} style={[styles.photoDotBar, idx === currentPhotoIndex ? styles.photoDotBarActive : null]} />
+                ))}
               </View>
             ) : null}
-            <View style={styles.gradient} pointerEvents="none">
-              {isBoosted ? (
-                <View style={styles.boostBadgeLeft}>
-                  <View style={[styles.boostBadge, { backgroundColor: '#FFD700' }]}>
-                    <Feather name="zap" size={14} color="#000000" />
-                    <ThemedText style={[Typography.small, { color: '#000000', fontWeight: '700', marginLeft: 4 }]}>
-                      BOOSTED
-                    </ThemedText>
-                  </View>
+
+            {canSeeOnlineStatus() && isProfileOnline ? (
+              <View style={styles.onlineIndicatorContainer}>
+                <View style={[styles.onlineIndicator, { backgroundColor: '#3ECF8E' }]} />
+              </View>
+            ) : null}
+
+            {isBoosted ? (
+              <View style={styles.boostedBadge}>
+                <Feather name="zap" size={11} color="#000000" />
+                <ThemedText style={styles.boostedText}>BOOSTED</ThemedText>
+              </View>
+            ) : null}
+
+            <View style={styles.cardInfo}>
+              <ThemedText style={styles.cardName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                {currentProfile.name}, {currentProfile.age}
+              </ThemedText>
+              <ThemedText style={styles.cardJob} numberOfLines={1}>
+                {currentProfile.occupation} {currentProfile.preferences?.location ? `\u00B7 ${currentProfile.preferences.location}` : ''}
+              </ThemedText>
+              <ThemedText style={styles.cardBio} numberOfLines={2}>
+                {currentProfile.bio}
+              </ThemedText>
+              <View style={styles.cardTags}>
+                <View style={styles.tagDark}>
+                  <Feather name="dollar-sign" size={12} color="rgba(255,255,255,0.85)" />
+                  <ThemedText style={styles.tagDarkText}>${currentProfile.budget}/mo</ThemedText>
                 </View>
-              ) : null}
-              <View style={styles.cardInfo}>
-                <ThemedText 
-                  style={[Typography.hero, { fontSize: 30, color: '#FFFFFF', textShadowColor: 'rgba(0, 0, 0, 0.75)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 }]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.7}
-                >
-                  {currentProfile.name}, {currentProfile.age}{currentProfile.zodiacSign ? ` ${getZodiacSymbol(currentProfile.zodiacSign)}` : ''} {getGenderSymbol(currentProfile.gender)}
-                </ThemedText>
-                <ThemedText style={[Typography.body, { color: '#FFFFFF', marginTop: Spacing.sm, textShadowColor: 'rgba(0, 0, 0, 0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }]}>
-                  {currentProfile.occupation}
-                </ThemedText>
-                <ThemedText style={[Typography.caption, { color: '#FFFFFF', marginTop: Spacing.md, textShadowColor: 'rgba(0, 0, 0, 0.75)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }]} numberOfLines={3}>
-                  {currentProfile.bio}
-                </ThemedText>
-                <View style={styles.badges}>
-                  {getVerificationLevel(currentProfile.verification) > 0 ? (
-                    <View style={[styles.badge, { backgroundColor: '#2563EB' }]}>
-                      <Feather name="check-circle" size={14} color="#FFFFFF" />
-                      <ThemedText style={[Typography.small, { color: '#FFFFFF', marginLeft: Spacing.xs, fontWeight: '700' }]} numberOfLines={1}>
-                        {getVerificationLevel(currentProfile.verification) >= 3 ? 'Fully Verified' : getVerificationLevel(currentProfile.verification) >= 2 ? 'Verified' : 'Partially Verified'}
-                      </ThemedText>
-                    </View>
-                  ) : null}
-                  <View style={[styles.badge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-                    <Feather name="dollar-sign" size={14} color="#FFFFFF" />
-                    <ThemedText style={[Typography.small, { color: '#FFFFFF', marginLeft: Spacing.xs }]} numberOfLines={1}>
-                      ${currentProfile.budget}/mo
-                    </ThemedText>
-                  </View>
-                  {currentProfile.lookingFor ? (
-                    <View style={[styles.badge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-                      <Feather name={currentProfile.lookingFor === 'room' ? 'home' : 'key'} size={14} color="#FFFFFF" />
-                      <ThemedText style={[Typography.small, { color: '#FFFFFF', marginLeft: Spacing.xs }]} numberOfLines={1}>
-                        {currentProfile.lookingFor === 'room' ? 'Room' : 'Entire Apt'}
-                      </ThemedText>
-                    </View>
-                  ) : null}
-                  <View style={[styles.badge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-                    <Feather name="map-pin" size={14} color="#FFFFFF" />
-                    <ThemedText style={[Typography.small, { color: '#FFFFFF', marginLeft: Spacing.xs }]} numberOfLines={1}>
-                      {currentProfile.preferences.location}
-                    </ThemedText>
-                  </View>
-                  <View style={[styles.badge, { backgroundColor: getMatchQualityColor(currentProfile.compatibility || 50) }]}>
-                    <Feather name="heart" size={14} color="#FFFFFF" />
-                    <ThemedText style={[Typography.small, { color: '#FFFFFF', marginLeft: Spacing.xs, fontWeight: '600' }]} numberOfLines={1}>
-                      {currentProfile.compatibility || 50}% Match
-                    </ThemedText>
-                  </View>
+                <View style={styles.tagDark}>
+                  <Feather name="briefcase" size={12} color="rgba(255,255,255,0.85)" />
+                  <ThemedText style={styles.tagDarkText}>{currentProfile.lifestyle?.workSchedule === 'remote' ? 'Remote' : currentProfile.lifestyle?.workSchedule === 'hybrid' ? 'Hybrid' : 'Office'}</ThemedText>
+                </View>
+                <View style={styles.tagDark}>
+                  <Feather name="map-pin" size={12} color="rgba(255,255,255,0.85)" />
+                  <ThemedText style={styles.tagDarkText} numberOfLines={1}>{currentProfile.preferences?.location || 'NYC'}</ThemedText>
+                </View>
+                <View style={styles.tagMatch}>
+                  <Feather name="heart" size={12} color="#ff8070" />
+                  <ThemedText style={styles.tagMatchText}>{currentProfile.compatibility || 50}% Match</ThemedText>
                 </View>
               </View>
             </View>
           </Animated.View>
         </GestureDetector>
+
+        <View style={styles.adBanner}>
+          <View style={styles.adLeft}>
+            <View style={styles.adLogo}>
+              <Feather name="home" size={16} color="#FFFFFF" />
+            </View>
+            <View>
+              <ThemedText style={styles.adSponsoredLabel}>SPONSORED</ThemedText>
+              <ThemedText style={styles.adTitle}>Renters Insurance from $5/mo</ThemedText>
+              <ThemedText style={styles.adSubtitle}>Protect your belongings</ThemedText>
+            </View>
+          </View>
+          <View style={styles.adCta}>
+            <ThemedText style={styles.adCtaText}>View</ThemedText>
+            <Feather name="arrow-right" size={10} color="#FFFFFF" />
+          </View>
+        </View>
       </View>
 
-      <AdBanner size="banner" />
-
-      <View style={[styles.actions, { paddingBottom: 90 }]}>
+      <View style={styles.actionRow}>
         <Pressable
-          style={[
-            styles.actionButtonSmall, 
-            { 
-              backgroundColor: '#FFFFFF', 
-              borderColor: lastSwipedProfile ? theme.warning : theme.textSecondary,
-              opacity: lastSwipedProfile ? 1 : 0.4,
-            }
-          ]}
+          style={[styles.actionBtnSm, styles.actionUndo, { opacity: lastSwipedProfile ? 1 : 0.4 }]}
           onPress={handleUndo}
         >
-          <Feather name="rotate-ccw" size={24} color={lastSwipedProfile ? theme.warning : theme.textSecondary} />
+          <Feather name="rotate-ccw" size={18} color="rgba(255,255,255,0.5)" />
         </Pressable>
         <Pressable
-          style={[styles.actionButton, { backgroundColor: '#FFFFFF', borderColor: theme.error }]}
+          style={[styles.actionBtnMd, styles.actionPass]}
           onPress={() => handleSwipeAction('nope')}
         >
-          <Feather name="x" size={32} color={theme.error} />
+          <Feather name="x" size={24} color="#ff4d4d" />
         </Pressable>
         <Pressable
-          style={[styles.actionButtonSmall, { backgroundColor: '#FFFFFF', borderColor: theme.primary }]}
+          style={[styles.actionBtnMd, styles.actionMsg]}
           onPress={handleMessageClick}
         >
-          <Feather name="message-circle" size={24} color={theme.primary} />
+          <Feather name="message-square" size={22} color="#ff6b8a" />
         </Pressable>
         <Pressable
-          style={[styles.actionButtonSmall, { backgroundColor: '#FFFFFF', borderColor: theme.info }]}
+          style={[styles.actionBtnMd, styles.actionStar]}
           onPress={() => handleSwipeAction('superlike')}
         >
-          <Feather name="star" size={24} color={theme.info} />
+          <Feather name="star" size={22} color="#5b8cff" />
         </Pressable>
         <Pressable
-          style={[styles.actionButton, { backgroundColor: '#FFFFFF', borderColor: theme.success }]}
+          style={[styles.actionBtnLg, styles.actionLike]}
           onPress={() => handleSwipeAction('like')}
         >
-          <Feather name="heart" size={32} color={theme.success} />
+          <Feather name="heart" size={28} color="#2ecc71" />
         </Pressable>
       </View>
 
@@ -1394,158 +1391,297 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.lg,
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 8,
     zIndex: 10,
   },
-  aiButton: {
-    width: 44,
-    height: 44,
+  navIconBtn: {
+    width: 42,
+    height: 42,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  aiButtonInner: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  iconButton: {
-    width: 44,
-    height: 44,
+  navIconBtnInner: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  cardContainer: {
+  wordmark: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -0.3,
+  },
+  cardArea: {
     flex: 1,
-    justifyContent: 'flex-start',
-    alignItems: 'center',
-    paddingTop: Spacing.md,
+    paddingHorizontal: 16,
+    gap: 12,
+    overflow: 'hidden',
+    maxWidth: MAX_CARD_WIDTH + 32,
+    alignSelf: 'center',
+    width: '100%',
   },
   card: {
-    width: CARD_WIDTH,
-    height: Math.min(SCREEN_HEIGHT * 0.58, 650),
-    borderRadius: BorderRadius.large,
+    flex: 1,
+    borderRadius: 24,
     overflow: 'hidden',
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
+    backgroundColor: '#1e1e1e',
   },
   cardImage: {
     width: '100%',
     height: '100%',
   },
-  gradient: {
+  cardGradient: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: '50%',
-    justifyContent: 'flex-end',
-    padding: Spacing.lg,
+    height: '65%',
   },
-  topBadges: {
+  flagBtn: {
     position: 'absolute',
-    top: Spacing.lg,
-    right: Spacing.lg,
-    flexDirection: 'column',
-    alignItems: 'flex-end',
-    gap: Spacing.sm,
-  },
-  compatibilityBadge: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.small,
-  },
-  boostBadgeLeft: {
-    position: 'absolute',
-    top: Spacing.md,
-    right: Spacing.md,
-    zIndex: 2,
-  },
-  boostBadge: {
-    flexDirection: 'row',
+    top: 14,
+    left: 14,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.small,
+    zIndex: 20,
+  },
+  photoDots: {
+    position: 'absolute',
+    top: 14,
+    left: 60,
+    right: 60,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 5,
+    zIndex: 10,
+  },
+  photoDotBar: {
+    flex: 1,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+  },
+  photoDotBarActive: {
+    backgroundColor: 'rgba(255,255,255,0.9)',
   },
   onlineIndicatorContainer: {
     position: 'absolute',
-    top: Spacing.sm,
-    right: Spacing.sm,
+    top: 14,
+    right: 60,
     zIndex: 3,
   },
   onlineIndicator: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
     borderWidth: 2,
     borderColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.3,
-    shadowRadius: 2,
-    elevation: 3,
+  },
+  boostedBadge: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    backgroundColor: '#FFD700',
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    zIndex: 10,
+  },
+  boostedText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#000000',
+    letterSpacing: 0.5,
   },
   cardInfo: {
-    gap: Spacing.xs,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 18,
+    paddingTop: 24,
   },
-  badges: {
+  cardName: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -0.3,
+    lineHeight: 30,
+    marginBottom: 3,
+  },
+  cardJob: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.7)',
+    marginBottom: 8,
+  },
+  cardBio: {
+    fontSize: 12.5,
+    color: 'rgba(255,255,255,0.6)',
+    lineHeight: 19,
+    marginBottom: 12,
+  },
+  cardTags: {
     flexDirection: 'row',
-    flexWrap: 'nowrap',
-    gap: Spacing.xs,
-    marginTop: Spacing.md,
+    flexWrap: 'wrap',
+    gap: 7,
   },
-  badge: {
+  tagDark: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.small,
-    flexShrink: 1,
+    gap: 5,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
-  actions: {
+  tagDarkText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.85)',
+  },
+  tagMatch: {
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 107, 91, 0.25)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 91, 0.4)',
+  },
+  tagMatchText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: '#ff8070',
+  },
+  adBanner: {
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  adLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  adLogo: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#667eea',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: Spacing.xl,
-    paddingTop: Spacing.xl,
   },
-  actionButton: {
-    width: Spacing.swipeButtonSize,
-    height: Spacing.swipeButtonSize,
-    borderRadius: Spacing.swipeButtonSize / 2,
+  adSponsoredLabel: {
+    fontSize: 9,
+    color: 'rgba(255,255,255,0.2)',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  adTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  adSubtitle: {
+    fontSize: 10.5,
+    color: 'rgba(255,255,255,0.4)',
+    marginTop: 1,
+  },
+  adCta: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  adCtaText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 14,
+    paddingVertical: 8,
+    paddingBottom: 90,
+  },
+  actionBtnSm: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    borderWidth: 2.5,
+    backgroundColor: 'transparent',
   },
-  actionButtonSmall: {
-    width: Spacing.swipeButtonSmall,
-    height: Spacing.swipeButtonSmall,
-    borderRadius: Spacing.swipeButtonSmall / 2,
+  actionBtnMd: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    borderWidth: 2.5,
+    backgroundColor: 'transparent',
+  },
+  actionBtnLg: {
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2.5,
+    backgroundColor: 'transparent',
+  },
+  actionUndo: {
+    borderColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  actionPass: {
+    borderColor: '#ff4d4d',
+    backgroundColor: 'rgba(255,77,77,0.08)',
+  },
+  actionMsg: {
+    borderColor: '#ff6b8a',
+    backgroundColor: 'rgba(255,107,138,0.08)',
+  },
+  actionStar: {
+    borderColor: '#5b8cff',
+    backgroundColor: 'rgba(91,140,255,0.08)',
+  },
+  actionLike: {
+    borderColor: '#2ecc71',
+    backgroundColor: 'rgba(46,204,113,0.08)',
   },
   emptyState: {
     flex: 1,
@@ -1586,11 +1722,6 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     borderRadius: BorderRadius.large,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
   },
   vipModalHeader: {
     padding: Spacing.xxl,
@@ -1742,36 +1873,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: Spacing.lg,
     borderRadius: BorderRadius.medium,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  reportIconButton: {
-    position: 'absolute',
-    top: Spacing.lg,
-    left: Spacing.lg,
-    zIndex: 20,
-  },
-  reportIconInner: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  infoButton: {
-    position: 'absolute',
-    top: Spacing.lg,
-    right: Spacing.lg,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 10,
   },
   detailCloseButton: {
     position: 'absolute',
@@ -1785,10 +1886,5 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
   },
 });
