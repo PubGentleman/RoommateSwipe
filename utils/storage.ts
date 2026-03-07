@@ -15,6 +15,7 @@ const STORAGE_KEYS = {
   SAVED_PROPERTIES: '@roomdr/saved_properties',
   NOTIFICATIONS: '@roomdr/notifications',
   MOCK_DATA_VERSION: '@roomdr/mock_data_version',
+  ONBOARDING_COMPLETED: '@roomdr/onboarding_completed',
 };
 
 let notificationIdCounter = 0;
@@ -1286,6 +1287,25 @@ export const StorageService = {
     } catch (error) {
       console.error('[StorageService] Error deleting user:', error);
       throw error;
+    }
+  },
+
+  async isOnboardingCompleted(userId: string): Promise<boolean> {
+    try {
+      const key = `${STORAGE_KEYS.ONBOARDING_COMPLETED}_${userId}`;
+      const value = await AsyncStorage.getItem(key);
+      return value === 'true';
+    } catch {
+      return false;
+    }
+  },
+
+  async setOnboardingCompleted(userId: string, completed: boolean): Promise<void> {
+    try {
+      const key = `${STORAGE_KEYS.ONBOARDING_COMPLETED}_${userId}`;
+      await AsyncStorage.setItem(key, completed ? 'true' : 'false');
+    } catch (error) {
+      console.error('[StorageService] Error saving onboarding status:', error);
     }
   },
 };
