@@ -163,15 +163,6 @@ export const ProfileScreen = () => {
           </View>
           <View style={styles.settingsCard}>
             <SettingsItem
-              iconName="user"
-              iconColor="#667eea"
-              iconBgColor="rgba(102,126,234,0.15)"
-              iconBorderColor="rgba(102,126,234,0.2)"
-              title="Edit Profile"
-              subtitle="Name, bio, photos, preferences"
-              onPress={() => navigation.navigate('ProfileQuestionnaire')}
-            />
-            <SettingsItem
               iconName="bell"
               iconColor="#2ecc71"
               iconBgColor="rgba(46,204,113,0.12)"
@@ -192,12 +183,48 @@ export const ProfileScreen = () => {
             />
             <SettingsItem
               iconName="credit-card"
-              iconColor="#ff6b5b"
-              iconBgColor="rgba(255,77,77,0.12)"
-              iconBorderColor="rgba(255,77,77,0.18)"
+              iconColor="#667eea"
+              iconBgColor="rgba(102,126,234,0.15)"
+              iconBorderColor="rgba(102,126,234,0.2)"
               title="Payment"
               subtitle="Manage payment methods"
               onPress={() => navigation.navigate('Payment')}
+            />
+            <SettingsItem
+              iconName="check-circle"
+              iconColor="#3ECF8E"
+              iconBgColor="rgba(62,207,142,0.12)"
+              iconBorderColor="rgba(62,207,142,0.18)"
+              title="Verify Identity"
+              subtitle="Phone, ID, social verification"
+              onPress={() => navigation.navigate('Verification')}
+              isLast
+            />
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Support</Text>
+          </View>
+          <View style={styles.settingsCard}>
+            <SettingsItem
+              iconName="file-text"
+              iconColor="rgba(255,255,255,0.5)"
+              iconBgColor="rgba(255,255,255,0.06)"
+              iconBorderColor="rgba(255,255,255,0.08)"
+              title="Terms of Service"
+              subtitle="Rules and conditions"
+              onPress={() => navigation.navigate('TermsOfService')}
+            />
+            <SettingsItem
+              iconName="info"
+              iconColor="rgba(255,255,255,0.5)"
+              iconBgColor="rgba(255,255,255,0.06)"
+              iconBorderColor="rgba(255,255,255,0.08)"
+              title="About Roomdr"
+              subtitle="Version and info"
+              onPress={() => navigation.navigate('About')}
               isLast
             />
           </View>

@@ -203,15 +203,18 @@ export const NotificationsScreen = () => {
           <Feather name="chevron-left" size={28} color={theme.primary} />
         </Pressable>
         <ThemedText style={Typography.h2}>Notifications</ThemedText>
-        {unreadCount > 0 ? (
-          <Pressable onPress={handleMarkAllAsRead} hitSlop={8}>
-            <ThemedText style={[Typography.caption, { color: theme.primary, fontWeight: '600' }]}>
-              Mark all read
-            </ThemedText>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          {unreadCount > 0 ? (
+            <Pressable onPress={handleMarkAllAsRead} hitSlop={8}>
+              <ThemedText style={[Typography.caption, { color: theme.primary, fontWeight: '600' }]}>
+                Mark all read
+              </ThemedText>
+            </Pressable>
+          ) : null}
+          <Pressable onPress={() => (navigation as any).navigate('NotificationPreferences')} hitSlop={8}>
+            <Feather name="sliders" size={20} color="rgba(255,255,255,0.5)" />
           </Pressable>
-        ) : (
-          <View style={{ width: 80 }} />
-        )}
+        </View>
       </View>
 
       {isLoading ? (

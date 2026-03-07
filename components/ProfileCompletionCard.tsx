@@ -216,7 +216,7 @@ export const ProfileCompletionCard = ({ user, onEditProfile }: ProfileCompletion
         ))}
 
         {missing.length > 3 ? (
-          <Pressable style={styles.moreLink} onPress={onEditProfile}>
+          <Pressable style={styles.moreLink} onPress={() => onEditProfile()}>
             <Text style={styles.moreLinkText}>+{missing.length - 3} more to complete</Text>
           </Pressable>
         ) : null}
