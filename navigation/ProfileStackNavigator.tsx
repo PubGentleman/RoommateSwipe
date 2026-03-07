@@ -6,6 +6,7 @@ import { ProfileScreen } from '../screens/shared/ProfileScreen';
 import { PaymentScreen } from '../screens/shared/PaymentScreen';
 import { PlansScreen } from '../screens/shared/PlansScreen';
 import { EditProfileScreen } from '../screens/shared/EditProfileScreen';
+import { ProfileQuestionnaireScreen } from '../screens/shared/ProfileQuestionnaireScreen';
 import { NotificationsScreen } from '../screens/shared/NotificationsScreen';
 import { PrivacySecurityScreen } from '../screens/shared/PrivacySecurityScreen';
 import { ProfileViewsScreen } from '../screens/renter/ProfileViewsScreen';
@@ -22,6 +23,7 @@ export type ProfileStackParamList = {
   Payment: undefined;
   Plans: undefined;
   EditProfile: undefined;
+  ProfileQuestionnaire: undefined;
   Notifications: undefined;
   PrivacySecurity: undefined;
   ProfileViews: undefined;
@@ -87,6 +89,13 @@ export const ProfileStackNavigator = () => {
       <Stack.Screen 
         name="EditProfile" 
         component={EditProfileScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen 
+        name="ProfileQuestionnaire" 
+        component={ProfileQuestionnaireScreen}
         options={{
           headerShown: false,
         }}

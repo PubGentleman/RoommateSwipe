@@ -151,7 +151,7 @@ export const ProfileScreen = () => {
             <ThemedText style={[Typography.h3, styles.sectionTitle]}>Profile Strength</ThemedText>
             <ProfileCompletionCard
               user={user}
-              onEditProfile={() => navigation.navigate('EditProfile')}
+              onEditProfile={() => navigation.navigate('ProfileQuestionnaire')}
             />
           </View>
         ) : null}
@@ -306,7 +306,7 @@ export const ProfileScreen = () => {
 
         <View style={styles.section}>
           <ThemedText style={[Typography.h3, styles.sectionTitle]}>Account</ThemedText>
-          <MenuItem icon="edit-3" label="Edit Profile" onPress={() => navigation.navigate('EditProfile')} />
+          <MenuItem icon="edit-3" label="Edit Profile" onPress={() => navigation.navigate('ProfileQuestionnaire')} />
           <MenuItem
             icon="check-circle"
             label={getVerificationLevel(user?.verification) > 0 ? `Verification (${getVerificationLevel(user?.verification)}/3)` : 'Verify Your Identity'}
