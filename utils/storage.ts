@@ -709,7 +709,10 @@ export const StorageService = {
 
   async clearAllData(): Promise<void> {
     try {
-      await AsyncStorage.multiRemove(Object.values(STORAGE_KEYS));
+      const allKeys = await AsyncStorage.getAllKeys();
+      if (allKeys.length > 0) {
+        await AsyncStorage.multiRemove(allKeys as string[]);
+      }
     } catch (error) {
       console.error('Error clearing all data:', error);
     }

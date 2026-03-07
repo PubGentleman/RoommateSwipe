@@ -258,8 +258,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
-    await StorageService.clearUserData();
-    await StorageService.clearSwipeHistory();
+    await StorageService.clearAllData();
     setUser(null);
   };
 

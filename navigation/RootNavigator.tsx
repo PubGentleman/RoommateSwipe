@@ -31,11 +31,12 @@ export const RootNavigator = () => {
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
+    setOnboardingChecked(false);
     StorageService.isOnboardingCompleted().then((completed) => {
       setShowOnboarding(!completed);
       setOnboardingChecked(true);
     });
-  }, []);
+  }, [user]);
 
   const handleOnboardingComplete = useCallback(() => {
     StorageService.setOnboardingCompleted(true);
