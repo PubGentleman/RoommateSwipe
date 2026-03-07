@@ -6,98 +6,107 @@ import {
   Dimensions,
   FlatList,
   Pressable,
-  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue,
-  useAnimatedStyle,
   withSpring,
-  withTiming,
-  interpolate,
   FadeIn,
   FadeInDown,
 } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
-import { useTheme } from '../../hooks/useTheme';
-import { Spacing, BorderRadius, Typography } from '../../constants/theme';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+interface OnboardingFeature {
+  icon: keyof typeof Feather.glyphMap;
+  title: string;
+  subtitle: string;
+}
 
 interface OnboardingPage {
   id: string;
   icon: keyof typeof Feather.glyphMap;
-  iconColor: string;
-  iconBg: string;
+  accentColor: string;
+  accentBg: string;
+  gradient: [string, string];
   title: string;
   subtitle: string;
-  features: { icon: keyof typeof Feather.glyphMap; text: string }[];
+  features: OnboardingFeature[];
 }
+
+const ACCENT = '#ff6b5b';
 
 const PAGES: OnboardingPage[] = [
   {
     id: 'welcome',
     icon: 'home',
-    iconColor: '#FF6B6B',
-    iconBg: 'rgba(255, 107, 107, 0.12)',
+    accentColor: ACCENT,
+    accentBg: 'rgba(255, 107, 91, 0.15)',
+    gradient: ['#ff6b5b', '#ff4040'],
     title: 'Welcome to Roomdr',
-    subtitle: 'Find your perfect roommate match with smart compatibility scoring',
+    subtitle: 'Find your perfect roommate match\nwith smart compatibility scoring',
     features: [
-      { icon: 'users', text: 'AI-powered roommate matching' },
-      { icon: 'map-pin', text: 'Location-aware property search' },
-      { icon: 'shield', text: 'Verified profiles you can trust' },
+      { icon: 'users', title: 'AI-powered roommate matching', subtitle: 'Smart compatibility scores based on your lifestyle' },
+      { icon: 'map-pin', title: 'Location-aware property search', subtitle: 'Find rooms near you, work, or school' },
+      { icon: 'shield', title: 'Verified profiles you can trust', subtitle: 'ID-verified users and background checks' },
     ],
   },
   {
     id: 'matching',
     icon: 'heart',
-    iconColor: '#4ECDC4',
-    iconBg: 'rgba(78, 205, 196, 0.12)',
+    accentColor: '#4ECDC4',
+    accentBg: 'rgba(78, 205, 196, 0.15)',
+    gradient: ['#4ECDC4', '#36B5AC'],
     title: 'Swipe to Match',
-    subtitle: 'Browse compatible roommates and find your ideal living situation',
+    subtitle: 'Browse compatible roommates and\nfind your ideal living situation',
     features: [
-      { icon: 'arrow-right', text: 'Swipe right to like a profile' },
-      { icon: 'arrow-left', text: 'Swipe left to pass' },
-      { icon: 'star', text: 'Super Like to stand out' },
+      { icon: 'arrow-right', title: 'Swipe right to like', subtitle: 'Show interest in potential roommates' },
+      { icon: 'arrow-left', title: 'Swipe left to pass', subtitle: 'Skip profiles that aren\'t a fit' },
+      { icon: 'star', title: 'Super Like to stand out', subtitle: 'Let someone know you\'re really interested' },
     ],
   },
   {
     id: 'compatibility',
     icon: 'bar-chart-2',
-    iconColor: '#5B7FFF',
-    iconBg: 'rgba(91, 127, 255, 0.12)',
+    accentColor: '#5B7FFF',
+    accentBg: 'rgba(91, 127, 255, 0.15)',
+    gradient: ['#5B7FFF', '#4060E0'],
     title: 'Smart Compatibility',
-    subtitle: 'Our algorithm scores 14 lifestyle factors for accurate matching',
+    subtitle: 'Our algorithm scores 14 lifestyle\nfactors for accurate matching',
     features: [
-      { icon: 'moon', text: 'Sleep schedule & cleanliness habits' },
-      { icon: 'dollar-sign', text: 'Budget & shared expense preferences' },
-      { icon: 'map-pin', text: 'Neighborhood & move-in timeline' },
+      { icon: 'moon', title: 'Sleep schedule & cleanliness', subtitle: 'Matched on daily habits and routines' },
+      { icon: 'dollar-sign', title: 'Budget & shared expenses', subtitle: 'Aligned financial expectations' },
+      { icon: 'map-pin', title: 'Neighborhood & timeline', subtitle: 'Coordinated location and move-in dates' },
     ],
   },
   {
     id: 'groups',
     icon: 'users',
-    iconColor: '#9B59B6',
-    iconBg: 'rgba(155, 89, 182, 0.12)',
+    accentColor: '#9B59B6',
+    accentBg: 'rgba(155, 89, 182, 0.15)',
+    gradient: ['#9B59B6', '#8040A0'],
     title: 'Form Groups',
-    subtitle: 'Team up with compatible roommates to find a place together',
+    subtitle: 'Team up with compatible roommates\nto find a place together',
     features: [
-      { icon: 'plus-circle', text: 'Create or join roommate groups' },
-      { icon: 'message-circle', text: 'Group chat with potential roommates' },
-      { icon: 'search', text: 'Browse properties as a group' },
+      { icon: 'plus-circle', title: 'Create or join groups', subtitle: 'Build your ideal roommate team' },
+      { icon: 'message-circle', title: 'Group chat', subtitle: 'Coordinate with potential roommates' },
+      { icon: 'search', title: 'Browse as a group', subtitle: 'Find properties that fit everyone' },
     ],
   },
   {
     id: 'getstarted',
     icon: 'check-circle',
-    iconColor: '#3ECF8E',
-    iconBg: 'rgba(62, 207, 142, 0.12)',
+    accentColor: '#3ECF8E',
+    accentBg: 'rgba(62, 207, 142, 0.15)',
+    gradient: ['#3ECF8E', '#28B070'],
     title: 'Ready to Start',
-    subtitle: 'Complete your profile to get the best matches',
+    subtitle: 'Complete your profile to get\nthe best matches',
     features: [
-      { icon: 'user', text: 'Add photos & fill in your preferences' },
-      { icon: 'check', text: 'Verify your identity for more matches' },
-      { icon: 'zap', text: 'Upgrade anytime for premium features' },
+      { icon: 'user', title: 'Add photos & preferences', subtitle: 'Build a profile that attracts great matches' },
+      { icon: 'check', title: 'Verify your identity', subtitle: 'Get more matches with a verified badge' },
+      { icon: 'zap', title: 'Upgrade for premium', subtitle: 'Unlock advanced features anytime' },
     ],
   },
 ];
@@ -107,13 +116,13 @@ interface OnboardingScreenProps {
 }
 
 export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
-  const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const [currentPage, setCurrentPage] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const progress = useSharedValue(0);
 
   const isLastPage = currentPage === PAGES.length - 1;
+  const page = PAGES[currentPage];
 
   const handleNext = () => {
     if (isLastPage) {
@@ -132,37 +141,48 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
 
   const handleScroll = (event: any) => {
     const offsetX = event.nativeEvent.contentOffset.x;
-    const page = Math.round(offsetX / SCREEN_WIDTH);
-    if (page !== currentPage && page >= 0 && page < PAGES.length) {
-      setCurrentPage(page);
-      progress.value = withSpring(page);
+    const newPage = Math.round(offsetX / SCREEN_WIDTH);
+    if (newPage !== currentPage && newPage >= 0 && newPage < PAGES.length) {
+      setCurrentPage(newPage);
+      progress.value = withSpring(newPage);
     }
   };
 
-  const renderPage = ({ item, index }: { item: OnboardingPage; index: number }) => (
+  const renderPage = ({ item }: { item: OnboardingPage }) => (
     <View style={[styles.page, { width: SCREEN_WIDTH }]}>
       <View style={styles.pageContent}>
         <Animated.View
-          entering={FadeIn.delay(200).duration(400)}
-          style={[styles.iconContainer, { backgroundColor: item.iconBg }]}
+          entering={FadeIn.delay(150).duration(350)}
+          style={[styles.appIcon, {
+            backgroundColor: item.accentBg,
+            borderColor: `${item.accentColor}30`,
+          }]}
         >
-          <Feather name={item.icon} size={48} color={item.iconColor} />
+          <Feather name={item.icon} size={36} color={item.accentColor} />
         </Animated.View>
 
-        <Text style={[styles.title, { color: theme.text }]}>{item.title}</Text>
-        <Text style={[styles.subtitle, { color: theme.textSecondary }]}>{item.subtitle}</Text>
+        <Text style={styles.title}>{item.title}</Text>
+        <Text style={styles.subtitle}>{item.subtitle}</Text>
+
+        <View style={styles.divider} />
 
         <View style={styles.featuresContainer}>
           {item.features.map((feature, fIndex) => (
             <Animated.View
               key={fIndex}
-              entering={FadeInDown.delay(300 + fIndex * 100).duration(400)}
-              style={[styles.featureRow, { backgroundColor: theme.backgroundSecondary }]}
+              entering={FadeInDown.delay(250 + fIndex * 80).duration(350)}
+              style={styles.featureCard}
             >
-              <View style={[styles.featureIcon, { backgroundColor: item.iconBg }]}>
-                <Feather name={feature.icon} size={18} color={item.iconColor} />
+              <View style={[styles.featureIcon, {
+                backgroundColor: item.accentBg,
+                borderColor: `${item.accentColor}40`,
+              }]}>
+                <Feather name={feature.icon} size={18} color={item.accentColor} />
               </View>
-              <Text style={[styles.featureText, { color: theme.text }]}>{feature.text}</Text>
+              <View style={styles.featureTextWrap}>
+                <Text style={styles.featureTitle}>{feature.title}</Text>
+                <Text style={styles.featureSubtitle}>{feature.subtitle}</Text>
+              </View>
             </Animated.View>
           ))}
         </View>
@@ -171,43 +191,12 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.backgroundRoot, paddingTop: insets.top }]}>
-      <View style={[styles.header, { paddingTop: Spacing.sm }]}>
-        {currentPage > 0 ? (
-          <Pressable
-            onPress={() => {
-              const prevPage = currentPage - 1;
-              flatListRef.current?.scrollToIndex({ index: prevPage, animated: true });
-              setCurrentPage(prevPage);
-              progress.value = withSpring(prevPage);
-            }}
-            style={styles.headerButton}
-          >
-            <Feather name="arrow-left" size={20} color={theme.textSecondary} />
-          </Pressable>
-        ) : (
-          <View style={styles.headerButton} />
-        )}
-
-        <View style={styles.dotsContainer}>
-          {PAGES.map((_, index) => (
-            <DotIndicator
-              key={index}
-              index={index}
-              currentPage={currentPage}
-              theme={theme}
-            />
-          ))}
-        </View>
-
-        {!isLastPage ? (
-          <Pressable onPress={handleSkip} style={styles.headerButton}>
-            <Text style={[styles.skipText, { color: theme.textSecondary }]}>Skip</Text>
-          </Pressable>
-        ) : (
-          <View style={styles.headerButton} />
-        )}
-      </View>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      {!isLastPage ? (
+        <Pressable onPress={handleSkip} style={styles.skipBtn}>
+          <Text style={styles.skipText}>Skip</Text>
+        </Pressable>
+      ) : null}
 
       <FlatList
         ref={flatListRef}
@@ -227,78 +216,59 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
         })}
       />
 
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, Spacing.lg) + Spacing.md }]}>
-        <Pressable
-          onPress={handleNext}
-          style={[styles.nextButton, { backgroundColor: theme.primary }]}
-        >
-          <Text style={styles.nextButtonText}>
-            {isLastPage ? "Let's Go" : 'Next'}
-          </Text>
-          <Feather
-            name={isLastPage ? 'check' : 'arrow-right'}
-            size={20}
-            color="#FFFFFF"
-          />
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 20) + 16 }]}>
+        <Pressable onPress={handleNext} style={({ pressed }) => [{ opacity: pressed ? 0.9 : 1, width: '100%' }]}>
+          <LinearGradient
+            colors={page.gradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.nextButton}
+          >
+            <Text style={styles.nextButtonText}>
+              {isLastPage ? "Let's Go" : 'Next'}
+            </Text>
+            <Feather
+              name={isLastPage ? 'check' : 'arrow-right'}
+              size={18}
+              color="#FFFFFF"
+            />
+          </LinearGradient>
         </Pressable>
 
-        {!isLastPage ? (
-          <Text style={[styles.pageCounter, { color: theme.textSecondary }]}>
-            {currentPage + 1} of {PAGES.length}
-          </Text>
-        ) : null}
+        <View style={styles.dotsContainer}>
+          {PAGES.map((_, index) => (
+            <View
+              key={index}
+              style={[
+                styles.dot,
+                index === currentPage
+                  ? { width: 22, borderRadius: 4, backgroundColor: page.accentColor }
+                  : { width: 7, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.18)' },
+              ]}
+            />
+          ))}
+        </View>
       </View>
     </View>
-  );
-};
-
-const DotIndicator: React.FC<{
-  index: number;
-  currentPage: number;
-  theme: any;
-}> = ({ index, currentPage, theme }) => {
-  const isActive = index === currentPage;
-
-  return (
-    <View
-      style={[
-        styles.dot,
-        {
-          backgroundColor: isActive ? theme.primary : theme.backgroundTertiary,
-          width: isActive ? 24 : 8,
-        },
-      ]}
-    />
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#141414',
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.sm,
-  },
-  headerButton: {
-    width: 60,
-    alignItems: 'center',
+  skipBtn: {
+    position: 'absolute',
+    top: 52,
+    right: 28,
+    zIndex: 10,
   },
   skipText: {
-    ...Typography.body,
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 14,
     fontWeight: '500',
-  },
-  dotsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  dot: {
-    height: 8,
-    borderRadius: 4,
+    letterSpacing: 0.2,
   },
   page: {
     flex: 1,
@@ -307,72 +277,105 @@ const styles = StyleSheet.create({
   },
   pageContent: {
     alignItems: 'center',
-    paddingHorizontal: Spacing.xl,
+    paddingHorizontal: 28,
     maxWidth: 400,
     width: '100%',
   },
-  iconContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 30,
+  appIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: Spacing.xl,
+    marginBottom: 28,
+    borderWidth: 1,
   },
   title: {
-    ...Typography.h1,
+    fontSize: 30,
+    fontWeight: '800',
+    color: '#ffffff',
+    letterSpacing: -0.5,
+    lineHeight: 35,
     textAlign: 'center',
-    marginBottom: Spacing.sm,
+    marginBottom: 8,
   },
   subtitle: {
-    ...Typography.body,
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.45)',
+    fontWeight: '400',
+    lineHeight: 22,
     textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: Spacing.xxl,
-    paddingHorizontal: Spacing.md,
+  },
+  divider: {
+    height: 1,
+    width: '100%',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    marginVertical: 26,
   },
   featuresContainer: {
     width: '100%',
-    gap: Spacing.md,
+    gap: 14,
   },
-  featureRow: {
+  featureCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    borderRadius: BorderRadius.medium,
-    gap: Spacing.md,
+    gap: 16,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 18,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
   },
   featureIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 46,
+    height: 46,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
   },
-  featureText: {
-    ...Typography.body,
+  featureTextWrap: {
     flex: 1,
+  },
+  featureTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 2,
+  },
+  featureSubtitle: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.38)',
+    fontWeight: '400',
+    lineHeight: 17,
   },
   footer: {
     alignItems: 'center',
-    paddingHorizontal: Spacing.xl,
-    gap: Spacing.md,
+    paddingHorizontal: 28,
+    gap: 18,
   },
   nextButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
-    height: Spacing.buttonHeight,
-    borderRadius: BorderRadius.large,
-    gap: Spacing.sm,
+    height: 56,
+    borderRadius: 18,
+    gap: 8,
   },
   nextButtonText: {
     color: '#FFFFFF',
-    ...Typography.h3,
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
-  pageCounter: {
-    ...Typography.small,
+  dotsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  dot: {
+    height: 7,
   },
 });
