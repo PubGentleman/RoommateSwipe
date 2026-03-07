@@ -163,7 +163,14 @@ export const EditProfileScreen = () => {
   const [roommateRelationship, setRoommateRelationship] = useState<'respectful_coliving' | 'occasional_hangouts' | 'prefer_friends' | 'minimal_interaction'>(user?.profileData?.preferences?.roommateRelationship || 'respectful_coliving');
   const [pets, setPets] = useState<'have_pets' | 'open_to_pets' | 'no_pets'>(user?.profileData?.preferences?.pets || 'open_to_pets');
   const [lifestyle, setLifestyle] = useState<Array<'active_gym' | 'homebody' | 'nightlife_social' | 'quiet_introverted' | 'creative_artistic' | 'professional_focused'>>(user?.profileData?.preferences?.lifestyle || []);
-  const [moveInDate, setMoveInDate] = useState(user?.profileData?.preferences?.moveInDate || '');
+  const [moveInDate, setMoveInDate] = useState(() => {
+    const raw = user?.profileData?.preferences?.moveInDate || '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      const [y, m, d] = raw.split('-');
+      return `${m}/${d}/${y}`;
+    }
+    return raw;
+  });
   const [bedrooms, setBedrooms] = useState(user?.profileData?.preferences?.bedrooms?.toString() || '');
   
   const [isSaving, setIsSaving] = useState(false);
@@ -769,7 +776,7 @@ export const EditProfileScreen = () => {
             </ThemedText>
             <TextInput
               style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
-              placeholder="YYYY-MM-DD (e.g., 2025-02-01)"
+              placeholder="MM/DD/YYYY (e.g., 02/01/2025)"
               placeholderTextColor={theme.textSecondary}
               value={moveInDate}
               onChangeText={setMoveInDate}

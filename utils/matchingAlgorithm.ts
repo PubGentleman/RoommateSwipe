@@ -658,7 +658,16 @@ export const getWorkScheduleLabel = (schedule: string): string => {
 export const formatMoveInDate = (dateString: string): string => {
   if (!dateString) return 'Flexible';
   
-  const date = new Date(dateString);
+  let date: Date;
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateString)) {
+    const [month, day, year] = dateString.split('/').map(Number);
+    date = new Date(year, month - 1, day);
+  } else {
+    date = new Date(dateString);
+  }
+
+  if (isNaN(date.getTime())) return 'Flexible';
+
   const today = new Date();
   const diffTime = date.getTime() - today.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -668,8 +677,10 @@ export const formatMoveInDate = (dateString: string): string => {
   if (diffDays <= 14) return 'Next Week';
   if (diffDays <= 30) return 'This Month';
   
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return `${months[date.getMonth()]} ${date.getFullYear()}`;
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  const yyyy = date.getFullYear();
+  return `${mm}/${dd}/${yyyy}`;
 };
 
 /**

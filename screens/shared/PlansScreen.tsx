@@ -12,6 +12,14 @@ import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme
 
 type PlansScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'Plans'>;
 
+const fmtDate = (d: Date | string) => {
+  const date = typeof d === 'string' ? new Date(d) : d;
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  const yyyy = date.getFullYear();
+  return `${mm}/${dd}/${yyyy}`;
+};
+
 export const PlansScreen = () => {
   const { theme } = useTheme();
   const { user, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, reactivateSubscription } = useAuth();
@@ -109,7 +117,7 @@ export const PlansScreen = () => {
     await downgradeToPlan(downgradeTo);
     
     const expiryDate = user?.subscription?.expiresAt 
-      ? new Date(user.subscription.expiresAt).toLocaleDateString()
+      ? fmtDate(user.subscription.expiresAt)
       : 'the end of your billing period';
     
     const targetPlanName = downgradeTo.charAt(0).toUpperCase() + downgradeTo.slice(1);
@@ -131,7 +139,7 @@ export const PlansScreen = () => {
     await cancelSubscription();
     
     const expiryDate = user?.subscription?.expiresAt 
-      ? new Date(user.subscription.expiresAt).toLocaleDateString()
+      ? fmtDate(user.subscription.expiresAt)
       : 'the end of your billing period';
     
     Alert.alert(
@@ -307,8 +315,8 @@ export const PlansScreen = () => {
               </ThemedText>
               <ThemedText style={[Typography.small, { color: subscriptionStatus === 'cancelled' ? '#991B1B' : '#9A3412', marginBottom: Spacing.sm }]}>
                 {subscriptionStatus === 'cancelled' 
-                  ? `Your subscription will end on ${new Date(scheduledChangeDate).toLocaleDateString()}. You'll keep your current features until then.`
-                  : `Your plan will change to ${scheduledPlan.charAt(0).toUpperCase() + scheduledPlan.slice(1)} on ${new Date(scheduledChangeDate).toLocaleDateString()}.`
+                  ? `Your subscription will end on ${fmtDate(scheduledChangeDate)}. You'll keep your current features until then.`
+                  : `Your plan will change to ${scheduledPlan.charAt(0).toUpperCase() + scheduledPlan.slice(1)} on ${fmtDate(scheduledChangeDate)}.`
                 }
               </ThemedText>
               <Pressable
@@ -340,7 +348,7 @@ export const PlansScreen = () => {
                   {isElite ? 'Elite' : 'Plus'} Subscription
                 </ThemedText>
                 <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
-                  {new Date().toLocaleDateString()}
+                  {fmtDate(new Date())}
                 </ThemedText>
               </View>
               <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
@@ -404,7 +412,7 @@ export const PlansScreen = () => {
             </ThemedText>
             <ThemedText style={[Typography.body, { color: theme.textSecondary, marginBottom: Spacing.xl }]}>
               Your plan will change to {downgradeTo === 'basic' ? 'Basic' : 'Plus'} at the end of your current billing period. 
-              {'\n\n'}You'll keep your current {currentPlan === 'plus' ? 'Plus' : 'Elite'} features until {user?.subscription?.expiresAt ? new Date(user.subscription.expiresAt).toLocaleDateString() : 'the end of your billing period'}.
+              {'\n\n'}You'll keep your current {currentPlan === 'plus' ? 'Plus' : 'Elite'} features until {user?.subscription?.expiresAt ? fmtDate(user.subscription.expiresAt) : 'the end of your billing period'}.
               {'\n\n'}Continue with downgrade?
             </ThemedText>
             <View style={styles.modalActions}>
@@ -443,7 +451,7 @@ export const PlansScreen = () => {
             </ThemedText>
             <ThemedText style={[Typography.body, { color: theme.textSecondary, marginBottom: Spacing.xl }]}>
               Are you sure you want to cancel your {currentPlan === 'plus' ? 'Plus' : 'Elite'} subscription?
-              {'\n\n'}You'll keep your current features until {user?.subscription?.expiresAt ? new Date(user.subscription.expiresAt).toLocaleDateString() : 'the end of your billing period'}, then your plan will revert to Basic.
+              {'\n\n'}You'll keep your current features until {user?.subscription?.expiresAt ? fmtDate(user.subscription.expiresAt) : 'the end of your billing period'}, then your plan will revert to Basic.
               {'\n\n'}You can re-subscribe at any time.
             </ThemedText>
             <View style={styles.modalActions}>

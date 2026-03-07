@@ -177,7 +177,7 @@ export const ProfileScreen = () => {
                 </View>
                 {user?.subscription?.expiresAt ? (
                   <ThemedText style={[Typography.small, { color: theme.textSecondary, marginTop: Spacing.md }]}>
-                    Renews on {new Date(user.subscription.expiresAt).toLocaleDateString()}
+                    Renews on {(() => { const d = new Date(user.subscription.expiresAt); return `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}/${d.getFullYear()}`; })()}
                   </ThemedText>
                 ) : null}
               </View>

@@ -409,7 +409,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     },
     preferences: {
       location: 'Financial District',
-      moveInDate: '2025-01-01',
+      moveInDate: '01/01/2025',
       bedrooms: 2,
     },
     compatibility: 92,
@@ -439,7 +439,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     },
     preferences: {
       location: 'Bushwick',
-      moveInDate: '2025-02-01',
+      moveInDate: '02/01/2025',
       bedrooms: 2,
     },
     compatibility: 85,
@@ -470,7 +470,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     },
     preferences: {
       location: 'Park Slope',
-      moveInDate: '2025-01-15',
+      moveInDate: '01/15/2025',
       bedrooms: 2,
     },
     compatibility: 78,
@@ -500,7 +500,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     },
     preferences: {
       location: 'Astoria',
-      moveInDate: '2025-01-10',
+      moveInDate: '01/10/2025',
       bedrooms: 2,
     },
     compatibility: 88,
@@ -531,7 +531,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     },
     preferences: {
       location: 'Williamsburg',
-      moveInDate: '2025-01-20',
+      moveInDate: '01/20/2025',
       bedrooms: 1,
     },
     compatibility: 81,
@@ -559,7 +559,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     },
     preferences: {
       location: 'Financial District',
-      moveInDate: '2025-02-15',
+      moveInDate: '02/15/2025',
       bedrooms: 2,
     },
     compatibility: 90,
@@ -588,7 +588,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     },
     preferences: {
       location: 'Crown Heights',
-      moveInDate: '2025-01-25',
+      moveInDate: '01/25/2025',
       bedrooms: 2,
     },
     compatibility: 76,
@@ -618,7 +618,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     },
     preferences: {
       location: 'Bushwick',
-      moveInDate: '2025-02-01',
+      moveInDate: '02/01/2025',
       bedrooms: 1,
     },
     compatibility: 83,
@@ -647,7 +647,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     },
     preferences: {
       location: 'Park Slope',
-      moveInDate: '2025-01-30',
+      moveInDate: '01/30/2025',
       bedrooms: 2,
     },
     compatibility: 79,
@@ -677,7 +677,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     },
     preferences: {
       location: 'Tribeca',
-      moveInDate: '2025-02-10',
+      moveInDate: '02/10/2025',
       bedrooms: 2,
     },
     compatibility: 72,
@@ -706,7 +706,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     },
     preferences: {
       location: 'Upper East Side',
-      moveInDate: '2025-01-05',
+      moveInDate: '01/05/2025',
       bedrooms: 1,
     },
     compatibility: 85,
@@ -736,7 +736,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     },
     preferences: {
       location: 'Greenwich Village',
-      moveInDate: '2025-02-20',
+      moveInDate: '02/20/2025',
       bedrooms: 2,
     },
     compatibility: 87,
@@ -764,7 +764,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     },
     preferences: {
       location: 'East Williamsburg',
-      moveInDate: '2025-01-15',
+      moveInDate: '01/15/2025',
       bedrooms: 2,
     },
     compatibility: 82,
@@ -795,7 +795,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     },
     preferences: {
       location: 'Chelsea',
-      moveInDate: '2025-02-05',
+      moveInDate: '02/05/2025',
       bedrooms: 1,
     },
     compatibility: 80,
@@ -824,7 +824,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     },
     preferences: {
       location: 'Upper West Side',
-      moveInDate: '2025-03-01',
+      moveInDate: '03/01/2025',
       bedrooms: 2,
     },
     compatibility: 91,
@@ -854,7 +854,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     },
     preferences: {
       location: 'SoHo',
-      moveInDate: '2025-01-12',
+      moveInDate: '01/12/2025',
       bedrooms: 1,
     },
     compatibility: 77,
@@ -882,7 +882,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     },
     preferences: {
       location: 'East Village',
-      moveInDate: '2025-02-12',
+      moveInDate: '02/12/2025',
       bedrooms: 2,
     },
     compatibility: 84,
@@ -906,7 +906,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     },
     preferences: {
       location: 'Hell\'s Kitchen',
-      moveInDate: '2025-01-28',
+      moveInDate: '01/28/2025',
       bedrooms: 2,
     },
     compatibility: 86,
@@ -930,7 +930,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     },
     preferences: {
       location: 'Bedford-Stuyvesant',
-      moveInDate: '2025-02-08',
+      moveInDate: '02/08/2025',
       bedrooms: 1,
     },
     compatibility: 75,
@@ -954,7 +954,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     },
     preferences: {
       location: 'Flushing',
-      moveInDate: '2025-02-18',
+      moveInDate: '02/18/2025',
       bedrooms: 2,
     },
     compatibility: 89,

@@ -137,7 +137,10 @@ export const NotificationsScreen = () => {
     if (days < 7) return `${days}d ago`;
     const weeks = Math.floor(days / 7);
     if (weeks < 4) return `${weeks}w ago`;
-    return date.toLocaleDateString();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    const yyyy = date.getFullYear();
+    return `${mm}/${dd}/${yyyy}`;
   };
 
   const renderNotification = ({ item }: { item: Notification }) => (
