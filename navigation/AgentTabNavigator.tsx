@@ -30,10 +30,14 @@ export const AgentTabNavigator = () => {
         tabBarActiveTintColor: theme.tabIconSelected,
         tabBarInactiveTintColor: theme.tabIconDefault,
         tabBarLabelStyle: {
-          fontSize: 10,
+          fontSize: 9,
         },
         tabBarItemStyle: {
-          paddingHorizontal: 2,
+          paddingHorizontal: 0,
+          minWidth: 0,
+        },
+        tabBarIconStyle: {
+          marginBottom: -2,
         },
         tabBarStyle: {
           position: 'absolute',
