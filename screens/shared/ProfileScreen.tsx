@@ -15,7 +15,7 @@ import { getVerificationLevel } from '../../components/VerificationBadge';
 type ProfileScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'ProfileMain'>;
 
 export const ProfileScreen = () => {
-  const { user, logout, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost } = useAuth();
+  const { user, logout, updateUser, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost } = useAuth();
   const { unreadCount } = useNotificationContext();
   const navigation = useNavigation<ProfileScreenNavigationProp>();
   const insets = useSafeAreaInsets();
@@ -237,6 +237,19 @@ export const ProfileScreen = () => {
               isLast
             />
           </View>
+
+          <Pressable
+            style={styles.switchRoleBtn}
+            onPress={() => {
+              const newRole = user?.role === 'renter' ? 'host' : 'renter';
+              updateUser({ role: newRole });
+            }}
+          >
+            <Feather name="repeat" size={16} color="#ff6b5b" />
+            <Text style={styles.switchRoleText}>
+              Switch to {user?.role === 'renter' ? 'Host' : 'Renter'}
+            </Text>
+          </Pressable>
 
           <Pressable style={styles.signoutBtn} onPress={logout}>
             <Feather name="log-out" size={16} color="#ff4d4d" />
@@ -537,6 +550,23 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: 'rgba(255,255,255,0.3)',
     marginTop: 1,
+  },
+  switchRoleBtn: {
+    marginTop: 14,
+    height: 48,
+    backgroundColor: 'rgba(255,107,91,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.18)',
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  switchRoleText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#ff6b5b',
   },
   signoutBtn: {
     marginTop: 14,
