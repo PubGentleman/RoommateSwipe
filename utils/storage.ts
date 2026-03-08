@@ -184,6 +184,26 @@ export const StorageService = {
     }
   },
 
+  async assignPropertiesToHost(userId: string, userName: string): Promise<void> {
+    try {
+      const properties = await this.getProperties();
+      const myProperties = properties.filter(p => p.hostId === userId);
+      if (myProperties.length > 0) return;
+      const unassigned = properties.filter(p => !p.hostId || /^\d+$/.test(p.hostId));
+      const toAssign = unassigned.slice(0, Math.min(6, unassigned.length));
+      if (toAssign.length === 0) return;
+      const updated = properties.map(p => {
+        if (toAssign.find(t => t.id === p.id)) {
+          return { ...p, hostId: userId, hostName: userName };
+        }
+        return p;
+      });
+      await this.setProperties(updated);
+    } catch (error) {
+      console.error('Error assigning properties to host:', error);
+    }
+  },
+
   async deleteProperty(propertyId: string): Promise<void> {
     try {
       const properties = await this.getProperties();
@@ -517,7 +537,7 @@ export const StorageService = {
       const applications = JSON.parse(data);
       return applications.map((app: any) => ({
         ...app,
-        submittedAt: new Date(app.submittedAt),
+        submittedDate: app.submittedDate ? new Date(app.submittedDate) : (app.submittedAt ? new Date(app.submittedAt) : new Date()),
       }));
     } catch (error) {
       console.error('Error getting applications:', error);

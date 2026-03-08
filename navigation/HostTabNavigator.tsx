@@ -1,28 +1,66 @@
 import React from 'react';
 import { View, Pressable, StyleSheet, Platform, Text } from 'react-native';
 import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Feather } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { HostDashboardScreen } from '../screens/host/HostDashboardScreen';
 import { MyListingsScreen } from '../screens/host/MyListingsScreen';
+import { CreateEditListingScreen } from '../screens/host/CreateEditListingScreen';
 import { ApplicationsScreen } from '../screens/host/ApplicationsScreen';
+import { HostAnalyticsScreen } from '../screens/host/HostAnalyticsScreen';
 import { MessagesStackNavigator } from './MessagesStackNavigator';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
 import { useTheme } from '../hooks/useTheme';
 import { useNotificationContext } from '../contexts/NotificationContext';
 
-export type HostTabParamList = {
+export type HostListingsStackParamList = {
   MyListings: undefined;
+  CreateEditListing: { propertyId?: string };
+};
+
+export type HostDashboardStackParamList = {
+  DashboardMain: undefined;
+  CreateEditListing: { propertyId?: string };
+  Analytics: undefined;
+};
+
+export type HostTabParamList = {
+  Dashboard: undefined;
+  Listings: undefined;
   Applications: undefined;
   Messages: undefined;
   Profile: undefined;
 };
 
 const Tab = createBottomTabNavigator<HostTabParamList>();
+const ListingsStack = createNativeStackNavigator<HostListingsStackParamList>();
+const DashboardStack = createNativeStackNavigator<HostDashboardStackParamList>();
+
+function DashboardStackNavigator() {
+  return (
+    <DashboardStack.Navigator screenOptions={{ headerShown: false }}>
+      <DashboardStack.Screen name="DashboardMain" component={HostDashboardScreen} />
+      <DashboardStack.Screen name="CreateEditListing" component={CreateEditListingScreen} />
+      <DashboardStack.Screen name="Analytics" component={HostAnalyticsScreen} />
+    </DashboardStack.Navigator>
+  );
+}
+
+function ListingsStackNavigator() {
+  return (
+    <ListingsStack.Navigator screenOptions={{ headerShown: false }}>
+      <ListingsStack.Screen name="MyListings" component={MyListingsScreen} />
+      <ListingsStack.Screen name="CreateEditListing" component={CreateEditListingScreen} />
+    </ListingsStack.Navigator>
+  );
+}
 
 const HOST_TAB_CONFIG: Record<string, { icon: string; label: string }> = {
-  MyListings: { icon: 'home', label: 'Listings' },
-  Applications: { icon: 'file-text', label: 'Applications' },
+  Dashboard: { icon: 'grid', label: 'Dashboard' },
+  Listings: { icon: 'home', label: 'Listings' },
+  Applications: { icon: 'file-text', label: 'Apps' },
   Messages: { icon: 'message-circle', label: 'Messages' },
   Profile: { icon: 'user', label: 'Profile' },
 };
@@ -125,13 +163,14 @@ const hostTabStyles = StyleSheet.create({
 export const HostTabNavigator = () => {
   return (
     <Tab.Navigator
-      initialRouteName="MyListings"
+      initialRouteName="Dashboard"
       tabBar={(props) => <HostCustomTabBar {...props} />}
       screenOptions={{
         headerShown: false,
       }}
     >
-      <Tab.Screen name="MyListings" component={MyListingsScreen} />
+      <Tab.Screen name="Dashboard" component={DashboardStackNavigator} />
+      <Tab.Screen name="Listings" component={ListingsStackNavigator} />
       <Tab.Screen name="Applications" component={ApplicationsScreen} />
       <Tab.Screen name="Messages" component={MessagesStackNavigator} />
       <Tab.Screen name="Profile" component={ProfileStackNavigator} />

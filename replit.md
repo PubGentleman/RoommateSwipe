@@ -32,7 +32,7 @@ The application is built with React Native and Expo using TypeScript, featuring 
 
 **Key Features:**
 - **Renter:** Swipe-based matching, 1-on-1 messaging, group management, property exploration with advanced filters and map/list views, saved properties, rewind, profile view tracking, AI Match Assistant, animated match celebration, report/block system, notification feed, and profile completion indicator. The Match screen has a dark Tinder-style UI with specific branding elements and action buttons.
-- **Host:** Property listing management (CRUD), application review, and listing status control.
+- **Host:** Full host dashboard with stats overview (total/active/paused/rented listings, applications, unread messages), listing management (create/edit/delete/pause/unpause/mark rented), enhanced application review (filter by status, approve/reject with persistence, internal notes), analytics screen (overview stats, conversion funnel, per-listing breakdowns), and role switching from Profile. Host tab navigator has 5 tabs: Dashboard, Listings, Apps, Messages, Profile. Dashboard and Listings tabs use stack navigators to push CreateEditListing and Analytics screens.
 - **Agent:** Multi-property portfolio management, document verification, and a legal template library.
 
 **User Experience Enhancements:**

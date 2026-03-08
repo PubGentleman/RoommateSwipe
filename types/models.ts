@@ -125,6 +125,7 @@ export interface Application {
   status: 'pending' | 'approved' | 'rejected';
   submittedDate: Date;
   message: string;
+  notes?: string;
 }
 
 export interface Match {

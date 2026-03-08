@@ -1,0 +1,77 @@
+The Renter section of my app is already built. Do not rebuild or break the existing Renter flow. Build a new Host section that connects to the existing Renter section through the same shared database, shared authentication, and shared user account system.
+
+App context:
+- This is a roommate/sublet marketplace app
+- The Renter side is already completed
+- Now I need the Host side built and fully connected to the existing Renter functionality
+- Users should be able to switch between Renter mode and Host mode from the same account
+- Keep the current app architecture intact
+
+Build the Host section with these features:
+1. Host dashboard
+   - Overview with total listings, views, saves, inquiries, applications, and unread messages
+   - Status summary for listings: active, paused, rented, expired
+
+2. Listing management
+   - Create listing
+   - Edit listing
+   - Delete listing
+   - Pause/unpause listing
+   - Mark listing as rented
+   - Upload/manage photos
+   - Add rent, deposit, lease length, move-in date, amenities, house rules, and roommate preferences
+
+3. Inquiries and applications
+   - View inquiries submitted by renters from the existing Renter section
+   - View applications submitted by renters from the existing Renter section
+   - Show renter profile summaries with each application
+   - Approve, reject, or mark pending
+   - Add internal notes
+
+4. Messaging
+   - Host inbox connected to the existing renter messaging system
+   - Messages must sync both ways between Host and Renter
+   - Group messages by listing and renter
+   - Show conversation history
+
+5. Analytics
+   - Listing views
+   - Favorites/saves
+   - Inquiries
+   - Applications
+   - Conversion metrics
+
+6. Host settings
+   - Profile
+   - Notifications
+   - Privacy
+   - Verification
+   - Payment/payout settings
+
+Critical integration requirements:
+- Do not change or rebuild the existing Renter section unless absolutely necessary for integration
+- Reuse the current database tables, authentication, and account structure wherever possible
+- A listing created in Host mode must automatically appear in the already-built Renter section
+- Renter favorites/saves must appear in Host analytics
+- Renter inquiries and applications must appear instantly in the Host dashboard
+- Messages between renters and hosts must stay fully synced
+- Any listing update made by a Host must immediately reflect in the existing Renter section
+- If a Host pauses, deletes, or rents a listing, update the listing status everywhere in the renter flow
+- Keep role-based permissions strict so hosts manage only their own listings and renters manage only their own actions
+
+Technical requirements:
+- Keep the existing Renter code working
+- Extend the app instead of replacing current logic
+- Use shared relational SQL models
+- No JSON file storage
+- Reuse existing components where possible
+- Add only the backend routes, frontend pages, database changes, and integrations needed for the Host section
+- Maintain scalable architecture and clean code organization
+
+Please generate:
+- The Host section pages
+- Required backend routes/controllers
+- Database/schema updates if needed
+- The integration logic connecting Host features to the already-built Renter section
+- Role-switching logic between Renter and Host
+- Any minimal updates needed in the existing Renter section only to support integration
