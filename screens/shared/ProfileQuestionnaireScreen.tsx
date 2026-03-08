@@ -292,7 +292,6 @@ export const ProfileQuestionnaireScreen = () => {
 
   const handleSave = async () => {
     setIsSaving(true);
-    await new Promise(resolve => setTimeout(resolve, 400));
 
     const birthdayStorageFormat = birthday.trim() ? convertToStorageFormat(birthday) : user?.birthday;
     const zodiacSign = birthdayStorageFormat ? calculateZodiacFromBirthday(birthdayStorageFormat) : undefined;
@@ -338,8 +337,8 @@ export const ProfileQuestionnaireScreen = () => {
       },
     });
 
+    try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
     setIsSaving(false);
-    Alert.alert('Success', 'Profile updated successfully');
     navigation.goBack();
   };
 
