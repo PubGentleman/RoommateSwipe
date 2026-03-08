@@ -141,7 +141,7 @@ const FIELD_TO_STEP: Record<string, string> = {
 
 interface ProfileCompletionCardProps {
   user: User;
-  onEditProfile: (step?: string) => void;
+  onEditProfile: (missingSteps?: string[]) => void;
 }
 
 export const ProfileCompletionCard = ({ user, onEditProfile }: ProfileCompletionCardProps) => {
@@ -198,25 +198,33 @@ export const ProfileCompletionCard = ({ user, onEditProfile }: ProfileCompletion
 
         <Text style={styles.progressHint}>Complete your profile to unlock better matches</Text>
 
-        {topMissing.map((field) => (
-          <Pressable key={field.key} style={styles.completionItem} onPress={() => onEditProfile(FIELD_TO_STEP[field.key])}>
-            <View style={styles.completionIcon}>
-              <Feather name={field.icon} size={17} color="#ff6b5b" />
-            </View>
-            <View style={styles.completionText}>
-              <Text style={styles.completionTitle}>{field.label}</Text>
-              <Text style={styles.completionSubtitle}>
-                {field.boostText ? (
-                  <><Text style={styles.boostText}>{field.boostText}</Text> {field.tip}</>
-                ) : field.tip}
-              </Text>
-            </View>
-            <Feather name="chevron-right" size={14} color="rgba(255,255,255,0.2)" />
-          </Pressable>
-        ))}
+        {topMissing.map((field) => {
+          const allMissingSteps = [...new Set(missing.map(f => FIELD_TO_STEP[f.key]))];
+          const tappedStep = FIELD_TO_STEP[field.key];
+          const orderedSteps = [tappedStep, ...allMissingSteps.filter(s => s !== tappedStep)];
+          return (
+            <Pressable key={field.key} style={styles.completionItem} onPress={() => onEditProfile(orderedSteps)}>
+              <View style={styles.completionIcon}>
+                <Feather name={field.icon} size={17} color="#ff6b5b" />
+              </View>
+              <View style={styles.completionText}>
+                <Text style={styles.completionTitle}>{field.label}</Text>
+                <Text style={styles.completionSubtitle}>
+                  {field.boostText ? (
+                    <><Text style={styles.boostText}>{field.boostText}</Text> {field.tip}</>
+                  ) : field.tip}
+                </Text>
+              </View>
+              <Feather name="chevron-right" size={14} color="rgba(255,255,255,0.2)" />
+            </Pressable>
+          );
+        })}
 
         {missing.length > 3 ? (
-          <Pressable style={styles.moreLink} onPress={() => onEditProfile()}>
+          <Pressable style={styles.moreLink} onPress={() => {
+            const allMissingSteps = [...new Set(missing.map(f => FIELD_TO_STEP[f.key]))];
+            onEditProfile(allMissingSteps);
+          }}>
             <Text style={styles.moreLinkText}>+{missing.length - 3} more to complete</Text>
           </Pressable>
         ) : null}

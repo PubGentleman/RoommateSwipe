@@ -111,10 +111,19 @@ export const ProfileQuestionnaireScreen = () => {
   const route = useRoute();
   const insets = useSafeAreaInsets();
 
-  const initialStepParam = (route.params as any)?.initialStep;
-  const initialStepIndex = initialStepParam ? STEP_ORDER.indexOf(initialStepParam as StepId) : -1;
-  const isSingleStepMode = initialStepIndex >= 0;
-  const [currentStep, setCurrentStep] = useState(initialStepIndex >= 0 ? initialStepIndex : 0);
+  const missingStepsParam = (route.params as any)?.missingSteps as string[] | undefined;
+  const filteredSteps = React.useMemo(() => {
+    if (missingStepsParam?.length) {
+      return missingStepsParam.filter(s => STEP_ORDER.includes(s as StepId)) as StepId[];
+    }
+    return null;
+  }, []);
+  const isMissingMode = !!filteredSteps;
+  const stepsToShow = filteredSteps || STEP_ORDER;
+  const [currentFilteredIndex, setCurrentFilteredIndex] = useState(0);
+  const currentStep = isMissingMode
+    ? STEP_ORDER.indexOf(stepsToShow[currentFilteredIndex])
+    : currentFilteredIndex;
   const [direction, setDirection] = useState<'forward' | 'back'>('forward');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -272,19 +281,17 @@ export const ProfileQuestionnaireScreen = () => {
 
   const goNext = () => {
     if (!validateCurrentStep()) return;
-    if (currentStep < TOTAL_STEPS - 1) {
+    if (currentFilteredIndex < stepsToShow.length - 1) {
       setDirection('forward');
-      setCurrentStep(currentStep + 1);
+      setCurrentFilteredIndex(currentFilteredIndex + 1);
       try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
     }
   };
 
   const goBack = () => {
-    if (isSingleStepMode) {
-      navigation.goBack();
-    } else if (currentStep > 0) {
+    if (currentFilteredIndex > 0) {
       setDirection('back');
-      setCurrentStep(currentStep - 1);
+      setCurrentFilteredIndex(currentFilteredIndex - 1);
     } else {
       navigation.goBack();
     }
@@ -342,7 +349,7 @@ export const ProfileQuestionnaireScreen = () => {
     navigation.goBack();
   };
 
-  const isLastStep = currentStep === TOTAL_STEPS - 1;
+  const isLastStep = currentFilteredIndex === stepsToShow.length - 1;
 
   const renderStepContent = () => {
     const stepId = STEP_ORDER[currentStep];
@@ -657,11 +664,17 @@ export const ProfileQuestionnaireScreen = () => {
             <Feather name="arrow-left" size={24} color={theme.text} />
           </Pressable>
           <ThemedText style={[Typography.h3, { flex: 1, textAlign: 'center' }]}>
-            {currentStep === 0 ? 'Edit Profile' : ''}
+            {isMissingMode ? `${currentFilteredIndex + 1} of ${stepsToShow.length}` : (currentFilteredIndex === 0 ? 'Edit Profile' : '')}
           </ThemedText>
-          <View style={styles.navButton} />
+          {isMissingMode ? (
+            <Pressable onPress={() => navigation.goBack()} style={styles.navButton}>
+              <Feather name="x" size={24} color="rgba(255,255,255,0.5)" />
+            </Pressable>
+          ) : (
+            <View style={styles.navButton} />
+          )}
         </View>
-        <ProgressBar currentStep={isSingleStepMode ? 0 : currentStep} totalSteps={isSingleStepMode ? 1 : TOTAL_STEPS} />
+        <ProgressBar currentStep={currentFilteredIndex} totalSteps={stepsToShow.length} />
       </View>
 
       <ScrollView
@@ -686,7 +699,7 @@ export const ProfileQuestionnaireScreen = () => {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, Spacing.lg) + 80 }]}>
-        {isLastStep || isSingleStepMode ? (
+        {isLastStep ? (
           <Pressable
             style={[styles.primaryButton, { backgroundColor: theme.primary, opacity: isSaving ? 0.7 : 1 }]}
             onPress={handleSave}
@@ -696,7 +709,7 @@ export const ProfileQuestionnaireScreen = () => {
               <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
               <>
-                <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>{isSingleStepMode ? 'Save' : 'Save Profile'}</ThemedText>
+                <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>{isMissingMode ? 'Save' : 'Save Profile'}</ThemedText>
                 <Feather name="check" size={20} color="#FFFFFF" />
               </>
             )}
