@@ -1,8 +1,10 @@
 import { RoommateProfile, Property, Group, Conversation, Application, User } from '../types/models';
 import { getCityFromNeighborhood, getStateFromNeighborhood, getCoordinatesFromNeighborhood } from './locationData';
 import { additionalProfiles } from './additionalProfiles';
+import { extraProfiles } from './extraProfiles';
+import { extraConversations, extraProperties, extraGroups, extraApplications } from './extraMockData';
 
-export const MOCK_DATA_VERSION = '1.7.0';
+export const MOCK_DATA_VERSION = '2.0.0';
 
 export const mockProfileUsers: User[] = [
   {
@@ -1195,6 +1197,7 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     compatibility: 82,
   },
   ...additionalProfiles,
+  ...extraProfiles,
 ];
 
 export const mockProperties: Property[] = [
@@ -1937,6 +1940,7 @@ export const mockProperties: Property[] = [
     roomType: 'entire',
     walkScore: 85,
   },
+  ...extraProperties,
 ];
 
 export const mockGroups: Group[] = [
@@ -2312,6 +2316,7 @@ export const mockGroups: Group[] = [
     createdAt: new Date('2024-04-22'),
     createdBy: '26',
   },
+  ...extraGroups,
 ];
 
 export const mockConversations: Conversation[] = [
@@ -2341,6 +2346,7 @@ export const mockConversations: Conversation[] = [
     unread: 0,
     messages: [],
   },
+  ...extraConversations,
 ];
 
 export const mockApplications: Application[] = [
@@ -2366,4 +2372,5 @@ export const mockApplications: Application[] = [
     submittedDate: new Date(Date.now() - 1000 * 60 * 60 * 24),
     message: 'This looks perfect for my needs. I have a stable job and excellent credit.',
   },
+  ...extraApplications,
 ];

@@ -789,7 +789,7 @@ export const StorageService = {
 
   async initializeWithMockData(): Promise<void> {
     try {
-      const { MOCK_DATA_VERSION, mockRoommateProfiles, mockProperties, mockGroups, mockProfileUsers } = await import('./mockData');
+      const { MOCK_DATA_VERSION, mockRoommateProfiles, mockProperties, mockGroups, mockProfileUsers, mockConversations, mockApplications } = await import('./mockData');
       
       const storedVersion = await AsyncStorage.getItem(STORAGE_KEYS.MOCK_DATA_VERSION);
       const versionChanged = storedVersion !== MOCK_DATA_VERSION;
@@ -799,6 +799,8 @@ export const StorageService = {
         await this.setRoommateProfiles(mockRoommateProfiles);
         await this.setProperties(mockProperties);
         await this.setGroups(mockGroups);
+        await AsyncStorage.setItem(STORAGE_KEYS.CONVERSATIONS, JSON.stringify(mockConversations));
+        await AsyncStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(mockApplications));
         
         await AsyncStorage.removeItem(STORAGE_KEYS.USERS);
         for (const profileUser of mockProfileUsers) {
@@ -857,7 +859,7 @@ export const StorageService = {
   async forceReloadMockData(): Promise<void> {
     try {
       console.log('[StorageService] Force reloading all mock data...');
-      const { mockRoommateProfiles, mockProperties, mockGroups, mockProfileUsers } = await import('./mockData');
+      const { mockRoommateProfiles, mockProperties, mockGroups, mockProfileUsers, mockConversations, mockApplications } = await import('./mockData');
       
       console.log(`[StorageService] Importing ${mockProperties.length} properties from mockData...`);
       
@@ -869,6 +871,12 @@ export const StorageService = {
       
       await this.setGroups(mockGroups);
       console.log(`[StorageService] Loaded ${mockGroups.length} groups`);
+
+      await AsyncStorage.setItem(STORAGE_KEYS.CONVERSATIONS, JSON.stringify(mockConversations));
+      console.log(`[StorageService] Loaded ${mockConversations.length} conversations`);
+
+      await AsyncStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(mockApplications));
+      console.log(`[StorageService] Loaded ${mockApplications.length} applications`);
       
       // Clear and reseed users
       await AsyncStorage.removeItem(STORAGE_KEYS.USERS);
