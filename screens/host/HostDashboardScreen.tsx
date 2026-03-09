@@ -8,7 +8,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { StorageService } from '../../utils/storage';
-import { Property, Application, InterestCard } from '../../types/models';
+import { Property, InterestCard } from '../../types/models';
 
 interface StatCard {
   icon: keyof typeof Feather.glyphMap;
@@ -22,7 +22,6 @@ export const HostDashboardScreen = () => {
   const { user } = useAuth();
   const navigation = useNavigation<any>();
   const [listings, setListings] = useState<Property[]>([]);
-  const [applications, setApplications] = useState<Application[]>([]);
   const [inquiries, setInquiries] = useState<InterestCard[]>([]);
   const [messageCount, setMessageCount] = useState(0);
 
@@ -34,11 +33,6 @@ export const HostDashboardScreen = () => {
     const allProperties = await StorageService.getProperties();
     const myListings = allProperties.filter(p => p.hostId === user.id);
     setListings(myListings);
-
-    const myPropertyIds = new Set(myListings.map(p => p.id));
-    const allApps = await StorageService.getApplications();
-    const myApps = allApps.filter(a => myPropertyIds.has(a.propertyId));
-    setApplications(myApps);
 
     const allConvos = await StorageService.getConversations();
     const unreadMessages = allConvos.reduce((sum, c) => sum + (c.unread || 0), 0);
@@ -57,7 +51,6 @@ export const HostDashboardScreen = () => {
   const activeCount = listings.filter(p => p.available && !p.rentedDate).length;
   const pausedCount = listings.filter(p => !p.available && !p.rentedDate).length;
   const rentedCount = listings.filter(p => !!p.rentedDate).length;
-  const pendingApps = applications.filter(a => a.status === 'pending').length;
   const pendingInquiries = inquiries.filter(c => c.status === 'pending').length;
 
   const stats: StatCard[] = [
@@ -67,19 +60,18 @@ export const HostDashboardScreen = () => {
     { icon: 'lock', value: rentedCount, label: 'Rented', color: theme.primary },
     { icon: 'heart', value: inquiries.length, label: 'Inquiries', color: '#ff6b5b' },
     { icon: 'clock', value: pendingInquiries, label: 'Pending Inquiries', color: '#FFA500' },
-    { icon: 'file-text', value: applications.length, label: 'Applications', color: theme.secondary },
     { icon: 'message-circle', value: messageCount, label: 'Unread Messages', color: '#4ECDC4' },
   ];
 
-  const recentApps = [...applications]
-    .sort((a, b) => new Date(b.submittedDate).getTime() - new Date(a.submittedDate).getTime())
+  const recentInquiries = [...inquiries]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 3);
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending': return theme.warning;
-      case 'approved': return theme.success;
-      case 'rejected': return theme.error;
+      case 'accepted': return theme.success;
+      case 'passed': return '#999';
       default: return theme.textSecondary;
     }
   };
@@ -100,12 +92,12 @@ export const HostDashboardScreen = () => {
       },
     },
     {
-      icon: 'file-text' as keyof typeof Feather.glyphMap,
-      label: 'View All Applications',
+      icon: 'users' as keyof typeof Feather.glyphMap,
+      label: 'Find Roommates',
       onPress: () => {
         const parent = navigation.getParent();
         if (parent) {
-          parent.navigate('Applications');
+          parent.navigate('Roommates');
         }
       },
     },
@@ -142,39 +134,46 @@ export const HostDashboardScreen = () => {
 
         <View style={styles.section}>
           <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>
-            Recent Applications
+            Recent Inquiries
           </ThemedText>
-          {recentApps.length === 0 ? (
+          {recentInquiries.length === 0 ? (
             <View style={[styles.emptyState, { backgroundColor: theme.backgroundDefault }]}>
               <Feather name="inbox" size={32} color={theme.textSecondary} />
               <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.md }]}>
-                No applications yet
+                No inquiries yet
               </ThemedText>
             </View>
           ) : (
-            recentApps.map((app) => (
-              <View
-                key={app.id}
-                style={[styles.applicationCard, { backgroundColor: theme.backgroundDefault }]}
+            recentInquiries.map((inquiry) => (
+              <Pressable
+                key={inquiry.id}
+                style={[styles.inquiryCard, { backgroundColor: theme.backgroundDefault }]}
+                onPress={() => navigation.navigate('Inquiries')}
               >
-                <Image
-                  source={{ uri: app.applicantPhoto || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100' }}
-                  style={styles.applicantPhoto}
-                />
-                <View style={styles.applicationInfo}>
+                {inquiry.renterPhoto ? (
+                  <Image
+                    source={{ uri: inquiry.renterPhoto }}
+                    style={styles.inquiryPhoto}
+                  />
+                ) : (
+                  <View style={[styles.inquiryPhoto, { backgroundColor: theme.backgroundSecondary, justifyContent: 'center', alignItems: 'center' }]}>
+                    <Feather name="user" size={20} color={theme.textSecondary} />
+                  </View>
+                )}
+                <View style={styles.inquiryInfo}>
                   <ThemedText style={[Typography.body, { fontWeight: '600' }]} numberOfLines={1}>
-                    {app.applicantName}
+                    {inquiry.renterName}
                   </ThemedText>
                   <ThemedText style={[Typography.caption, { color: theme.textSecondary }]} numberOfLines={1}>
-                    {app.propertyTitle}
+                    {inquiry.propertyTitle}
                   </ThemedText>
                 </View>
-                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(app.status) + '20' }]}>
-                  <ThemedText style={[Typography.small, { color: getStatusColor(app.status), fontWeight: '600' }]}>
-                    {app.status.charAt(0).toUpperCase() + app.status.slice(1)}
+                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(inquiry.status) + '20' }]}>
+                  <ThemedText style={[Typography.small, { color: getStatusColor(inquiry.status), fontWeight: '600' }]}>
+                    {inquiry.status.charAt(0).toUpperCase() + inquiry.status.slice(1)}
                   </ThemedText>
                 </View>
-              </View>
+              </Pressable>
             ))
           )}
         </View>
@@ -235,19 +234,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  applicationCard: {
+  inquiryCard: {
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: BorderRadius.medium,
     padding: Spacing.md,
     marginBottom: Spacing.sm,
   },
-  applicantPhoto: {
+  inquiryPhoto: {
     width: 44,
     height: 44,
     borderRadius: 22,
   },
-  applicationInfo: {
+  inquiryInfo: {
     flex: 1,
     marginLeft: Spacing.md,
   },

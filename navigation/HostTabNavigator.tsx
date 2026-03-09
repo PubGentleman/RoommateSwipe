@@ -8,8 +8,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HostDashboardScreen } from '../screens/host/HostDashboardScreen';
 import { MyListingsScreen } from '../screens/host/MyListingsScreen';
 import { CreateEditListingScreen } from '../screens/host/CreateEditListingScreen';
-import { ApplicationsScreen } from '../screens/host/ApplicationsScreen';
 import { HostInquiriesScreen } from '../screens/host/HostInquiriesScreen';
+import { RoommatesScreen } from '../screens/renter/RoommatesScreen';
 import { HostAnalyticsScreen } from '../screens/host/HostAnalyticsScreen';
 import { MessagesStackNavigator } from './MessagesStackNavigator';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
@@ -31,7 +31,7 @@ export type HostDashboardStackParamList = {
 export type HostTabParamList = {
   Dashboard: undefined;
   Listings: undefined;
-  Applications: undefined;
+  Roommates: undefined;
   Messages: undefined;
   Profile: undefined;
 };
@@ -63,7 +63,7 @@ function ListingsStackNavigator() {
 const HOST_TAB_CONFIG: Record<string, { icon: string; label: string }> = {
   Dashboard: { icon: 'grid', label: 'Dashboard' },
   Listings: { icon: 'home', label: 'Listings' },
-  Applications: { icon: 'file-text', label: 'Apps' },
+  Roommates: { icon: 'users', label: 'Match' },
   Messages: { icon: 'message-circle', label: 'Messages' },
   Profile: { icon: 'user', label: 'Profile' },
 };
@@ -174,7 +174,7 @@ export const HostTabNavigator = () => {
     >
       <Tab.Screen name="Dashboard" component={DashboardStackNavigator} />
       <Tab.Screen name="Listings" component={ListingsStackNavigator} />
-      <Tab.Screen name="Applications" component={ApplicationsScreen} />
+      <Tab.Screen name="Roommates" component={RoommatesScreen} />
       <Tab.Screen name="Messages" component={MessagesStackNavigator} />
       <Tab.Screen name="Profile" component={ProfileStackNavigator} />
     </Tab.Navigator>

@@ -7,7 +7,7 @@ import { ThemedText } from '../../components/ThemedText';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../hooks/useTheme';
 import { StorageService } from '../../utils/storage';
-import { Property, Application } from '../../types/models';
+import { Property, InterestCard } from '../../types/models';
 import { Spacing, BorderRadius } from '../../constants/theme';
 
 const ACCENT = '#ff6b5b';
@@ -18,7 +18,7 @@ export const HostAnalyticsScreen = () => {
   const { user } = useAuth();
   const { theme } = useTheme();
   const [properties, setProperties] = useState<Property[]>([]);
-  const [applications, setApplications] = useState<Application[]>([]);
+  const [inquiries, setInquiries] = useState<InterestCard[]>([]);
 
   useFocusEffect(
     useCallback(() => {
@@ -33,10 +33,8 @@ export const HostAnalyticsScreen = () => {
     const hostProperties = allProperties.filter(p => p.hostId === user.id);
     setProperties(hostProperties);
 
-    const allApps = await StorageService.getApplications();
-    const hostPropertyIds = new Set(hostProperties.map(p => p.id));
-    const hostApps = allApps.filter(a => hostPropertyIds.has(a.propertyId));
-    setApplications(hostApps);
+    const hostInquiries = await StorageService.getInterestCardsForHost(user.id);
+    setInquiries(hostInquiries);
   };
 
   const totalListings = properties.length;
@@ -44,20 +42,20 @@ export const HostAnalyticsScreen = () => {
   const rentedListings = properties.filter(p => !!p.rentedDate).length;
   const pausedListings = properties.filter(p => !p.available && !p.rentedDate).length;
 
-  const totalApplications = applications.length;
-  const pendingApps = applications.filter(a => a.status === 'pending').length;
-  const approvedApps = applications.filter(a => a.status === 'approved').length;
-  const rejectedApps = applications.filter(a => a.status === 'rejected').length;
-  const approvalRate = totalApplications > 0 ? Math.round((approvedApps / totalApplications) * 100) : 0;
+  const totalInquiries = inquiries.length;
+  const pendingInquiries = inquiries.filter(i => i.status === 'pending').length;
+  const acceptedInquiries = inquiries.filter(i => i.status === 'accepted').length;
+  const passedInquiries = inquiries.filter(i => i.status === 'passed').length;
+  const acceptRate = totalInquiries > 0 ? Math.round((acceptedInquiries / totalInquiries) * 100) : 0;
 
-  const estimatedViews = totalApplications * 15;
-  const estimatedSaves = totalApplications * 8;
+  const estimatedViews = totalInquiries * 15;
+  const estimatedSaves = totalInquiries * 8;
 
-  const perListingApps = properties.map(p => {
-    const count = applications.filter(a => a.propertyId === p.id).length;
-    return { property: p, appCount: count };
+  const perListingInquiries = properties.map(p => {
+    const count = inquiries.filter(i => i.propertyId === p.id).length;
+    return { property: p, inquiryCount: count };
   });
-  const maxAppCount = Math.max(...perListingApps.map(p => p.appCount), 1);
+  const maxInquiryCount = Math.max(...perListingInquiries.map(p => p.inquiryCount), 1);
 
   const getStatusLabel = (p: Property) => {
     if (p.rentedDate) return 'Rented';
@@ -77,14 +75,14 @@ export const HostAnalyticsScreen = () => {
       <View style={styles.overviewGrid}>
         <OverviewCard icon="home" label="Total Listings" value={totalListings} />
         <OverviewCard icon="check-circle" label="Active" value={activeListings} color="#3ECF8E" />
-        <OverviewCard icon="file-text" label="Applications" value={totalApplications} />
-        <OverviewCard icon="trending-up" label="Approval Rate" value={`${approvalRate}%`} color={ACCENT} />
+        <OverviewCard icon="heart" label="Inquiries" value={totalInquiries} />
+        <OverviewCard icon="trending-up" label="Accept Rate" value={`${acceptRate}%`} color={ACCENT} />
       </View>
 
       <View style={styles.statusRow}>
-        <StatusPill label="Pending" value={pendingApps} color="#FFA500" />
-        <StatusPill label="Approved" value={approvedApps} color="#3ECF8E" />
-        <StatusPill label="Rejected" value={rejectedApps} color="#FF4757" />
+        <StatusPill label="Pending" value={pendingInquiries} color="#FFA500" />
+        <StatusPill label="Accepted" value={acceptedInquiries} color="#3ECF8E" />
+        <StatusPill label="Passed" value={passedInquiries} color="#FF4757" />
         <StatusPill label="Rented" value={rentedListings} color="#5B7FFF" />
         <StatusPill label="Paused" value={pausedListings} color="#FFA500" />
       </View>
@@ -93,18 +91,18 @@ export const HostAnalyticsScreen = () => {
       <View style={[styles.card, { backgroundColor: CARD_BG }]}>
         <FunnelRow label="Estimated Views" value={estimatedViews} maxValue={estimatedViews} color="#5B7FFF" />
         <FunnelRow label="Estimated Saves" value={estimatedSaves} maxValue={estimatedViews} color="#FFA500" />
-        <FunnelRow label="Applications" value={totalApplications} maxValue={estimatedViews} color={ACCENT} />
-        <FunnelRow label="Approved" value={approvedApps} maxValue={estimatedViews} color="#3ECF8E" />
+        <FunnelRow label="Inquiries" value={totalInquiries} maxValue={estimatedViews} color={ACCENT} />
+        <FunnelRow label="Accepted" value={acceptedInquiries} maxValue={estimatedViews} color="#3ECF8E" />
       </View>
 
       <ThemedText type="h2" style={styles.sectionTitle}>Per-Listing Breakdown</ThemedText>
-      {perListingApps.length === 0 ? (
+      {perListingInquiries.length === 0 ? (
         <View style={[styles.card, { backgroundColor: CARD_BG, alignItems: 'center', paddingVertical: Spacing.xxl }]}>
           <Feather name="bar-chart-2" size={40} color="#666" />
           <ThemedText style={{ color: '#888', marginTop: Spacing.md }}>No listings yet</ThemedText>
         </View>
       ) : (
-        perListingApps.map(({ property, appCount }) => (
+        perListingInquiries.map(({ property, inquiryCount }) => (
           <View key={property.id} style={[styles.card, { backgroundColor: CARD_BG, marginBottom: Spacing.md }]}>
             <View style={styles.listingHeader}>
               <ThemedText type="h3" style={{ flex: 1 }} numberOfLines={1}>{property.title}</ThemedText>
@@ -116,13 +114,13 @@ export const HostAnalyticsScreen = () => {
             </View>
             <ThemedText style={{ color: '#888', marginBottom: Spacing.sm }}>${property.price}/mo</ThemedText>
             <View style={styles.barRow}>
-              <ThemedText style={{ color: '#aaa', width: 80 }}>{appCount} apps</ThemedText>
+              <ThemedText style={{ color: '#aaa', width: 80 }}>{inquiryCount} inquiries</ThemedText>
               <View style={styles.barContainer}>
                 <View
                   style={[
                     styles.bar,
                     {
-                      width: `${Math.max((appCount / maxAppCount) * 100, appCount > 0 ? 8 : 0)}%`,
+                      width: `${Math.max((inquiryCount / maxInquiryCount) * 100, inquiryCount > 0 ? 8 : 0)}%`,
                       backgroundColor: ACCENT,
                     },
                   ]}
@@ -139,12 +137,12 @@ export const HostAnalyticsScreen = () => {
           <Feather name="trending-up" size={24} color="#3ECF8E" />
           <View style={{ marginLeft: Spacing.md, flex: 1 }}>
             <ThemedText type="h3">
-              {totalApplications > 0 ? 'Trending Up' : 'Getting Started'}
+              {totalInquiries > 0 ? 'Trending Up' : 'Getting Started'}
             </ThemedText>
             <ThemedText style={{ color: '#888', marginTop: Spacing.xs }}>
-              {totalApplications > 0
-                ? `You have ${totalApplications} application${totalApplications !== 1 ? 's' : ''} across ${totalListings} listing${totalListings !== 1 ? 's' : ''}. ${approvalRate}% approval rate.`
-                : 'Add listings to start receiving applications and tracking performance.'}
+              {totalInquiries > 0
+                ? `You have ${totalInquiries} inquir${totalInquiries !== 1 ? 'ies' : 'y'} across ${totalListings} listing${totalListings !== 1 ? 's' : ''}. ${acceptRate}% accept rate.`
+                : 'Add listings to start receiving inquiries and tracking performance.'}
             </ThemedText>
           </View>
         </View>
@@ -187,7 +185,7 @@ function FunnelRow({ label, value, maxValue, color }: { label: string; value: nu
       </View>
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   sectionTitle: {
