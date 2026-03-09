@@ -21,7 +21,7 @@ export const PlanBadge = ({ plan, size = 14 }: PlanBadgeProps) => {
   if (plan === 'elite') {
     return (
       <View style={styles.badge}>
-        <Feather name="zap" size={size} color="#FF4500" />
+        <Feather name="shield" size={size} color="#FF4500" />
       </View>
     );
   }
