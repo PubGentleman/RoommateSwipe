@@ -11,6 +11,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { ReportBlockModal } from '../../components/ReportBlockModal';
 import { PlanBadge } from '../../components/PlanBadge';
+import { AIFloatingButton } from '../../components/AIFloatingButton';
+import { RoomdrAISheet } from '../../components/RoomdrAISheet';
 
 type ChatScreenProps = {
   route: {
@@ -34,6 +36,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [otherUser, setOtherUser] = useState<RoommateProfile | null>(routeOtherUser || null);
   const flatListRef = useRef<FlatList>(null);
   const [showReportBlockModal, setShowReportBlockModal] = useState(false);
+  const [showAISheet, setShowAISheet] = useState(false);
   const [otherUserPlan, setOtherUserPlan] = useState<string | undefined>();
 
   // Tab bar height for bottom padding
@@ -315,6 +318,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         </Pressable>
       </View>
 
+      <AIFloatingButton onPress={() => setShowAISheet(true)} top={insets.top + 60} />
+
       {!canSeeOnlineStatus() ? (
         <Pressable
           style={[styles.premiumBanner, { backgroundColor: theme.backgroundSecondary }]}
@@ -386,6 +391,20 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           <Feather name="send" size={20} color="#FFFFFF" />
         </Pressable>
       </View>
+
+      <RoomdrAISheet
+        visible={showAISheet}
+        onDismiss={() => setShowAISheet(false)}
+        screenContext="chat"
+        contextData={{
+          chat: {
+            otherUserName: otherUser?.name,
+            otherUserProfile: otherUser || undefined,
+            messages: messages,
+            onSuggestMessage: (text) => setInputText(text),
+          },
+        }}
+      />
 
       {otherUser ? (
         <ReportBlockModal

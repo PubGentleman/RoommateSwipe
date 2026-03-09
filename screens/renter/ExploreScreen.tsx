@@ -22,6 +22,8 @@ import * as Haptics from 'expo-haptics';
 import { formatMoveInDate, calculateCompatibility, getMatchQualityColor, getGenderSymbol, formatLocation } from '../../utils/matchingAlgorithm';
 import { getZodiacSymbol } from '../../utils/zodiacUtils';
 import { PropertyMapView } from '../../components/PropertyMapView';
+import { AIFloatingButton } from '../../components/AIFloatingButton';
+import { RoomdrAISheet } from '../../components/RoomdrAISheet';
 
 const COMMON_AMENITIES = [
   'Parking', 'Gym', 'Pool', 'Laundry', 'Pet Friendly',
@@ -93,6 +95,7 @@ export const ExploreScreen = () => {
   const [paywallFeature, setPaywallFeature] = useState('');
   const [paywallPlan, setPaywallPlan] = useState<'plus' | 'elite'>('plus');
   const [activeQuickFilters, setActiveQuickFilters] = useState<Set<string>>(new Set(['bestMatch']));
+  const [showAISheet, setShowAISheet] = useState(false);
 
   useEffect(() => {
     loadProperties();
@@ -688,6 +691,7 @@ export const ExploreScreen = () => {
           {hasActiveFilters() ? <View style={styles.filterDot} /> : null}
         </Pressable>
       </View>
+      <AIFloatingButton onPress={() => setShowAISheet(true)} top={insets.top + 60} />
 
       <View style={styles.cityRow}>
         <CityPillButton activeCity={activeCity} onPress={() => setShowCityPicker(true)} />
@@ -1383,6 +1387,23 @@ export const ExploreScreen = () => {
         visible={showInterestConfirmation}
         onClose={() => setShowInterestConfirmation(false)}
         isSuperInterest={confirmationWasSuper}
+      />
+      <RoomdrAISheet
+        visible={showAISheet}
+        onDismiss={() => setShowAISheet(false)}
+        screenContext="explore"
+        contextData={{
+          explore: {
+            budget: user?.profileData?.budget || 0,
+            city: activeCity || undefined,
+            totalListings: properties.length,
+            filteredCount: filteredProperties.length,
+            activeFilters: filters,
+            onApplyFilters: (suggested) => {
+              setFilters(prev => ({ ...prev, ...suggested }));
+            },
+          },
+        }}
       />
     </View>
   );

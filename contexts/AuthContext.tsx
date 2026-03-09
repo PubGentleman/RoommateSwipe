@@ -253,7 +253,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await StorageService.seedInitialMatches(mockUser.id);
     }
     await StorageService.seedMockNotifications(mockUser.id);
-    setUser(mockUser);
+    const summaryUser = await checkWeeklySummary(mockUser);
+    setUser(summaryUser || mockUser);
+  };
+
+  const checkWeeklySummary = async (loginUser: User): Promise<User | null> => {
+    const lastSummary = (loginUser as any).lastAISummaryDate;
+    const now = new Date();
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+
+    if (!lastSummary || new Date(lastSummary) <= weekAgo) {
+      const likesCount = Math.floor(Math.random() * 12) + 3;
+      const responseRate = Math.floor(Math.random() * 25) + 65;
+      await StorageService.addNotification({
+        id: `notif-ai-weekly-${Date.now()}`,
+        userId: loginUser.id,
+        type: 'system',
+        title: 'Your Roomdr Weekly',
+        body: `${likesCount} new likes, ${responseRate}% response rate. Tap to see your AI insights.`,
+        isRead: false,
+        createdAt: now,
+        data: {},
+      });
+      const updatedUser = { ...loginUser, lastAISummaryDate: now.toISOString() };
+      await StorageService.setCurrentUser(updatedUser);
+      await StorageService.addOrUpdateUser(updatedUser);
+      return updatedUser;
+    }
+    return null;
   };
 
   const register = async (email: string, password: string, name: string, role: UserRole) => {

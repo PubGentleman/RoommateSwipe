@@ -16,6 +16,8 @@ import { getVerificationLevel } from '../../components/VerificationBadge';
 import { calculateCompatibility } from '../../utils/matchingAlgorithm';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PlanBadge } from '../../components/PlanBadge';
+import { AIFloatingButton } from '../../components/AIFloatingButton';
+import { RoomdrAISheet } from '../../components/RoomdrAISheet';
 import { User } from '../../types/models';
 
 type MessagesScreenNavigationProp = NativeStackNavigationProp<MessagesStackParamList, 'MessagesList'>;
@@ -48,6 +50,7 @@ export const MessagesScreen = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
+  const [showAISheet, setShowAISheet] = useState(false);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -428,6 +431,8 @@ export const MessagesScreen = () => {
         </View>
       </View>
 
+      <AIFloatingButton onPress={() => setShowAISheet(true)} top={insets.top + 60} />
+
       {isSearchVisible ? (
         <View style={styles.searchBarContainer}>
           <Feather name="search" size={14} color="rgba(255,255,255,0.4)" />
@@ -459,6 +464,12 @@ export const MessagesScreen = () => {
           { paddingBottom: insets.bottom + 100, flexGrow: filteredConversations.length === 0 ? 1 : undefined },
         ]}
         showsVerticalScrollIndicator={false}
+      />
+
+      <RoomdrAISheet
+        visible={showAISheet}
+        onDismiss={() => setShowAISheet(false)}
+        screenContext="messages"
       />
     </View>
   );

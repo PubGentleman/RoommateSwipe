@@ -1,6 +1,6 @@
 # Overview
 
-Roomdr is a React Native mobile application designed to connect renters, hosts, and agents/landlords in the roommate-finding marketplace. It functions as an "Airbnb for roommates," offering features like role-based navigation, swipe-based roommate matching, property listings, group formation, and messaging to streamline the housing and roommate search process. The project aims to capture a significant share of the roommate search market by providing a comprehensive and intuitive platform.
+Roomdr is a React Native mobile application aiming to be the "Airbnb for roommates." It connects renters, hosts, and agents/landlords, streamlining the housing and roommate search process. The platform offers role-based navigation, swipe-based roommate matching, property listings, group formation, and secure messaging. Its core purpose is to capture a significant share of the roommate search market by providing a comprehensive and intuitive solution for finding roommates and properties.
 
 # User Preferences
 
@@ -24,80 +24,63 @@ Preferred communication style: Simple, everyday language.
 
 ## Core Functionality
 
-Roomdr implements a points-based compatibility algorithm (0-100 score) across 14 weighted factors including location, budget, and lifestyle, providing detailed breakdowns with strengths and concerns. Date of Birth is used to calculate Zodiac signs for minor compatibility weighting.
+Roomdr features a points-based compatibility algorithm (0-100 score) using 14 weighted factors, including location, budget, and lifestyle. Date of Birth is used for Zodiac sign compatibility.
 
 ## Frontend Architecture
 
-The application is built with React Native and Expo using TypeScript, featuring React Navigation for role-based access (Renter, Host, Agent/Landlord) and a theme system for light/dark modes.
+The application is built with React Native and Expo using TypeScript, utilizing React Navigation for role-based access (Renter, Host, Agent/Landlord) and a theme system supporting light/dark modes.
 
 **Key Features:**
-- **Renter:** Swipe-based matching, 1-on-1 messaging, group management, property exploration with advanced filters and map/list views, saved properties, rewind, profile view tracking, AI Match Assistant, animated match celebration, report/block system, notification feed, profile completion indicator, and mutual interest flow (send Interest Cards to hosts from property listings with daily limits and Super Interest for premium users). The Match screen has a dark Tinder-style UI with specific branding elements and action buttons. The Explore screen features redesigned property cards with: photo overlays (LEASE/SUBLET + ENTIRE UNIT/PRIVATE ROOM + FEATURED tags), price/title overlay on gradient, match score badge, host info row with gradient avatar and initials, "Fast reply" badge, "Available now"/"Pet OK" green badges, premium upsell row for basic users, and quick filter chips (Best Match, Under $2k, Private Room, Pet Friendly, Available Now, Near Transit). Uses `LinearGradient` for photo overlays and tab gradients.
-- **Host:** Full host dashboard with stats overview (total/active/paused/rented listings, inquiries, pending inquiries, unread messages), listing management (create/edit/delete/pause/unpause/mark rented), dedicated Inquiries screen for interest card management (filter by status, accept/pass with notifications, super interest highlighting), inquiry-based analytics screen (overview stats, conversion funnel, per-listing breakdowns), roommate matching (same swipe UI as renters), and role switching from Profile. Host tab navigator has 5 tabs: Dashboard, Listings, Match (Roommates), Messages, Profile. Dashboard and Listings tabs use stack navigators to push CreateEditListing and Analytics screens. Dashboard stack also includes Inquiries screen accessible via "View Inquiries" quick action.
+- **Renter:** Swipe-based matching, 1-on-1 messaging, group management, property exploration with advanced filters and map/list views, saved properties, profile view tracking, AI Match Assistant, animated match celebration, report/block system, notification feed, profile completion indicator, and a mutual interest flow (Interest Cards and Super Interest).
+- **Host:** Full host dashboard with statistics, listing management (create, edit, delete, pause, mark rented), dedicated Inquiries screen for interest card management, inquiry-based analytics, roommate matching (same UI as renters), and role switching.
 - **Agent:** Multi-property portfolio management, document verification, and a legal template library.
 
 **User Experience Enhancements:**
-- **Match Celebration:** An animated full-screen modal appears upon mutual likes, displaying user photos, compatibility, and options to message or continue swiping.
-- **Profile Questionnaire:** A multi-step guided questionnaire replaces previous single-page forms, featuring progress tracking, `SelectionCard` components, and keyboard avoidance.
-- **Report/Block System:** Users can report or block others from various screens, filtering blocked users from interactions.
-- **Notification System:** A context-based system provides app-wide notifications with unread counts, real-time toast alerts, and configurable preferences.
-- **Profile Completion:** A component tracks progress across 10 weighted profile fields, offering suggestions for improvement.
-- **Identity Verification:** Users can verify identity via phone, government ID, and social media, with verification badges displayed across the app.
-- **Onboarding Tutorial:** A swipeable tutorial introduces new users to core features upon first login.
+- **Match Celebration:** An animated full-screen modal for mutual likes.
+- **Profile Questionnaire:** A multi-step guided questionnaire with progress tracking.
+- **Report/Block System:** Functionality to report or block users.
+- **Notification System:** Context-based, app-wide notifications with real-time toast alerts.
+- **Profile Completion:** A component tracking progress across weighted profile fields.
+- **Identity Verification:** Users can verify identity via phone, government ID, social media, with optional background and income checks for elite users.
+- **Onboarding Tutorial:** A swipeable tutorial for new users.
+- **Roomdr AI Assistant:** A floating button providing context-aware AI assistance for compatibility breakdowns, conversation coaching, and smart filter tips.
+- **Read Receipts:** Elite users can see message read status.
+- **Who Liked You:** Plus/Elite users can view received interest cards.
 
-Animations are powered by React Native Reanimated, gestures by React Native Gesture Handler, and state managed by React Context API and AsyncStorage.
+Animations are handled by React Native Reanimated, gestures by React Native Gesture Handler, and state is managed by React Context API and AsyncStorage.
 
 ## Authentication & Authorization
 
-The system uses mock authentication for demonstration, supporting role-based navigation and conditional access for `renter`, `host`, and `agent` roles. Privacy settings and account deletion are implemented.
+Mock authentication supports role-based navigation and conditional access for `renter`, `host`, and `agent` roles. Privacy settings and account deletion are implemented.
 
 ## Subscription & Paywall System
 
-**Renter Tiers:** Basic (Free), Plus ($14.99/mo or $149.90/yr), Elite ($29.99/mo or $299.90/yr). Annual billing saves 2 months. 7-day free trial for Plus. Usage stats shown for Basic users (interest cards, rewinds, super likes). Elite highlighted as recommended.
+**Renter Tiers:** Basic (Free), Plus, and Elite. Includes one-time purchases like Super Interest.
+**Host Tiers:** Starter (Free), Pro, and Business. Includes one-time purchases like Listing Boost and Host Verification Badge.
 
-**Host Tiers:** Starter (Free, 1 active listing, 5 inquiry responses/mo, basic analytics views only), Pro ($29.99/mo or $299.90/yr, up to 5 active listings, unlimited inquiry responses, boosted listing visibility, full analytics dashboard, verified host badge), Business ($79.99/mo or $799.90/yr, unlimited listings, priority placement in search, featured listing on Explore, advanced analytics, dedicated host support). Pro highlighted as recommended.
-
-**One-Time Purchases:** Listing Boost ($4.99/7 days), Host Verification Badge ($9.99), Super Interest ($0.99/use).
-
-**Paywall System:** `PaywallSheet` component (`components/PaywallSheet.tsx`) — reusable modal bottom sheet triggered when users hit plan limits. Adapts for renter vs host tiers. Wired into ExploreScreen (interest card limits, advanced filters, Walk Score), MyListingsScreen (listing limits), and RoommatesScreen (AI Match Assistant).
-
-**Plan Badges:** `PlanBadge` component (`components/PlanBadge.tsx`) — gold "award" icon for Plus users, orange-red "zap" icon for Elite users. Shown in MessagesScreen, ChatScreen, RoommatesScreen cards, and MatchCelebrationModal.
-
-**AuthContext Host Functions:** `upgradeHostPlan`, `downgradeHostPlan`, `getHostPlan`, `canAddListing`, `canRespondToInquiry`, `useInquiryResponse`, `purchaseListingBoost`, `purchaseHostVerification`, `purchaseSuperInterest`. Host scheduled downgrades applied on login. All mutations persist to both currentUser and users list.
-
-**Key Files:** `screens/shared/PlansScreen.tsx` (renter plans), `screens/host/HostPricingScreen.tsx` (host plans), `components/PaywallSheet.tsx`, `components/PlanBadge.tsx`.
+A `PaywallSheet` component handles subscription prompts when users hit plan limits. `PlanBadge` components indicate user tiers. `AuthContext` includes functions for managing host plans and purchases.
 
 ## Data Layer
 
-The data layer uses mock data and TypeScript interfaces for models like `RoommateProfile`, `Property`, `Group`, `Conversation`, `Message`, `Match`, `Application`, and `InterestCard`. There are 201 total demo roommate profiles spread across 11 major US cities (New York, Los Angeles, Chicago, Miami, San Francisco, Austin, Seattle, Denver, Boston, Houston, Atlanta). Profiles are split across three files: 26 base profiles in `utils/mockData.ts`, 100 in `utils/additionalProfiles.ts`, and 75 in `utils/extraProfiles.ts`, all merged via spread operator. The app also has 17 conversations, 50 properties, 30 groups, and 10 applications across all cities. Extra conversations, properties, groups, and applications are in `utils/extraMockData.ts`. Data version is managed via `MOCK_DATA_VERSION` in `utils/mockData.ts` (currently '2.0.0') — changing this triggers automatic re-seeding on next app load. It supports reciprocal matching, automatic conversation creation, and message limits. Property management includes distinguishing room types and tracking existing roommates. An AI Match Assistant refines user profiles through natural language interactions.
+The data layer uses mock data and TypeScript interfaces for models such as `RoommateProfile`, `Property`, `Group`, `Conversation`, `Message`, `Match`, `Application`, and `InterestCard`. Mock data is extensive, covering 11 major US cities and various entities, with versioning for automatic re-seeding.
 
 ## Dark Theme UI
 
-All screens use a consistent dark theme with hardcoded colors:
-- Root background: `#111` (near-black)
-- Card backgrounds: `#1a1a1a` (dark gray)
-- Accent/CTA: coral `#ff6b5b` with gradient to `#e83a2a`
-- Text: white `#fff` with opacity variants for secondary text (`rgba(255,255,255,0.35)`)
-- Section titles: uppercase, `rgba(255,255,255,0.5)`, 13px, 700 weight
-- Settings items: colored icon boxes (purple, green, orange, red) with rounded backgrounds
-- All profile sub-screens (Payment, Plans, Notifications, Privacy, Verification, etc.) use matching dark backgrounds
-
-The ProfileScreen uses a custom ScrollView layout with manual safe area insets (matching other main screens like RoommatesScreen and MessagesScreen). Sub-screens use either ScreenScrollView or custom layouts with dark background overrides.
+The application uses a consistent dark theme with specific color palettes for backgrounds, cards, accents, and text, ensuring a cohesive visual experience across all screens.
 
 ## Branding
 
-The `RoomdrLogo` component renders the brand logo using `react-native-svg` and `expo-linear-gradient`, with variants for horizontal, stacked, and icon-only layouts in `sm`, `md`, `lg` sizes. Brand colors are coral-red gradients and white.
+The `RoomdrLogo` component renders the brand logo using `react-native-svg` and `expo-linear-gradient`, with variants for different layouts and sizes. Brand colors are coral-red gradients and white.
 
 ## Location System
 
-The application supports over 10 US cities across multiple states, centralizing location data. A `LocationPicker` component provides a cascading State → City → Neighborhood selection. Location filtering is applied to roommate profiles, groups, and property searches. Public property displays enforce location privacy by showing only neighborhood and city.
+The application supports over 10 US cities with a centralized location data system. A `LocationPicker` component provides cascading selection. Location filtering is applied to searches. A shared `CityContext` synchronizes city selection across Match, Groups, and Explore tabs, persisting selections via AsyncStorage.
 
-**Shared City Selector (All Tabs):** City selection is synchronized across the Match, Groups, and Explore tabs via a shared `CityContext` (`contexts/CityContext.tsx`). All three tabs use the same `CityPillButton` (map-pin icon + city name + dropdown arrow) and `CityPickerModal` bottom sheet (`components/CityPickerModal.tsx`) with Recently Viewed cities (last 3), Popular Cities chips, and a search bar. Selecting a city on any tab carries over to all others. The selected city and recent cities are persisted via AsyncStorage. The Match screen also has a filter icon button beside the city pill.
-
-**Match Filters (`components/RoommateFilterSheet.tsx`):** A comprehensive filter bottom sheet accessible from the filter icon on the Roommates screen. Includes: Budget Range (preset chips for $500-$1K, $1K-$2K, $2K-$3.5K, $3.5K+), Move-in Date (ASAP, 30 days, 3 months), Room Type (Private/Shared/Entire/Studio, multi-select), Lifestyle (Pet Friendly, Non-Smoker, Remote Worker, Students OK, Night Owl, Early Bird, multi-select), Search Radius (5/10/25/50mi segmented control), and Minimum Compatibility (Any/50%+/60%+/70%+/80%+/90%+). Filters persist via AsyncStorage. Active filters show as dismissible chips below the city selector. Filter count badge appears on the filter icon. Zero-results state offers a "Relax Filters" button. Real-time matching count shown in the sheet. Accent color: coral `#ff6b5b`.
+Match filters are comprehensive, including Budget Range, Move-in Date, Room Type, Lifestyle, Search Radius, and Minimum Compatibility, all persistently stored and displayed as dismissible chips.
 
 ## Technical Decisions
 
-Key technical decisions include Babel module resolver for simplified imports, platform-specific UI adaptations, performance optimizations via React Native's New Architecture, React Compiler, and Reanimated, and error handling through an error boundary component.
+Key technical decisions include Babel module resolver for simplified imports, platform-specific UI adaptations, performance optimizations via React Native's New Architecture, React Compiler, and Reanimated, and robust error handling through an error boundary component.
 
 # External Dependencies
 
@@ -124,9 +107,8 @@ Key technical decisions include Babel module resolver for simplified imports, pl
 - `@react-native-async-storage/async-storage`
 
 **Maps:**
-- `react-native-maps` (iOS/Android native maps)
-- Leaflet/OpenStreetMap via iframe for web maps
-- `react-native-webview`
+- `react-native-maps`
+- `react-native-webview` (for web-based maps like Leaflet/OpenStreetMap)
 
 **Utilities:**
 - `expo-linking`
@@ -137,7 +119,7 @@ Key technical decisions include Babel module resolver for simplified imports, pl
 - `react-native-keyboard-controller`
 
 **Monetization:**
-- `AdBanner` component (placeholder for Google AdMob integration)
+- `AdBanner` component (placeholder for Google AdMob)
 
 **Development Tools:**
 - `typescript`
