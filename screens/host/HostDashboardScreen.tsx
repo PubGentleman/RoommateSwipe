@@ -96,10 +96,7 @@ export const HostDashboardScreen = () => {
       icon: 'heart' as keyof typeof Feather.glyphMap,
       label: 'View Inquiries',
       onPress: () => {
-        const parent = navigation.getParent();
-        if (parent) {
-          parent.navigate('Inquiries');
-        }
+        navigation.navigate('Inquiries');
       },
     },
     {

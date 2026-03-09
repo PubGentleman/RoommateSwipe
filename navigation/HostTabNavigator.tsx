@@ -25,12 +25,12 @@ export type HostDashboardStackParamList = {
   DashboardMain: undefined;
   CreateEditListing: { propertyId?: string };
   Analytics: undefined;
+  Inquiries: undefined;
 };
 
 export type HostTabParamList = {
   Dashboard: undefined;
   Listings: undefined;
-  Inquiries: undefined;
   Applications: undefined;
   Messages: undefined;
   Profile: undefined;
@@ -46,6 +46,7 @@ function DashboardStackNavigator() {
       <DashboardStack.Screen name="DashboardMain" component={HostDashboardScreen} />
       <DashboardStack.Screen name="CreateEditListing" component={CreateEditListingScreen} />
       <DashboardStack.Screen name="Analytics" component={HostAnalyticsScreen} />
+      <DashboardStack.Screen name="Inquiries" component={HostInquiriesScreen} />
     </DashboardStack.Navigator>
   );
 }
@@ -62,7 +63,6 @@ function ListingsStackNavigator() {
 const HOST_TAB_CONFIG: Record<string, { icon: string; label: string }> = {
   Dashboard: { icon: 'grid', label: 'Dashboard' },
   Listings: { icon: 'home', label: 'Listings' },
-  Inquiries: { icon: 'heart', label: 'Inquiries' },
   Applications: { icon: 'file-text', label: 'Apps' },
   Messages: { icon: 'message-circle', label: 'Messages' },
   Profile: { icon: 'user', label: 'Profile' },
@@ -174,7 +174,6 @@ export const HostTabNavigator = () => {
     >
       <Tab.Screen name="Dashboard" component={DashboardStackNavigator} />
       <Tab.Screen name="Listings" component={ListingsStackNavigator} />
-      <Tab.Screen name="Inquiries" component={HostInquiriesScreen} />
       <Tab.Screen name="Applications" component={ApplicationsScreen} />
       <Tab.Screen name="Messages" component={MessagesStackNavigator} />
       <Tab.Screen name="Profile" component={ProfileStackNavigator} />
