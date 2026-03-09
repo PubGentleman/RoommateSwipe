@@ -8,7 +8,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { StorageService } from '../../utils/storage';
-import { Property, Application } from '../../types/models';
+import { Property, Application, InterestCard } from '../../types/models';
 
 interface StatCard {
   icon: keyof typeof Feather.glyphMap;
@@ -23,6 +23,7 @@ export const HostDashboardScreen = () => {
   const navigation = useNavigation<any>();
   const [listings, setListings] = useState<Property[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
+  const [inquiries, setInquiries] = useState<InterestCard[]>([]);
   const [messageCount, setMessageCount] = useState(0);
 
   const loadData = useCallback(async () => {
@@ -42,6 +43,9 @@ export const HostDashboardScreen = () => {
     const allConvos = await StorageService.getConversations();
     const unreadMessages = allConvos.reduce((sum, c) => sum + (c.unread || 0), 0);
     setMessageCount(unreadMessages);
+
+    const interestCards = await StorageService.getInterestCardsForHost(user.id);
+    setInquiries(interestCards);
   }, [user]);
 
   useFocusEffect(
@@ -54,14 +58,16 @@ export const HostDashboardScreen = () => {
   const pausedCount = listings.filter(p => !p.available && !p.rentedDate).length;
   const rentedCount = listings.filter(p => !!p.rentedDate).length;
   const pendingApps = applications.filter(a => a.status === 'pending').length;
+  const pendingInquiries = inquiries.filter(c => c.status === 'pending').length;
 
   const stats: StatCard[] = [
     { icon: 'home', value: listings.length, label: 'Total Listings', color: theme.info },
     { icon: 'check-circle', value: activeCount, label: 'Active', color: theme.success },
     { icon: 'pause-circle', value: pausedCount, label: 'Paused', color: theme.warning },
     { icon: 'lock', value: rentedCount, label: 'Rented', color: theme.primary },
+    { icon: 'heart', value: inquiries.length, label: 'Inquiries', color: '#ff6b5b' },
+    { icon: 'clock', value: pendingInquiries, label: 'Pending Inquiries', color: '#FFA500' },
     { icon: 'file-text', value: applications.length, label: 'Applications', color: theme.secondary },
-    { icon: 'clock', value: pendingApps, label: 'Pending', color: '#FFA500' },
     { icon: 'message-circle', value: messageCount, label: 'Unread Messages', color: '#4ECDC4' },
   ];
 
@@ -84,6 +90,16 @@ export const HostDashboardScreen = () => {
       label: 'Add Listing',
       onPress: () => {
         navigation.navigate('CreateEditListing');
+      },
+    },
+    {
+      icon: 'heart' as keyof typeof Feather.glyphMap,
+      label: 'View Inquiries',
+      onPress: () => {
+        const parent = navigation.getParent();
+        if (parent) {
+          parent.navigate('Inquiries');
+        }
       },
     },
     {

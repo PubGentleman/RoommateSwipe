@@ -9,6 +9,7 @@ import { HostDashboardScreen } from '../screens/host/HostDashboardScreen';
 import { MyListingsScreen } from '../screens/host/MyListingsScreen';
 import { CreateEditListingScreen } from '../screens/host/CreateEditListingScreen';
 import { ApplicationsScreen } from '../screens/host/ApplicationsScreen';
+import { HostInquiriesScreen } from '../screens/host/HostInquiriesScreen';
 import { HostAnalyticsScreen } from '../screens/host/HostAnalyticsScreen';
 import { MessagesStackNavigator } from './MessagesStackNavigator';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
@@ -29,6 +30,7 @@ export type HostDashboardStackParamList = {
 export type HostTabParamList = {
   Dashboard: undefined;
   Listings: undefined;
+  Inquiries: undefined;
   Applications: undefined;
   Messages: undefined;
   Profile: undefined;
@@ -60,6 +62,7 @@ function ListingsStackNavigator() {
 const HOST_TAB_CONFIG: Record<string, { icon: string; label: string }> = {
   Dashboard: { icon: 'grid', label: 'Dashboard' },
   Listings: { icon: 'home', label: 'Listings' },
+  Inquiries: { icon: 'heart', label: 'Inquiries' },
   Applications: { icon: 'file-text', label: 'Apps' },
   Messages: { icon: 'message-circle', label: 'Messages' },
   Profile: { icon: 'user', label: 'Profile' },
@@ -171,6 +174,7 @@ export const HostTabNavigator = () => {
     >
       <Tab.Screen name="Dashboard" component={DashboardStackNavigator} />
       <Tab.Screen name="Listings" component={ListingsStackNavigator} />
+      <Tab.Screen name="Inquiries" component={HostInquiriesScreen} />
       <Tab.Screen name="Applications" component={ApplicationsScreen} />
       <Tab.Screen name="Messages" component={MessagesStackNavigator} />
       <Tab.Screen name="Profile" component={ProfileStackNavigator} />
