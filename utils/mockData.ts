@@ -4,7 +4,7 @@ import { additionalProfiles } from './additionalProfiles';
 import { extraProfiles } from './extraProfiles';
 import { extraConversations, extraProperties, extraGroups, extraApplications } from './extraMockData';
 
-export const MOCK_DATA_VERSION = '2.0.0';
+export const MOCK_DATA_VERSION = '2.1.0';
 
 export const mockProfileUsers: User[] = [
   {
@@ -416,6 +416,8 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       location: 'Financial District',
       moveInDate: '01/01/2025',
       bedrooms: 2,
+      bathrooms: 1,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-11-01') },
@@ -451,6 +453,8 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       location: 'Bushwick',
       moveInDate: '02/01/2025',
       bedrooms: 2,
+      bathrooms: 2,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-10-15') },
@@ -485,6 +489,8 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       location: 'Park Slope',
       moveInDate: '01/15/2025',
       bedrooms: 2,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-01') },
@@ -519,6 +525,8 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       location: 'Astoria',
       moveInDate: '01/10/2025',
       bedrooms: 2,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-11-20') },
@@ -554,6 +562,8 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       location: 'Williamsburg',
       moveInDate: '01/20/2025',
       bedrooms: 1,
+      bathrooms: 1,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-10') },
@@ -586,6 +596,8 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       location: 'Financial District',
       moveInDate: '02/15/2025',
       bedrooms: 2,
+      bathrooms: 2,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-10-01') },
@@ -620,6 +632,8 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       location: 'Crown Heights',
       moveInDate: '01/25/2025',
       bedrooms: 2,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-11-10') },
@@ -654,6 +668,8 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       location: 'Bushwick',
       moveInDate: '02/01/2025',
       bedrooms: 1,
+      bathrooms: 1,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-05') },
@@ -688,6 +704,8 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       location: 'Park Slope',
       moveInDate: '01/30/2025',
       bedrooms: 2,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-11-28') },
@@ -722,6 +740,8 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       location: 'Tribeca',
       moveInDate: '02/10/2025',
       bedrooms: 2,
+      bathrooms: 2,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-10-20') },
@@ -754,6 +774,8 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       location: 'Upper East Side',
       moveInDate: '01/05/2025',
       bedrooms: 1,
+      bathrooms: 1,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-15') },
@@ -789,6 +811,8 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       location: 'Greenwich Village',
       moveInDate: '02/20/2025',
       bedrooms: 2,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-11-05') },
@@ -821,6 +845,8 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       location: 'East Williamsburg',
       moveInDate: '01/15/2025',
       bedrooms: 2,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-20') },
@@ -856,6 +882,8 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       location: 'Chelsea',
       moveInDate: '02/05/2025',
       bedrooms: 1,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-01') },
@@ -890,6 +918,8 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       location: 'Upper West Side',
       moveInDate: '03/01/2025',
       bedrooms: 2,
+      bathrooms: 2,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-11-20') },
@@ -924,6 +954,8 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       location: 'SoHo',
       moveInDate: '01/12/2025',
       bedrooms: 1,
+      bathrooms: 1,
+      privateBathroom: true,
     },
     compatibility: 77,
   },
@@ -952,6 +984,8 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       location: 'East Village',
       moveInDate: '02/12/2025',
       bedrooms: 2,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     compatibility: 84,
   },
@@ -976,6 +1010,8 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       location: 'Hell\'s Kitchen',
       moveInDate: '01/28/2025',
       bedrooms: 2,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     compatibility: 86,
   },
@@ -1000,6 +1036,8 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       location: 'Bedford-Stuyvesant',
       moveInDate: '02/08/2025',
       bedrooms: 1,
+      bathrooms: 2,
+      privateBathroom: false,
     },
     compatibility: 75,
   },
@@ -1024,6 +1062,8 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       location: 'Flushing',
       moveInDate: '02/18/2025',
       bedrooms: 2,
+      bathrooms: 1,
+      privateBathroom: true,
     },
     compatibility: 89,
   },
@@ -1052,6 +1092,8 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       location: 'Silver Lake',
       moveInDate: '03/01/2025',
       bedrooms: 2,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     compatibility: 84,
   },
@@ -1081,6 +1123,8 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       location: 'Mission District',
       moveInDate: '02/15/2025',
       bedrooms: 1,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     compatibility: 88,
   },
@@ -1109,6 +1153,8 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       location: 'Wicker Park',
       moveInDate: '01/20/2025',
       bedrooms: 2,
+      bathrooms: 1,
+      privateBathroom: true,
     },
     compatibility: 79,
   },
@@ -1138,6 +1184,8 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       location: 'Coconut Grove',
       moveInDate: '02/01/2025',
       bedrooms: 2,
+      bathrooms: 2,
+      privateBathroom: false,
     },
     compatibility: 86,
   },
@@ -1166,6 +1214,8 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       location: 'Capitol Hill Seattle',
       moveInDate: '03/01/2025',
       bedrooms: 1,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     compatibility: 90,
   },
@@ -1193,6 +1243,8 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       location: 'Hyde Park',
       moveInDate: '01/15/2025',
       bedrooms: 1,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     compatibility: 82,
   },

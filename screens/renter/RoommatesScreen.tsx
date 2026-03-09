@@ -1582,6 +1582,24 @@ export const RoommatesScreen = () => {
                     <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{currentProfile.preferences.bedrooms}</ThemedText>
                   </View>
                 </View>
+                {currentProfile.preferences.privateBathroom != null ? (
+                  <View style={styles.detailRow}>
+                    <Feather name="droplet" size={20} color={theme.primary} />
+                    <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                      <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Private Bathroom</ThemedText>
+                      <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{currentProfile.preferences.privateBathroom ? 'Yes' : 'No'}</ThemedText>
+                    </View>
+                  </View>
+                ) : null}
+                {currentProfile.preferences.bathrooms ? (
+                  <View style={styles.detailRow}>
+                    <Feather name="layout" size={20} color={theme.primary} />
+                    <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                      <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Bathrooms in Apartment</ThemedText>
+                      <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{currentProfile.preferences.bathrooms}</ThemedText>
+                    </View>
+                  </View>
+                ) : null}
               </View>
 
               <View style={styles.detailSection}>

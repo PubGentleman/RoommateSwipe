@@ -27,6 +27,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Chelsea',
       moveInDate: '07/01/2025',
       bedrooms: 2,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-01') },
@@ -60,6 +62,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'East Village',
       moveInDate: '06/15/2025',
       bedrooms: 2,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-11-20') },
@@ -94,6 +98,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Astoria',
       moveInDate: '05/01/2025',
       bedrooms: 2,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-10-10') },
@@ -125,6 +131,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Crown Heights',
       moveInDate: '08/01/2025',
       bedrooms: 1,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-05') },
@@ -159,6 +167,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'West Village',
       moveInDate: '06/01/2025',
       bedrooms: 1,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-11-15') },
@@ -192,6 +202,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Greenpoint',
       moveInDate: '07/15/2025',
       bedrooms: 2,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-01') },
@@ -225,6 +237,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Tribeca',
       moveInDate: '05/15/2025',
       bedrooms: 2,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-11-10') },
@@ -258,6 +272,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Downtown LA',
       moveInDate: '06/01/2025',
       bedrooms: 1,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-10') },
@@ -291,6 +307,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Venice',
       moveInDate: '07/01/2025',
       bedrooms: 2,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-11-25') },
@@ -325,6 +343,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Echo Park',
       moveInDate: '06/15/2025',
       bedrooms: 2,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-01') },
@@ -358,6 +378,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Los Feliz',
       moveInDate: '05/01/2025',
       bedrooms: 2,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-10-20') },
@@ -389,6 +411,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Koreatown',
       moveInDate: '07/01/2025',
       bedrooms: 1,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     compatibility: 72,
   },
@@ -419,6 +443,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'West Hollywood',
       moveInDate: '08/01/2025',
       bedrooms: 2,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-15') },
@@ -452,6 +478,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Silver Lake',
       moveInDate: '06/01/2025',
       bedrooms: 1,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-11-05') },
@@ -484,6 +512,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Lincoln Park',
       moveInDate: '07/01/2025',
       bedrooms: 2,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-01') },
@@ -517,6 +547,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Wicker Park',
       moveInDate: '06/15/2025',
       bedrooms: 1,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-11-20') },
@@ -550,6 +582,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Logan Square',
       moveInDate: '05/15/2025',
       bedrooms: 1,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-10-15') },
@@ -583,6 +617,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Lakeview',
       moveInDate: '07/01/2025',
       bedrooms: 2,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-05') },
@@ -616,6 +652,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'River North',
       moveInDate: '06/01/2025',
       bedrooms: 1,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-11-15') },
@@ -649,6 +687,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'West Loop',
       moveInDate: '08/01/2025',
       bedrooms: 1,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     compatibility: 63,
   },
@@ -678,6 +718,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Hyde Park',
       moveInDate: '06/01/2025',
       bedrooms: 2,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-10') },
@@ -712,6 +754,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'South Beach',
       moveInDate: '07/01/2025',
       bedrooms: 2,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-01') },
@@ -747,6 +791,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Brickell',
       moveInDate: '06/15/2025',
       bedrooms: 2,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-11-20') },
@@ -779,6 +825,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Wynwood',
       moveInDate: '05/01/2025',
       bedrooms: 1,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-11-10') },
@@ -811,6 +859,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Coconut Grove',
       moveInDate: '07/15/2025',
       bedrooms: 2,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-05') },
@@ -845,6 +895,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Coral Gables',
       moveInDate: '06/01/2025',
       bedrooms: 3,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-11-25') },
@@ -877,6 +929,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Downtown Miami',
       moveInDate: '05/15/2025',
       bedrooms: 1,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     compatibility: 58,
   },
@@ -907,6 +961,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Little Havana',
       moveInDate: '06/01/2025',
       bedrooms: 1,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-01') },
@@ -940,6 +996,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Design District',
       moveInDate: '08/01/2025',
       bedrooms: 2,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-10') },
@@ -974,6 +1032,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Mission District',
       moveInDate: '07/01/2025',
       bedrooms: 2,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-01') },
@@ -1007,6 +1067,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Marina District',
       moveInDate: '06/15/2025',
       bedrooms: 2,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-11-20') },
@@ -1040,6 +1102,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'SOMA',
       moveInDate: '08/15/2025',
       bedrooms: 1,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-05') },
@@ -1074,6 +1138,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Pacific Heights SF',
       moveInDate: '07/01/2025',
       bedrooms: 2,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-01') },
@@ -1107,6 +1173,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Haight-Ashbury',
       moveInDate: '06/01/2025',
       bedrooms: 1,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-11-10') },
@@ -1139,6 +1207,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Noe Valley',
       moveInDate: '07/15/2025',
       bedrooms: 2,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-10') },
@@ -1171,6 +1241,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Castro',
       moveInDate: '05/01/2025',
       bedrooms: 1,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-10-25') },
@@ -1203,6 +1275,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'East Austin',
       moveInDate: '07/01/2025',
       bedrooms: 2,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-01') },
@@ -1237,6 +1311,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Downtown Austin',
       moveInDate: '06/15/2025',
       bedrooms: 2,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-11-15') },
@@ -1269,6 +1345,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'South Congress',
       moveInDate: '08/15/2025',
       bedrooms: 1,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-05') },
@@ -1302,6 +1380,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Zilker',
       moveInDate: '06/01/2025',
       bedrooms: 2,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-01') },
@@ -1334,6 +1414,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Hyde Park Austin',
       moveInDate: '07/01/2025',
       bedrooms: 1,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-11-20') },
@@ -1368,6 +1450,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Mueller',
       moveInDate: '06/01/2025',
       bedrooms: 2,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-10') },
@@ -1402,6 +1486,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Capitol Hill Seattle',
       moveInDate: '07/01/2025',
       bedrooms: 2,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-01') },
@@ -1435,6 +1521,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Ballard',
       moveInDate: '06/15/2025',
       bedrooms: 2,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-11-25') },
@@ -1468,6 +1556,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Fremont',
       moveInDate: '07/15/2025',
       bedrooms: 1,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-05') },
@@ -1502,6 +1592,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Queen Anne',
       moveInDate: '06/01/2025',
       bedrooms: 2,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-01') },
@@ -1535,6 +1627,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'South Lake Union',
       moveInDate: '09/01/2025',
       bedrooms: 1,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-11-15') },
@@ -1567,6 +1661,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Belltown',
       moveInDate: '07/01/2025',
       bedrooms: 1,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-10') },
@@ -1600,6 +1696,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'LoDo',
       moveInDate: '06/01/2025',
       bedrooms: 1,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-01') },
@@ -1632,6 +1730,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'RiNo',
       moveInDate: '07/01/2025',
       bedrooms: 1,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-11-20') },
@@ -1666,6 +1766,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Capitol Hill Denver',
       moveInDate: '06/15/2025',
       bedrooms: 2,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-11-10') },
@@ -1699,6 +1801,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Cherry Creek',
       moveInDate: '07/01/2025',
       bedrooms: 2,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-05') },
@@ -1732,6 +1836,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Washington Park',
       moveInDate: '05/15/2025',
       bedrooms: 1,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     compatibility: 62,
   },
@@ -1761,6 +1867,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Five Points',
       moveInDate: '08/01/2025',
       bedrooms: 2,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-10') },
@@ -1795,6 +1903,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Cambridge',
       moveInDate: '09/01/2025',
       bedrooms: 1,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-01') },
@@ -1827,6 +1937,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Back Bay',
       moveInDate: '07/01/2025',
       bedrooms: 2,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-11-20') },
@@ -1861,6 +1973,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'South Boston',
       moveInDate: '06/01/2025',
       bedrooms: 1,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-11-15') },
@@ -1894,6 +2008,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'South End',
       moveInDate: '07/15/2025',
       bedrooms: 2,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-05') },
@@ -1927,6 +2043,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Beacon Hill',
       moveInDate: '06/01/2025',
       bedrooms: 1,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-01') },
@@ -1959,6 +2077,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Fenway',
       moveInDate: '09/01/2025',
       bedrooms: 1,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     compatibility: 68,
   },
@@ -1988,6 +2108,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Midtown Houston',
       moveInDate: '07/01/2025',
       bedrooms: 2,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-01') },
@@ -2021,6 +2143,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Montrose',
       moveInDate: '06/15/2025',
       bedrooms: 1,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-11-25') },
@@ -2054,6 +2178,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'The Heights Houston',
       moveInDate: '06/01/2025',
       bedrooms: 2,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-05') },
@@ -2086,6 +2212,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Museum District',
       moveInDate: '08/01/2025',
       bedrooms: 1,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-11-15') },
@@ -2119,6 +2247,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Rice Village',
       moveInDate: '07/01/2025',
       bedrooms: 2,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-10') },
@@ -2153,6 +2283,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'EaDo',
       moveInDate: '06/01/2025',
       bedrooms: 1,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-01') },
@@ -2186,6 +2318,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Midtown Atlanta',
       moveInDate: '07/01/2025',
       bedrooms: 2,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-01') },
@@ -2219,6 +2353,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Virginia-Highland',
       moveInDate: '06/15/2025',
       bedrooms: 2,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-11-20') },
@@ -2252,6 +2388,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Old Fourth Ward',
       moveInDate: '05/01/2025',
       bedrooms: 1,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-11-10') },
@@ -2285,6 +2423,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Inman Park',
       moveInDate: '07/01/2025',
       bedrooms: 2,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-05') },
@@ -2318,6 +2458,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Decatur',
       moveInDate: '06/01/2025',
       bedrooms: 1,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-11-15') },
@@ -2351,6 +2493,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Buckhead',
       moveInDate: '08/01/2025',
       bedrooms: 2,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-10') },
@@ -2384,6 +2528,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Midtown Atlanta',
       moveInDate: '08/15/2025',
       bedrooms: 1,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     compatibility: 63,
   },
@@ -2413,6 +2559,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'Upper West Side',
       moveInDate: '07/01/2025',
       bedrooms: 2,
+      bathrooms: 2,
+      privateBathroom: true,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-01') },
@@ -2448,6 +2596,8 @@ export const extraProfiles: RoommateProfile[] = [
       location: 'North Beach SF',
       moveInDate: '06/15/2025',
       bedrooms: 2,
+      bathrooms: 1,
+      privateBathroom: false,
     },
     verification: {
       phone: { verified: true, verifiedAt: new Date('2024-12-05') },
