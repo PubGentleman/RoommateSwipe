@@ -801,26 +801,28 @@ export const RoommatesScreen = () => {
         </Pressable>
         <RoomdrLogo variant="horizontal" size="sm" />
         <View style={{ flexDirection: 'row', gap: 8 }}>
-          {user?.boostData?.isBoosted && user?.boostData?.boostExpiresAt && new Date(user.boostData.boostExpiresAt) > new Date() ? (
-            <View style={styles.navIconBtn}>
-              <View style={[styles.navIconBtnInner, { backgroundColor: '#FFD700' }]}>
-                <Feather name="zap" size={18} color="#000000" />
-              </View>
-            </View>
-          ) : (
-            <Pressable onPress={() => {
+          <Pressable onPress={() => {
+            const isActive = user?.boostData?.isBoosted && user?.boostData?.boostExpiresAt && new Date(user.boostData.boostExpiresAt) > new Date();
+            if (isActive) {
+              const expiresAt = new Date(user!.boostData!.boostExpiresAt!);
+              const hoursLeft = Math.max(0, Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60)));
+              Alert.alert('Boost Active', `Your profile is boosted! ${hoursLeft} hour${hoursLeft !== 1 ? 's' : ''} remaining.`);
+            } else {
               const plan = user?.subscription?.plan || 'basic';
               if (plan === 'basic') {
                 setShowPurchaseBoostModal(true);
               } else {
                 handleBoostForPaidPlan();
               }
-            }} style={styles.navIconBtn}>
-              <View style={[styles.navIconBtnInner, { backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }]}>
-                <Feather name="zap" size={18} color="#FFD700" />
-              </View>
-            </Pressable>
-          )}
+            }
+          }} style={styles.navIconBtn}>
+            <View style={[styles.navIconBtnInner, user?.boostData?.isBoosted && user?.boostData?.boostExpiresAt && new Date(user.boostData.boostExpiresAt) > new Date()
+              ? { backgroundColor: '#FFD700' }
+              : { backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }
+            ]}>
+              <Feather name="zap" size={18} color={user?.boostData?.isBoosted && user?.boostData?.boostExpiresAt && new Date(user.boostData.boostExpiresAt) > new Date() ? '#000000' : '#FFD700'} />
+            </View>
+          </Pressable>
           <Pressable onPress={() => (navigation as any).navigate('Profile', { screen: 'Notifications' })} style={styles.navIconBtn}>
             <View style={[styles.navIconBtnInner, { backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }]}>
               <Feather name="bell" size={18} color="#FFFFFF" />
