@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, Image, Pressable, FlatList, Modal, TextInput, ScrollView, Switch, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Image, Pressable, FlatList, Modal, TextInput, ScrollView, Switch, Alert, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useFocusEffect } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { ThemedText } from '../../components/ThemedText';
 import { ThemedView } from '../../components/ThemedView';
 import { WalkScoreBadge } from '../../components/WalkScoreBadge';
@@ -26,6 +27,40 @@ const COMMON_AMENITIES = [
   'Parking', 'Gym', 'Pool', 'Laundry', 'Pet Friendly',
   'Air Conditioning', 'Dishwasher', 'Balcony',
 ];
+
+const BG = '#111';
+const CARD_BG = '#1a1a1a';
+const ACCENT = '#ff6b5b';
+
+const QUICK_FILTERS = [
+  { key: 'bestMatch', label: 'Best Match', icon: 'heart' as const },
+  { key: 'under2k', label: 'Under $2k' },
+  { key: 'privateRoom', label: 'Private Room' },
+  { key: 'petFriendly', label: 'Pet Friendly' },
+  { key: 'availableNow', label: 'Available Now' },
+  { key: 'nearTransit', label: 'Near Transit' },
+];
+
+const AVATAR_GRADIENTS: [string, string][] = [
+  ['#4a9eff', '#1e6fd4'],
+  ['#e83a7a', '#9b1fad'],
+  ['#ff6b5b', '#e83a2a'],
+  ['#2ecc71', '#1aa355'],
+  ['#ffd700', '#ff9500'],
+  ['#9b59b6', '#6c3483'],
+];
+
+const getInitials = (name: string) => {
+  const parts = name.split(' ');
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return name.substring(0, 2).toUpperCase();
+};
+
+const getAvatarGradient = (id: string): [string, string] => {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = ((hash << 5) - hash) + id.charCodeAt(i);
+  return AVATAR_GRADIENTS[Math.abs(hash) % AVATAR_GRADIENTS.length];
+};
 
 export const ExploreScreen = () => {
   const { theme } = useTheme();
@@ -57,6 +92,7 @@ export const ExploreScreen = () => {
   const [showPaywall, setShowPaywall] = useState(false);
   const [paywallFeature, setPaywallFeature] = useState('');
   const [paywallPlan, setPaywallPlan] = useState<'plus' | 'elite'>('plus');
+  const [activeQuickFilters, setActiveQuickFilters] = useState<Set<string>>(new Set(['bestMatch']));
 
   useEffect(() => {
     loadProperties();
@@ -66,7 +102,7 @@ export const ExploreScreen = () => {
 
   useEffect(() => {
     applyFilters();
-  }, [properties, filters, viewMode, saved, searchQuery, activeCity]);
+  }, [properties, filters, viewMode, saved, searchQuery, activeCity, activeQuickFilters]);
 
   const loadProperties = async () => {
     try {
@@ -299,9 +335,31 @@ export const ExploreScreen = () => {
       );
     }
 
+    if (activeQuickFilters.has('under2k')) {
+      filtered = filtered.filter(p => p.price < 2000);
+    }
+    if (activeQuickFilters.has('privateRoom')) {
+      filtered = filtered.filter(p => p.roomType === 'room');
+    }
+    if (activeQuickFilters.has('petFriendly')) {
+      filtered = filtered.filter(p => p.amenities?.some(a => a.toLowerCase().includes('pet')));
+    }
+    if (activeQuickFilters.has('availableNow')) {
+      filtered = filtered.filter(p => p.available);
+    }
+
     filtered.sort((a, b) => {
       if (a.featured && !b.featured) return -1;
       if (!a.featured && b.featured) return 1;
+      if (activeQuickFilters.has('bestMatch') && user) {
+        const hostA = a.hostProfileId ? hostProfiles.get(a.hostProfileId) : null;
+        const hostB = b.hostProfileId ? hostProfiles.get(b.hostProfileId) : null;
+        const profileA = hostA ? getUserAsRoommateProfile(hostA) : null;
+        const profileB = hostB ? getUserAsRoommateProfile(hostB) : null;
+        const compA = profileA ? calculateCompatibility(user, profileA) : 0;
+        const compB = profileB ? calculateCompatibility(user, profileB) : 0;
+        return compB - compA;
+      }
       return 0;
     });
 
@@ -387,153 +445,131 @@ export const ExploreScreen = () => {
     }
   };
 
+  const toggleQuickFilter = (key: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setActiveQuickFilters(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const isBasic = (user?.subscription?.plan || 'basic') === 'basic';
+
   const renderProperty = ({ item }: { item: Property }) => {
     const hostUser = item.hostProfileId ? hostProfiles.get(item.hostProfileId) : null;
     const hostProfile = hostUser ? getUserAsRoommateProfile(hostUser) : null;
     const compatibility = hostProfile && user ? calculateCompatibility(user, hostProfile) : null;
+    const hostName = hostUser?.name || 'Host';
+    const hostInitials = getInitials(hostName);
+    const avatarGradient = getAvatarGradient(item.hostProfileId || item.id);
+    const isPetFriendly = item.amenities?.some(a => a.toLowerCase().includes('pet'));
 
     return (
       <Pressable
-        style={[styles.propertyCard, { backgroundColor: theme.backgroundDefault }]}
+        style={styles.propCard}
         onPress={() => {
           setSelectedProperty(item);
           setShowPropertyDetail(true);
         }}
       >
-        <Image source={{ uri: item.photos[0] }} style={styles.propertyImage} />
-        <View style={styles.badgeContainer}>
-          {item.propertyType ? (
-            <View style={[
-              styles.propertyTypeBadge,
-              { backgroundColor: item.propertyType === 'lease' ? theme.primary : theme.success }
-            ]}>
-              <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '700' }]}>
-                {item.propertyType.toUpperCase()}
-              </ThemedText>
+        <View style={styles.cardPhoto}>
+          <Image source={{ uri: item.photos[0] }} style={styles.photoBg} />
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.88)']}
+            style={styles.photoGradient}
+          />
+          <View style={styles.photoTags}>
+            {item.propertyType ? (
+              <View style={item.propertyType === 'lease' ? styles.tagLease : styles.tagSublet}>
+                <Text style={styles.tagText}>{item.propertyType.toUpperCase()}</Text>
+              </View>
+            ) : null}
+            <View style={item.roomType === 'entire' ? styles.tagEntire : styles.tagRoom}>
+              <Text style={[styles.tagText, item.roomType === 'room' ? { color: '#2ecc71' } : { color: '#fff' }]}>
+                {item.roomType === 'entire' ? 'ENTIRE UNIT' : 'PRIVATE ROOM'}
+              </Text>
             </View>
-          ) : null}
-          <View style={[
-            styles.roomTypeBadge,
-            { backgroundColor: item.roomType === 'room' ? '#9333EA' : '#0EA5E9' }
-          ]}>
-            <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '700' }]}>
-              {item.roomType === 'room' ? 'ROOM' : 'ENTIRE'}
-            </ThemedText>
+            {item.featured ? (
+              <View style={styles.tagFeatured}>
+                <Feather name="star" size={9} color="#ffd700" />
+                <Text style={[styles.tagText, { color: '#ffd700', marginLeft: 3 }]}>FEATURED</Text>
+              </View>
+            ) : null}
           </View>
-          {item.featured ? (
-            <View style={[styles.featuredBadge, { backgroundColor: theme.primary }]}>
-              <Feather name="star" size={12} color="#FFFFFF" />
-              <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '700', marginLeft: 4 }]}>
-                FEATURED
-              </ThemedText>
+          <Pressable
+            style={[styles.saveBtn, saved.has(item.id) ? styles.saveBtnActive : null]}
+            onPress={() => toggleSave(item.id)}
+          >
+            <Feather
+              name="heart"
+              size={14}
+              color={saved.has(item.id) ? ACCENT : 'rgba(255,255,255,0.65)'}
+              fill={saved.has(item.id) ? ACCENT : 'none'}
+            />
+          </Pressable>
+          <View style={styles.priceOverlay}>
+            <Text style={styles.priceText}>${item.price.toLocaleString()}/mo</Text>
+            <Text style={styles.propNameText} numberOfLines={1}>{item.title}</Text>
+          </View>
+          {compatibility !== null ? (
+            <View style={styles.matchScoreBadge}>
+              <Feather name="heart" size={9} color="#ff8878" />
+              <Text style={styles.matchScoreText}>{compatibility}% match</Text>
             </View>
           ) : null}
         </View>
-        <Pressable
-          style={[styles.saveButton, { backgroundColor: theme.backgroundDefault }]}
-          onPress={() => toggleSave(item.id)}
-        >
-          <Feather
-            name={saved.has(item.id) ? 'heart' : 'heart'}
-            size={20}
-            color={saved.has(item.id) ? theme.error : theme.text}
-            fill={saved.has(item.id) ? theme.error : 'none'}
-          />
-        </Pressable>
-        <View style={styles.propertyInfo}>
-          <ThemedText style={[Typography.h3]}>${item.price}/mo</ThemedText>
-          <ThemedText style={[Typography.body, { marginTop: Spacing.xs }]} numberOfLines={1}>
-            {item.title}
-          </ThemedText>
-          {item.roomType === 'room' && (hostUser || (item.existingRoommates && item.existingRoommates.length > 0)) ? (
-            <View style={[styles.roommateGenderContainer, { marginTop: Spacing.sm }]}>
-              <Feather 
-                name="users" 
-                size={14} 
-                color={theme.textSecondary} 
-              />
-              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
-                {hostUser?.profileData?.gender ? getGenderSymbol(hostUser.profileData.gender) : ''}
-                {item.existingRoommates && item.existingRoommates.length > 0 
-                  ? item.existingRoommates.map((rm, idx) => getGenderSymbol(rm.gender)).join('')
-                  : ''
-                }
-              </ThemedText>
+        <View style={styles.cardDetails}>
+          <View style={styles.detailsRow}>
+            <View style={styles.detailChips}>
+              <View style={styles.detailChip}>
+                <Feather name="home" size={13} color="rgba(255,255,255,0.5)" />
+                <Text style={styles.detailChipText}>{item.bedrooms} bd{item.roomType === 'room' ? ' total' : ''}</Text>
+              </View>
+              <View style={styles.detailChip}>
+                <Feather name="droplet" size={13} color="rgba(255,255,255,0.5)" />
+                <Text style={styles.detailChipText}>{item.bathrooms} ba{item.roomType === 'room' ? ' shared' : ''}</Text>
+              </View>
+              {item.sqft ? (
+                <View style={styles.detailChip}>
+                  <Feather name="maximize" size={13} color="rgba(255,255,255,0.5)" />
+                  <Text style={styles.detailChipText}>{item.sqft.toLocaleString()} sqft</Text>
+                </View>
+              ) : null}
+            </View>
+            {isPetFriendly ? (
+              <View style={styles.availBadge}>
+                <Text style={styles.availBadgeText}>Pet OK</Text>
+              </View>
+            ) : (
+              <View style={styles.availBadge}>
+                <Text style={styles.availBadgeText}>Available now</Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.locationRow2}>
+            <Feather name="map-pin" size={12} color="rgba(255,107,91,0.55)" />
+            <Text style={styles.locationText}>{formatLocation(item)}</Text>
+          </View>
+          <View style={styles.hostRow}>
+            <LinearGradient colors={avatarGradient} style={styles.hostAvatar}>
+              <Text style={styles.hostAvatarText}>{hostInitials}</Text>
+            </LinearGradient>
+            <View style={styles.hostInfo}>
+              <Text style={styles.hostName}>{hostName.split(' ')[0]} {hostName.split(' ')[1]?.[0] ? hostName.split(' ')[1][0] + '.' : ''} · Host</Text>
+              <Text style={styles.hostStatus}>Member · {hostUser ? Math.max(1, (item.hostProfileId?.charCodeAt(0) || 0) % 6 + 1) : 1} listings</Text>
+            </View>
+            <View style={styles.respBadge}>
+              <Text style={styles.respBadgeText}>Fast reply</Text>
+            </View>
+          </View>
+          {isBasic ? (
+            <View style={styles.premiumRow}>
+              <Feather name="lock" size={13} color="rgba(255,215,0,0.6)" />
+              <Text style={styles.premiumText}>Upgrade to Plus to contact host & schedule a tour</Text>
             </View>
           ) : null}
-          <View style={styles.detailsRow}>
-            <View style={styles.details}>
-              <View style={[styles.detail, { backgroundColor: item.roomType === 'entire' ? 'rgba(167,139,250,0.12)' : 'rgba(96,165,250,0.12)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }]}>
-                <Feather name={item.roomType === 'entire' ? 'home' : 'key'} size={13} color={item.roomType === 'entire' ? '#a78bfa' : '#60a5fa'} />
-                <ThemedText style={[Typography.caption, { color: item.roomType === 'entire' ? '#a78bfa' : '#60a5fa', marginLeft: Spacing.xs, fontWeight: '600' }]}>
-                  {item.roomType === 'entire' ? 'Entire' : 'Room'}
-                </ThemedText>
-              </View>
-              <View style={styles.detail}>
-                <Feather name="home" size={16} color={theme.textSecondary} />
-                <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
-                  {item.bedrooms} bd
-                </ThemedText>
-              </View>
-              <View style={styles.detail}>
-                <Feather name="droplet" size={16} color={theme.textSecondary} />
-                <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
-                  {item.bathrooms} ba
-                </ThemedText>
-              </View>
-              <View style={styles.detail}>
-                <Feather name="maximize" size={16} color={theme.textSecondary} />
-                <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
-                  {item.sqft} sqft
-                </ThemedText>
-              </View>
-            </View>
-            {item.walkScore ? (
-              (() => {
-                const userPlan = user?.subscription?.plan || 'basic';
-                const hasWalkScoreAccess = userPlan === 'plus' || userPlan === 'elite';
-                
-                return hasWalkScoreAccess ? (
-                  <WalkScoreBadge score={item.walkScore} size="small" />
-                ) : (
-                  <Pressable
-                    style={{
-                      width: 50,
-                      height: 50,
-                      borderRadius: 25,
-                      borderWidth: 2,
-                      borderColor: theme.textSecondary + '40',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                    }}
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      setPaywallFeature('Walk Score');
-                      setPaywallPlan('plus');
-                      setShowPaywall(true);
-                    }}
-                  >
-                    <Feather name="lock" size={20} color={theme.textSecondary} />
-                  </Pressable>
-                );
-              })()
-            ) : null}
-          </View>
-          <View style={styles.locationRow}>
-            <View style={styles.location}>
-              <Feather name="map-pin" size={14} color={theme.textSecondary} />
-              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
-                {formatLocation(item)}
-              </ThemedText>
-            </View>
-            {compatibility !== null ? (
-              <View style={[styles.matchBadge, { backgroundColor: getMatchQualityColor(compatibility) + '20' }]}>
-                <ThemedText style={[Typography.caption, { color: getMatchQualityColor(compatibility), fontWeight: '700' }]}>
-                  {compatibility}% Match
-                </ThemedText>
-              </View>
-            ) : null}
-          </View>
         </View>
       </Pressable>
     );
@@ -571,22 +607,14 @@ export const ExploreScreen = () => {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
-      <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-        <View style={[styles.searchBar, { backgroundColor: theme.backgroundDefault }]}>
-          <Feather name="search" size={20} color={theme.textSecondary} />
+    <View style={[styles.container, { backgroundColor: BG }]}>
+      <View style={[styles.searchBarRow, { paddingTop: insets.top + 12 }]}>
+        <View style={styles.searchInput}>
+          <Feather name="search" size={15} color="rgba(255,255,255,0.3)" />
           <TextInput
-            style={[
-              Typography.body,
-              {
-                flex: 1,
-                marginLeft: Spacing.md,
-                color: theme.text,
-                paddingVertical: 0,
-              }
-            ]}
-            placeholder={activeCity ? `Search in ${activeCity}...` : 'Search all properties...'}
-            placeholderTextColor={theme.textSecondary}
+            style={styles.searchInputText}
+            placeholder={activeCity ? `Search in ${activeCity}...` : 'Search neighborhoods, streets...'}
+            placeholderTextColor="rgba(255,255,255,0.3)"
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoCapitalize="words"
@@ -595,94 +623,76 @@ export const ExploreScreen = () => {
           />
           {searchQuery.length > 0 ? (
             <Pressable onPress={handleClearSearch} hitSlop={8}>
-              <Feather name="x-circle" size={18} color={theme.textSecondary} />
+              <Feather name="x-circle" size={16} color="rgba(255,255,255,0.3)" />
             </Pressable>
           ) : null}
         </View>
         <Pressable
-          style={[styles.filterButton, displayMode === 'map' && { backgroundColor: theme.primary + '15', borderRadius: BorderRadius.medium }]}
+          style={styles.iconBtn}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             setDisplayMode(displayMode === 'list' ? 'map' : 'list');
           }}
         >
-          <Feather name={displayMode === 'list' ? 'map' : 'list'} size={22} color={displayMode === 'map' ? theme.primary : theme.text} />
+          <Feather name={displayMode === 'list' ? 'map' : 'list'} size={18} color="rgba(255,255,255,0.55)" />
         </Pressable>
-        <Pressable style={styles.filterButton} onPress={handleFilterPress}>
-          <Feather name="sliders" size={24} color={theme.text} />
-          {hasActiveFilters() ? (
-            <View style={[styles.filterBadge, { backgroundColor: theme.primary }]} />
-          ) : null}
+        <Pressable style={styles.filterBtn} onPress={handleFilterPress}>
+          <Feather name="sliders" size={17} color={ACCENT} />
+          {hasActiveFilters() ? <View style={styles.filterDot} /> : null}
         </Pressable>
       </View>
 
-      <View style={styles.citySelectorRow}>
+      <View style={styles.cityRow}>
         <CityPillButton activeCity={activeCity} onPress={() => setShowCityPicker(true)} />
+        <Text style={styles.listingCount}>{filteredProperties.length} listings</Text>
       </View>
-      
-      <View style={styles.viewToggleContainer}>
+
+      <View style={styles.tabsRow}>
         <Pressable
-          style={[
-            styles.viewToggleButton,
-            viewMode === 'all' && { backgroundColor: theme.primary },
-          ]}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setViewMode('all');
-          }}
+          style={viewMode === 'all' ? styles.tabActive : styles.tabInactive}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setViewMode('all'); }}
         >
-          <ThemedText
-            style={[
-              Typography.body,
-              { fontWeight: '600' },
-              viewMode === 'all' ? { color: '#FFFFFF' } : { color: theme.text },
-            ]}
-          >
-            All Properties
-          </ThemedText>
+          {viewMode === 'all' ? (
+            <LinearGradient colors={[ACCENT, '#e83a2a']} style={styles.tabGradient}>
+              <Feather name="home" size={13} color="#fff" />
+              <Text style={styles.tabActiveText}>All Listings</Text>
+            </LinearGradient>
+          ) : (
+            <>
+              <Feather name="home" size={13} color="rgba(255,255,255,0.4)" />
+              <Text style={styles.tabInactiveText}>All Listings</Text>
+            </>
+          )}
         </Pressable>
         <Pressable
-          style={[
-            styles.viewToggleButton,
-            viewMode === 'saved' && { backgroundColor: theme.primary },
-          ]}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setViewMode('saved');
-          }}
+          style={viewMode === 'saved' ? styles.tabActive : styles.tabInactive}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setViewMode('saved'); }}
         >
-          <Feather
-            name="heart"
-            size={18}
-            color={viewMode === 'saved' ? '#FFFFFF' : theme.text}
-          />
-          <ThemedText
-            style={[
-              Typography.body,
-              { fontWeight: '600', marginLeft: Spacing.xs },
-              viewMode === 'saved' ? { color: '#FFFFFF' } : { color: theme.text },
-            ]}
-          >
-            Saved ({saved.size})
-          </ThemedText>
+          {viewMode === 'saved' ? (
+            <LinearGradient colors={[ACCENT, '#e83a2a']} style={styles.tabGradient}>
+              <Feather name="heart" size={13} color="#fff" />
+              <Text style={styles.tabActiveText}>Saved ({saved.size})</Text>
+            </LinearGradient>
+          ) : (
+            <>
+              <Feather name="heart" size={13} color="rgba(255,255,255,0.4)" />
+              <Text style={styles.tabInactiveText}>Saved ({saved.size})</Text>
+            </>
+          )}
         </Pressable>
       </View>
 
-      {hasActiveFilters() ? (
-        <View style={styles.filterBanner}>
-          <View style={styles.filterBannerContent}>
-            <Feather name="filter" size={16} color={theme.primary} />
-            <ThemedText style={[Typography.small, { color: theme.primary, marginLeft: Spacing.xs }]}>
-              {filteredProperties.length} {filteredProperties.length === 1 ? 'property matches' : 'properties match'} your filters
-            </ThemedText>
-          </View>
-          <Pressable onPress={handleClearFilters}>
-            <ThemedText style={[Typography.small, { color: theme.primary, fontWeight: '600' }]}>
-              Clear
-            </ThemedText>
-          </Pressable>
-        </View>
-      ) : null}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={styles.chipScrollContent}>
+        {QUICK_FILTERS.map(f => {
+          const active = activeQuickFilters.has(f.key);
+          return (
+            <Pressable key={f.key} style={active ? styles.chipSelected : styles.chipUnselected} onPress={() => toggleQuickFilter(f.key)}>
+              {f.icon ? <Feather name={f.icon} size={10} color={active ? '#ff8070' : 'rgba(255,255,255,0.4)'} /> : null}
+              <Text style={active ? styles.chipSelectedText : styles.chipUnselectedText}>{f.label}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
       {displayMode === 'map' ? (
         <PropertyMapView
           properties={filteredProperties}
@@ -915,11 +925,6 @@ export const ExploreScreen = () => {
                       {(() => {
                         const hostUser = selectedProperty.hostProfileId ? hostProfiles.get(selectedProperty.hostProfileId) : null;
                         const hostPhoto = hostUser?.profilePicture;
-                        console.log('[ExploreScreen] Property ID:', selectedProperty.id, 'Title:', selectedProperty.title);
-                        console.log('[ExploreScreen] Property hostProfileId:', selectedProperty.hostProfileId);
-                        console.log('[ExploreScreen] Host user found:', hostUser?.name, 'age:', hostUser?.age);
-                        console.log('[ExploreScreen] Host photo URL:', hostPhoto);
-                        console.log('[ExploreScreen] Host gender:', hostUser?.profileData?.gender);
                         return hostPhoto ? (
                           <Image 
                             source={{ uri: hostPhoto }} 
@@ -1285,101 +1290,401 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
+  searchBarRow: {
     flexDirection: 'row',
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.lg,
-    gap: Spacing.md,
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    gap: 8,
   },
-  searchBar: {
+  searchInput: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    height: 48,
-    borderRadius: BorderRadius.medium,
-    paddingHorizontal: Spacing.lg,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
   },
-  filterButton: {
-    width: 48,
-    height: 48,
+  searchInputText: {
+    flex: 1,
+    marginLeft: 8,
+    color: '#fff',
+    fontSize: 13,
+    paddingVertical: 0,
+  },
+  iconBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  filterBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,107,91,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
   },
-  filterBadge: {
+  filterDot: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 8,
-    height: 8,
+    top: 10,
+    right: 10,
+    width: 7,
+    height: 7,
     borderRadius: 4,
+    backgroundColor: ACCENT,
   },
-  viewToggleContainer: {
+  cityRow: {
     flexDirection: 'row',
-    marginHorizontal: Spacing.lg,
-    marginTop: Spacing.md,
-    gap: Spacing.sm,
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 8,
   },
-  viewToggleButton: {
+  listingCount: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.3)',
+    marginLeft: 10,
+  },
+  tabsRow: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    gap: 8,
+    marginBottom: 8,
+  },
+  tabActive: {
+    flex: 1,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  tabInactive: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.medium,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    gap: 6,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
   },
-  filterBanner: {
+  tabGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.md,
-    borderRadius: BorderRadius.medium,
-    backgroundColor: 'rgba(var(--primary-rgb), 0.1)',
+    justifyContent: 'center',
+    gap: 6,
+    height: 40,
+    borderRadius: 14,
   },
-  filterBannerContent: {
+  tabActiveText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  tabInactiveText: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  chipScroll: {
+    maxHeight: 38,
+    marginBottom: 6,
+  },
+  chipScrollContent: {
+    paddingHorizontal: 16,
+    gap: 8,
+    alignItems: 'center',
+  },
+  chipSelected: {
     flexDirection: 'row',
     alignItems: 'center',
+    height: 30,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,107,91,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.35)',
+    gap: 5,
+  },
+  chipUnselected: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 30,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    gap: 5,
+  },
+  chipSelectedText: {
+    color: '#ff8070',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  chipUnselectedText: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 12,
+    fontWeight: '600',
   },
   list: {
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: 16,
   },
-  propertyCard: {
-    borderRadius: BorderRadius.medium,
-    marginBottom: Spacing.lg,
+  propCard: {
+    borderRadius: 22,
+    backgroundColor: CARD_BG,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
     overflow: 'hidden',
   },
-  propertyImage: {
-    width: '100%',
-    height: 200,
-    borderRadius: BorderRadius.medium,
+  cardPhoto: {
+    height: 185,
+    position: 'relative',
+    overflow: 'hidden',
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
   },
-  saveButton: {
+  photoBg: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  photoGradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  photoTags: {
     position: 'absolute',
-    top: Spacing.md,
-    right: Spacing.md,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    top: 10,
+    left: 10,
+    flexDirection: 'row',
+    gap: 5,
+    flexWrap: 'wrap',
+  },
+  tagLease: {
+    backgroundColor: ACCENT,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  tagSublet: {
+    backgroundColor: 'rgba(255,107,91,0.3)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.5)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  tagEntire: {
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  tagRoom: {
+    backgroundColor: 'rgba(46,204,113,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(46,204,113,0.35)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  tagFeatured: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,215,0,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,215,0,0.35)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  tagText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  saveBtn: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  badgeContainer: {
-    position: 'absolute',
-    top: Spacing.md,
-    left: Spacing.md,
-    flexDirection: 'row',
-    gap: Spacing.sm,
+  saveBtnActive: {
+    backgroundColor: 'rgba(255,107,91,0.28)',
+    borderColor: ACCENT,
   },
-  propertyTypeBadge: {
+  priceOverlay: {
+    position: 'absolute',
+    bottom: 12,
+    left: 14,
+  },
+  priceText: {
+    color: '#fff',
+    fontSize: 21,
+    fontWeight: '900',
+    letterSpacing: -0.5,
+  },
+  propNameText: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 12.5,
+    fontWeight: '600',
+    marginTop: 2,
+    maxWidth: 250,
+  },
+  matchScoreBadge: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.small,
+    gap: 4,
+    backgroundColor: 'rgba(255,107,91,0.22)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.4)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  matchScoreText: {
+    color: '#ff8878',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  cardDetails: {
+    padding: 12,
+    paddingHorizontal: 14,
+    paddingBottom: 14,
+  },
+  detailsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  detailChips: {
+    flexDirection: 'row',
+    gap: 10,
+    flex: 1,
+  },
+  detailChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  detailChipText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 12,
+  },
+  availBadge: {
+    backgroundColor: 'rgba(46,204,113,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(46,204,113,0.25)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  availBadgeText: {
+    color: '#2ecc71',
+    fontSize: 10.5,
+    fontWeight: '700',
+  },
+  locationRow2: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 8,
+  },
+  locationText: {
+    color: 'rgba(255,255,255,0.35)',
+    fontSize: 12,
+  },
+  hostRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.06)',
+    gap: 8,
+  },
+  hostAvatar: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  hostAvatarText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  hostInfo: {
+    flex: 1,
+  },
+  hostName: {
+    color: 'rgba(255,255,255,0.65)',
+    fontSize: 11.5,
+    fontWeight: '600',
+  },
+  hostStatus: {
+    color: 'rgba(255,255,255,0.3)',
+    fontSize: 10.5,
+    marginTop: 1,
+  },
+  respBadge: {
+    backgroundColor: 'rgba(46,204,113,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(46,204,113,0.25)',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  respBadgeText: {
+    color: '#2ecc71',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  premiumRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,215,0,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,215,0,0.12)',
+  },
+  premiumText: {
+    color: 'rgba(255,215,0,0.6)',
+    fontSize: 11,
+    fontWeight: '500',
+    flex: 1,
   },
   featuredBadge: {
     flexDirection: 'row',
@@ -1387,63 +1692,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.small,
-  },
-  roomTypeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.small,
-  },
-  roommateInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.small,
-  },
-  roommateGenderContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  compatibilityBadge: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 4,
-    borderRadius: BorderRadius.small,
-  },
-  propertyInfo: {
-    padding: Spacing.lg,
-  },
-  detailsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: Spacing.md,
-  },
-  details: {
-    flexDirection: 'row',
-    gap: Spacing.lg,
-    flex: 1,
-  },
-  detail: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  location: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  locationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: Spacing.sm,
-  },
-  matchBadge: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 4,
-    borderRadius: BorderRadius.full,
   },
   emptyState: {
     flex: 1,
@@ -1499,12 +1747,6 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     borderRadius: BorderRadius.medium,
     fontSize: 16,
-  },
-  citySelectorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.sm,
   },
   roomsRow: {
     flexDirection: 'row',
@@ -1635,7 +1877,6 @@ const styles = StyleSheet.create({
   detailImage: {
     width: '100%',
     height: 300,
-    resizeMode: 'cover',
   },
   detailSection: {
     padding: Spacing.lg,
