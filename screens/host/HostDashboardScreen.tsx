@@ -15,6 +15,7 @@ interface StatCard {
   value: number;
   label: string;
   color: string;
+  onPress?: () => void;
 }
 
 export const HostDashboardScreen = () => {
@@ -53,14 +54,21 @@ export const HostDashboardScreen = () => {
   const rentedCount = listings.filter(p => !!p.rentedDate).length;
   const pendingInquiries = inquiries.filter(c => c.status === 'pending').length;
 
+  const navigateToTab = (tabName: string) => {
+    const parent = navigation.getParent();
+    if (parent) {
+      parent.navigate(tabName);
+    }
+  };
+
   const stats: StatCard[] = [
-    { icon: 'home', value: listings.length, label: 'Total Listings', color: theme.info },
-    { icon: 'check-circle', value: activeCount, label: 'Active', color: theme.success },
-    { icon: 'pause-circle', value: pausedCount, label: 'Paused', color: theme.warning },
-    { icon: 'lock', value: rentedCount, label: 'Rented', color: theme.primary },
-    { icon: 'heart', value: inquiries.length, label: 'Inquiries', color: '#ff6b5b' },
-    { icon: 'clock', value: pendingInquiries, label: 'Pending Inquiries', color: '#FFA500' },
-    { icon: 'message-circle', value: messageCount, label: 'Unread Messages', color: '#4ECDC4' },
+    { icon: 'home', value: listings.length, label: 'Total Listings', color: theme.info, onPress: () => navigateToTab('Listings') },
+    { icon: 'check-circle', value: activeCount, label: 'Active', color: theme.success, onPress: () => navigateToTab('Listings') },
+    { icon: 'pause-circle', value: pausedCount, label: 'Paused', color: theme.warning, onPress: () => navigateToTab('Listings') },
+    { icon: 'lock', value: rentedCount, label: 'Rented', color: theme.primary, onPress: () => navigateToTab('Listings') },
+    { icon: 'heart', value: inquiries.length, label: 'Inquiries', color: '#ff6b5b', onPress: () => navigation.navigate('Inquiries') },
+    { icon: 'clock', value: pendingInquiries, label: 'Pending Inquiries', color: '#FFA500', onPress: () => navigation.navigate('Inquiries') },
+    { icon: 'message-circle', value: messageCount, label: 'Unread Messages', color: '#4ECDC4', onPress: () => navigateToTab('Messages') },
   ];
 
   const recentInquiries = [...inquiries]
@@ -115,9 +123,10 @@ export const HostDashboardScreen = () => {
       <View style={styles.container}>
         <View style={styles.statsGrid}>
           {stats.map((stat, index) => (
-            <View
+            <Pressable
               key={index}
               style={[styles.statCard, { backgroundColor: theme.backgroundDefault }]}
+              onPress={stat.onPress}
             >
               <View style={[styles.statIconContainer, { backgroundColor: stat.color + '20' }]}>
                 <Feather name={stat.icon} size={20} color={stat.color} />
@@ -128,7 +137,7 @@ export const HostDashboardScreen = () => {
               <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
                 {stat.label}
               </ThemedText>
-            </View>
+            </Pressable>
           ))}
         </View>
 
