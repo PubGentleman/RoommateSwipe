@@ -13,6 +13,7 @@ const ACCENT = '#ff6b5b';
 const GOLD = '#ffd700';
 
 type HostPlan = 'starter' | 'pro' | 'business';
+type BillingCycle = 'monthly' | '3month' | 'annual';
 
 interface PlanFeature {
   label: string;
@@ -23,17 +24,28 @@ interface PlanTier {
   id: HostPlan;
   name: string;
   monthlyPrice: number;
+  threeMonthPrice: number;
   annualPrice: number;
   recommended?: boolean;
   features: PlanFeature[];
   monthlyNote: string;
 }
 
+const HOST_STRIPE_PRICES: Record<string, string> = {
+  pro_monthly: 'price_pro_monthly',
+  pro_3month: 'price_pro_3month',
+  pro_annual: 'price_pro_annual',
+  biz_monthly: 'price_biz_monthly',
+  biz_3month: 'price_biz_3month',
+  biz_annual: 'price_biz_annual',
+};
+
 const HOST_PLANS: PlanTier[] = [
   {
     id: 'starter',
     name: 'Starter',
     monthlyPrice: 0,
+    threeMonthPrice: 0,
     annualPrice: 0,
     monthlyNote: 'No credit card required',
     features: [
@@ -49,7 +61,8 @@ const HOST_PLANS: PlanTier[] = [
     id: 'pro',
     name: 'Pro',
     monthlyPrice: 29.99,
-    annualPrice: 299.90,
+    threeMonthPrice: 80.97,
+    annualPrice: 298.70,
     recommended: true,
     monthlyNote: 'Unlimited inquiries, full analytics & verified badge',
     features: [
@@ -66,7 +79,8 @@ const HOST_PLANS: PlanTier[] = [
     id: 'business',
     name: 'Business',
     monthlyPrice: 79.99,
-    annualPrice: 799.90,
+    threeMonthPrice: 215.97,
+    annualPrice: 796.70,
     monthlyNote: 'Unlimited listings, priority placement & dedicated support',
     features: [
       { label: 'Everything in Pro', included: true },
@@ -118,17 +132,20 @@ export const HostPricingScreen = () => {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { getHostPlan, upgradeHostPlan, downgradeHostPlan, purchaseListingBoost, purchaseHostVerification, purchaseSuperInterest } = useAuth();
-  const [isAnnual, setIsAnnual] = useState(false);
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
   const [selectedTier, setSelectedTier] = useState<HostPlan>('pro');
   const currentPlan = getHostPlan();
 
+  const getMonthlyRate = (plan: PlanTier) => {
+    if (plan.monthlyPrice === 0) return 0;
+    if (billingCycle === '3month') return plan.threeMonthPrice / 3;
+    if (billingCycle === 'annual') return plan.annualPrice / 12;
+    return plan.monthlyPrice;
+  };
+
   const getDisplayPrice = (plan: PlanTier) => {
     if (plan.monthlyPrice === 0) return '$0';
-    if (isAnnual) {
-      const monthly = plan.annualPrice / 12;
-      return `$${monthly.toFixed(2)}`;
-    }
-    return `$${plan.monthlyPrice.toFixed(2)}`;
+    return `$${getMonthlyRate(plan).toFixed(2)}`;
   };
 
   const getStripPer = (plan: PlanTier) => {
@@ -139,6 +156,12 @@ export const HostPricingScreen = () => {
   const getCardPeriod = (plan: PlanTier) => {
     if (plan.monthlyPrice === 0) return '/ forever';
     return '/ mo';
+  };
+
+  const getBillingCtaSuffix = () => {
+    if (billingCycle === '3month') return 'Billed Every 3 Months';
+    if (billingCycle === 'annual') return 'Billed Annually';
+    return 'Billed Monthly';
   };
 
   const handleSelectPlan = (plan: PlanTier) => {
@@ -162,16 +185,17 @@ export const HostPricingScreen = () => {
       return;
     }
     const isUpgrade = planOrder[plan.id] > planOrder[currentPlan];
-    const price = isAnnual
-      ? `$${plan.annualPrice.toFixed(2)}/year`
-      : `$${plan.monthlyPrice.toFixed(2)}/month`;
+    let price: string;
+    if (billingCycle === '3month') price = `$${plan.threeMonthPrice.toFixed(2)} every 3 months`;
+    else if (billingCycle === 'annual') price = `$${plan.annualPrice.toFixed(2)}/year`;
+    else price = `$${plan.monthlyPrice.toFixed(2)}/month`;
     const title = isUpgrade ? `Upgrade to ${plan.name}` : `Switch to ${plan.name}`;
     const actionText = isUpgrade ? 'Subscribe' : 'Switch';
     Alert.alert(title, `${actionText} to ${plan.name} for ${price}?`, [
       { text: 'Cancel', style: 'cancel' },
       { text: actionText, onPress: async () => {
         if (isUpgrade) {
-          await upgradeHostPlan(plan.id as 'pro' | 'business');
+          await upgradeHostPlan(plan.id as 'pro' | 'business', billingCycle);
         } else {
           await downgradeHostPlan(plan.id as 'starter' | 'pro');
         }
@@ -218,7 +242,7 @@ export const HostPricingScreen = () => {
 
   const getCTALabel = (plan: PlanTier) => {
     if (plan.id === currentPlan) return 'Current Plan';
-    if (planOrder[plan.id] > planOrder[currentPlan]) return `Upgrade to ${plan.name}`;
+    if (planOrder[plan.id] > planOrder[currentPlan]) return `Upgrade — ${getBillingCtaSuffix()}`;
     return `Switch to ${plan.name}`;
   };
 
@@ -247,6 +271,8 @@ export const HostPricingScreen = () => {
         <View style={s.tierStrip}>
           {HOST_PLANS.map(plan => {
             const active = selectedTier === plan.id;
+            const showSaveBadge = plan.monthlyPrice > 0 && billingCycle !== 'monthly';
+            const saveBadgeLabel = billingCycle === '3month' ? 'SAVE 10%' : 'ANNUAL';
             return (
               <Pressable
                 key={plan.id}
@@ -257,53 +283,47 @@ export const HostPricingScreen = () => {
                 <Text style={[s.tName, active ? s.tNameActive : null]}>{plan.name.toUpperCase()}</Text>
                 <Text style={s.tPrice}>{getDisplayPrice(plan)}</Text>
                 <Text style={s.tPer}>{getStripPer(plan)}</Text>
+                {showSaveBadge ? <LinearGradient colors={[ACCENT, '#e83a2a']} style={s.tSaveBadge}><Text style={s.tSaveText}>{saveBadgeLabel}</Text></LinearGradient> : null}
               </Pressable>
             );
           })}
         </View>
 
         <View style={s.billingToggle}>
-          <Pressable
-            style={[s.toggleBtn, !isAnnual ? s.toggleBtnActive : null]}
-            onPress={() => setIsAnnual(false)}
-          >
-            {!isAnnual ? (
-              <LinearGradient colors={[ACCENT, '#e83a2a']} style={s.toggleGradient}>
-                <Text style={s.toggleActiveText}>Monthly</Text>
-              </LinearGradient>
-            ) : (
-              <View style={s.toggleInnerRow}>
-                <Text style={s.toggleInactiveText}>Monthly</Text>
-              </View>
-            )}
-          </Pressable>
-          <Pressable
-            style={[s.toggleBtn, isAnnual ? s.toggleBtnActive : null]}
-            onPress={() => setIsAnnual(true)}
-          >
-            {isAnnual ? (
-              <LinearGradient colors={[ACCENT, '#e83a2a']} style={s.toggleGradient}>
-                <Text style={s.toggleActiveText}>Annual</Text>
-                <View style={s.saveBadgeOn}>
-                  <Text style={s.saveBadgeOnText}>PAY ONCE/YEAR</Text>
-                </View>
-              </LinearGradient>
-            ) : (
-              <View style={s.toggleInnerRow}>
-                <Text style={s.toggleInactiveText}>Annual</Text>
-                <View style={s.saveBadgeOff}>
-                  <Text style={s.saveBadgeOffText}>PAY ONCE/YEAR</Text>
-                </View>
-              </View>
-            )}
-          </Pressable>
+          {([
+            { cycle: 'monthly' as BillingCycle, label: 'Monthly', badge: undefined },
+            { cycle: '3month' as BillingCycle, label: '3 Months', badge: 'SAVE 10%' },
+            { cycle: 'annual' as BillingCycle, label: 'Annual', badge: 'SAVE 17%' },
+          ]).map(opt => {
+            const active = billingCycle === opt.cycle;
+            return (
+              <Pressable key={opt.cycle} style={s.toggleBtn} onPress={() => setBillingCycle(opt.cycle)}>
+                {active ? (
+                  <LinearGradient colors={[ACCENT, '#e83a2a']} style={s.toggleGradient}>
+                    <Text style={s.toggleActiveText}>{opt.label}</Text>
+                    {opt.badge ? <View style={s.saveBadgeOn}><Text style={s.saveBadgeOnText}>{opt.badge}</Text></View> : null}
+                  </LinearGradient>
+                ) : (
+                  <View style={s.toggleInnerRow}>
+                    <Text style={s.toggleInactiveText}>{opt.label}</Text>
+                    {opt.badge ? <View style={s.saveBadgeOff}><Text style={s.saveBadgeOffText}>{opt.badge}</Text></View> : null}
+                  </View>
+                )}
+              </Pressable>
+            );
+          })}
         </View>
 
         {HOST_PLANS.map(plan => {
           const isRec = plan.recommended;
-          const annualTotal = plan.monthlyPrice > 0 && isAnnual
-            ? `Billed $${(plan.monthlyPrice * 12).toFixed(2)}/yr`
-            : null;
+          let priceNote = plan.monthlyNote;
+          if (plan.monthlyPrice > 0) {
+            if (billingCycle === '3month') {
+              priceNote = `Billed $${plan.threeMonthPrice.toFixed(2)} every 3 months · Save 10%`;
+            } else if (billingCycle === 'annual') {
+              priceNote = `Billed $${plan.annualPrice.toFixed(2)}/yr · Save 17%`;
+            }
+          }
           const ctaStyle = getCTAStyle(plan);
 
           return (
@@ -327,13 +347,7 @@ export const HostPricingScreen = () => {
                   <Text style={s.priceBig}>{getDisplayPrice(plan)}</Text>
                   <Text style={s.pricePeriod}>{getCardPeriod(plan)}</Text>
                 </View>
-                {isAnnual && annualTotal ? (
-                  <Text style={s.priceNote}>
-                    {annualTotal}  ·  <Text style={s.savingsTag}>One annual payment</Text>
-                  </Text>
-                ) : (
-                  <Text style={s.priceNote}>{plan.monthlyNote}</Text>
-                )}
+                <Text style={s.priceNote}>{priceNote}</Text>
               </View>
               <View style={[s.planDivider, isRec ? s.planDividerCoral : null]} />
               <View style={s.planFeatures}>
@@ -511,6 +525,17 @@ const s = StyleSheet.create({
     fontSize: 9.5,
     color: 'rgba(255,255,255,0.28)',
     fontWeight: '500',
+  },
+  tSaveBadge: {
+    borderRadius: 5,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginTop: 2,
+  },
+  tSaveText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#fff',
   },
   billingToggle: {
     flexDirection: 'row',

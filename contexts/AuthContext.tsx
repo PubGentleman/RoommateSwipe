@@ -10,11 +10,13 @@ interface AuthContextType {
   login: (email: string, password: string, role: UserRole) => Promise<void>;
   register: (email: string, password: string, name: string, role: UserRole) => Promise<void>;
   logout: () => Promise<void>;
-  upgradeToPlus: () => Promise<void>;
-  upgradeToElite: () => Promise<void>;
+  upgradeToPlus: (billingCycle?: 'monthly' | '3month' | 'annual') => Promise<void>;
+  upgradeToElite: (billingCycle?: 'monthly' | '3month' | 'annual') => Promise<void>;
   downgradeToPlan: (plan: 'basic' | 'plus') => Promise<void>;
   cancelSubscription: () => Promise<void>;
+  cancelSubscriptionAtPeriodEnd: () => Promise<void>;
   reactivateSubscription: () => Promise<void>;
+  getSubscriptionDetails: () => { nextRenewalDate: string; renewalAmount: number; billingCycle: string; billingHistory: Array<{ date: string; amount: number; description: string }> };
   updateUser: (updates: Partial<User>) => Promise<void>;
   blockUser: (blockedUserId: string) => Promise<void>;
   unblockUser: (blockedUserId: string) => Promise<void>;
@@ -43,7 +45,7 @@ interface AuthContextType {
   useListingView: () => Promise<void>;
   canSendInterest: () => Promise<{ canSend: boolean; remaining: number; reason?: string }>;
   canSendSuperInterest: () => boolean;
-  upgradeHostPlan: (plan: 'pro' | 'business') => Promise<void>;
+  upgradeHostPlan: (plan: 'pro' | 'business', billingCycle?: 'monthly' | '3month' | 'annual') => Promise<void>;
   downgradeHostPlan: (plan: 'starter' | 'pro') => Promise<void>;
   getHostPlan: () => 'starter' | 'pro' | 'business';
   canAddListing: (currentCount: number) => { allowed: boolean; limit: number; reason?: string };
@@ -317,13 +319,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   };
 
-  const upgradeToPlus = async () => {
+  const getExpiryForCycle = (cycle: 'monthly' | '3month' | 'annual') => {
+    const d = new Date();
+    if (cycle === 'annual') d.setFullYear(d.getFullYear() + 1);
+    else if (cycle === '3month') d.setMonth(d.getMonth() + 3);
+    else d.setMonth(d.getMonth() + 1);
+    return d;
+  };
+
+  const getBillingAmount = (plan: 'plus' | 'elite', cycle: 'monthly' | '3month' | 'annual') => {
+    const prices = {
+      plus: { monthly: 14.99, '3month': 40.47, annual: 149.30 },
+      elite: { monthly: 29.99, '3month': 80.97, annual: 298.70 },
+    };
+    return prices[plan][cycle];
+  };
+
+  const upgradeToPlus = async (billingCycle: 'monthly' | '3month' | 'annual' = 'monthly') => {
     if (!user) return;
-    
-    const expiresAt = user.subscription?.expiresAt 
-      ? new Date(user.subscription.expiresAt) 
-      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-    
+    const expiresAt = getExpiryForCycle(billingCycle);
+    const amount = getBillingAmount('plus', billingCycle);
+    const prevHistory = user.subscription?.billingHistory || [];
     const updatedUser: User = {
       ...user,
       subscription: {
@@ -332,22 +348,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         expiresAt,
         scheduledPlan: undefined,
         scheduledChangeDate: undefined,
+        billingCycle,
+        billingHistory: [{ date: new Date().toISOString(), amount, description: `Plus - ${billingCycle}` }, ...prevHistory].slice(0, 10),
       },
     };
-    
     await StorageService.setCurrentUser(updatedUser);
     await StorageService.addOrUpdateUser(updatedUser);
     setUser(updatedUser);
     console.log('[Auth] Upgraded to Plus:', updatedUser.subscription);
   };
 
-  const upgradeToElite = async () => {
+  const upgradeToElite = async (billingCycle: 'monthly' | '3month' | 'annual' = 'monthly') => {
     if (!user) return;
-    
-    const expiresAt = user.subscription?.expiresAt 
-      ? new Date(user.subscription.expiresAt) 
-      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-    
+    const expiresAt = getExpiryForCycle(billingCycle);
+    const amount = getBillingAmount('elite', billingCycle);
+    const prevHistory = user.subscription?.billingHistory || [];
     const updatedUser: User = {
       ...user,
       subscription: {
@@ -356,9 +371,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         expiresAt,
         scheduledPlan: undefined,
         scheduledChangeDate: undefined,
+        billingCycle,
+        billingHistory: [{ date: new Date().toISOString(), amount, description: `Elite - ${billingCycle}` }, ...prevHistory].slice(0, 10),
       },
     };
-    
     await StorageService.setCurrentUser(updatedUser);
     await StorageService.addOrUpdateUser(updatedUser);
     setUser(updatedUser);
@@ -459,6 +475,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await StorageService.addOrUpdateUser(updatedUser);
     setUser(updatedUser);
     console.log(`[Auth] Reactivated subscription for ${user.subscription.plan}`);
+  };
+
+  const cancelSubscriptionAtPeriodEnd = async () => {
+    if (!user || !user.subscription || user.subscription.plan === 'basic') return;
+    const expiresAt = user.subscription.expiresAt
+      ? new Date(user.subscription.expiresAt)
+      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const updatedUser: User = {
+      ...user,
+      subscription: {
+        ...user.subscription,
+        status: 'cancelling',
+        expiresAt,
+        scheduledPlan: 'basic',
+        scheduledChangeDate: expiresAt,
+      },
+    };
+    await StorageService.setCurrentUser(updatedUser);
+    await StorageService.addOrUpdateUser(updatedUser);
+    setUser(updatedUser);
+    console.log(`[Auth] Subscription set to cancel at period end: ${expiresAt}`);
+  };
+
+  const getSubscriptionDetails = () => {
+    const sub = user?.subscription;
+    const cycle = sub?.billingCycle || 'monthly';
+    const plan = sub?.plan || 'basic';
+    const expiresAt = sub?.expiresAt ? new Date(sub.expiresAt) : new Date();
+    const nextRenewalDate = expiresAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    let renewalAmount = 0;
+    if (plan === 'plus' || plan === 'elite') {
+      renewalAmount = getBillingAmount(plan, cycle as 'monthly' | '3month' | 'annual');
+    }
+    const billingHistory = sub?.billingHistory || [];
+    return { nextRenewalDate, renewalAmount, billingCycle: cycle, billingHistory };
   };
 
   const updateUser = async (updates: Partial<User>) => {
@@ -1338,10 +1389,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return user?.hostSubscription?.plan || 'starter';
   };
 
-  const upgradeHostPlan = async (plan: 'pro' | 'business') => {
+  const upgradeHostPlan = async (plan: 'pro' | 'business', billingCycle: 'monthly' | '3month' | 'annual' = 'monthly') => {
     if (!user) return;
-    const expiresAt = new Date();
-    expiresAt.setMonth(expiresAt.getMonth() + 1);
+    const expiresAt = getExpiryForCycle(billingCycle);
+    const hostPrices = {
+      pro: { monthly: 29.99, '3month': 80.97, annual: 298.70 },
+      business: { monthly: 79.99, '3month': 215.97, annual: 796.70 },
+    };
+    const amount = hostPrices[plan][billingCycle];
+    const prevHistory = user.hostSubscription?.billingHistory || [];
     const updated = {
       ...user,
       hostSubscription: {
@@ -1351,9 +1407,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         expiresAt,
         scheduledPlan: undefined,
         scheduledChangeDate: undefined,
-        billingCycle: user.hostSubscription?.billingCycle || 'monthly' as const,
+        billingCycle,
         inquiryResponsesUsed: user.hostSubscription?.inquiryResponsesUsed || 0,
         lastInquiryResetDate: user.hostSubscription?.lastInquiryResetDate || new Date().toISOString(),
+        billingHistory: [
+          { date: new Date().toISOString(), amount, description: `${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan - ${billingCycle === '3month' ? '3-Month' : billingCycle.charAt(0).toUpperCase() + billingCycle.slice(1)}` },
+          ...prevHistory.slice(0, 2),
+        ],
       },
     };
     await StorageService.setCurrentUser(updated);
@@ -1487,7 +1547,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, reactivateSubscription, updateUser, blockUser: blockUserAction, unblockUser: unblockUserAction, reportUser: reportUserAction, isUserBlocked: isUserBlockedCheck, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike, watchAdForCredit, getAdCredits, useAdCredit, isBasicUser, canViewListing, useListingView, canSendInterest, canSendSuperInterest, upgradeHostPlan, downgradeHostPlan, getHostPlan, canAddListing, canRespondToInquiry, useInquiryResponse, purchaseListingBoost, purchaseHostVerification, purchaseSuperInterest }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, cancelSubscriptionAtPeriodEnd, reactivateSubscription, getSubscriptionDetails, updateUser, blockUser: blockUserAction, unblockUser: unblockUserAction, reportUser: reportUserAction, isUserBlocked: isUserBlockedCheck, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike, watchAdForCredit, getAdCredits, useAdCredit, isBasicUser, canViewListing, useListingView, canSendInterest, canSendSuperInterest, upgradeHostPlan, downgradeHostPlan, getHostPlan, canAddListing, canRespondToInquiry, useInquiryResponse, purchaseListingBoost, purchaseHostVerification, purchaseSuperInterest }}>
       {children}
     </AuthContext.Provider>
   );

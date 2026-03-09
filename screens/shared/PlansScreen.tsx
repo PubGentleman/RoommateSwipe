@@ -19,8 +19,22 @@ const fmtDate = (d: Date | string) => {
   return `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}/${date.getFullYear()}`;
 };
 
-const MONTHLY_PRICING = { plus: 14.99, elite: 29.99 };
-const ANNUAL_PRICING = { plus: 149.90, elite: 299.90 };
+type BillingCycle = 'monthly' | '3month' | 'annual';
+
+const PRICING: Record<BillingCycle, { plus: number; elite: number }> = {
+  monthly: { plus: 14.99, elite: 29.99 },
+  '3month': { plus: 40.47, elite: 80.97 },
+  annual: { plus: 149.30, elite: 298.70 },
+};
+
+const STRIPE_PRICE_IDS: Record<string, string> = {
+  plus_monthly: 'price_plus_monthly',
+  plus_3month: 'price_plus_3month',
+  plus_annual: 'price_plus_annual',
+  elite_monthly: 'price_elite_monthly',
+  elite_3month: 'price_elite_3month',
+  elite_annual: 'price_elite_annual',
+};
 
 type Tier = 'basic' | 'plus' | 'elite';
 
@@ -52,7 +66,7 @@ const FEATURES: Record<Tier, { text: string; included: boolean }[]> = {
 
 export const PlansScreen = () => {
   const insets = useSafeAreaInsets();
-  const { user, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, reactivateSubscription, canSendInterest, canRewind, canSuperLike } = useAuth();
+  const { user, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscriptionAtPeriodEnd, reactivateSubscription, canSendInterest, canRewind, canSuperLike } = useAuth();
   const navigation = useNavigation<PlansScreenNavigationProp>();
 
   const [showUpgradeConfirm, setShowUpgradeConfirm] = useState(false);
@@ -61,7 +75,7 @@ export const PlansScreen = () => {
   const [selectedPlan, setSelectedPlan] = useState<'plus' | 'elite' | null>(null);
   const [downgradeTo, setDowngradeTo] = useState<'basic' | 'plus' | null>(null);
   const [processing, setProcessing] = useState(false);
-  const [isAnnual, setIsAnnual] = useState(false);
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
   const [selectedTier, setSelectedTier] = useState<Tier>('plus');
   const [interestStats, setInterestStats] = useState<{ remaining: number; total: number }>({ remaining: 5, total: 5 });
 
@@ -85,10 +99,22 @@ export const PlansScreen = () => {
     loadStats();
   }, []);
 
-  const getPrice = (plan: 'plus' | 'elite') => isAnnual ? ANNUAL_PRICING[plan] : MONTHLY_PRICING[plan];
+  const getTotalPrice = (plan: 'plus' | 'elite') => PRICING[billingCycle][plan];
+  const getMonthlyRate = (plan: 'plus' | 'elite') => {
+    if (billingCycle === 'monthly') return PRICING.monthly[plan];
+    if (billingCycle === '3month') return PRICING['3month'][plan] / 3;
+    return PRICING.annual[plan] / 12;
+  };
   const getPriceLabel = (plan: 'plus' | 'elite') => {
-    const price = getPrice(plan);
-    return isAnnual ? `$${price.toFixed(2)}/yr` : `$${price.toFixed(2)}/mo`;
+    const total = getTotalPrice(plan);
+    if (billingCycle === 'annual') return `$${total.toFixed(2)}/yr`;
+    if (billingCycle === '3month') return `$${total.toFixed(2)}/3mo`;
+    return `$${total.toFixed(2)}/mo`;
+  };
+  const getBillingCtaSuffix = () => {
+    if (billingCycle === '3month') return 'Billed Every 3 Months';
+    if (billingCycle === 'annual') return 'Billed Annually';
+    return 'Billed Monthly';
   };
 
   const handleUpgrade = (plan: 'plus' | 'elite') => {
@@ -112,8 +138,8 @@ export const PlansScreen = () => {
     setShowUpgradeConfirm(false);
     setProcessing(true);
     await new Promise(r => setTimeout(r, 1500));
-    if (selectedPlan === 'plus') await upgradeToPlus();
-    else await upgradeToElite();
+    if (selectedPlan === 'plus') await upgradeToPlus(billingCycle);
+    else await upgradeToElite(billingCycle);
     const planName = selectedPlan === 'plus' ? 'Plus' : 'Elite';
     Alert.alert('Success!', `Welcome to ${planName}! You now have access to all ${planName} features.`, [
       { text: 'OK', onPress: () => navigation.goBack() },
@@ -144,7 +170,7 @@ export const PlansScreen = () => {
     setShowCancelConfirm(false);
     setProcessing(true);
     await new Promise(r => setTimeout(r, 1000));
-    await cancelSubscription();
+    await cancelSubscriptionAtPeriodEnd();
     const expiryDate = user?.subscription?.expiresAt ? fmtDate(user.subscription.expiresAt) : 'the end of your billing period';
     Alert.alert('Subscription Cancelled', `You'll keep your ${currentPlan === 'plus' ? 'Plus' : 'Elite'} features until ${expiryDate}.`);
     setProcessing(false);
@@ -168,47 +194,49 @@ export const PlansScreen = () => {
       {(['basic', 'plus', 'elite'] as Tier[]).map(tier => {
         const active = selectedTier === tier;
         const isBasic = tier === 'basic';
-        const price = isBasic ? '$0' : (isAnnual ? `$${(getPrice(tier as 'plus' | 'elite') / 12).toFixed(0)}` : `$${MONTHLY_PRICING[tier as 'plus' | 'elite']}`);
+        const price = isBasic ? '$0' : `$${getMonthlyRate(tier as 'plus' | 'elite').toFixed(2)}`;
         const perLabel = isBasic ? 'forever' : '/mo';
+        const showSaveBadge = !isBasic && billingCycle !== 'monthly';
+        const saveBadgeLabel = billingCycle === '3month' ? 'SAVE 10%' : 'ANNUAL';
         return (
           <Pressable key={tier} style={[s.tierTile, active && s.tierTileActive]} onPress={() => selectTier(tier)}>
             {active ? <View style={s.tierDot} /> : null}
             <Text style={[s.tierName, active && s.tierNameActive]}>{tier.charAt(0).toUpperCase() + tier.slice(1)}</Text>
             <Text style={s.tierPrice}>{price}</Text>
             <Text style={s.tierPer}>{perLabel}</Text>
-            {isAnnual && !isBasic ? <LinearGradient colors={[ACCENT, ACCENT_DARK]} style={s.tierSaveBadge}><Text style={s.tierSaveText}>ANNUAL</Text></LinearGradient> : null}
+            {showSaveBadge ? <LinearGradient colors={[ACCENT, ACCENT_DARK]} style={s.tierSaveBadge}><Text style={s.tierSaveText}>{saveBadgeLabel}</Text></LinearGradient> : null}
           </Pressable>
         );
       })}
     </View>
   );
 
-  const renderBillingToggle = () => (
-    <View style={s.billingToggle}>
-      <Pressable style={[s.toggleBtn, !isAnnual && s.toggleBtnActive]} onPress={() => setIsAnnual(false)}>
-        {!isAnnual ? (
-          <LinearGradient colors={[ACCENT, ACCENT_DARK]} style={StyleSheet.absoluteFill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-            <View style={s.toggleBtnInner}><Text style={s.toggleBtnTextActive}>Monthly</Text></View>
-          </LinearGradient>
-        ) : (
-          <Text style={s.toggleBtnText}>Monthly</Text>
-        )}
-      </Pressable>
-      <Pressable style={[s.toggleBtn, isAnnual && s.toggleBtnActive]} onPress={() => setIsAnnual(true)}>
-        {isAnnual ? (
+  const renderToggleOption = (cycle: BillingCycle, label: string, badge?: string) => {
+    const active = billingCycle === cycle;
+    return (
+      <Pressable key={cycle} style={[s.toggleBtn]} onPress={() => setBillingCycle(cycle)}>
+        {active ? (
           <LinearGradient colors={[ACCENT, ACCENT_DARK]} style={StyleSheet.absoluteFill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
             <View style={s.toggleBtnInner}>
-              <Text style={s.toggleBtnTextActive}>Annual</Text>
-              <View style={s.saveBadgeOnActive}><Text style={s.saveBadgeOnActiveText}>PAY ONCE/YEAR</Text></View>
+              <Text style={s.toggleBtnTextActive}>{label}</Text>
+              {badge ? <View style={s.saveBadgeOnActive}><Text style={s.saveBadgeOnActiveText}>{badge}</Text></View> : null}
             </View>
           </LinearGradient>
         ) : (
           <View style={s.toggleBtnInner}>
-            <Text style={s.toggleBtnText}>Annual</Text>
-            <View style={s.saveBadge}><Text style={s.saveBadgeText}>PAY ONCE/YEAR</Text></View>
+            <Text style={s.toggleBtnText}>{label}</Text>
+            {badge ? <View style={s.saveBadge}><Text style={s.saveBadgeText}>{badge}</Text></View> : null}
           </View>
         )}
       </Pressable>
+    );
+  };
+
+  const renderBillingToggle = () => (
+    <View style={s.billingToggle}>
+      {renderToggleOption('monthly', 'Monthly')}
+      {renderToggleOption('3month', '3 Months', 'SAVE 10%')}
+      {renderToggleOption('annual', 'Annual', 'SAVE 17%')}
     </View>
   );
 
@@ -258,11 +286,15 @@ export const PlansScreen = () => {
     let annualNote = isBasic ? 'No credit card required' : '';
 
     if (!isBasic) {
-      const p = isAnnual ? getPrice(tier as 'plus' | 'elite') / 12 : MONTHLY_PRICING[tier as 'plus' | 'elite'];
-      priceText = `$${p.toFixed(2)}`;
+      const monthlyRate = getMonthlyRate(tier as 'plus' | 'elite');
+      priceText = `$${monthlyRate.toFixed(2)}`;
       periodText = '/ mo';
-      if (isAnnual) {
-        annualNote = `Billed $${getPrice(tier as 'plus' | 'elite').toFixed(2)}/yr`;
+      if (billingCycle === '3month') {
+        const total = getTotalPrice(tier as 'plus' | 'elite');
+        annualNote = `Billed $${total.toFixed(2)} every 3 months · Save 10%`;
+      } else if (billingCycle === 'annual') {
+        const total = getTotalPrice(tier as 'plus' | 'elite');
+        annualNote = `Billed $${total.toFixed(2)}/yr · Save 17%`;
       } else if (tier === 'plus' && currentPlan === 'basic') {
         annualNote = 'Then $14.99/mo after free trial';
       } else if (tier === 'elite') {
@@ -278,8 +310,8 @@ export const PlansScreen = () => {
     } else if (tier === 'plus' && currentPlan === 'basic') {
       ctaLabel = 'Start 7-Day Free Trial';
       ctaStyle = 'primary';
-    } else if (tier === 'elite') {
-      ctaLabel = 'Upgrade to Elite';
+    } else if (tier === 'elite' && currentPlan !== 'elite') {
+      ctaLabel = `Upgrade — ${getBillingCtaSuffix()}`;
       ctaStyle = 'outline';
     } else if (tier === 'plus' && currentPlan === 'elite') {
       ctaLabel = 'Downgrade to Plus';
@@ -288,7 +320,7 @@ export const PlansScreen = () => {
       ctaLabel = currentPlan === 'basic' ? 'Current Plan' : 'Downgrade to Basic';
       ctaStyle = currentPlan === 'basic' ? 'ghost' : 'outline';
     } else {
-      ctaLabel = `Upgrade to ${tier.charAt(0).toUpperCase() + tier.slice(1)}`;
+      ctaLabel = `Upgrade — ${getBillingCtaSuffix()}`;
       ctaStyle = 'outline';
     }
 

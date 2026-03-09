@@ -60,7 +60,13 @@ Mock authentication supports role-based navigation and conditional access for `r
 
 A `PaywallSheet` component handles subscription prompts when users hit plan limits. `PlanBadge` components indicate user tiers. `AuthContext` includes functions for managing host plans and purchases.
 
-**Renter Subscription Screen (`PlansScreen.tsx`):** Custom header (nav header hidden), hero with gradient accent text, 7-day trial banner (Basic users), tier comparison strip (3 tiles with tap-to-scroll), monthly/annual billing toggle with LinearGradient, "Today's Usage" card with progress bars (Interest Cards, Rewinds, Super Likes), three plan cards (Basic ghost CTA, Plus coral "MOST POPULAR" with trial CTA, Elite gold "BEST VALUE"), scheduled change/reactivation banner, and fine-print footer. All upgrade/downgrade/cancel/reactivate logic wired to AuthContext.
+**Billing Cycles:** Monthly, 3-Month, and Annual options for both renter and host subscriptions. 3-month saves 10%, annual saves 17%. Stripe price ID constants are mapped per plan/cycle (placeholder IDs for future backend integration). `BillingCycle` type: `'monthly' | '3month' | 'annual'`.
+
+**Renter Subscription Screen (`PlansScreen.tsx`):** Custom header (nav header hidden), hero with gradient accent text, 7-day trial banner (Basic users), tier comparison strip (3 tiles with tap-to-scroll and save badges), 3-option billing toggle (Monthly/3 Months/Annual) with LinearGradient, "Today's Usage" card with progress bars (Interest Cards, Rewinds, Super Likes), three plan cards (Basic ghost CTA, Plus coral "MOST POPULAR" with trial CTA, Elite gold "BEST VALUE"), scheduled change/reactivation banner, and fine-print footer. All upgrade/downgrade/cancel/reactivate logic wired to AuthContext.
+
+**Host Pricing Screen (`HostPricingScreen.tsx`):** Same 3-option billing toggle, tier strip with save badges, plan cards with cycle-aware pricing notes and CTAs.
+
+**ManageSubscription Screen (`ManageSubscriptionScreen.tsx`):** Shows current plan + billing cycle, next renewal date + amount, billing history (last 3 charges), Cancel Plan button with confirmation bottom sheet ("Keep My Plan" primary, "Cancel Anyway" outline). Cancellation sets `status: 'cancelling'` (cancel_at_period_end). Resubscribe option shown when cancelling. Accessible from ProfileScreen "Manage Subscription" row (visible for paid plan users). Cancelling banner shown on ProfileScreen.
 
 ## Data Layer
 

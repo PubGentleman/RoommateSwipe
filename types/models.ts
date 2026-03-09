@@ -190,23 +190,30 @@ export interface User {
   profilePicture?: string;
   verification?: VerificationStatus;
   photos?: string[];
+  stripeCustomerId?: string;
   subscription?: {
     plan: 'basic' | 'plus' | 'elite';
-    status: 'active' | 'cancelled' | 'expired';
+    status: 'active' | 'cancelled' | 'cancelling' | 'expired';
     expiresAt?: Date;
     scheduledPlan?: 'basic' | 'plus' | 'elite';
     scheduledChangeDate?: Date;
-    billingCycle?: 'monthly' | 'annual';
+    billingCycle?: 'monthly' | '3month' | 'annual';
+    stripeSubscriptionId?: string;
+    stripePriceId?: string;
+    billingHistory?: Array<{ date: string; amount: number; description: string }>;
   };
   hostSubscription?: {
     plan: 'starter' | 'pro' | 'business';
-    status: 'active' | 'cancelled' | 'expired';
+    status: 'active' | 'cancelled' | 'cancelling' | 'expired';
     expiresAt?: Date;
     scheduledPlan?: 'starter' | 'pro' | 'business';
     scheduledChangeDate?: Date;
-    billingCycle?: 'monthly' | 'annual';
+    billingCycle?: 'monthly' | '3month' | 'annual';
+    stripeSubscriptionId?: string;
+    stripePriceId?: string;
     inquiryResponsesUsed?: number;
     lastInquiryResetDate?: string;
+    billingHistory?: Array<{ date: string; amount: number; description: string }>;
   };
   purchases?: {
     listingBoosts?: Array<{ propertyId: string; expiresAt: string }>;
