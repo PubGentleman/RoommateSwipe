@@ -106,7 +106,7 @@ const STEP_SUBTITLES: Record<StepId, string> = {
 
 export const ProfileQuestionnaireScreen = () => {
   const { theme } = useTheme();
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, completeOnboardingStep } = useAuth();
   const navigation = useNavigation();
   const route = useRoute();
   const insets = useSafeAreaInsets();
@@ -292,7 +292,7 @@ export const ProfileQuestionnaireScreen = () => {
     if (currentFilteredIndex > 0) {
       setDirection('back');
       setCurrentFilteredIndex(currentFilteredIndex - 1);
-    } else {
+    } else if (user?.onboardingStep !== 'profile') {
       navigation.goBack();
     }
   };
@@ -346,7 +346,11 @@ export const ProfileQuestionnaireScreen = () => {
 
     try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
     setIsSaving(false);
-    navigation.goBack();
+    if (user?.onboardingStep === 'profile') {
+      await completeOnboardingStep('plan');
+    } else {
+      navigation.goBack();
+    }
   };
 
   const isLastStep = currentFilteredIndex === stepsToShow.length - 1;

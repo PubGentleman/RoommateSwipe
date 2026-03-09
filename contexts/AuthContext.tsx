@@ -54,6 +54,7 @@ interface AuthContextType {
   purchaseListingBoost: (propertyId: string) => Promise<{ success: boolean; message: string }>;
   purchaseHostVerification: () => Promise<{ success: boolean; message: string }>;
   purchaseSuperInterest: () => Promise<{ success: boolean; message: string }>;
+  completeOnboardingStep: (step: 'profile' | 'plan' | 'complete') => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -206,6 +207,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         password,
         name: email.split('@')[0],
         role,
+        onboardingStep: 'profile',
         subscription: {
           plan: 'basic',
           status: 'active',
@@ -225,6 +227,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       let needsUpdate = false;
+      if (!mockUser.onboardingStep) {
+        mockUser = { ...mockUser, onboardingStep: 'complete' };
+        needsUpdate = true;
+      }
       if (!mockUser.password) {
         mockUser = {
           ...mockUser,
@@ -293,6 +299,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       password,
       name,
       role,
+      onboardingStep: 'profile',
       subscription: {
         plan: 'basic',
         status: 'active',
@@ -312,6 +319,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     await StorageService.seedMockNotifications(mockUser.id);
     setUser(mockUser);
+  };
+
+  const completeOnboardingStep = async (step: 'profile' | 'plan' | 'complete') => {
+    if (!user) return;
+    const latest = await StorageService.getCurrentUser() || user;
+    const updated = { ...latest, onboardingStep: step };
+    await StorageService.setCurrentUser(updated);
+    await StorageService.addOrUpdateUser(updated);
+    setUser(updated);
   };
 
   const logout = async () => {
@@ -1547,7 +1563,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, cancelSubscriptionAtPeriodEnd, reactivateSubscription, getSubscriptionDetails, updateUser, blockUser: blockUserAction, unblockUser: unblockUserAction, reportUser: reportUserAction, isUserBlocked: isUserBlockedCheck, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike, watchAdForCredit, getAdCredits, useAdCredit, isBasicUser, canViewListing, useListingView, canSendInterest, canSendSuperInterest, upgradeHostPlan, downgradeHostPlan, getHostPlan, canAddListing, canRespondToInquiry, useInquiryResponse, purchaseListingBoost, purchaseHostVerification, purchaseSuperInterest }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, cancelSubscriptionAtPeriodEnd, reactivateSubscription, getSubscriptionDetails, updateUser, blockUser: blockUserAction, unblockUser: unblockUserAction, reportUser: reportUserAction, isUserBlocked: isUserBlockedCheck, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike, watchAdForCredit, getAdCredits, useAdCredit, isBasicUser, canViewListing, useListingView, canSendInterest, canSendSuperInterest, upgradeHostPlan, downgradeHostPlan, getHostPlan, canAddListing, canRespondToInquiry, useInquiryResponse, purchaseListingBoost, purchaseHostVerification, purchaseSuperInterest, completeOnboardingStep }}>
       {children}
     </AuthContext.Provider>
   );

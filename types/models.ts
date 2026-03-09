@@ -187,6 +187,7 @@ export interface User {
   birthday?: string;
   zodiacSign?: ZodiacSign;
   role: 'renter' | 'host';
+  onboardingStep?: 'profile' | 'plan' | 'complete';
   profilePicture?: string;
   verification?: VerificationStatus;
   photos?: string[];

@@ -53,6 +53,12 @@ Animations are handled by React Native Reanimated, gestures by React Native Gest
 
 Mock authentication supports role-based navigation and conditional access for `renter` and `host` roles. Privacy settings and account deletion are implemented.
 
+**Post-Signup Onboarding Flow:** After signup, users must complete a mandatory 2-step onboarding before accessing the main app:
+1. **Profile Creation** — 13-step questionnaire (photos, bio, location, lifestyle preferences)
+2. **Plan Selection** — Choose subscription tier (Basic/Plus/Elite for renters, Starter/Pro/Business for hosts) with billing cycle options
+
+The `onboardingStep` field on the User model (`'profile' | 'plan' | 'complete'`) gates access in `RootNavigator`. Existing/login users default to `'complete'`.
+
 ## Subscription & Paywall System
 
 **Renter Tiers:** Basic (Free), Plus, and Elite. Includes one-time purchases like Super Interest.

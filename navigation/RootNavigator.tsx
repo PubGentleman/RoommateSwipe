@@ -3,6 +3,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../contexts/AuthContext';
 import { LoginScreen } from '../screens/auth/LoginScreen';
 import { OnboardingScreen } from '../screens/shared/OnboardingScreen';
+import { ProfileQuestionnaireScreen } from '../screens/shared/ProfileQuestionnaireScreen';
+import { PlanSelectionScreen } from '../screens/shared/PlanSelectionScreen';
 import { RenterTabNavigator } from './RenterTabNavigator';
 import { HostTabNavigator } from './HostTabNavigator';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
@@ -12,6 +14,8 @@ import { StorageService } from '../utils/storage';
 export type RootStackParamList = {
   Login: undefined;
   Main: undefined;
+  OnboardingProfile: undefined;
+  OnboardingPlan: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -55,6 +59,24 @@ export const RootNavigator = () => {
     return (
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Login" component={LoginScreen} />
+      </Stack.Navigator>
+    );
+  }
+
+  const step = user.onboardingStep || 'complete';
+
+  if (step === 'profile') {
+    return (
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="OnboardingProfile" component={ProfileQuestionnaireScreen} />
+      </Stack.Navigator>
+    );
+  }
+
+  if (step === 'plan') {
+    return (
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="OnboardingPlan" component={PlanSelectionScreen} />
       </Stack.Navigator>
     );
   }
