@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, StyleSheet, Pressable, Image } from 'react-native';
+import { View, StyleSheet, Pressable, Image, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { ScreenScrollView } from '../../components/ScreenScrollView';
 import { ThemedText } from '../../components/ThemedText';
@@ -15,7 +15,7 @@ type FilterStatus = 'all' | 'pending' | 'accepted' | 'passed';
 
 export const HostInquiriesScreen = () => {
   const { theme } = useTheme();
-  const { user } = useAuth();
+  const { user, canRespondToInquiry, useInquiryResponse, getHostPlan } = useAuth();
   const [interestCards, setInterestCards] = useState<InterestCard[]>([]);
   const [filter, setFilter] = useState<FilterStatus>('all');
 
@@ -45,6 +45,17 @@ export const HostInquiriesScreen = () => {
   const handleAcceptInterest = async (card: InterestCard) => {
     if (!user) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    const responseCheck = await canRespondToInquiry();
+    if (!responseCheck.allowed) {
+      Alert.alert(
+        'Response Limit Reached',
+        responseCheck.reason || `You've used all ${responseCheck.limit} inquiry responses this month. Upgrade to Pro for unlimited responses.`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    await useInquiryResponse();
 
     await StorageService.updateInterestCard(card.id, {
       status: 'accepted',
@@ -120,6 +131,17 @@ export const HostInquiriesScreen = () => {
   const handlePassInterest = async (card: InterestCard) => {
     if (!user) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    const responseCheck = await canRespondToInquiry();
+    if (!responseCheck.allowed) {
+      Alert.alert(
+        'Response Limit Reached',
+        responseCheck.reason || `You've used all ${responseCheck.limit} inquiry responses this month. Upgrade to Pro for unlimited responses.`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    await useInquiryResponse();
 
     await StorageService.updateInterestCard(card.id, {
       status: 'passed',

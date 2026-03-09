@@ -204,9 +204,6 @@ export const RoommatesScreen = () => {
   const isBoosted = isBoostActive;
   const subscriptionPlan = currentProfileUser?.subscription?.plan || 'basic';
   
-  // PAYWALL MISSING: Online status visibility promises Plus access in PlansScreen but only grants to Elite here
-  // MISSING FEATURE: Elite profiles ranked higher in match results — no plan-based sort applied to profiles (Renter Elite)
-  // MISSING FEATURE: "Who Liked You" screen/section — no screen exists to show users who sent interest cards to the current user (Renter Plus)
   const canSeeOnlineStatus = () => {
     const userPlan = user?.subscription?.plan || 'basic';
     const userStatus = user?.subscription?.status || 'active';
@@ -616,6 +613,7 @@ export const RoommatesScreen = () => {
           onApply={handleApplyFilters}
           currentFilters={matchFilters}
           allProfiles={unfilteredProfiles}
+          userPlan={user?.subscription?.plan || 'basic'}
         />
       </View>
     );
@@ -1596,6 +1594,7 @@ export const RoommatesScreen = () => {
         onApply={handleApplyFilters}
         currentFilters={matchFilters}
         allProfiles={unfilteredProfiles}
+        userPlan={user?.subscription?.plan || 'basic'}
       />
     </View>
   );

@@ -16,7 +16,7 @@ import { StorageService } from '../../utils/storage';
 type ProfileScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'ProfileMain'>;
 
 export const ProfileScreen = () => {
-  const { user, logout, updateUser, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost } = useAuth();
+  const { user, logout, updateUser, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, getHostPlan } = useAuth();
   const { unreadCount } = useNotificationContext();
   const navigation = useNavigation<ProfileScreenNavigationProp>();
   const insets = useSafeAreaInsets();
@@ -84,8 +84,6 @@ export const ProfileScreen = () => {
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <View style={styles.topNav}>
-        {/* MISSING FEATURE: Verified host badge display on host profile — purchaseHostVerification sets flag but badge is never rendered here (Host Pro / One-time purchase) */}
-        {/* MISSING FEATURE: Dedicated support contact/chat option for Business hosts — no support UI exists (Host Business) */}
         <Text style={styles.topNavTitle}>My Profile</Text>
         <Pressable style={styles.iconBtn} onPress={() => navigation.navigate('PrivacySecurity')}>
           <Feather name="settings" size={16} color="rgba(255,255,255,0.7)" />
@@ -111,7 +109,15 @@ export const ProfileScreen = () => {
             <Text style={styles.roleBadgeText}>{getRoleLabel()}</Text>
           </View>
 
-          <Text style={styles.profileName}>{user?.name || 'User'}</Text>
+          <View style={styles.nameRow}>
+            <Text style={styles.profileName}>{user?.name || 'User'}</Text>
+            {user?.purchases?.hostVerificationBadge === true ? (
+              <View style={styles.verifiedBadge}>
+                <Feather name="shield" size={14} color="#3ECF8E" />
+                <Text style={styles.verifiedBadgeText}>Verified</Text>
+              </View>
+            ) : null}
+          </View>
           <Text style={styles.profileEmail}>{user?.email || ''}</Text>
 
           <View style={styles.statsRow}>
@@ -232,8 +238,26 @@ export const ProfileScreen = () => {
               title="Verify Identity"
               subtitle="Phone, ID, social verification"
               onPress={() => navigation.navigate('Verification')}
-              isLast
+              isLast={!(user?.role === 'host' && getHostPlan() === 'business')}
             />
+            {user?.role === 'host' && getHostPlan() === 'business' ? (
+              <SettingsItem
+                iconName="headphones"
+                iconColor="#667eea"
+                iconBgColor="rgba(102,126,234,0.15)"
+                iconBorderColor="rgba(102,126,234,0.2)"
+                title="Dedicated Support"
+                subtitle="Priority support for Business hosts"
+                onPress={() => {
+                  Alert.alert(
+                    'Dedicated Support',
+                    'As a Business host, you have access to priority support.\n\nEmail: support@roomdr.com\nResponse time: Within 2 hours\n\nOur dedicated team is here to help you with any questions or issues.',
+                    [{ text: 'OK' }]
+                  );
+                }}
+                isLast
+              />
+            ) : null}
           </View>
         </View>
 
@@ -426,12 +450,33 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#ff8070',
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 3,
+  },
+  verifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(62,207,142,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(62,207,142,0.25)',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  verifiedBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#3ECF8E',
+  },
   profileName: {
     fontSize: 22,
     fontWeight: '800',
     color: '#fff',
     letterSpacing: -0.3,
-    marginBottom: 3,
   },
   profileEmail: {
     fontSize: 12.5,

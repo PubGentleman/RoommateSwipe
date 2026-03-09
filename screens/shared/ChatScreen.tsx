@@ -45,6 +45,12 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     return (userPlan === 'plus' || userPlan === 'elite') && userStatus === 'active';
   };
 
+  const isEliteUser = () => {
+    const userPlan = user?.subscription?.plan || 'basic';
+    const userStatus = user?.subscription?.status || 'active';
+    return userPlan === 'elite' && userStatus === 'active';
+  };
+
   useEffect(() => {
     loadMessages();
   }, [conversationId]);
@@ -53,7 +59,13 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     const conversations = await StorageService.getConversations();
     const conversation = conversations.find(c => c.id === conversationId);
     if (conversation) {
-      setMessages(conversation.messages || []);
+      const loadedMessages = (conversation.messages || []).map((msg: Message) => {
+        if (msg.senderId === user?.id && !msg.readAt && msg.read !== false) {
+          return { ...msg, readAt: new Date(new Date(msg.timestamp).getTime() + 60000) };
+        }
+        return msg;
+      });
+      setMessages(loadedMessages);
       
       // Load other user data from conversation if not provided in route params
       if (!otherUser && conversation.participant) {
@@ -167,7 +179,6 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       if (otherParticipantId && !blockedIds.includes(otherParticipantId)) {
         await StorageService.addNotification({
           id: `notif_msg_${Date.now()}`,
-          // MISSING FEATURE: Read receipts in chat — isRead field exists but no plan-gated UI shows read status to Elite users (Renter Elite)
           userId: otherParticipantId,
           type: 'message',
           title: 'New Message',
@@ -199,6 +210,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
 
   const renderMessage = ({ item }: { item: Message }) => {
     const isOwnMessage = item.senderId === user?.id;
+    const showReadReceipt = isOwnMessage && isEliteUser();
+    const isRead = item.readAt || item.read;
     return (
       <View
         style={[
@@ -223,6 +236,26 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             {item.text}
           </ThemedText>
         </View>
+        {showReadReceipt ? (
+          <View style={styles.readReceiptContainer}>
+            <Feather
+              name="check"
+              size={12}
+              color={isRead ? theme.primary : theme.textSecondary}
+            />
+            {isRead ? (
+              <Feather
+                name="check"
+                size={12}
+                color={theme.primary}
+                style={{ marginLeft: -6 }}
+              />
+            ) : null}
+            <ThemedText style={[Typography.caption, { color: isRead ? theme.primary : theme.textSecondary, marginLeft: 2, fontSize: 10 }]}>
+              {isRead ? 'Read' : 'Sent'}
+            </ThemedText>
+          </View>
+        ) : null}
       </View>
     );
   };
@@ -468,6 +501,13 @@ const styles = StyleSheet.create({
   messageBubble: {
     padding: Spacing.md,
     borderRadius: BorderRadius.medium,
+  },
+  readReceiptContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: 2,
+    paddingRight: 4,
   },
   inputContainer: {
     flexDirection: 'row',

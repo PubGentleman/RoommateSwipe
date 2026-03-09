@@ -188,9 +188,19 @@ export const HostPricingScreen = () => {
         { text: 'Purchase', onPress: () => { purchaseListingBoost(''); Alert.alert('Purchased', 'Listing Boost activated for 7 days!'); }},
       ]);
     } else if (id === 'verify') {
-      Alert.alert('Host Verification', 'Get verified for $9.99 (one-time)?', [
+      Alert.alert('Host Verification', 'Get verified for $9.99 (one-time)? You will need to complete ID verification to activate your badge.', [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Purchase', onPress: () => { purchaseHostVerification(); Alert.alert('Purchased', 'Your Host Verification badge is now active!'); }},
+        { text: 'Purchase', onPress: async () => {
+          const result = await purchaseHostVerification();
+          if (result.success) {
+            Alert.alert('Payment Successful', 'Complete your ID verification to activate the Host Verification Badge.', [
+              { text: 'Verify Now', onPress: () => navigation.navigate('Profile', { screen: 'Verification', params: { fromHostPurchase: true } }) },
+              { text: 'Later', style: 'cancel' },
+            ]);
+          } else {
+            Alert.alert('Notice', result.message);
+          }
+        }},
       ]);
     } else if (id === 'super') {
       Alert.alert('Super Interest', 'Purchase Super Interest for $0.99?', [

@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { View, StyleSheet, Pressable } from 'react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
 import { ScreenScrollView } from '../../components/ScreenScrollView';
 import { ThemedText } from '../../components/ThemedText';
@@ -9,15 +9,18 @@ import { useTheme } from '../../hooks/useTheme';
 import { StorageService } from '../../utils/storage';
 import { Property, InterestCard } from '../../types/models';
 import { Spacing, BorderRadius } from '../../constants/theme';
+import { PaywallSheet } from '../../components/PaywallSheet';
 
 const ACCENT = '#ff6b5b';
 const CARD_BG = '#1a1a1a';
 const BG = '#111';
 
-// PAYWALL MISSING: Analytics screen is not gated by host plan — Starter users can see full analytics including conversion funnel, inquiry counts, and accept rate. Starter should only see view counts. (Host Starter/Pro)
-// MISSING FEATURE: Advanced analytics differentiation for Business tier — no additional metrics beyond what Pro sees (Host Business)
 export const HostAnalyticsScreen = () => {
-  const { user } = useAuth();
+  const { user, getHostPlan } = useAuth();
+  const navigation = useNavigation<any>();
+  const hostPlan = getHostPlan();
+  const isStarter = hostPlan === 'starter';
+  const [showPaywall, setShowPaywall] = useState(false);
   const { theme } = useTheme();
   const [properties, setProperties] = useState<Property[]>([]);
   const [inquiries, setInquiries] = useState<InterestCard[]>([]);
@@ -89,48 +92,92 @@ export const HostAnalyticsScreen = () => {
         <StatusPill label="Paused" value={pausedListings} color="#FFA500" />
       </View>
 
-      <ThemedText type="h2" style={styles.sectionTitle}>Conversion Funnel</ThemedText>
-      <View style={[styles.card, { backgroundColor: CARD_BG }]}>
-        <FunnelRow label="Estimated Views" value={estimatedViews} maxValue={estimatedViews} color="#5B7FFF" />
-        <FunnelRow label="Estimated Saves" value={estimatedSaves} maxValue={estimatedViews} color="#FFA500" />
-        <FunnelRow label="Inquiries" value={totalInquiries} maxValue={estimatedViews} color={ACCENT} />
-        <FunnelRow label="Accepted" value={acceptedInquiries} maxValue={estimatedViews} color="#3ECF8E" />
-      </View>
-
-      <ThemedText type="h2" style={styles.sectionTitle}>Per-Listing Breakdown</ThemedText>
-      {perListingInquiries.length === 0 ? (
-        <View style={[styles.card, { backgroundColor: CARD_BG, alignItems: 'center', paddingVertical: Spacing.xxl }]}>
-          <Feather name="bar-chart-2" size={40} color="#666" />
-          <ThemedText style={{ color: '#888', marginTop: Spacing.md }}>No listings yet</ThemedText>
-        </View>
-      ) : (
-        perListingInquiries.map(({ property, inquiryCount }) => (
-          <View key={property.id} style={[styles.card, { backgroundColor: CARD_BG, marginBottom: Spacing.md }]}>
-            <View style={styles.listingHeader}>
-              <ThemedText type="h3" style={{ flex: 1 }} numberOfLines={1}>{property.title}</ThemedText>
-              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(property) + '22' }]}>
-                <ThemedText style={[styles.statusBadgeText, { color: getStatusColor(property) }]}>
-                  {getStatusLabel(property)}
-                </ThemedText>
-              </View>
+      {isStarter ? (
+        <Pressable onPress={() => setShowPaywall(true)}>
+          <ThemedText type="h2" style={styles.sectionTitle}>Conversion Funnel</ThemedText>
+          <View style={[styles.card, { backgroundColor: CARD_BG, overflow: 'hidden' }]}>  
+            <View style={{ opacity: 0.15 }}>
+              <FunnelRow label="Estimated Views" value={0} maxValue={1} color="#5B7FFF" />
+              <FunnelRow label="Estimated Saves" value={0} maxValue={1} color="#FFA500" />
+              <FunnelRow label="Inquiries" value={0} maxValue={1} color={ACCENT} />
+              <FunnelRow label="Accepted" value={0} maxValue={1} color="#3ECF8E" />
             </View>
-            <ThemedText style={{ color: '#888', marginBottom: Spacing.sm }}>${property.price}/mo</ThemedText>
-            <View style={styles.barRow}>
-              <ThemedText style={{ color: '#aaa', width: 80 }}>{inquiryCount} inquiries</ThemedText>
-              <View style={styles.barContainer}>
-                <View
-                  style={[
-                    styles.bar,
-                    {
-                      width: `${Math.max((inquiryCount / maxInquiryCount) * 100, inquiryCount > 0 ? 8 : 0)}%`,
-                      backgroundColor: ACCENT,
-                    },
-                  ]}
-                />
+            <View style={styles.lockedOverlay}>
+              <View style={styles.lockedBadge}>
+                <Feather name="lock" size={18} color={ACCENT} />
+                <ThemedText style={styles.lockedText}>Upgrade to Pro</ThemedText>
               </View>
             </View>
           </View>
-        ))
+
+          <ThemedText type="h2" style={styles.sectionTitle}>Per-Listing Breakdown</ThemedText>
+          <View style={[styles.card, { backgroundColor: CARD_BG, overflow: 'hidden' }]}>  
+            <View style={{ opacity: 0.15 }}>
+              <View style={styles.listingHeader}>
+                <ThemedText type="h3" style={{ flex: 1 }}>Sample Listing</ThemedText>
+              </View>
+              <ThemedText style={{ color: '#888', marginBottom: Spacing.sm }}>$0/mo</ThemedText>
+              <View style={styles.barRow}>
+                <ThemedText style={{ color: '#aaa', width: 80 }}>0 inquiries</ThemedText>
+                <View style={styles.barContainer}>
+                  <View style={[styles.bar, { width: '0%', backgroundColor: ACCENT }]} />
+                </View>
+              </View>
+            </View>
+            <View style={styles.lockedOverlay}>
+              <View style={styles.lockedBadge}>
+                <Feather name="lock" size={18} color={ACCENT} />
+                <ThemedText style={styles.lockedText}>Upgrade to Pro</ThemedText>
+              </View>
+            </View>
+          </View>
+        </Pressable>
+      ) : (
+        <>
+          <ThemedText type="h2" style={styles.sectionTitle}>Conversion Funnel</ThemedText>
+          <View style={[styles.card, { backgroundColor: CARD_BG }]}>
+            <FunnelRow label="Estimated Views" value={estimatedViews} maxValue={estimatedViews} color="#5B7FFF" />
+            <FunnelRow label="Estimated Saves" value={estimatedSaves} maxValue={estimatedViews} color="#FFA500" />
+            <FunnelRow label="Inquiries" value={totalInquiries} maxValue={estimatedViews} color={ACCENT} />
+            <FunnelRow label="Accepted" value={acceptedInquiries} maxValue={estimatedViews} color="#3ECF8E" />
+          </View>
+
+          <ThemedText type="h2" style={styles.sectionTitle}>Per-Listing Breakdown</ThemedText>
+          {perListingInquiries.length === 0 ? (
+            <View style={[styles.card, { backgroundColor: CARD_BG, alignItems: 'center', paddingVertical: Spacing.xxl }]}>
+              <Feather name="bar-chart-2" size={40} color="#666" />
+              <ThemedText style={{ color: '#888', marginTop: Spacing.md }}>No listings yet</ThemedText>
+            </View>
+          ) : (
+            perListingInquiries.map(({ property, inquiryCount }) => (
+              <View key={property.id} style={[styles.card, { backgroundColor: CARD_BG, marginBottom: Spacing.md }]}>
+                <View style={styles.listingHeader}>
+                  <ThemedText type="h3" style={{ flex: 1 }} numberOfLines={1}>{property.title}</ThemedText>
+                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(property) + '22' }]}>
+                    <ThemedText style={[styles.statusBadgeText, { color: getStatusColor(property) }]}>
+                      {getStatusLabel(property)}
+                    </ThemedText>
+                  </View>
+                </View>
+                <ThemedText style={{ color: '#888', marginBottom: Spacing.sm }}>${property.price}/mo</ThemedText>
+                <View style={styles.barRow}>
+                  <ThemedText style={{ color: '#aaa', width: 80 }}>{inquiryCount} inquiries</ThemedText>
+                  <View style={styles.barContainer}>
+                    <View
+                      style={[
+                        styles.bar,
+                        {
+                          width: `${Math.max((inquiryCount / maxInquiryCount) * 100, inquiryCount > 0 ? 8 : 0)}%`,
+                          backgroundColor: ACCENT,
+                        },
+                      ]}
+                    />
+                  </View>
+                </View>
+              </View>
+            ))
+          )}
+        </>
       )}
 
       <ThemedText type="h2" style={styles.sectionTitle}>Monthly Trend</ThemedText>
@@ -149,6 +196,18 @@ export const HostAnalyticsScreen = () => {
           </View>
         </View>
       </View>
+
+      <PaywallSheet
+        visible={showPaywall}
+        featureName="Full Analytics"
+        requiredPlan="pro"
+        role="host"
+        onUpgrade={() => {
+          setShowPaywall(false);
+          navigation.navigate('HostPricing');
+        }}
+        onDismiss={() => setShowPaywall(false)}
+      />
     </ScreenScrollView>
   );
 };
@@ -263,5 +322,28 @@ const styles = StyleSheet.create({
   trendRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+  },
+  lockedOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(17, 17, 17, 0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: BorderRadius.medium,
+  },
+  lockedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    backgroundColor: 'rgba(255,107,91,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.3)',
+    borderRadius: BorderRadius.full,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+  },
+  lockedText: {
+    color: ACCENT,
+    fontWeight: '700',
+    fontSize: 14,
   },
 });

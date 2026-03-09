@@ -64,7 +64,7 @@ const getAvatarGradient = (id: string): [string, string] => {
 
 export const ExploreScreen = () => {
   const { theme } = useTheme();
-  const { user, canSendInterest, canSendSuperInterest } = useAuth();
+  const { user, canSendInterest, canSendSuperInterest, canViewListing, useListingView } = useAuth();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [properties, setProperties] = useState<Property[]>([]);
@@ -348,14 +348,37 @@ export const ExploreScreen = () => {
       filtered = filtered.filter(p => p.available);
     }
 
-    // MISSING FEATURE: Daily listing view limit (10/day) for Basic renter plan — no view cap enforced
-    // MISSING FEATURE: Boosted listing visibility — purchaseListingBoost sets expiry but boosted listings are not prioritized in sort (Host Pro)
-    // MISSING FEATURE: Pro host listings ranked higher than Starter listings in Explore results (Host Pro)
-    // MISSING FEATURE: Business host listings ranked above Pro listings in search results (Host Business)
-    // MISSING FEATURE: Featured listing slot for Business hosts — separate from regular feed (Host Business)
+    const getHostPlanPriority = (property: Property) => {
+      const host = property.hostProfileId ? hostProfiles.get(property.hostProfileId) : null;
+      if (!host) return 0;
+      const plan = (host as any).hostPlan || 'starter';
+      if (plan === 'business') return 3;
+      if (plan === 'pro') return 2;
+      return 1;
+    };
+
+    const isListingBoosted = (property: Property) => {
+      const host = property.hostProfileId ? hostProfiles.get(property.hostProfileId) : null;
+      if (!(host as any)?.purchases?.listingBoosts) return false;
+      const now = new Date();
+      return (host as any).purchases.listingBoosts.some(
+        (boost: { propertyId: string; expiresAt: string }) =>
+          boost.propertyId === property.id && new Date(boost.expiresAt) > now
+      );
+    };
+
     filtered.sort((a, b) => {
       if (a.featured && !b.featured) return -1;
       if (!a.featured && b.featured) return 1;
+
+      const boostedA = isListingBoosted(a) ? 1 : 0;
+      const boostedB = isListingBoosted(b) ? 1 : 0;
+      if (boostedA !== boostedB) return boostedB - boostedA;
+
+      const planA = getHostPlanPriority(a);
+      const planB = getHostPlanPriority(b);
+      if (planA !== planB) return planB - planA;
+
       if (activeQuickFilters.has('bestMatch') && user) {
         const hostA = a.hostProfileId ? hostProfiles.get(a.hostProfileId) : null;
         const hostB = b.hostProfileId ? hostProfiles.get(b.hostProfileId) : null;
@@ -475,6 +498,15 @@ export const ExploreScreen = () => {
       <Pressable
         style={styles.propCard}
         onPress={() => {
+          const viewCheck = canViewListing();
+          if (!viewCheck.canView) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            setPaywallFeature('Unlimited Listing Views');
+            setPaywallPlan('plus');
+            setShowPaywall(true);
+            return;
+          }
+          useListingView();
           setSelectedProperty(item);
           setShowPropertyDetail(true);
         }}
@@ -564,7 +596,15 @@ export const ExploreScreen = () => {
               <Text style={styles.hostAvatarText}>{hostInitials}</Text>
             </LinearGradient>
             <View style={styles.hostInfo}>
-              <Text style={styles.hostName}>{hostName.split(' ')[0]} {hostName.split(' ')[1]?.[0] ? hostName.split(' ')[1][0] + '.' : ''} · Host</Text>
+              <View style={styles.hostNameRow}>
+                <Text style={styles.hostName}>{hostName.split(' ')[0]} {hostName.split(' ')[1]?.[0] ? hostName.split(' ')[1][0] + '.' : ''} · Host</Text>
+                {hostUser?.purchases?.hostVerificationBadge === true ? (
+                  <View style={styles.verifiedHostBadge}>
+                    <Feather name="shield" size={10} color="#3ECF8E" />
+                    <Text style={styles.verifiedHostText}>Verified</Text>
+                  </View>
+                ) : null}
+              </View>
               <Text style={styles.hostStatus}>Member · {hostUser ? Math.max(1, (item.hostProfileId?.charCodeAt(0) || 0) % 6 + 1) : 1} listings</Text>
             </View>
             <View style={styles.respBadge}>
@@ -707,6 +747,15 @@ export const ExploreScreen = () => {
           hostProfiles={hostProfiles}
           currentUser={user || null}
           onPropertyPress={(property) => {
+            const viewCheck = canViewListing();
+            if (!viewCheck.canView) {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+              setPaywallFeature('Unlimited Listing Views');
+              setPaywallPlan('plus');
+              setShowPaywall(true);
+              return;
+            }
+            useListingView();
             setSelectedProperty(property);
             setShowPropertyDetail(true);
           }}
@@ -723,6 +772,52 @@ export const ExploreScreen = () => {
             { paddingBottom: insets.bottom + 100, paddingTop: Spacing.lg },
           ]}
           showsVerticalScrollIndicator={false}
+          ListHeaderComponent={() => {
+            const featuredListings = filteredProperties.filter(p => {
+              const host = p.hostProfileId ? hostProfiles.get(p.hostProfileId) : null;
+              return host && (host as any).hostPlan === 'business';
+            });
+            if (featuredListings.length === 0 || viewMode === 'saved') return null;
+            return (
+              <View style={styles.featuredSection}>
+                <View style={styles.featuredHeader}>
+                  <Feather name="star" size={14} color="#ffd700" />
+                  <Text style={styles.featuredTitle}>Featured</Text>
+                </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.featuredScroll}>
+                  {featuredListings.slice(0, 5).map(item => (
+                    <Pressable
+                      key={`featured-${item.id}`}
+                      style={styles.featuredCard}
+                      onPress={() => {
+                        const viewCheck = canViewListing();
+                        if (!viewCheck.canView) {
+                          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                          setPaywallFeature('Unlimited Listing Views');
+                          setPaywallPlan('plus');
+                          setShowPaywall(true);
+                          return;
+                        }
+                        useListingView();
+                        setSelectedProperty(item);
+                        setShowPropertyDetail(true);
+                      }}
+                    >
+                      <Image source={{ uri: item.photos[0] }} style={styles.featuredPhoto} />
+                      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.85)']} style={styles.featuredGradient}>
+                        <Text style={styles.featuredPrice}>${item.price?.toLocaleString()}/mo</Text>
+                        <Text style={styles.featuredName} numberOfLines={1}>{item.title}</Text>
+                        <View style={styles.featuredBadge}>
+                          <Feather name="star" size={8} color="#ffd700" />
+                          <Text style={styles.featuredBadgeText}>FEATURED</Text>
+                        </View>
+                      </LinearGradient>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </View>
+            );
+          }}
           ListEmptyComponent={
             <View style={styles.emptyStateInline}>
               <Feather name={viewMode === 'saved' ? 'heart' : 'home'} size={64} color={theme.textSecondary} />
@@ -1659,10 +1754,31 @@ const styles = StyleSheet.create({
   hostInfo: {
     flex: 1,
   },
+  hostNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
   hostName: {
     color: 'rgba(255,255,255,0.65)',
     fontSize: 11.5,
     fontWeight: '600',
+  },
+  verifiedHostBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(62,207,142,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(62,207,142,0.25)',
+    borderRadius: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  verifiedHostText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#3ECF8E',
   },
   hostStatus: {
     color: 'rgba(255,255,255,0.3)',
@@ -1716,6 +1832,67 @@ const styles = StyleSheet.create({
   emptyStateInline: {
     paddingVertical: Spacing.xxl * 2,
     alignItems: 'center',
+  },
+  featuredSection: {
+    marginBottom: Spacing.lg,
+  },
+  featuredHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: Spacing.sm,
+  },
+  featuredTitle: {
+    color: '#ffd700',
+    fontSize: 14,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  featuredScroll: {
+    gap: 12,
+  },
+  featuredCard: {
+    width: 200,
+    height: 140,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#1a1a1a',
+  },
+  featuredPhoto: {
+    width: '100%',
+    height: '100%',
+    position: 'absolute',
+  },
+  featuredGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 10,
+    justifyContent: 'flex-end',
+  },
+  featuredPrice: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  featuredName: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  featuredBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginTop: 4,
+  },
+  featuredBadgeText: {
+    color: '#ffd700',
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   retryButton: {
     flexDirection: 'row',

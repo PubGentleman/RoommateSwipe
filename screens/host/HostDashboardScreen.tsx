@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, StyleSheet, Pressable, Text, ScrollView } from 'react-native';
+import { View, StyleSheet, Pressable, Text, ScrollView, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -59,7 +59,8 @@ function formatBudget(range?: string): string {
 }
 
 export const HostDashboardScreen = () => {
-  const { user } = useAuth();
+  const { user, getHostPlan } = useAuth();
+  const hostPlan = getHostPlan();
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const [listings, setListings] = useState<Property[]>([]);
@@ -248,7 +249,6 @@ export const HostDashboardScreen = () => {
             <Feather name="home" size={12} color={ACCENT} />
             <Text style={styles.hostBadgeText}>Host Mode</Text>
           </View>
-          {/* PAYWALL MISSING: Analytics navigation not gated — Starter hosts can access full analytics dashboard (Host Starter) */}
           <Pressable style={styles.periodPill} onPress={() => navigation.navigate('Analytics')}>
             <Feather name="clock" size={11} color="rgba(255,255,255,0.4)" />
             <Text style={styles.periodPillText}>Last 30 days</Text>
@@ -386,11 +386,28 @@ export const HostDashboardScreen = () => {
           <Pressable style={styles.qaSecondary} onPress={() => navigation.navigate('Analytics')}>
             <Feather name="bar-chart-2" size={15} color="rgba(255,255,255,0.6)" />
             <Text style={styles.qaSecondaryText}>Analytics</Text>
+            {hostPlan === 'starter' ? (
+              <View style={styles.proBadge}>
+                <Text style={styles.proBadgeText}>Pro</Text>
+              </View>
+            ) : null}
           </Pressable>
           <Pressable style={styles.qaSecondary} onPress={() => navigation.navigate('HostPricing')}>
             <Feather name="star" size={15} color={GOLD} />
             <Text style={styles.qaSecondaryText}>Plans</Text>
           </Pressable>
+          {user?.hostPlan === 'business' ? (
+            <Pressable style={styles.qaSecondary} onPress={() => {
+              Alert.alert(
+                'Dedicated Support',
+                'As a Business host, you have access to priority support.\n\nEmail: support@roomdr.com\nResponse time: Within 2 hours\n\nOur dedicated team is here to help you with any questions or issues.',
+                [{ text: 'OK' }]
+              );
+            }}>
+              <Feather name="headphones" size={15} color="#667eea" />
+              <Text style={styles.qaSecondaryText}>Support</Text>
+            </Pressable>
+          ) : null}
         </View>
       </ScrollView>
     </View>
@@ -665,4 +682,20 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   qaSecondaryText: { fontSize: 12.5, fontWeight: '700', color: 'rgba(255,255,255,0.6)' },
+  proBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: 'rgba(255,107,91,0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.4)',
+    borderRadius: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  proBadgeText: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: ACCENT,
+  },
 });

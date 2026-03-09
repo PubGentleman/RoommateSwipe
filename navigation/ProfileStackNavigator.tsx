@@ -36,7 +36,7 @@ export type ProfileStackParamList = {
   DownloadData: undefined;
   BlockedUsers: undefined;
   NotificationPreferences: undefined;
-  Verification: undefined;
+  Verification: { fromHostPurchase?: boolean } | undefined;
   MyInterests: undefined;
 };
 

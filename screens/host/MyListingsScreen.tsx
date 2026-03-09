@@ -145,6 +145,15 @@ export const MyListingsScreen = () => {
 
   const toggleFeatured = async (propertyId: string) => {
     if (!user) return;
+    const hostPlan = (user as any).hostPlan || 'starter';
+    if (hostPlan !== 'business') {
+      Alert.alert(
+        'Business Plan Required',
+        'Featured listings are available exclusively for Business hosts. Upgrade your plan to feature your listings.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const property = listings.find(p => p.id === propertyId);
     if (!property || property.hostId !== user.id) return;
@@ -203,7 +212,15 @@ export const MyListingsScreen = () => {
 
         <View style={styles.cardBody}>
           <Pressable onPress={() => navigation.navigate('CreateEditListing', { propertyId: listing.id })}>
-            <Text style={styles.cardTitle} numberOfLines={1}>{listing.title}</Text>
+            <View style={styles.cardTitleRow}>
+              <Text style={styles.cardTitle} numberOfLines={1}>{listing.title}</Text>
+              {user?.purchases?.hostVerificationBadge === true ? (
+                <View style={styles.verifiedBadge}>
+                  <Feather name="shield" size={11} color="#3ECF8E" />
+                  <Text style={styles.verifiedBadgeText}>Verified</Text>
+                </View>
+              ) : null}
+            </View>
             <View style={styles.cardLocation}>
               <Feather name="map-pin" size={12} color={ACCENT} />
               <Text style={styles.cardLocationText} numberOfLines={1}>
@@ -573,13 +590,35 @@ const styles = StyleSheet.create({
   },
 
   cardBody: { padding: 14, paddingHorizontal: 15 },
+  cardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
   cardTitle: {
     fontSize: 15,
     fontWeight: '700',
     color: '#fff',
     letterSpacing: -0.2,
     lineHeight: 20,
-    marginBottom: 6,
+    flex: 1,
+  },
+  verifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(62,207,142,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(62,207,142,0.25)',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  verifiedBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#3ECF8E',
   },
   cardLocation: {
     flexDirection: 'row',

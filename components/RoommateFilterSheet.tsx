@@ -156,10 +156,11 @@ interface Props {
   onApply: (filters: MatchFilters) => void;
   currentFilters: MatchFilters;
   allProfiles: any[];
+  userPlan?: string;
 }
 
-// PAYWALL MISSING: Lifestyle and schedule filters are accessible to all users — should be gated behind Plus/Elite for Roommate matching (Renter Plus)
-export const RoommateFilterSheet: React.FC<Props> = ({ visible, onClose, onApply, currentFilters, allProfiles }) => {
+export const RoommateFilterSheet: React.FC<Props> = ({ visible, onClose, onApply, currentFilters, allProfiles, userPlan = 'basic' }) => {
+  const isLifestyleLocked = userPlan === 'basic';
   const [filters, setFilters] = useState<MatchFilters>({ ...currentFilters });
 
   useEffect(() => {
@@ -177,7 +178,11 @@ export const RoommateFilterSheet: React.FC<Props> = ({ visible, onClose, onApply
   };
 
   const handleApply = () => {
-    onApply(filters);
+    if (isLifestyleLocked) {
+      onApply({ ...filters, lifestyle: [] });
+    } else {
+      onApply(filters);
+    }
   };
 
   const budgetSteps = Math.round((BUDGET_MAX - BUDGET_MIN) / BUDGET_STEP);
@@ -289,21 +294,45 @@ export const RoommateFilterSheet: React.FC<Props> = ({ visible, onClose, onApply
           </View>
 
           <View style={s.section}>
-            <ThemedText style={s.sectionLabel}>Lifestyle</ThemedText>
-            <View style={s.chipRow}>
-              {LIFESTYLE_OPTIONS.map(ls => {
-                const isActive = filters.lifestyle.includes(ls);
-                return (
-                  <Pressable
-                    key={ls}
-                    style={[s.chip, isActive ? s.chipActive : null]}
-                    onPress={() => setFilters(f => ({ ...f, lifestyle: toggleArrayItem(f.lifestyle, ls) }))}
-                  >
-                    <ThemedText style={[s.chipText, isActive ? s.chipTextActive : null]}>{ls}</ThemedText>
-                  </Pressable>
-                );
-              })}
+            <View style={s.sectionHeaderRow}>
+              <ThemedText style={[s.sectionLabel, { marginBottom: 0 }]}>Lifestyle</ThemedText>
+              {isLifestyleLocked ? (
+                <View style={s.lockBadge}>
+                  <Feather name="lock" size={10} color="#FFFFFF" />
+                  <ThemedText style={s.lockBadgeText}>Plus</ThemedText>
+                </View>
+              ) : null}
             </View>
+            {isLifestyleLocked ? (
+              <View style={s.lockedOverlay}>
+                <View style={s.lockedChipRow}>
+                  {LIFESTYLE_OPTIONS.map(ls => (
+                    <View key={ls} style={[s.chip, { opacity: 0.35 }]}>
+                      <ThemedText style={[s.chipText, { opacity: 0.5 }]}>{ls}</ThemedText>
+                    </View>
+                  ))}
+                </View>
+                <View style={s.lockedMessage}>
+                  <Feather name="lock" size={16} color={ACCENT} />
+                  <ThemedText style={s.lockedMessageText}>Upgrade to Plus to unlock lifestyle filters</ThemedText>
+                </View>
+              </View>
+            ) : (
+              <View style={s.chipRow}>
+                {LIFESTYLE_OPTIONS.map(ls => {
+                  const isActive = filters.lifestyle.includes(ls);
+                  return (
+                    <Pressable
+                      key={ls}
+                      style={[s.chip, isActive ? s.chipActive : null]}
+                      onPress={() => setFilters(f => ({ ...f, lifestyle: toggleArrayItem(f.lifestyle, ls) }))}
+                    >
+                      <ThemedText style={[s.chipText, isActive ? s.chipTextActive : null]}>{ls}</ThemedText>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
           </View>
 
           <View style={s.section}>
@@ -494,6 +523,52 @@ const s = StyleSheet.create({
   chipTextActive: {
     color: '#FFFFFF',
     fontWeight: '600',
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  lockBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,107,91,0.25)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+  },
+  lockBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: ACCENT,
+  },
+  lockedOverlay: {
+    borderRadius: BorderRadius.lg,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    padding: 12,
+  },
+  lockedChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  lockedMessage: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.08)',
+  },
+  lockedMessageText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: ACCENT,
   },
   segmentedRow: {
     flexDirection: 'row',

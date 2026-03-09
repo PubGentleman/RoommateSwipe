@@ -99,6 +99,7 @@ export interface Message {
   content?: string;
   timestamp: Date;
   read?: boolean;
+  readAt?: Date;
 }
 
 export interface Conversation {
@@ -167,6 +168,14 @@ export interface VerificationStatus {
     verifiedAt?: Date;
     platform?: 'instagram' | 'linkedin' | 'facebook';
   };
+  background_check?: {
+    verified: boolean;
+    verifiedAt?: Date;
+  };
+  income_verification?: {
+    verified: boolean;
+    verifiedAt?: Date;
+  };
 }
 
 export interface User {
@@ -202,6 +211,7 @@ export interface User {
   purchases?: {
     listingBoosts?: Array<{ propertyId: string; expiresAt: string }>;
     hostVerificationBadge?: boolean;
+    hostVerificationPaid?: boolean;
     superInterestsRemaining?: number;
   };
   paymentMethods?: Array<{
@@ -230,6 +240,10 @@ export interface User {
     undoPassExpiresAt?: Date;
   };
   activeChatsCount?: number;
+  listingViewData?: {
+    viewsToday: number;
+    lastViewReset: Date;
+  };
   rewindData?: {
     rewindsUsedToday: number;
     lastRewindReset: Date;

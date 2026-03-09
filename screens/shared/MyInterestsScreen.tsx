@@ -1,18 +1,27 @@
 import React, { useState, useCallback } from 'react';
-import { View, StyleSheet, Pressable, FlatList, Text, Alert } from 'react-native';
+import { View, StyleSheet, Pressable, FlatList, Text, Alert, Image } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../contexts/AuthContext';
 import { StorageService } from '../../utils/storage';
 import { InterestCard } from '../../types/models';
+import { PaywallSheet } from '../../components/PaywallSheet';
+
+type TabType = 'sent' | 'received';
 
 export const MyInterestsScreen = () => {
   const { user, canSendInterest } = useAuth();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [interests, setInterests] = useState<InterestCard[]>([]);
+  const [receivedInterests, setReceivedInterests] = useState<InterestCard[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<TabType>('sent');
+  const [showPaywall, setShowPaywall] = useState(false);
+
+  const userPlan = user?.subscription?.plan || 'basic';
+  const canSeeWhoLikedYou = userPlan === 'plus' || userPlan === 'elite';
 
   const loadInterests = useCallback(async () => {
     if (!user) return;
@@ -36,6 +45,11 @@ export const MyInterestsScreen = () => {
     const cards = await StorageService.getInterestCardsForRenter(user.id);
     cards.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     setInterests(cards);
+
+    const received = await StorageService.getInterestCardsForHost(user.id);
+    received.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    setReceivedInterests(received);
+
     setLoading(false);
   }, [user]);
 
@@ -68,6 +82,18 @@ export const MyInterestsScreen = () => {
     const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
     if (hours > 0) return `${hours}h ${minutes}m remaining`;
     return `${minutes}m remaining`;
+  };
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffHours = Math.floor(diffMs / (60 * 60 * 1000));
+    const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+    if (diffHours < 1) return 'Just now';
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
   };
 
   const handleMessage = async (card: InterestCard) => {
@@ -107,7 +133,7 @@ export const MyInterestsScreen = () => {
     await loadInterests();
   };
 
-  const renderItem = ({ item }: { item: InterestCard }) => {
+  const renderSentItem = ({ item }: { item: InterestCard }) => {
     const badge = getStatusBadge(item.status);
     return (
       <View style={styles.card}>
@@ -169,7 +195,102 @@ export const MyInterestsScreen = () => {
     );
   };
 
+  const renderReceivedItem = ({ item }: { item: InterestCard }) => {
+    const badge = getStatusBadge(item.status);
+    return (
+      <View style={styles.card}>
+        <View style={styles.receivedCardHeader}>
+          <View style={styles.senderInfo}>
+            {item.renterPhoto ? (
+              <Image source={{ uri: item.renterPhoto }} style={styles.senderPhoto} />
+            ) : (
+              <View style={styles.senderPhotoPlaceholder}>
+                <Feather name="user" size={18} color="rgba(255,255,255,0.4)" />
+              </View>
+            )}
+            <View style={styles.senderDetails}>
+              <Text style={styles.senderName} numberOfLines={1}>{item.renterName}</Text>
+              <Text style={styles.receivedDate}>{formatDate(item.createdAt)}</Text>
+            </View>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: badge.bg, borderColor: badge.borderColor }]}>
+            <Text style={[styles.statusText, { color: badge.color }]}>{badge.label}</Text>
+          </View>
+        </View>
+
+        <Text style={styles.receivedPropertyTitle} numberOfLines={1}>{item.propertyTitle}</Text>
+
+        <View style={styles.cardDetails}>
+          <View style={styles.detailRow}>
+            <Feather name="percent" size={12} color="rgba(255,255,255,0.4)" />
+            <Text style={styles.detailText}>{item.compatibilityScore}% match</Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Feather name="dollar-sign" size={12} color="rgba(255,255,255,0.4)" />
+            <Text style={styles.detailText}>{item.budgetRange}</Text>
+          </View>
+        </View>
+
+        {item.isSuperInterest ? (
+          <View style={[styles.superBadge, { marginTop: 8, alignSelf: 'flex-start' }]}>
+            <Feather name="star" size={10} color="#FFD700" />
+            <Text style={styles.superBadgeText}>Super Interest</Text>
+          </View>
+        ) : null}
+
+        {item.personalNote ? (
+          <Text style={styles.noteText} numberOfLines={2}>{item.personalNote}</Text>
+        ) : null}
+      </View>
+    );
+  };
+
+  const renderLockedReceivedItem = ({ item, index }: { item: InterestCard; index: number }) => {
+    return (
+      <View style={styles.card}>
+        <View style={styles.receivedCardHeader}>
+          <View style={styles.senderInfo}>
+            <View style={styles.blurredPhoto}>
+              <Feather name="user" size={18} color="rgba(255,255,255,0.2)" />
+            </View>
+            <View style={styles.senderDetails}>
+              <View style={styles.blurredTextLine} />
+              <View style={[styles.blurredTextLine, { width: 60 }]} />
+            </View>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: 'rgba(255,255,255,0.06)', borderColor: 'rgba(255,255,255,0.1)' }]}>
+            <View style={[styles.blurredTextLine, { width: 40, height: 10, marginBottom: 0 }]} />
+          </View>
+        </View>
+        <View style={[styles.blurredTextLine, { width: '70%', height: 14, marginTop: 8 }]} />
+        <View style={[styles.cardDetails, { marginTop: 10 }]}>
+          <View style={[styles.blurredTextLine, { width: 70, height: 12, marginBottom: 0 }]} />
+          <View style={[styles.blurredTextLine, { width: 80, height: 12, marginBottom: 0 }]} />
+        </View>
+        {index === 0 ? (
+          <View style={styles.lockOverlay}>
+            <Feather name="lock" size={20} color="#ff6b5b" />
+            <Text style={styles.lockText}>Upgrade to see who liked you</Text>
+          </View>
+        ) : null}
+      </View>
+    );
+  };
+
   const pendingCount = interests.filter(i => i.status === 'pending').length;
+  const receivedCount = receivedInterests.length;
+
+  const handleTabPress = (tab: TabType) => {
+    if (tab === 'received' && !canSeeWhoLikedYou && receivedInterests.length > 0) {
+      setActiveTab(tab);
+      return;
+    }
+    setActiveTab(tab);
+  };
+
+  const handleUpgradePress = () => {
+    setShowPaywall(true);
+  };
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -185,23 +306,113 @@ export const MyInterestsScreen = () => {
         ) : <View style={{ width: 28 }} />}
       </View>
 
-      <FlatList
-        data={interests}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 100 }]}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          loading ? null : (
-            <View style={styles.emptyState}>
-              <View style={styles.emptyIcon}>
-                <Feather name="heart" size={32} color="rgba(255,255,255,0.15)" />
-              </View>
-              <Text style={styles.emptyTitle}>No interest cards sent yet</Text>
-              <Text style={styles.emptySubtitle}>Browse properties and send interest cards to get started</Text>
+      <View style={styles.tabBar}>
+        <Pressable
+          style={[styles.tab, activeTab === 'sent' ? styles.tabActive : null]}
+          onPress={() => handleTabPress('sent')}
+        >
+          <Text style={[styles.tabText, activeTab === 'sent' ? styles.tabTextActive : null]}>Sent</Text>
+          {interests.length > 0 ? (
+            <View style={[styles.tabCount, activeTab === 'sent' ? styles.tabCountActive : null]}>
+              <Text style={[styles.tabCountText, activeTab === 'sent' ? styles.tabCountTextActive : null]}>{interests.length}</Text>
             </View>
-          )
-        }
+          ) : null}
+        </Pressable>
+        <Pressable
+          style={[styles.tab, activeTab === 'received' ? styles.tabActive : null]}
+          onPress={() => handleTabPress('received')}
+        >
+          <Feather name="heart" size={14} color={activeTab === 'received' ? '#ff6b5b' : 'rgba(255,255,255,0.4)'} style={{ marginRight: 4 }} />
+          <Text style={[styles.tabText, activeTab === 'received' ? styles.tabTextActive : null]}>Who Liked You</Text>
+          {receivedCount > 0 ? (
+            <View style={[styles.tabCount, activeTab === 'received' ? styles.tabCountActive : null]}>
+              <Text style={[styles.tabCountText, activeTab === 'received' ? styles.tabCountTextActive : null]}>{receivedCount}</Text>
+            </View>
+          ) : null}
+          {!canSeeWhoLikedYou ? (
+            <Feather name="lock" size={12} color="rgba(255,255,255,0.3)" style={{ marginLeft: 4 }} />
+          ) : null}
+        </Pressable>
+      </View>
+
+      {activeTab === 'sent' ? (
+        <FlatList
+          data={interests}
+          keyExtractor={(item) => item.id}
+          renderItem={renderSentItem}
+          contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 100 }]}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            loading ? null : (
+              <View style={styles.emptyState}>
+                <View style={styles.emptyIcon}>
+                  <Feather name="heart" size={32} color="rgba(255,255,255,0.15)" />
+                </View>
+                <Text style={styles.emptyTitle}>No interest cards sent yet</Text>
+                <Text style={styles.emptySubtitle}>Browse properties and send interest cards to get started</Text>
+              </View>
+            )
+          }
+        />
+      ) : (
+        canSeeWhoLikedYou ? (
+          <FlatList
+            data={receivedInterests}
+            keyExtractor={(item) => item.id}
+            renderItem={renderReceivedItem}
+            contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 100 }]}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              loading ? null : (
+                <View style={styles.emptyState}>
+                  <View style={styles.emptyIcon}>
+                    <Feather name="heart" size={32} color="rgba(255,255,255,0.15)" />
+                  </View>
+                  <Text style={styles.emptyTitle}>No interest cards received yet</Text>
+                  <Text style={styles.emptySubtitle}>When someone sends you an interest card, it will appear here</Text>
+                </View>
+              )
+            }
+          />
+        ) : (
+          <View style={[styles.listContent, { flex: 1 }]}>
+            <FlatList
+              data={receivedInterests.length > 0 ? receivedInterests.slice(0, 3) : [{ id: 'placeholder-1' }, { id: 'placeholder-2' }, { id: 'placeholder-3' }] as any[]}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item, index }) => renderLockedReceivedItem({ item, index })}
+              contentContainerStyle={{ paddingBottom: 20 }}
+              showsVerticalScrollIndicator={false}
+              scrollEnabled={false}
+            />
+            <View style={styles.upgradePrompt}>
+              <View style={styles.upgradeIconWrap}>
+                <Feather name="eye" size={24} color="#ff6b5b" />
+              </View>
+              <Text style={styles.upgradeTitle}>See Who Liked You</Text>
+              <Text style={styles.upgradeSubtitle}>
+                {receivedInterests.length > 0
+                  ? `${receivedInterests.length} ${receivedInterests.length === 1 ? 'person has' : 'people have'} sent you interest cards`
+                  : 'Upgrade to Plus to see who sends you interest cards'}
+              </Text>
+              <Pressable style={styles.upgradeBtn} onPress={handleUpgradePress}>
+                <Feather name="zap" size={16} color="#fff" />
+                <Text style={styles.upgradeBtnText}>Upgrade to Plus</Text>
+              </Pressable>
+            </View>
+          </View>
+        )
+      )}
+
+      <PaywallSheet
+        visible={showPaywall}
+        featureName="Who Liked You"
+        requiredPlan="plus"
+        onUpgrade={() => {
+          setShowPaywall(false);
+          (navigation as any).navigate('Plans');
+        }}
+        onDismiss={() => setShowPaywall(false)}
+        role="renter"
       />
     </View>
   );
@@ -244,6 +455,54 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#fff',
+  },
+  tabBar: {
+    flexDirection: 'row',
+    marginHorizontal: 18,
+    marginBottom: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 12,
+    padding: 3,
+  },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  tabActive: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  tabText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.4)',
+  },
+  tabTextActive: {
+    color: '#fff',
+  },
+  tabCount: {
+    marginLeft: 6,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 8,
+    minWidth: 20,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+  },
+  tabCountActive: {
+    backgroundColor: 'rgba(255,107,91,0.2)',
+  },
+  tabCountText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.4)',
+  },
+  tabCountTextActive: {
+    color: '#ff6b5b',
   },
   listContent: {
     paddingHorizontal: 18,
@@ -398,5 +657,126 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.35)',
     textAlign: 'center',
     lineHeight: 18,
+  },
+  receivedCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  senderInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  senderPhoto: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 10,
+  },
+  senderPhotoPlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  senderDetails: {
+    flex: 1,
+  },
+  senderName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+    letterSpacing: -0.2,
+  },
+  receivedDate: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.35)',
+    marginTop: 2,
+  },
+  receivedPropertyTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.6)',
+    marginBottom: 8,
+  },
+  blurredPhoto: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  blurredTextLine: {
+    height: 12,
+    width: 100,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    marginBottom: 4,
+  },
+  lockOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(17,17,17,0.7)',
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  lockText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.5)',
+  },
+  upgradePrompt: {
+    alignItems: 'center',
+    paddingHorizontal: 30,
+    paddingVertical: 24,
+  },
+  upgradeIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,107,91,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  upgradeTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 6,
+  },
+  upgradeSubtitle: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.45)',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 18,
+  },
+  upgradeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#ff6b5b',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 28,
+  },
+  upgradeBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
   },
 });

@@ -1,0 +1,28 @@
+Add AI Help Button (Roomdr Assistant) to the App
+Add an AI-powered help assistant button to the Roomdr app. The button should appear as a floating icon in the top-left corner of the Chat/Messages screen, Match screen, and Explore screen. Use a small gradient brain or sparkle icon (coral gradient: #ff6b5b → #e83a2a) with a subtle glow effect.
+Button Behavior:
+When tapped, a bottom sheet slides up (80% screen height) with a chat-style AI assistant panel. The panel has a dark background (#1a1a1a), a header that says "Roomdr AI" with a small coral sparkle icon, and a close (X) button. The assistant greeting changes based on which screen the user is on.
+Context-Aware Responses by Screen:
+Match Screen: The assistant reads the current user's profile data (budget, schedule, lifestyle preferences) and the match being viewed. It displays a compatibility breakdown explaining why the match scored high or low — for example: "Jordan scored 78% — you both prefer quiet evenings and share similar budgets. However, they listed 'early riser' and you listed 'night owl' — worth discussing." Pull these fields from the user profile and match profile objects.
+Chat Screen: The assistant acts as a conversation coach. If a conversation has no messages yet, suggest an ice-breaker based on shared interests from both profiles. If the last message was more than 48 hours ago, suggest a follow-up message. Show 2–3 suggested message chips the user can tap to auto-fill into the chat input box.
+Explore Screen: The assistant acts as a smart filter guide. Read the user's saved search preferences and current filter selections. Surface a tip like: "Your budget of $1,400 eliminates 70% of Financial District listings — try SoMa or Mission for better options." Include a "Apply Suggested Filters" button that updates the active filters automatically.
+Personalized Insights Panel (all screens):
+Below the context-aware message, show a scrollable "Your Insights" section with cards for:
+
+Profile completion score and what's missing
+Match rate this week vs last week (% change)
+Most common reason users aren't matching (e.g., "Your 'no pets' preference reduces your match pool by 58% in your city")
+Response rate score and a tip to improve it
+
+Feedback on Recommendations:
+Every AI suggestion card has a thumbs up 👍 and thumbs down 👎 icon. When the user taps thumbs down, store that feedback in the user's profile preferences object and adjust future match weighting accordingly (e.g., if they consistently dismiss early risers, reduce the match score weight for that trait).
+Weekly Summary Notification:
+Once per week (Monday morning), send a push notification: "Your Roomdr Weekly: X new likes, Y% response rate. Tap to see your AI insights." Tapping opens the app directly to the AI panel on the Match screen.
+Design requirements:
+
+Coral gradient button (#ff6b5b → #e83a2a), 44px circle, top-left with 16px margin from edge
+Bottom sheet uses #1a1a1a background, rounded top corners (24px radius)
+AI messages appear in dark card bubbles (#242424)
+Suggested action chips use coral border with transparent fill
+Thumbs icons are muted white, turn coral on selection
+Font: Inter throughout

@@ -39,6 +39,8 @@ interface AuthContextType {
   getAdCredits: () => { rewinds: number; superLikes: number; boosts: number; messages: number };
   useAdCredit: (creditType: 'rewinds' | 'superLikes' | 'boosts' | 'messages') => Promise<boolean>;
   isBasicUser: () => boolean;
+  canViewListing: () => { canView: boolean; remaining: number; limit: number; message?: string };
+  useListingView: () => Promise<void>;
   canSendInterest: () => Promise<{ canSend: boolean; remaining: number; reason?: string }>;
   canSendSuperInterest: () => boolean;
   upgradeHostPlan: (plan: 'pro' | 'business') => Promise<void>;
@@ -629,29 +631,55 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const checkAndUpdateBoostStatus = async () => {
-    if (!user || !user.boostData?.isBoosted) return;
-    
+    if (!user) return;
+
     const now = new Date();
-    const expiresAt = user.boostData.boostExpiresAt 
-      ? new Date(user.boostData.boostExpiresAt)
-      : null;
-    
-    if (expiresAt && expiresAt <= now) {
-      const updatedUser: User = {
-        ...user,
-        boostData: {
-          ...user.boostData,
-          lastBoostDate: user.boostData.lastBoostDate 
-            ? new Date(user.boostData.lastBoostDate)
-            : undefined,
-          boostExpiresAt: expiresAt,
-          isBoosted: false,
-        },
-      };
+
+    if (user.boostData?.isBoosted) {
+      const expiresAt = user.boostData.boostExpiresAt 
+        ? new Date(user.boostData.boostExpiresAt)
+        : null;
       
-      await StorageService.setCurrentUser(updatedUser);
-      await StorageService.addOrUpdateUser(updatedUser);
-      setUser(updatedUser);
+      if (expiresAt && expiresAt <= now) {
+        const updatedUser: User = {
+          ...user,
+          boostData: {
+            ...user.boostData,
+            lastBoostDate: user.boostData.lastBoostDate 
+              ? new Date(user.boostData.lastBoostDate)
+              : undefined,
+            boostExpiresAt: expiresAt,
+            isBoosted: false,
+          },
+        };
+        
+        await StorageService.setCurrentUser(updatedUser);
+        await StorageService.addOrUpdateUser(updatedUser);
+        setUser(updatedUser);
+        return;
+      }
+    }
+
+    const plan = user.subscription?.plan || 'basic';
+    if (plan === 'elite' && !user.boostData?.isBoosted) {
+      const lastBoost = user.boostData?.lastBoostDate ? new Date(user.boostData.lastBoostDate) : null;
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      if (!lastBoost || lastBoost <= weekAgo) {
+        const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+        const updatedUser: User = {
+          ...user,
+          boostData: {
+            boostsUsed: (user.boostData?.boostsUsed || 0) + 1,
+            lastBoostDate: now,
+            isBoosted: true,
+            boostExpiresAt: expiresAt,
+          },
+        };
+        await StorageService.setCurrentUser(updatedUser);
+        await StorageService.addOrUpdateUser(updatedUser);
+        setUser(updatedUser);
+      }
     }
   };
 
@@ -1181,8 +1209,68 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return true;
   };
 
-  // MISSING FEATURE: Weekly automatic profile boost for Elite users — no scheduled/automatic boost, only manual activation (Renter Elite)
-  // MISSING FEATURE: Background and income verification flow — VerificationScreen exists for ID/phone/social but no income or background check (Renter Elite)
+  const canViewListing = (): { canView: boolean; remaining: number; limit: number; message?: string } => {
+    if (!user) return { canView: false, remaining: 0, limit: 0, message: 'Not logged in' };
+
+    const plan = user.subscription?.plan || 'basic';
+    if (plan === 'plus' || plan === 'elite') {
+      return { canView: true, remaining: Infinity, limit: Infinity };
+    }
+
+    const now = new Date();
+    const lastReset = user.listingViewData?.lastViewReset
+      ? new Date(user.listingViewData.lastViewReset)
+      : null;
+
+    let viewsUsed = user.listingViewData?.viewsToday || 0;
+    if (!lastReset || !isSameDay(lastReset, now)) {
+      viewsUsed = 0;
+    }
+
+    const limit = 10;
+    const remaining = Math.max(0, limit - viewsUsed);
+
+    if (remaining > 0) {
+      return { canView: true, remaining, limit };
+    }
+
+    return {
+      canView: false,
+      remaining: 0,
+      limit,
+      message: `You've reached your daily listing view limit (${limit}/${limit}). Upgrade to Plus for unlimited views!`,
+    };
+  };
+
+  const useListingView = async (): Promise<void> => {
+    if (!user) return;
+
+    const plan = user.subscription?.plan || 'basic';
+    if (plan === 'plus' || plan === 'elite') return;
+
+    const now = new Date();
+    const lastReset = user.listingViewData?.lastViewReset
+      ? new Date(user.listingViewData.lastViewReset)
+      : null;
+
+    let viewsUsed = user.listingViewData?.viewsToday || 0;
+    if (!lastReset || !isSameDay(lastReset, now)) {
+      viewsUsed = 0;
+    }
+
+    const updatedUser: User = {
+      ...user,
+      listingViewData: {
+        viewsToday: viewsUsed + 1,
+        lastViewReset: now,
+      },
+    };
+
+    await StorageService.setCurrentUser(updatedUser);
+    await StorageService.addOrUpdateUser(updatedUser);
+    setUser(updatedUser);
+  };
+
   const canSendInterest = async (): Promise<{ canSend: boolean; remaining: number; reason?: string }> => {
     if (!user) return { canSend: false, remaining: 0, reason: 'Not logged in' };
 
@@ -1344,14 +1432,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (user.purchases?.hostVerificationBadge) {
       return { success: false, message: 'You already have the verification badge.' };
     }
+    if (user.purchases?.hostVerificationPaid) {
+      return { success: false, message: 'You have already purchased verification. Complete ID verification to activate your badge.' };
+    }
     const updated = {
       ...user,
-      purchases: { ...user.purchases, hostVerificationBadge: true },
+      purchases: { ...user.purchases, hostVerificationPaid: true },
     };
     await StorageService.setCurrentUser(updated);
     await StorageService.addOrUpdateUser(updated);
     setUser(updated);
-    return { success: true, message: 'Host Verification Badge activated!' };
+    return { success: true, message: 'Purchase complete! Now complete ID verification to activate your Host Verification Badge.' };
   };
 
   const purchaseSuperInterest = async (): Promise<{ success: boolean; message: string }> => {
@@ -1368,7 +1459,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, reactivateSubscription, updateUser, blockUser: blockUserAction, unblockUser: unblockUserAction, reportUser: reportUserAction, isUserBlocked: isUserBlockedCheck, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike, watchAdForCredit, getAdCredits, useAdCredit, isBasicUser, canSendInterest, canSendSuperInterest, upgradeHostPlan, downgradeHostPlan, getHostPlan, canAddListing, canRespondToInquiry, useInquiryResponse, purchaseListingBoost, purchaseHostVerification, purchaseSuperInterest }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, reactivateSubscription, updateUser, blockUser: blockUserAction, unblockUser: unblockUserAction, reportUser: reportUserAction, isUserBlocked: isUserBlockedCheck, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike, watchAdForCredit, getAdCredits, useAdCredit, isBasicUser, canViewListing, useListingView, canSendInterest, canSendSuperInterest, upgradeHostPlan, downgradeHostPlan, getHostPlan, canAddListing, canRespondToInquiry, useInquiryResponse, purchaseListingBoost, purchaseHostVerification, purchaseSuperInterest }}>
       {children}
     </AuthContext.Provider>
   );
