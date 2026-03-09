@@ -43,7 +43,7 @@ The application is built with React Native and Expo using TypeScript, utilizing 
 - **Profile Completion:** A component tracking progress across weighted profile fields.
 - **Identity Verification:** Users can verify identity via phone, government ID, social media, with optional background and income checks for elite users.
 - **Onboarding Tutorial:** A swipeable tutorial for new users.
-- **Roomdr AI Assistant:** A floating button providing context-aware AI assistance for compatibility breakdowns, conversation coaching, and smart filter tips.
+- **Roomdr AI Assistant:** A header-integrated red CPU button on every renter screen (Match, Groups, Explore, Messages, Profile, Chat) that opens a context-aware AI bottom sheet. The sheet dynamically adapts greetings, content cards, and insights based on the current screen context and live data (match compatibility, conversation stats, group analysis, profile completion, filter guidance). Supports 6 screen contexts with a context pill indicator in the header.
 - **Read Receipts:** Elite users can see message read status.
 - **Who Liked You:** Plus/Elite users can view received interest cards.
 

@@ -21,6 +21,7 @@ import { AdBanner } from '../../components/AdBanner';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCityContext } from '../../contexts/CityContext';
 import { CityPickerModal, CityPillButton } from '../../components/CityPickerModal';
+import { RoomdrAISheet } from '../../components/RoomdrAISheet';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - Spacing.xxl;
@@ -51,6 +52,7 @@ export const GroupsScreen = () => {
   const [avatarsExpanded, setAvatarsExpanded] = useState(false);
   const { activeCity, recentCities, setActiveCity } = useCityContext();
   const [showCityPicker, setShowCityPicker] = useState(false);
+  const [showAISheet, setShowAISheet] = useState(false);
   
   const [groupName, setGroupName] = useState('');
   const [groupDescription, setGroupDescription] = useState('');
@@ -1165,6 +1167,14 @@ export const GroupsScreen = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: '#111111', paddingTop: insets.top, paddingBottom: insets.bottom + 80 }]}>
+      <View style={styles.groupsTopNav}>
+        <Pressable onPress={() => setShowAISheet(true)} style={styles.groupsAiBtn}>
+          <View style={styles.groupsAiBtnInner}>
+            <Feather name="cpu" size={18} color="#FFFFFF" />
+          </View>
+        </Pressable>
+      </View>
+
       <View style={styles.tabBar}>
         {(['my-groups', 'discover', 'create'] as Tab[]).map((tab) => {
           const isActive = activeTab === tab;
@@ -1537,6 +1547,22 @@ export const GroupsScreen = () => {
           </View>
         </View>
       </Modal>
+
+      <RoomdrAISheet
+        visible={showAISheet}
+        onDismiss={() => setShowAISheet(false)}
+        screenContext="groups"
+        contextData={activeTab === 'discover' && allGroups[currentIndex] ? {
+          groups: {
+            currentGroup: allGroups[currentIndex],
+            groupCompatibility: calculateGroupCompatibility(allGroups[currentIndex]),
+            memberProfiles: allGroups[currentIndex].members
+              .map(id => mockRoommateProfiles.find(p => p.id === id))
+              .filter((p): p is RoommateProfile => !!p),
+            openSpots: allGroups[currentIndex].maxMembers - allGroups[currentIndex].members.length,
+          },
+        } : undefined}
+      />
     </View>
   );
 };
@@ -1544,6 +1570,27 @@ export const GroupsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  groupsTopNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  groupsAiBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    overflow: 'hidden',
+  },
+  groupsAiBtnInner: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#ff4d4d',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   tabBar: {
     flexDirection: 'row',

@@ -1,21 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, StyleSheet, Pressable, Modal, ScrollView, Dimensions, Text } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
-import { Spacing, BorderRadius } from '../constants/theme';
+import { Spacing } from '../constants/theme';
 import { calculateDetailedCompatibility } from '../utils/matchingAlgorithm';
-import type { RoommateProfile, User, Message } from '../types/models';
+import type { RoommateProfile, User, Message, Group, Conversation } from '../types/models';
 import * as Haptics from 'expo-haptics';
 
 const ACCENT = '#ff6b5b';
 const SHEET_BG = '#1a1a1a';
 const CARD_BG = '#242424';
+const GREEN = '#2ecc71';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const SHEET_HEIGHT = SCREEN_HEIGHT * 0.8;
 
-type ScreenContext = 'match' | 'chat' | 'explore' | 'messages';
+export type ScreenContext = 'match' | 'chat' | 'explore' | 'messages' | 'groups' | 'profile';
 
 interface MatchContextData {
   currentProfile?: RoommateProfile;
@@ -34,13 +35,38 @@ interface ExploreContextData {
   city?: string;
   totalListings?: number;
   filteredCount?: number;
+  savedCount?: number;
   onApplyFilters?: (filters: Record<string, any>) => void;
+}
+
+interface MessagesContextData {
+  conversations?: Conversation[];
+  unmessagedMatchCount?: number;
+  staleConversationCount?: number;
+}
+
+interface GroupsContextData {
+  currentGroup?: Group;
+  groupCompatibility?: number;
+  memberProfiles?: RoommateProfile[];
+  openSpots?: number;
+}
+
+interface ProfileContextData {
+  interestCardsUsedToday?: number;
+  interestCardLimit?: number;
+  rewindsUsed?: number;
+  superLikesUsed?: number;
+  savedListingsCount?: number;
 }
 
 export interface AISheetContextData {
   match?: MatchContextData;
   chat?: ChatContextData;
   explore?: ExploreContextData;
+  messages?: MessagesContextData;
+  groups?: GroupsContextData;
+  profile?: ProfileContextData;
 }
 
 interface RoomdrAISheetProps {
@@ -51,31 +77,32 @@ interface RoomdrAISheetProps {
 }
 
 const PROFILE_FIELDS = [
-  { key: 'photo', label: 'Profile Photo', check: (u: User) => !!(u.photos?.length || u.profilePicture) },
-  { key: 'bio', label: 'Bio', check: (u: User) => !!(u.profileData?.bio && u.profileData.bio.trim().length > 0) },
-  { key: 'birthday', label: 'Birthday', check: (u: User) => !!u.birthday },
-  { key: 'budget', label: 'Budget', check: (u: User) => !!(u.profileData?.budget && u.profileData.budget > 0) },
-  { key: 'location', label: 'Location', check: (u: User) => !!(u.profileData?.city || u.profileData?.neighborhood) },
-  { key: 'occupation', label: 'Occupation', check: (u: User) => !!(u.profileData?.occupation) },
-  { key: 'interests', label: 'Interests', check: (u: User) => !!(u.profileData?.interests) },
-  { key: 'sleepSchedule', label: 'Sleep Schedule', check: (u: User) => !!u.profileData?.preferences?.sleepSchedule },
-  { key: 'cleanliness', label: 'Cleanliness', check: (u: User) => !!u.profileData?.preferences?.cleanliness },
-  { key: 'smoking', label: 'Smoking Pref', check: (u: User) => !!u.profileData?.preferences?.smoking },
+  { key: 'photo', label: 'Profile Photo', weight: 20, check: (u: User) => !!(u.photos?.length || u.profilePicture) },
+  { key: 'bio', label: 'Bio', weight: 15, check: (u: User) => !!(u.profileData?.bio && u.profileData.bio.trim().length > 0) },
+  { key: 'birthday', label: 'Birthday', weight: 5, check: (u: User) => !!u.birthday },
+  { key: 'budget', label: 'Budget', weight: 10, check: (u: User) => !!(u.profileData?.budget && u.profileData.budget > 0) },
+  { key: 'location', label: 'Location', weight: 10, check: (u: User) => !!(u.profileData?.city || u.profileData?.neighborhood) },
+  { key: 'occupation', label: 'Occupation', weight: 10, check: (u: User) => !!(u.profileData?.occupation) },
+  { key: 'interests', label: 'Interests', weight: 10, check: (u: User) => !!(u.profileData?.interests) },
+  { key: 'sleepSchedule', label: 'Sleep Schedule', weight: 8, check: (u: User) => !!u.profileData?.preferences?.sleepSchedule },
+  { key: 'cleanliness', label: 'Cleanliness', weight: 7, check: (u: User) => !!u.profileData?.preferences?.cleanliness },
+  { key: 'smoking', label: 'Smoking Pref', weight: 5, check: (u: User) => !!u.profileData?.preferences?.smoking },
 ];
 
-const getGreeting = (context: ScreenContext): string => {
-  switch (context) {
-    case 'match':
-      return "Let me help you understand your matches better.";
-    case 'chat':
-      return "Need help with your conversation? I've got you.";
-    case 'explore':
-      return "I can help you find the perfect place.";
-    case 'messages':
-      return "Here are some tips to improve your conversations.";
-    default:
-      return "How can I help you today?";
-  }
+const CONTEXT_LABELS: Record<ScreenContext, { label: string; icon: keyof typeof Feather.glyphMap }> = {
+  explore: { label: 'Explore', icon: 'search' },
+  match: { label: 'Match', icon: 'heart' },
+  groups: { label: 'Groups', icon: 'users' },
+  chat: { label: 'Chat', icon: 'message-circle' },
+  messages: { label: 'Messages', icon: 'inbox' },
+  profile: { label: 'Profile', icon: 'user' },
+};
+
+const MATCH_MULTIPLIERS: Record<string, number> = {
+  'Profile Photo': 3,
+  'Bio': 2.5,
+  'Interests': 1.8,
+  'Occupation': 1.5,
 };
 
 const FeedbackThumbs = ({ id, onFeedback }: { id: string; onFeedback?: (id: string, positive: boolean) => void }) => {
@@ -107,12 +134,13 @@ const FeedbackThumbs = ({ id, onFeedback }: { id: string; onFeedback?: (id: stri
   );
 };
 
-const InsightCard = ({ icon, title, body, id, onFeedback }: {
+const InsightCard = ({ icon, title, body, id, onFeedback, actionChip }: {
   icon: keyof typeof Feather.glyphMap;
   title: string;
   body: string;
   id: string;
   onFeedback?: (id: string, positive: boolean) => void;
+  actionChip?: { label: string; onPress: () => void };
 }) => (
   <View style={styles.insightCard}>
     <View style={styles.insightHeader}>
@@ -122,6 +150,12 @@ const InsightCard = ({ icon, title, body, id, onFeedback }: {
       <Text style={styles.insightTitle}>{title}</Text>
     </View>
     <Text style={styles.insightBody}>{body}</Text>
+    {actionChip ? (
+      <Pressable style={styles.actionChip} onPress={actionChip.onPress}>
+        <Text style={styles.actionChipText}>{actionChip.label}</Text>
+        <Feather name="arrow-right" size={12} color={ACCENT} />
+      </Pressable>
+    ) : null}
     <FeedbackThumbs id={id} onFeedback={onFeedback} />
   </View>
 );
@@ -129,30 +163,127 @@ const InsightCard = ({ icon, title, body, id, onFeedback }: {
 export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData }: RoomdrAISheetProps) => {
   const insets = useSafeAreaInsets();
   const { user, updateUser } = useAuth();
-  const [suggestedMessages, setSuggestedMessages] = useState<string[]>([]);
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
 
   const handleFeedback = async (id: string, positive: boolean) => {
-    if (!user || positive) return;
-    const existing = (user as any).aiAssistantData?.dismissedSuggestions || [];
-    const updated = {
-      ...user,
-      aiAssistantData: {
-        ...(user as any).aiAssistantData,
-        dismissedSuggestions: [...existing, { id, timestamp: new Date().toISOString() }],
-      },
-    };
-    await updateUser(updated);
+    if (!user) return;
+    if (!positive) {
+      setDismissedIds(prev => new Set(prev).add(id));
+      const existing = (user as any).aiAssistantData?.dismissedSuggestions || [];
+      const updated = {
+        ...user,
+        aiAssistantData: {
+          ...(user as any).aiAssistantData,
+          dismissedSuggestions: [...existing, { id, timestamp: new Date().toISOString() }],
+        },
+      };
+      await updateUser(updated);
+    }
   };
 
-  const getProfileCompletion = () => {
-    if (!user) return { score: 0, missing: [] as string[] };
-    let completed = 0;
+  const isDismissed = (id: string) => dismissedIds.has(id);
+
+  const profileCompletion = useMemo(() => {
+    if (!user) return { score: 0, missing: [] as string[], weightedScore: 0 };
+    let totalWeight = 0;
+    let earnedWeight = 0;
     const missing: string[] = [];
     PROFILE_FIELDS.forEach(f => {
-      if (f.check(user)) completed++;
+      totalWeight += f.weight;
+      if (f.check(user)) earnedWeight += f.weight;
       else missing.push(f.label);
     });
-    return { score: Math.round((completed / PROFILE_FIELDS.length) * 100), missing };
+    return {
+      score: Math.round((earnedWeight / totalWeight) * 100),
+      missing,
+      weightedScore: earnedWeight,
+    };
+  }, [user]);
+
+  const plan = user?.subscription?.plan || 'basic';
+  const planLabel = plan.charAt(0).toUpperCase() + plan.slice(1);
+
+  const getGreeting = (): string => {
+    const name = user?.name?.split(' ')[0] || '';
+    switch (screenContext) {
+      case 'explore': {
+        const city = contextData?.explore?.city;
+        const budget = contextData?.explore?.budget || user?.profileData?.budget;
+        if (city && budget) {
+          const total = contextData?.explore?.totalListings || 0;
+          const filtered = contextData?.explore?.filteredCount || 0;
+          const outOfRange = total > 0 ? Math.round(((total - filtered) / total) * 100) : 0;
+          if (outOfRange > 30) {
+            return `You're browsing in ${city}. Based on your $${budget.toLocaleString()} budget, ${outOfRange}% of listings are out of range — want me to suggest better-value neighborhoods?`;
+          }
+          return `You're browsing in ${city} with ${filtered} listings matching your $${budget.toLocaleString()} budget. Your filters look well-tuned.`;
+        }
+        if (city) return `You're exploring ${city}. Let me help you find the best listings for your needs.`;
+        return 'I can help you find the perfect place. Set your city and budget for personalized suggestions.';
+      }
+      case 'match': {
+        const profile = contextData?.match?.currentProfile;
+        if (profile && user) {
+          const detailed = calculateDetailedCompatibility(user, profile);
+          const score = Math.round(detailed.totalScore);
+          const { strengths, concerns } = detailed.reasons;
+          let msg = `${profile.name} scored ${score}%`;
+          if (strengths.length > 0) msg += ` — ${strengths[0].toLowerCase()}`;
+          if (concerns.length > 0) msg += `. But ${concerns[0].toLowerCase()} — worth a conversation.`;
+          else msg += '.';
+          return msg;
+        }
+        return `${name ? name + ', l' : 'L'}et me help you understand your matches better.`;
+      }
+      case 'groups': {
+        const group = contextData?.groups?.currentGroup;
+        if (group) {
+          const compat = contextData?.groups?.groupCompatibility || 0;
+          const spots = contextData?.groups?.openSpots || 0;
+          const remoteCount = contextData?.groups?.memberProfiles?.filter(m =>
+            m.lifestyle?.workSchedule === 'remote' || m.lifestyle?.workSchedule === 'work_from_home'
+          ).length || 0;
+          let msg = `This group of ${group.members.length} is looking for ${spots > 0 ? `${spots} more` : 'members'} in ${group.preferredLocation || 'your area'}. Their combined lifestyle score with your profile is ${compat}%.`;
+          if (remoteCount > 0) msg += ` ${remoteCount} member${remoteCount > 1 ? 's are' : ' is a'} remote worker${remoteCount > 1 ? 's' : ''} like you.`;
+          return msg;
+        }
+        return 'I can help you find the right group. Swipe to discover groups that match your lifestyle.';
+      }
+      case 'chat': {
+        const chatName = contextData?.chat?.otherUserName || 'them';
+        const msgs = contextData?.chat?.messages;
+        if (!msgs || msgs.length === 0) {
+          return `Start the conversation with ${chatName}! I have some ice-breakers based on their profile.`;
+        }
+        const lastMsg = msgs[msgs.length - 1];
+        const hoursSince = (Date.now() - new Date(lastMsg.timestamp).getTime()) / (1000 * 60 * 60);
+        if (hoursSince > 48) {
+          return `It's been ${Math.round(hoursSince / 24)} days since the last message with ${chatName}. A follow-up can revive the conversation!`;
+        }
+        return `Your conversation with ${chatName} is active. Keep the momentum going!`;
+      }
+      case 'messages': {
+        const unmessaged = contextData?.messages?.unmessagedMatchCount || 0;
+        const stale = contextData?.messages?.staleConversationCount || 0;
+        if (unmessaged > 0) {
+          return `You have ${unmessaged} match${unmessaged !== 1 ? 'es' : ''} you haven't messaged yet. Want me to help break the ice?`;
+        }
+        if (stale > 0) {
+          return `${stale} conversation${stale !== 1 ? 's have' : ' has'} gone quiet. A quick follow-up could revive them.`;
+        }
+        return 'Your conversations are looking active. Keep responding quickly to boost your visibility.';
+      }
+      case 'profile': {
+        if (profileCompletion.score < 100 && profileCompletion.missing.length > 0) {
+          const topMissing = profileCompletion.missing[0];
+          const multiplier = MATCH_MULTIPLIERS[topMissing] || 1.5;
+          return `Your profile is ${profileCompletion.score}% complete. Adding ${topMissing.toLowerCase().startsWith('a') ? 'an' : 'a'} ${topMissing.toLowerCase()} gets ${multiplier}x more matches.`;
+        }
+        return `${name ? name + ', y' : 'Y'}our profile is 100% complete. You're getting maximum visibility.`;
+      }
+      default:
+        return 'How can I help you today?';
+    }
   };
 
   const getMatchContextContent = () => {
@@ -161,18 +292,6 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData }
     const detailed = calculateDetailedCompatibility(user, profile);
     const score = Math.round(detailed.totalScore);
     const { strengths, concerns } = detailed.reasons;
-
-    const topStrengths = strengths.slice(0, 3);
-    const topConcerns = concerns.slice(0, 2);
-
-    let analysis = `${profile.name} scored ${score}%`;
-    if (topStrengths.length > 0) {
-      analysis += ` — ${topStrengths[0]}`;
-    }
-    if (topConcerns.length > 0) {
-      analysis += `. However, ${topConcerns[0].toLowerCase()}`;
-    }
-    analysis += '.';
 
     const breakdownLabels: Record<string, { label: string; max: number }> = {
       location: { label: 'Location', max: 16 },
@@ -193,9 +312,8 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData }
       <View style={styles.contextCard}>
         <View style={styles.contextHeader}>
           <Feather name="users" size={14} color={ACCENT} />
-          <Text style={styles.contextTitle}>Match Analysis</Text>
+          <Text style={styles.contextTitle}>Match Analysis — {profile.name}</Text>
         </View>
-        <Text style={styles.contextBody}>{analysis}</Text>
 
         <View style={styles.breakdownContainer}>
           {topFactors.map(([key, value]) => {
@@ -206,7 +324,7 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData }
               <View key={key} style={styles.breakdownRow}>
                 <Text style={styles.breakdownLabel}>{info.label}</Text>
                 <View style={styles.breakdownBarBg}>
-                  <View style={[styles.breakdownBarFill, { width: `${pct}%`, backgroundColor: pct >= 70 ? '#2ecc71' : pct >= 40 ? '#f1c40f' : '#e74c3c' }]} />
+                  <View style={[styles.breakdownBarFill, { width: `${pct}%`, backgroundColor: pct >= 70 ? GREEN : pct >= 40 ? '#f1c40f' : '#e74c3c' }]} />
                 </View>
                 <Text style={styles.breakdownPct}>{pct}%</Text>
               </View>
@@ -214,25 +332,38 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData }
           })}
         </View>
 
-        {topStrengths.length > 0 ? (
+        {strengths.length > 0 ? (
           <View style={styles.tagRow}>
-            {topStrengths.slice(0, 3).map((s, i) => (
+            {strengths.slice(0, 3).map((s, i) => (
               <View key={i} style={styles.strengthTag}>
-                <Feather name="check" size={10} color="#2ecc71" />
+                <Feather name="check" size={10} color={GREEN} />
                 <Text style={styles.strengthText} numberOfLines={1}>{s}</Text>
               </View>
             ))}
           </View>
         ) : null}
-        {topConcerns.length > 0 ? (
+        {concerns.length > 0 ? (
           <View style={styles.tagRow}>
-            {topConcerns.slice(0, 2).map((c, i) => (
+            {concerns.slice(0, 2).map((c, i) => (
               <View key={i} style={styles.concernTag}>
                 <Feather name="alert-circle" size={10} color="#e74c3c" />
                 <Text style={styles.concernText} numberOfLines={1}>{c}</Text>
               </View>
             ))}
           </View>
+        ) : null}
+
+        {contextData?.chat?.onSuggestMessage && profile.name ? (
+          <Pressable
+            style={styles.actionChip}
+            onPress={() => {
+              contextData.chat?.onSuggestMessage?.(`Hey ${profile.name}, I noticed we have a lot in common! Want to chat about our living preferences?`);
+              onDismiss();
+            }}
+          >
+            <Text style={styles.actionChipText}>Ask {profile.name} about their schedule</Text>
+            <Feather name="arrow-right" size={12} color={ACCENT} />
+          </Pressable>
         ) : null}
         <FeedbackThumbs id="match-analysis" onFeedback={handleFeedback} />
       </View>
@@ -244,28 +375,24 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData }
     const { otherUserName, otherUserProfile, messages, onSuggestMessage } = contextData.chat;
     const name = otherUserName || 'them';
 
-    let tip = '';
-    const chips: string[] = [];
+    let chips: string[] = [];
 
     if (!messages || messages.length === 0) {
-      tip = `Start the conversation with ${name}! Here are some ice-breakers based on their profile.`;
       if (otherUserProfile?.occupation) {
-        chips.push(`Hey ${name}! I see you work as ${otherUserProfile.occupation.toLowerCase().startsWith('a') || otherUserProfile.occupation.toLowerCase().startsWith('e') ? 'an' : 'a'} ${otherUserProfile.occupation}. How do you like the work schedule?`);
+        const article = otherUserProfile.occupation.toLowerCase().startsWith('a') || otherUserProfile.occupation.toLowerCase().startsWith('e') ? 'an' : 'a';
+        chips.push(`Hey ${name}! I see you work as ${article} ${otherUserProfile.occupation}. How do you like the work schedule?`);
       }
       chips.push(`Hi ${name}! I'm looking for a roommate in the area. What's your ideal living situation?`);
       chips.push(`Hey! What's your typical day like? I'm trying to find someone with a compatible schedule.`);
     } else {
       const lastMsg = messages[messages.length - 1];
-      const lastTime = new Date(lastMsg.timestamp).getTime();
-      const hoursSince = (Date.now() - lastTime) / (1000 * 60 * 60);
+      const hoursSince = (Date.now() - new Date(lastMsg.timestamp).getTime()) / (1000 * 60 * 60);
 
       if (hoursSince > 48) {
-        tip = `It's been ${Math.round(hoursSince / 24)} days since the last message. A follow-up can revive the conversation!`;
         chips.push(`Hey ${name}, just checking in! Are you still looking for a roommate?`);
         chips.push(`Hi again! I wanted to follow up — would you be free to chat about the living situation?`);
         chips.push(`Hope you're doing well! I'm still interested in rooming together if you are.`);
       } else {
-        tip = `Your conversation with ${name} is active. Keep the momentum going!`;
         chips.push(`That sounds great! When would be a good time to meet up?`);
         chips.push(`I'd love to see the place if possible. Are you free this weekend?`);
         chips.push(`What are the most important things you're looking for in a roommate?`);
@@ -278,7 +405,6 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData }
           <Feather name="message-circle" size={14} color={ACCENT} />
           <Text style={styles.contextTitle}>Conversation Coach</Text>
         </View>
-        <Text style={styles.contextBody}>{tip}</Text>
         <View style={styles.chipsContainer}>
           {chips.map((chip, i) => (
             <Pressable
@@ -301,25 +427,13 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData }
 
   const getExploreContextContent = () => {
     if (!contextData?.explore) return null;
-    const { budget, city, totalListings, filteredCount, onApplyFilters } = contextData.explore;
+    const { budget, city, totalListings, filteredCount, savedCount, onApplyFilters } = contextData.explore;
 
-    let tip = '';
-    if (budget && totalListings && filteredCount !== undefined) {
-      const eliminatedPct = totalListings > 0 ? Math.round(((totalListings - filteredCount) / totalListings) * 100) : 0;
-      if (eliminatedPct > 50) {
-        tip = `Your current filters eliminate ${eliminatedPct}% of listings${city ? ` in ${city}` : ''}. `;
-        if (budget < 2000) {
-          tip += 'Try expanding your budget range or checking nearby neighborhoods for better options.';
-        } else {
-          tip += 'Consider relaxing some filters to see more options.';
-        }
-      } else {
-        tip = `Great filter setup! You're seeing ${filteredCount} of ${totalListings} listings${city ? ` in ${city}` : ''}. `;
-        tip += 'Your preferences are well-balanced.';
-      }
-    } else {
-      tip = 'Use the filters to narrow down listings that match your lifestyle and budget.';
+    const filterChips: { label: string; filters: Record<string, any> }[] = [];
+    if (budget && budget < 2000) {
+      filterChips.push({ label: `Expand budget to $${budget + 500}/mo`, filters: { maxPrice: budget + 500 } });
     }
+    filterChips.push({ label: 'Show Pet Friendly only', filters: { petFriendly: true } });
 
     return (
       <View style={styles.contextCard}>
@@ -327,21 +441,41 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData }
           <Feather name="search" size={14} color={ACCENT} />
           <Text style={styles.contextTitle}>Smart Filter Guide</Text>
         </View>
-        <Text style={styles.contextBody}>{tip}</Text>
-        {onApplyFilters && budget && budget < 2000 ? (
-          <Pressable
-            style={styles.applyBtn}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              onApplyFilters({ maxPrice: budget + 500 });
-              onDismiss();
-            }}
-          >
-            <LinearGradient colors={[ACCENT, '#e83a2a']} style={styles.applyGradient}>
-              <Feather name="sliders" size={14} color="#fff" />
-              <Text style={styles.applyText}>Apply Suggested Filters</Text>
-            </LinearGradient>
-          </Pressable>
+        {budget && totalListings && filteredCount !== undefined ? (
+          <Text style={styles.contextBody}>
+            {filteredCount < totalListings * 0.3
+              ? `Your filters are very strict — only ${filteredCount} of ${totalListings} listings${city ? ` in ${city}` : ''} match. Try relaxing some filters.`
+              : `You're seeing ${filteredCount} of ${totalListings} listings${city ? ` in ${city}` : ''}. Your preferences are well-balanced.`
+            }
+          </Text>
+        ) : (
+          <Text style={styles.contextBody}>Use the filters to narrow down listings that match your lifestyle and budget.</Text>
+        )}
+
+        {savedCount && savedCount > 0 ? (
+          <View style={styles.savedNote}>
+            <Feather name="bookmark" size={12} color={ACCENT} />
+            <Text style={styles.savedNoteText}>You've saved {savedCount} listing{savedCount !== 1 ? 's' : ''}. Want me to compare them?</Text>
+          </View>
+        ) : null}
+
+        {onApplyFilters && filterChips.length > 0 ? (
+          <View style={styles.filterChipsRow}>
+            {filterChips.map((fc, i) => (
+              <Pressable
+                key={i}
+                style={styles.filterChip}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  onApplyFilters(fc.filters);
+                  onDismiss();
+                }}
+              >
+                <Feather name="sliders" size={11} color={ACCENT} />
+                <Text style={styles.filterChipText}>{fc.label}</Text>
+              </Pressable>
+            ))}
+          </View>
         ) : null}
         <FeedbackThumbs id="explore-guide" onFeedback={handleFeedback} />
       </View>
@@ -349,16 +483,128 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData }
   };
 
   const getMessagesContextContent = () => {
+    const unmessaged = contextData?.messages?.unmessagedMatchCount || 0;
+    const stale = contextData?.messages?.staleConversationCount || 0;
+
     return (
       <View style={styles.contextCard}>
         <View style={styles.contextHeader}>
           <Feather name="inbox" size={14} color={ACCENT} />
-          <Text style={styles.contextTitle}>Messaging Tips</Text>
+          <Text style={styles.contextTitle}>Messaging Insights</Text>
         </View>
-        <Text style={styles.contextBody}>
-          Respond within 24 hours to keep conversations active. Profiles with fast reply rates get 40% more matches. Open a conversation to get personalized message suggestions.
+        {unmessaged > 0 ? (
+          <View style={styles.statRow}>
+            <View style={[styles.statDot, { backgroundColor: ACCENT }]} />
+            <Text style={styles.contextBody}>{unmessaged} new match{unmessaged !== 1 ? 'es' : ''} waiting for your first message</Text>
+          </View>
+        ) : null}
+        {stale > 0 ? (
+          <View style={styles.statRow}>
+            <View style={[styles.statDot, { backgroundColor: '#f1c40f' }]} />
+            <Text style={styles.contextBody}>{stale} conversation{stale !== 1 ? 's' : ''} with no reply in 48+ hours</Text>
+          </View>
+        ) : null}
+        <Text style={[styles.contextBody, { marginTop: 8 }]}>
+          Respond within 24 hours to keep conversations active. Profiles with fast reply rates get 40% more matches.
         </Text>
         <FeedbackThumbs id="messages-tips" onFeedback={handleFeedback} />
+      </View>
+    );
+  };
+
+  const getGroupsContextContent = () => {
+    const group = contextData?.groups?.currentGroup;
+    if (!group) return null;
+
+    const compat = contextData?.groups?.groupCompatibility || 0;
+    const members = contextData?.groups?.memberProfiles || [];
+    const spots = contextData?.groups?.openSpots || 0;
+
+    return (
+      <View style={styles.contextCard}>
+        <View style={styles.contextHeader}>
+          <Feather name="users" size={14} color={ACCENT} />
+          <Text style={styles.contextTitle}>Group Analysis — {group.name}</Text>
+        </View>
+
+        <View style={styles.groupStatsRow}>
+          <View style={styles.groupStat}>
+            <Text style={styles.groupStatValue}>{compat}%</Text>
+            <Text style={styles.groupStatLabel}>Match</Text>
+          </View>
+          <View style={styles.groupStat}>
+            <Text style={styles.groupStatValue}>{group.members.length}</Text>
+            <Text style={styles.groupStatLabel}>Members</Text>
+          </View>
+          <View style={styles.groupStat}>
+            <Text style={styles.groupStatValue}>{spots}</Text>
+            <Text style={styles.groupStatLabel}>Open</Text>
+          </View>
+          <View style={styles.groupStat}>
+            <Text style={styles.groupStatValue}>${group.budget}</Text>
+            <Text style={styles.groupStatLabel}>Budget</Text>
+          </View>
+        </View>
+
+        {members.length > 0 ? (
+          <View style={styles.memberTraits}>
+            {members.slice(0, 3).map((m, i) => (
+              <View key={i} style={styles.memberTraitRow}>
+                <Text style={styles.memberName}>{m.name}</Text>
+                <Text style={styles.memberDetail}>
+                  {m.occupation || 'N/A'} · {m.lifestyle?.workSchedule === 'remote' || m.lifestyle?.workSchedule === 'work_from_home' ? 'Remote' : 'In-office'}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        <FeedbackThumbs id="groups-analysis" onFeedback={handleFeedback} />
+      </View>
+    );
+  };
+
+  const getProfileContextContent = () => {
+    const cardsUsed = contextData?.profile?.interestCardsUsedToday || 0;
+    const cardLimit = contextData?.profile?.interestCardLimit || (plan === 'basic' ? 5 : plan === 'plus' ? 15 : 999);
+    const savedCount = contextData?.profile?.savedListingsCount || 0;
+
+    return (
+      <View style={styles.contextCard}>
+        <View style={styles.contextHeader}>
+          <Feather name="bar-chart-2" size={14} color={ACCENT} />
+          <Text style={styles.contextTitle}>Your Stats</Text>
+        </View>
+
+        <View style={styles.profileStatsGrid}>
+          <View style={styles.profileStatItem}>
+            <Text style={styles.profileStatValue}>{profileCompletion.score}%</Text>
+            <Text style={styles.profileStatLabel}>Profile</Text>
+          </View>
+          <View style={styles.profileStatItem}>
+            <Text style={styles.profileStatValue}>{planLabel}</Text>
+            <Text style={styles.profileStatLabel}>Plan</Text>
+          </View>
+          <View style={styles.profileStatItem}>
+            <Text style={styles.profileStatValue}>{cardsUsed}/{cardLimit === 999 ? 'Unlimited' : cardLimit}</Text>
+            <Text style={styles.profileStatLabel}>Cards Today</Text>
+          </View>
+          <View style={styles.profileStatItem}>
+            <Text style={styles.profileStatValue}>{savedCount}</Text>
+            <Text style={styles.profileStatLabel}>Saved</Text>
+          </View>
+        </View>
+
+        {plan === 'basic' && cardsUsed >= cardLimit - 1 ? (
+          <View style={styles.upgradeNudge}>
+            <Feather name="zap" size={13} color="#FFD700" />
+            <Text style={styles.upgradeNudgeText}>
+              You've used {cardsUsed} of {cardLimit} interest cards today. Upgrade to Plus for unlimited.
+            </Text>
+          </View>
+        ) : null}
+
+        <FeedbackThumbs id="profile-stats" onFeedback={handleFeedback} />
       </View>
     );
   };
@@ -369,22 +615,65 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData }
       case 'chat': return getChatContextContent();
       case 'explore': return getExploreContextContent();
       case 'messages': return getMessagesContextContent();
+      case 'groups': return getGroupsContextContent();
+      case 'profile': return getProfileContextContent();
       default: return null;
     }
   };
 
-  const profileCompletion = getProfileCompletion();
+  const getInsights = () => {
+    const insights: { icon: keyof typeof Feather.glyphMap; title: string; body: string; id: string; actionChip?: { label: string; onPress: () => void } }[] = [];
 
-  const matchRateThisWeek = Math.floor(Math.random() * 20) + 60;
-  const matchRateLastWeek = Math.floor(Math.random() * 20) + 50;
-  const matchRateChange = matchRateThisWeek - matchRateLastWeek;
+    if (!isDismissed('profile-completion') && profileCompletion.score < 100) {
+      const topMissing = profileCompletion.missing.slice(0, 2);
+      const multiplier = MATCH_MULTIPLIERS[topMissing[0]] || 1.5;
+      insights.push({
+        icon: 'user',
+        title: 'Profile Completion',
+        body: `Your profile is ${profileCompletion.score}% complete. Adding ${topMissing.join(' and ').toLowerCase()} could get you ${multiplier}x more matches.`,
+        id: 'profile-completion',
+      });
+    }
 
-  const responseRate = Math.floor(Math.random() * 30) + 65;
+    if (!isDismissed('match-rate')) {
+      const rate = 60 + ((user?.id?.charCodeAt(0) || 0) % 25);
+      const change = ((user?.id?.charCodeAt(1) || 0) % 15) - 5;
+      insights.push({
+        icon: 'trending-up',
+        title: 'Match Rate',
+        body: `${rate}% this week (${change >= 0 ? '+' : ''}${change}% vs last week). ${change >= 0 ? 'Keep it up!' : 'Complete your profile to improve.'}`,
+        id: 'match-rate',
+      });
+    }
 
-  const poolReduction = user?.profileData?.preferences?.pets === 'no_pets' ? 58 : 
-    user?.profileData?.preferences?.smoking === 'no' ? 32 : 15;
-  const poolFactor = user?.profileData?.preferences?.pets === 'no_pets' ? "'no pets' preference" :
-    user?.profileData?.preferences?.smoking === 'no' ? "'non-smoker' preference" : 'your filter selections';
+    if (!isDismissed('pool-impact')) {
+      const poolReduction = user?.profileData?.preferences?.pets === 'no_pets' ? 58 :
+        user?.profileData?.preferences?.smoking === 'no' ? 32 : 15;
+      const poolFactor = user?.profileData?.preferences?.pets === 'no_pets' ? "'no pets' preference" :
+        user?.profileData?.preferences?.smoking === 'no' ? "'non-smoker' preference" : 'your filter selections';
+      insights.push({
+        icon: 'alert-circle',
+        title: 'Match Pool Impact',
+        body: `Your ${poolFactor} reduces your match pool by ${poolReduction}% in your city. Consider adjusting if you want more options.`,
+        id: 'pool-impact',
+      });
+    }
+
+    if (!isDismissed('response-rate')) {
+      const responseRate = 65 + ((user?.id?.charCodeAt(2) || 0) % 30);
+      insights.push({
+        icon: 'clock',
+        title: 'Response Rate',
+        body: `Your response rate is ${responseRate}%. ${responseRate >= 80 ? 'Excellent — you reply quickly!' : 'Try responding within 24 hours to boost your visibility.'}`,
+        id: 'response-rate',
+      });
+    }
+
+    return insights;
+  };
+
+  const contextInfo = CONTEXT_LABELS[screenContext];
+  const insights = getInsights();
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onDismiss}>
@@ -397,7 +686,13 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData }
               <LinearGradient colors={[ACCENT, '#e83a2a']} style={styles.headerIcon}>
                 <Feather name="zap" size={14} color="#fff" />
               </LinearGradient>
-              <Text style={styles.headerTitle}>Roomdr AI</Text>
+              <View>
+                <Text style={styles.headerTitle}>Roomdr AI</Text>
+                <View style={styles.contextPill}>
+                  <Feather name={contextInfo.icon} size={10} color={ACCENT} />
+                  <Text style={styles.contextPillText}>{contextInfo.label}</Text>
+                </View>
+              </View>
             </View>
             <Pressable onPress={onDismiss} style={styles.closeBtn}>
               <Feather name="x" size={20} color="rgba(255,255,255,0.6)" />
@@ -406,47 +701,27 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData }
 
           <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
             <View style={styles.greetingCard}>
-              <Text style={styles.greetingText}>{getGreeting(screenContext)}</Text>
+              <Text style={styles.greetingText}>{getGreeting()}</Text>
             </View>
 
             {renderContextContent()}
 
-            <Text style={styles.sectionLabel}>YOUR INSIGHTS</Text>
-
-            <InsightCard
-              icon="user"
-              title="Profile Completion"
-              body={profileCompletion.score === 100
-                ? 'Your profile is 100% complete. Great job!'
-                : `Your profile is ${profileCompletion.score}% complete. Add ${profileCompletion.missing.slice(0, 2).join(' and ')} to get more matches.`
-              }
-              id="profile-completion"
-              onFeedback={handleFeedback}
-            />
-
-            <InsightCard
-              icon="trending-up"
-              title="Match Rate"
-              body={`${matchRateThisWeek}% this week (${matchRateChange >= 0 ? '+' : ''}${matchRateChange}% vs last week). ${matchRateChange >= 0 ? 'Keep it up!' : 'Complete your profile to improve.'}`}
-              id="match-rate"
-              onFeedback={handleFeedback}
-            />
-
-            <InsightCard
-              icon="alert-circle"
-              title="Match Pool Impact"
-              body={`Your ${poolFactor} reduces your match pool by ${poolReduction}% in your city. Consider adjusting if you want more options.`}
-              id="pool-impact"
-              onFeedback={handleFeedback}
-            />
-
-            <InsightCard
-              icon="clock"
-              title="Response Rate"
-              body={`Your response rate is ${responseRate}%. ${responseRate >= 80 ? 'Excellent — you reply quickly!' : 'Try responding within 24 hours to boost your visibility.'}`}
-              id="response-rate"
-              onFeedback={handleFeedback}
-            />
+            {insights.length > 0 ? (
+              <>
+                <Text style={styles.sectionLabel}>YOUR INSIGHTS</Text>
+                {insights.map(insight => (
+                  <InsightCard
+                    key={insight.id}
+                    icon={insight.icon}
+                    title={insight.title}
+                    body={insight.body}
+                    id={insight.id}
+                    onFeedback={handleFeedback}
+                    actionChip={insight.actionChip}
+                  />
+                ))}
+              </>
+            ) : null}
 
             <View style={{ height: Spacing.xxl }} />
           </ScrollView>
@@ -501,6 +776,22 @@ const styles = StyleSheet.create({
   headerTitle: {
     color: '#fff',
     fontSize: 17,
+    fontWeight: '700',
+  },
+  contextPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,107,91,0.15)',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginTop: 2,
+    alignSelf: 'flex-start',
+  },
+  contextPillText: {
+    color: ACCENT,
+    fontSize: 10,
     fontWeight: '700',
   },
   closeBtn: {
@@ -571,7 +862,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   strengthText: {
-    color: '#2ecc71',
+    color: GREEN,
     fontSize: 11,
     maxWidth: 180,
   },
@@ -606,23 +897,137 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
-  applyBtn: {
-    marginTop: 10,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  applyGradient: {
+  actionChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: 6,
-    paddingVertical: 10,
-    borderRadius: 12,
+    marginTop: 10,
+    paddingVertical: 8,
   },
-  applyText: {
-    color: '#fff',
+  actionChipText: {
+    color: ACCENT,
     fontSize: 13,
+    fontWeight: '600',
+  },
+  filterChipsRow: {
+    gap: 8,
+    marginTop: 10,
+  },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: ACCENT,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  filterChipText: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  savedNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    backgroundColor: 'rgba(255,107,91,0.08)',
+    borderRadius: 8,
+    padding: 8,
+  },
+  savedNoteText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 12,
+    flex: 1,
+  },
+  statRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  statDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  groupStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  groupStat: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  groupStatValue: {
+    color: '#fff',
+    fontSize: 16,
     fontWeight: '700',
+  },
+  groupStatLabel: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 10,
+    marginTop: 2,
+  },
+  memberTraits: {
+    gap: 6,
+    marginTop: 4,
+  },
+  memberTraitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.06)',
+  },
+  memberName: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  memberDetail: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 11,
+  },
+  profileStatsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  profileStatItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  profileStatValue: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  profileStatLabel: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 10,
+    marginTop: 2,
+  },
+  upgradeNudge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,215,0,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,215,0,0.2)',
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 6,
+  },
+  upgradeNudgeText: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 12,
+    flex: 1,
+    lineHeight: 17,
   },
   thumbsRow: {
     flexDirection: 'row',

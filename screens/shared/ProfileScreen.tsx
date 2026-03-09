@@ -12,6 +12,7 @@ import { useNotificationContext } from '../../contexts/NotificationContext';
 import { ProfileCompletionCard } from '../../components/ProfileCompletionCard';
 import { getVerificationLevel } from '../../components/VerificationBadge';
 import { StorageService } from '../../utils/storage';
+import { RoomdrAISheet } from '../../components/RoomdrAISheet';
 
 type ProfileScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'ProfileMain'>;
 
@@ -23,6 +24,7 @@ export const ProfileScreen = () => {
   const [showPurchaseBoostModal, setShowPurchaseBoostModal] = useState(false);
   const [processingBoost, setProcessingBoost] = useState(false);
   const [pendingInterestCount, setPendingInterestCount] = useState(0);
+  const [showAISheet, setShowAISheet] = useState(false);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -84,6 +86,11 @@ export const ProfileScreen = () => {
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <View style={styles.topNav}>
+        <Pressable onPress={() => setShowAISheet(true)} style={styles.profileAiBtn}>
+          <View style={styles.profileAiBtnInner}>
+            <Feather name="cpu" size={18} color="#FFFFFF" />
+          </View>
+        </Pressable>
         <Text style={styles.topNavTitle}>My Profile</Text>
         <Pressable style={styles.iconBtn} onPress={() => navigation.navigate('PrivacySecurity')}>
           <Feather name="settings" size={16} color="rgba(255,255,255,0.7)" />
@@ -342,6 +349,17 @@ export const ProfileScreen = () => {
           </View>
         </View>
       </Modal>
+
+      <RoomdrAISheet
+        visible={showAISheet}
+        onDismiss={() => setShowAISheet(false)}
+        screenContext="profile"
+        contextData={{
+          profile: {
+            savedListingsCount: 0,
+          },
+        }}
+      />
     </View>
   );
 };
@@ -376,6 +394,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
     paddingTop: 12,
     paddingBottom: 10,
+  },
+  profileAiBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    overflow: 'hidden',
+  },
+  profileAiBtnInner: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#ff4d4d',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   topNavTitle: {
     fontSize: 22,

@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Roomdr – Subscription</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0a0a0a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .phone {
+      width: 375px;
+      height: 812px;
+      background: #111;
+      border-radius: 50px;
+      box-shadow: 0 0 0 10px #222, 0 40px 100px rgba(0,0,0,0.85);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 28px 0;
+      font-size: 12px;
+      font-weight: 600;
+      color: #fff;
+      flex-shrink: 0;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 20px 8px;
+      flex-shrink: 0;
+    }
+
+    .back-btn {
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.09);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .header-title { font-size: 17px; font-weight: 800; color: #fff; }
+
+    /* Scroll */
+    .scroll {
+      flex: 1;
+      overflow-y: auto;
+      scrollbar-width: none;
+      padding: 0 16px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .scroll::-webkit-scrollbar { display: none; }
+
+    /* Hero */
+    .hero h1 {
+      font-size: 24px;
+      font-weight: 900;
+      color: #fff;
+      letter-spacing: -0.5px;
+      line-height: 1.15;
+      margin-bottom: 4px;
+    }
+    .hero h1 span {
+      background: linear-gradient(135deg, #ff6b5b, #e83a2a);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero p {
+      font-size: 13px;
+      color: rgba(255,255,255,0.4);
+      font-weight: 400;
+    }
+
+    /* Trial banner */
+    .trial-banner {
+      background: linear-gradient(135deg, rgba(255,107,91,0.14), rgba(232,58,42,0.07));
+      border: 1px solid rgba(255,107,91,0.22);
+      border-radius: 14px;
+      padding: 11px 13px;
+      display: flex;
+      align-items: center;
+      gap: 11px;
+    }
+    .trial-icon {
+      width: 36px; height: 36px;
+      border-radius: 10px;
+      background: rgba(255,107,91,0.18);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .trial-text .t-title { font-size: 13px; font-weight: 800; color: #ff7b6b; margin-bottom: 2px; }
+    .trial-text .t-sub   { font-size: 11px; color: rgba(255,255,255,0.38); font-weight: 400; line-height: 1.35; }
+
+    /* ── TIER COMPARISON STRIP ── */
+    .tier-strip {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px;
+    }
+
+    .tier-tile {
+      background: #1a1a1a;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 14px;
+      padding: 10px 10px 11px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .tier-tile.active {
+      border-color: rgba(255,107,91,0.45);
+      background: rgba(255,107,91,0.07);
+    }
+
+    .tier-tile .t-name {
+      font-size: 11px;
+      font-weight: 700;
+      color: rgba(255,255,255,0.5);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .tier-tile.active .t-name { color: #ff8070; }
+
+    .tier-tile .t-price {
+      font-size: 18px;
+      font-weight: 900;
+      color: #fff;
+      letter-spacing: -0.5px;
+      line-height: 1;
+    }
+
+    .tier-tile .t-per {
+      font-size: 10px;
+      color: rgba(255,255,255,0.3);
+      font-weight: 500;
+    }
+
+    .tier-tile .t-save {
+      font-size: 9px;
+      font-weight: 800;
+      color: #fff;
+      background: linear-gradient(135deg, #ff6b5b, #e83a2a);
+      border-radius: 5px;
+      padding: 2px 6px;
+      margin-top: 2px;
+    }
+
+    .tier-tile .t-dot {
+      position: absolute;
+      top: 8px; right: 8px;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #ff6b5b, #e83a2a);
+      display: none;
+    }
+
+    .tier-tile.active .t-dot { display: block; }
+
+    /* Billing toggle */
+    .billing-toggle {
+      display: flex;
+      background: #1a1a1a;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 14px;
+      padding: 4px;
+    }
+
+    .toggle-btn {
+      flex: 1; height: 36px;
+      border-radius: 10px;
+      font-size: 13px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      gap: 7px;
+      cursor: pointer;
+      border: none;
+      font-family: 'Inter', sans-serif;
+      transition: all 0.2s;
+    }
+
+    .toggle-btn.active {
+      background: linear-gradient(135deg, #ff6b5b, #e83a2a);
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(255,80,60,0.28);
+    }
+
+    .toggle-btn.inactive { background: transparent; color: rgba(255,255,255,0.38); }
+
+    .save-badge {
+      font-size: 9px; font-weight: 800;
+      color: #ff6b5b;
+      background: rgba(255,107,91,0.15);
+      border: 1px solid rgba(255,107,91,0.25);
+      border-radius: 5px;
+      padding: 2px 6px;
+    }
+
+    .save-badge.on-active {
+      color: #fff;
+      background: rgba(255,255,255,0.2);
+      border-color: transparent;
+    }
+
+    /* Usage card */
+    .usage-card {
+      background: #1a1a1a;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 16px;
+      padding: 12px 14px;
+    }
+
+    .usage-label-row {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: rgba(255,255,255,0.35);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+    }
+
+    .usage-row {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-bottom: 8px;
+    }
+    .usage-row:last-of-type { margin-bottom: 0; }
+
+    .usage-icon {
+      width: 26px; height: 26px;
+      border-radius: 7px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .usage-name {
+      flex: 1;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.7);
+    }
+
+    .usage-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+    }
+
+    .usage-count {
+      font-size: 11px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.35);
+    }
+
+    .usage-bar {
+      width: 80px; height: 4px;
+      background: rgba(255,255,255,0.07);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .usage-fill { height: 100%; border-radius: 99px; }
+
+    .usage-hint {
+      text-align: center;
+      font-size: 11px;
+      color: rgba(255,255,255,0.22);
+      margin-top: 10px;
+      padding-top: 9px;
+      border-top: 1px solid rgba(255,255,255,0.05);
+    }
+
+    /* Plan card */
+    .plan-card {
+      background: #1a1a1a;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 20px;
+      overflow: hidden;
+    }
+
+    .plan-card.recommended {
+      border-color: rgba(255,107,91,0.4);
+      box-shadow: 0 0 0 1px rgba(255,107,91,0.12), 0 6px 22px rgba(255,80,60,0.1);
+    }
+
+    /* Plan header band */
+    .plan-band {
+      padding: 12px 15px 11px;
+    }
+
+    .plan-band.rec-band {
+      background: linear-gradient(135deg, rgba(255,107,91,0.12), rgba(232,58,42,0.06));
+    }
+
+    .plan-top-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .plan-name {
+      font-size: 17px;
+      font-weight: 900;
+      color: #fff;
+      letter-spacing: -0.3px;
+    }
+
+    .plan-name.coral {
+      background: linear-gradient(135deg, #ff6b5b, #e83a2a);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .rec-pill {
+      font-size: 9px;
+      font-weight: 800;
+      color: #fff;
+      background: linear-gradient(135deg, #ff6b5b, #e83a2a);
+      border-radius: 6px;
+      padding: 3px 8px;
+      letter-spacing: 0.3px;
+      margin-top: 3px;
+    }
+
+    /* Price row */
+    .price-row {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+    }
+
+    .price-big {
+      font-size: 28px;
+      font-weight: 900;
+      color: #fff;
+      letter-spacing: -1px;
+      line-height: 1;
+    }
+
+    .price-period {
+      font-size: 12px;
+      color: rgba(255,255,255,0.35);
+      font-weight: 500;
+    }
+
+    .price-annual-note {
+      font-size: 11px;
+      color: rgba(255,255,255,0.3);
+      margin-top: 3px;
+      font-weight: 500;
+    }
+
+    .price-annual-note .savings-tag {
+      color: #ff8070;
+      font-weight: 700;
+    }
+
+    /* Divider */
+    .plan-divider { height: 1px; background: rgba(255,255,255,0.06); margin: 0 15px; }
+    .plan-divider.coral-div { background: rgba(255,107,91,0.1); }
+
+    /* Features */
+    .plan-features {
+      padding: 11px 15px 13px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .feat-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .feat-icon {
+      width: 17px; height: 17px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .feat-icon.on  { background: rgba(255,107,91,0.15); }
+    .feat-icon.off { background: rgba(255,255,255,0.05); }
+
+    .feat-label { font-size: 12px; font-weight: 500; }
+    .feat-label.on  { color: rgba(255,255,255,0.78); }
+    .feat-label.off { color: rgba(255,255,255,0.22); text-decoration: line-through; }
+
+    /* CTA button */
+    .plan-cta {
+      margin: 0 15px 13px;
+      height: 42px;
+      border-radius: 13px;
+      font-size: 13.5px;
+      font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      border: none;
+      font-family: 'Inter', sans-serif;
+      letter-spacing: 0.2px;
+    }
+
+    .plan-cta.primary {
+      background: linear-gradient(135deg, #ff6b5b, #e83a2a);
+      color: #fff;
+      box-shadow: 0 5px 16px rgba(255,80,60,0.3);
+    }
+
+    .plan-cta.outline {
+      background: transparent;
+      border: 1.5px solid rgba(255,255,255,0.11);
+      color: rgba(255,255,255,0.45);
+    }
+
+    .plan-cta.ghost {
+      background: rgba(255,255,255,0.04);
+      color: rgba(255,255,255,0.25);
+    }
+
+    /* Fine print */
+    .fine-print {
+      text-align: center;
+      font-size: 10.5px;
+      color: rgba(255,255,255,0.18);
+      line-height: 1.5;
+      padding-bottom: 2px;
+    }
+
+    /* ── BOTTOM NAV ── */
+    .bottom-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      padding: 10px 10px 22px;
+      background: rgba(17,17,17,0.98);
+      border-top: 1px solid rgba(255,255,255,0.06);
+      flex-shrink: 0;
+    }
+
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      position: relative;
+      min-width: 52px;
+      padding: 6px 8px 4px;
+      border-radius: 14px;
+    }
+
+    .nav-item.active { background: rgba(255,107,91,0.1); }
+    .nav-item span { font-size: 10px; font-weight: 500; color: rgba(255,255,255,0.3); }
+    .nav-item.active span { color: #ff6b5b; font-weight: 700; }
+
+    .nav-badge {
+      position: absolute;
+      top: 2px; right: 6px;
+      background: #ff4d4d;
+      color: white;
+      font-size: 9px; font-weight: 700;
+      width: 15px; height: 15px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+    }
+  </style>
+</head>
+<body>
+<div class="phone">
+
+  <!-- Status bar -->
+  <div class="status-bar">
+    <span>9:41</span>
+    <div style="display:flex;gap:5px;align-items:center;">
+      <svg width="16" height="11" viewBox="0 0 16 11" fill="white"><rect x="0" y="4" width="3" height="7" rx="1"/><rect x="4.5" y="2.5" width="3" height="8.5" rx="1"/><rect x="9" y="0.5" width="3" height="10.5" rx="1"/><rect x="13.5" y="0" width="2.5" height="11" rx="1" opacity="0.3"/></svg>
+      <svg width="16" height="12" viewBox="0 0 16 12" fill="white"><path d="M8 2.4C10.3 2.4 12.4 3.4 13.8 5L15.5 3.3C13.6 1.3 11 0 8 0C5 0 2.4 1.3.5 3.3L2.2 5C3.6 3.4 5.7 2.4 8 2.4Z" opacity="0.4"/><path d="M8 5.2C9.5 5.2 10.9 5.8 11.9 6.8L13.6 5.1C12.1 3.8 10.1 3 8 3C5.9 3 3.9 3.8 2.4 5.1L4.1 6.8C5.1 5.8 6.5 5.2 8 5.2Z" opacity="0.7"/><circle cx="8" cy="10" r="2"/></svg>
+      <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x="0.5" y="0.5" width="21" height="11" rx="3.5" stroke="white" stroke-opacity="0.35"/><rect x="2" y="2" width="16" height="8" rx="2" fill="white"/><path d="M23 4.5V7.5C23.8 7.2 24.5 6.5 24.5 6C24.5 5.5 23.8 4.8 23 4.5Z" fill="white" fill-opacity="0.4"/></svg>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="back-btn">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.65)" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+    </div>
+    <span class="header-title">Subscription</span>
+  </div>
+
+  <!-- Scroll area -->
+  <div class="scroll">
+
+    <!-- Hero -->
+    <div class="hero">
+      <h1>Choose Your <span>Plan</span></h1>
+      <p>Find your perfect roommate faster with premium</p>
+    </div>
+
+    <!-- Trial banner -->
+    <div class="trial-banner">
+      <div class="trial-icon">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#ff7b6b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><path d="M12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
+      </div>
+      <div class="trial-text">
+        <div class="t-title">Try Plus Free for 7 Days</div>
+        <div class="t-sub">Unlimited cards, AI matching &amp; advanced filters. Cancel anytime.</div>
+      </div>
+    </div>
+
+    <!-- ── TIER COMPARISON STRIP ── -->
+    <div class="tier-strip">
+
+      <!-- Basic tile -->
+      <div class="tier-tile" id="tile-basic" onclick="selectTier('basic')">
+        <div class="t-dot"></div>
+        <span class="t-name">Basic</span>
+        <span class="t-price">$0</span>
+        <span class="t-per">forever</span>
+      </div>
+
+      <!-- Plus tile -->
+      <div class="tier-tile active" id="tile-plus" onclick="selectTier('plus')">
+        <div class="t-dot"></div>
+        <span class="t-name">Plus</span>
+        <span class="t-price" id="plus-strip-price">$14.99</span>
+        <span class="t-per" id="plus-strip-per">/mo</span>
+        <span class="t-save" id="plus-strip-save" style="display:none;">ANNUAL</span>
+      </div>
+
+      <!-- Elite tile -->
+      <div class="tier-tile" id="tile-elite" onclick="selectTier('elite')">
+        <div class="t-dot"></div>
+        <span class="t-name">Elite</span>
+        <span class="t-price" id="elite-strip-price">$29.99</span>
+        <span class="t-per" id="elite-strip-per">/mo</span>
+        <span class="t-save" id="elite-strip-save" style="display:none;">ANNUAL</span>
+      </div>
+
+    </div>
+
+    <!-- Billing toggle -->
+    <div class="billing-toggle">
+      <button class="toggle-btn active" id="btn-monthly" onclick="setBilling('monthly')">Monthly</button>
+      <button class="toggle-btn inactive" id="btn-annual" onclick="setBilling('annual')">
+        Annual
+        <span class="save-badge" id="save-badge-label">PAY ONCE/YEAR</span>
+      </button>
+    </div>
+
+    <!-- Daily usage -->
+    <div class="usage-card">
+      <div class="usage-label-row">Today's Usage</div>
+
+      <div class="usage-row">
+        <div class="usage-icon" style="background:rgba(255,107,91,0.11);">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ff7b6b" stroke-width="2.3" stroke-linecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        </div>
+        <span class="usage-name">Interest Cards</span>
+        <div class="usage-right">
+          <span class="usage-count">1 of 5 used</span>
+          <div class="usage-bar"><div class="usage-fill" style="width:20%;background:linear-gradient(90deg,#ff6b5b,#e83a2a);"></div></div>
+        </div>
+      </div>
+
+      <div class="usage-row">
+        <div class="usage-icon" style="background:rgba(100,180,255,0.1);">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#78c0ff" stroke-width="2.3" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+        </div>
+        <span class="usage-name">Rewinds</span>
+        <div class="usage-right">
+          <span class="usage-count">0 of 1 used</span>
+          <div class="usage-bar"><div class="usage-fill" style="width:0%;background:linear-gradient(90deg,#78c0ff,#4a9eff);"></div></div>
+        </div>
+      </div>
+
+      <div class="usage-row">
+        <div class="usage-icon" style="background:rgba(255,215,0,0.09);">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffd700" stroke-width="2.3" stroke-linecap="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        </div>
+        <span class="usage-name">Super Likes</span>
+        <div class="usage-right">
+          <span class="usage-count">0 of 1 used</span>
+          <div class="usage-bar"><div class="usage-fill" style="width:0%;background:linear-gradient(90deg,#ffd700,#e6a800);"></div></div>
+        </div>
+      </div>
+
+      <div class="usage-hint">Upgrade to Plus or Elite for unlimited daily usage</div>
+    </div>
+
+    <!-- ── BASIC PLAN ── -->
+    <div class="plan-card" id="card-basic">
+      <div class="plan-band">
+        <div class="plan-top-row">
+          <div class="plan-name">Basic</div>
+        </div>
+        <div class="price-row">
+          <span class="price-big">$0</span>
+          <span class="price-period">/ forever</span>
+        </div>
+        <div class="price-annual-note">No credit card required</div>
+      </div>
+      <div class="plan-divider"></div>
+      <div class="plan-features">
+        <div class="feat-row">
+          <div class="feat-icon on"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#ff6b5b" stroke-width="3.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <span class="feat-label on">5 interest cards per day</span>
+        </div>
+        <div class="feat-row">
+          <div class="feat-icon on"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#ff6b5b" stroke-width="3.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <span class="feat-label on">Basic match filters</span>
+        </div>
+        <div class="feat-row">
+          <div class="feat-icon on"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#ff6b5b" stroke-width="3.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <span class="feat-label on">10 listing views per day</span>
+        </div>
+        <div class="feat-row">
+          <div class="feat-icon off"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="3.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div>
+          <span class="feat-label off">AI roommate assistant</span>
+        </div>
+        <div class="feat-row">
+          <div class="feat-icon off"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="3.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div>
+          <span class="feat-label off">See who liked you</span>
+        </div>
+      </div>
+      <button class="plan-cta ghost">Current Plan</button>
+    </div>
+
+    <!-- ── PLUS PLAN — RECOMMENDED ── -->
+    <div class="plan-card recommended" id="card-plus">
+      <div class="plan-band rec-band">
+        <div class="plan-top-row">
+          <div class="plan-name coral">Plus</div>
+          <div class="rec-pill">⭐ MOST POPULAR</div>
+        </div>
+        <div class="price-row">
+          <span class="price-big" id="plus-price-big">$14.99</span>
+          <span class="price-period" id="plus-price-period">/ mo</span>
+        </div>
+        <div class="price-annual-note" id="plus-annual-note" style="display:none;">
+          Billed $<span id="plus-annual-total">179.88</span>/yr &nbsp;·&nbsp; <span class="savings-tag">One annual payment</span>
+        </div>
+        <div class="price-annual-note" id="plus-monthly-note">Then $14.99/mo after free trial</div>
+      </div>
+      <div class="plan-divider coral-div"></div>
+      <div class="plan-features">
+        <div class="feat-row">
+          <div class="feat-icon on"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#ff6b5b" stroke-width="3.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <span class="feat-label on">Unlimited interest cards</span>
+        </div>
+        <div class="feat-row">
+          <div class="feat-icon on"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#ff6b5b" stroke-width="3.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <span class="feat-label on">Advanced filters (lifestyle, schedule)</span>
+        </div>
+        <div class="feat-row">
+          <div class="feat-icon on"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#ff6b5b" stroke-width="3.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <span class="feat-label on">AI roommate assistant</span>
+        </div>
+        <div class="feat-row">
+          <div class="feat-icon on"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#ff6b5b" stroke-width="3.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <span class="feat-label on">See who liked you</span>
+        </div>
+        <div class="feat-row">
+          <div class="feat-icon on"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#ff6b5b" stroke-width="3.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <span class="feat-label on">5 rewinds &amp; 3 super likes/day</span>
+        </div>
+        <div class="feat-row">
+          <div class="feat-icon off"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="3.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div>
+          <span class="feat-label off">Weekly profile boost</span>
+        </div>
+      </div>
+      <button class="plan-cta primary">Start 7-Day Free Trial →</button>
+    </div>
+
+    <!-- ── ELITE PLAN ── -->
+    <div class="plan-card" id="card-elite">
+      <div class="plan-band">
+        <div class="plan-top-row">
+          <div class="plan-name">Elite</div>
+          <div style="font-size:9px;font-weight:800;color:rgba(255,215,0,0.7);background:rgba(255,215,0,0.1);border:1px solid rgba(255,215,0,0.2);border-radius:6px;padding:3px 8px;margin-top:3px;">👑 BEST VALUE</div>
+        </div>
+        <div class="price-row">
+          <span class="price-big" id="elite-price-big">$29.99</span>
+          <span class="price-period" id="elite-price-period">/ mo</span>
+        </div>
+        <div class="price-annual-note" id="elite-annual-note" style="display:none;">
+          Billed $<span id="elite-annual-total">359.88</span>/yr &nbsp;·&nbsp; <span class="savings-tag">One annual payment</span>
+        </div>
+        <div class="price-annual-note" id="elite-monthly-note">Everything you need to find a roommate fast</div>
+      </div>
+      <div class="plan-divider"></div>
+      <div class="plan-features">
+        <div class="feat-row">
+          <div class="feat-icon on"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#ff6b5b" stroke-width="3.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <span class="feat-label on">Everything in Plus</span>
+        </div>
+        <div class="feat-row">
+          <div class="feat-icon on"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#ff6b5b" stroke-width="3.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <span class="feat-label on">Weekly profile boost</span>
+        </div>
+        <div class="feat-row">
+          <div class="feat-icon on"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#ff6b5b" stroke-width="3.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <span class="feat-label on">Priority in match results</span>
+        </div>
+        <div class="feat-row">
+          <div class="feat-icon on"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#ff6b5b" stroke-width="3.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <span class="feat-label on">Read receipts in chat</span>
+        </div>
+        <div class="feat-row">
+          <div class="feat-icon on"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#ff6b5b" stroke-width="3.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <span class="feat-label on">Background &amp; income verification</span>
+        </div>
+        <div class="feat-row">
+          <div class="feat-icon on"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#ff6b5b" stroke-width="3.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <span class="feat-label on">Unlimited super likes &amp; rewinds</span>
+        </div>
+      </div>
+      <button class="plan-cta outline">Upgrade to Elite</button>
+    </div>
+
+    <!-- Fine print -->
+    <div class="fine-print">
+      Cancel anytime in Account Settings &nbsp;·&nbsp; Prices in USD<br/>
+      Subscription renews automatically. Terms &amp; Privacy apply.
+    </div>
+
+  </div>
+
+  <!-- Bottom nav (Renter) -->
+  <div class="bottom-nav">
+    <div class="nav-item">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="8" stroke="rgba(255,255,255,0.3)" stroke-width="2"/><path d="m21 21-4.35-4.35" stroke="rgba(255,255,255,0.3)" stroke-width="2" stroke-linecap="round"/></svg>
+      <span>Explore</span>
+    </div>
+    <div class="nav-item">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="rgba(255,255,255,0.3)" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="7" r="4" stroke="rgba(255,255,255,0.3)" stroke-width="2"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke="rgba(255,255,255,0.3)" stroke-width="2" stroke-linecap="round"/></svg>
+      <span>Match</span>
+    </div>
+    <div class="nav-item">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1" stroke="rgba(255,255,255,0.3)" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="rgba(255,255,255,0.3)" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="rgba(255,255,255,0.3)" stroke-width="2"/><rect x="14" y="14" width="7" height="7" rx="1" stroke="rgba(255,255,255,0.3)" stroke-width="2"/></svg>
+      <span>Groups</span>
+    </div>
+    <div class="nav-item" style="position:relative">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="rgba(255,255,255,0.3)" stroke-width="2" stroke-linejoin="round"/></svg>
+      <div class="nav-badge">3</div>
+      <span>Chat</span>
+    </div>
+    <div class="nav-item active" style="position:relative">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="#ff6b5b" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="7" r="4" stroke="#ff6b5b" stroke-width="2"/></svg>
+      <span>Profile</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  let billing = 'monthly';
+  let selectedTier = 'plus';
+
+  const prices = {
+    monthly: { plus: '$14.99', elite: '$29.99', plusPer: '/ mo', elitePer: '/ mo' },
+    annual:  { plus: '$14.99', elite: '$29.99', plusPer: '/ mo', elitePer: '/ mo' }
+  };
+
+  function setBilling(mode) {
+    billing = mode;
+    const isAnnual = mode === 'annual';
+
+    // Toggle buttons
+    document.getElementById('btn-monthly').className = 'toggle-btn ' + (isAnnual ? 'inactive' : 'active');
+    document.getElementById('btn-annual').className  = 'toggle-btn ' + (isAnnual ? 'active' : 'inactive');
+
+    const badge = document.getElementById('save-badge-label');
+    badge.className = isAnnual ? 'save-badge on-active' : 'save-badge';
+
+    // Update Plus prices
+    document.getElementById('plus-price-big').textContent    = prices[mode].plus;
+    document.getElementById('plus-price-period').textContent = prices[mode].plusPer;
+    document.getElementById('plus-strip-price').textContent  = prices[mode].plus;
+    document.getElementById('plus-annual-note').style.display  = isAnnual ? 'block' : 'none';
+    document.getElementById('plus-monthly-note').style.display = isAnnual ? 'none' : 'block';
+    document.getElementById('plus-strip-save').style.display   = isAnnual ? 'inline-block' : 'none';
+
+    // Update Elite prices
+    document.getElementById('elite-price-big').textContent    = prices[mode].elite;
+    document.getElementById('elite-price-period').textContent = prices[mode].elitePer;
+    document.getElementById('elite-strip-price').textContent  = prices[mode].elite;
+    document.getElementById('elite-annual-note').style.display  = isAnnual ? 'block' : 'none';
+    document.getElementById('elite-monthly-note').style.display = isAnnual ? 'none' : 'block';
+    document.getElementById('elite-strip-save').style.display   = isAnnual ? 'inline-block' : 'none';
+  }
+
+  function selectTier(tier) {
+    selectedTier = tier;
+    ['basic','plus','elite'].forEach(t => {
+      document.getElementById('tile-' + t).classList.toggle('active', t === tier);
+    });
+    // Scroll to that plan card
+    document.getElementById('card-' + tier).scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+</script>
+</body>
+</html>

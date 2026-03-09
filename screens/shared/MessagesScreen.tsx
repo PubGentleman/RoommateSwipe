@@ -472,6 +472,19 @@ export const MessagesScreen = () => {
         visible={showAISheet}
         onDismiss={() => setShowAISheet(false)}
         screenContext="messages"
+        contextData={{
+          messages: {
+            conversations,
+            unmessagedMatchCount: newMatches.filter(m => {
+              const conv = conversations.find(c => c.participant.id === m.profile.id);
+              return !conv || conv.messages.length === 0;
+            }).length,
+            staleConversationCount: conversations.filter(c => {
+              const hoursSince = (Date.now() - c.timestamp.getTime()) / (1000 * 60 * 60);
+              return hoursSince > 48 && c.messages.length > 0;
+            }).length,
+          },
+        }}
       />
     </View>
   );
