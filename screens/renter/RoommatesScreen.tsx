@@ -31,6 +31,7 @@ import { RoommateFilterSheet, MatchFilters, DEFAULT_FILTERS, getActiveFilterCoun
 import { PlanBadge } from '../../components/PlanBadge';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { RoomdrAISheet, AISheetContextData } from '../../components/RoomdrAISheet';
+import { getSwipeDeck, sendLike, sendPass, undoLastAction } from '../../services/discoverService';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Limit card size for web/desktop viewing
@@ -122,32 +123,78 @@ export const RoommatesScreen = () => {
   const loadProfiles = async () => {
     try {
       setIsLoading(true);
-      const allProfiles = await StorageService.getRoommateProfiles();
-      const allUsers = await StorageService.getUsers();
-      const history = await StorageService.getSwipeHistory();
-      setSwipedIds(history);
-      
-      const userMap = new Map(allUsers.map(u => [u.id, u]));
-      setProfileUsers(userMap);
-      
-      const blockedIds = new Set(user?.blockedUsers || []);
-      const filterCity = activeCity;
-      const unseen = allProfiles.filter(p => {
-        if (history.has(p.id) || p.id === user?.id || blockedIds.has(p.id)) return false;
-        if (filterCity) {
-          const profileUser = userMap.get(p.id);
-          const profileUserCity = profileUser?.profileData?.city;
-          if (profileUserCity && profileUserCity !== filterCity) return false;
-          if (!profileUserCity && p.preferences?.location) {
-            const profileCity = getCityFromNeighborhood(p.preferences.location);
-            if (profileCity && profileCity !== filterCity) return false;
-          }
+
+      let allProfiles: RoommateProfile[] = [];
+      let allUsers: any[] = [];
+      let history = new Set<string>();
+      let usedSupabase = false;
+
+      try {
+        const supabaseFilters: any = {};
+        if (matchFilters.budgetMin > 0 || matchFilters.budgetMax < 10000) {
+          supabaseFilters.budgetMin = matchFilters.budgetMin;
+          supabaseFilters.budgetMax = matchFilters.budgetMax;
         }
-        return true;
-      });
+        if (matchFilters.roomTypes && matchFilters.roomTypes.length > 0) {
+          supabaseFilters.roomType = matchFilters.roomTypes[0];
+        }
+        if (matchFilters.minCompatibility && matchFilters.minCompatibility > 0) {
+          supabaseFilters.minCompatibility = matchFilters.minCompatibility;
+        }
+        const deckProfiles = await getSwipeDeck(activeCity || undefined, supabaseFilters);
+        if (deckProfiles && deckProfiles.length > 0) {
+          allProfiles = deckProfiles.map((p: any) => ({
+            id: p.id,
+            name: p.full_name || p.name || 'Unknown',
+            age: p.age || p.profile?.age || 0,
+            gender: p.gender || p.profile?.gender,
+            occupation: p.occupation || p.profile?.occupation || '',
+            bio: p.bio || p.profile?.bio || '',
+            budget: p.profile?.budget_max || p.profile?.budget || 0,
+            photos: p.avatar_url ? [p.avatar_url] : p.profile?.photos || [],
+            preferences: p.profile?.preferences || { location: '', moveInDate: '', bedrooms: 1 },
+            lifestyle: p.profile?.lifestyle || { cleanliness: 3, socialLevel: 3, workSchedule: 'regular', pets: false, smoking: false },
+            compatibility: p.profile?.compatibility,
+            zodiacSign: p.profile?.zodiac_sign,
+            moveInDate: p.profile?.move_in_date,
+            verified: p.profile?.verified || false,
+          })) as RoommateProfile[];
+          usedSupabase = true;
+          console.log('[RoommatesScreen] Loaded profiles from Supabase:', allProfiles.length);
+        }
+      } catch (supabaseError) {
+        console.log('[RoommatesScreen] Supabase getSwipeDeck failed, falling back to StorageService:', supabaseError);
+      }
+
+      if (!usedSupabase) {
+        allProfiles = await StorageService.getRoommateProfiles();
+        allUsers = await StorageService.getUsers();
+        history = await StorageService.getSwipeHistory();
+        setSwipedIds(history);
+
+        const userMap = new Map(allUsers.map(u => [u.id, u]));
+        setProfileUsers(userMap);
+
+        const blockedIds = new Set(user?.blockedUsers || []);
+        const filterCity = activeCity;
+        const unseen = allProfiles.filter(p => {
+          if (history.has(p.id) || p.id === user?.id || blockedIds.has(p.id)) return false;
+          if (filterCity) {
+            const profileUser = userMap.get(p.id);
+            const profileUserCity = profileUser?.profileData?.city;
+            if (profileUserCity && profileUserCity !== filterCity) return false;
+            if (!profileUserCity && p.preferences?.location) {
+              const profileCity = getCityFromNeighborhood(p.preferences.location);
+              if (profileCity && profileCity !== filterCity) return false;
+            }
+          }
+          return true;
+        });
+        allProfiles = unseen;
+      }
       
-      const profilesWithCompatibility = unseen.map(profile => {
-        const compatibility = user ? calculateCompatibility(user, profile) : 50;
+      const profilesWithCompatibility = allProfiles.map(profile => {
+        const compatibility = profile.compatibility || (user ? calculateCompatibility(user, profile) : 50);
         return {
           ...profile,
           compatibility,
@@ -157,7 +204,9 @@ export const RoommatesScreen = () => {
       setUnfilteredCount(profilesWithCompatibility.length);
       setUnfilteredProfiles(profilesWithCompatibility);
 
-      const filteredProfiles = applyFiltersToProfiles(profilesWithCompatibility, matchFilters);
+      const filteredProfiles = usedSupabase ? profilesWithCompatibility : applyFiltersToProfiles(profilesWithCompatibility, matchFilters);
+
+      const userMap = profileUsers.size > 0 ? profileUsers : new Map(allUsers.map((u: any) => [u.id, u]));
 
       const byCompatibility = (a: typeof filteredProfiles[0], b: typeof filteredProfiles[0]) =>
         (b.compatibility || 0) - (a.compatibility || 0);
@@ -275,6 +324,14 @@ export const RoommatesScreen = () => {
 
   const undoLastSwipeAsync = async (profileId: string, action: 'like' | 'nope' | 'superlike') => {
     try {
+      try {
+        await undoLastAction();
+        console.log('[RoommatesScreen] Undo via Supabase successful');
+        return;
+      } catch (supabaseError) {
+        console.log('[RoommatesScreen] Supabase undo failed, falling back to StorageService:', supabaseError);
+      }
+
       await StorageService.removeFromSwipeHistory(profileId);
       
       if (action === 'like' || action === 'superlike') {
@@ -288,11 +345,33 @@ export const RoommatesScreen = () => {
 
   const processSwipeAsync = async (action: 'like' | 'nope' | 'superlike', profileId: string, userId: string) => {
     try {
-      await StorageService.addToSwipeHistory(profileId);
+      let supabaseResult: any = null;
+      let usedSupabase = false;
+
+      try {
+        if (action === 'like' || action === 'superlike') {
+          supabaseResult = await sendLike(profileId);
+          usedSupabase = true;
+          console.log('[RoommatesScreen] Sent like via Supabase');
+        } else {
+          await sendPass(profileId);
+          usedSupabase = true;
+          console.log('[RoommatesScreen] Sent pass via Supabase');
+        }
+      } catch (supabaseError) {
+        console.log('[RoommatesScreen] Supabase swipe failed, falling back to StorageService:', supabaseError);
+      }
+
+      if (!usedSupabase) {
+        await StorageService.addToSwipeHistory(profileId);
+      }
       
       if (action === 'like' || action === 'superlike') {
         const isSuperLike = action === 'superlike';
-        await StorageService.addLike(userId, profileId, isSuperLike);
+
+        if (!usedSupabase) {
+          await StorageService.addLike(userId, profileId, isSuperLike);
+        }
         
         if (isSuperLike) {
           await StorageService.addNotification({
@@ -312,19 +391,23 @@ export const RoommatesScreen = () => {
           
           await StorageService.addSuperLike(profileId, userId, user?.name, user?.profilePicture);
         }
+
+        const hasMatch = usedSupabase ? !!supabaseResult?.match : await StorageService.checkReciprocalLike(userId, profileId);
         
-        const isReciprocalMatch = await StorageService.checkReciprocalLike(userId, profileId);
-        if (isReciprocalMatch) {
-          const match: Match = {
-            id: `match_${Date.now()}`,
-            userId1: userId,
-            userId2: profileId,
-            matchedAt: new Date(),
-            isSuperLike,
-            superLiker: isSuperLike ? userId : undefined,
-            matchType: isSuperLike ? 'super_interest' : 'mutual',
-          };
-          await StorageService.addMatch(match);
+        if (hasMatch) {
+          if (!usedSupabase) {
+            const match: Match = {
+              id: `match_${Date.now()}`,
+              userId1: userId,
+              userId2: profileId,
+              matchedAt: new Date(),
+              isSuperLike,
+              superLiker: isSuperLike ? userId : undefined,
+              matchType: isSuperLike ? 'super_interest' : 'mutual',
+            };
+            await StorageService.addMatch(match);
+          }
+
           const matchedProfile = profiles.find(p => p.id === profileId);
           if (matchedProfile) {
             setMatchedProfileData({
@@ -334,6 +417,8 @@ export const RoommatesScreen = () => {
           }
 
           const matchedName = matchedProfile?.name || 'Someone';
+          const matchId = usedSupabase ? supabaseResult?.match?.id : `match_${Date.now()}`;
+
           await StorageService.addNotification({
             id: `notification_match_${Date.now()}_${Math.random()}`,
             userId: userId,
@@ -343,7 +428,7 @@ export const RoommatesScreen = () => {
             isRead: false,
             createdAt: new Date(),
             data: {
-              matchId: match.id,
+              matchId,
               fromUserId: profileId,
               fromUserName: matchedName,
               fromUserPhoto: matchedProfile?.photos?.[0],
@@ -359,7 +444,7 @@ export const RoommatesScreen = () => {
             isRead: false,
             createdAt: new Date(),
             data: {
-              matchId: match.id,
+              matchId,
               fromUserId: userId,
               fromUserName: user?.name,
               fromUserPhoto: user?.profilePicture,

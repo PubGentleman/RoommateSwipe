@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, StyleSheet, Pressable, FlatList, RefreshControl, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -11,6 +11,18 @@ import { StorageService } from '../../utils/storage';
 import { Notification } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNotificationContext } from '../../contexts/NotificationContext';
+import { getNotifications, markNotificationRead, markAllNotificationsRead, subscribeToNotifications } from '../../services/notificationService';
+
+const mapSupabaseNotification = (row: any): Notification => ({
+  id: row.id,
+  userId: row.user_id,
+  type: row.type,
+  title: row.title,
+  body: row.body,
+  isRead: row.read ?? row.isRead ?? false,
+  createdAt: new Date(row.created_at || row.createdAt),
+  data: row.data || undefined,
+});
 
 export const NotificationsScreen = () => {
   const { theme } = useTheme();
@@ -21,23 +33,52 @@ export const NotificationsScreen = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
 
   const loadNotifications = async () => {
     if (!user?.id) return;
     try {
-      const userNotifications = await StorageService.getNotifications(user.id);
+      const supabaseNotifications = await getNotifications();
+      const mapped = supabaseNotifications.map(mapSupabaseNotification);
       const blockedIds = user.blockedUsers || [];
-      const filtered = userNotifications.filter(
+      const filtered = mapped.filter(
         n => !n.data?.fromUserId || !blockedIds.includes(n.data.fromUserId)
       );
       setNotifications(filtered);
     } catch (error) {
-      console.error('Error loading notifications:', error);
+      console.error('Error loading notifications from Supabase, falling back to StorageService:', error);
+      try {
+        const userNotifications = await StorageService.getNotifications(user.id);
+        const blockedIds = user.blockedUsers || [];
+        const filtered = userNotifications.filter(
+          n => !n.data?.fromUserId || !blockedIds.includes(n.data.fromUserId)
+        );
+        setNotifications(filtered);
+      } catch (fallbackError) {
+        console.error('Error loading notifications from StorageService:', fallbackError);
+      }
     } finally {
       setIsLoading(false);
       setRefreshing(false);
     }
   };
+
+  useEffect(() => {
+    if (!user?.id) return;
+    unsubscribeRef.current = subscribeToNotifications(user.id, (newNotification) => {
+      const mapped = mapSupabaseNotification(newNotification);
+      const blockedIds = user.blockedUsers || [];
+      if (mapped.data?.fromUserId && blockedIds.includes(mapped.data.fromUserId)) return;
+      setNotifications(prev => [mapped, ...prev]);
+      refreshUnreadCount();
+    });
+    return () => {
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+        unsubscribeRef.current = null;
+      }
+    };
+  }, [user?.id]);
 
   useFocusEffect(
     useCallback(() => {
@@ -52,7 +93,12 @@ export const NotificationsScreen = () => {
 
   const handleNotificationPress = async (notification: Notification) => {
     if (!notification.isRead) {
-      await StorageService.markNotificationAsRead(notification.id);
+      try {
+        await markNotificationRead(notification.id);
+      } catch (error) {
+        console.error('Error marking notification read via Supabase, falling back:', error);
+        await StorageService.markNotificationAsRead(notification.id);
+      }
       setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, isRead: true } : n));
       await refreshUnreadCount();
     }
@@ -98,14 +144,23 @@ export const NotificationsScreen = () => {
   };
 
   const handleDelete = async (notificationId: string) => {
-    await StorageService.deleteNotification(notificationId);
+    try {
+      await StorageService.deleteNotification(notificationId);
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+    }
     setNotifications(prev => prev.filter(n => n.id !== notificationId));
     await refreshUnreadCount();
   };
 
   const handleMarkAllAsRead = async () => {
     if (!user?.id) return;
-    await StorageService.markAllNotificationsAsRead(user.id);
+    try {
+      await markAllNotificationsRead();
+    } catch (error) {
+      console.error('Error marking all read via Supabase, falling back:', error);
+      await StorageService.markAllNotificationsAsRead(user.id);
+    }
     setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
     await refreshUnreadCount();
   };

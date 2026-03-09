@@ -8,6 +8,7 @@ import { StorageService } from '@/utils/storage';
 import { Typography, Spacing } from '@/constants/theme';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { getProfileViews as supabaseGetProfileViews } from '@/services/profileService';
 
 interface ProfileView {
   viewerId: string;
@@ -36,10 +37,22 @@ export const ProfileViewsScreen = () => {
 
     try {
       setIsLoading(true);
-      const views = await StorageService.getProfileViews(user.id);
-      setProfileViews(views);
-    } catch (error) {
-      console.error('[ProfileViewsScreen] Error loading profile views:', error);
+      const supabaseViews = await supabaseGetProfileViews();
+      const mapped: ProfileView[] = (supabaseViews || []).map((v: any) => ({
+        viewerId: v.viewer?.id || v.viewer_id,
+        viewerName: v.viewer?.full_name || 'Unknown User',
+        viewerPhoto: v.viewer?.avatar_url,
+        viewedAt: new Date(v.created_at),
+      }));
+      setProfileViews(mapped);
+    } catch (supabaseError) {
+      console.warn('[ProfileViewsScreen] Supabase fetch failed, falling back to StorageService:', supabaseError);
+      try {
+        const views = await StorageService.getProfileViews(user.id);
+        setProfileViews(views);
+      } catch (error) {
+        console.error('[ProfileViewsScreen] Error loading profile views:', error);
+      }
     } finally {
       setIsLoading(false);
     }

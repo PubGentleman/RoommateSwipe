@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { AppState, AppStateStatus } from 'react-native';
 import { StorageService } from '../utils/storage';
 import { User, Notification } from '../types/models';
+import { supabase } from '../lib/supabase';
+import type { Session } from '@supabase/supabase-js';
 
 export type UserRole = 'renter' | 'host';
 
@@ -72,6 +74,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     loadUser();
+
+    const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'SIGNED_IN' && session) {
+          await loadUserFromSupabase(session);
+        } else if (event === 'SIGNED_OUT') {
+          setUser(null);
+        }
+      }
+    );
+
+    return () => {
+      authSubscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -137,134 +153,197 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return updated;
   };
 
-  const loadUser = async () => {
+  const mapSupabaseToUser = (supabaseUser: any, profile: any, subscription: any): User => {
+    return {
+      id: supabaseUser.id,
+      email: supabaseUser.email,
+      name: supabaseUser.full_name || supabaseUser.email?.split('@')[0] || '',
+      role: supabaseUser.role || 'renter',
+      onboardingStep: supabaseUser.onboarding_step || 'profile',
+      profilePicture: supabaseUser.avatar_url,
+      age: supabaseUser.age,
+      birthday: supabaseUser.birthday,
+      zodiacSign: supabaseUser.zodiac_sign,
+      subscription: {
+        plan: subscription?.plan || 'basic',
+        status: subscription?.status || 'active',
+        expiresAt: subscription?.current_period_end ? new Date(subscription.current_period_end) : undefined,
+        billingCycle: subscription?.billing_cycle || 'monthly',
+        billingHistory: [],
+      },
+      hostSubscription: supabaseUser.role === 'host' ? {
+        plan: subscription?.plan || 'starter',
+        status: subscription?.status || 'active',
+        billingCycle: subscription?.billing_cycle || 'monthly',
+        inquiryResponsesUsed: 0,
+      } : undefined,
+      profileData: profile ? {
+        bio: supabaseUser.bio,
+        budget: profile.budget_max,
+        budgetMin: profile.budget_min,
+        budgetMax: profile.budget_max,
+        lookingFor: profile.looking_for,
+        location: supabaseUser.location,
+        neighborhood: supabaseUser.neighborhood,
+        city: supabaseUser.city,
+        state: supabaseUser.state,
+        coordinates: profile.coordinates,
+        occupation: supabaseUser.occupation,
+        interests: profile.interests,
+        gender: supabaseUser.gender,
+        photos: profile.photos,
+        preferences: {
+          sleepSchedule: profile.sleep_schedule,
+          cleanliness: profile.cleanliness,
+          noiseTolerance: profile.noise_tolerance,
+          smoking: profile.smoking,
+          pets: profile.pets,
+          drinking: profile.drinking,
+          guests: profile.guests,
+          wakeTime: profile.wake_time,
+          sleepTime: profile.sleep_time,
+          privateBathroom: profile.private_bathroom,
+          bathrooms: profile.bathrooms,
+        },
+        moveInDate: profile.move_in_date,
+        roomType: profile.room_type,
+        leaseDuration: profile.lease_duration,
+      } : {
+        neighborhood: supabaseUser.neighborhood || 'Williamsburg',
+        city: supabaseUser.city || 'New York',
+        state: supabaseUser.state || 'NY',
+        coordinates: { lat: 40.7081, lng: -73.9571 },
+      },
+      messageCount: 0,
+      photos: profile?.photos || [],
+    };
+  };
+
+  const loadUserFromSupabase = async (session: Session | null) => {
     try {
-      await StorageService.initializeWithMockData();
-      let currentUser = await StorageService.getCurrentUser();
-      if (currentUser) {
-        if (currentUser.messageCount === undefined) {
-          currentUser.messageCount = 0;
-        }
-        
-        if (currentUser.subscription) {
-          currentUser.subscription = {
-            ...currentUser.subscription,
-            expiresAt: currentUser.subscription.expiresAt 
-              ? new Date(currentUser.subscription.expiresAt) 
-              : undefined,
-            scheduledChangeDate: currentUser.subscription.scheduledChangeDate 
-              ? new Date(currentUser.subscription.scheduledChangeDate) 
-              : undefined,
-          };
-        }
-        
-        if (currentUser.boostData) {
-          currentUser.boostData = {
-            ...currentUser.boostData,
-            lastBoostDate: currentUser.boostData.lastBoostDate 
-              ? new Date(currentUser.boostData.lastBoostDate) 
-              : undefined,
-            boostExpiresAt: currentUser.boostData.boostExpiresAt 
-              ? String(currentUser.boostData.boostExpiresAt)
-              : undefined,
-          };
-        }
-
-        if (currentUser.role === 'renter' && !currentUser.profileData?.city) {
-          currentUser = {
-            ...currentUser,
-            profileData: {
-              ...currentUser.profileData,
-              neighborhood: 'Williamsburg',
-              city: 'New York',
-              state: 'NY',
-              coordinates: { lat: 40.7081, lng: -73.9571 },
-            },
-          };
-          await StorageService.setCurrentUser(currentUser);
-          await StorageService.addOrUpdateUser(currentUser);
-        }
-
-        currentUser = await checkAndApplyScheduledChanges(currentUser);
-        
-        await StorageService.seedMockNotifications(currentUser.id);
-        
-        setUser(currentUser);
+      if (!session?.user) {
+        setUser(null);
+        setIsLoading(false);
+        return;
       }
+
+      const { data: userData } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+
+      if (!userData) {
+        setUser(null);
+        setIsLoading(false);
+        return;
+      }
+
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .single();
+
+      const { data: subscriptionData } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .single();
+
+      let mappedUser = mapSupabaseToUser(userData, profileData, subscriptionData);
+      mappedUser = await checkAndApplyScheduledChanges(mappedUser);
+
+      await StorageService.setCurrentUser(mappedUser);
+      await StorageService.addOrUpdateUser(mappedUser);
+
+      setUser(mappedUser);
     } catch (error) {
-      console.error('Error loading user:', error);
+      console.error('Error loading user from Supabase:', error);
+      try {
+        await StorageService.initializeWithMockData();
+        const fallbackUser = await StorageService.getCurrentUser();
+        if (fallbackUser) {
+          setUser(fallbackUser);
+        }
+      } catch {
+        console.error('Fallback to local storage also failed');
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
+  const loadUser = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        await loadUserFromSupabase(session);
+      } else {
+        await StorageService.initializeWithMockData();
+        const currentUser = await StorageService.getCurrentUser();
+        if (currentUser) {
+          if (currentUser.messageCount === undefined) {
+            currentUser.messageCount = 0;
+          }
+          if (currentUser.subscription) {
+            currentUser.subscription = {
+              ...currentUser.subscription,
+              expiresAt: currentUser.subscription.expiresAt
+                ? new Date(currentUser.subscription.expiresAt)
+                : undefined,
+              scheduledChangeDate: currentUser.subscription.scheduledChangeDate
+                ? new Date(currentUser.subscription.scheduledChangeDate)
+                : undefined,
+            };
+          }
+          if (currentUser.boostData) {
+            currentUser.boostData = {
+              ...currentUser.boostData,
+              lastBoostDate: currentUser.boostData.lastBoostDate
+                ? new Date(currentUser.boostData.lastBoostDate)
+                : undefined,
+              boostExpiresAt: currentUser.boostData.boostExpiresAt
+                ? String(currentUser.boostData.boostExpiresAt)
+                : undefined,
+            };
+          }
+          setUser(currentUser);
+        }
+        setIsLoading(false);
+      }
+    } catch (error) {
+      console.error('Error loading user:', error);
+      setIsLoading(false);
+    }
+  };
+
   const login = async (email: string, password: string, role: UserRole) => {
-    const users = await StorageService.getUsers();
-    let mockUser = users.find(u => u.email === email || u.email === email.replace('@example.com', '@email.com'));
-    
-    if (!mockUser) {
-      mockUser = {
-        id: Math.random().toString(36).substr(2, 9),
-        email,
-        password,
-        name: email.split('@')[0],
-        role,
-        onboardingStep: 'profile',
-        subscription: {
-          plan: 'basic',
-          status: 'active',
-        },
-        messageCount: 0,
-        profileData: role === 'renter' ? {
-          neighborhood: 'Williamsburg',
-          city: 'New York',
-          state: 'NY',
-          coordinates: { lat: 40.7081, lng: -73.9571 },
-        } : undefined,
-      };
-      await StorageService.addOrUpdateUser(mockUser);
-    } else {
-      if (mockUser.password && mockUser.password !== password) {
-        throw new Error('Invalid password');
-      }
-      
-      let needsUpdate = false;
-      if (!mockUser.onboardingStep) {
-        mockUser = { ...mockUser, onboardingStep: 'complete' };
-        needsUpdate = true;
-      }
-      if (!mockUser.password) {
-        mockUser = {
-          ...mockUser,
-          password,
-        };
-        needsUpdate = true;
-      }
-      if (role === 'renter' && !mockUser.profileData?.city) {
-        mockUser = {
-          ...mockUser,
-          profileData: {
-            ...mockUser.profileData,
-            neighborhood: 'Williamsburg',
-            city: 'New York',
-            state: 'NY',
-            coordinates: { lat: 40.7081, lng: -73.9571 },
-          },
-        };
-        needsUpdate = true;
-      }
-      if (needsUpdate) {
-        await StorageService.addOrUpdateUser(mockUser);
-      }
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      throw new Error(error.message);
     }
-    
-    await StorageService.setCurrentUser(mockUser);
-    if (role === 'renter' && mockUser.id) {
-      await StorageService.seedInitialMatches(mockUser.id);
+
+    if (data.session) {
+      const { data: userData } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', data.user.id)
+        .single();
+
+      if (userData && userData.role !== role) {
+        await supabase
+          .from('users')
+          .update({ role })
+          .eq('id', data.user.id);
+      }
+
+      await loadUserFromSupabase(data.session);
     }
-    await StorageService.seedMockNotifications(mockUser.id);
-    const summaryUser = await checkWeeklySummary(mockUser);
-    setUser(summaryUser || mockUser);
   };
 
   const checkWeeklySummary = async (loginUser: User): Promise<User | null> => {
@@ -295,32 +374,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const register = async (email: string, password: string, name: string, role: UserRole) => {
-    const mockUser: User = {
-      id: Math.random().toString(36).substr(2, 9),
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      name,
-      role,
-      onboardingStep: 'profile',
-      subscription: {
-        plan: 'basic',
-        status: 'active',
-      },
-      messageCount: 0,
-      profileData: role === 'renter' ? {
-        neighborhood: 'Williamsburg',
-        city: 'New York',
-        state: 'NY',
-        coordinates: { lat: 40.7081, lng: -73.9571 },
-      } : undefined,
-    };
-    await StorageService.setCurrentUser(mockUser);
-    await StorageService.addOrUpdateUser(mockUser);
-    if (role === 'renter') {
-      await StorageService.seedInitialMatches(mockUser.id);
+    });
+
+    if (error) {
+      throw new Error(error.message);
     }
-    await StorageService.seedMockNotifications(mockUser.id);
-    setUser(mockUser);
+
+    if (data.user) {
+      const { error: insertError } = await supabase
+        .from('users')
+        .insert({
+          id: data.user.id,
+          email,
+          full_name: name,
+          role,
+          onboarding_step: 'profile',
+          city: 'New York',
+          state: 'NY',
+          neighborhood: 'Williamsburg',
+        });
+
+      if (insertError) {
+        console.error('Error creating user record:', insertError);
+      }
+
+      if (data.session) {
+        await loadUserFromSupabase(data.session);
+      } else {
+        const newUser: User = {
+          id: data.user.id,
+          email,
+          name,
+          role,
+          onboardingStep: 'profile',
+          subscription: { plan: 'basic', status: 'active' },
+          messageCount: 0,
+          profileData: role === 'renter' ? {
+            neighborhood: 'Williamsburg',
+            city: 'New York',
+            state: 'NY',
+            coordinates: { lat: 40.7081, lng: -73.9571 },
+          } : undefined,
+        };
+        await StorageService.setCurrentUser(newUser);
+        await StorageService.addOrUpdateUser(newUser);
+        setUser(newUser);
+      }
+    }
   };
 
   const completeOnboardingStep = async (step: 'profile' | 'plan' | 'complete') => {
@@ -329,10 +432,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updated = { ...latest, onboardingStep: step };
     await StorageService.setCurrentUser(updated);
     await StorageService.addOrUpdateUser(updated);
+
+    await supabase
+      .from('users')
+      .update({ onboarding_step: step })
+      .eq('id', user.id);
+
     setUser(updated);
   };
 
   const logout = async () => {
+    await supabase.auth.signOut();
     await StorageService.logoutAndReset();
     setUser(null);
   };
@@ -372,6 +482,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     await StorageService.setCurrentUser(updatedUser);
     await StorageService.addOrUpdateUser(updatedUser);
+    await supabase.from('subscriptions').update({ plan: 'plus', billing_cycle: billingCycle, status: 'active', current_period_end: expiresAt.toISOString(), cancel_at_period_end: false }).eq('user_id', user.id);
     setUser(updatedUser);
     console.log('[Auth] Upgraded to Plus:', updatedUser.subscription);
   };
@@ -395,6 +506,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     await StorageService.setCurrentUser(updatedUser);
     await StorageService.addOrUpdateUser(updatedUser);
+    await supabase.from('subscriptions').update({ plan: 'elite', billing_cycle: billingCycle, status: 'active', current_period_end: expiresAt.toISOString(), cancel_at_period_end: false }).eq('user_id', user.id);
     setUser(updatedUser);
     console.log('[Auth] Upgraded to Elite:', updatedUser.subscription);
   };

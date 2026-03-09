@@ -6,6 +6,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { Group } from '../../types/models';
 import { StorageService } from '../../utils/storage';
+import { createGroup as createGroupSupabase } from '../../services/groupService';
 import { useAuth } from '../../contexts/AuthContext';
 import { ScreenKeyboardAwareScrollView } from '../../components/ScreenKeyboardAwareScrollView';
 import { Image } from 'expo-image';
@@ -51,6 +52,7 @@ export const CreateGroupScreen = ({ route, navigation }: CreateGroupScreenProps)
         name: groupName.trim(),
         description: description.trim() || `A group looking for roommates`,
         members: [user.id, matchedUserId],
+        pendingMembers: [],
         maxMembers: membersCount,
         budget: 2000,
         preferredLocation: 'San Francisco Bay Area',
@@ -58,7 +60,18 @@ export const CreateGroupScreen = ({ route, navigation }: CreateGroupScreenProps)
         createdBy: user.id,
       };
 
-      await StorageService.addOrUpdateGroup(newGroup);
+      try {
+        await createGroupSupabase({
+          name: groupName.trim(),
+          description: description.trim() || `A group looking for roommates`,
+          max_members: membersCount,
+          budget_min: 2000,
+          city: 'San Francisco Bay Area',
+        });
+      } catch (supabaseError) {
+        console.warn('[CreateGroupScreen] Supabase createGroup failed, falling back to StorageService:', supabaseError);
+        await StorageService.addOrUpdateGroup(newGroup);
+      }
       
       Alert.alert(
         'Group Created!',

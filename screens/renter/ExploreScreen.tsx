@@ -16,6 +16,7 @@ import { useCityContext } from '../../contexts/CityContext';
 import { CityPickerModal, CityPillButton } from '../../components/CityPickerModal';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { StorageService } from '../../utils/storage';
+import { getListings } from '../../services/listingService';
 import { Property, PropertyFilter, User, RoommateProfile, InterestCard } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -112,6 +113,45 @@ export const ExploreScreen = () => {
     try {
       setIsLoading(true);
       setError(null);
+
+      try {
+        const supabaseListings = await getListings(
+          activeCity ? { city: activeCity } : undefined
+        );
+        if (supabaseListings && supabaseListings.length > 0) {
+          const mapped: Property[] = supabaseListings.map((l: any) => ({
+            id: l.id,
+            title: l.title || '',
+            description: l.description || '',
+            price: l.rent || 0,
+            address: l.address || '',
+            city: l.city || '',
+            state: l.state || '',
+            neighborhood: l.neighborhood || '',
+            bedrooms: l.bedrooms || 1,
+            bathrooms: l.bathrooms || 1,
+            sqft: l.sqft || undefined,
+            photos: l.photos || [],
+            amenities: l.amenities || [],
+            available: l.is_active && !l.is_rented && !l.is_paused,
+            featured: l.featured || false,
+            propertyType: l.property_type || 'lease',
+            roomType: l.room_type || 'entire',
+            hostId: l.host_id || '',
+            hostProfileId: l.host_id || '',
+            hostName: l.host?.full_name || 'Host',
+            existingRoommates: l.existing_roommates || [],
+            availableDate: l.available_date ? new Date(l.available_date) : undefined,
+            coordinates: l.coordinates || undefined,
+          }));
+          setProperties(mapped);
+          setFilteredProperties(mapped);
+          return;
+        }
+      } catch (supabaseErr) {
+        console.warn('Supabase getListings failed, falling back to StorageService:', supabaseErr);
+      }
+
       await StorageService.initializeWithMockData();
       const allProperties = await StorageService.getProperties();
       setProperties(allProperties);

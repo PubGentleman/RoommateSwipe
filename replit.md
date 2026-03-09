@@ -51,9 +51,30 @@ The application is built with React Native and Expo using TypeScript, utilizing 
 
 Animations are handled by React Native Reanimated, gestures by React Native Gesture Handler, and state is managed by React Context API and AsyncStorage.
 
+## Backend (Supabase)
+
+The app uses Supabase as the full backend:
+- **Auth**: Supabase Auth (email/password) via `@supabase/supabase-js`
+- **Database**: Supabase PostgreSQL with tables for users, profiles, listings, matches, messages, subscriptions, boosts, super_interests, groups, group_members, reports, blocked_users, notifications, profile_views, usage_tracking
+- **Realtime**: Supabase Realtime subscriptions for messages and notifications
+- **Storage**: Supabase Storage buckets for profile-photos and listing-photos
+- **RLS**: Row Level Security enabled on all tables
+
+**Key Files:**
+- `lib/supabase.ts` — Supabase client with AsyncStorage session persistence
+- `services/*.ts` — Service layer (profileService, discoverService, messageService, listingService, subscriptionService, boostService, superInterestService, groupService, notificationService, moderationService)
+- `supabase/migrations/001_schema.sql` — Database schema (run in Supabase SQL Editor)
+- `supabase/migrations/002_rls_policies.sql` — RLS policies (run in Supabase SQL Editor)
+
+**Environment Variables:**
+- `EXPO_PUBLIC_SUPABASE_URL` — Supabase project URL
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY` — Supabase anon public key (secret)
+
+**Hybrid Mode:** AuthContext uses Supabase Auth for login/register/logout with fallback to local AsyncStorage/mock data when Supabase is unreachable.
+
 ## Authentication & Authorization
 
-Mock authentication supports role-based navigation and conditional access for `renter` and `host` roles. Privacy settings and account deletion are implemented.
+Supabase Auth handles real email/password authentication. AuthContext subscribes to `onAuthStateChange` for session management. Role-based navigation and conditional access for `renter` and `host` roles. Privacy settings and account deletion are implemented.
 
 **Post-Signup Onboarding Flow:** After signup, users must complete a mandatory 2-step onboarding before accessing the main app:
 1. **Profile Creation** — 13-step questionnaire (photos, bio, location, lifestyle preferences)
@@ -78,7 +99,7 @@ A `PaywallSheet` component handles subscription prompts when users hit plan limi
 
 ## Data Layer
 
-The data layer uses mock data and TypeScript interfaces for models such as `RoommateProfile`, `Property`, `Group`, `Conversation`, `Message`, `Match`, `Application`, and `InterestCard`. Mock data is extensive, covering 11 major US cities and various entities, with versioning for automatic re-seeding.
+The data layer uses Supabase PostgreSQL as the primary backend, with local AsyncStorage as a fallback cache. TypeScript interfaces in `types/models.ts` define models for `User`, `RoommateProfile`, `Property`, `Group`, `Conversation`, `Message`, `Match`, `Application`, and `InterestCard`. Service files in `services/` provide async functions for all database operations. Mock data in `utils/mockData.ts` serves as fallback when Supabase is unavailable.
 
 ## Dark Theme UI
 

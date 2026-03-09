@@ -11,6 +11,7 @@ import { InterestCard, Conversation, Message } from '../../types/models';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { useNotificationContext } from '../../contexts/NotificationContext';
+import { getReceivedInterestCards } from '../../services/discoverService';
 
 type FilterStatus = 'all' | 'pending' | 'accepted' | 'passed';
 
@@ -23,14 +24,42 @@ export const HostInquiriesScreen = () => {
 
   const loadInterestCards = useCallback(async () => {
     if (!user) return;
-    await StorageService.expireOldInterestCards();
-    const cards = await StorageService.getInterestCardsForHost(user.id);
-    const sorted = [...cards].sort((a, b) => {
-      if (a.isSuperInterest && !b.isSuperInterest) return -1;
-      if (!a.isSuperInterest && b.isSuperInterest) return 1;
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
-    setInterestCards(sorted);
+    try {
+      const supaCards = await getReceivedInterestCards();
+      const mapped: InterestCard[] = (supaCards || []).map((c: any) => ({
+        id: c.id,
+        renterId: c.sender?.id || c.sender_id,
+        renterName: c.sender?.full_name || 'Unknown',
+        renterPhoto: c.sender?.avatar_url,
+        hostId: c.recipient_id || user.id,
+        propertyId: c.listing_id || '',
+        propertyTitle: c.listing_title || '',
+        status: c.status || 'pending',
+        isSuperInterest: c.action === 'super_interest',
+        compatibilityScore: c.compatibility_score || 0,
+        budgetRange: c.budget_range || '',
+        moveInDate: c.move_in_date || '',
+        lifestyleTags: c.lifestyle_tags || [],
+        personalNote: c.personal_note || '',
+        createdAt: c.created_at || new Date().toISOString(),
+        respondedAt: c.responded_at,
+      }));
+      const sorted = [...mapped].sort((a, b) => {
+        if (a.isSuperInterest && !b.isSuperInterest) return -1;
+        if (!a.isSuperInterest && b.isSuperInterest) return 1;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+      setInterestCards(sorted);
+    } catch {
+      await StorageService.expireOldInterestCards();
+      const cards = await StorageService.getInterestCardsForHost(user.id);
+      const sorted = [...cards].sort((a, b) => {
+        if (a.isSuperInterest && !b.isSuperInterest) return -1;
+        if (!a.isSuperInterest && b.isSuperInterest) return 1;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+      setInterestCards(sorted);
+    }
   }, [user]);
 
   useFocusEffect(

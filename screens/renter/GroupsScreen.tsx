@@ -9,6 +9,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { Group, RoommateProfile } from '../../types/models';
 import { StorageService } from '../../utils/storage';
+import { getGroups as getGroupsFromSupabase, getMyGroups as getMyGroupsFromSupabase, joinGroup as joinGroupSupabase, leaveGroup as leaveGroupSupabase, createGroup as createGroupSupabase } from '../../services/groupService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -77,17 +78,56 @@ export const GroupsScreen = () => {
     
     try {
       setIsLoading(true);
-      const groups = await StorageService.getGroups();
-      const userGroups = groups.filter(g => g.members.includes(user.id));
-      const filterCity = activeCity;
-      const otherGroups = groups.filter(g => {
-        if (g.members.includes(user.id) || g.pendingMembers.includes(user.id)) return false;
-        if (filterCity && g.preferredLocation) {
-          const groupCity = getCityFromNeighborhood(g.preferredLocation);
-          if (groupCity && groupCity !== filterCity) return false;
-        }
-        return true;
-      });
+      let userGroups: Group[] = [];
+      let otherGroups: Group[] = [];
+      
+      try {
+        const [supabaseGroups, supabaseMyGroups] = await Promise.all([
+          getGroupsFromSupabase(activeCity || undefined),
+          getMyGroupsFromSupabase(),
+        ]);
+        const myGroupIds = new Set((supabaseMyGroups || []).map((g: any) => g.id));
+        userGroups = (supabaseMyGroups || []).map((g: any) => ({
+          id: g.id,
+          name: g.name,
+          description: g.description,
+          members: [],
+          pendingMembers: [],
+          budget: g.budget_min || 0,
+          preferredLocation: g.city || '',
+          maxMembers: g.max_members || 4,
+          createdAt: new Date(g.created_at),
+          createdBy: g.created_by,
+        }));
+        otherGroups = (supabaseGroups || [])
+          .filter((g: any) => !myGroupIds.has(g.id))
+          .map((g: any) => ({
+            id: g.id,
+            name: g.name,
+            description: g.description,
+            members: [],
+            pendingMembers: [],
+            budget: g.budget_min || 0,
+            preferredLocation: g.city || '',
+            maxMembers: g.max_members || 4,
+            createdAt: new Date(g.created_at),
+            createdBy: g.created_by,
+          }));
+      } catch (supabaseError) {
+        console.warn('[GroupsScreen] Supabase failed, falling back to StorageService:', supabaseError);
+        const groups = await StorageService.getGroups();
+        userGroups = groups.filter(g => g.members.includes(user.id));
+        const filterCity = activeCity;
+        otherGroups = groups.filter(g => {
+          if (g.members.includes(user.id) || g.pendingMembers.includes(user.id)) return false;
+          if (filterCity && g.preferredLocation) {
+            const groupCity = getCityFromNeighborhood(g.preferredLocation);
+            if (groupCity && groupCity !== filterCity) return false;
+          }
+          return true;
+        });
+      }
+      
       setMyGroups(userGroups);
       setAllGroups(otherGroups);
       setCurrentIndex(0);
@@ -261,7 +301,12 @@ export const GroupsScreen = () => {
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     
-    await StorageService.likeGroup(group.id, user.id);
+    try {
+      await joinGroupSupabase(group.id);
+    } catch (supabaseError) {
+      console.warn('[GroupsScreen] Supabase joinGroup failed, falling back to StorageService:', supabaseError);
+      await StorageService.likeGroup(group.id, user.id);
+    }
     
     // Delay showing notification until card animation completes
     setTimeout(() => {
@@ -317,7 +362,12 @@ export const GroupsScreen = () => {
   const undoLastSwipeAsync = async (groupId: string, action: 'like' | 'skip') => {
     try {
       if (action === 'like') {
-        await StorageService.unlikeGroup(groupId, user!.id);
+        try {
+          await leaveGroupSupabase(groupId);
+        } catch (supabaseError) {
+          console.warn('[GroupsScreen] Supabase leaveGroup (undo) failed, falling back:', supabaseError);
+          await StorageService.unlikeGroup(groupId, user!.id);
+        }
       }
     } catch (error) {
       console.error('[GroupsScreen] Error undoing swipe:', error);
@@ -552,7 +602,19 @@ export const GroupsScreen = () => {
       createdBy: user.id,
     };
 
-    await StorageService.addOrUpdateGroup(newGroup);
+    try {
+      await createGroupSupabase({
+        name: groupName.trim(),
+        description: groupDescription.trim() || undefined,
+        city: groupLocation.trim(),
+        max_members: maxMembers,
+        budget_min: parseInt(groupBudget),
+        budget_max: apartmentPrice,
+      });
+    } catch (supabaseError) {
+      console.warn('[GroupsScreen] Supabase createGroup failed, falling back to StorageService:', supabaseError);
+      await StorageService.addOrUpdateGroup(newGroup);
+    }
 
     setGroupName('');
     setGroupDescription('');
@@ -580,7 +642,12 @@ export const GroupsScreen = () => {
           text: 'Leave',
           style: 'destructive',
           onPress: async () => {
-            await StorageService.leaveGroup(group.id, user.id);
+            try {
+              await leaveGroupSupabase(group.id);
+            } catch (supabaseError) {
+              console.warn('[GroupsScreen] Supabase leaveGroup failed, falling back:', supabaseError);
+              await StorageService.leaveGroup(group.id, user.id);
+            }
             loadGroups();
           },
         },

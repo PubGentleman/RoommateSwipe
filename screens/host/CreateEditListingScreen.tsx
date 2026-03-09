@@ -10,6 +10,7 @@ import { StorageService } from '../../utils/storage';
 import { Property } from '../../types/models';
 import { US_STATES } from '../../utils/locationData';
 import { Spacing, BorderRadius } from '../../constants/theme';
+import { createListing as createListingSupa, updateListing as updateListingSupa, getListing, deleteListing as deleteListingSupa } from '../../services/listingService';
 
 type RouteParams = {
   CreateEditListing: { propertyId?: string };
@@ -70,8 +71,35 @@ export const CreateEditListingScreen = () => {
 
   const loadProperty = async () => {
     if (!propertyId) return;
-    const properties = await StorageService.getProperties();
-    const prop = properties.find(p => p.id === propertyId);
+    let prop: any = null;
+    try {
+      const supaListing = await getListing(propertyId);
+      if (supaListing) {
+        prop = {
+          title: supaListing.title || '',
+          description: supaListing.description || '',
+          price: supaListing.rent || 0,
+          bedrooms: supaListing.bedrooms || 1,
+          bathrooms: supaListing.bathrooms || 1,
+          sqft: supaListing.sqft || 0,
+          propertyType: supaListing.property_type || 'lease',
+          roomType: supaListing.room_type || 'entire',
+          city: supaListing.city || '',
+          state: supaListing.state || '',
+          neighborhood: supaListing.neighborhood || '',
+          address: supaListing.address || '',
+          availableDate: supaListing.available_date ? new Date(supaListing.available_date) : undefined,
+          amenities: supaListing.amenities || [],
+          photos: supaListing.photos || [],
+        };
+      }
+    } catch {
+      const properties = await StorageService.getProperties();
+      const found = properties.find(p => p.id === propertyId);
+      if (found) {
+        prop = found;
+      }
+    }
     if (!prop) return;
 
     setTitle(prop.title);
@@ -139,30 +167,56 @@ export const CreateEditListingScreen = () => {
         fullDescription += `\n\nHouse Rules: ${houseRules.trim()}`;
       }
 
-      const property: Property = {
-        id: propertyId || `prop_${Date.now()}`,
+      const supaData = {
         title: title.trim(),
         description: fullDescription,
-        price: Number(price),
+        rent: Number(price),
         bedrooms,
         bathrooms,
-        sqft: Number(sqft) || 0,
-        propertyType,
-        roomType,
+        address: address.trim(),
         city: city.trim(),
         state: state.trim(),
         neighborhood: neighborhood.trim() || undefined,
-        address: address.trim(),
-        availableDate: availableDate ? new Date(availableDate) : undefined,
+        room_type: roomType,
         amenities: selectedAmenities,
         photos: photos.length > 0 ? photos : PLACEHOLDER_PHOTOS.slice(0, 1),
-        available: true,
-        hostId: user?.id || '',
-        hostName: user?.name || '',
-        hostProfileId: user?.id,
+        available_date: availableDate ? new Date(availableDate).toISOString() : undefined,
+        is_active: true,
+        is_paused: false,
+        is_rented: false,
       };
 
-      await StorageService.addOrUpdateProperty(property);
+      try {
+        if (isEditing && propertyId) {
+          await updateListingSupa(propertyId, supaData);
+        } else {
+          await createListingSupa(supaData);
+        }
+      } catch {
+        const property: Property = {
+          id: propertyId || `prop_${Date.now()}`,
+          title: title.trim(),
+          description: fullDescription,
+          price: Number(price),
+          bedrooms,
+          bathrooms,
+          sqft: Number(sqft) || 0,
+          propertyType,
+          roomType,
+          city: city.trim(),
+          state: state.trim(),
+          neighborhood: neighborhood.trim() || undefined,
+          address: address.trim(),
+          availableDate: availableDate ? new Date(availableDate) : undefined,
+          amenities: selectedAmenities,
+          photos: photos.length > 0 ? photos : PLACEHOLDER_PHOTOS.slice(0, 1),
+          available: true,
+          hostId: user?.id || '',
+          hostName: user?.name || '',
+          hostProfileId: user?.id,
+        };
+        await StorageService.addOrUpdateProperty(property);
+      }
       navigation.goBack();
     } catch (error) {
       Alert.alert('Error', 'Failed to save listing');
@@ -182,7 +236,11 @@ export const CreateEditListingScreen = () => {
           style: 'destructive',
           onPress: async () => {
             if (propertyId) {
-              await StorageService.deleteProperty(propertyId);
+              try {
+                await deleteListingSupa(propertyId);
+              } catch {
+                await StorageService.deleteProperty(propertyId);
+              }
               navigation.goBack();
             }
           },

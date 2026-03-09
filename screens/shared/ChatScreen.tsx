@@ -13,6 +13,7 @@ import { ReportBlockModal } from '../../components/ReportBlockModal';
 import { PlanBadge } from '../../components/PlanBadge';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
 import { useNotificationContext } from '../../contexts/NotificationContext';
+import { getMessages as getSupabaseMessages, sendMessage as sendSupabaseMessage, markMessagesAsRead as markSupabaseMessagesAsRead, subscribeToMessages } from '../../services/messageService';
 
 type ChatScreenProps = {
   route: {
@@ -58,56 +59,106 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     return userPlan === 'elite' && userStatus === 'active';
   };
 
+  const matchIdFromConversation = conversationId.startsWith('conv_') ? conversationId.slice(5) : conversationId;
+
   useEffect(() => {
     loadMessages();
   }, [conversationId]);
 
+  useEffect(() => {
+    if (!matchIdFromConversation) return;
+    const unsubscribe = subscribeToMessages(matchIdFromConversation, (newMsg: any) => {
+      if (newMsg.sender_id !== user?.id) {
+        const mapped: Message = {
+          id: newMsg.id,
+          senderId: newMsg.sender_id,
+          text: newMsg.content,
+          content: newMsg.content,
+          timestamp: new Date(newMsg.created_at),
+          read: newMsg.read || false,
+          readAt: newMsg.read_at ? new Date(newMsg.read_at) : undefined,
+        };
+        setMessages(prev => [...prev, mapped]);
+        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+        try { markSupabaseMessagesAsRead(matchIdFromConversation); } catch (_e) {}
+      }
+    });
+    return () => { unsubscribe(); };
+  }, [matchIdFromConversation, user?.id]);
+
   const loadMessages = async () => {
+    let loadedMessages: Message[] = [];
+    let loadedFromSupabase = false;
+
+    try {
+      const supaMessages = await getSupabaseMessages(matchIdFromConversation);
+      if (supaMessages && supaMessages.length > 0) {
+        loadedMessages = supaMessages.map((msg: any) => ({
+          id: msg.id,
+          senderId: msg.sender_id,
+          text: msg.content,
+          content: msg.content,
+          timestamp: new Date(msg.created_at),
+          read: msg.read || false,
+          readAt: msg.read_at ? new Date(msg.read_at) : undefined,
+        }));
+        loadedFromSupabase = true;
+        try { markSupabaseMessagesAsRead(matchIdFromConversation); } catch (_e) {}
+      }
+    } catch (supaError) {
+      console.warn('Supabase getMessages failed, falling back to StorageService:', supaError);
+    }
+
+    if (!loadedFromSupabase) {
+      const conversations = await StorageService.getConversations();
+      const conversation = conversations.find(c => c.id === conversationId);
+      if (conversation) {
+        loadedMessages = (conversation.messages || []).map((msg: Message) => {
+          if (msg.senderId === user?.id && !msg.readAt && msg.read !== false) {
+            return { ...msg, readAt: new Date(new Date(msg.timestamp).getTime() + 60000) };
+          }
+          return msg;
+        });
+      }
+    }
+
+    setMessages(loadedMessages);
+
     const conversations = await StorageService.getConversations();
     const conversation = conversations.find(c => c.id === conversationId);
-    if (conversation) {
-      const loadedMessages = (conversation.messages || []).map((msg: Message) => {
-        if (msg.senderId === user?.id && !msg.readAt && msg.read !== false) {
-          return { ...msg, readAt: new Date(new Date(msg.timestamp).getTime() + 60000) };
-        }
-        return msg;
-      });
-      setMessages(loadedMessages);
-      
-      // Load other user data from conversation if not provided in route params
-      if (!otherUser && conversation.participant) {
-        const roommateProfiles = await StorageService.getRoommateProfiles();
-        const profile = roommateProfiles.find(p => p.id === conversation.participant.id);
-        if (profile) {
-          setOtherUser(profile);
-        } else {
-          setOtherUser({
-            id: conversation.participant.id,
-            name: conversation.participant.name,
-            photos: conversation.participant.photo ? [conversation.participant.photo] : [],
-          } as RoommateProfile);
-        }
-      }
 
-      if (conversation.participant) {
-        const allUsers = await StorageService.getUsers();
-        const participantUser = allUsers.find(u => u.id === conversation.participant.id);
-        if (participantUser) {
-          setOtherUserPlan(participantUser.subscription?.plan);
-        }
+    if (!otherUser && conversation?.participant) {
+      const roommateProfiles = await StorageService.getRoommateProfiles();
+      const profile = roommateProfiles.find(p => p.id === conversation.participant.id);
+      if (profile) {
+        setOtherUser(profile);
+      } else {
+        setOtherUser({
+          id: conversation.participant.id,
+          name: conversation.participant.name,
+          photos: conversation.participant.photo ? [conversation.participant.photo] : [],
+        } as RoommateProfile);
       }
+    }
 
-      if (user) {
-        const matches = await StorageService.getMatches();
-        const hasMatch = matches.some(m =>
-          (m.userId1 === user.id && m.userId2 === conversation.participant.id) ||
-          (m.userId2 === user.id && m.userId1 === conversation.participant.id)
-        );
-        if (conversation.matchType === 'cold' || !hasMatch) {
-          setIsColdMessage(true);
-          const otherResponded = loadedMessages.some(m => m.senderId === conversation.participant.id);
-          setColdMessageResponded(otherResponded);
-        }
+    if (conversation?.participant) {
+      const allUsers = await StorageService.getUsers();
+      const participantUser = allUsers.find(u => u.id === conversation.participant.id);
+      if (participantUser) {
+        setOtherUserPlan(participantUser.subscription?.plan);
+      }
+    }
+
+    if (user && conversation) {
+      const matches = await StorageService.getMatches();
+      const hasMatch = matches.some(m =>
+        (m.userId1 === user.id && m.userId2 === conversation.participant.id) ||
+        (m.userId2 === user.id && m.userId1 === conversation.participant.id)
+      );
+      if (conversation.matchType === 'cold' || !hasMatch) {
+        setIsColdMessage(true);
+        const otherResponded = loadedMessages.some(m => m.senderId === conversation.participant.id);
+        setColdMessageResponded(otherResponded);
       }
     }
   };
@@ -184,13 +235,30 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         }
       }
 
-      const newMessage: Message = {
-        id: `msg_${Date.now()}`,
-        senderId: user.id,
-        text: inputText.trim(),
-        timestamp: new Date(),
-      };
-      
+      let newMessage: Message;
+      let sentViaSupabase = false;
+
+      try {
+        const supaMsg = await sendSupabaseMessage(matchIdFromConversation, inputText.trim());
+        newMessage = {
+          id: supaMsg.id,
+          senderId: supaMsg.sender_id,
+          text: supaMsg.content,
+          content: supaMsg.content,
+          timestamp: new Date(supaMsg.created_at),
+          read: false,
+        };
+        sentViaSupabase = true;
+      } catch (supaError) {
+        console.warn('Supabase sendMessage failed, falling back to StorageService:', supaError);
+        newMessage = {
+          id: `msg_${Date.now()}`,
+          senderId: user.id,
+          text: inputText.trim(),
+          timestamp: new Date(),
+        };
+      }
+
       if (!conversations[conversationIndex].messages) {
         conversations[conversationIndex].messages = [];
       }

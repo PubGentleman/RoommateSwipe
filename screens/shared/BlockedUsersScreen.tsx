@@ -9,6 +9,7 @@ import { Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { StorageService } from '../../utils/storage';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getBlockedUsers as supabaseGetBlockedUsers, unblockUser as supabaseUnblockUser } from '../../services/moderationService';
 
 interface BlockedUserInfo {
   id: string;
@@ -32,6 +33,20 @@ export const BlockedUsersScreen = () => {
   const loadBlockedUsers = async () => {
     if (!user) return;
     setIsLoading(true);
+    try {
+      const supabaseData = await supabaseGetBlockedUsers();
+      const users: BlockedUserInfo[] = (supabaseData || []).map((entry: any) => ({
+        id: entry.blocked?.id || entry.blocked_id,
+        name: entry.blocked?.full_name || 'Unknown User',
+        photo: entry.blocked?.avatar_url,
+      }));
+      setBlockedUsers(users);
+      setIsLoading(false);
+      return;
+    } catch (supabaseError) {
+      console.warn('[BlockedUsersScreen] Supabase fetch failed, falling back to StorageService:', supabaseError);
+    }
+
     try {
       const blockedIds = user.blockedUsers || [];
       const allUsers = await StorageService.getUsers();
@@ -64,6 +79,11 @@ export const BlockedUsersScreen = () => {
           text: 'Unblock',
           onPress: async () => {
             if (!user) return;
+            try {
+              await supabaseUnblockUser(blockedUser.id);
+            } catch (supabaseError) {
+              console.warn('[BlockedUsersScreen] Supabase unblock failed, falling back to StorageService:', supabaseError);
+            }
             await StorageService.unblockUser(user.id, blockedUser.id);
             const updatedBlockedUsers = (user.blockedUsers || []).filter(id => id !== blockedUser.id);
             await updateUser({ blockedUsers: updatedBlockedUsers });

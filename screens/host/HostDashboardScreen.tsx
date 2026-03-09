@@ -9,6 +9,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { StorageService } from '../../utils/storage';
 import { Property, InterestCard, Message, Conversation } from '../../types/models';
 import { useNotificationContext } from '../../contexts/NotificationContext';
+import { getMyListings } from '../../services/listingService';
+import { getReceivedInterestCards } from '../../services/discoverService';
 
 const BG = '#111';
 const CARD_BG = '#1a1a1a';
@@ -71,19 +73,74 @@ export const HostDashboardScreen = () => {
 
   const loadData = useCallback(async () => {
     if (!user) return;
-    await StorageService.initializeWithMockData();
-    await StorageService.assignPropertiesToHost(user.id, user.name);
 
-    const allProperties = await StorageService.getProperties();
-    const myListings = allProperties.filter(p => p.hostId === user.id);
-    setListings(myListings);
+    try {
+      const supaListings = await getMyListings();
+      if (supaListings && supaListings.length > 0) {
+        const mapped: Property[] = supaListings.map((l: any) => ({
+          id: l.id,
+          title: l.title || '',
+          description: l.description || '',
+          price: l.rent || 0,
+          bedrooms: l.bedrooms || 1,
+          bathrooms: l.bathrooms || 1,
+          sqft: l.sqft || 0,
+          propertyType: l.property_type || 'lease',
+          roomType: l.room_type || 'entire',
+          city: l.city || '',
+          state: l.state || '',
+          neighborhood: l.neighborhood,
+          address: l.address || '',
+          availableDate: l.available_date ? new Date(l.available_date) : undefined,
+          amenities: l.amenities || [],
+          photos: l.photos || [],
+          available: l.is_active && !l.is_paused,
+          hostId: l.host_id || user.id,
+          hostName: user.name,
+          featured: l.is_featured || false,
+          rentedDate: l.is_rented ? new Date() : undefined,
+        }));
+        setListings(mapped);
+      } else {
+        setListings([]);
+      }
+    } catch {
+      await StorageService.initializeWithMockData();
+      await StorageService.assignPropertiesToHost(user.id, user.name);
+      const allProperties = await StorageService.getProperties();
+      const myListings = allProperties.filter(p => p.hostId === user.id);
+      setListings(myListings);
+    }
 
     const allConvos = await StorageService.getConversations();
     const unreadMessages = allConvos.reduce((sum, c) => sum + (c.unread || 0), 0);
     setMessageCount(unreadMessages);
 
-    const interestCards = await StorageService.getInterestCardsForHost(user.id);
-    setInquiries(interestCards);
+    try {
+      const supaCards = await getReceivedInterestCards();
+      const mapped: InterestCard[] = (supaCards || []).map((c: any) => ({
+        id: c.id,
+        renterId: c.sender?.id || c.sender_id,
+        renterName: c.sender?.full_name || 'Unknown',
+        renterPhoto: c.sender?.avatar_url,
+        hostId: c.recipient_id || user.id,
+        propertyId: c.listing_id || '',
+        propertyTitle: c.listing_title || '',
+        status: c.status || 'pending',
+        isSuperInterest: c.action === 'super_interest',
+        compatibilityScore: c.compatibility_score || 0,
+        budgetRange: c.budget_range || '',
+        moveInDate: c.move_in_date || '',
+        lifestyleTags: c.lifestyle_tags || [],
+        personalNote: c.personal_note || '',
+        createdAt: c.created_at || new Date().toISOString(),
+        respondedAt: c.responded_at,
+      }));
+      setInquiries(mapped);
+    } catch {
+      const interestCards = await StorageService.getInterestCardsForHost(user.id);
+      setInquiries(interestCards);
+    }
   }, [user]);
 
   useFocusEffect(

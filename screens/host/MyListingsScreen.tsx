@@ -9,6 +9,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { PaywallSheet } from '../../components/PaywallSheet';
 import { StorageService } from '../../utils/storage';
 import { Property, InterestCard } from '../../types/models';
+import { getMyListings, updateListing, deleteListing as deleteListingSupa } from '../../services/listingService';
+import { getReceivedInterestCards } from '../../services/discoverService';
 
 const BG = '#111';
 const CARD_BG = '#1a1a1a';
@@ -72,14 +74,69 @@ export const MyListingsScreen = () => {
 
   const loadData = useCallback(async () => {
     if (!user) return;
-    await StorageService.initializeWithMockData();
-    await StorageService.assignPropertiesToHost(user.id, user.name);
-    const allProperties = await StorageService.getProperties();
-    const myListings = allProperties.filter(p => p.hostId === user.id);
-    setListings(myListings);
+    try {
+      const supaListings = await getMyListings();
+      if (supaListings && supaListings.length > 0) {
+        const mapped: Property[] = supaListings.map((l: any) => ({
+          id: l.id,
+          title: l.title || '',
+          description: l.description || '',
+          price: l.rent || 0,
+          bedrooms: l.bedrooms || 1,
+          bathrooms: l.bathrooms || 1,
+          sqft: l.sqft || 0,
+          propertyType: l.property_type || 'lease',
+          roomType: l.room_type || 'entire',
+          city: l.city || '',
+          state: l.state || '',
+          neighborhood: l.neighborhood,
+          address: l.address || '',
+          availableDate: l.available_date ? new Date(l.available_date) : undefined,
+          amenities: l.amenities || [],
+          photos: l.photos || [],
+          available: l.is_active && !l.is_paused,
+          hostId: l.host_id || user.id,
+          hostName: user.name,
+          featured: l.is_featured || false,
+          rentedDate: l.is_rented ? new Date() : undefined,
+        }));
+        setListings(mapped);
+      } else {
+        setListings([]);
+      }
+    } catch {
+      await StorageService.initializeWithMockData();
+      await StorageService.assignPropertiesToHost(user.id, user.name);
+      const allProperties = await StorageService.getProperties();
+      const myListings = allProperties.filter(p => p.hostId === user.id);
+      setListings(myListings);
+    }
 
-    const cards = await StorageService.getInterestCardsForHost(user.id);
-    setInquiries(cards);
+    try {
+      const supaCards = await getReceivedInterestCards();
+      const mapped: InterestCard[] = (supaCards || []).map((c: any) => ({
+        id: c.id,
+        renterId: c.sender?.id || c.sender_id,
+        renterName: c.sender?.full_name || 'Unknown',
+        renterPhoto: c.sender?.avatar_url,
+        hostId: c.recipient_id || user.id,
+        propertyId: c.listing_id || '',
+        propertyTitle: c.listing_title || '',
+        status: c.status || 'pending',
+        isSuperInterest: c.action === 'super_interest',
+        compatibilityScore: c.compatibility_score || 0,
+        budgetRange: c.budget_range || '',
+        moveInDate: c.move_in_date || '',
+        lifestyleTags: c.lifestyle_tags || [],
+        personalNote: c.personal_note || '',
+        createdAt: c.created_at || new Date().toISOString(),
+        respondedAt: c.responded_at,
+      }));
+      setInquiries(mapped);
+    } catch {
+      const cards = await StorageService.getInterestCardsForHost(user.id);
+      setInquiries(cards);
+    }
   }, [user]);
 
   useFocusEffect(
@@ -105,26 +162,38 @@ export const MyListingsScreen = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const property = listings.find(p => p.id === propertyId);
     if (!property || property.hostId !== user.id) return;
-    const updated = { ...property, available: false, rentedDate: undefined };
-    await StorageService.addOrUpdateProperty(updated);
+    try {
+      await updateListing(propertyId, { is_paused: true, is_active: true });
+    } catch {
+      const updated = { ...property, available: false, rentedDate: undefined };
+      await StorageService.addOrUpdateProperty(updated);
+    }
     await loadData();
   };
 
   const markAsRented = async (propertyId: string) => {
     if (!user) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await StorageService.markPropertyAsRented(propertyId);
+    try {
+      await updateListing(propertyId, { is_rented: true, is_active: false });
+    } catch {
+      await StorageService.markPropertyAsRented(propertyId);
+    }
     await loadData();
   };
 
   const markAsAvailable = async (propertyId: string) => {
     if (!user) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await StorageService.markPropertyAsAvailable(propertyId);
+    try {
+      await updateListing(propertyId, { is_rented: false, is_paused: false, is_active: true });
+    } catch {
+      await StorageService.markPropertyAsAvailable(propertyId);
+    }
     await loadData();
   };
 
-  const deleteListing = (propertyId: string) => {
+  const deleteListingHandler = (propertyId: string) => {
     Alert.alert(
       'Delete Listing',
       'Are you sure you want to delete this listing? This action cannot be undone.',
@@ -135,7 +204,11 @@ export const MyListingsScreen = () => {
           style: 'destructive',
           onPress: async () => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-            await StorageService.deleteProperty(propertyId);
+            try {
+              await deleteListingSupa(propertyId);
+            } catch {
+              await StorageService.deleteProperty(propertyId);
+            }
             await loadData();
           },
         },
@@ -158,7 +231,11 @@ export const MyListingsScreen = () => {
     const property = listings.find(p => p.id === propertyId);
     if (!property || property.hostId !== user.id) return;
     const updated = { ...property, featured: !property.featured };
-    await StorageService.addOrUpdateProperty(updated);
+    try {
+      await updateListing(propertyId, { is_featured: !property.featured } as any);
+    } catch {
+      await StorageService.addOrUpdateProperty(updated);
+    }
     setListings(prev => prev.map(p => p.id === propertyId ? updated : p));
   };
 
@@ -341,7 +418,7 @@ export const MyListingsScreen = () => {
                 <Text style={styles.actRentedText}>Available</Text>
               </Pressable>
             )}
-            <Pressable style={styles.actDelete} onPress={() => deleteListing(listing.id)}>
+            <Pressable style={styles.actDelete} onPress={() => deleteListingHandler(listing.id)}>
               <Feather name="trash-2" size={14} color="#ff4d4d" />
             </Pressable>
           </View>

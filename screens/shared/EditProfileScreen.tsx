@@ -14,6 +14,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { calculateZodiacFromBirthday } from '../../utils/zodiacUtils';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { updateUser as supabaseUpdateUser, updateProfile as supabaseUpdateProfile, uploadProfilePhoto } from '../../services/profileService';
 
 const DraggablePhoto = ({ photo, index, photos, theme, onRemove, onReorder }: any) => {
   const translateX = useSharedValue(0);
@@ -364,13 +365,61 @@ export const EditProfileScreen = () => {
     }
 
     setIsSaving(true);
-    await new Promise(resolve => setTimeout(resolve, 500));
 
     const birthdayStorageFormat = convertToStorageFormat(birthday);
     const zodiacSign = birthdayStorageFormat ? calculateZodiacFromBirthday(birthdayStorageFormat) : undefined;
     
     console.log('[EditProfileScreen] Saving profile with photos:', photos);
     console.log('[EditProfileScreen] Calculated zodiac sign from birthday:', { birthday: birthdayStorageFormat, zodiacSign });
+
+    try {
+      const uploadedPhotoUrls: string[] = [];
+      for (const photo of photos) {
+        if (photo.startsWith('data:') || photo.startsWith('file://') || photo.startsWith('content://')) {
+          try {
+            const fileName = `photo_${Date.now()}_${uploadedPhotoUrls.length}.jpg`;
+            const url = await uploadProfilePhoto(photo, fileName);
+            uploadedPhotoUrls.push(url);
+          } catch (uploadErr) {
+            console.warn('[EditProfileScreen] Photo upload failed, keeping local URI:', uploadErr);
+            uploadedPhotoUrls.push(photo);
+          }
+        } else {
+          uploadedPhotoUrls.push(photo);
+        }
+      }
+
+      await supabaseUpdateUser({
+        full_name: name.trim(),
+        avatar_url: uploadedPhotoUrls[0] || undefined,
+        bio: bio.trim() || undefined,
+        birthday: birthdayStorageFormat,
+        zodiac_sign: zodiacSign,
+        gender,
+        occupation: occupation.trim() || undefined,
+        location: location.trim() || undefined,
+      });
+
+      await supabaseUpdateProfile({
+        budget_min: budget.trim() ? parseInt(budget) : undefined,
+        looking_for: lookingFor,
+        interests: interests.trim() ? interests.split(',').map(i => i.trim()) : undefined,
+        photos: uploadedPhotoUrls,
+        sleep_schedule: sleepSchedule,
+        cleanliness: cleanliness === 'very_tidy' ? 5 : cleanliness === 'moderately_tidy' ? 3 : 1,
+        noise_tolerance: noiseTolerance === 'prefer_quiet' ? 1 : noiseTolerance === 'normal_noise' ? 3 : 5,
+        pets,
+        smoking: smoking === 'yes',
+        guests: guestPolicy,
+        work_location: workLocation,
+        move_in_date: moveInDate.trim() || undefined,
+        bathrooms: bedrooms.trim() ? parseInt(bedrooms) : undefined,
+      });
+
+      console.log('[EditProfileScreen] Supabase profile updated successfully');
+    } catch (supabaseError) {
+      console.warn('[EditProfileScreen] Supabase update failed, falling back to local storage:', supabaseError);
+    }
     
     await updateUser({
       name: name.trim(),

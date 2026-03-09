@@ -18,6 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { PlanBadge } from '../../components/PlanBadge';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
 import { User } from '../../types/models';
+import { getConversations as getSupabaseConversations, subscribeToAllMessages } from '../../services/messageService';
 
 type MessagesScreenNavigationProp = NativeStackNavigationProp<MessagesStackParamList, 'MessagesList'>;
 
@@ -52,18 +53,52 @@ export const MessagesScreen = () => {
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [showAISheet, setShowAISheet] = useState(false);
 
+  useEffect(() => {
+    if (!user) return;
+    const unsubscribe = subscribeToAllMessages(user.id, () => {
+      loadConversations();
+    });
+    return () => { unsubscribe(); };
+  }, [user?.id]);
+
   useFocusEffect(
     React.useCallback(() => {
       loadConversations();
     }, [user])
   );
 
+  const loadConversationsFromSupabase = async (): Promise<Conversation[]> => {
+    const supaConvs = await getSupabaseConversations();
+    return supaConvs.map((sc: any) => ({
+      id: `conv_${sc.matchId}`,
+      participant: {
+        id: sc.participant?.id || '',
+        name: sc.participant?.full_name || 'Unknown',
+        photo: sc.participant?.avatar_url || undefined,
+        online: false,
+      },
+      lastMessage: sc.lastMessage || 'You matched!',
+      timestamp: new Date(sc.lastMessageAt),
+      unread: sc.unreadCount || 0,
+      messages: [],
+      matchType: sc.matchType === 'super_interest' ? 'super_interest' : sc.matchType === 'cold' ? 'cold' : 'mutual',
+    }));
+  };
+
   const loadConversations = async () => {
     if (!user) return;
     
     try {
       setIsLoading(true);
-      let existingConversations = await StorageService.getConversations();
+
+      let existingConversations: Conversation[] = [];
+      try {
+        existingConversations = await loadConversationsFromSupabase();
+      } catch (supaError) {
+        console.warn('Supabase getConversations failed, falling back to StorageService:', supaError);
+        existingConversations = await StorageService.getConversations();
+      }
+
       const matches = await StorageService.getMatches();
       const profiles = await StorageService.getRoommateProfiles();
       const allUsers = await StorageService.getUsers();
