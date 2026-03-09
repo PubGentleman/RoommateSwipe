@@ -289,6 +289,12 @@ export const MyListingsScreen = () => {
                 <Text style={styles.chipMutedText}>{formatListedAgo(listing) || 'New'}</Text>
               </View>
             )}
+            <View style={listing.roomType === 'entire' ? styles.chipEntire : styles.chipRoom}>
+              <Feather name={listing.roomType === 'entire' ? 'home' : 'key'} size={12} color={listing.roomType === 'entire' ? '#a78bfa' : '#60a5fa'} />
+              <Text style={listing.roomType === 'entire' ? styles.chipEntireText : styles.chipRoomText}>
+                {listing.roomType === 'entire' ? 'Entire' : 'Room'}
+              </Text>
+            </View>
           </View>
 
           <View style={styles.cardDivider} />
@@ -689,6 +695,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
   },
   chipGreenText: { fontSize: 11, fontWeight: '600', color: GREEN },
+  chipRoom: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 5,
+    backgroundColor: 'rgba(96,165,250,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(96,165,250,0.18)',
+    borderRadius: 10,
+    paddingVertical: 5,
+    paddingHorizontal: 9,
+  },
+  chipRoomText: { fontSize: 11, fontWeight: '600' as const, color: '#60a5fa' },
+  chipEntire: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 5,
+    backgroundColor: 'rgba(167,139,250,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(167,139,250,0.18)',
+    borderRadius: 10,
+    paddingVertical: 5,
+    paddingHorizontal: 9,
+  },
+  chipEntireText: { fontSize: 11, fontWeight: '600' as const, color: '#a78bfa' },
 
   cardDivider: {
     height: 1,

@@ -463,6 +463,12 @@ export const ExploreScreen = () => {
           ) : null}
           <View style={styles.detailsRow}>
             <View style={styles.details}>
+              <View style={[styles.detail, { backgroundColor: item.roomType === 'entire' ? 'rgba(167,139,250,0.12)' : 'rgba(96,165,250,0.12)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }]}>
+                <Feather name={item.roomType === 'entire' ? 'home' : 'key'} size={13} color={item.roomType === 'entire' ? '#a78bfa' : '#60a5fa'} />
+                <ThemedText style={[Typography.caption, { color: item.roomType === 'entire' ? '#a78bfa' : '#60a5fa', marginLeft: Spacing.xs, fontWeight: '600' }]}>
+                  {item.roomType === 'entire' ? 'Entire' : 'Room'}
+                </ThemedText>
+              </View>
               <View style={styles.detail}>
                 <Feather name="home" size={16} color={theme.textSecondary} />
                 <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
@@ -1050,6 +1056,15 @@ export const ExploreScreen = () => {
                         </View>
                       </View>
                     ) : null}
+                    <View style={styles.detailRow}>
+                      <Feather name={selectedProperty.roomType === 'entire' ? 'home' : 'key'} size={20} color={selectedProperty.roomType === 'entire' ? '#a78bfa' : '#60a5fa'} />
+                      <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                        <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Listing Type</ThemedText>
+                        <ThemedText style={[Typography.body, { fontWeight: '600', color: selectedProperty.roomType === 'entire' ? '#a78bfa' : '#60a5fa' }]}>
+                          {selectedProperty.roomType === 'entire' ? 'Entire Place' : 'Private Room'}
+                        </ThemedText>
+                      </View>
+                    </View>
                     <View style={styles.detailRow}>
                       <Feather name="home" size={20} color={theme.primary} />
                       <View style={{ flex: 1, marginLeft: Spacing.md }}>

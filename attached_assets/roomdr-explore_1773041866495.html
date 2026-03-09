@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Roomdr – Explore</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0a0a0a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .phone {
+      width: 375px;
+      height: 812px;
+      background: #111;
+      border-radius: 50px;
+      box-shadow: 0 0 0 10px #222, 0 40px 100px rgba(0,0,0,0.85);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 28px 0;
+      font-size: 12px;
+      font-weight: 600;
+      color: #fff;
+      flex-shrink: 0;
+    }
+
+    /* ── TOP SEARCH BAR ── */
+    .search-bar-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px 8px;
+      flex-shrink: 0;
+    }
+
+    .search-input {
+      flex: 1;
+      height: 44px;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 14px;
+    }
+
+    .search-input span {
+      font-size: 13px;
+      color: rgba(255,255,255,0.3);
+      font-weight: 400;
+    }
+
+    .icon-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+
+    .map-btn {
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.09);
+    }
+
+    .filter-btn {
+      background: linear-gradient(135deg, rgba(255,107,91,0.18), rgba(232,58,42,0.12));
+      border: 1px solid rgba(255,107,91,0.28);
+      position: relative;
+    }
+
+    .filter-dot {
+      position: absolute;
+      top: 9px; right: 9px;
+      width: 7px; height: 7px;
+      background: #ff6b5b;
+      border-radius: 50%;
+      border: 1.5px solid #111;
+    }
+
+    /* ── CITY SELECTOR ── */
+    .city-row {
+      padding: 0 16px 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .city-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 22px;
+      padding: 7px 13px;
+      cursor: pointer;
+    }
+
+    .city-pill span {
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .listing-count {
+      font-size: 12px;
+      color: rgba(255,255,255,0.3);
+      font-weight: 500;
+    }
+
+    /* ── TABS ── */
+    .tabs-row {
+      display: flex;
+      gap: 8px;
+      padding: 0 16px 8px;
+      flex-shrink: 0;
+    }
+
+    .tab-btn {
+      height: 36px;
+      border-radius: 20px;
+      padding: 0 18px;
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      border: none;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .tab-btn.active {
+      background: linear-gradient(135deg, #ff6b5b, #e83a2a);
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(255,80,60,0.3);
+    }
+
+    .tab-btn.inactive {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.09);
+      color: rgba(255,255,255,0.4);
+    }
+
+    /* ── FILTER CHIPS ── */
+    .filter-chips {
+      display: flex;
+      gap: 7px;
+      padding: 0 16px 10px;
+      overflow-x: auto;
+      flex-shrink: 0;
+      scrollbar-width: none;
+    }
+    .filter-chips::-webkit-scrollbar { display: none; }
+
+    .chip {
+      height: 30px;
+      border-radius: 20px;
+      padding: 0 12px;
+      font-size: 12px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .chip.selected {
+      background: rgba(255,107,91,0.15);
+      border: 1px solid rgba(255,107,91,0.35);
+      color: #ff8070;
+    }
+
+    .chip.unselected {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.09);
+      color: rgba(255,255,255,0.4);
+    }
+
+    /* ── SCROLLABLE FEED ── */
+    .feed {
+      flex: 1;
+      overflow-y: auto;
+      scrollbar-width: none;
+      padding: 0 16px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .feed::-webkit-scrollbar { display: none; }
+
+    /* ── PROPERTY CARD ── */
+    .prop-card {
+      background: #1a1a1a;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 22px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform 0.15s;
+    }
+
+    .card-photo {
+      position: relative;
+      height: 185px;
+      overflow: hidden;
+    }
+
+    .photo-bg { width: 100%; height: 100%; }
+
+    .photo-gradient {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 65%;
+      background: linear-gradient(to top, rgba(0,0,0,0.88) 0%, transparent 100%);
+    }
+
+    /* Tags top-left */
+    .photo-tags {
+      position: absolute;
+      top: 12px; left: 12px;
+      display: flex;
+      gap: 5px;
+    }
+
+    .tag-pill {
+      height: 23px;
+      border-radius: 7px;
+      padding: 0 8px;
+      font-size: 10px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      letter-spacing: 0.3px;
+    }
+
+    .tag-pill.lease   { background: #ff6b5b; color: #fff; }
+    .tag-pill.sublet  { background: rgba(255,107,91,0.3); border: 1px solid rgba(255,107,91,0.5); color: #ff8070; }
+    .tag-pill.entire  { background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.22); color: #fff; backdrop-filter: blur(6px); }
+    .tag-pill.room    { background: rgba(46,204,113,0.18); border: 1px solid rgba(46,204,113,0.32); color: #2ecc71; }
+    .tag-pill.featured{ background: rgba(255,215,0,0.18); border: 1px solid rgba(255,215,0,0.3); color: #ffd700; }
+    .tag-pill.new-tag { background: rgba(100,180,255,0.18); border: 1px solid rgba(100,180,255,0.3); color: #78c0ff; }
+
+    /* Save button */
+    .save-btn {
+      position: absolute;
+      top: 12px; right: 12px;
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.4);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.14);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .save-btn.saved { background: rgba(255,107,91,0.28); border-color: rgba(255,107,91,0.5); }
+
+    /* Price + name on photo */
+    .price-overlay {
+      position: absolute;
+      bottom: 12px; left: 14px;
+    }
+
+    .price-overlay .price {
+      font-size: 21px;
+      font-weight: 900;
+      color: #fff;
+      letter-spacing: -0.5px;
+      line-height: 1;
+      margin-bottom: 2px;
+    }
+
+    .price-overlay .prop-name {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.75);
+    }
+
+    /* Match score badge */
+    .match-score {
+      position: absolute;
+      bottom: 12px; right: 12px;
+      background: rgba(255,107,91,0.22);
+      border: 1px solid rgba(255,107,91,0.4);
+      border-radius: 20px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #ff8878;
+      backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* Card detail section */
+    .card-details {
+      padding: 12px 14px 14px;
+    }
+
+    .details-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .detail-chips {
+      display: flex;
+      gap: 10px;
+    }
+
+    .detail-chip {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      font-weight: 500;
+      color: rgba(255,255,255,0.5);
+    }
+
+    .detail-chip svg { width: 13px; height: 13px; flex-shrink: 0; }
+
+    .location-row {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      margin-top: 8px;
+    }
+
+    .location-row span {
+      font-size: 12px;
+      color: rgba(255,255,255,0.35);
+      font-weight: 500;
+    }
+
+    /* Host info row */
+    .host-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .host-avatar {
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 800;
+      color: #fff;
+      flex-shrink: 0;
+    }
+
+    .host-info { flex: 1; }
+
+    .host-name {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.65);
+    }
+
+    .host-status {
+      font-size: 10.5px;
+      color: rgba(255,255,255,0.3);
+      font-weight: 400;
+    }
+
+    .resp-badge {
+      font-size: 10px;
+      font-weight: 700;
+      color: rgba(46,204,113,0.9);
+      background: rgba(46,204,113,0.1);
+      border: 1px solid rgba(46,204,113,0.2);
+      border-radius: 8px;
+      padding: 2px 7px;
+    }
+
+    /* Premium upsell row */
+    .premium-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-top: 10px;
+      padding: 9px 11px;
+      background: rgba(255,215,0,0.05);
+      border: 1px solid rgba(255,215,0,0.12);
+      border-radius: 10px;
+    }
+
+    .premium-row span {
+      font-size: 11px;
+      color: rgba(255,215,0,0.65);
+      font-weight: 600;
+    }
+
+    /* Map view banner */
+    .map-banner {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 16px;
+      padding: 11px;
+      cursor: pointer;
+    }
+
+    .map-banner span {
+      font-size: 13px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.45);
+    }
+
+    /* ── BOTTOM NAV ── */
+    .bottom-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      padding: 10px 10px 22px;
+      background: rgba(17,17,17,0.98);
+      border-top: 1px solid rgba(255,255,255,0.06);
+      flex-shrink: 0;
+    }
+
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      position: relative;
+      min-width: 52px;
+      padding: 6px 8px 4px;
+      border-radius: 14px;
+    }
+
+    .nav-item.active {
+      background: rgba(255,107,91,0.1);
+    }
+
+    .nav-item span { font-size: 10px; font-weight: 500; color: rgba(255,255,255,0.3); }
+    .nav-item.active span { color: #ff6b5b; font-weight: 700; }
+
+    .nav-badge {
+      position: absolute;
+      top: 2px; right: 6px;
+      background: #ff4d4d;
+      color: white;
+      font-size: 9px;
+      font-weight: 700;
+      width: 15px; height: 15px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .scene { width: 100%; height: 100%; }
+  </style>
+</head>
+<body>
+<div class="phone">
+
+  <!-- Status bar -->
+  <div class="status-bar">
+    <span>9:41</span>
+    <div style="display:flex;gap:5px;align-items:center;">
+      <svg width="16" height="11" viewBox="0 0 16 11" fill="white"><rect x="0" y="4" width="3" height="7" rx="1"/><rect x="4.5" y="2.5" width="3" height="8.5" rx="1"/><rect x="9" y="0.5" width="3" height="10.5" rx="1"/><rect x="13.5" y="0" width="2.5" height="11" rx="1" opacity="0.3"/></svg>
+      <svg width="16" height="12" viewBox="0 0 16 12" fill="white"><path d="M8 2.4C10.3 2.4 12.4 3.4 13.8 5L15.5 3.3C13.6 1.3 11 0 8 0C5 0 2.4 1.3.5 3.3L2.2 5C3.6 3.4 5.7 2.4 8 2.4Z" opacity="0.4"/><path d="M8 5.2C9.5 5.2 10.9 5.8 11.9 6.8L13.6 5.1C12.1 3.8 10.1 3 8 3C5.9 3 3.9 3.8 2.4 5.1L4.1 6.8C5.1 5.8 6.5 5.2 8 5.2Z" opacity="0.7"/><circle cx="8" cy="10" r="2"/></svg>
+      <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x="0.5" y="0.5" width="21" height="11" rx="3.5" stroke="white" stroke-opacity="0.35"/><rect x="2" y="2" width="16" height="8" rx="2" fill="white"/><path d="M23 4.5V7.5C23.8 7.2 24.5 6.5 24.5 6C24.5 5.5 23.8 4.8 23 4.5Z" fill="white" fill-opacity="0.4"/></svg>
+    </div>
+  </div>
+
+  <!-- Search bar -->
+  <div class="search-bar-row">
+    <div class="search-input">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <span>Search neighborhoods, streets…</span>
+    </div>
+    <div class="icon-btn map-btn">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+    </div>
+    <div class="icon-btn filter-btn">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#ff6b5b" stroke-width="2.2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="10" y1="18" x2="14" y2="18"/></svg>
+      <div class="filter-dot"></div>
+    </div>
+  </div>
+
+  <!-- City selector -->
+  <div class="city-row">
+    <div class="city-pill">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ff6b5b" stroke-width="2.5" stroke-linecap="round"><path d="M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7z"/><circle cx="12" cy="9" r="2.5" fill="#ff6b5b" stroke="none"/></svg>
+      <span>New York</span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="2.5" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg>
+    </div>
+    <span class="listing-count">248 listings</span>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs-row">
+    <button class="tab-btn active">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+      All Listings
+    </button>
+    <button class="tab-btn inactive">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+      Saved (3)
+    </button>
+  </div>
+
+  <!-- Filter chips -->
+  <div class="filter-chips">
+    <div class="chip selected">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+      Best Match
+    </div>
+    <div class="chip unselected">Under $2k</div>
+    <div class="chip unselected">Private Room</div>
+    <div class="chip unselected">Pet Friendly</div>
+    <div class="chip unselected">Available Now</div>
+    <div class="chip unselected">Near Transit</div>
+  </div>
+
+  <!-- Feed -->
+  <div class="feed">
+
+    <!-- Card 1 — Featured listing -->
+    <div class="prop-card">
+      <div class="card-photo">
+        <svg class="scene" viewBox="0 0 343 185" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="sky1" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#0f1c2e"/>
+              <stop offset="100%" stop-color="#1a2d45"/>
+            </linearGradient>
+            <linearGradient id="bldg1" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#1e3050"/>
+              <stop offset="100%" stop-color="#0e1e35"/>
+            </linearGradient>
+          </defs>
+          <rect width="343" height="185" fill="url(#sky1)"/>
+          <!-- Stars -->
+          <circle cx="25" cy="18" r="1" fill="rgba(255,255,255,0.55)"/>
+          <circle cx="75" cy="8" r="1.3" fill="rgba(255,255,255,0.45)"/>
+          <circle cx="190" cy="12" r="0.9" fill="rgba(255,255,255,0.65)"/>
+          <circle cx="285" cy="22" r="1.1" fill="rgba(255,255,255,0.4)"/>
+          <circle cx="315" cy="6" r="1.4" fill="rgba(255,255,255,0.55)"/>
+          <circle cx="140" cy="20" r="0.8" fill="rgba(255,255,255,0.5)"/>
+          <!-- Moon glow -->
+          <circle cx="310" cy="28" r="16" fill="rgba(200,220,255,0.06)"/>
+          <circle cx="310" cy="28" r="10" fill="rgba(200,220,255,0.08)"/>
+          <!-- Skyline -->
+          <rect x="0"   y="55"  width="48"  height="130" fill="url(#bldg1)"/>
+          <rect x="43"  y="75"  width="38"  height="110" fill="#162238"/>
+          <rect x="76"  y="35"  width="58"  height="150" fill="url(#bldg1)"/>
+          <rect x="88"  y="28"  width="12"  height="10"  fill="url(#bldg1)"/>
+          <rect x="130" y="65"  width="34"  height="120" fill="#162238"/>
+          <rect x="160" y="42"  width="52"  height="143" fill="url(#bldg1)"/>
+          <rect x="174" y="32"  width="8"   height="12"  fill="url(#bldg1)"/>
+          <rect x="208" y="70"  width="38"  height="115" fill="#162238"/>
+          <rect x="242" y="38"  width="50"  height="147" fill="url(#bldg1)"/>
+          <rect x="258" y="28"  width="10"  height="12"  fill="url(#bldg1)"/>
+          <rect x="288" y="60"  width="55"  height="125" fill="#162238"/>
+          <!-- Windows - lit -->
+          <rect x="8"  y="65" width="6" height="5" rx="1" fill="rgba(255,230,140,0.7)"/>
+          <rect x="18" y="65" width="6" height="5" rx="1" fill="rgba(255,230,140,0.35)"/>
+          <rect x="8"  y="78" width="6" height="5" rx="1" fill="rgba(255,230,140,0.5)"/>
+          <rect x="18" y="78" width="6" height="5" rx="1" fill="rgba(255,230,140,0.8)"/>
+          <rect x="84" y="45" width="7" height="6" rx="1" fill="rgba(255,230,140,0.6)"/>
+          <rect x="96" y="45" width="7" height="6" rx="1" fill="rgba(255,230,140,0.3)"/>
+          <rect x="108" y="45" width="7" height="6" rx="1" fill="rgba(255,230,140,0.75)"/>
+          <rect x="84" y="58" width="7" height="6" rx="1" fill="rgba(255,230,140,0.4)"/>
+          <rect x="96" y="58" width="7" height="6" rx="1" fill="rgba(255,230,140,0.85)"/>
+          <rect x="166" y="52" width="8" height="7" rx="1" fill="rgba(255,230,140,0.5)"/>
+          <rect x="180" y="52" width="8" height="7" rx="1" fill="rgba(255,230,140,0.7)"/>
+          <rect x="194" y="52" width="8" height="7" rx="1" fill="rgba(255,230,140,0.4)"/>
+          <rect x="166" y="66" width="8" height="7" rx="1" fill="rgba(255,230,140,0.8)"/>
+          <rect x="180" y="66" width="8" height="7" rx="1" fill="rgba(255,230,140,0.3)"/>
+          <rect x="250" y="48" width="7" height="6" rx="1" fill="rgba(255,230,140,0.6)"/>
+          <rect x="262" y="48" width="7" height="6" rx="1" fill="rgba(255,230,140,0.85)"/>
+          <rect x="274" y="48" width="7" height="6" rx="1" fill="rgba(255,230,140,0.35)"/>
+          <rect x="250" y="62" width="7" height="6" rx="1" fill="rgba(255,230,140,0.7)"/>
+          <rect x="262" y="62" width="7" height="6" rx="1" fill="rgba(255,230,140,0.4)"/>
+          <rect x="296" y="70" width="8" height="6" rx="1" fill="rgba(255,230,140,0.6)"/>
+          <rect x="310" y="70" width="8" height="6" rx="1" fill="rgba(255,230,140,0.4)"/>
+          <rect x="296" y="82" width="8" height="6" rx="1" fill="rgba(255,230,140,0.75)"/>
+          <!-- Ground -->
+          <rect x="0" y="160" width="343" height="25" fill="#080f1a"/>
+          <rect x="0" y="158" width="343" height="4" fill="rgba(255,255,255,0.03)"/>
+          <!-- Street lights -->
+          <rect x="60"  y="138" width="2" height="22" fill="rgba(255,255,255,0.12)"/>
+          <circle cx="61" cy="138" r="4" fill="rgba(255,240,160,0.2)"/>
+          <rect x="200" y="138" width="2" height="22" fill="rgba(255,255,255,0.12)"/>
+          <circle cx="201" cy="138" r="4" fill="rgba(255,240,160,0.2)"/>
+        </svg>
+        <div class="photo-gradient"></div>
+        <div class="photo-tags">
+          <span class="tag-pill lease">LEASE</span>
+          <span class="tag-pill entire">ENTIRE UNIT</span>
+          <span class="tag-pill featured">⭐ FEATURED</span>
+        </div>
+        <div class="save-btn saved">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="#ff6b5b"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        </div>
+        <div class="price-overlay">
+          <div class="price">$2,400/mo</div>
+          <div class="prop-name">Modern Downtown Apartment</div>
+        </div>
+        <div class="match-score">
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="#ff8878"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          87% match
+        </div>
+      </div>
+      <div class="card-details">
+        <div class="details-row">
+          <div class="detail-chips">
+            <div class="detail-chip">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+              2 bd
+            </div>
+            <div class="detail-chip">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 12h16M4 12a2 2 0 0 1-2-2V7h6v3a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V7h6v3a2 2 0 0 1-2 2M4 12v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/></svg>
+              2 ba
+            </div>
+            <div class="detail-chip">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+              1,200 sqft
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:4px;font-size:10.5px;color:rgba(46,204,113,0.85);font-weight:600;background:rgba(46,204,113,0.08);border:1px solid rgba(46,204,113,0.18);border-radius:8px;padding:2px 7px;">
+            Available now
+          </div>
+        </div>
+        <div class="location-row">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(255,107,91,0.55)" stroke-width="2.5" stroke-linecap="round"><path d="M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7z"/></svg>
+          <span>Financial District, New York · 0.4 mi away</span>
+        </div>
+        <div class="host-row">
+          <div class="host-avatar" style="background:linear-gradient(135deg,#4a9eff,#1e6fd4);">MK</div>
+          <div class="host-info">
+            <div class="host-name">Marcus K. · Host</div>
+            <div class="host-status">Member since 2023 · 14 listings</div>
+          </div>
+          <div class="resp-badge">Fast reply</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 2 — Private Room -->
+    <div class="prop-card">
+      <div class="card-photo">
+        <svg class="scene" viewBox="0 0 343 185" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="roomGlow" cx="0.65" cy="0.35" r="0.6">
+              <stop offset="0%" stop-color="rgba(255,200,100,0.18)"/>
+              <stop offset="100%" stop-color="transparent"/>
+            </radialGradient>
+            <linearGradient id="floorG" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#1a1428"/>
+              <stop offset="100%" stop-color="#110e1f"/>
+            </linearGradient>
+          </defs>
+          <!-- Room walls -->
+          <rect width="343" height="185" fill="#1a1530"/>
+          <!-- Left wall slightly different shade -->
+          <polygon points="0,0 130,30 130,185 0,185" fill="#16122a"/>
+          <!-- Floor perspective -->
+          <polygon points="0,135 343,115 343,185 0,185" fill="url(#floorG)"/>
+          <!-- Floor wood lines -->
+          <line x1="0" y1="148" x2="343" y2="132" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+          <line x1="0" y1="160" x2="343" y2="145" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+          <line x1="0" y1="173" x2="343" y2="158" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+          <!-- Window -->
+          <rect x="200" y="15" width="125" height="95" rx="4" fill="rgba(100,160,255,0.06)" stroke="rgba(255,255,255,0.12)" stroke-width="2"/>
+          <line x1="262" y1="15" x2="262" y2="110" stroke="rgba(255,255,255,0.1)" stroke-width="1.5"/>
+          <line x1="200" y1="63" x2="325" y2="63" stroke="rgba(255,255,255,0.1)" stroke-width="1.5"/>
+          <!-- Window glow -->
+          <rect x="200" y="15" width="125" height="95" rx="4" fill="url(#roomGlow)"/>
+          <!-- Night sky through window -->
+          <circle cx="285" cy="35" r="1" fill="rgba(255,255,255,0.4)"/>
+          <circle cx="310" cy="25" r="0.8" fill="rgba(255,255,255,0.5)"/>
+          <circle cx="220" cy="30" r="0.9" fill="rgba(255,255,255,0.35)"/>
+          <!-- Bed headboard -->
+          <rect x="20" y="75" width="140" height="70" rx="8" fill="#241e38"/>
+          <rect x="25" y="80" width="130" height="58" rx="6" fill="#1e1830"/>
+          <!-- Pillow -->
+          <rect x="35" y="84" width="50" height="28" rx="8" fill="#2a2340" opacity="0.9"/>
+          <rect x="90" y="84" width="50" height="28" rx="8" fill="#2a2340" opacity="0.9"/>
+          <!-- Blanket -->
+          <rect x="25" y="110" width="130" height="26" rx="4" fill="#1e3050" opacity="0.8"/>
+          <!-- Bedside table -->
+          <rect x="168" y="98" width="28" height="42" rx="4" fill="#1e1830" opacity="0.9"/>
+          <!-- Lamp on table -->
+          <rect x="177" y="90" width="3" height="10" rx="1" fill="#2a2440" opacity="0.8"/>
+          <polygon points="172,90 188,90 184,82 176,82" fill="rgba(255,210,100,0.35)"/>
+          <rect x="172" y="90" width="16" height="2" rx="1" fill="rgba(255,200,80,0.4)"/>
+          <!-- Lamp glow -->
+          <circle cx="180" cy="86" r="12" fill="rgba(255,200,80,0.08)"/>
+        </svg>
+        <div class="photo-gradient"></div>
+        <div class="photo-tags">
+          <span class="tag-pill lease">LEASE</span>
+          <span class="tag-pill room">PRIVATE ROOM</span>
+          <span class="tag-pill new-tag">NEW</span>
+        </div>
+        <div class="save-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.65)" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        </div>
+        <div class="price-overlay">
+          <div class="price">$1,100/mo</div>
+          <div class="prop-name">Cozy Private Room · Brooklyn Heights</div>
+        </div>
+        <div class="match-score">
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="#ff8878"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          72% match
+        </div>
+      </div>
+      <div class="card-details">
+        <div class="details-row">
+          <div class="detail-chips">
+            <div class="detail-chip">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+              3 bd total
+            </div>
+            <div class="detail-chip">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 12h16M4 12a2 2 0 0 1-2-2V7h6v3a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V7h6v3a2 2 0 0 1-2 2M4 12v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/></svg>
+              1 ba shared
+            </div>
+          </div>
+          <span style="font-size:10.5px;color:rgba(46,204,113,0.85);font-weight:600;background:rgba(46,204,113,0.08);border:1px solid rgba(46,204,113,0.18);border-radius:8px;padding:2px 7px;">Pet OK 🐾</span>
+        </div>
+        <div class="location-row">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(255,107,91,0.55)" stroke-width="2.5" stroke-linecap="round"><path d="M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7z"/></svg>
+          <span>Brooklyn Heights · 1.2 mi away</span>
+        </div>
+        <div class="host-row">
+          <div class="host-avatar" style="background:linear-gradient(135deg,#e83a7a,#9b1fad);">SL</div>
+          <div class="host-info">
+            <div class="host-name">Sofia L. · Host</div>
+            <div class="host-status">Member since 2024 · 3 listings</div>
+          </div>
+          <div class="resp-badge">Fast reply</div>
+        </div>
+        <div class="premium-row">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,215,0,0.6)" stroke-width="2" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <span>Upgrade to Plus to contact host &amp; schedule a tour</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Map view -->
+    <div class="map-banner">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+      <span>Switch to Map View</span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>
+    </div>
+
+  </div>
+
+  <!-- Bottom nav -->
+  <div class="bottom-nav">
+    <div class="nav-item active">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="8" stroke="#ff6b5b" stroke-width="2"/><path d="m21 21-4.35-4.35" stroke="#ff6b5b" stroke-width="2" stroke-linecap="round"/></svg>
+      <span>Explore</span>
+    </div>
+    <div class="nav-item">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="rgba(255,255,255,0.3)" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="7" r="4" stroke="rgba(255,255,255,0.3)" stroke-width="2"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke="rgba(255,255,255,0.3)" stroke-width="2" stroke-linecap="round"/></svg>
+      <span>Match</span>
+    </div>
+    <div class="nav-item">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1" stroke="rgba(255,255,255,0.3)" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="rgba(255,255,255,0.3)" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="rgba(255,255,255,0.3)" stroke-width="2"/><rect x="14" y="14" width="7" height="7" rx="1" stroke="rgba(255,255,255,0.3)" stroke-width="2"/></svg>
+      <span>Groups</span>
+    </div>
+    <div class="nav-item" style="position:relative">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="rgba(255,255,255,0.3)" stroke-width="2" stroke-linejoin="round"/></svg>
+      <div class="nav-badge">3</div>
+      <span>Chat</span>
+    </div>
+    <div class="nav-item" style="position:relative">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="rgba(255,255,255,0.3)" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="7" r="4" stroke="rgba(255,255,255,0.3)" stroke-width="2"/></svg>
+      <div class="nav-badge">3</div>
+      <span>Profile</span>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
