@@ -118,13 +118,6 @@ export const PlansScreen = () => {
   };
 
   const handleUpgrade = (plan: 'plus' | 'elite') => {
-    if (!user?.paymentMethods || user.paymentMethods.length === 0) {
-      Alert.alert('Payment Method Required', 'Please add a payment method before upgrading.', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Add Card', onPress: () => navigation.navigate('Payment') },
-      ]);
-      return;
-    }
     setSelectedPlan(plan);
     setShowUpgradeConfirm(true);
   };
