@@ -509,16 +509,18 @@ export const ExploreScreen = () => {
               fill={saved.has(item.id) ? ACCENT : 'none'}
             />
           </Pressable>
-          <View style={styles.priceOverlay}>
-            <Text style={styles.priceText}>${item.price.toLocaleString()}/mo</Text>
-            <Text style={styles.propNameText} numberOfLines={1}>{item.title}</Text>
-          </View>
-          {compatibility !== null ? (
-            <View style={styles.matchScoreBadge}>
-              <Feather name="heart" size={9} color="#ff8878" />
-              <Text style={styles.matchScoreText}>{compatibility}% match</Text>
+          <View style={styles.photoBottom}>
+            <View style={styles.priceOverlay}>
+              <Text style={styles.priceText}>${item.price.toLocaleString()}/mo</Text>
+              <Text style={styles.propNameText} numberOfLines={1}>{item.title}</Text>
             </View>
-          ) : null}
+            {compatibility !== null ? (
+              <View style={styles.matchScoreBadge}>
+                <Feather name="heart" size={9} color="#ff8878" />
+                <Text style={styles.matchScoreText}>{compatibility}% match</Text>
+              </View>
+            ) : null}
+          </View>
         </View>
         <View style={styles.cardDetails}>
           <View style={styles.detailsRow}>
@@ -1537,10 +1539,18 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,107,91,0.28)',
     borderColor: ACCENT,
   },
-  priceOverlay: {
+  photoBottom: {
     position: 'absolute',
-    bottom: 12,
-    left: 14,
+    bottom: 10,
+    left: 12,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+  },
+  priceOverlay: {
+    flex: 1,
+    marginRight: 8,
   },
   priceText: {
     color: '#fff',
@@ -1553,12 +1563,8 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     fontWeight: '600',
     marginTop: 2,
-    maxWidth: 250,
   },
   matchScoreBadge: {
-    position: 'absolute',
-    bottom: 12,
-    right: 12,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
@@ -1568,6 +1574,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 20,
+    flexShrink: 0,
   },
   matchScoreText: {
     color: '#ff8878',
@@ -1583,11 +1590,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 6,
   },
   detailChips: {
     flexDirection: 'row',
     gap: 10,
-    flex: 1,
+    flexShrink: 1,
   },
   detailChip: {
     flexDirection: 'row',
