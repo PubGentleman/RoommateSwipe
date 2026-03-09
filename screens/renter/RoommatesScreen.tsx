@@ -1015,12 +1015,6 @@ export const RoommatesScreen = () => {
           <Feather name="x" size={24} color="#ff4d4d" />
         </Pressable>
         <Pressable
-          style={[styles.actionBtnMd, { backgroundColor: 'rgba(255,107,91,0.15)', borderColor: 'rgba(255,107,91,0.3)', borderWidth: 1 }, superInterestGlow ? { borderColor: '#ff6b5b', borderWidth: 2, shadowColor: '#ff6b5b', shadowOpacity: 0.5, shadowRadius: 8, elevation: 5 } : {}]}
-          onPress={handleSuperInterest}
-        >
-          <Feather name="zap" size={22} color="#ff6b5b" />
-        </Pressable>
-        <Pressable
           style={[styles.actionBtnMd, styles.actionMsg]}
           onPress={handleMessageClick}
         >

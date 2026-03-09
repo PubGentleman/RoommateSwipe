@@ -471,7 +471,19 @@ export const ProfileQuestionnaireScreen = () => {
               <TextInput
                 style={[styles.textInput, { backgroundColor: theme.backgroundDefault, borderColor: birthdayError ? theme.error : theme.border, color: theme.text }]}
                 value={birthday}
-                onChangeText={(text) => { setBirthday(text); setBirthdayError(''); }}
+                onChangeText={(text) => {
+                  const digits = text.replace(/\D/g, '');
+                  let formatted = '';
+                  if (digits.length <= 2) {
+                    formatted = digits;
+                  } else if (digits.length <= 4) {
+                    formatted = digits.slice(0, 2) + '/' + digits.slice(2);
+                  } else {
+                    formatted = digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/' + digits.slice(4, 8);
+                  }
+                  setBirthday(formatted);
+                  setBirthdayError('');
+                }}
                 placeholder="MM/DD/YYYY"
                 placeholderTextColor={theme.textSecondary}
                 keyboardType="number-pad"
@@ -636,7 +648,18 @@ export const ProfileQuestionnaireScreen = () => {
               <TextInput
                 style={[styles.textInput, { backgroundColor: theme.backgroundDefault, borderColor: theme.border, color: theme.text }]}
                 value={moveInDate}
-                onChangeText={setMoveInDate}
+                onChangeText={(text) => {
+                  const digits = text.replace(/\D/g, '');
+                  let formatted = '';
+                  if (digits.length <= 2) {
+                    formatted = digits;
+                  } else if (digits.length <= 4) {
+                    formatted = digits.slice(0, 2) + '/' + digits.slice(2);
+                  } else {
+                    formatted = digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/' + digits.slice(4, 8);
+                  }
+                  setMoveInDate(formatted);
+                }}
                 placeholder="MM/DD/YYYY"
                 placeholderTextColor={theme.textSecondary}
                 keyboardType="number-pad"
