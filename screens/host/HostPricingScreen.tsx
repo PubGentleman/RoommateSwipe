@@ -263,7 +263,9 @@ export const HostPricingScreen = () => {
                 <Text style={s.toggleActiveText}>Monthly</Text>
               </LinearGradient>
             ) : (
-              <Text style={s.toggleInactiveText}>Monthly</Text>
+              <View style={s.toggleInnerRow}>
+                <Text style={s.toggleInactiveText}>Monthly</Text>
+              </View>
             )}
           </Pressable>
           <Pressable
