@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Pressable, Image, Alert, Modal, ScrollView, Text } from 'react-native';
+import { View, StyleSheet, Pressable, Image, Alert, Modal, ScrollView, Text, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -156,19 +156,19 @@ export const ProfileScreen = () => {
           </View>
 
           {user?.role === 'renter' ? (
-            <Pressable onPress={handleBoostPress} style={styles.boostBtnWrap}>
+            <TouchableOpacity activeOpacity={0.7} onPress={handleBoostPress} style={styles.boostBtnWrap}>
               {boostIsActive ? (
                 <View style={styles.boostActiveBtn}>
                   <Feather name="zap" size={14} color="#FFD700" />
                   <Text style={styles.boostActiveBtnText}>Boosted — {boostTimeLabel}</Text>
                 </View>
               ) : (
-                <LinearGradient colors={['#ff6b5b', '#e83a2a']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.boostBtn} pointerEvents="none">
+                <View style={[styles.boostBtn, { backgroundColor: '#ff6b5b' }]}>
                   <Feather name="zap" size={14} color="#fff" />
                   <Text style={styles.boostBtnText}>Boost Profile</Text>
-                </LinearGradient>
+                </View>
               )}
-            </Pressable>
+            </TouchableOpacity>
           ) : null}
         </View>
 
