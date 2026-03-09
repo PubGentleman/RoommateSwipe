@@ -1,19 +1,32 @@
 import React, { useState, useCallback } from 'react';
-import { View, StyleSheet, Pressable, Image, Alert } from 'react-native';
+import { View, StyleSheet, Pressable, Text, ScrollView, Image, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { ScreenScrollView } from '../../components/ScreenScrollView';
-import { ThemedText } from '../../components/ThemedText';
-import { WalkScoreBadge } from '../../components/WalkScoreBadge';
-import { useTheme } from '../../hooks/useTheme';
-import { useAuth } from '../../contexts/AuthContext';
-import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
-import { StorageService } from '../../utils/storage';
-import { Property } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import { useAuth } from '../../contexts/AuthContext';
+import { StorageService } from '../../utils/storage';
+import { Property, InterestCard } from '../../types/models';
+
+const BG = '#111';
+const CARD_BG = '#1a1a1a';
+const ACCENT = '#ff6b5b';
+const GREEN = '#2ecc71';
+const GOLD = '#ffd700';
+const BLUE = '#5b8cff';
+const ORANGE = '#ffa500';
 
 type FilterStatus = 'all' | 'active' | 'paused' | 'rented';
+
+const AVATAR_GRADIENTS: [string, string][] = [
+  ['#667eea', '#764ba2'],
+  ['#f093fb', '#f5576c'],
+  ['#11998e', '#38ef7d'],
+  ['#fc4a1a', '#f7b733'],
+  ['#4facfe', '#00f2fe'],
+  ['#a18cd1', '#fbc2eb'],
+];
 
 const getListingStatus = (listing: Property): 'active' | 'paused' | 'rented' => {
   if (listing.rentedDate && !listing.available) return 'rented';
@@ -21,27 +34,56 @@ const getListingStatus = (listing: Property): 'active' | 'paused' | 'rented' => 
   return 'active';
 };
 
+const getStatusColor = (status: string) => {
+  if (status === 'active') return GREEN;
+  if (status === 'paused') return ORANGE;
+  return BLUE;
+};
+
+const getStatusLabel = (status: string) => {
+  if (status === 'active') return 'Active';
+  if (status === 'paused') return 'Paused';
+  return 'Rented';
+};
+
+function getGradient(name: string): [string, string] {
+  const hash = name.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+  return AVATAR_GRADIENTS[hash % AVATAR_GRADIENTS.length];
+}
+
+function formatListedAgo(listing: Property): string {
+  if (!listing.availableDate) return '';
+  const diff = Date.now() - new Date(listing.availableDate).getTime();
+  const days = Math.floor(diff / 86400000);
+  if (days < 1) return 'Listed today';
+  if (days === 1) return 'Listed 1d ago';
+  return `Listed ${days}d ago`;
+}
+
 export const MyListingsScreen = () => {
-  const { theme } = useTheme();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const [listings, setListings] = useState<Property[]>([]);
+  const [inquiries, setInquiries] = useState<InterestCard[]>([]);
   const [filter, setFilter] = useState<FilterStatus>('all');
 
-  const loadListings = useCallback(async () => {
+  const loadData = useCallback(async () => {
     if (!user) return;
     await StorageService.initializeWithMockData();
     await StorageService.assignPropertiesToHost(user.id, user.name);
     const allProperties = await StorageService.getProperties();
     const myListings = allProperties.filter(p => p.hostId === user.id);
     setListings(myListings);
+
+    const cards = await StorageService.getInterestCardsForHost(user.id);
+    setInquiries(cards);
   }, [user]);
 
   useFocusEffect(
     useCallback(() => {
-      loadListings();
-    }, [loadListings])
+      loadData();
+    }, [loadData])
   );
 
   const filteredListings = listings.filter(listing => {
@@ -49,29 +91,12 @@ export const MyListingsScreen = () => {
     return getListingStatus(listing) === filter;
   });
 
-  const toggleFeatured = async (propertyId: string) => {
-    if (!user) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const property = listings.find(p => p.id === propertyId);
-    if (!property || property.hostId !== user.id) return;
-    const updated = { ...property, featured: !property.featured };
-    await StorageService.addOrUpdateProperty(updated);
-    setListings(prev => prev.map(p => p.id === propertyId ? updated : p));
-  };
+  const activeCount = listings.filter(p => getListingStatus(p) === 'active').length;
+  const pausedCount = listings.filter(p => getListingStatus(p) === 'paused').length;
+  const rentedCount = listings.filter(p => getListingStatus(p) === 'rented').length;
 
-  const markAsRented = async (propertyId: string) => {
-    if (!user) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await StorageService.markPropertyAsRented(propertyId);
-    await loadListings();
-  };
-
-  const markAsAvailable = async (propertyId: string) => {
-    if (!user) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await StorageService.markPropertyAsAvailable(propertyId);
-    await loadListings();
-  };
+  const getInquiriesForListing = (propertyId: string) =>
+    inquiries.filter(c => c.propertyId === propertyId);
 
   const pauseListing = async (propertyId: string) => {
     if (!user) return;
@@ -80,7 +105,21 @@ export const MyListingsScreen = () => {
     if (!property || property.hostId !== user.id) return;
     const updated = { ...property, available: false, rentedDate: undefined };
     await StorageService.addOrUpdateProperty(updated);
-    await loadListings();
+    await loadData();
+  };
+
+  const markAsRented = async (propertyId: string) => {
+    if (!user) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    await StorageService.markPropertyAsRented(propertyId);
+    await loadData();
+  };
+
+  const markAsAvailable = async (propertyId: string) => {
+    if (!user) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    await StorageService.markPropertyAsAvailable(propertyId);
+    await loadData();
   };
 
   const deleteListing = (propertyId: string) => {
@@ -95,281 +134,611 @@ export const MyListingsScreen = () => {
           onPress: async () => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
             await StorageService.deleteProperty(propertyId);
-            await loadListings();
+            await loadData();
           },
         },
       ]
     );
   };
 
-  const isElite = user?.subscription?.plan === 'elite' && user?.subscription?.status === 'active';
+  const toggleFeatured = async (propertyId: string) => {
+    if (!user) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const property = listings.find(p => p.id === propertyId);
+    if (!property || property.hostId !== user.id) return;
+    const updated = { ...property, featured: !property.featured };
+    await StorageService.addOrUpdateProperty(updated);
+    setListings(prev => prev.map(p => p.id === propertyId ? updated : p));
+  };
 
-  const filterTabs: { key: FilterStatus; label: string }[] = [
-    { key: 'all', label: 'All' },
-    { key: 'active', label: 'Active' },
-    { key: 'paused', label: 'Paused' },
-    { key: 'rented', label: 'Rented' },
+  const filterTabs: { key: FilterStatus; label: string; count: number }[] = [
+    { key: 'all', label: 'All', count: listings.length },
+    { key: 'active', label: 'Active', count: activeCount },
+    { key: 'paused', label: 'Paused', count: pausedCount },
+    { key: 'rented', label: 'Rented', count: rentedCount },
   ];
 
-  const getStatusBadgeColor = (listing: Property) => {
+  const renderListingCard = (listing: Property) => {
     const status = getListingStatus(listing);
-    if (status === 'active') return theme.success;
-    if (status === 'rented') return theme.warning;
-    return theme.textSecondary;
-  };
+    const statusColor = getStatusColor(status);
+    const listingInquiries = getInquiriesForListing(listing.id);
+    const pendingInquiries = listingInquiries.filter(c => c.status === 'pending');
+    const viewsHash = listing.id.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+    const views = (viewsHash % 180) + 10;
+    const rate = listingInquiries.length > 0 ? ((listingInquiries.length / views) * 100).toFixed(1) : '0.0';
 
-  const getStatusLabel = (listing: Property) => {
-    const status = getListingStatus(listing);
-    if (status === 'active') return 'Active';
-    if (status === 'rented') return 'Rented';
-    return 'Paused';
-  };
-
-  const renderListing = (listing: Property) => {
-    const status = getListingStatus(listing);
     return (
-      <Pressable
-        key={listing.id}
-        style={[styles.listingCard, { backgroundColor: theme.backgroundDefault }]}
-        onPress={() => navigation.navigate('CreateEditListing', { propertyId: listing.id })}
-      >
-        <Image source={{ uri: listing.photos[0] }} style={styles.listingImage} />
-        <View style={[styles.statusBadge, { backgroundColor: getStatusBadgeColor(listing) }]}>
-          <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '600' }]}>
-            {getStatusLabel(listing)}
-          </ThemedText>
-        </View>
-        {listing.featured ? (
-          <View style={[styles.featuredBadge, { backgroundColor: theme.primary }]}>
-            <Feather name="star" size={12} color="#FFFFFF" />
-            <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '700', marginLeft: 4 }]}>
-              FEATURED
-            </ThemedText>
+      <View key={listing.id} style={styles.card}>
+        <Pressable
+          style={styles.cardPhoto}
+          onPress={() => navigation.navigate('CreateEditListing', { propertyId: listing.id })}
+        >
+          {listing.photos && listing.photos.length > 0 ? (
+            <Image source={{ uri: listing.photos[0] }} style={styles.photoImage} />
+          ) : (
+            <View style={styles.photoPlaceholder} />
+          )}
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.8)']}
+            style={styles.photoGradient}
+          />
+          <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
+            <View style={styles.statusDot} />
+            <Text style={styles.statusBadgeText}>{getStatusLabel(status)}</Text>
           </View>
-        ) : null}
-        <View style={styles.listingInfo}>
-          <ThemedText style={[Typography.h3]} numberOfLines={1}>{listing.title}</ThemedText>
-          <ThemedText style={[Typography.body, { color: theme.primary, marginTop: Spacing.xs }]}>
-            ${listing.price}/mo
-          </ThemedText>
-          <View style={styles.listingDetails}>
-            <View style={styles.detail}>
-              <Feather name="home" size={16} color={theme.textSecondary} />
-              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
-                {listing.bedrooms} bd {listing.bathrooms} ba
-              </ThemedText>
+          <View style={styles.priceOnPhoto}>
+            <Text style={styles.priceText}>
+              ${listing.price?.toLocaleString()}<Text style={styles.pricePeriod}>/mo</Text>
+            </Text>
+          </View>
+          {listing.featured ? (
+            <View style={styles.boostBadge}>
+              <Feather name="star" size={10} color={GOLD} />
+              <Text style={styles.boostBadgeText}>Featured</Text>
             </View>
-            {listing.walkScore ? (
-              <WalkScoreBadge score={listing.walkScore} size="small" />
-            ) : null}
-          </View>
-          <View style={styles.actions}>
+          ) : null}
+        </Pressable>
+
+        <View style={styles.cardBody}>
+          <Pressable onPress={() => navigation.navigate('CreateEditListing', { propertyId: listing.id })}>
+            <Text style={styles.cardTitle} numberOfLines={1}>{listing.title}</Text>
+            <View style={styles.cardLocation}>
+              <Feather name="map-pin" size={12} color={ACCENT} />
+              <Text style={styles.cardLocationText} numberOfLines={1}>
+                {listing.neighborhood ? `${listing.neighborhood}, ` : ''}{listing.city}
+                {listing.bedrooms || listing.bathrooms ? ` · ${listing.bedrooms} bd ${listing.bathrooms} ba` : ''}
+              </Text>
+            </View>
+          </Pressable>
+
+          {listingInquiries.length > 0 ? (
             <Pressable
-              style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
+              style={styles.inquiryRow}
+              onPress={() => {
+                const parent = navigation.getParent();
+                if (parent) {
+                  parent.navigate('Dashboard', { screen: 'Inquiries' });
+                }
+              }}
+            >
+              <View style={styles.inquiryRowLeft}>
+                <View style={styles.inqAvatars}>
+                  {listingInquiries.slice(0, 2).map((inq, i) => {
+                    const grad = getGradient(inq.renterName);
+                    return (
+                      <LinearGradient
+                        key={inq.id}
+                        colors={grad}
+                        style={[styles.inqMiniAv, i > 0 ? { marginLeft: -8 } : null]}
+                      >
+                        <Text style={styles.inqMiniAvText}>
+                          {inq.renterName.charAt(0).toUpperCase()}
+                        </Text>
+                      </LinearGradient>
+                    );
+                  })}
+                  {listingInquiries.length > 2 ? (
+                    <View style={[styles.inqMiniAv, styles.inqMiniAvMore, { marginLeft: -8 }]}>
+                      <Text style={styles.inqMiniAvText}>+{listingInquiries.length - 2}</Text>
+                    </View>
+                  ) : null}
+                </View>
+                <Text style={styles.inquiryRowText}>
+                  <Text style={{ color: '#ff8070' }}>{listingInquiries.length} renter{listingInquiries.length !== 1 ? 's' : ''}</Text>
+                  {' '}interested{pendingInquiries.length > 0 ? ` · ${pendingInquiries.length} pending review` : ''}
+                </Text>
+              </View>
+              <Feather name="chevron-right" size={14} color="rgba(255,107,91,0.5)" />
+            </Pressable>
+          ) : (
+            <Pressable
+              style={styles.inquiryRowEmpty}
+              onPress={() => toggleFeatured(listing.id)}
+            >
+              <View style={styles.inquiryRowLeft}>
+                <Feather name="message-square" size={16} color="rgba(255,255,255,0.2)" />
+                <Text style={styles.inquiryRowTextEmpty}>
+                  No inquiries yet — <Text style={{ color: '#ff8070' }}>Boost to get noticed</Text>
+                </Text>
+              </View>
+              <Feather name="chevron-right" size={14} color="rgba(255,107,91,0.4)" />
+            </Pressable>
+          )}
+
+          <View style={styles.statChips}>
+            <View style={styles.chipMuted}>
+              <Feather name="eye" size={12} color="rgba(255,255,255,0.45)" />
+              <Text style={styles.chipMutedText}>{views} views</Text>
+            </View>
+            <View style={listingInquiries.length > 0 ? styles.chipCoral : styles.chipMuted}>
+              <Feather name="heart" size={12} color={listingInquiries.length > 0 ? '#ff8070' : 'rgba(255,255,255,0.45)'} />
+              <Text style={listingInquiries.length > 0 ? styles.chipCoralText : styles.chipMutedText}>
+                {listingInquiries.length} inquiries
+              </Text>
+            </View>
+            {listingInquiries.length > 0 ? (
+              <View style={styles.chipGreen}>
+                <Feather name="trending-up" size={12} color={GREEN} />
+                <Text style={styles.chipGreenText}>{rate}% rate</Text>
+              </View>
+            ) : (
+              <View style={styles.chipMuted}>
+                <Feather name="clock" size={12} color="rgba(255,255,255,0.45)" />
+                <Text style={styles.chipMutedText}>{formatListedAgo(listing) || 'New'}</Text>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.cardDivider} />
+
+          <View style={styles.actionRow}>
+            <Pressable
+              style={styles.actEdit}
               onPress={() => navigation.navigate('CreateEditListing', { propertyId: listing.id })}
             >
-              <Feather name="edit-2" size={16} color={theme.text} />
-              <ThemedText style={[Typography.caption, { marginLeft: Spacing.xs }]}>Edit</ThemedText>
+              <Feather name="edit-2" size={13} color="rgba(255,255,255,0.7)" />
+              <Text style={styles.actEditText}>Edit</Text>
             </Pressable>
-            {isElite ? (
-              <Pressable
-                style={[
-                  styles.actionButton,
-                  { backgroundColor: listing.featured ? theme.primary : theme.backgroundSecondary }
-                ]}
-                onPress={() => toggleFeatured(listing.id)}
-              >
-                <Feather name="star" size={16} color={listing.featured ? '#FFFFFF' : theme.text} />
-                <ThemedText style={[Typography.caption, { marginLeft: Spacing.xs, color: listing.featured ? '#FFFFFF' : theme.text }]}>
-                  {listing.featured ? 'Featured' : 'Feature'}
-                </ThemedText>
-              </Pressable>
-            ) : null}
             {status === 'active' ? (
               <>
-                <Pressable
-                  style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
-                  onPress={() => pauseListing(listing.id)}
-                >
-                  <Feather name="pause-circle" size={16} color={theme.text} />
-                  <ThemedText style={[Typography.caption, { marginLeft: Spacing.xs }]}>Pause</ThemedText>
+                <Pressable style={styles.actPause} onPress={() => pauseListing(listing.id)}>
+                  <Feather name="pause" size={13} color={ORANGE} />
+                  <Text style={styles.actPauseText}>Pause</Text>
                 </Pressable>
-                <Pressable
-                  style={[styles.actionButton, { backgroundColor: theme.warning }]}
-                  onPress={() => markAsRented(listing.id)}
-                >
-                  <Feather name="check-circle" size={16} color="#FFFFFF" />
-                  <ThemedText style={[Typography.caption, { marginLeft: Spacing.xs, color: '#FFFFFF' }]}>Rented</ThemedText>
+                <Pressable style={styles.actRented} onPress={() => markAsRented(listing.id)}>
+                  <Feather name="check" size={13} color={GREEN} />
+                  <Text style={styles.actRentedText}>Rented</Text>
                 </Pressable>
               </>
             ) : (
-              <Pressable
-                style={[styles.actionButton, { backgroundColor: theme.success }]}
-                onPress={() => markAsAvailable(listing.id)}
-              >
-                <Feather name="refresh-cw" size={16} color="#FFFFFF" />
-                <ThemedText style={[Typography.caption, { marginLeft: Spacing.xs, color: '#FFFFFF' }]}>Available</ThemedText>
+              <Pressable style={styles.actRented} onPress={() => markAsAvailable(listing.id)}>
+                <Feather name="refresh-cw" size={13} color={GREEN} />
+                <Text style={styles.actRentedText}>Available</Text>
               </Pressable>
             )}
-            <Pressable
-              style={[styles.actionButton, { backgroundColor: theme.error }]}
-              onPress={() => deleteListing(listing.id)}
-            >
-              <Feather name="trash-2" size={16} color="#FFFFFF" />
+            <Pressable style={styles.actDelete} onPress={() => deleteListing(listing.id)}>
+              <Feather name="trash-2" size={14} color="#ff4d4d" />
             </Pressable>
           </View>
         </View>
-      </Pressable>
+      </View>
     );
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.backgroundRoot }}>
-      <ScreenScrollView>
-        <View style={styles.container}>
-          <View style={styles.headerRow}>
-            <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
-              {filteredListings.length} listing{filteredListings.length !== 1 ? 's' : ''}
-            </ThemedText>
-          </View>
-          <View style={styles.filterRow}>
-            {filterTabs.map(tab => (
-              <Pressable
-                key={tab.key}
-                style={[
-                  styles.filterPill,
-                  {
-                    backgroundColor: filter === tab.key ? theme.primary : theme.backgroundSecondary,
-                  },
-                ]}
-                onPress={() => setFilter(tab.key)}
-              >
-                <ThemedText
-                  style={[
-                    Typography.caption,
-                    { color: filter === tab.key ? '#FFFFFF' : theme.text, fontWeight: filter === tab.key ? '600' : '400' },
-                  ]}
-                >
-                  {tab.label}
-                </ThemedText>
-              </Pressable>
-            ))}
-          </View>
-          {filteredListings.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Feather name="home" size={48} color={theme.textSecondary} />
-              <ThemedText style={[Typography.h3, { color: theme.textSecondary, marginTop: Spacing.lg, textAlign: 'center' }]}>
-                No listings found
-              </ThemedText>
-              <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.sm, textAlign: 'center' }]}>
-                {filter === 'all' ? 'Tap the + button to create your first listing' : `No ${filter} listings`}
-              </ThemedText>
-            </View>
-          ) : (
-            filteredListings.map(listing => renderListing(listing))
-          )}
+    <View style={[styles.container, { backgroundColor: BG }]}>
+      <View style={[styles.topNav, { paddingTop: insets.top + 14 }]}>
+        <View>
+          <Text style={styles.topTitle}>My Listings</Text>
+          <Text style={styles.topSub}>
+            {listings.length} listing{listings.length !== 1 ? 's' : ''} · {activeCount} active
+          </Text>
         </View>
-      </ScreenScrollView>
-      <Pressable
-        style={[
-          styles.fab,
-          {
-            backgroundColor: theme.primary,
-            bottom: insets.bottom + 100,
-          },
-        ]}
-        onPress={() => navigation.navigate('CreateEditListing')}
+        <Pressable onPress={() => navigation.navigate('CreateEditListing')}>
+          <LinearGradient
+            colors={[ACCENT, '#e83a2a']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.addBtn}
+          >
+            <Feather name="plus" size={13} color="#fff" />
+            <Text style={styles.addBtnText}>Add Listing</Text>
+          </LinearGradient>
+        </Pressable>
+      </View>
+
+      <View style={styles.filterTabs}>
+        {filterTabs.map(tab => (
+          <Pressable
+            key={tab.key}
+            style={filter === tab.key ? styles.ftabActive : styles.ftabInactive}
+            onPress={() => setFilter(tab.key)}
+          >
+            <Text style={filter === tab.key ? styles.ftabActiveText : styles.ftabInactiveText}>
+              {tab.label}
+            </Text>
+            <View style={filter === tab.key ? styles.ftabCountActive : styles.ftabCountInactive}>
+              <Text style={[styles.ftabCountText, filter === tab.key ? { color: '#fff' } : { color: 'rgba(255,255,255,0.45)' }]}>
+                {tab.count}
+              </Text>
+            </View>
+          </Pressable>
+        ))}
+      </View>
+
+      <ScrollView
+        style={styles.feed}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
+        showsVerticalScrollIndicator={false}
       >
-        <Feather name="plus" size={24} color="#FFFFFF" />
-      </Pressable>
+        {filteredListings.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Feather name="home" size={48} color="rgba(255,255,255,0.15)" />
+            <Text style={styles.emptyTitle}>No listings found</Text>
+            <Text style={styles.emptySub}>
+              {filter === 'all' ? 'Tap "Add Listing" to create your first listing' : `No ${filter} listings`}
+            </Text>
+          </View>
+        ) : (
+          filteredListings.map(listing => renderListingCard(listing))
+        )}
+      </ScrollView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    padding: Spacing.lg,
-  },
-  headerRow: {
-    marginBottom: Spacing.md,
-  },
-  filterRow: {
+  container: { flex: 1 },
+  topNav: {
     flexDirection: 'row',
-    gap: Spacing.sm,
-    marginBottom: Spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingBottom: 10,
   },
-  filterPill: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.full,
+  topTitle: { fontSize: 22, fontWeight: '800', color: '#fff', letterSpacing: -0.4 },
+  topSub: { fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: 1 },
+  addBtn: {
+    height: 38,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
-  listingCard: {
-    borderRadius: BorderRadius.medium,
-    marginBottom: Spacing.lg,
+  addBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
+
+  filterTabs: {
+    flexDirection: 'row',
+    gap: 7,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  ftabActive: {
+    height: 32,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: ACCENT,
+  },
+  ftabInactive: {
+    height: 32,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.09)',
+  },
+  ftabActiveText: { fontSize: 12.5, fontWeight: '600', color: '#fff' },
+  ftabInactiveText: { fontSize: 12.5, fontWeight: '600', color: 'rgba(255,255,255,0.45)' },
+  ftabCountActive: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  ftabCountInactive: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  ftabCountText: { fontSize: 10, fontWeight: '700' },
+
+  feed: { flex: 1, paddingHorizontal: 16 },
+
+  card: {
+    backgroundColor: CARD_BG,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 22,
+    overflow: 'hidden',
+    marginBottom: 14,
+  },
+  cardPhoto: {
+    position: 'relative',
+    height: 160,
     overflow: 'hidden',
   },
-  listingImage: {
+  photoImage: {
     width: '100%',
-    height: 180,
+    height: '100%',
+  },
+  photoPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#1a2535',
+  },
+  photoGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '60%',
   },
   statusBadge: {
     position: 'absolute',
-    top: Spacing.md,
-    left: Spacing.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.small,
+    top: 12,
+    left: 12,
+    height: 26,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
   },
-  featuredBadge: {
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.8)',
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#fff',
+    letterSpacing: 0.2,
+  },
+  priceOnPhoto: {
     position: 'absolute',
-    top: Spacing.md,
-    right: Spacing.md,
+    bottom: 12,
+    left: 14,
+  },
+  priceText: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#fff',
+    letterSpacing: -0.5,
+  },
+  pricePeriod: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.6)',
+  },
+  boostBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(255,215,0,0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,215,0,0.4)',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.small,
+    gap: 4,
   },
-  listingInfo: {
-    padding: Spacing.lg,
+  boostBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: GOLD,
   },
-  listingDetails: {
-    marginTop: Spacing.md,
-    marginBottom: Spacing.lg,
+
+  cardBody: { padding: 14, paddingHorizontal: 15 },
+  cardTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+    letterSpacing: -0.2,
+    lineHeight: 20,
+    marginBottom: 6,
   },
-  detail: {
+  cardLocation: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 5,
+    marginBottom: 10,
   },
-  actions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
+  cardLocationText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.35)',
+    flex: 1,
   },
-  actionButton: {
+
+  inquiryRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.small,
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255,107,91,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.12)',
+    borderRadius: 12,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    marginBottom: 10,
   },
+  inquiryRowEmpty: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 12,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    marginBottom: 10,
+  },
+  inquiryRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  inqAvatars: { flexDirection: 'row' },
+  inqMiniAv: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: CARD_BG,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inqMiniAvMore: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  inqMiniAvText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  inquiryRowText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.65)',
+    flex: 1,
+  },
+  inquiryRowTextEmpty: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.3)',
+    flex: 1,
+  },
+
+  statChips: {
+    flexDirection: 'row',
+    gap: 7,
+    marginBottom: 12,
+  },
+  chipMuted: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 10,
+    paddingVertical: 5,
+    paddingHorizontal: 9,
+  },
+  chipMutedText: { fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.45)' },
+  chipCoral: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(255,107,91,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.18)',
+    borderRadius: 10,
+    paddingVertical: 5,
+    paddingHorizontal: 9,
+  },
+  chipCoralText: { fontSize: 11, fontWeight: '600', color: '#ff8070' },
+  chipGreen: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(46,204,113,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(46,204,113,0.18)',
+    borderRadius: 10,
+    paddingVertical: 5,
+    paddingHorizontal: 9,
+  },
+  chipGreenText: { fontSize: 11, fontWeight: '600', color: GREEN },
+
+  cardDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    marginBottom: 12,
+  },
+
+  actionRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  actEdit: {
+    flex: 1,
+    height: 36,
+    borderRadius: 11,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  actEditText: { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.7)' },
+  actPause: {
+    flex: 1,
+    height: 36,
+    borderRadius: 11,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,165,0,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,165,0,0.2)',
+  },
+  actPauseText: { fontSize: 12, fontWeight: '700', color: ORANGE },
+  actRented: {
+    flex: 1,
+    height: 36,
+    borderRadius: 11,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(46,204,113,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(46,204,113,0.2)',
+  },
+  actRentedText: { fontSize: 12, fontWeight: '700', color: GREEN },
+  actDelete: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,77,77,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,77,77,0.18)',
+  },
+
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: Spacing.xxl * 2,
+    paddingVertical: 80,
   },
-  fab: {
-    position: 'absolute',
-    right: Spacing.lg,
-    width: Spacing.fabSize,
-    height: Spacing.fabSize,
-    borderRadius: Spacing.fabSize / 2,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+  emptyTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.4)',
+    marginTop: 16,
+  },
+  emptySub: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.25)',
+    marginTop: 8,
+    textAlign: 'center',
   },
 });
