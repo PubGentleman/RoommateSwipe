@@ -11,7 +11,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { ReportBlockModal } from '../../components/ReportBlockModal';
 import { PlanBadge } from '../../components/PlanBadge';
-import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 
@@ -306,6 +305,11 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             ) : null}
           </View>
         </View>
+        <Pressable onPress={() => setShowAISheet(true)} style={styles.aiNavBtn}>
+          <View style={styles.aiNavBtnInner}>
+            <Feather name="cpu" size={16} color="#FFFFFF" />
+          </View>
+        </Pressable>
         <Pressable onPress={() => {
           Alert.alert(
             'Options',
@@ -320,8 +324,6 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           <Feather name="more-vertical" size={24} color={theme.text} />
         </Pressable>
       </View>
-
-      <AIFloatingButton onPress={() => setShowAISheet(true)} top={insets.top + 60} />
 
       {!canSeeOnlineStatus() ? (
         <Pressable
@@ -475,6 +477,20 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 2,
     borderColor: '#FFFFFF',
+  },
+  aiNavBtn: {
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  aiNavBtnInner: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#ff4d4d',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   moreButton: {
     width: 44,

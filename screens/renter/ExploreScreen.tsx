@@ -22,7 +22,6 @@ import * as Haptics from 'expo-haptics';
 import { formatMoveInDate, calculateCompatibility, getMatchQualityColor, getGenderSymbol, formatLocation } from '../../utils/matchingAlgorithm';
 import { getZodiacSymbol } from '../../utils/zodiacUtils';
 import { PropertyMapView } from '../../components/PropertyMapView';
-import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 
@@ -662,6 +661,11 @@ export const ExploreScreen = () => {
   return (
     <View style={[styles.container, { backgroundColor: BG }]}>
       <View style={[styles.searchBarRow, { paddingTop: insets.top + 12 }]}>
+        <Pressable onPress={() => setShowAISheet(true)} style={styles.aiNavBtn}>
+          <View style={styles.aiNavBtnInner}>
+            <Feather name="cpu" size={18} color="#FFFFFF" />
+          </View>
+        </Pressable>
         <View style={styles.searchInput}>
           <Feather name="search" size={15} color="rgba(255,255,255,0.3)" />
           <TextInput
@@ -694,8 +698,6 @@ export const ExploreScreen = () => {
           {hasActiveFilters() ? <View style={styles.filterDot} /> : null}
         </Pressable>
       </View>
-      <AIFloatingButton onPress={() => setShowAISheet(true)} top={insets.top + 60} />
-
       <View style={styles.cityRow}>
         <CityPillButton activeCity={activeCity} onPress={() => setShowCityPicker(true)} />
         <Text style={styles.listingCount}>{filteredProperties.length} listings</Text>
@@ -1422,6 +1424,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 10,
     gap: 8,
+  },
+  aiNavBtn: {
+    width: 42,
+    height: 42,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  aiNavBtnInner: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#ff4d4d',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   searchInput: {
     flex: 1,

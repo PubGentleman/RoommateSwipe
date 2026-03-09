@@ -16,7 +16,6 @@ import { getVerificationLevel } from '../../components/VerificationBadge';
 import { calculateCompatibility } from '../../utils/matchingAlgorithm';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PlanBadge } from '../../components/PlanBadge';
-import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
 import { User } from '../../types/models';
 
@@ -420,6 +419,11 @@ export const MessagesScreen = () => {
   return (
     <View style={[styles.container, { backgroundColor: '#111' }]}>
       <View style={[styles.topNav, { paddingTop: insets.top + 14 }]}>
+        <Pressable onPress={() => setShowAISheet(true)} style={styles.aiNavBtn}>
+          <View style={styles.aiNavBtnInner}>
+            <Feather name="cpu" size={18} color="#FFFFFF" />
+          </View>
+        </Pressable>
         <ThemedText style={styles.topNavTitle}>Messages</ThemedText>
         <View style={styles.navActions}>
           <Pressable style={styles.iconBtn} onPress={handleSearchToggle}>
@@ -430,8 +434,6 @@ export const MessagesScreen = () => {
           </Pressable>
         </View>
       </View>
-
-      <AIFloatingButton onPress={() => setShowAISheet(true)} top={insets.top + 60} />
 
       {isSearchVisible ? (
         <View style={styles.searchBarContainer}>
@@ -485,6 +487,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 22,
     paddingBottom: 12,
+  },
+  aiNavBtn: {
+    width: 42,
+    height: 42,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  aiNavBtnInner: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#ff4d4d',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   topNavTitle: {
     fontSize: 22,
