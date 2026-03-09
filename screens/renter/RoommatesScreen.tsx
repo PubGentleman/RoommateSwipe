@@ -918,11 +918,6 @@ export const RoommatesScreen = () => {
               </View>
             ) : null}
 
-            {canSeeOnlineStatus() && isProfileOnline ? (
-              <View style={styles.onlineIndicatorContainer}>
-                <View style={[styles.onlineIndicator, { backgroundColor: '#3ECF8E' }]} />
-              </View>
-            ) : null}
 
             {isBoosted ? (
               <View style={styles.boostedBadge}>
