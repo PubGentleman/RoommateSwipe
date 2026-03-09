@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, Image, Pressable, Dimensions, Modal, ScrollView, Alert } from 'react-native';
+import { View, StyleSheet, Image, Pressable, Dimensions, Modal, ScrollView, Alert, Text } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, runOnJS, interpolate } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, withSequence, runOnJS, interpolate } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -62,6 +62,8 @@ export const RoommatesScreen = () => {
   const [showSuperInterestUpsell, setShowSuperInterestUpsell] = useState(false);
   const [showSuperInterestConfirm, setShowSuperInterestConfirm] = useState(false);
   const [superInterestGlow, setSuperInterestGlow] = useState(false);
+  const [showSuperInterestFlash, setShowSuperInterestFlash] = useState(false);
+  const superInterestScale = useSharedValue(1);
   const [showReportBlockModal, setShowReportBlockModal] = useState(false);
   const [matchedProfileData, setMatchedProfileData] = useState<{ profile: RoommateProfile; compatibility: number } | null>(null);
   const { activeCity, recentCities, setActiveCity, initialized: cityInitialized } = useCityContext();
@@ -373,6 +375,10 @@ export const RoommatesScreen = () => {
     }
   };
 
+  const superInterestBtnStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: superInterestScale.value }],
+  }));
+
   const handleSuperInterest = async () => {
     if (!currentProfile || !user) return;
     const check = canSendSuperInterest();
@@ -381,19 +387,25 @@ export const RoommatesScreen = () => {
       return;
     }
     await useSuperInterestCredit();
+    superInterestScale.value = withSequence(
+      withTiming(1.3, { duration: 150 }),
+      withTiming(1.0, { duration: 150 })
+    );
+    setShowSuperInterestFlash(true);
     setSuperInterestGlow(true);
     setShowSuperInterestConfirm(true);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setTimeout(() => setShowSuperInterestFlash(false), 400);
     setTimeout(() => {
       setShowSuperInterestConfirm(false);
       setSuperInterestGlow(false);
     }, 2000);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await StorageService.addNotification({
       id: `notification_si_${Date.now()}_${Math.random()}`,
       userId: currentProfile.id,
       type: 'super_like',
-      title: 'Super Interest!',
-      body: `${user.name || 'Someone'} sent you a Super Interest`,
+      title: 'You got a Super Interest!',
+      body: `${user.name || 'Someone'} really wants to connect with you`,
       isRead: false,
       createdAt: new Date(),
       data: {
@@ -440,6 +452,7 @@ export const RoommatesScreen = () => {
       setShowMatch(true);
       await refreshUnreadCount();
     }
+    setTimeout(() => handleSwipeAction('like'), 500);
   };
 
   const pan = Gesture.Pan()
@@ -901,7 +914,12 @@ export const RoommatesScreen = () => {
 
       <View style={styles.cardArea}>
         <GestureDetector gesture={composedGesture}>
-          <Animated.View style={[styles.card, animatedCardStyle, isBoosted ? styles.cardBoostedGlow : null]}>
+          <Animated.View style={[
+            styles.card,
+            animatedCardStyle,
+            isBoosted ? styles.cardBoostedGlow : null,
+            user?.receivedSuperLikes?.some((sl: { superLikerId: string }) => sl.superLikerId === currentProfile.id) ? styles.cardSuperInterestGlow : null,
+          ]}>
             <Image source={{ uri: photosArray[0] }} resizeMode="cover" style={styles.cardImage} />
 
             <LinearGradient
@@ -918,6 +936,13 @@ export const RoommatesScreen = () => {
               </View>
             ) : null}
 
+            {user?.receivedSuperLikes?.some((sl: { superLikerId: string }) => sl.superLikerId === currentProfile.id) ? (
+              <View style={styles.superInterestCardBadge}>
+                <LinearGradient colors={['#4A90E2', '#1a5fc4']} style={{ width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center' }}>
+                  <Feather name="star" size={14} color="#fff" />
+                </LinearGradient>
+              </View>
+            ) : null}
 
             {isBoosted ? (
               <View style={styles.boostedBadge}>
@@ -937,6 +962,9 @@ export const RoommatesScreen = () => {
                   </View>
                 ) : null}
               </View>
+              {user?.receivedSuperLikes?.some((sl: { superLikerId: string }) => sl.superLikerId === currentProfile.id) ? (
+                <ThemedText style={styles.superInterestCardLabel}>Sent you a Super Interest</ThemedText>
+              ) : null}
               <ThemedText style={styles.cardJob} numberOfLines={1}>
                 {currentProfile.occupation} {currentProfile.preferences?.location ? `\u00B7 ${currentProfile.preferences.location}` : ''}
               </ThemedText>
@@ -1009,6 +1037,21 @@ export const RoommatesScreen = () => {
         >
           <Feather name="x" size={24} color="#ff4d4d" />
         </Pressable>
+        <Animated.View style={superInterestBtnStyle}>
+          <Pressable
+            style={[styles.actionBtnSuperInterest, getSuperInterestCount() === 0 && user?.subscription?.plan !== 'elite' ? { opacity: 0.4 } : null]}
+            onPress={handleSuperInterest}
+          >
+            <LinearGradient colors={['#4A90E2', '#1a5fc4']} style={styles.actionBtnSuperInterestGradient}>
+              <Feather name="star" size={24} color="#fff" />
+              {getSuperInterestCount() === 0 && user?.subscription?.plan !== 'elite' ? (
+                <View style={styles.superInterestLockBadge}>
+                  <Feather name="lock" size={10} color="#fff" />
+                </View>
+              ) : null}
+            </LinearGradient>
+          </Pressable>
+        </Animated.View>
         <Pressable
           style={[styles.actionBtnMd, styles.actionMsg]}
           onPress={handleMessageClick}
@@ -1341,8 +1384,15 @@ export const RoommatesScreen = () => {
         </View>
       </Modal>
 
+      {showSuperInterestFlash ? (
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 998, pointerEvents: 'none' }}>
+          <LinearGradient colors={['rgba(74,144,226,0.3)', 'rgba(26,95,196,0.1)', 'transparent']} style={{ flex: 1 }} />
+        </View>
+      ) : null}
+
       {showSuperInterestConfirm ? (
-        <View style={{ position: 'absolute', top: '40%', alignSelf: 'center', backgroundColor: 'rgba(255,107,91,0.95)', paddingHorizontal: 24, paddingVertical: 14, borderRadius: 20, zIndex: 999 }}>
+        <View style={{ position: 'absolute', top: 80, alignSelf: 'center', backgroundColor: 'rgba(74,144,226,0.95)', paddingHorizontal: 24, paddingVertical: 14, borderRadius: 20, zIndex: 999, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Feather name="star" size={16} color="#fff" />
           <ThemedText style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>Super Interest Sent!</ThemedText>
         </View>
       ) : null}
@@ -1355,40 +1405,23 @@ export const RoommatesScreen = () => {
       >
         <View style={styles.modalOverlay}>
           <View style={[styles.vipModalContainer, { backgroundColor: theme.backgroundSecondary }]}>
-            <View style={[styles.vipModalHeader, { backgroundColor: '#ff6b5b' }]}>
-              <Feather name="zap" size={32} color="#FFFFFF" />
+            <Pressable style={{ position: 'absolute', top: 16, right: 16, zIndex: 10 }} onPress={() => setShowSuperInterestUpsell(false)}>
+              <Feather name="x" size={22} color={theme.textSecondary} />
+            </Pressable>
+            <View style={[styles.vipModalHeader, { backgroundColor: '#4A90E2' }]}>
+              <Feather name="star" size={36} color="#FFFFFF" />
             </View>
             <View style={styles.vipModalContent}>
               <ThemedText style={[Typography.h2, { textAlign: 'center', marginBottom: Spacing.sm }]}>
-                Get More Super Interests
+                You're out of Super Interests
               </ThemedText>
               <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary, marginBottom: Spacing.xl }]}>
-                Super Interests immediately notify the other person and boost your visibility.
+                Stand out instantly — your profile gets highlighted on their card and they're notified right away
               </ThemedText>
-              <View style={styles.vipFeaturesList}>
-                <View style={styles.vipFeatureItem}>
-                  <Feather name="zap" size={20} color="#ff6b5b" />
-                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
-                    Basic: Buy at $0.99 each
-                  </ThemedText>
-                </View>
-                <View style={styles.vipFeatureItem}>
-                  <Feather name="zap" size={20} color="#ff6b5b" />
-                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
-                    Plus: 5 free per month + buy more
-                  </ThemedText>
-                </View>
-                <View style={styles.vipFeatureItem}>
-                  <Feather name="zap" size={20} color="#ff6b5b" />
-                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
-                    Elite: Unlimited Super Interests
-                  </ThemedText>
-                </View>
-              </View>
             </View>
             <View style={styles.vipModalActions}>
               <Pressable
-                style={[styles.vipUpgradeButton, { backgroundColor: '#ff6b5b', marginBottom: Spacing.sm }]}
+                style={[styles.vipUpgradeButton, { backgroundColor: '#4A90E2', marginBottom: Spacing.sm }]}
                 onPress={async () => {
                   await purchaseSuperInterest();
                   setShowSuperInterestUpsell(false);
@@ -1396,26 +1429,21 @@ export const RoommatesScreen = () => {
                 }}
               >
                 <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
-                  Buy 1 for $0.99
+                  3 Super Interests for $1.99
                 </ThemedText>
               </Pressable>
+              <ThemedText style={[Typography.small, { textAlign: 'center', color: theme.textSecondary, marginBottom: Spacing.md }]}>
+                Or $0.99 each
+              </ThemedText>
               <Pressable
-                style={[styles.vipUpgradeButton, { backgroundColor: theme.info }]}
+                style={[styles.vipUpgradeButton, { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: '#ff6b5b', marginBottom: Spacing.sm }]}
                 onPress={() => {
                   setShowSuperInterestUpsell(false);
                   (navigation as any).navigate('Profile', { screen: 'Subscription' });
                 }}
               >
-                <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
-                  Upgrade Plan
-                </ThemedText>
-              </Pressable>
-              <Pressable
-                style={[styles.vipCancelButton, { borderColor: theme.border }]}
-                onPress={() => setShowSuperInterestUpsell(false)}
-              >
-                <ThemedText style={[Typography.h3, { color: theme.textSecondary }]}>
-                  Maybe Later
+                <ThemedText style={[Typography.h3, { color: '#ff6b5b' }]}>
+                  Get 5 free every month with Plus — $14.99/mo
                 </ThemedText>
               </Pressable>
             </View>
@@ -2120,6 +2148,62 @@ const styles = StyleSheet.create({
   actionStar: {
     borderColor: '#5b8cff',
     backgroundColor: 'rgba(91,140,255,0.08)',
+  },
+  actionBtnSuperInterest: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    overflow: 'hidden',
+    shadowColor: '#4A90E2',
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 8,
+  },
+  actionBtnSuperInterestGradient: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  superInterestLockBadge: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cardSuperInterestGlow: {
+    borderWidth: 2,
+    borderColor: '#4A90E2',
+    shadowColor: '#4A90E2',
+    shadowOpacity: 0.6,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 8,
+  },
+  superInterestCardBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+    overflow: 'hidden',
+  },
+  superInterestCardLabel: {
+    fontSize: 12,
+    color: '#4A90E2',
+    fontWeight: '600',
+    marginTop: 2,
   },
   actionLike: {
     borderColor: '#2ecc71',

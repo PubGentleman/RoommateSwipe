@@ -244,6 +244,8 @@ export interface User {
   superInterestData?: {
     usedThisMonth: number;
     lastResetDate: string;
+    monthlyResetDate?: string;
+    totalSent?: number;
   };
   boostData?: {
     isBoosted: boolean;

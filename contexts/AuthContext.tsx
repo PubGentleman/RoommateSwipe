@@ -1409,14 +1409,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const useSuperInterestCredit = async (): Promise<void> => {
     if (!user) return;
     const plan = user.subscription?.plan || 'basic';
-    if (plan === 'elite') return;
+    const prevTotal = user.superInterestData?.totalSent || 0;
+    if (plan === 'elite') {
+      const updated = {
+        ...user,
+        superInterestData: { ...user.superInterestData, usedThisMonth: user.superInterestData?.usedThisMonth || 0, lastResetDate: user.superInterestData?.lastResetDate || new Date().toISOString(), totalSent: prevTotal + 1 },
+      };
+      await StorageService.setCurrentUser(updated);
+      await StorageService.addOrUpdateUser(updated);
+      setUser(updated);
+      return;
+    }
     if (plan === 'plus') {
       const monthData = resetSuperInterestMonthly();
       const freeRemaining = Math.max(0, 5 - monthData.usedThisMonth);
       if (freeRemaining > 0) {
         const updated = {
           ...user,
-          superInterestData: { usedThisMonth: monthData.usedThisMonth + 1, lastResetDate: monthData.lastResetDate },
+          superInterestData: { usedThisMonth: monthData.usedThisMonth + 1, lastResetDate: monthData.lastResetDate, totalSent: prevTotal + 1 },
         };
         await StorageService.setCurrentUser(updated);
         await StorageService.addOrUpdateUser(updated);
@@ -1429,6 +1439,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updated = {
       ...user,
       purchases: { ...user.purchases, superInterestsRemaining: current - 1 },
+      superInterestData: { ...user.superInterestData, usedThisMonth: user.superInterestData?.usedThisMonth || 0, lastResetDate: user.superInterestData?.lastResetDate || new Date().toISOString(), totalSent: prevTotal + 1 },
     };
     await StorageService.setCurrentUser(updated);
     await StorageService.addOrUpdateUser(updated);

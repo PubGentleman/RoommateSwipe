@@ -18,7 +18,7 @@ import { getBoostTimeRemaining, getBoostDuration, isBoostExpired } from '../../u
 type ProfileScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'ProfileMain'>;
 
 export const ProfileScreen = () => {
-  const { user, logout, updateUser, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, getHostPlan } = useAuth();
+  const { user, logout, updateUser, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, getHostPlan, getSuperInterestCount } = useAuth();
   const { unreadCount } = useNotificationContext();
   const navigation = useNavigation<ProfileScreenNavigationProp>();
   const insets = useSafeAreaInsets();
@@ -227,6 +227,32 @@ export const ProfileScreen = () => {
               <Text style={styles.cancellingText}>
                 Your plan ends on {user?.subscription?.expiresAt ? new Date(user.subscription.expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'end of period'}. Resubscribe anytime.
               </Text>
+            </View>
+          ) : null}
+          {user?.role === 'renter' ? (
+            <View style={styles.superInterestTracker}>
+              <Feather name="star" size={16} color="#4A90E2" />
+              {user?.subscription?.plan === 'elite' ? (
+                <Text style={styles.superInterestTrackerText}>Super Interests: Unlimited</Text>
+              ) : user?.subscription?.plan === 'plus' ? (
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <Text style={styles.superInterestTrackerText}>
+                    Super Interests: {Math.max(0, 5 - (user?.superInterestData?.usedThisMonth || 0))} / 5 this month
+                  </Text>
+                  <View style={styles.superInterestProgressBar}>
+                    <View style={[styles.superInterestProgressFill, { width: `${Math.min(100, ((user?.superInterestData?.usedThisMonth || 0) / 5) * 100)}%` }]} />
+                  </View>
+                </View>
+              ) : (
+                <View style={{ flex: 1, marginLeft: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Text style={styles.superInterestTrackerText}>
+                    Super Interests: {getSuperInterestCount()} remaining
+                  </Text>
+                  <Pressable onPress={() => navigation.navigate('Plans')}>
+                    <Text style={{ color: '#4A90E2', fontWeight: '600', fontSize: 13 }}>Buy more</Text>
+                  </Pressable>
+                </View>
+              )}
             </View>
           ) : null}
         </View>
@@ -798,6 +824,35 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(255,255,255,0.5)',
     lineHeight: 16,
+  },
+  superInterestTracker: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(74,144,226,0.08)',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(74,144,226,0.15)',
+  },
+  superInterestTrackerText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.8)',
+    marginLeft: 10,
+  },
+  superInterestProgressBar: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    marginTop: 6,
+    overflow: 'hidden',
+  },
+  superInterestProgressFill: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#4A90E2',
   },
   settingsCard: {
     backgroundColor: '#1a1a1a',
