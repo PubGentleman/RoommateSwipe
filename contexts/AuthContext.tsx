@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { StorageService } from '../utils/storage';
-import { User } from '../types/models';
+import { User, Notification } from '../types/models';
 
 export type UserRole = 'renter' | 'host';
 
@@ -24,8 +24,8 @@ interface AuthContextType {
   isUserBlocked: (otherUserId: string) => boolean;
   incrementMessageCount: () => Promise<void>;
   canSendMessage: () => boolean;
-  activateBoost: () => Promise<{ success: boolean; message: string }>;
-  canBoost: () => { canBoost: boolean; reason?: string; requiresPayment?: boolean };
+  activateBoost: (paid?: boolean) => Promise<{ success: boolean; message: string }>;
+  canBoost: () => { canBoost: boolean; reason?: string; requiresPayment?: boolean; nextAvailableAt?: string; hasFreeBoost?: boolean };
   checkAndUpdateBoostStatus: () => Promise<void>;
   purchaseBoost: () => Promise<{ success: boolean; message: string }>;
   purchaseUndoPass: () => Promise<{ success: boolean; message: string }>;
@@ -625,74 +625,76 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return false;
   };
 
-  const canBoost = (): { canBoost: boolean; reason?: string; requiresPayment?: boolean } => {
+  const canBoost = (): { canBoost: boolean; reason?: string; requiresPayment?: boolean; nextAvailableAt?: string; hasFreeBoost?: boolean } => {
     if (!user) return { canBoost: false, reason: 'Not logged in' };
     
     const plan = user.subscription?.plan || 'basic';
     
     if (user.boostData?.isBoosted && user.boostData.boostExpiresAt) {
-      const now = new Date();
-      if (user.boostData.boostExpiresAt > now) {
+      if (new Date().getTime() < new Date(user.boostData.boostExpiresAt).getTime()) {
         return { canBoost: false, reason: 'Boost is already active' };
       }
     }
     
     if (plan === 'basic') {
-      return { canBoost: true, requiresPayment: true };
+      return { canBoost: true, requiresPayment: true, hasFreeBoost: false };
     }
     
     if (plan === 'elite') {
-      return { canBoost: true };
+      return { canBoost: true, hasFreeBoost: true };
     }
     
     if (plan === 'plus') {
-      const lastBoostDate = user.boostData?.lastBoostDate;
-      if (lastBoostDate) {
-        const weekAgo = new Date();
-        weekAgo.setDate(weekAgo.getDate() - 7);
-        if (lastBoostDate > weekAgo) {
-          const nextBoostDate = new Date(lastBoostDate);
-          nextBoostDate.setDate(nextBoostDate.getDate() + 7);
-          return { 
-            canBoost: false, 
-            reason: `Next boost available on ${nextBoostDate.toLocaleDateString()}` 
-          };
-        }
+      const nextFree = user.boostData?.nextFreeBoostAvailableAt;
+      if (nextFree && new Date() < new Date(nextFree)) {
+        return {
+          canBoost: true,
+          requiresPayment: true,
+          hasFreeBoost: false,
+          nextAvailableAt: nextFree,
+          reason: `Next free boost available on ${new Date(nextFree).toLocaleDateString()}`,
+        };
       }
-      return { canBoost: true };
+      return { canBoost: true, hasFreeBoost: true };
     }
     
     return { canBoost: false };
   };
 
-  const activateBoost = async (): Promise<{ success: boolean; message: string }> => {
+  const activateBoost = async (paid?: boolean): Promise<{ success: boolean; message: string }> => {
     if (!user) {
       return { success: false, message: 'Not logged in' };
     }
     
-    const boostCheck = canBoost();
-    if (!boostCheck.canBoost) {
-      return { success: false, message: boostCheck.reason || 'Cannot boost' };
-    }
+    const plan = user.subscription?.plan || 'basic';
+    const durationMap: Record<string, 12 | 24 | 48> = { basic: 12, plus: 24, elite: 48 };
+    const durationHours = paid && plan === 'plus' ? 12 : (durationMap[plan] || 12);
     
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const expiresAt = new Date(now.getTime() + durationHours * 60 * 60 * 1000).toISOString();
     
-    const updatedUser: User = {
-      ...user,
-      boostData: {
-        boostsUsed: (user.boostData?.boostsUsed || 0) + 1,
-        lastBoostDate: now,
-        isBoosted: true,
-        boostExpiresAt: expiresAt,
-      },
+    const boostData = {
+      ...(user.boostData || { boostsUsed: 0, boostDurationHours: durationHours as 12 | 24 | 48 }),
+      isBoosted: true,
+      boostExpiresAt: expiresAt,
+      lastBoostActivatedAt: now.toISOString(),
+      boostDurationHours: durationHours as 12 | 24 | 48,
+      boostsUsed: (user.boostData?.boostsUsed || 0) + 1,
+      lastBoostDate: now,
     };
+    
+    if (plan === 'plus' && !paid) {
+      const nextFree = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      boostData.nextFreeBoostAvailableAt = nextFree.toISOString();
+    }
+    
+    const updatedUser: User = { ...user, boostData };
     
     await StorageService.setCurrentUser(updatedUser);
     await StorageService.addOrUpdateUser(updatedUser);
     setUser(updatedUser);
     
-    return { success: true, message: 'Boost activated! Your profile will be prioritized for 24 hours.' };
+    return { success: true, message: `Boost activated! Your profile will be prioritized for ${durationHours} hours.` };
   };
 
   const purchaseBoost = async (): Promise<{ success: boolean; message: string }> => {
@@ -700,81 +702,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: false, message: 'Not logged in' };
     }
 
-    if (!user.paymentMethods || user.paymentMethods.length === 0) {
-      return { success: false, message: 'Please add a payment method first' };
-    }
-
-    const boostCheck = canBoost();
-    if (!boostCheck.canBoost) {
-      return { success: false, message: boostCheck.reason || 'Cannot purchase boost' };
-    }
-
-    const now = new Date();
-    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-    
-    const updatedUser: User = {
-      ...user,
-      boostData: {
-        boostsUsed: (user.boostData?.boostsUsed || 0) + 1,
-        lastBoostDate: now,
-        isBoosted: true,
-        boostExpiresAt: expiresAt,
-      },
-    };
-    
-    await StorageService.setCurrentUser(updatedUser);
-    await StorageService.addOrUpdateUser(updatedUser);
-    setUser(updatedUser);
-    
-    return { success: true, message: 'Boost purchased and activated! Your profile will be prioritized for 24 hours.' };
+    return activateBoost(true);
   };
 
   const checkAndUpdateBoostStatus = async () => {
     if (!user) return;
 
-    const now = new Date();
+    if (user.boostData?.isBoosted && user.boostData.boostExpiresAt) {
+      if (new Date().getTime() >= new Date(user.boostData.boostExpiresAt).getTime()) {
+        const plan = user.subscription?.plan || 'basic';
+        let notifBody = 'Boost again for $4.99 to stay at the top';
+        if (plan === 'plus') {
+          const nextFree = user.boostData.nextFreeBoostAvailableAt;
+          notifBody = nextFree
+            ? `Boost again — your next free boost is available ${new Date(nextFree).toLocaleDateString()}`
+            : 'Boost again — your next free boost is available now';
+        } else if (plan === 'elite') {
+          notifBody = 'Activate a new boost anytime from your profile';
+        }
 
-    if (user.boostData?.isBoosted) {
-      const expiresAt = user.boostData.boostExpiresAt 
-        ? new Date(user.boostData.boostExpiresAt)
-        : null;
-      
-      if (expiresAt && expiresAt <= now) {
+        const notification: Notification = {
+          id: `boost-expired-${Date.now()}`,
+          userId: user.id,
+          type: 'system',
+          title: 'Your Profile Boost Expired',
+          body: notifBody,
+          isRead: false,
+          createdAt: new Date(),
+        };
+        await StorageService.addNotification(notification);
+
         const updatedUser: User = {
           ...user,
           boostData: {
             ...user.boostData,
-            lastBoostDate: user.boostData.lastBoostDate 
-              ? new Date(user.boostData.lastBoostDate)
-              : undefined,
-            boostExpiresAt: expiresAt,
             isBoosted: false,
           },
         };
         
-        await StorageService.setCurrentUser(updatedUser);
-        await StorageService.addOrUpdateUser(updatedUser);
-        setUser(updatedUser);
-        return;
-      }
-    }
-
-    const plan = user.subscription?.plan || 'basic';
-    if (plan === 'elite' && !user.boostData?.isBoosted) {
-      const lastBoost = user.boostData?.lastBoostDate ? new Date(user.boostData.lastBoostDate) : null;
-      const weekAgo = new Date();
-      weekAgo.setDate(weekAgo.getDate() - 7);
-      if (!lastBoost || lastBoost <= weekAgo) {
-        const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-        const updatedUser: User = {
-          ...user,
-          boostData: {
-            boostsUsed: (user.boostData?.boostsUsed || 0) + 1,
-            lastBoostDate: now,
-            isBoosted: true,
-            boostExpiresAt: expiresAt,
-          },
-        };
         await StorageService.setCurrentUser(updatedUser);
         await StorageService.addOrUpdateUser(updatedUser);
         setUser(updatedUser);

@@ -949,7 +949,7 @@ export const RoommatesScreen = () => {
 
       <View style={styles.cardArea}>
         <GestureDetector gesture={composedGesture}>
-          <Animated.View style={[styles.card, animatedCardStyle]}>
+          <Animated.View style={[styles.card, animatedCardStyle, isBoosted ? styles.cardBoostedGlow : null]}>
             <Image source={{ uri: photosArray[0] }} resizeMode="cover" style={styles.cardImage} />
 
             <LinearGradient
@@ -974,8 +974,7 @@ export const RoommatesScreen = () => {
 
             {isBoosted ? (
               <View style={styles.boostedBadge}>
-                <Feather name="zap" size={11} color="#000000" />
-                <ThemedText style={styles.boostedText}>BOOSTED</ThemedText>
+                <Feather name="zap" size={12} color="#fff" />
               </View>
             ) : null}
 
@@ -2045,20 +2044,13 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 14,
     right: 14,
-    backgroundColor: '#FFD700',
-    borderRadius: 20,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    flexDirection: 'row',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,107,91,0.85)',
     alignItems: 'center',
-    gap: 5,
+    justifyContent: 'center',
     zIndex: 10,
-  },
-  boostedText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#000000',
-    letterSpacing: 0.5,
   },
   cardInfo: {
     position: 'absolute',

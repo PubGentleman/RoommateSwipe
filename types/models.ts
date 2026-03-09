@@ -246,10 +246,13 @@ export interface User {
     lastResetDate: string;
   };
   boostData?: {
+    isBoosted: boolean;
+    boostExpiresAt?: string;
+    lastBoostActivatedAt?: string;
+    nextFreeBoostAvailableAt?: string;
+    boostDurationHours: 12 | 24 | 48;
     boostsUsed: number;
     lastBoostDate?: Date;
-    isBoosted: boolean;
-    boostExpiresAt?: Date;
   };
   undoPassData?: {
     hasUndoPass: boolean;
