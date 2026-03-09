@@ -1,0 +1,89 @@
+Full App Audit + Remove Agent Role
+Do the following two things in order. Complete both fully before stopping.
+
+PART 1 — REMOVE AGENT / LANDLORD ROLE COMPLETELY
+Search the entire codebase and remove every reference to the agent and landlord role:
+In types/models.ts:
+
+Find role: 'renter' | 'host' | 'agent' and change to role: 'renter' | 'host'
+Find any other type or interface that references 'agent' or 'landlord' and remove those values
+
+In navigation/RootNavigator.tsx:
+
+Remove the import for AgentTabNavigator
+Remove any condition like role === 'agent' and the navigator it renders
+If there is a default/fallback that points to AgentTabNavigator, change it to RenterTabNavigator
+
+Delete the file navigation/AgentTabNavigator.tsx entirely.
+In screens/shared/OnboardingScreen.tsx:
+
+Remove any UI option, button, card, or selectable tile that represents the Agent or Landlord role
+The role selection step should only show two options: Renter and Host
+
+Do a project-wide search for these strings and remove every occurrence:
+
+agent
+landlord
+AgentTabNavigator
+role === 'agent'
+role === 'landlord'
+
+After removal, verify the app compiles with no TypeScript errors related to these terms.
+
+PART 2 — ADD FULL APP DIAGNOSTIC SCREEN
+Create a new file screens/shared/DiagnosticScreen.tsx that runs 10 automated checks when it mounts and displays a live pass/fail dashboard.
+Style it with the Roomdr dark theme: #111111 background, #ff6b5b coral for pass/headings, #ff4444 red for fail, white text, Inter font, rounded cards for each check.
+Run these 10 checks automatically:
+Check 1 — Auth: User Loaded
+Verify useAuth() returns a non-null user with a valid id, email, and role (renter or host only).
+Pass: ✅ Auth user loaded — Role: [role]
+Fail: ❌ Auth user is null or missing fields
+Check 2 — Role Gating: Renter Navigator
+Verify that when role === 'renter', the app routes to RenterTabNavigator (tabs: Match, Explore, Groups, Messages, Profile).
+Pass: ✅ Renter routes correctly
+Fail: ❌ Renter navigator not found
+Check 3 — Role Gating: Host Navigator
+Verify that when role === 'host', the app routes to HostTabNavigator (tabs: Dashboard, Listings, Match, Messages, Profile).
+Pass: ✅ Host routes correctly
+Fail: ❌ Host navigator not found
+Check 4 — Agent Role Removed
+Check that role type does not include 'agent' or 'landlord'. Check that AgentTabNavigator is not imported anywhere in the navigation files.
+Pass: ✅ Agent/Landlord role fully removed
+Fail: ❌ Agent or landlord reference still exists
+Check 5 — AI Button: All 5 Screens
+Verify that RoommatesScreen, ExploreScreen, GroupsScreen, MessagesScreen, and ProfileScreen each have exactly ONE button that calls setShowAISheet(true) and ONE <RoomdrAISheet> rendered.
+Pass: ✅ AI button connected on all 5 screens
+Fail: ❌ Missing or duplicate on: [list which screens]
+Check 6 — Work Style Tags
+Call getWorkStyleTag() with wfh_fulltime, hybrid, office_fulltime, irregular and verify they return Remote, Hybrid, Office, Flexible. Call with null and verify it returns null.
+Pass: ✅ All 5 tag values correct
+Fail: ❌ Incorrect: [show which values are wrong]
+Check 7 — Subscription: Billing Cycles
+Verify billingCycle accepts monthly, 3month, and annual. Verify annual pricing equals exactly 12× monthly for all tiers (Basic, Plus, Elite for renters; Starter, Pro, Business for hosts).
+Pass: ✅ Billing cycles valid, annual = 12× monthly
+Fail: ❌ Mismatch: [show which tier is wrong]
+Check 8 — Navigation: All Screens Registered
+Check that these screens are registered in the navigator and reachable: Plans, Payment, ManageSubscription, Diagnostic, Notifications, Profile, Chat, About, PrivacyPolicy, TermsOfService, EditProfile, Verification.
+Pass: ✅ All [X] screens registered
+Fail: ❌ Missing screens: [list them]
+Check 9 — Onboarding: No Agent Option
+Verify the onboarding role selection screen only contains renter and host options. Check that no button, card, or selectable tile contains the text "Agent" or "Landlord".
+Pass: ✅ Onboarding only shows Renter and Host
+Fail: ❌ Agent or Landlord option still present
+Check 10 — No Hardcoded Demo Credentials
+Search for demo@roomdr.com, password, or any hardcoded email/password string being auto-filled in the login screen.
+Pass: ✅ No hardcoded credentials found
+Fail: ❌ Hardcoded credentials detected in: [file + line]
+
+Display at the top of the screen:
+A large summary card showing "X / 10 Checks Passed" with a coral progress bar filling based on pass count. If all 10 pass, show a green banner: "✅ App Healthy — Ready for Testing". If any fail, show a red banner: "⚠️ [X] Issues Found — See Below".
+Hidden entry point:
+In ProfileScreen.tsx, add a tap counter on the Roomdr logo. When tapped 5 times in a row within 3 seconds, navigate to DiagnosticScreen. No visible button — this is developer-only access.
+Add to navigation:
+Register DiagnosticScreen as a stack screen named "Diagnostic" in both RenterTabNavigator and HostTabNavigator. It should NOT appear in the tab bar.
+
+After completing both parts, confirm:
+
+The app builds with zero TypeScript errors
+The onboarding screen shows only Renter and Host
+Tapping the Profile logo 5 times opens the diagnostic screen showing 10 checks

@@ -19,7 +19,7 @@ export default function AboutScreen() {
         </ThemedText>
 
         <ThemedText style={[Typography.body, { marginBottom: Spacing.lg, lineHeight: 24 }]}>
-          Our platform uses smart algorithms, user profiles, and neighborhood-based location matching to help renters, hosts, and landlords connect with the right people faster. No scams. No endless scrolling. No mismatches.
+          Our platform uses smart algorithms, user profiles, and neighborhood-based location matching to help renters and hosts connect with the right people faster. No scams. No endless scrolling. No mismatches.
         </ThemedText>
 
         <ThemedText style={[Typography.body, { marginBottom: Spacing.xxl, lineHeight: 24 }]}>

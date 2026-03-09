@@ -1,6 +1,6 @@
 # Overview
 
-Roomdr is a React Native mobile application aiming to be the "Airbnb for roommates." It connects renters, hosts, and agents/landlords, streamlining the housing and roommate search process. The platform offers role-based navigation, swipe-based roommate matching, property listings, group formation, and secure messaging. Its core purpose is to capture a significant share of the roommate search market by providing a comprehensive and intuitive solution for finding roommates and properties.
+Roomdr is a React Native mobile application aiming to be the "Airbnb for roommates." It connects renters and hosts, streamlining the housing and roommate search process. The platform offers role-based navigation, swipe-based roommate matching, property listings, group formation, and secure messaging. Its core purpose is to capture a significant share of the roommate search market by providing a comprehensive and intuitive solution for finding roommates and properties.
 
 # User Preferences
 
@@ -42,6 +42,7 @@ The application is built with React Native and Expo using TypeScript, utilizing 
 - **Profile Completion:** A component tracking progress across weighted profile fields.
 - **Identity Verification:** Users can verify identity via phone, government ID, social media, with optional background and income checks for elite users.
 - **Onboarding Tutorial:** A swipeable tutorial for new users.
+- **App Diagnostics:** Hidden diagnostic screen (tap "My Profile" title 5 times) with 10 automated health checks covering auth, navigation, theme, billing, and profile integrity.
 - **Roomdr AI Assistant:** A floating coral-red CPU button (`AIFloatingButton`) positioned on every renter screen (Match, Groups, Explore, Messages, Profile) that opens a context-aware AI bottom sheet. The sheet dynamically adapts greetings, content cards, and insights based on the current screen context and live data (match compatibility, conversation stats, group analysis, profile completion, filter guidance). Supports 6 screen contexts with a context pill indicator in the header.
 - **Read Receipts:** Elite users can see message read status.
 - **Who Liked You:** Plus/Elite users can view received interest cards.

@@ -25,6 +25,20 @@ export const ProfileScreen = () => {
   const [processingBoost, setProcessingBoost] = useState(false);
   const [pendingInterestCount, setPendingInterestCount] = useState(0);
   const [showAISheet, setShowAISheet] = useState(false);
+  const [devTapCount, setDevTapCount] = useState(0);
+  const [devTapTimer, setDevTapTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleDevTap = () => {
+    const newCount = devTapCount + 1;
+    if (devTapTimer) clearTimeout(devTapTimer);
+    if (newCount >= 5) {
+      setDevTapCount(0);
+      navigation.navigate('Diagnostic');
+      return;
+    }
+    setDevTapCount(newCount);
+    setDevTapTimer(setTimeout(() => setDevTapCount(0), 3000));
+  };
 
   useFocusEffect(
     React.useCallback(() => {
@@ -91,7 +105,9 @@ export const ProfileScreen = () => {
             <Feather name="cpu" size={18} color="#FFFFFF" />
           </View>
         </Pressable>
-        <Text style={styles.topNavTitle}>My Profile</Text>
+        <Pressable onPress={handleDevTap}>
+          <Text style={styles.topNavTitle}>My Profile</Text>
+        </Pressable>
         <Pressable style={styles.iconBtn} onPress={() => navigation.navigate('PrivacySecurity')}>
           <Feather name="settings" size={16} color="rgba(255,255,255,0.7)" />
         </Pressable>

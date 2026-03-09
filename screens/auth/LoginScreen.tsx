@@ -23,10 +23,11 @@ export const LoginScreen = () => {
 
   const handleSubmit = async () => {
     setError('');
+    if (!email.trim()) { setError('Please enter your email address'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setError('Please enter a valid email address'); return; }
+    if (!password || password.length < 6) { setError('Password must be at least 6 characters'); return; }
     if (isSignUp) {
       if (!name.trim()) { setError('Please enter your name'); return; }
-      if (!email.trim()) { setError('Please enter your email'); return; }
-      if (!password.trim() || password.length < 6) { setError('Password must be at least 6 characters'); return; }
       if (password !== confirmPassword) { setError('Passwords do not match'); return; }
     }
     setIsLoading(true);
@@ -34,7 +35,7 @@ export const LoginScreen = () => {
       if (isSignUp) {
         await register(email.trim(), password, name.trim(), selectedRole);
       } else {
-        await login(email.trim() || 'demo@roomdr.com', password || 'password', selectedRole);
+        await login(email.trim(), password, selectedRole);
       }
     } catch (err: any) {
       setError(err?.message || 'Something went wrong. Please try again.');
