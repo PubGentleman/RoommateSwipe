@@ -38,7 +38,7 @@ const CARD_WIDTH = Math.min(SCREEN_WIDTH - Spacing.xxl, MAX_CARD_WIDTH);
 
 export const RoommatesScreen = () => {
   const { theme } = useTheme();
-  const { user, purchaseBoost, activateBoost, canBoost, canSendInterest, purchaseUndoPass, canRewind, useRewind, canSuperLike, useSuperLike, blockUser, reportUser } = useAuth();
+  const { user, purchaseBoost, activateBoost, canBoost, canSendInterest, purchaseUndoPass, canRewind, useRewind, canSuperLike, useSuperLike, blockUser, reportUser, canSendSuperInterest, useSuperInterestCredit, getSuperInterestCount, purchaseSuperInterest, canSendColdMessage } = useAuth();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { refreshUnreadCount } = useNotificationContext();
@@ -59,6 +59,9 @@ export const RoommatesScreen = () => {
   const [showMessageModal, setShowMessageModal] = useState(false);
   const [processingMessagePurchase, setProcessingMessagePurchase] = useState(false);
   const [showSuperLikeUpgradeModal, setShowSuperLikeUpgradeModal] = useState(false);
+  const [showSuperInterestUpsell, setShowSuperInterestUpsell] = useState(false);
+  const [showSuperInterestConfirm, setShowSuperInterestConfirm] = useState(false);
+  const [superInterestGlow, setSuperInterestGlow] = useState(false);
   const [showReportBlockModal, setShowReportBlockModal] = useState(false);
   const [matchedProfileData, setMatchedProfileData] = useState<{ profile: RoommateProfile; compatibility: number } | null>(null);
   const { activeCity, recentCities, setActiveCity, initialized: cityInitialized } = useCityContext();
@@ -331,6 +334,7 @@ export const RoommatesScreen = () => {
             matchedAt: new Date(),
             isSuperLike,
             superLiker: isSuperLike ? userId : undefined,
+            matchType: isSuperLike ? 'super_interest' : 'mutual',
           };
           await StorageService.addMatch(match);
           const matchedProfile = profiles.find(p => p.id === profileId);
@@ -380,6 +384,75 @@ export const RoommatesScreen = () => {
       }
     } catch (error) {
       console.error('[RoommatesScreen] Error processing swipe:', error);
+    }
+  };
+
+  const handleSuperInterest = async () => {
+    if (!currentProfile || !user) return;
+    const check = canSendSuperInterest();
+    if (!check.canSend) {
+      setShowSuperInterestUpsell(true);
+      return;
+    }
+    await useSuperInterestCredit();
+    setSuperInterestGlow(true);
+    setShowSuperInterestConfirm(true);
+    setTimeout(() => {
+      setShowSuperInterestConfirm(false);
+      setSuperInterestGlow(false);
+    }, 2000);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    await StorageService.addNotification({
+      id: `notification_si_${Date.now()}_${Math.random()}`,
+      userId: currentProfile.id,
+      type: 'super_like',
+      title: 'Super Interest!',
+      body: `${user.name || 'Someone'} sent you a Super Interest`,
+      isRead: false,
+      createdAt: new Date(),
+      data: {
+        fromUserId: user.id,
+        fromUserName: user.name,
+        fromUserPhoto: user.profilePicture,
+      },
+    });
+    await StorageService.addLike(user.id, currentProfile.id, true);
+    await StorageService.addSuperLike(currentProfile.id, user.id, user.name, user.profilePicture);
+    const isReciprocalMatch = await StorageService.checkReciprocalLike(user.id, currentProfile.id);
+    if (isReciprocalMatch) {
+      const match: Match = {
+        id: `match_${Date.now()}`,
+        userId1: user.id,
+        userId2: currentProfile.id,
+        matchedAt: new Date(),
+        isSuperLike: true,
+        superLiker: user.id,
+        matchType: 'super_interest',
+      };
+      await StorageService.addMatch(match);
+      setMatchedProfileData({ profile: currentProfile, compatibility: currentProfile.compatibility || 50 });
+      await StorageService.addNotification({
+        id: `notification_match_${Date.now()}_${Math.random()}`,
+        userId: user.id,
+        type: 'match',
+        title: 'New Match!',
+        body: `You and ${currentProfile.name} are a match!`,
+        isRead: false,
+        createdAt: new Date(),
+        data: { matchId: match.id, fromUserId: currentProfile.id, fromUserName: currentProfile.name, fromUserPhoto: currentProfile.photos?.[0] },
+      });
+      await StorageService.addNotification({
+        id: `notification_match_${Date.now()}_${Math.random()}_other`,
+        userId: currentProfile.id,
+        type: 'match',
+        title: 'New Match!',
+        body: `You and ${user.name || 'Someone'} are a match!`,
+        isRead: false,
+        createdAt: new Date(),
+        data: { matchId: match.id, fromUserId: user.id, fromUserName: user.name, fromUserPhoto: user.profilePicture },
+      });
+      setShowMatch(true);
+      await refreshUnreadCount();
     }
   };
 
@@ -710,21 +783,32 @@ export const RoommatesScreen = () => {
   };
 
   const handleMessageClick = async () => {
-    const users = await StorageService.getUsers();
-    const currentUser = users.find(u => u.id === user?.id);
-    const userPlan = currentUser?.subscription?.plan || 'basic';
-    const userStatus = currentUser?.subscription?.status || 'active';
-    
-    const isEliteMember = userPlan === 'elite' && userStatus === 'active';
-    
-    if (isEliteMember) {
-      handleSendDirectMessage();
+    if (!currentProfile || !user) return;
+    const matches = await StorageService.getMatches();
+    const hasMatch = matches.some(m =>
+      (m.userId1 === user.id && m.userId2 === currentProfile.id) ||
+      (m.userId2 === user.id && m.userId1 === currentProfile.id)
+    );
+    if (hasMatch) {
+      handleSendDirectMessage(false);
     } else {
-      setShowMessageModal(true);
+      const userPlan = user.subscription?.plan || 'basic';
+      const userStatus = user.subscription?.status || 'active';
+      const isEliteMember = userPlan === 'elite' && userStatus === 'active';
+      if (isEliteMember) {
+        const coldCheck = canSendColdMessage();
+        if (!coldCheck.canSend) {
+          Alert.alert('Limit Reached', coldCheck.reason || 'No direct messages remaining this month.');
+          return;
+        }
+        handleSendDirectMessage(true);
+      } else {
+        setShowMessageModal(true);
+      }
     }
   };
 
-  const handleSendDirectMessage = async () => {
+  const handleSendDirectMessage = async (isCold: boolean) => {
     if (!currentProfile || !user) return;
     
     const conversations = await StorageService.getConversations();
@@ -735,7 +819,7 @@ export const RoommatesScreen = () => {
     if (existingConversation) {
       (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: existingConversation.id } });
     } else {
-      const newConversation = {
+      const newConversation: any = {
         id: `conv-${currentProfile.id}-${Date.now()}`,
         participant: {
           id: currentProfile.id,
@@ -747,6 +831,7 @@ export const RoommatesScreen = () => {
         timestamp: new Date(),
         unread: 0,
         messages: [],
+        matchType: isCold ? 'cold' : 'mutual',
       };
       await StorageService.addOrUpdateConversation(newConversation);
       (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: newConversation.id } });
@@ -779,7 +864,7 @@ export const RoommatesScreen = () => {
       
       setProcessingMessagePurchase(false);
       setShowMessageModal(false);
-      await handleSendDirectMessage();
+      await handleSendDirectMessage(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }, 1000);
   };
@@ -979,6 +1064,12 @@ export const RoommatesScreen = () => {
           <Feather name="x" size={24} color="#ff4d4d" />
         </Pressable>
         <Pressable
+          style={[styles.actionBtnMd, { backgroundColor: 'rgba(255,107,91,0.15)', borderColor: 'rgba(255,107,91,0.3)', borderWidth: 1 }, superInterestGlow ? { borderColor: '#ff6b5b', borderWidth: 2, shadowColor: '#ff6b5b', shadowOpacity: 0.5, shadowRadius: 8, elevation: 5 } : {}]}
+          onPress={handleSuperInterest}
+        >
+          <Feather name="zap" size={22} color="#ff6b5b" />
+        </Pressable>
+        <Pressable
           style={[styles.actionBtnMd, styles.actionMsg]}
           onPress={handleMessageClick}
         >
@@ -1018,6 +1109,11 @@ export const RoommatesScreen = () => {
             if (existingConversation) {
               (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: existingConversation.id } });
             } else {
+              const storedMatches = await StorageService.getMatches();
+              const thisMatch = storedMatches.find(m =>
+                (m.userId1 === user?.id && m.userId2 === matchedProfileData.profile.id) ||
+                (m.userId2 === user?.id && m.userId1 === matchedProfileData.profile.id)
+              );
               const newConversation = {
                 id: `conv-${matchedProfileData.profile.id}-${Date.now()}`,
                 participant: {
@@ -1030,6 +1126,7 @@ export const RoommatesScreen = () => {
                 timestamp: new Date(),
                 unread: 0,
                 messages: [],
+                matchType: (thisMatch?.matchType || 'mutual') as 'mutual' | 'super_interest' | 'cold',
               };
               await StorageService.addOrUpdateConversation(newConversation);
               (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: newConversation.id } });
@@ -1260,35 +1357,29 @@ export const RoommatesScreen = () => {
             
             <View style={styles.vipModalContent}>
               <ThemedText style={[Typography.h2, { textAlign: 'center', marginBottom: Spacing.sm }]}>
-                Send Direct Message
+                Match Required
               </ThemedText>
               <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary, marginBottom: Spacing.xl }]}>
-                Plus members can send messages without matching. Choose an option below to message {currentProfile?.name}.
+                Messaging requires a mutual match. Upgrade to Elite to send direct messages to anyone — 3 per month included.
               </ThemedText>
-              
-              <View style={[styles.priceCard, { backgroundColor: theme.backgroundDefault, borderColor: theme.border, marginBottom: Spacing.lg }]}>
-                <ThemedText style={[Typography.h3, { marginBottom: Spacing.xs }]}>
-                  One-Time Message
-                </ThemedText>
-                <ThemedText style={[Typography.h1, { color: theme.primary, marginBottom: Spacing.xs }]}>
-                  $0.99
-                </ThemedText>
-                <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
-                  Send a single message to this person
-                </ThemedText>
-              </View>
               
               <View style={styles.vipFeaturesList}>
                 <View style={styles.vipFeatureItem}>
-                  <Feather name="check-circle" size={20} color={theme.success} />
+                  <Feather name="send" size={20} color="#9370DB" />
                   <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
-                    Start a conversation instantly
+                    3 direct messages per month
                   </ThemedText>
                 </View>
                 <View style={styles.vipFeatureItem}>
-                  <Feather name="check-circle" size={20} color={theme.success} />
+                  <Feather name="zap" size={20} color="#FFD700" />
                   <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
-                    No matching required
+                    Unlimited Super Interests
+                  </ThemedText>
+                </View>
+                <View style={styles.vipFeatureItem}>
+                  <Feather name="eye" size={20} color={theme.info} />
+                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
+                    Read receipts and more
                   </ThemedText>
                 </View>
               </View>
@@ -1296,20 +1387,14 @@ export const RoommatesScreen = () => {
             
             <View style={styles.vipModalActions}>
               <Pressable
-                style={[styles.vipModalButton, { backgroundColor: theme.primary, opacity: processingMessagePurchase ? 0.7 : 1 }]}
-                onPress={handlePurchaseMessageCredit}
-                disabled={processingMessagePurchase}
+                style={[styles.vipModalButton, { backgroundColor: theme.primary }]}
+                onPress={() => {
+                  setShowMessageModal(false);
+                  (navigation as any).navigate('Profile', { screen: 'Subscription' });
+                }}
               >
                 <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
-                  {processingMessagePurchase ? 'Processing...' : 'Send Message - $0.99'}
-                </ThemedText>
-              </Pressable>
-              <Pressable
-                style={[styles.vipModalButton, { backgroundColor: theme.warning, marginTop: Spacing.md }]}
-                onPress={handleUpgradeForMessaging}
-              >
-                <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
-                  Upgrade to Plus
+                  Upgrade to Elite
                 </ThemedText>
               </Pressable>
               <Pressable
@@ -1317,7 +1402,7 @@ export const RoommatesScreen = () => {
                 onPress={() => setShowMessageModal(false)}
               >
                 <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
-                  Cancel
+                  Maybe Later
                 </ThemedText>
               </Pressable>
             </View>
@@ -1388,6 +1473,88 @@ export const RoommatesScreen = () => {
               >
                 <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
                   Upgrade
+                </ThemedText>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {showSuperInterestConfirm ? (
+        <View style={{ position: 'absolute', top: '40%', alignSelf: 'center', backgroundColor: 'rgba(255,107,91,0.95)', paddingHorizontal: 24, paddingVertical: 14, borderRadius: 20, zIndex: 999 }}>
+          <ThemedText style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>Super Interest Sent!</ThemedText>
+        </View>
+      ) : null}
+
+      <Modal
+        visible={showSuperInterestUpsell}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowSuperInterestUpsell(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.vipModalContainer, { backgroundColor: theme.backgroundSecondary }]}>
+            <View style={[styles.vipModalHeader, { backgroundColor: '#ff6b5b' }]}>
+              <Feather name="zap" size={32} color="#FFFFFF" />
+            </View>
+            <View style={styles.vipModalContent}>
+              <ThemedText style={[Typography.h2, { textAlign: 'center', marginBottom: Spacing.sm }]}>
+                Get More Super Interests
+              </ThemedText>
+              <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary, marginBottom: Spacing.xl }]}>
+                Super Interests immediately notify the other person and boost your visibility.
+              </ThemedText>
+              <View style={styles.vipFeaturesList}>
+                <View style={styles.vipFeatureItem}>
+                  <Feather name="zap" size={20} color="#ff6b5b" />
+                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
+                    Basic: Buy at $0.99 each
+                  </ThemedText>
+                </View>
+                <View style={styles.vipFeatureItem}>
+                  <Feather name="zap" size={20} color="#ff6b5b" />
+                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
+                    Plus: 5 free per month + buy more
+                  </ThemedText>
+                </View>
+                <View style={styles.vipFeatureItem}>
+                  <Feather name="zap" size={20} color="#ff6b5b" />
+                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
+                    Elite: Unlimited Super Interests
+                  </ThemedText>
+                </View>
+              </View>
+            </View>
+            <View style={styles.vipModalActions}>
+              <Pressable
+                style={[styles.vipUpgradeButton, { backgroundColor: '#ff6b5b', marginBottom: Spacing.sm }]}
+                onPress={async () => {
+                  await purchaseSuperInterest();
+                  setShowSuperInterestUpsell(false);
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                }}
+              >
+                <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
+                  Buy 1 for $0.99
+                </ThemedText>
+              </Pressable>
+              <Pressable
+                style={[styles.vipUpgradeButton, { backgroundColor: theme.info }]}
+                onPress={() => {
+                  setShowSuperInterestUpsell(false);
+                  (navigation as any).navigate('Profile', { screen: 'Subscription' });
+                }}
+              >
+                <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
+                  Upgrade Plan
+                </ThemedText>
+              </Pressable>
+              <Pressable
+                style={[styles.vipCancelButton, { borderColor: theme.border }]}
+                onPress={() => setShowSuperInterestUpsell(false)}
+              >
+                <ThemedText style={[Typography.h3, { color: theme.textSecondary }]}>
+                  Maybe Later
                 </ThemedText>
               </Pressable>
             </View>

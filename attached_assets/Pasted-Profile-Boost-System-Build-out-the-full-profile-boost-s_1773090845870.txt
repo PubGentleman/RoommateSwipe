@@ -1,0 +1,119 @@
+Profile Boost System
+Build out the full profile boost system for Roomdr. Implement all tiers, durations, UI indicators, and purchase flows exactly as described below.
+
+BOOST RULES BY TIER
+BasicPlusEliteCost$4.99 one-time purchase1 free per weekUnlimited freeDuration12 hours24 hours48 hoursCooldownNone (pay anytime)7 days between free boostsOnce current boost expiresExtra boostsPay $4.99 for morePay $4.99 for extraNot needed
+
+TYPES — Update types/models.ts
+Add or update the boost data on the User object:
+tsboostData?: {
+  isBoosted: boolean;
+  boostExpiresAt?: string;        // ISO date string
+  lastBoostActivatedAt?: string;  // ISO date string
+  nextFreeBoostAvailableAt?: string; // Plus tier only
+  boostDurationHours: 12 | 24 | 48;
+}
+
+BOOST LOGIC — Create utils/boostUtils.ts
+Create a utility file with these functions:
+tsgetBoostDuration(plan: string): 12 | 24 | 48
+// Basic → 12, Plus → 24, Elite → 48
+
+canActivateBoost(user: User): { allowed: boolean; reason?: string; nextAvailableAt?: string }
+// Basic → always allowed (costs money)
+// Plus → allowed if lastBoostActivatedAt was more than 7 days ago or never boosted
+// Elite → allowed if current boost is expired or not active
+
+getBoostTimeRemaining(boostExpiresAt: string): string
+// Returns human readable string like "6 hrs 30 mins remaining"
+
+isBoostExpired(boostExpiresAt: string): boolean
+// Returns true if current time is past boostExpiresAt
+Add a background check that runs on app launch and whenever the app comes to foreground — if boostExpiresAt is in the past, set isBoosted = false automatically.
+
+BOOST ACTIVATION FLOW
+In ProfileScreen.tsx, add a Boost Profile button in the profile header area. Style it as a coral gradient pill button with a ⚡ icon and the label "Boost Profile". If currently boosted, change it to show a gold pulsing badge "⚡ Boosted — 6h 30m left" with a countdown that updates every minute.
+When the Boost button is tapped:
+Basic user:
+
+Show a bottom sheet modal titled "Boost Your Profile"
+Show: "Your profile appears near the top of swipe decks for 12 hours"
+Show price: $4.99
+Show CTA button: "Boost for $4.99"
+On confirm: process purchase, set isBoosted = true, set boostExpiresAt to now + 12 hours, show success toast "⚡ Profile Boosted for 12 hours!"
+
+Plus user (free boost available):
+
+Show bottom sheet: "Boost Your Profile — Free with Plus"
+Show: "Your profile appears near the top of swipe decks for 24 hours"
+Show CTA: "Activate Free Boost"
+On confirm: activate boost, set nextFreeBoostAvailableAt to now + 7 days
+
+Plus user (free boost already used this week):
+
+Show bottom sheet with a locked state
+Show: "Your next free boost is available on [date]"
+Show secondary option: "Boost now for $4.99 (12 hours)" with pay button
+
+Elite user (no active boost):
+
+Show bottom sheet: "Boost Your Profile — Unlimited with Elite"
+Show: "Your profile appears near the top of swipe decks for 48 hours"
+Show CTA: "Activate Boost"
+On confirm: activate immediately, no charge
+
+Elite user (boost active):
+
+Show bottom sheet: "Boost Already Active"
+Show time remaining
+Show: "You can activate a new boost once this one expires"
+
+
+BOOST CARD INDICATOR — Update RoommatesScreen.tsx
+When viewing profiles on the swipe deck, if that profile's boostData.isBoosted === true:
+
+Add a subtle coral glowing border around the profile card (use a soft shadow: shadowColor: '#ff6b5b', shadowOpacity: 0.6, shadowRadius: 12)
+Add a small ⚡ badge in the top-right corner of the card with a coral background
+Do NOT show the word "Boosted" — keep it subtle and visual only
+
+
+BOOST SORTING — Update matchingAlgorithm.ts
+In the function that returns the sorted list of profiles to swipe:
+
+Boosted profiles should appear in the top 20% of the swipe deck
+Among boosted profiles, sort by compatibility score descending
+Among non-boosted profiles, keep existing compatibility sort
+Never show the same boosted profile twice in one session even if they re-appear in the deck
+
+
+MATCHING ALGORITHM PLACEMENT
+Add this logic at the top of the profile sort function:
+tsconst boosted = profiles.filter(p => p.boostData?.isBoosted && !isBoostExpired(p.boostData.boostExpiresAt));
+const normal = profiles.filter(p => !p.boostData?.isBoosted || isBoostExpired(p.boostData.boostExpiresAt));
+
+const topSlots = Math.ceil(profiles.length * 0.2);
+const boostedSlice = boosted.slice(0, topSlots).sort(byCompatibility);
+const normalSorted = normal.sort(byCompatibility);
+
+return [...boostedSlice, ...normalSorted];
+
+NOTIFICATIONS
+When a boost expires, send a local push notification:
+
+Title: "Your Profile Boost Expired ⚡"
+Body (Plus): "Boost again — your next free boost is available [date]"
+Body (Basic): "Boost again for $4.99 to stay at the top"
+Body (Elite): "Activate a new boost anytime from your profile"
+
+Use the existing NotificationContext to send this.
+
+After completing all changes, verify:
+
+Basic user sees $4.99 purchase modal and boost lasts 12 hours
+Plus user gets free boost once per week, sees countdown to next free boost
+Elite user can boost anytime for 48 hours, no charge
+Boosted profiles show coral glow border and ⚡ badge on swipe cards
+Boosted profiles appear in top 20% of swipe deck
+Expired boosts auto-clear on app foreground
+Push notification fires when boost expires
+App compiles with no TypeScript errors

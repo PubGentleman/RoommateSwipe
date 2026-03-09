@@ -114,6 +114,7 @@ export interface Conversation {
   timestamp: Date;
   unread: number;
   messages: Message[];
+  matchType?: 'mutual' | 'super_interest' | 'cold';
 }
 
 export interface Application {
@@ -136,6 +137,7 @@ export interface Match {
   matchedAt: Date;
   isSuperLike?: boolean;
   superLiker?: string;
+  matchType?: 'mutual' | 'super_interest' | 'cold';
 }
 
 export type ZodiacSign = 
@@ -237,6 +239,12 @@ export interface User {
     twoFactorEnabled: boolean;
   };
   messageCount?: number;
+  coldMessagesUsedThisMonth?: number;
+  coldMessagesResetDate?: string;
+  superInterestData?: {
+    usedThisMonth: number;
+    lastResetDate: string;
+  };
   boostData?: {
     boostsUsed: number;
     lastBoostDate?: Date;

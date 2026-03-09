@@ -1341,7 +1341,7 @@ export const ExploreScreen = () => {
                             <ThemedText style={{ color: '#fff', fontWeight: '700', marginLeft: Spacing.sm, fontSize: 15 }}>
                               I'm Interested
                             </ThemedText>
-                            {canSendSuperInterest() ? (
+                            {canSendSuperInterest().canSend ? (
                               <Pressable
                                 onPress={(e) => {
                                   e.stopPropagation();
@@ -1354,7 +1354,7 @@ export const ExploreScreen = () => {
                               </Pressable>
                             ) : null}
                           </Pressable>
-                          {canSendSuperInterest() ? (
+                          {canSendSuperInterest().canSend ? (
                             <ThemedText style={{ color: isSuperInterest ? '#FFD700' : 'rgba(255,255,255,0.4)', fontSize: 11, textAlign: 'center', marginTop: 6 }}>
                               {isSuperInterest ? 'Super Interest — Bumped to top!' : 'Tap the star for Super Interest'}
                             </ThemedText>

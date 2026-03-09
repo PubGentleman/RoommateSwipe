@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Pressable, FlatList, TextInput, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, StyleSheet, Pressable, FlatList, TextInput, KeyboardAvoidingView, Platform, Alert, Modal } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
@@ -27,7 +27,7 @@ type ChatScreenProps = {
 export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const { conversationId, otherUser: routeOtherUser } = route.params;
   const { theme } = useTheme();
-  const { user, incrementMessageCount, canSendMessage, canStartNewChat, incrementActiveChatCount, watchAdForCredit, isBasicUser, blockUser, reportUser } = useAuth();
+  const { user, incrementMessageCount, canSendMessage, canStartNewChat, incrementActiveChatCount, watchAdForCredit, isBasicUser, blockUser, reportUser, canSendColdMessage, useColdMessage } = useAuth();
   const insets = useSafeAreaInsets();
   const { refreshUnreadCount } = useNotificationContext();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -39,6 +39,9 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [showReportBlockModal, setShowReportBlockModal] = useState(false);
   const [showAISheet, setShowAISheet] = useState(false);
   const [otherUserPlan, setOtherUserPlan] = useState<string | undefined>();
+  const [isColdMessage, setIsColdMessage] = useState(false);
+  const [coldMessageResponded, setColdMessageResponded] = useState(false);
+  const [showColdMessageBlockSheet, setShowColdMessageBlockSheet] = useState(false);
 
   // Tab bar height for bottom padding
   const TAB_BAR_HEIGHT = 80;
@@ -93,11 +96,36 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           setOtherUserPlan(participantUser.subscription?.plan);
         }
       }
+
+      if (user) {
+        const matches = await StorageService.getMatches();
+        const hasMatch = matches.some(m =>
+          (m.userId1 === user.id && m.userId2 === conversation.participant.id) ||
+          (m.userId2 === user.id && m.userId1 === conversation.participant.id)
+        );
+        if (conversation.matchType === 'cold' || !hasMatch) {
+          setIsColdMessage(true);
+          const otherResponded = loadedMessages.some(m => m.senderId === conversation.participant.id);
+          setColdMessageResponded(otherResponded);
+        }
+      }
     }
   };
 
   const sendMessage = async () => {
     if (!inputText.trim() || !user) return;
+
+    if (isColdMessage && !coldMessageResponded) {
+      const coldCheck = canSendColdMessage();
+      if (!coldCheck.canSend) {
+        if (isEliteUser()) {
+          Alert.alert('Limit Reached', coldCheck.reason || 'No cold messages remaining.');
+        } else {
+          setShowColdMessageBlockSheet(true);
+        }
+        return;
+      }
+    }
 
     if (!canSendMessage()) {
       const alertButtons: any[] = [
@@ -174,6 +202,11 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       
       if (isFirstMessageFromUser) {
         await incrementActiveChatCount(conversationId);
+        if (isColdMessage && !coldMessageResponded) {
+          await useColdMessage();
+          conversations[conversationIndex].matchType = 'cold';
+          await StorageService.setConversations(conversations);
+        }
       }
 
       const otherParticipantId = conversations[conversationIndex].participants?.find(
@@ -353,6 +386,15 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         </Pressable>
       ) : null}
 
+      {isColdMessage && !coldMessageResponded ? (
+        <View style={[styles.premiumBanner, { backgroundColor: 'rgba(147,112,219,0.15)', borderBottomWidth: 1, borderBottomColor: 'rgba(147,112,219,0.3)' }]}>
+          <Feather name="send" size={16} color="#9370DB" />
+          <ThemedText style={[Typography.caption, { color: '#9370DB', marginLeft: Spacing.sm, flex: 1 }]}>
+            You sent a direct message — they haven't matched with you yet
+          </ThemedText>
+        </View>
+      ) : null}
+
       <View style={{ flex: 1 }}>
         <FlatList
           ref={flatListRef}
@@ -429,6 +471,43 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           }}
         />
       ) : null}
+
+      <Modal
+        visible={showColdMessageBlockSheet}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowColdMessageBlockSheet(false)}
+      >
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <View style={{ backgroundColor: theme.backgroundSecondary, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: insets.bottom + 24 }}>
+            <View style={{ alignItems: 'center', marginBottom: 16 }}>
+              <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: theme.border, marginBottom: 16 }} />
+              <Feather name="lock" size={32} color={theme.primary} />
+            </View>
+            <ThemedText style={[Typography.h2, { textAlign: 'center', marginBottom: 8 }]}>
+              Match Required
+            </ThemedText>
+            <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary, marginBottom: 24 }]}>
+              Messaging requires a mutual match. Upgrade to Elite to send direct messages.
+            </ThemedText>
+            <Pressable
+              style={{ backgroundColor: theme.primary, paddingVertical: 14, borderRadius: 12, alignItems: 'center', marginBottom: 12 }}
+              onPress={() => {
+                setShowColdMessageBlockSheet(false);
+                (navigation as any).navigate('Profile', { screen: 'Subscription' });
+              }}
+            >
+              <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>Upgrade to Elite</ThemedText>
+            </Pressable>
+            <Pressable
+              style={{ paddingVertical: 14, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: theme.border }}
+              onPress={() => setShowColdMessageBlockSheet(false)}
+            >
+              <ThemedText style={[Typography.h3, { color: theme.textSecondary }]}>Maybe Later</ThemedText>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };

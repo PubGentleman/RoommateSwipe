@@ -44,7 +44,11 @@ interface AuthContextType {
   canViewListing: () => { canView: boolean; remaining: number; limit: number; message?: string };
   useListingView: () => Promise<void>;
   canSendInterest: () => Promise<{ canSend: boolean; remaining: number; reason?: string }>;
-  canSendSuperInterest: () => boolean;
+  canSendSuperInterest: () => { canSend: boolean; remaining: number; reason?: string };
+  useSuperInterestCredit: () => Promise<void>;
+  canSendColdMessage: () => { canSend: boolean; remaining: number; reason?: string };
+  useColdMessage: () => Promise<void>;
+  getSuperInterestCount: () => number;
   upgradeHostPlan: (plan: 'pro' | 'business', billingCycle?: 'monthly' | '3month' | 'annual') => Promise<void>;
   downgradeHostPlan: (plan: 'starter' | 'pro') => Promise<void>;
   getHostPlan: () => 'starter' | 'pro' | 'business';
@@ -1394,11 +1398,113 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { canSend: true, remaining };
   };
 
-  const canSendSuperInterest = (): boolean => {
-    if (!user) return false;
+  const resetSuperInterestMonthly = (): { usedThisMonth: number; lastResetDate: string } => {
+    if (!user) return { usedThisMonth: 0, lastResetDate: new Date().toISOString() };
+    const data = user.superInterestData;
+    const now = new Date();
+    if (data?.lastResetDate) {
+      const lastReset = new Date(data.lastResetDate);
+      if (lastReset.getMonth() !== now.getMonth() || lastReset.getFullYear() !== now.getFullYear()) {
+        return { usedThisMonth: 0, lastResetDate: now.toISOString() };
+      }
+      return { usedThisMonth: data.usedThisMonth, lastResetDate: data.lastResetDate };
+    }
+    return { usedThisMonth: 0, lastResetDate: now.toISOString() };
+  };
+
+  const canSendSuperInterest = (): { canSend: boolean; remaining: number; reason?: string } => {
+    if (!user) return { canSend: false, remaining: 0, reason: 'Not logged in' };
     const plan = user.subscription?.plan || 'basic';
-    const status = user.subscription?.status || 'active';
-    return (plan === 'plus' || plan === 'elite') && status === 'active';
+    if (plan === 'elite') {
+      return { canSend: true, remaining: 999 };
+    }
+    if (plan === 'plus') {
+      const monthData = resetSuperInterestMonthly();
+      const remaining = Math.max(0, 5 - monthData.usedThisMonth);
+      const purchased = user.purchases?.superInterestsRemaining || 0;
+      const total = remaining + purchased;
+      if (total <= 0) return { canSend: false, remaining: 0, reason: 'No Super Interests remaining this month. Buy more for $0.99 each.' };
+      return { canSend: true, remaining: total };
+    }
+    const purchased = user.purchases?.superInterestsRemaining || 0;
+    if (purchased <= 0) return { canSend: false, remaining: 0, reason: 'Buy Super Interests for $0.99 each or upgrade to Plus for 5 free per month.' };
+    return { canSend: true, remaining: purchased };
+  };
+
+  const getSuperInterestCount = (): number => {
+    if (!user) return 0;
+    const plan = user.subscription?.plan || 'basic';
+    if (plan === 'elite') return 999;
+    if (plan === 'plus') {
+      const monthData = resetSuperInterestMonthly();
+      const freeRemaining = Math.max(0, 5 - monthData.usedThisMonth);
+      return freeRemaining + (user.purchases?.superInterestsRemaining || 0);
+    }
+    return user.purchases?.superInterestsRemaining || 0;
+  };
+
+  const useSuperInterestCredit = async (): Promise<void> => {
+    if (!user) return;
+    const plan = user.subscription?.plan || 'basic';
+    if (plan === 'elite') return;
+    if (plan === 'plus') {
+      const monthData = resetSuperInterestMonthly();
+      const freeRemaining = Math.max(0, 5 - monthData.usedThisMonth);
+      if (freeRemaining > 0) {
+        const updated = {
+          ...user,
+          superInterestData: { usedThisMonth: monthData.usedThisMonth + 1, lastResetDate: monthData.lastResetDate },
+        };
+        await StorageService.setCurrentUser(updated);
+        await StorageService.addOrUpdateUser(updated);
+        setUser(updated);
+        return;
+      }
+    }
+    const current = user.purchases?.superInterestsRemaining || 0;
+    if (current <= 0) return;
+    const updated = {
+      ...user,
+      purchases: { ...user.purchases, superInterestsRemaining: current - 1 },
+    };
+    await StorageService.setCurrentUser(updated);
+    await StorageService.addOrUpdateUser(updated);
+    setUser(updated);
+  };
+
+  const canSendColdMessage = (): { canSend: boolean; remaining: number; reason?: string } => {
+    if (!user) return { canSend: false, remaining: 0, reason: 'Not logged in' };
+    const plan = user.subscription?.plan || 'basic';
+    if (plan !== 'elite') {
+      return { canSend: false, remaining: 0, reason: 'Messaging requires a mutual match. Upgrade to Elite to send direct messages.' };
+    }
+    const now = new Date();
+    let used = user.coldMessagesUsedThisMonth || 0;
+    const resetDate = user.coldMessagesResetDate ? new Date(user.coldMessagesResetDate) : null;
+    if (!resetDate || resetDate.getMonth() !== now.getMonth() || resetDate.getFullYear() !== now.getFullYear()) {
+      used = 0;
+    }
+    const remaining = Math.max(0, 3 - used);
+    if (remaining <= 0) return { canSend: false, remaining: 0, reason: 'You\'ve used all 3 direct messages this month.' };
+    return { canSend: true, remaining };
+  };
+
+  const useColdMessage = async (): Promise<void> => {
+    if (!user) return;
+    const now = new Date();
+    let used = user.coldMessagesUsedThisMonth || 0;
+    const resetDate = user.coldMessagesResetDate ? new Date(user.coldMessagesResetDate) : null;
+    if (!resetDate || resetDate.getMonth() !== now.getMonth() || resetDate.getFullYear() !== now.getFullYear()) {
+      used = 0;
+    }
+    const updated = {
+      ...user,
+      coldMessagesUsedThisMonth: used + 1,
+      coldMessagesResetDate: now.toISOString(),
+    };
+    await StorageService.setCurrentUser(updated);
+    await StorageService.addOrUpdateUser(updated);
+    setUser(updated);
   };
 
   const getHostPlan = (): 'starter' | 'pro' | 'business' => {
@@ -1563,7 +1669,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, cancelSubscriptionAtPeriodEnd, reactivateSubscription, getSubscriptionDetails, updateUser, blockUser: blockUserAction, unblockUser: unblockUserAction, reportUser: reportUserAction, isUserBlocked: isUserBlockedCheck, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike, watchAdForCredit, getAdCredits, useAdCredit, isBasicUser, canViewListing, useListingView, canSendInterest, canSendSuperInterest, upgradeHostPlan, downgradeHostPlan, getHostPlan, canAddListing, canRespondToInquiry, useInquiryResponse, purchaseListingBoost, purchaseHostVerification, purchaseSuperInterest, completeOnboardingStep }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, cancelSubscriptionAtPeriodEnd, reactivateSubscription, getSubscriptionDetails, updateUser, blockUser: blockUserAction, unblockUser: unblockUserAction, reportUser: reportUserAction, isUserBlocked: isUserBlockedCheck, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike, watchAdForCredit, getAdCredits, useAdCredit, isBasicUser, canViewListing, useListingView, canSendInterest, canSendSuperInterest, useSuperInterestCredit, canSendColdMessage, useColdMessage, getSuperInterestCount, upgradeHostPlan, downgradeHostPlan, getHostPlan, canAddListing, canRespondToInquiry, useInquiryResponse, purchaseListingBoost, purchaseHostVerification, purchaseSuperInterest, completeOnboardingStep }}>
       {children}
     </AuthContext.Provider>
   );

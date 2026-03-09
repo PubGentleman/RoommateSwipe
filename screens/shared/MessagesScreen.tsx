@@ -46,6 +46,7 @@ export const MessagesScreen = () => {
   const [profilesMap, setProfilesMap] = useState<Map<string, RoommateProfile>>(new Map());
   const [usersMap, setUsersMap] = useState<Map<string, User>>(new Map());
   const [newMatches, setNewMatches] = useState<{ profile: RoommateProfile; match: Match; compatibility: number }[]>([]);
+  const [matchesMap, setMatchesMap] = useState<Map<string, Match>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
@@ -73,10 +74,12 @@ export const MessagesScreen = () => {
 
       const recentMatchProfiles: { profile: RoommateProfile; match: Match; compatibility: number }[] = [];
 
+      const mMap = new Map<string, Match>();
       for (const match of matches) {
         if (match.userId1 !== user.id && match.userId2 !== user.id) continue;
 
         const otherUserId = match.userId1 === user.id ? match.userId2 : match.userId1;
+        mMap.set(otherUserId, match);
         const conversationExists = existingConversations.some(
           c => c.participant.id === otherUserId
         );
@@ -96,8 +99,14 @@ export const MessagesScreen = () => {
               timestamp: match.matchedAt,
               unread: 0,
               messages: [],
+              matchType: match.matchType || 'mutual',
             };
             existingConversations.push(newConversation);
+          }
+        } else {
+          const existingConv = existingConversations.find(c => c.participant.id === otherUserId);
+          if (existingConv && !existingConv.matchType) {
+            existingConv.matchType = match.matchType || 'mutual';
           }
         }
 
@@ -107,6 +116,7 @@ export const MessagesScreen = () => {
           recentMatchProfiles.push({ profile: otherProfile, match, compatibility });
         }
       }
+      setMatchesMap(mMap);
 
       recentMatchProfiles.sort((a, b) => b.match.matchedAt.getTime() - a.match.matchedAt.getTime());
       setNewMatches(recentMatchProfiles.slice(0, 10));
@@ -115,6 +125,7 @@ export const MessagesScreen = () => {
       const userConversations = existingConversations.filter(
         c => !blockedIds.includes(c.participant.id) && (
           c.id.startsWith('conv-interest-') ||
+          c.matchType === 'cold' ||
           matches.some(match => 
             (match.userId1 === user.id && match.userId2 === c.participant.id) ||
             (match.userId2 === user.id && match.userId1 === c.participant.id)
@@ -257,6 +268,8 @@ export const MessagesScreen = () => {
     const participantUser = usersMap.get(item.participant.id);
     const participantPlan = participantUser?.subscription?.plan;
     const isVerified = profile ? getVerificationLevel(profile.verification) >= 2 : false;
+    const match = matchesMap.get(item.participant.id);
+    const convMatchType = item.matchType || match?.matchType || 'mutual';
 
     return (
       <Pressable
@@ -315,14 +328,30 @@ export const MessagesScreen = () => {
             ) : null}
           </View>
 
-          {compatibility !== null ? (
-            <View style={styles.convMetaRow}>
+          <View style={styles.convMetaRow}>
+            {convMatchType === 'super_interest' ? (
+              <View style={[styles.convMatchTag, { backgroundColor: 'rgba(255,215,0,0.15)' }]}>
+                <Feather name="zap" size={10} color="#FFD700" />
+                <ThemedText style={[styles.convMatchTagText, { color: '#FFD700' }]}>Super Interest</ThemedText>
+              </View>
+            ) : convMatchType === 'cold' ? (
+              <View style={[styles.convMatchTag, { backgroundColor: 'rgba(147,112,219,0.15)' }]}>
+                <Feather name="send" size={10} color="#9370DB" />
+                <ThemedText style={[styles.convMatchTagText, { color: '#9370DB' }]}>Direct</ThemedText>
+              </View>
+            ) : (
               <View style={styles.convMatchTag}>
+                <Feather name="refresh-cw" size={10} color="rgba(255,107,91,0.7)" />
+                <ThemedText style={styles.convMatchTagText}>Matched</ThemedText>
+              </View>
+            )}
+            {compatibility !== null ? (
+              <View style={[styles.convMatchTag, { marginLeft: 6 }]}>
                 <Feather name="heart" size={10} color="rgba(255,107,91,0.7)" />
                 <ThemedText style={styles.convMatchTagText}>{compatibility}% match</ThemedText>
               </View>
-            </View>
-          ) : null}
+            ) : null}
+          </View>
 
           {isNew ? (
             <View style={styles.iceRow}>

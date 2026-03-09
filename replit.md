@@ -31,7 +31,7 @@ Roomdr features a points-based compatibility algorithm (0-100 score) using 14 we
 The application is built with React Native and Expo using TypeScript, utilizing React Navigation for role-based access (Renter, Host, Agent/Landlord) and a theme system supporting light/dark modes.
 
 **Key Features:**
-- **Renter:** Swipe-based matching, 1-on-1 messaging, group management, property exploration with advanced filters and map/list views, saved properties, profile view tracking, AI Match Assistant, animated match celebration, report/block system, notification feed, profile completion indicator, and a mutual interest flow (Interest Cards and Super Interest).
+- **Renter:** Swipe-based matching, 1-on-1 messaging, group management, property exploration with advanced filters and map/list views, saved properties, profile view tracking, AI Match Assistant, animated match celebration, report/block system, notification feed, profile completion indicator, mutual interest flow (Interest Cards and Super Interest), and cold messaging (Elite).
 - **Host:** Full host dashboard with statistics, listing management (create, edit, delete, pause, mark rented), dedicated Inquiries screen for interest card management, inquiry-based analytics, roommate matching (same UI as renters), and role switching.
 
 **User Experience Enhancements:**
@@ -46,6 +46,7 @@ The application is built with React Native and Expo using TypeScript, utilizing 
 - **Roomdr AI Assistant:** A floating coral-red CPU button (`AIFloatingButton`) positioned on every renter screen (Match, Groups, Explore, Messages, Profile) that opens a context-aware AI bottom sheet. The sheet dynamically adapts greetings, content cards, and insights based on the current screen context and live data (match compatibility, conversation stats, group analysis, profile completion, filter guidance). Supports 6 screen contexts with a context pill indicator in the header.
 - **Read Receipts:** Elite users can see message read status.
 - **Who Liked You:** Plus/Elite users can view received interest cards.
+- **Roommate Interaction System:** Three interaction types: Swipe Right (free, mutual match required), Super Interest ($0.99/each for Basic, 5/mo free for Plus, unlimited for Elite — immediately notifies recipient), and Cold Messaging (Elite only, 3/mo — messages non-matches with banner indicator). Match types tracked as `'mutual' | 'super_interest' | 'cold'` on Match and Conversation models. MessagesScreen shows colored badges per match type (coral "Matched", gold "Super Interest", purple "Direct"). ChatScreen shows cold message banner and blocks non-Elite users from messaging non-matches. Upsell modals for Super Interest and cold message upgrade.
 
 Animations are handled by React Native Reanimated, gestures by React Native Gesture Handler, and state is managed by React Context API and AsyncStorage.
 
