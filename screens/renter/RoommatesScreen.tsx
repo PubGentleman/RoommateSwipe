@@ -12,6 +12,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { StorageService } from '../../utils/storage';
 import { RoommateProfile, Match, InterestCard } from '../../types/models';
+import { isBoostExpired } from '../../utils/boostUtils';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scaleFont, moderateScale, getResponsiveSpacing } from '../../utils/responsive';
 import { calculateCompatibility, getMatchQualityColor, getCleanlinessLabel, getSocialLevelLabel, getWorkScheduleLabel, getWorkStyleTag, validateProfileDataConsistency, formatMoveInDate, getGenderSymbol } from '../../utils/matchingAlgorithm';
@@ -38,7 +39,7 @@ const CARD_WIDTH = Math.min(SCREEN_WIDTH - Spacing.xxl, MAX_CARD_WIDTH);
 
 export const RoommatesScreen = () => {
   const { theme } = useTheme();
-  const { user, purchaseBoost, activateBoost, canBoost, canSendInterest, purchaseUndoPass, canRewind, useRewind, canSuperLike, useSuperLike, blockUser, reportUser, canSendSuperInterest, useSuperInterestCredit, getSuperInterestCount, purchaseSuperInterest, canSendColdMessage } = useAuth();
+  const { user, canSendInterest, purchaseUndoPass, canRewind, useRewind, canSuperLike, useSuperLike, blockUser, reportUser, canSendSuperInterest, useSuperInterestCredit, getSuperInterestCount, purchaseSuperInterest, canSendColdMessage } = useAuth();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { refreshUnreadCount } = useNotificationContext();
@@ -49,8 +50,7 @@ export const RoommatesScreen = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [profileUsers, setProfileUsers] = useState<Map<string, any>>(new Map());
   const [showPaywall, setShowPaywall] = useState(false);
-  const [showPurchaseBoostModal, setShowPurchaseBoostModal] = useState(false);
-  const [processingBoost, setProcessingBoost] = useState(false);
+  
   const [lastSwipedProfile, setLastSwipedProfile] = useState<{ profile: RoommateProfile; action: 'like' | 'nope' | 'superlike' } | null>(null);
   const [showUndoUpgradeModal, setShowUndoUpgradeModal] = useState(false);
   const [processingUndoPass, setProcessingUndoPass] = useState(false);
@@ -157,35 +157,22 @@ export const RoommatesScreen = () => {
 
       const filteredProfiles = applyFiltersToProfiles(profilesWithCompatibility, matchFilters);
 
-      const sortedProfiles = filteredProfiles.sort((a, b) => {
-        const userA = userMap.get(a.id);
-        const userB = userMap.get(b.id);
-        
-        const now = new Date();
-        const isActiveBoostA = userA?.boostData?.isBoosted && userA?.boostData?.boostExpiresAt
-          ? new Date(userA.boostData.boostExpiresAt) > now
-          : false;
-        const isActiveBoostB = userB?.boostData?.isBoosted && userB?.boostData?.boostExpiresAt
-          ? new Date(userB.boostData.boostExpiresAt) > now
-          : false;
-        
-        const isBoostedA = isActiveBoostA ? 1 : 0;
-        const isBoostedB = isActiveBoostB ? 1 : 0;
-        if (isBoostedA !== isBoostedB) return isBoostedB - isBoostedA;
-        
-        const getPriority = (user: typeof userA) => {
-          const plan = user?.subscription?.plan || 'basic';
-          if (plan === 'elite') return 3;
-          if (plan === 'plus') return 2;
-          return 1;
-        };
-        
-        const priorityA = getPriority(userA);
-        const priorityB = getPriority(userB);
-        if (priorityA !== priorityB) return priorityB - priorityA;
-        
-        return (b.compatibility || 0) - (a.compatibility || 0);
-      });
+      const byCompatibility = (a: typeof filteredProfiles[0], b: typeof filteredProfiles[0]) =>
+        (b.compatibility || 0) - (a.compatibility || 0);
+
+      const isBoostedProfile = (p: typeof filteredProfiles[0]) => {
+        const u = userMap.get(p.id);
+        return u?.boostData?.isBoosted && u?.boostData?.boostExpiresAt && !isBoostExpired(String(u.boostData.boostExpiresAt));
+      };
+
+      const boosted = filteredProfiles.filter(isBoostedProfile).sort(byCompatibility);
+      const normal = filteredProfiles.filter(p => !isBoostedProfile(p)).sort(byCompatibility);
+
+      const topSlots = Math.ceil(filteredProfiles.length * 0.2);
+      const boostedForTop = boosted.slice(0, topSlots);
+      const boostedRemainder = boosted.slice(topSlots);
+
+      const sortedProfiles = [...boostedForTop, ...boostedRemainder, ...normal];
       
       sortedProfiles.forEach(p => validateProfileDataConsistency(p));
       setProfiles(sortedProfiles);
@@ -205,9 +192,8 @@ export const RoommatesScreen = () => {
   const currentProfile = profiles[currentIndex];
   const currentProfileUser = currentProfile ? profileUsers.get(currentProfile.id) : null;
   
-  const now = new Date();
   const isBoostActive = currentProfileUser?.boostData?.isBoosted && currentProfileUser?.boostData?.boostExpiresAt
-    ? new Date(currentProfileUser.boostData.boostExpiresAt) > now
+    ? !isBoostExpired(String(currentProfileUser.boostData.boostExpiresAt))
     : false;
   const isBoosted = isBoostActive;
   const subscriptionPlan = currentProfileUser?.subscription?.plan || 'basic';
@@ -735,36 +721,7 @@ export const RoommatesScreen = () => {
     );
   };
 
-  const handleBoostForPaidPlan = async () => {
-    const boostStatus = canBoost();
-    if (!boostStatus.canBoost) {
-      Alert.alert('Cannot Boost', boostStatus.reason || 'Boost is currently unavailable');
-      return;
-    }
-    const result = await activateBoost();
-    if (result.success) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Boost Activated!', result.message);
-    } else {
-      Alert.alert('Cannot Boost', result.message);
-    }
-  };
-
-  const handlePurchaseBoost = async () => {
-    setProcessingBoost(true);
-    const result = await purchaseBoost();
-    setProcessingBoost(false);
-    
-    if (result.success) {
-      setShowPurchaseBoostModal(false);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } else {
-      if (result.message.includes('payment method')) {
-        (navigation as any).navigate('Profile', { screen: 'Payment' });
-        setShowPurchaseBoostModal(false);
-      }
-    }
-  };
+  
 
   const handlePurchaseUndoPass = async () => {
     setProcessingUndoPass(true);
@@ -887,25 +844,20 @@ export const RoommatesScreen = () => {
         <RoomdrLogo variant="horizontal" size="sm" />
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <Pressable onPress={() => {
-            const isActive = user?.boostData?.isBoosted && user?.boostData?.boostExpiresAt && new Date(user.boostData.boostExpiresAt) > new Date();
-            if (isActive) {
+            const myBoostActive = user?.boostData?.isBoosted && user?.boostData?.boostExpiresAt && !isBoostExpired(String(user.boostData.boostExpiresAt));
+            if (myBoostActive) {
               const expiresAt = new Date(user!.boostData!.boostExpiresAt!);
               const hoursLeft = Math.max(0, Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60)));
               Alert.alert('Boost Active', `Your profile is boosted! ${hoursLeft} hour${hoursLeft !== 1 ? 's' : ''} remaining.`);
             } else {
-              const plan = user?.subscription?.plan || 'basic';
-              if (plan === 'basic') {
-                setShowPurchaseBoostModal(true);
-              } else {
-                handleBoostForPaidPlan();
-              }
+              (navigation as any).navigate('Profile', { screen: 'ProfileMain' });
             }
           }} style={styles.navIconBtn}>
-            <View style={[styles.navIconBtnInner, user?.boostData?.isBoosted && user?.boostData?.boostExpiresAt && new Date(user.boostData.boostExpiresAt) > new Date()
+            <View style={[styles.navIconBtnInner, user?.boostData?.isBoosted && user?.boostData?.boostExpiresAt && !isBoostExpired(String(user.boostData.boostExpiresAt))
               ? { backgroundColor: '#FFD700' }
               : { backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }
             ]}>
-              <Feather name="zap" size={18} color={user?.boostData?.isBoosted && user?.boostData?.boostExpiresAt && new Date(user.boostData.boostExpiresAt) > new Date() ? '#000000' : '#FFD700'} />
+              <Feather name="zap" size={18} color={user?.boostData?.isBoosted && user?.boostData?.boostExpiresAt && !isBoostExpired(String(user.boostData.boostExpiresAt)) ? '#000000' : '#FFD700'} />
             </View>
           </Pressable>
           <Pressable onPress={() => (navigation as any).navigate('Profile', { screen: 'Notifications' })} style={styles.navIconBtn}>
@@ -1147,80 +1099,7 @@ export const RoommatesScreen = () => {
         onDismiss={() => setShowPaywall(false)}
       />
 
-      <Modal
-        visible={showPurchaseBoostModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowPurchaseBoostModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.vipModalContainer, { backgroundColor: theme.backgroundSecondary }]}>
-            <View style={[styles.vipModalHeader, { backgroundColor: '#FFD700' }]}>
-              <Feather name="zap" size={32} color="#000000" />
-            </View>
-            
-            <View style={styles.vipModalContent}>
-              <ThemedText style={[Typography.h2, { textAlign: 'center', marginBottom: Spacing.sm }]}>
-                Purchase Boost
-              </ThemedText>
-              <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary, marginBottom: Spacing.xl }]}>
-                Boost your profile for 24 hours and get prioritized placement in the swipe deck!
-              </ThemedText>
-              
-              <View style={[styles.priceCard, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
-                <ThemedText style={[Typography.h1, { color: theme.primary, marginBottom: Spacing.xs }]}>
-                  $3.00
-                </ThemedText>
-                <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
-                  24 hours of priority placement
-                </ThemedText>
-              </View>
-              
-              <View style={styles.vipFeaturesList}>
-                <View style={styles.vipFeatureItem}>
-                  <Feather name="check-circle" size={20} color={theme.success} />
-                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
-                    Priority placement in swipe deck
-                  </ThemedText>
-                </View>
-                <View style={styles.vipFeatureItem}>
-                  <Feather name="check-circle" size={20} color={theme.success} />
-                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
-                    Visible BOOSTED badge on profile
-                  </ThemedText>
-                </View>
-                <View style={styles.vipFeatureItem}>
-                  <Feather name="check-circle" size={20} color={theme.success} />
-                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
-                    Instant activation
-                  </ThemedText>
-                </View>
-              </View>
-            </View>
-            
-            <View style={styles.vipModalActions}>
-              <Pressable
-                style={[styles.vipModalButton, { backgroundColor: '#FFD700', opacity: processingBoost ? 0.7 : 1 }]}
-                onPress={handlePurchaseBoost}
-                disabled={processingBoost}
-              >
-                <ThemedText style={[Typography.h3, { color: '#000000' }]}>
-                  {processingBoost ? 'Processing...' : 'Purchase for $3'}
-                </ThemedText>
-              </Pressable>
-              <Pressable
-                style={[styles.vipModalButtonSecondary, { borderColor: theme.border }]}
-                onPress={() => setShowPurchaseBoostModal(false)}
-                disabled={processingBoost}
-              >
-                <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
-                  Cancel
-                </ThemedText>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      
 
       <Modal
         visible={showUndoUpgradeModal}
@@ -1981,6 +1860,15 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     overflow: 'hidden',
     backgroundColor: '#1e1e1e',
+  },
+  cardBoostedGlow: {
+    shadowColor: '#ff6b5b',
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 8,
+    borderWidth: 2,
+    borderColor: 'rgba(255,107,91,0.4)',
   },
   cardImage: {
     width: '100%',

@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import { StorageService } from '../utils/storage';
 import { User, Notification } from '../types/models';
 
@@ -67,9 +68,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+
   useEffect(() => {
     loadUser();
   }, []);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+      if (appStateRef.current.match(/inactive|background/) && nextState === 'active') {
+        checkAndUpdateBoostStatus();
+      }
+      appStateRef.current = nextState;
+    });
+    return () => subscription.remove();
+  }, [user]);
 
   const checkAndApplyScheduledChanges = async (user: User): Promise<User> => {
     let updated = { ...user };
@@ -152,24 +165,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               ? new Date(currentUser.boostData.lastBoostDate) 
               : undefined,
             boostExpiresAt: currentUser.boostData.boostExpiresAt 
-              ? new Date(currentUser.boostData.boostExpiresAt) 
+              ? String(currentUser.boostData.boostExpiresAt)
               : undefined,
           };
-          
-          if (currentUser.boostData.isBoosted && currentUser.boostData.boostExpiresAt) {
-            const now = new Date();
-            if (currentUser.boostData.boostExpiresAt <= now) {
-              currentUser = {
-                ...currentUser,
-                boostData: {
-                  ...currentUser.boostData,
-                  isBoosted: false,
-                },
-              };
-              await StorageService.setCurrentUser(currentUser);
-              await StorageService.addOrUpdateUser(currentUser);
-            }
-          }
         }
 
         if (currentUser.role === 'renter' && !currentUser.profileData?.city) {
