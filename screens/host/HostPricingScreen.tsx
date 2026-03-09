@@ -37,9 +37,7 @@ const HOST_PLANS: PlanTier[] = [
     features: [
       '1 active listing',
       '5 inquiry responses per month',
-      'Basic listing views only',
-      'Standard listing placement',
-      'Email support',
+      'Basic analytics (views only)',
     ],
   },
   {
@@ -51,13 +49,11 @@ const HOST_PLANS: PlanTier[] = [
     icon: 'star',
     gradient: [ACCENT, '#e83a2a'],
     features: [
-      '5 active listings',
+      'Up to 5 active listings',
       'Unlimited inquiry responses',
+      'Boosted listing visibility',
       'Full analytics dashboard',
       'Verified host badge',
-      'Priority listing placement',
-      'Renter compatibility scores',
-      'Priority support',
     ],
   },
   {
@@ -68,14 +64,11 @@ const HOST_PLANS: PlanTier[] = [
     icon: 'briefcase',
     gradient: ['#ffd700', '#ff9500'],
     features: [
-      'Unlimited active listings',
-      'Unlimited inquiry responses',
-      'Advanced analytics & reports',
-      'Featured listing spots',
-      'Priority search placement',
-      'Dedicated account manager',
-      'Custom branding options',
-      'API access',
+      'Unlimited listings',
+      'Priority placement in search',
+      'Featured listing on Explore',
+      'Advanced analytics',
+      'Dedicated host support',
     ],
   },
 ];

@@ -54,17 +54,17 @@ const HOST_TIERS = {
   starter: {
     name: 'Starter',
     price: 'Free',
-    features: ['1 listing', '5 responses/month', 'Views only'],
+    features: ['1 active listing', '5 inquiry responses/mo', 'Basic analytics (views only)'],
   },
   pro: {
     name: 'Pro',
     price: '$29.99/mo',
-    features: ['5 listings', 'Unlimited responses', 'Full analytics', 'Verified badge'],
+    features: ['Up to 5 active listings', 'Unlimited inquiry responses', 'Boosted visibility', 'Full analytics dashboard', 'Verified host badge'],
   },
   business: {
     name: 'Business',
     price: '$79.99/mo',
-    features: ['Unlimited listings', 'Priority placement', 'Featured listings', 'Advanced analytics'],
+    features: ['Unlimited listings', 'Priority placement in search', 'Featured listing on Explore', 'Advanced analytics', 'Dedicated host support'],
   },
 };
 

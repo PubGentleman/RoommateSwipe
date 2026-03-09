@@ -54,7 +54,7 @@ The system uses mock authentication for demonstration, supporting role-based nav
 
 **Renter Tiers:** Basic (Free), Plus ($14.99/mo or $149.90/yr), Elite ($29.99/mo or $299.90/yr). Annual billing saves 2 months. 7-day free trial for Plus. Usage stats shown for Basic users (interest cards, rewinds, super likes). Elite highlighted as recommended.
 
-**Host Tiers:** Starter (Free, 1 listing, 5 inquiry responses/mo), Pro ($29.99/mo or $299.90/yr, 5 listings, unlimited responses, analytics, verified badge), Business ($79.99/mo or $799.90/yr, unlimited everything, priority, featured, advanced analytics). Pro highlighted as recommended.
+**Host Tiers:** Starter (Free, 1 active listing, 5 inquiry responses/mo, basic analytics views only), Pro ($29.99/mo or $299.90/yr, up to 5 active listings, unlimited inquiry responses, boosted listing visibility, full analytics dashboard, verified host badge), Business ($79.99/mo or $799.90/yr, unlimited listings, priority placement in search, featured listing on Explore, advanced analytics, dedicated host support). Pro highlighted as recommended.
 
 **One-Time Purchases:** Listing Boost ($4.99/7 days), Host Verification Badge ($9.99), Super Interest ($0.99/use).
 
