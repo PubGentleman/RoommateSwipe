@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, Pressable, Modal, Dimensions } from 'react-native';
+import { View, StyleSheet, Pressable, Modal, Dimensions, ScrollView } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import Animated, {
   useAnimatedStyle,
@@ -119,82 +119,88 @@ export function PaywallSheet({ visible, featureName, requiredPlan, onUpgrade, on
         >
           <View style={styles.handle} />
 
-          <View style={styles.headerSection}>
-            <View style={[styles.lockIconContainer, { backgroundColor: CORAL + '20' }]}>
-              <Feather name="lock" size={28} color={CORAL} />
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+            contentContainerStyle={styles.scrollContent}
+          >
+            <View style={styles.headerSection}>
+              <View style={[styles.lockIconContainer, { backgroundColor: CORAL + '20' }]}>
+                <Feather name="lock" size={28} color={CORAL} />
+              </View>
+              <ThemedText type="h2" style={styles.title}>
+                Unlock {featureName}
+              </ThemedText>
+              <ThemedText type="body" style={[styles.subtitle, { color: theme.textSecondary }]}>
+                Upgrade to {tierInfo.name} to access this feature
+              </ThemedText>
             </View>
-            <ThemedText type="h2" style={styles.title}>
-              Unlock {featureName}
-            </ThemedText>
-            <ThemedText type="body" style={[styles.subtitle, { color: theme.textSecondary }]}>
-              Upgrade to {tierInfo.name} to access this feature
-            </ThemedText>
-          </View>
 
-          <View style={styles.tiersContainer}>
-            {tiers.map((tier) => {
-              const isRequired = isRequiredTier(tier);
-              return (
-                <View
-                  key={tier.name}
-                  style={[
-                    styles.tierCard,
-                    {
-                      backgroundColor: isRequired ? CORAL + '15' : theme.backgroundSecondary,
-                      borderColor: isRequired ? CORAL : theme.border,
-                      borderWidth: isRequired ? 2 : 1,
-                    },
-                  ]}
-                >
-                  <View style={styles.tierHeader}>
-                    <ThemedText type="h3" style={isRequired ? { color: CORAL } : undefined}>
-                      {tier.name}
-                    </ThemedText>
-                    <ThemedText type="body" style={[styles.tierPrice, isRequired ? { color: CORAL } : { color: theme.textSecondary }]}>
-                      {tier.price}
-                    </ThemedText>
-                  </View>
-                  {tier.features.map((feature, idx) => (
-                    <View key={idx} style={styles.featureRow}>
-                      <Feather
-                        name="check"
-                        size={14}
-                        color={isRequired ? CORAL : theme.textSecondary}
-                      />
-                      <ThemedText type="small" style={[styles.featureText, { color: theme.textSecondary }]}>
-                        {feature}
+            <View style={styles.tiersContainer}>
+              {tiers.map((tier) => {
+                const isRequired = isRequiredTier(tier);
+                return (
+                  <View
+                    key={tier.name}
+                    style={[
+                      styles.tierCard,
+                      {
+                        backgroundColor: isRequired ? CORAL + '15' : theme.backgroundSecondary,
+                        borderColor: isRequired ? CORAL : theme.border,
+                        borderWidth: isRequired ? 2 : 1,
+                      },
+                    ]}
+                  >
+                    <View style={styles.tierHeader}>
+                      <ThemedText type="h3" style={isRequired ? { color: CORAL } : undefined}>
+                        {tier.name}
+                      </ThemedText>
+                      <ThemedText type="body" style={[styles.tierPrice, isRequired ? { color: CORAL } : { color: theme.textSecondary }]}>
+                        {tier.price}
                       </ThemedText>
                     </View>
-                  ))}
-                </View>
-              );
-            })}
-          </View>
+                    {tier.features.map((feature, idx) => (
+                      <View key={idx} style={styles.featureRow}>
+                        <Feather
+                          name="check"
+                          size={14}
+                          color={isRequired ? CORAL : theme.textSecondary}
+                        />
+                        <ThemedText type="small" style={[styles.featureText, { color: theme.textSecondary }]}>
+                          {feature}
+                        </ThemedText>
+                      </View>
+                    ))}
+                  </View>
+                );
+              })}
+            </View>
 
-          <View style={styles.buttonsContainer}>
-            <AnimatedPressable
-              onPress={onUpgrade}
-              onPressIn={() => { upgradeScale.value = withSpring(0.96, springConfig); }}
-              onPressOut={() => { upgradeScale.value = withSpring(1, springConfig); }}
-              style={[styles.upgradeButton, { backgroundColor: CORAL }, upgradeAnimatedStyle]}
-            >
-              <Feather name="zap" size={18} color="#FFFFFF" style={{ marginRight: Spacing.sm }} />
-              <ThemedText type="body" style={styles.upgradeButtonText}>
-                Upgrade to {tierInfo.name} - {tierInfo.price}
-              </ThemedText>
-            </AnimatedPressable>
+            <View style={styles.buttonsContainer}>
+              <AnimatedPressable
+                onPress={onUpgrade}
+                onPressIn={() => { upgradeScale.value = withSpring(0.96, springConfig); }}
+                onPressOut={() => { upgradeScale.value = withSpring(1, springConfig); }}
+                style={[styles.upgradeButton, { backgroundColor: CORAL }, upgradeAnimatedStyle]}
+              >
+                <Feather name="zap" size={18} color="#FFFFFF" style={{ marginRight: Spacing.sm }} />
+                <ThemedText type="body" style={styles.upgradeButtonText}>
+                  Upgrade to {tierInfo.name} - {tierInfo.price}
+                </ThemedText>
+              </AnimatedPressable>
 
-            <AnimatedPressable
-              onPress={onDismiss}
-              onPressIn={() => { dismissScale.value = withSpring(0.96, springConfig); }}
-              onPressOut={() => { dismissScale.value = withSpring(1, springConfig); }}
-              style={[styles.dismissButton, { borderColor: theme.border }, dismissAnimatedStyle]}
-            >
-              <ThemedText type="body" style={[styles.dismissButtonText, { color: theme.textSecondary }]}>
-                Maybe Later
-              </ThemedText>
-            </AnimatedPressable>
-          </View>
+              <AnimatedPressable
+                onPress={onDismiss}
+                onPressIn={() => { dismissScale.value = withSpring(0.96, springConfig); }}
+                onPressOut={() => { dismissScale.value = withSpring(1, springConfig); }}
+                style={[styles.dismissButton, { borderColor: theme.border }, dismissAnimatedStyle]}
+              >
+                <ThemedText type="body" style={[styles.dismissButtonText, { color: theme.textSecondary }]}>
+                  Maybe Later
+                </ThemedText>
+              </AnimatedPressable>
+            </View>
+          </ScrollView>
         </Pressable>
       </Pressable>
     </Modal>
@@ -210,9 +216,11 @@ const styles = StyleSheet.create({
   sheet: {
     borderTopLeftRadius: BorderRadius.large + 8,
     borderTopRightRadius: BorderRadius.large + 8,
+    maxHeight: SCREEN_HEIGHT * 0.85,
+  },
+  scrollContent: {
     paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing.xxl + 16,
-    maxHeight: SCREEN_HEIGHT * 0.85,
   },
   handle: {
     width: 40,
@@ -221,7 +229,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#888',
     alignSelf: 'center',
     marginTop: Spacing.md,
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.sm,
   },
   headerSection: {
     alignItems: 'center',
