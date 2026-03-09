@@ -39,7 +39,7 @@ import { LocationPicker } from '../../components/LocationPicker';
 import { getCoordinatesFromNeighborhood } from '../../utils/locationData';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const TOTAL_STEPS = 13;
+const TOTAL_STEPS = 14;
 
 type StepId =
   | 'photos'
@@ -51,6 +51,7 @@ type StepId =
   | 'cleanliness'
   | 'smoking'
   | 'social'
+  | 'noiseTolerance'
   | 'workPets'
   | 'housing'
   | 'lifestyle'
@@ -66,6 +67,7 @@ const STEP_ORDER: StepId[] = [
   'cleanliness',
   'smoking',
   'social',
+  'noiseTolerance',
   'workPets',
   'housing',
   'lifestyle',
@@ -82,6 +84,7 @@ const STEP_TITLES: Record<StepId, string> = {
   cleanliness: 'Cleanliness Style',
   smoking: 'Smoking Preferences',
   social: 'Social Preferences',
+  noiseTolerance: 'Noise Tolerance',
   workPets: 'Work & Pets',
   housing: 'Housing Preferences',
   lifestyle: 'Your Lifestyle',
@@ -97,7 +100,8 @@ const STEP_SUBTITLES: Record<StepId, string> = {
   sleepSchedule: 'When do you usually sleep and wake up?',
   cleanliness: 'How tidy do you keep your space?',
   smoking: 'What are your preferences on smoking?',
-  social: 'How do you feel about guests and noise?',
+  social: 'How do you feel about guests?',
+  noiseTolerance: 'How much noise can you handle?',
   workPets: 'Where do you work and how do you feel about pets?',
   housing: 'What are your housing needs?',
   lifestyle: 'Pick up to 3 that describe you best.',
@@ -173,6 +177,8 @@ export const ProfileQuestionnaireScreen = () => {
     return raw;
   });
   const [bedrooms, setBedrooms] = useState(user?.profileData?.preferences?.bedrooms?.toString() || '');
+  const [bathrooms, setBathrooms] = useState(user?.profileData?.preferences?.bathrooms?.toString() || '');
+  const [privateBathroom, setPrivateBathroom] = useState<boolean | undefined>(user?.profileData?.preferences?.privateBathroom);
 
   useEffect(() => {
     if (user?.photos && user.photos.length > 0) {
@@ -264,15 +270,55 @@ export const ProfileQuestionnaireScreen = () => {
   const validateCurrentStep = (): boolean => {
     const stepId = STEP_ORDER[currentStep];
     switch (stepId) {
+      case 'photos':
+        if (photos.length === 0) { Alert.alert('Required', 'Please add at least one photo'); return false; }
+        return true;
       case 'basicInfo':
         if (!name.trim()) { Alert.alert('Required', 'Please enter your name'); return false; }
         if (!email.trim()) { Alert.alert('Required', 'Please enter your email'); return false; }
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) { Alert.alert('Error', 'Please enter a valid email'); return false; }
-        if (birthday.trim()) {
-          const v = validateBirthday(birthday);
-          if (!v.valid) { setBirthdayError(v.error); Alert.alert('Error', v.error); return false; }
-        }
+        if (!birthday.trim()) { Alert.alert('Required', 'Please enter your date of birth'); return false; }
+        const v = validateBirthday(birthday);
+        if (!v.valid) { setBirthdayError(v.error); Alert.alert('Error', v.error); return false; }
+        return true;
+      case 'gender':
+        if (!gender) { Alert.alert('Required', 'Please select your gender'); return false; }
+        return true;
+      case 'locationOccupation':
+        if (!selectedCity && !location.trim()) { Alert.alert('Required', 'Please select a location'); return false; }
+        if (!occupation.trim()) { Alert.alert('Required', 'Please enter your occupation'); return false; }
+        return true;
+      case 'bio':
+        if (!bio.trim()) { Alert.alert('Required', 'Please write a short bio'); return false; }
+        return true;
+      case 'sleepSchedule':
+        return true;
+      case 'cleanliness':
+        return true;
+      case 'smoking':
+        return true;
+      case 'social':
+        return true;
+      case 'noiseTolerance':
+        return true;
+      case 'workPets':
+        return true;
+      case 'housing':
+        if (!budget.trim()) { Alert.alert('Required', 'Please enter your monthly budget'); return false; }
+        if (isNaN(parseInt(budget)) || parseInt(budget) <= 0) { Alert.alert('Error', 'Please enter a valid budget amount'); return false; }
+        if (!moveInDate.trim()) { Alert.alert('Required', 'Please enter your move-in date'); return false; }
+        if (!/^\d{2}\/\d{2}\/\d{4}$/.test(moveInDate)) { Alert.alert('Error', 'Please enter a valid date (MM/DD/YYYY)'); return false; }
+        if (!bedrooms.trim()) { Alert.alert('Required', 'Please enter the number of bedrooms'); return false; }
+        if (isNaN(parseInt(bedrooms)) || parseInt(bedrooms) <= 0) { Alert.alert('Error', 'Please enter a valid number of bedrooms'); return false; }
+        if (!bathrooms.trim()) { Alert.alert('Required', 'Please enter the number of bathrooms'); return false; }
+        if (isNaN(parseInt(bathrooms)) || parseInt(bathrooms) <= 0) { Alert.alert('Error', 'Please enter a valid number of bathrooms'); return false; }
+        if (privateBathroom === undefined) { Alert.alert('Required', 'Please select your bathroom preference'); return false; }
+        return true;
+      case 'lifestyle':
+        if (lifestyle.length === 0) { Alert.alert('Required', 'Please select at least one lifestyle choice'); return false; }
+        return true;
+      case 'expenses':
         return true;
       default:
         return true;
@@ -298,6 +344,7 @@ export const ProfileQuestionnaireScreen = () => {
   };
 
   const handleSave = async () => {
+    if (!validateCurrentStep()) return;
     setIsSaving(true);
 
     const birthdayStorageFormat = birthday.trim() ? convertToStorageFormat(birthday) : user?.birthday;
@@ -334,6 +381,8 @@ export const ProfileQuestionnaireScreen = () => {
           lifestyle,
           moveInDate: moveInDate.trim() || undefined,
           bedrooms: bedrooms.trim() ? parseInt(bedrooms) : undefined,
+          bathrooms: bathrooms.trim() ? parseInt(bathrooms) : undefined,
+          privateBathroom,
           sharedExpenses: {
             utilities: expenseUtilities,
             groceries: expenseGroceries,
@@ -533,13 +582,15 @@ export const ProfileQuestionnaireScreen = () => {
             <SelectionCard icon="user-check" title="Occasionally" isSelected={guestPolicy === 'occasionally'} onPress={() => setGuestPolicy('occasionally')} index={1} />
             <SelectionCard icon="users" title="Frequently" isSelected={guestPolicy === 'frequently'} onPress={() => setGuestPolicy('frequently')} index={2} />
             <SelectionCard icon="x" title="Prefer No Guests" isSelected={guestPolicy === 'prefer_no_guests'} onPress={() => setGuestPolicy('prefer_no_guests')} index={3} />
+          </View>
+        );
 
-            <View style={{ height: Spacing.xl }} />
-
-            <ThemedText style={[Typography.h3, { marginBottom: Spacing.md, color: theme.text }]}>Noise Tolerance</ThemedText>
-            <SelectionCard icon="volume-x" title="Prefer Quiet" isSelected={noiseTolerance === 'prefer_quiet'} onPress={() => setNoiseTolerance('prefer_quiet')} index={0} />
-            <SelectionCard icon="volume-1" title="Normal Noise is Fine" isSelected={noiseTolerance === 'normal_noise'} onPress={() => setNoiseTolerance('normal_noise')} index={1} />
-            <SelectionCard icon="volume-2" title="Loud is OK" isSelected={noiseTolerance === 'loud_environments'} onPress={() => setNoiseTolerance('loud_environments')} index={2} />
+      case 'noiseTolerance':
+        return (
+          <View style={styles.stepInner}>
+            <SelectionCard icon="volume-x" title="Prefer Quiet" subtitle="I need a peaceful space to focus and relax" isSelected={noiseTolerance === 'prefer_quiet'} onPress={() => setNoiseTolerance('prefer_quiet')} index={0} />
+            <SelectionCard icon="volume-1" title="Normal Noise is Fine" subtitle="Everyday sounds don't bother me" isSelected={noiseTolerance === 'normal_noise'} onPress={() => setNoiseTolerance('normal_noise')} index={1} />
+            <SelectionCard icon="volume-2" title="Loud Environments are OK" subtitle="Music, TV, and lively spaces are welcome" isSelected={noiseTolerance === 'loud_environments'} onPress={() => setNoiseTolerance('loud_environments')} index={2} />
           </View>
         );
 
@@ -603,6 +654,21 @@ export const ProfileQuestionnaireScreen = () => {
                 keyboardType="number-pad"
               />
             </View>
+            <View style={styles.inputGroup}>
+              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>Bathrooms</ThemedText>
+              <TextInput
+                style={[styles.textInput, { backgroundColor: theme.backgroundDefault, borderColor: theme.border, color: theme.text }]}
+                value={bathrooms}
+                onChangeText={setBathrooms}
+                placeholder="1"
+                placeholderTextColor={theme.textSecondary}
+                keyboardType="number-pad"
+              />
+            </View>
+
+            <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.sm, marginTop: Spacing.md }]}>Private Bathroom</ThemedText>
+            <SelectionCard icon="check-circle" title="Yes, I need a private bathroom" isSelected={privateBathroom === true} onPress={() => setPrivateBathroom(true)} index={0} />
+            <SelectionCard icon="users" title="Shared bathroom is fine" isSelected={privateBathroom === false} onPress={() => setPrivateBathroom(false)} index={1} />
           </View>
         );
 

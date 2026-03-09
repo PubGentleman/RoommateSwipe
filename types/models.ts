@@ -314,6 +314,8 @@ export interface User {
       lifestyle?: Array<'active_gym' | 'homebody' | 'nightlife_social' | 'quiet_introverted' | 'creative_artistic' | 'professional_focused'>;
       moveInDate?: string;
       bedrooms?: number;
+      bathrooms?: number;
+      privateBathroom?: boolean;
       sharedExpenses?: {
         utilities?: 'split_equally' | 'usage_based' | 'included_in_rent';
         groceries?: 'split_equally' | 'buy_own' | 'shared_basics';

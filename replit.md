@@ -36,7 +36,7 @@ The application is built with React Native and Expo using TypeScript, utilizing 
 
 **User Experience Enhancements:**
 - **Match Celebration:** An animated full-screen modal for mutual likes.
-- **Profile Questionnaire:** A multi-step guided questionnaire with progress tracking.
+- **Profile Questionnaire:** A 14-step guided questionnaire with progress tracking, per-step validation (all required fields enforced before advancing), separate Noise Tolerance screen, and housing preferences including private bathroom and bathroom count.
 - **Report/Block System:** Functionality to report or block users.
 - **Notification System:** Context-based, app-wide notifications with real-time toast alerts.
 - **Profile Completion:** A component tracking progress across weighted profile fields.
