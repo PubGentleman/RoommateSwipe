@@ -1021,12 +1021,6 @@ export const RoommatesScreen = () => {
           <Feather name="message-square" size={22} color="#ff6b8a" />
         </Pressable>
         <Pressable
-          style={[styles.actionBtnMd, styles.actionStar]}
-          onPress={() => handleSwipeAction('superlike')}
-        >
-          <Feather name="star" size={22} color="#5b8cff" />
-        </Pressable>
-        <Pressable
           style={[styles.actionBtnLg, styles.actionLike]}
           onPress={() => handleSwipeAction('like')}
         >
