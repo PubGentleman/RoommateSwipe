@@ -750,13 +750,7 @@ export const StorageService = {
         STORAGE_KEYS.NOTIFICATIONS,
         STORAGE_KEYS.SAVED_PROPERTIES,
         STORAGE_KEYS.APPLICATIONS,
-        STORAGE_KEYS.ONBOARDING_COMPLETED,
       ]);
-      const allKeys = await AsyncStorage.getAllKeys();
-      const onboardingKeys = (allKeys as string[]).filter(k => k.startsWith(STORAGE_KEYS.ONBOARDING_COMPLETED));
-      if (onboardingKeys.length > 0) {
-        await AsyncStorage.multiRemove(onboardingKeys);
-      }
     } catch (error) {
       console.error('Error during logout reset:', error);
     }

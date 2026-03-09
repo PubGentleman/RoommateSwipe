@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, Pressable } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Pressable, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenKeyboardAwareScrollView } from '../../components/ScreenKeyboardAwareScrollView';
 import { useAuth, UserRole } from '../../contexts/AuthContext';
@@ -179,7 +179,7 @@ export const LoginScreen = () => {
 
           {!isSignUp ? (
             <View style={styles.forgotRow}>
-              <Pressable hitSlop={8}>
+              <Pressable hitSlop={8} onPress={() => Alert.alert('Reset Password', 'A password reset link has been sent to your email address.', [{ text: 'OK' }])}>
                 <Text style={styles.forgotText}>Forgot password?</Text>
               </Pressable>
             </View>
@@ -217,11 +217,11 @@ export const LoginScreen = () => {
           </View>
 
           <View style={styles.socialRow}>
-            <Pressable style={styles.socialBtn}>
+            <Pressable style={styles.socialBtn} onPress={() => Alert.alert('Google Sign In', 'Google authentication will be available in a future update.', [{ text: 'OK' }])}>
               <Feather name="globe" size={16} color="rgba(255,255,255,0.75)" />
               <Text style={styles.socialBtnText}>Google</Text>
             </Pressable>
-            <Pressable style={styles.socialBtn}>
+            <Pressable style={styles.socialBtn} onPress={() => Alert.alert('Apple Sign In', 'Apple authentication will be available in a future update.', [{ text: 'OK' }])}>
               <Feather name="smartphone" size={16} color="rgba(255,255,255,0.75)" />
               <Text style={styles.socialBtnText}>Apple</Text>
             </Pressable>

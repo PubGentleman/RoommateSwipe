@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Pressable, FlatList, ScrollView } from 'react-native';
+import { View, StyleSheet, Pressable, FlatList, ScrollView, TextInput, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
@@ -43,6 +43,8 @@ export const MessagesScreen = () => {
   const [profilesMap, setProfilesMap] = useState<Map<string, RoommateProfile>>(new Map());
   const [newMatches, setNewMatches] = useState<{ profile: RoommateProfile; match: Match; compatibility: number }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchVisible, setIsSearchVisible] = useState(false);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -382,30 +384,70 @@ export const MessagesScreen = () => {
     </View>
   );
 
+  const handleSearchToggle = () => {
+    setIsSearchVisible(!isSearchVisible);
+    if (isSearchVisible) setSearchQuery('');
+  };
+
+  const handleCompose = () => {
+    if (newMatches.length > 0) {
+      const firstMatch = newMatches[0];
+      navigateToMatchChat(firstMatch.profile, firstMatch.match);
+    } else {
+      Alert.alert('No New Matches', 'Match with roommates on the Match tab to start a new conversation.');
+    }
+  };
+
+  const filteredConversations = searchQuery.trim()
+    ? conversations.filter(c =>
+        c.participant.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (c.lastMessage && c.lastMessage.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
+    : conversations;
+
   return (
     <View style={[styles.container, { backgroundColor: '#111' }]}>
       <View style={[styles.topNav, { paddingTop: insets.top + 14 }]}>
         <ThemedText style={styles.topNavTitle}>Messages</ThemedText>
         <View style={styles.navActions}>
-          <Pressable style={styles.iconBtn}>
-            <Feather name="search" size={16} color="rgba(255,255,255,0.7)" />
+          <Pressable style={styles.iconBtn} onPress={handleSearchToggle}>
+            <Feather name={isSearchVisible ? 'x' : 'search'} size={16} color="rgba(255,255,255,0.7)" />
           </Pressable>
-          <Pressable style={styles.iconBtn}>
+          <Pressable style={styles.iconBtn} onPress={handleCompose}>
             <Feather name="edit" size={16} color="rgba(255,255,255,0.7)" />
           </Pressable>
         </View>
       </View>
 
+      {isSearchVisible ? (
+        <View style={styles.searchBarContainer}>
+          <Feather name="search" size={14} color="rgba(255,255,255,0.4)" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search conversations..."
+            placeholderTextColor="rgba(255,255,255,0.3)"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoFocus
+          />
+          {searchQuery.length > 0 ? (
+            <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
+              <Feather name="x-circle" size={14} color="rgba(255,255,255,0.4)" />
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+
       <FlatList
-        data={conversations}
+        data={filteredConversations}
         renderItem={renderConversation}
         keyExtractor={item => item.id}
-        ListHeaderComponent={renderHeader}
-        ListFooterComponent={renderFooterNudge}
+        ListHeaderComponent={!isSearchVisible ? renderHeader : null}
+        ListFooterComponent={!isSearchVisible ? renderFooterNudge : null}
         ListEmptyComponent={!isLoading ? renderEmptyState : null}
         contentContainerStyle={[
           styles.list,
-          { paddingBottom: insets.bottom + 100, flexGrow: conversations.length === 0 ? 1 : undefined },
+          { paddingBottom: insets.bottom + 100, flexGrow: filteredConversations.length === 0 ? 1 : undefined },
         ]}
         showsVerticalScrollIndicator={false}
       />
@@ -443,6 +485,23 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.08)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  searchBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 12,
+    marginHorizontal: 22,
+    marginBottom: 10,
+    paddingHorizontal: 12,
+    height: 40,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 14,
+    height: 40,
   },
   sectionLabel: {
     fontSize: 11,
