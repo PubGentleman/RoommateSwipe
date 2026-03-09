@@ -122,8 +122,12 @@ export const HostPricingScreen = () => {
   const [selectedTier, setSelectedTier] = useState<HostPlan>('pro');
   const currentPlan = getHostPlan();
 
-  const getStripPrice = (plan: PlanTier) => {
+  const getDisplayPrice = (plan: PlanTier) => {
     if (plan.monthlyPrice === 0) return '$0';
+    if (isAnnual) {
+      const monthly = plan.annualPrice / 12;
+      return `$${monthly.toFixed(2)}`;
+    }
     return `$${plan.monthlyPrice.toFixed(2)}`;
   };
 
@@ -132,14 +136,9 @@ export const HostPricingScreen = () => {
     return '/mo';
   };
 
-  const getCardPrice = (plan: PlanTier) => {
-    if (plan.monthlyPrice === 0) return '$0';
-    return `$${plan.monthlyPrice.toFixed(2)}`;
-  };
-
   const getCardPeriod = (plan: PlanTier) => {
     if (plan.monthlyPrice === 0) return '/ forever';
-    return isAnnual ? '/ mo' : '/ mo';
+    return '/ mo';
   };
 
   const handleSelectPlan = (plan: PlanTier) => {
@@ -246,7 +245,7 @@ export const HostPricingScreen = () => {
               >
                 {active ? <LinearGradient colors={[ACCENT, '#e83a2a']} style={s.tDot} /> : null}
                 <Text style={[s.tName, active ? s.tNameActive : null]}>{plan.name.toUpperCase()}</Text>
-                <Text style={s.tPrice}>{getStripPrice(plan)}</Text>
+                <Text style={s.tPrice}>{getDisplayPrice(plan)}</Text>
                 <Text style={s.tPer}>{getStripPer(plan)}</Text>
               </Pressable>
             );
@@ -315,7 +314,7 @@ export const HostPricingScreen = () => {
                   ) : null}
                 </View>
                 <View style={s.priceRow}>
-                  <Text style={s.priceBig}>{getCardPrice(plan)}</Text>
+                  <Text style={s.priceBig}>{getDisplayPrice(plan)}</Text>
                   <Text style={s.pricePeriod}>{getCardPeriod(plan)}</Text>
                 </View>
                 {isAnnual && annualTotal ? (
