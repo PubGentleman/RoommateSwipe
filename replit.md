@@ -60,6 +60,8 @@ Mock authentication supports role-based navigation and conditional access for `r
 
 A `PaywallSheet` component handles subscription prompts when users hit plan limits. `PlanBadge` components indicate user tiers. `AuthContext` includes functions for managing host plans and purchases.
 
+**Renter Subscription Screen (`PlansScreen.tsx`):** Custom header (nav header hidden), hero with gradient accent text, 7-day trial banner (Basic users), tier comparison strip (3 tiles with tap-to-scroll), monthly/annual billing toggle with LinearGradient, "Today's Usage" card with progress bars (Interest Cards, Rewinds, Super Likes), three plan cards (Basic ghost CTA, Plus coral "MOST POPULAR" with trial CTA, Elite gold "BEST VALUE"), scheduled change/reactivation banner, and fine-print footer. All upgrade/downgrade/cancel/reactivate logic wired to AuthContext.
+
 ## Data Layer
 
 The data layer uses mock data and TypeScript interfaces for models such as `RoommateProfile`, `Property`, `Group`, `Conversation`, `Message`, `Match`, `Application`, and `InterestCard`. Mock data is extensive, covering 11 major US cities and various entities, with versioning for automatic re-seeding.

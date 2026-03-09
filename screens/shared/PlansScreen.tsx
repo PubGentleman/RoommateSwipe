@@ -1,77 +1,60 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Pressable, Alert, Modal } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, StyleSheet, Pressable, Alert, Modal, Text, ScrollView } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { ProfileStackParamList } from '../../navigation/ProfileStackNavigator';
-import { ScreenScrollView } from '../../components/ScreenScrollView';
-import { ThemedText } from '../../components/ThemedText';
-import { useTheme } from '../../hooks/useTheme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../contexts/AuthContext';
-import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
+import * as Haptics from 'expo-haptics';
 
 type PlansScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'Plans'>;
 
+const ACCENT = '#ff6b5b';
+const ACCENT_DARK = '#e83a2a';
+
 const fmtDate = (d: Date | string) => {
   const date = typeof d === 'string' ? new Date(d) : d;
-  const mm = String(date.getMonth() + 1).padStart(2, '0');
-  const dd = String(date.getDate()).padStart(2, '0');
-  const yyyy = date.getFullYear();
-  return `${mm}/${dd}/${yyyy}`;
+  return `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}/${date.getFullYear()}`;
 };
 
-const MONTHLY_PRICING = {
-  plus: 14.99,
-  elite: 29.99,
+const MONTHLY_PRICING = { plus: 14.99, elite: 29.99 };
+const ANNUAL_PRICING = { plus: 149.90, elite: 299.90 };
+
+type Tier = 'basic' | 'plus' | 'elite';
+
+const FEATURES: Record<Tier, { text: string; included: boolean }[]> = {
+  basic: [
+    { text: '5 interest cards per day', included: true },
+    { text: 'Basic match filters', included: true },
+    { text: '10 listing views per day', included: true },
+    { text: 'AI roommate assistant', included: false },
+    { text: 'See who liked you', included: false },
+  ],
+  plus: [
+    { text: 'Unlimited interest cards', included: true },
+    { text: 'Advanced filters (lifestyle, schedule)', included: true },
+    { text: 'AI roommate assistant', included: true },
+    { text: 'See who liked you', included: true },
+    { text: '5 rewinds & 3 super likes/day', included: true },
+    { text: 'Weekly profile boost', included: false },
+  ],
+  elite: [
+    { text: 'Everything in Plus', included: true },
+    { text: 'Weekly profile boost', included: true },
+    { text: 'Priority in match results', included: true },
+    { text: 'Read receipts in chat', included: true },
+    { text: 'Background & income verification', included: true },
+    { text: 'Unlimited super likes & rewinds', included: true },
+  ],
 };
-
-const ANNUAL_PRICING = {
-  plus: 149.90,
-  elite: 299.90,
-};
-
-const BASIC_FEATURES = [
-  '5 interest cards per day',
-  '3 active chats maximum',
-  'Create 1 group',
-  'Join 1 group',
-  'Browse listings',
-  'Basic matching',
-];
-
-const PLUS_FEATURES = [
-  'Unlimited interest cards',
-  '10 active chats',
-  '5 rewinds per day',
-  'See who viewed your profile',
-  'Unlimited groups',
-  'Advanced filters',
-  'Walk Score access',
-  'Online status visibility',
-  'AI match assistant',
-  '1 boost per week',
-  'Super Interest cards',
-  '7-day free trial for new users',
-];
-
-const ELITE_FEATURES = [
-  'Everything in Plus',
-  'Unlimited chats',
-  'Unlimited rewinds',
-  'See who liked you',
-  'Priority visibility boost',
-  'Boosted matching',
-  'Priority messaging (no match needed)',
-  'Featured listings',
-  'Advanced AI match assistant',
-  'Daily boosts included',
-];
 
 export const PlansScreen = () => {
-  const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const { user, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, reactivateSubscription, canSendInterest, canRewind, canSuperLike } = useAuth();
   const navigation = useNavigation<PlansScreenNavigationProp>();
-  
+
   const [showUpgradeConfirm, setShowUpgradeConfirm] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [showDowngradeConfirm, setShowDowngradeConfirm] = useState(false);
@@ -79,14 +62,16 @@ export const PlansScreen = () => {
   const [downgradeTo, setDowngradeTo] = useState<'basic' | 'plus' | null>(null);
   const [processing, setProcessing] = useState(false);
   const [isAnnual, setIsAnnual] = useState(false);
+  const [selectedTier, setSelectedTier] = useState<Tier>('plus');
   const [interestStats, setInterestStats] = useState<{ remaining: number; total: number }>({ remaining: 5, total: 5 });
 
-  const currentPlan = user?.subscription?.plan || 'basic';
+  const scrollRef = useRef<ScrollView>(null);
+  const cardRefs = useRef<Record<Tier, number>>({} as any);
+
+  const currentPlan = (user?.subscription?.plan || 'basic') as Tier;
   const subscriptionStatus = user?.subscription?.status || 'active';
   const scheduledPlan = user?.subscription?.scheduledPlan;
   const scheduledChangeDate = user?.subscription?.scheduledChangeDate;
-  const isPlus = currentPlan === 'plus';
-  const isElite = currentPlan === 'elite';
 
   useEffect(() => {
     const loadStats = async () => {
@@ -100,66 +85,39 @@ export const PlansScreen = () => {
     loadStats();
   }, []);
 
-  const getPrice = (plan: 'plus' | 'elite') => {
-    return isAnnual ? ANNUAL_PRICING[plan] : MONTHLY_PRICING[plan];
-  };
-
+  const getPrice = (plan: 'plus' | 'elite') => isAnnual ? ANNUAL_PRICING[plan] : MONTHLY_PRICING[plan];
   const getPriceLabel = (plan: 'plus' | 'elite') => {
     const price = getPrice(plan);
-    return isAnnual ? `$${price.toFixed(2)}/year` : `$${price.toFixed(2)}/month`;
+    return isAnnual ? `$${price.toFixed(2)}/yr` : `$${price.toFixed(2)}/mo`;
   };
 
   const handleUpgrade = (plan: 'plus' | 'elite') => {
     if (!user?.paymentMethods || user.paymentMethods.length === 0) {
-      Alert.alert(
-        'Payment Method Required',
-        'Please add a payment method before upgrading.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Add Card', onPress: () => navigation.navigate('Payment') },
-        ]
-      );
+      Alert.alert('Payment Method Required', 'Please add a payment method before upgrading.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Add Card', onPress: () => navigation.navigate('Payment') },
+      ]);
       return;
     }
-
     setSelectedPlan(plan);
     setShowUpgradeConfirm(true);
   };
 
   const confirmUpgrade = async () => {
-    if (!selectedPlan) {
-      setShowUpgradeConfirm(false);
-      return;
-    }
-
-    if (selectedPlan === currentPlan) {
-      Alert.alert('Error', 'You are already on this plan.');
+    if (!selectedPlan || selectedPlan === currentPlan) {
       setShowUpgradeConfirm(false);
       setSelectedPlan(null);
       return;
     }
-
     setShowUpgradeConfirm(false);
     setProcessing(true);
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    if (selectedPlan === 'plus') {
-      await upgradeToPlus();
-    } else if (selectedPlan === 'elite') {
-      await upgradeToElite();
-    }
-    
+    await new Promise(r => setTimeout(r, 1500));
+    if (selectedPlan === 'plus') await upgradeToPlus();
+    else await upgradeToElite();
     const planName = selectedPlan === 'plus' ? 'Plus' : 'Elite';
-    Alert.alert(
-      'Success!',
-      `Welcome to ${planName}! You now have access to all ${planName} features.`,
-      [
-        {
-          text: 'OK',
-          onPress: () => navigation.goBack(),
-        },
-      ]
-    );
+    Alert.alert('Success!', `Welcome to ${planName}! You now have access to all ${planName} features.`, [
+      { text: 'OK', onPress: () => navigation.goBack() },
+    ]);
     setProcessing(false);
     setSelectedPlan(null);
   };
@@ -170,28 +128,14 @@ export const PlansScreen = () => {
   };
 
   const confirmDowngrade = async () => {
-    if (!downgradeTo) {
-      setShowDowngradeConfirm(false);
-      return;
-    }
-
+    if (!downgradeTo) { setShowDowngradeConfirm(false); return; }
     setShowDowngradeConfirm(false);
     setProcessing(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
+    await new Promise(r => setTimeout(r, 1000));
     await downgradeToPlan(downgradeTo);
-    
-    const expiryDate = user?.subscription?.expiresAt 
-      ? fmtDate(user.subscription.expiresAt)
-      : 'the end of your billing period';
-    
+    const expiryDate = user?.subscription?.expiresAt ? fmtDate(user.subscription.expiresAt) : 'the end of your billing period';
     const targetPlanName = downgradeTo.charAt(0).toUpperCase() + downgradeTo.slice(1);
-    Alert.alert(
-      'Downgrade Scheduled',
-      `Your plan will change to ${targetPlanName} on ${expiryDate}. You'll keep your current ${currentPlan === 'plus' ? 'Plus' : 'Elite'} features until then.`,
-      [{ text: 'OK' }]
-    );
-    
+    Alert.alert('Downgrade Scheduled', `Your plan will change to ${targetPlanName} on ${expiryDate}. You'll keep your current features until then.`);
     setProcessing(false);
     setDowngradeTo(null);
   };
@@ -199,630 +143,478 @@ export const PlansScreen = () => {
   const confirmCancellation = async () => {
     setShowCancelConfirm(false);
     setProcessing(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
+    await new Promise(r => setTimeout(r, 1000));
     await cancelSubscription();
-    
-    const expiryDate = user?.subscription?.expiresAt 
-      ? fmtDate(user.subscription.expiresAt)
-      : 'the end of your billing period';
-    
-    Alert.alert(
-      'Subscription Cancelled',
-      `Your subscription has been cancelled. You'll keep your current ${currentPlan === 'plus' ? 'Plus' : 'Elite'} features until ${expiryDate}.`,
-      [{ text: 'OK' }]
-    );
-    
+    const expiryDate = user?.subscription?.expiresAt ? fmtDate(user.subscription.expiresAt) : 'the end of your billing period';
+    Alert.alert('Subscription Cancelled', `You'll keep your ${currentPlan === 'plus' ? 'Plus' : 'Elite'} features until ${expiryDate}.`);
     setProcessing(false);
   };
 
   const rewindInfo = canRewind();
   const superLikeInfo = canSuperLike();
+  const interestUsed = interestStats.total > 0 ? interestStats.total - interestStats.remaining : 0;
 
-  const renderUsageStats = () => {
+  const selectTier = (tier: Tier) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedTier(tier);
+    const y = cardRefs.current[tier];
+    if (y != null && scrollRef.current) {
+      scrollRef.current.scrollTo({ y: y - 20, animated: true });
+    }
+  };
+
+  const renderTierStrip = () => (
+    <View style={s.tierStrip}>
+      {(['basic', 'plus', 'elite'] as Tier[]).map(tier => {
+        const active = selectedTier === tier;
+        const isBasic = tier === 'basic';
+        const price = isBasic ? '$0' : (isAnnual ? `$${(getPrice(tier as 'plus' | 'elite') / 12).toFixed(0)}` : `$${MONTHLY_PRICING[tier as 'plus' | 'elite']}`);
+        const perLabel = isBasic ? 'forever' : '/mo';
+        return (
+          <Pressable key={tier} style={[s.tierTile, active && s.tierTileActive]} onPress={() => selectTier(tier)}>
+            {active ? <View style={s.tierDot} /> : null}
+            <Text style={[s.tierName, active && s.tierNameActive]}>{tier.charAt(0).toUpperCase() + tier.slice(1)}</Text>
+            <Text style={s.tierPrice}>{price}</Text>
+            <Text style={s.tierPer}>{perLabel}</Text>
+            {isAnnual && !isBasic ? <LinearGradient colors={[ACCENT, ACCENT_DARK]} style={s.tierSaveBadge}><Text style={s.tierSaveText}>ANNUAL</Text></LinearGradient> : null}
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+
+  const renderBillingToggle = () => (
+    <View style={s.billingToggle}>
+      <Pressable style={[s.toggleBtn, !isAnnual && s.toggleBtnActive]} onPress={() => setIsAnnual(false)}>
+        {!isAnnual ? (
+          <LinearGradient colors={[ACCENT, ACCENT_DARK]} style={StyleSheet.absoluteFill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+            <View style={s.toggleBtnInner}><Text style={s.toggleBtnTextActive}>Monthly</Text></View>
+          </LinearGradient>
+        ) : (
+          <Text style={s.toggleBtnText}>Monthly</Text>
+        )}
+      </Pressable>
+      <Pressable style={[s.toggleBtn, isAnnual && s.toggleBtnActive]} onPress={() => setIsAnnual(true)}>
+        {isAnnual ? (
+          <LinearGradient colors={[ACCENT, ACCENT_DARK]} style={StyleSheet.absoluteFill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+            <View style={s.toggleBtnInner}>
+              <Text style={s.toggleBtnTextActive}>Annual</Text>
+              <View style={s.saveBadgeOnActive}><Text style={s.saveBadgeOnActiveText}>PAY ONCE/YEAR</Text></View>
+            </View>
+          </LinearGradient>
+        ) : (
+          <View style={s.toggleBtnInner}>
+            <Text style={s.toggleBtnText}>Annual</Text>
+            <View style={s.saveBadge}><Text style={s.saveBadgeText}>PAY ONCE/YEAR</Text></View>
+          </View>
+        )}
+      </Pressable>
+    </View>
+  );
+
+  const renderUsageCard = () => {
     if (currentPlan !== 'basic') return null;
-
-    const interestUsed = interestStats.total - interestStats.remaining;
+    const rows = [
+      { name: 'Interest Cards', icon: 'heart' as const, color: ACCENT, bgColor: 'rgba(255,107,91,0.11)', used: interestUsed, total: interestStats.total, gradient: [ACCENT, ACCENT_DARK] },
+      { name: 'Rewinds', icon: 'rotate-ccw' as const, color: '#78c0ff', bgColor: 'rgba(100,180,255,0.1)', used: rewindInfo.limit - rewindInfo.remaining, total: rewindInfo.limit, gradient: ['#78c0ff', '#4a9eff'] },
+      { name: 'Super Likes', icon: 'star' as const, color: '#ffd700', bgColor: 'rgba(255,215,0,0.09)', used: superLikeInfo.limit - superLikeInfo.remaining, total: superLikeInfo.limit, gradient: ['#ffd700', '#e6a800'] },
+    ];
 
     return (
-      <View style={[styles.usageStatsContainer, { backgroundColor: '#1a1a1a', borderColor: theme.border }]}>
-        <ThemedText style={[Typography.h3, { marginBottom: Spacing.lg }]}>Daily Usage</ThemedText>
-        
-        <View style={styles.usageStat}>
-          <View style={styles.usageStatLeft}>
-            <Feather name="heart" size={16} color={theme.primary} />
-            <ThemedText style={[Typography.caption, { color: theme.text, marginLeft: Spacing.sm }]}>Interest Cards</ThemedText>
-          </View>
-          <View style={styles.usageStatRight}>
-            <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
-              {interestUsed} of {interestStats.total} used today
-            </ThemedText>
-            <View style={styles.progressBarBg}>
-              <View style={[styles.progressBarFill, { width: `${(interestUsed / interestStats.total) * 100}%`, backgroundColor: interestUsed >= interestStats.total ? '#EF4444' : theme.primary }]} />
+      <View style={s.usageCard}>
+        <Text style={s.usageLabelRow}>TODAY'S USAGE</Text>
+        {rows.map((row, i) => (
+          <View key={i} style={s.usageRow}>
+            <View style={[s.usageIcon, { backgroundColor: row.bgColor }]}>
+              <Feather name={row.icon} size={13} color={row.color} />
+            </View>
+            <Text style={s.usageName}>{row.name}</Text>
+            <View style={s.usageRight}>
+              <Text style={s.usageCount}>{row.used} of {row.total} used</Text>
+              <View style={s.usageBar}>
+                <LinearGradient
+                  colors={row.gradient as [string, string]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={[s.usageFill, { width: row.total > 0 ? `${Math.min((row.used / row.total) * 100, 100)}%` : '0%' }]}
+                />
+              </View>
             </View>
           </View>
-        </View>
-
-        <View style={styles.usageStat}>
-          <View style={styles.usageStatLeft}>
-            <Feather name="rotate-ccw" size={16} color={theme.primary} />
-            <ThemedText style={[Typography.caption, { color: theme.text, marginLeft: Spacing.sm }]}>Rewinds</ThemedText>
-          </View>
-          <View style={styles.usageStatRight}>
-            <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
-              {rewindInfo.limit - rewindInfo.remaining} of {rewindInfo.limit} used today
-            </ThemedText>
-            <View style={styles.progressBarBg}>
-              <View style={[styles.progressBarFill, { width: `${((rewindInfo.limit - rewindInfo.remaining) / rewindInfo.limit) * 100}%`, backgroundColor: rewindInfo.remaining <= 0 ? '#EF4444' : theme.primary }]} />
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.usageStat}>
-          <View style={styles.usageStatLeft}>
-            <Feather name="star" size={16} color={theme.primary} />
-            <ThemedText style={[Typography.caption, { color: theme.text, marginLeft: Spacing.sm }]}>Super Likes</ThemedText>
-          </View>
-          <View style={styles.usageStatRight}>
-            <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
-              {superLikeInfo.limit - superLikeInfo.remaining} of {superLikeInfo.limit} used today
-            </ThemedText>
-            <View style={styles.progressBarBg}>
-              <View style={[styles.progressBarFill, { width: `${((superLikeInfo.limit - superLikeInfo.remaining) / superLikeInfo.limit) * 100}%`, backgroundColor: superLikeInfo.remaining <= 0 ? '#EF4444' : theme.primary }]} />
-            </View>
-          </View>
-        </View>
-
-        <ThemedText style={[Typography.small, { color: theme.textSecondary, marginTop: Spacing.md, textAlign: 'center' }]}>
-          Upgrade to Plus or Elite for unlimited usage
-        </ThemedText>
+        ))}
+        <Text style={s.usageHint}>Upgrade to Plus or Elite for unlimited daily usage</Text>
       </View>
     );
   };
 
-  const renderTrialBanner = () => {
-    if (currentPlan !== 'basic') return null;
+  const renderPlanCard = (tier: Tier) => {
+    const isCurrent = currentPlan === tier;
+    const isRec = tier === 'plus';
+    const features = FEATURES[tier];
+    const isBasic = tier === 'basic';
 
-    return (
-      <View style={[styles.trialBanner, { backgroundColor: theme.primary + '15', borderColor: theme.primary + '40' }]}>
-        <View style={styles.trialBannerContent}>
-          <Feather name="gift" size={22} color={theme.primary} />
-          <View style={{ flex: 1, marginLeft: Spacing.md }}>
-            <ThemedText style={[Typography.body, { fontWeight: '700', color: theme.primary }]}>
-              Try Plus Free for 7 Days
-            </ThemedText>
-            <ThemedText style={[Typography.small, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
-              Unlock unlimited interest cards, advanced filters, and AI matching. Cancel anytime.
-            </ThemedText>
-          </View>
-        </View>
-      </View>
-    );
-  };
+    let priceText = '$0';
+    let periodText = '/ forever';
+    let annualNote = isBasic ? 'No credit card required' : '';
 
-  const renderBillingToggle = () => {
-    return (
-      <View style={styles.billingToggleContainer}>
-        <Pressable
-          style={[
-            styles.billingToggleOption,
-            !isAnnual ? styles.billingToggleActive : null,
-            !isAnnual ? { backgroundColor: theme.primary } : { backgroundColor: '#2a2a2a' },
-          ]}
-          onPress={() => setIsAnnual(false)}
-        >
-          <ThemedText style={[Typography.caption, { color: !isAnnual ? '#FFFFFF' : theme.textSecondary, fontWeight: '600' }]}>
-            Monthly
-          </ThemedText>
-        </Pressable>
-        <Pressable
-          style={[
-            styles.billingToggleOption,
-            isAnnual ? styles.billingToggleActive : null,
-            isAnnual ? { backgroundColor: theme.primary } : { backgroundColor: '#2a2a2a' },
-          ]}
-          onPress={() => setIsAnnual(true)}
-        >
-          <ThemedText style={[Typography.caption, { color: isAnnual ? '#FFFFFF' : theme.textSecondary, fontWeight: '600' }]}>
-            Annual
-          </ThemedText>
-          <View style={[styles.saveBadge, { backgroundColor: '#10B981' }]}>
-            <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '700', fontSize: 10 }]}>
-              SAVE 2 MONTHS
-            </ThemedText>
-          </View>
-        </Pressable>
-      </View>
-    );
-  };
+    if (!isBasic) {
+      const p = isAnnual ? getPrice(tier as 'plus' | 'elite') / 12 : MONTHLY_PRICING[tier as 'plus' | 'elite'];
+      priceText = `$${p.toFixed(2)}`;
+      periodText = '/ mo';
+      if (isAnnual) {
+        annualNote = `Billed $${getPrice(tier as 'plus' | 'elite').toFixed(2)}/yr`;
+      } else if (tier === 'plus' && currentPlan === 'basic') {
+        annualNote = 'Then $14.99/mo after free trial';
+      } else if (tier === 'elite') {
+        annualNote = 'Everything you need to find a roommate fast';
+      }
+    }
 
-  const renderPlanCard = (
-    planType: 'basic' | 'plus' | 'elite',
-    features: string[],
-    isCurrentPlan: boolean
-  ) => {
-    const isRecommended = planType === 'elite';
-    const planColors = {
-      basic: '#1a1a1a',
-      plus: theme.primary,
-      elite: '#7C3AED',
+    let ctaLabel = '';
+    let ctaStyle: 'primary' | 'outline' | 'ghost' = 'outline';
+    if (isCurrent) {
+      ctaLabel = 'Current Plan';
+      ctaStyle = 'ghost';
+    } else if (tier === 'plus' && currentPlan === 'basic') {
+      ctaLabel = 'Start 7-Day Free Trial';
+      ctaStyle = 'primary';
+    } else if (tier === 'elite') {
+      ctaLabel = 'Upgrade to Elite';
+      ctaStyle = 'outline';
+    } else if (tier === 'plus' && currentPlan === 'elite') {
+      ctaLabel = 'Downgrade to Plus';
+      ctaStyle = 'outline';
+    } else if (tier === 'basic') {
+      ctaLabel = currentPlan === 'basic' ? 'Current Plan' : 'Downgrade to Basic';
+      ctaStyle = currentPlan === 'basic' ? 'ghost' : 'outline';
+    } else {
+      ctaLabel = `Upgrade to ${tier.charAt(0).toUpperCase() + tier.slice(1)}`;
+      ctaStyle = 'outline';
+    }
+
+    const handleCta = () => {
+      if (isCurrent) return;
+      if (tier === 'basic' && currentPlan !== 'basic') {
+        handleDowngrade('basic');
+      } else if (tier === 'plus') {
+        if (currentPlan === 'elite') handleDowngrade('plus');
+        else handleUpgrade('plus');
+      } else if (tier === 'elite') {
+        handleUpgrade('elite');
+      }
     };
-    const bgColor = isCurrentPlan ? planColors[planType] : '#1a1a1a';
-    const textColor = isCurrentPlan && planType !== 'basic' ? '#FFFFFF' : theme.text;
-
-    const priceLabel = planType === 'basic' ? 'Free' : getPriceLabel(planType);
 
     return (
-      <View key={planType}>
-        {isRecommended ? (
-          <View style={[styles.recommendedBadge, { backgroundColor: '#7C3AED' }]}>
-            <Feather name="zap" size={14} color="#FFD700" />
-            <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '700', marginLeft: Spacing.xs }]}>
-              RECOMMENDED
-            </ThemedText>
+      <View
+        key={tier}
+        onLayout={(e) => { cardRefs.current[tier] = e.nativeEvent.layout.y; }}
+        style={[s.planCard, isRec && s.planCardRec]}
+      >
+        <View style={[s.planBand, isRec && s.planBandRec]}>
+          <View style={s.planTopRow}>
+            {isRec ? (
+              <Text style={s.planNameCoral}>{tier.charAt(0).toUpperCase() + tier.slice(1)}</Text>
+            ) : (
+              <Text style={s.planName}>{tier.charAt(0).toUpperCase() + tier.slice(1)}</Text>
+            )}
+            {isRec ? (
+              <LinearGradient colors={[ACCENT, ACCENT_DARK]} style={s.recPill}>
+                <Text style={s.recPillText}>MOST POPULAR</Text>
+              </LinearGradient>
+            ) : tier === 'elite' ? (
+              <View style={s.bestValuePill}>
+                <Text style={s.bestValueText}>BEST VALUE</Text>
+              </View>
+            ) : null}
+          </View>
+          <View style={s.priceRow}>
+            <Text style={s.priceBig}>{priceText}</Text>
+            <Text style={s.pricePeriod}>{periodText}</Text>
+          </View>
+          {annualNote ? <Text style={s.priceAnnualNote}>{annualNote}</Text> : null}
+        </View>
+
+        <View style={[s.planDivider, isRec && s.planDividerCoral]} />
+
+        <View style={s.planFeatures}>
+          {features.map((f, i) => (
+            <View key={i} style={s.featRow}>
+              <View style={[s.featIcon, f.included ? s.featIconOn : s.featIconOff]}>
+                {f.included ? (
+                  <Feather name="check" size={8} color={ACCENT} />
+                ) : (
+                  <Feather name="x" size={8} color="rgba(255,255,255,0.18)" />
+                )}
+              </View>
+              <Text style={[s.featLabel, f.included ? s.featLabelOn : s.featLabelOff]}>{f.text}</Text>
+            </View>
+          ))}
+        </View>
+
+        {isCurrent && currentPlan !== 'basic' && subscriptionStatus === 'active' && !scheduledPlan ? (
+          <View style={s.planManageRow}>
+            {currentPlan === 'elite' ? (
+              <Pressable style={s.manageBtn} onPress={() => handleDowngrade('plus')} disabled={processing}>
+                <Text style={s.manageBtnText}>Downgrade to Plus</Text>
+              </Pressable>
+            ) : null}
+            <Pressable style={[s.manageBtn, s.manageBtnCancel]} onPress={() => setShowCancelConfirm(true)} disabled={processing}>
+              <Text style={s.manageBtnCancelText}>Cancel Subscription</Text>
+            </Pressable>
           </View>
         ) : null}
-        <View style={[
-          styles.planCard,
-          { backgroundColor: bgColor, borderColor: isRecommended && !isCurrentPlan ? '#7C3AED' : theme.border, borderWidth: isRecommended ? 2 : 1 },
-          isRecommended ? { marginTop: 0 } : null,
-        ]}>
-          <View style={styles.planHeader}>
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flexWrap: 'wrap' }}>
-                <ThemedText style={[Typography.h2, { color: textColor }]}>
-                  {planType.charAt(0).toUpperCase() + planType.slice(1)}
-                </ThemedText>
-                {planType === 'plus' ? <Feather name="award" size={20} color={isCurrentPlan ? '#FFD700' : theme.primary} /> : null}
-                {planType === 'elite' ? <Feather name="zap" size={20} color={isCurrentPlan ? '#FFD700' : '#7C3AED'} /> : null}
-              </View>
-              <ThemedText style={[Typography.body, { color: isCurrentPlan && planType !== 'basic' ? 'rgba(255,255,255,0.9)' : theme.textSecondary, marginTop: Spacing.sm, marginBottom: Spacing.md }]}>
-                {priceLabel}
-              </ThemedText>
-              {isAnnual && planType !== 'basic' ? (
-                <ThemedText style={[Typography.small, { color: isCurrentPlan ? 'rgba(255,255,255,0.7)' : '#10B981', marginTop: -Spacing.sm, marginBottom: Spacing.md }]}>
-                  ${(MONTHLY_PRICING[planType] * 12 - ANNUAL_PRICING[planType]).toFixed(2)} saved vs monthly
-                </ThemedText>
-              ) : null}
-            </View>
-          </View>
 
-          <View style={styles.features}>
-            {features.map((feature, index) => (
-              <View key={index} style={styles.feature}>
-                <Feather name="check" size={18} color={isCurrentPlan && planType !== 'basic' ? '#FFFFFF' : planType === 'elite' ? '#7C3AED' : theme.primary} />
-                <ThemedText style={[Typography.small, { marginLeft: Spacing.sm, color: textColor, flex: 1 }]}>
-                  {feature}
-                </ThemedText>
-              </View>
-            ))}
-          </View>
-
-          {isCurrentPlan ? (
-            <>
-              <View style={[styles.activeSubscription, { backgroundColor: planType === 'basic' ? theme.primary + '20' : 'rgba(255, 255, 255, 0.2)' }]}>
-                <Feather name="check-circle" size={18} color={planType === 'basic' ? theme.primary : '#FFFFFF'} />
-                <ThemedText style={[Typography.small, { color: planType === 'basic' ? theme.primary : '#FFFFFF', marginLeft: Spacing.sm, fontWeight: '600' }]}>
-                  Current Plan
-                </ThemedText>
-              </View>
-              
-              {planType !== 'basic' && subscriptionStatus === 'active' && !scheduledPlan ? (
-                <View style={{ marginTop: Spacing.md, gap: Spacing.sm }}>
-                  {planType === 'elite' ? (
-                    <>
-                      <Pressable
-                        style={[styles.downgradeButton, { borderColor: 'rgba(255,255,255,0.3)' }]}
-                        onPress={() => handleDowngrade('plus')}
-                        disabled={processing}
-                      >
-                        <ThemedText style={[Typography.small, { color: textColor }]}>
-                          Downgrade to Plus
-                        </ThemedText>
-                      </Pressable>
-                      <Pressable
-                        style={[styles.downgradeButton, { borderColor: 'rgba(255,255,255,0.3)' }]}
-                        onPress={() => handleDowngrade('basic')}
-                        disabled={processing}
-                      >
-                        <ThemedText style={[Typography.small, { color: textColor }]}>
-                          Downgrade to Basic
-                        </ThemedText>
-                      </Pressable>
-                    </>
-                  ) : planType === 'plus' ? (
-                    <Pressable
-                      style={[styles.downgradeButton, { borderColor: 'rgba(255,255,255,0.3)' }]}
-                      onPress={() => handleDowngrade('basic')}
-                      disabled={processing}
-                    >
-                      <ThemedText style={[Typography.small, { color: textColor }]}>
-                        Downgrade to Basic
-                      </ThemedText>
-                    </Pressable>
-                  ) : null}
-                  <Pressable
-                    style={[styles.cancelButton, { borderColor: '#EF4444' }]}
-                    onPress={() => setShowCancelConfirm(true)}
-                    disabled={processing}
-                  >
-                    <ThemedText style={[Typography.small, { color: '#EF4444' }]}>
-                      Cancel Subscription
-                    </ThemedText>
-                  </Pressable>
-                </View>
-              ) : null}
-            </>
-          ) : planType !== 'basic' ? (
-            <Pressable
-              style={[styles.upgradeButton, { backgroundColor: planType === 'plus' ? theme.primary : '#7C3AED', opacity: (planType === 'plus' && isElite) ? 0.5 : 1 }]}
-              onPress={() => handleUpgrade(planType)}
-              disabled={processing || (planType === 'plus' && isElite)}
-            >
-              <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>
-                {processing ? 'Processing...' : (planType === 'plus' && isElite) ? 'Downgrade Not Available' : `Upgrade - ${priceLabel}`}
-              </ThemedText>
-            </Pressable>
+        <Pressable
+          style={[s.planCta, ctaStyle === 'primary' && s.ctaPrimary, ctaStyle === 'outline' && s.ctaOutline, ctaStyle === 'ghost' && s.ctaGhost]}
+          onPress={handleCta}
+          disabled={isCurrent || processing}
+        >
+          {ctaStyle === 'primary' ? (
+            <LinearGradient colors={[ACCENT, ACCENT_DARK]} style={[StyleSheet.absoluteFill, { borderRadius: 13 }]} />
           ) : null}
-        </View>
+          <Text style={[s.ctaText, ctaStyle === 'primary' && s.ctaTextPrimary, ctaStyle === 'ghost' && s.ctaTextGhost]}>
+            {processing && !isCurrent ? 'Processing...' : ctaLabel}
+          </Text>
+        </Pressable>
       </View>
     );
   };
 
   return (
-    <ScreenScrollView style={{ backgroundColor: '#111111' }} contentContainerStyle={{ backgroundColor: '#111111' }}>
-      <View style={styles.container}>
-        <ThemedText style={[Typography.h2, { marginBottom: Spacing.sm }]}>Choose Your Plan</ThemedText>
-        <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.xl }]}>
-          Find your perfect roommate faster with premium features
-        </ThemedText>
-
-        {renderTrialBanner()}
-        {renderUsageStats()}
-        {renderBillingToggle()}
-        
-        {renderPlanCard('basic', BASIC_FEATURES, currentPlan === 'basic')}
-        {renderPlanCard('plus', PLUS_FEATURES, currentPlan === 'plus')}
-        {renderPlanCard('elite', ELITE_FEATURES, currentPlan === 'elite')}
-
-        {scheduledPlan && scheduledChangeDate ? (
-          <View style={[styles.section, styles.scheduledChangeBanner, { backgroundColor: subscriptionStatus === 'cancelled' ? '#FEF2F2' : '#FFF7ED', borderColor: subscriptionStatus === 'cancelled' ? '#EF4444' : '#F97316' }]}>
-            <Feather name="info" size={20} color={subscriptionStatus === 'cancelled' ? '#EF4444' : '#F97316'} />
-            <View style={{ flex: 1, marginLeft: Spacing.md }}>
-              <ThemedText style={[Typography.body, { fontWeight: '600', color: subscriptionStatus === 'cancelled' ? '#DC2626' : '#EA580C' }]}>
-                {subscriptionStatus === 'cancelled' ? 'Subscription Cancelled' : 'Plan Change Scheduled'}
-              </ThemedText>
-              <ThemedText style={[Typography.small, { color: subscriptionStatus === 'cancelled' ? '#991B1B' : '#9A3412', marginBottom: Spacing.sm }]}>
-                {subscriptionStatus === 'cancelled' 
-                  ? `Your subscription will end on ${fmtDate(scheduledChangeDate)}. You'll keep your current features until then.`
-                  : `Your plan will change to ${scheduledPlan.charAt(0).toUpperCase() + scheduledPlan.slice(1)} on ${fmtDate(scheduledChangeDate)}.`
-                }
-              </ThemedText>
-              <Pressable
-                style={[styles.reactivateButton, { backgroundColor: theme.primary }]}
-                onPress={async () => {
-                  await reactivateSubscription();
-                  Alert.alert(
-                    'Subscription Reactivated',
-                    'Your subscription will continue on the current plan.',
-                    [{ text: 'OK' }]
-                  );
-                }}
-                disabled={processing}
-              >
-                <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '600' }]}>
-                  {subscriptionStatus === 'cancelled' ? 'Reactivate Subscription' : 'Cancel Scheduled Change'}
-                </ThemedText>
-              </Pressable>
-            </View>
-          </View>
-        ) : null}
-
-        {(isPlus || isElite) ? (
-          <View style={styles.section}>
-            <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Billing History</ThemedText>
-            <View style={[styles.billingItem, { backgroundColor: '#1a1a1a' }]}>
-              <View>
-                <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
-                  {isElite ? 'Elite' : 'Plus'} Subscription
-                </ThemedText>
-                <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
-                  {fmtDate(new Date())}
-                </ThemedText>
-              </View>
-              <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
-                ${isElite ? MONTHLY_PRICING.elite : MONTHLY_PRICING.plus}
-              </ThemedText>
-            </View>
-          </View>
-        ) : null}
+    <View style={[s.root, { paddingTop: insets.top }]}>
+      <View style={s.header}>
+        <Pressable style={s.backBtn} onPress={() => navigation.goBack()}>
+          <Feather name="chevron-left" size={15} color="rgba(255,255,255,0.65)" />
+        </Pressable>
+        <Text style={s.headerTitle}>Subscription</Text>
       </View>
 
-      <Modal
-        visible={showUpgradeConfirm}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowUpgradeConfirm(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: '#1a1a1a' }]}>
-            <ThemedText style={[Typography.h2, { marginBottom: Spacing.md, color: '#FFFFFF' }]}>
-              Upgrade to {selectedPlan === 'plus' ? 'Plus' : 'Elite'}
-            </ThemedText>
-            <ThemedText style={[Typography.body, { color: theme.textSecondary, marginBottom: Spacing.xl }]}>
-              {selectedPlan === 'plus' 
+      <ScrollView ref={scrollRef} style={s.scroll} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 30 }}>
+        <View style={s.hero}>
+          <Text style={s.heroTitle}>Choose Your <Text style={s.heroTitleAccent}>Plan</Text></Text>
+          <Text style={s.heroSub}>Find your perfect roommate faster with premium</Text>
+        </View>
+
+        {currentPlan === 'basic' ? (
+          <View style={s.trialBanner}>
+            <View style={s.trialIcon}>
+              <Feather name="gift" size={17} color="#ff7b6b" />
+            </View>
+            <View style={s.trialTextWrap}>
+              <Text style={s.trialTitle}>Try Plus Free for 7 Days</Text>
+              <Text style={s.trialSub}>Unlimited cards, AI matching & advanced filters. Cancel anytime.</Text>
+            </View>
+          </View>
+        ) : null}
+
+        {renderTierStrip()}
+        {renderBillingToggle()}
+        {renderUsageCard()}
+
+        {scheduledPlan && scheduledChangeDate ? (
+          <View style={s.scheduledBanner}>
+            <Feather name="info" size={16} color={ACCENT} />
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <Text style={s.scheduledTitle}>
+                {subscriptionStatus === 'cancelled' ? 'Subscription Cancelled' : 'Plan Change Scheduled'}
+              </Text>
+              <Text style={s.scheduledBody}>
+                {subscriptionStatus === 'cancelled'
+                  ? `Ends on ${fmtDate(scheduledChangeDate)}. Features remain until then.`
+                  : `Changes to ${(scheduledPlan as string).charAt(0).toUpperCase() + (scheduledPlan as string).slice(1)} on ${fmtDate(scheduledChangeDate)}.`
+                }
+              </Text>
+              <Pressable style={s.reactivateBtn} onPress={async () => {
+                await reactivateSubscription();
+                Alert.alert('Subscription Reactivated', 'Your subscription will continue on the current plan.');
+              }}>
+                <Text style={s.reactivateBtnText}>{subscriptionStatus === 'cancelled' ? 'Reactivate' : 'Cancel Change'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
+
+        {renderPlanCard('basic')}
+        {renderPlanCard('plus')}
+        {renderPlanCard('elite')}
+
+        <Text style={s.finePrint}>
+          Cancel anytime in Account Settings  ·  Prices in USD{'\n'}
+          Subscription renews automatically. Terms & Privacy apply.
+        </Text>
+      </ScrollView>
+
+      <Modal visible={showUpgradeConfirm} transparent animationType="fade" onRequestClose={() => setShowUpgradeConfirm(false)}>
+        <View style={s.modalOverlay}>
+          <View style={s.modalContent}>
+            <Text style={s.modalTitle}>Upgrade to {selectedPlan === 'plus' ? 'Plus' : 'Elite'}</Text>
+            <Text style={s.modalBody}>
+              {selectedPlan === 'plus'
                 ? `Unlock unlimited interest cards, advanced filters, and AI matching for ${getPriceLabel('plus')}.${currentPlan === 'basic' ? '\n\nIncludes a 7-day free trial!' : ''}`
-                : `Get priority visibility, unlimited rewinds, and premium features for ${getPriceLabel('elite')}.`}
+                : `Get priority visibility, unlimited rewinds, and premium features for ${getPriceLabel('elite')}.`
+              }
               {'\n\n'}Continue with upgrade?
-            </ThemedText>
-            <View style={styles.modalActions}>
-              <Pressable
-                style={[styles.modalButton, { borderColor: theme.border }]}
-                onPress={() => {
-                  setShowUpgradeConfirm(false);
-                  setSelectedPlan(null);
-                }}
-              >
-                <ThemedText style={[Typography.body]}>Cancel</ThemedText>
+            </Text>
+            <View style={s.modalActions}>
+              <Pressable style={s.modalBtn} onPress={() => { setShowUpgradeConfirm(false); setSelectedPlan(null); }}>
+                <Text style={s.modalBtnText}>Cancel</Text>
               </Pressable>
-              <Pressable
-                style={[styles.modalButton, styles.modalButtonPrimary, { backgroundColor: selectedPlan === 'plus' ? theme.primary : '#7C3AED' }]}
-                onPress={confirmUpgrade}
-              >
-                <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>
-                  Upgrade
-                </ThemedText>
+              <Pressable style={[s.modalBtn, s.modalBtnPrimary]} onPress={confirmUpgrade}>
+                <LinearGradient colors={[ACCENT, ACCENT_DARK]} style={[StyleSheet.absoluteFill, { borderRadius: 12 }]} />
+                <Text style={s.modalBtnPrimaryText}>Upgrade</Text>
               </Pressable>
             </View>
           </View>
         </View>
       </Modal>
 
-      <Modal
-        visible={showDowngradeConfirm}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowDowngradeConfirm(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: '#1a1a1a' }]}>
-            <ThemedText style={[Typography.h2, { marginBottom: Spacing.md, color: '#FFFFFF' }]}>
-              Downgrade to {downgradeTo === 'basic' ? 'Basic' : 'Plus'}
-            </ThemedText>
-            <ThemedText style={[Typography.body, { color: theme.textSecondary, marginBottom: Spacing.xl }]}>
-              Your plan will change to {downgradeTo === 'basic' ? 'Basic' : 'Plus'} at the end of your current billing period. 
-              {'\n\n'}You'll keep your current {currentPlan === 'plus' ? 'Plus' : 'Elite'} features until {user?.subscription?.expiresAt ? fmtDate(user.subscription.expiresAt) : 'the end of your billing period'}.
-              {'\n\n'}Continue with downgrade?
-            </ThemedText>
-            <View style={styles.modalActions}>
-              <Pressable
-                style={[styles.modalButton, { borderColor: theme.border }]}
-                onPress={() => {
-                  setShowDowngradeConfirm(false);
-                  setDowngradeTo(null);
-                }}
-              >
-                <ThemedText style={[Typography.body]}>Cancel</ThemedText>
+      <Modal visible={showDowngradeConfirm} transparent animationType="fade" onRequestClose={() => setShowDowngradeConfirm(false)}>
+        <View style={s.modalOverlay}>
+          <View style={s.modalContent}>
+            <Text style={s.modalTitle}>Downgrade to {downgradeTo === 'basic' ? 'Basic' : 'Plus'}</Text>
+            <Text style={s.modalBody}>
+              Your plan will change to {downgradeTo === 'basic' ? 'Basic' : 'Plus'} at the end of your billing period.
+              {'\n\n'}You'll keep features until {user?.subscription?.expiresAt ? fmtDate(user.subscription.expiresAt) : 'the end of your billing period'}.
+            </Text>
+            <View style={s.modalActions}>
+              <Pressable style={s.modalBtn} onPress={() => { setShowDowngradeConfirm(false); setDowngradeTo(null); }}>
+                <Text style={s.modalBtnText}>Cancel</Text>
               </Pressable>
-              <Pressable
-                style={[styles.modalButton, styles.modalButtonPrimary, { backgroundColor: '#F97316' }]}
-                onPress={confirmDowngrade}
-              >
-                <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>
-                  Downgrade
-                </ThemedText>
+              <Pressable style={[s.modalBtn, { backgroundColor: '#F97316' }]} onPress={confirmDowngrade}>
+                <Text style={s.modalBtnPrimaryText}>Downgrade</Text>
               </Pressable>
             </View>
           </View>
         </View>
       </Modal>
 
-      <Modal
-        visible={showCancelConfirm}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowCancelConfirm(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: '#1a1a1a' }]}>
-            <ThemedText style={[Typography.h2, { marginBottom: Spacing.md, color: '#FFFFFF' }]}>
-              Cancel Subscription
-            </ThemedText>
-            <ThemedText style={[Typography.body, { color: theme.textSecondary, marginBottom: Spacing.xl }]}>
-              Are you sure you want to cancel your {currentPlan === 'plus' ? 'Plus' : 'Elite'} subscription?
-              {'\n\n'}You'll keep your current features until {user?.subscription?.expiresAt ? fmtDate(user.subscription.expiresAt) : 'the end of your billing period'}, then your plan will revert to Basic.
+      <Modal visible={showCancelConfirm} transparent animationType="fade" onRequestClose={() => setShowCancelConfirm(false)}>
+        <View style={s.modalOverlay}>
+          <View style={s.modalContent}>
+            <Text style={s.modalTitle}>Cancel Subscription</Text>
+            <Text style={s.modalBody}>
+              Are you sure? You'll keep features until {user?.subscription?.expiresAt ? fmtDate(user.subscription.expiresAt) : 'the end of your billing period'}, then revert to Basic.
               {'\n\n'}You can re-subscribe at any time.
-            </ThemedText>
-            <View style={styles.modalActions}>
-              <Pressable
-                style={[styles.modalButton, { borderColor: theme.border }]}
-                onPress={() => setShowCancelConfirm(false)}
-              >
-                <ThemedText style={[Typography.body]}>Keep Plan</ThemedText>
+            </Text>
+            <View style={s.modalActions}>
+              <Pressable style={s.modalBtn} onPress={() => setShowCancelConfirm(false)}>
+                <Text style={s.modalBtnText}>Keep Plan</Text>
               </Pressable>
-              <Pressable
-                style={[styles.modalButton, styles.modalButtonPrimary, { backgroundColor: '#EF4444' }]}
-                onPress={confirmCancellation}
-              >
-                <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>
-                  Cancel Subscription
-                </ThemedText>
+              <Pressable style={[s.modalBtn, { backgroundColor: '#EF4444' }]} onPress={confirmCancellation}>
+                <Text style={s.modalBtnPrimaryText}>Cancel Subscription</Text>
               </Pressable>
             </View>
           </View>
         </View>
       </Modal>
-    </ScreenScrollView>
+    </View>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    padding: Spacing.lg,
-  },
-  trialBanner: {
-    borderRadius: BorderRadius.large,
-    padding: Spacing.lg,
-    marginBottom: Spacing.xl,
-    borderWidth: 1,
-  },
-  trialBannerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  usageStatsContainer: {
-    borderRadius: BorderRadius.large,
-    padding: Spacing.xl,
-    marginBottom: Spacing.xl,
-    borderWidth: 1,
-  },
-  usageStat: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.md,
-  },
-  usageStatLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: 120,
-  },
-  usageStatRight: {
-    flex: 1,
-    alignItems: 'flex-end',
-  },
-  progressBarBg: {
-    width: '100%',
-    height: 4,
-    backgroundColor: '#333333',
-    borderRadius: 2,
-    marginTop: Spacing.xs,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    borderRadius: 2,
-  },
-  billingToggleContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#1a1a1a',
-    borderRadius: BorderRadius.medium,
-    padding: 4,
-    marginBottom: Spacing.xl,
-  },
-  billingToggleOption: {
-    flex: 1,
-    paddingVertical: Spacing.md,
-    alignItems: 'center',
-    borderRadius: BorderRadius.small,
-    position: 'relative',
-  },
-  billingToggleActive: {},
-  saveBadge: {
-    position: 'absolute',
-    top: -8,
-    right: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  recommendedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-    borderTopLeftRadius: BorderRadius.large,
-    borderTopRightRadius: BorderRadius.large,
-    marginBottom: 0,
-  },
-  planCard: {
-    padding: Spacing.xl,
-    borderRadius: BorderRadius.large,
-    marginBottom: Spacing.xxl,
-  },
-  planHeader: {
-    marginBottom: Spacing.lg,
-  },
-  features: {
-    gap: Spacing.md,
-    marginBottom: Spacing.xl,
-  },
-  feature: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  upgradeButton: {
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.medium,
-    alignItems: 'center',
-  },
-  activeSubscription: {
-    flexDirection: 'row',
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.medium,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  section: {
-    marginBottom: Spacing.xxl,
-  },
-  billingItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.medium,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.xl,
-  },
-  modalContent: {
-    width: '100%',
-    maxWidth: 400,
-    padding: Spacing.xxl,
-    borderRadius: BorderRadius.large,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: Spacing.md,
-  },
-  modalButton: {
-    flex: 1,
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.medium,
-    alignItems: 'center',
-    borderWidth: 1,
-  },
-  modalButtonPrimary: {
-    borderWidth: 0,
-  },
-  downgradeButton: {
-    padding: Spacing.sm,
-    borderRadius: BorderRadius.small,
-    alignItems: 'center',
-    borderWidth: 1,
-  },
-  cancelButton: {
-    padding: Spacing.sm,
-    borderRadius: BorderRadius.small,
-    alignItems: 'center',
-    borderWidth: 1,
-  },
-  scheduledChangeBanner: {
-    flexDirection: 'row',
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.medium,
-    borderWidth: 1,
-    marginBottom: Spacing.lg,
-  },
-  reactivateButton: {
-    padding: Spacing.sm,
-    borderRadius: BorderRadius.small,
-    alignItems: 'center',
-    marginTop: Spacing.sm,
-  },
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#111' },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 10 },
+  backBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: 17, fontWeight: '800', color: '#fff' },
+  scroll: { flex: 1, paddingHorizontal: 16 },
+
+  hero: { marginBottom: 10 },
+  heroTitle: { fontSize: 24, fontWeight: '900', color: '#fff', letterSpacing: -0.5, lineHeight: 28, marginBottom: 4 },
+  heroTitleAccent: { color: ACCENT },
+  heroSub: { fontSize: 13, color: 'rgba(255,255,255,0.4)' },
+
+  trialBanner: { flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: 'rgba(255,107,91,0.1)', borderWidth: 1, borderColor: 'rgba(255,107,91,0.22)', borderRadius: 14, padding: 11, paddingHorizontal: 13, marginBottom: 10 },
+  trialIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,107,91,0.18)', alignItems: 'center', justifyContent: 'center' },
+  trialTextWrap: { flex: 1 },
+  trialTitle: { fontSize: 13, fontWeight: '800', color: '#ff7b6b', marginBottom: 2 },
+  trialSub: { fontSize: 11, color: 'rgba(255,255,255,0.38)', lineHeight: 15 },
+
+  tierStrip: { flexDirection: 'row', gap: 6, marginBottom: 10 },
+  tierTile: { flex: 1, backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)', borderRadius: 14, padding: 10, paddingBottom: 11, alignItems: 'center', gap: 3, position: 'relative' as const },
+  tierTileActive: { borderColor: 'rgba(255,107,91,0.45)', backgroundColor: 'rgba(255,107,91,0.07)' },
+  tierDot: { position: 'absolute' as const, top: 8, right: 8, width: 8, height: 8, borderRadius: 4, backgroundColor: ACCENT },
+  tierName: { fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' as const, letterSpacing: 0.4 },
+  tierNameActive: { color: '#ff8070' },
+  tierPrice: { fontSize: 18, fontWeight: '900', color: '#fff', letterSpacing: -0.5, lineHeight: 22 },
+  tierPer: { fontSize: 10, color: 'rgba(255,255,255,0.3)', fontWeight: '500' },
+  tierSaveBadge: { borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2, marginTop: 2 },
+  tierSaveText: { fontSize: 9, fontWeight: '800', color: '#fff' },
+
+  billingToggle: { flexDirection: 'row', backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)', borderRadius: 14, padding: 4, marginBottom: 10 },
+  toggleBtn: { flex: 1, height: 36, borderRadius: 10, overflow: 'hidden' as const, alignItems: 'center', justifyContent: 'center' },
+  toggleBtnActive: {},
+  toggleBtnInner: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  toggleBtnText: { fontSize: 13, fontWeight: '700', color: 'rgba(255,255,255,0.38)' },
+  toggleBtnTextActive: { fontSize: 13, fontWeight: '700', color: '#fff' },
+  saveBadge: { backgroundColor: 'rgba(255,107,91,0.15)', borderWidth: 1, borderColor: 'rgba(255,107,91,0.25)', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 },
+  saveBadgeText: { fontSize: 9, fontWeight: '800', color: ACCENT },
+  saveBadgeOnActive: { backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 },
+  saveBadgeOnActiveText: { fontSize: 9, fontWeight: '800', color: '#fff' },
+
+  usageCard: { backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)', borderRadius: 16, padding: 12, paddingHorizontal: 14, marginBottom: 10 },
+  usageLabelRow: { fontSize: 11.5, fontWeight: '700', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' as const, letterSpacing: 0.5, marginBottom: 10 },
+  usageRow: { flexDirection: 'row', alignItems: 'center', gap: 9, marginBottom: 8 },
+  usageIcon: { width: 26, height: 26, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
+  usageName: { flex: 1, fontSize: 12.5, fontWeight: '600', color: 'rgba(255,255,255,0.7)' },
+  usageRight: { alignItems: 'flex-end', gap: 4 },
+  usageCount: { fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.35)' },
+  usageBar: { width: 80, height: 4, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 99, overflow: 'hidden' as const },
+  usageFill: { height: '100%', borderRadius: 99 },
+  usageHint: { textAlign: 'center', fontSize: 11, color: 'rgba(255,255,255,0.22)', marginTop: 10, paddingTop: 9, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' },
+
+  scheduledBanner: { flexDirection: 'row', backgroundColor: 'rgba(255,107,91,0.08)', borderWidth: 1, borderColor: 'rgba(255,107,91,0.2)', borderRadius: 14, padding: 12, marginBottom: 10 },
+  scheduledTitle: { fontSize: 13, fontWeight: '700', color: ACCENT, marginBottom: 3 },
+  scheduledBody: { fontSize: 12, color: 'rgba(255,255,255,0.5)', lineHeight: 17 },
+  reactivateBtn: { backgroundColor: ACCENT, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 12, marginTop: 8, alignSelf: 'flex-start' as const },
+  reactivateBtnText: { fontSize: 11, fontWeight: '700', color: '#fff' },
+
+  planCard: { backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)', borderRadius: 20, overflow: 'hidden' as const, marginBottom: 10 },
+  planCardRec: { borderColor: 'rgba(255,107,91,0.4)' },
+  planBand: { padding: 12, paddingHorizontal: 15, paddingBottom: 11 },
+  planBandRec: { backgroundColor: 'rgba(255,107,91,0.06)' },
+  planTopRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 6 },
+  planName: { fontSize: 17, fontWeight: '900', color: '#fff', letterSpacing: -0.3 },
+  planNameCoral: { fontSize: 17, fontWeight: '900', color: ACCENT, letterSpacing: -0.3 },
+  recPill: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, marginTop: 3 },
+  recPillText: { fontSize: 9, fontWeight: '800', color: '#fff', letterSpacing: 0.3 },
+  bestValuePill: { backgroundColor: 'rgba(255,215,0,0.1)', borderWidth: 1, borderColor: 'rgba(255,215,0,0.2)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, marginTop: 3 },
+  bestValueText: { fontSize: 9, fontWeight: '800', color: 'rgba(255,215,0,0.7)' },
+  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
+  priceBig: { fontSize: 28, fontWeight: '900', color: '#fff', letterSpacing: -1, lineHeight: 32 },
+  pricePeriod: { fontSize: 12, color: 'rgba(255,255,255,0.35)', fontWeight: '500' },
+  priceAnnualNote: { fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 3, fontWeight: '500' },
+  planDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.06)', marginHorizontal: 15 },
+  planDividerCoral: { backgroundColor: 'rgba(255,107,91,0.1)' },
+  planFeatures: { padding: 11, paddingHorizontal: 15, paddingBottom: 13, gap: 7 },
+  featRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  featIcon: { width: 17, height: 17, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  featIconOn: { backgroundColor: 'rgba(255,107,91,0.15)' },
+  featIconOff: { backgroundColor: 'rgba(255,255,255,0.05)' },
+  featLabel: { fontSize: 12, fontWeight: '500' },
+  featLabelOn: { color: 'rgba(255,255,255,0.78)' },
+  featLabelOff: { color: 'rgba(255,255,255,0.22)', textDecorationLine: 'line-through' as const },
+  planManageRow: { paddingHorizontal: 15, paddingBottom: 8, gap: 6 },
+  manageBtn: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.11)', borderRadius: 10, paddingVertical: 8, alignItems: 'center' },
+  manageBtnText: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.45)' },
+  manageBtnCancel: { borderColor: 'rgba(239,68,68,0.3)' },
+  manageBtnCancelText: { fontSize: 12, fontWeight: '600', color: '#EF4444' },
+  planCta: { marginHorizontal: 15, marginBottom: 13, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' as const },
+  ctaPrimary: {},
+  ctaOutline: { borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.11)' },
+  ctaGhost: { backgroundColor: 'rgba(255,255,255,0.04)' },
+  ctaText: { fontSize: 13.5, fontWeight: '700', color: 'rgba(255,255,255,0.45)', letterSpacing: 0.2 },
+  ctaTextPrimary: { color: '#fff' },
+  ctaTextGhost: { color: 'rgba(255,255,255,0.25)' },
+
+  finePrint: { textAlign: 'center', fontSize: 10.5, color: 'rgba(255,255,255,0.18)', lineHeight: 16, paddingBottom: 10, marginTop: 4 },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  modalContent: { width: '100%', maxWidth: 400, backgroundColor: '#1a1a1a', borderRadius: 20, padding: 24 },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: '#fff', marginBottom: 12 },
+  modalBody: { fontSize: 14, color: 'rgba(255,255,255,0.6)', lineHeight: 20, marginBottom: 20 },
+  modalActions: { flexDirection: 'row', gap: 10 },
+  modalBtn: { flex: 1, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  modalBtnPrimary: { borderWidth: 0, overflow: 'hidden' as const },
+  modalBtnText: { fontSize: 14, fontWeight: '600', color: 'rgba(255,255,255,0.6)' },
+  modalBtnPrimaryText: { fontSize: 14, fontWeight: '700', color: '#fff' },
 });

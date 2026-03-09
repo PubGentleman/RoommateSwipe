@@ -75,16 +75,8 @@ export const ProfileStackNavigator = () => {
       <Stack.Screen 
         name="Plans" 
         component={PlansScreen}
-        options={({ navigation }) => ({
-          headerShown: true,
-          ...darkHeaderOptions,
-          headerTitle: 'Subscription Plans',
-          headerBackVisible: false,
-          headerLeft: () => (
-            <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
-              <Feather name="chevron-left" size={28} color="#FFFFFF" />
-            </Pressable>
-          ),
+        options={() => ({
+          headerShown: false,
         })}
       />
       <Stack.Screen 
