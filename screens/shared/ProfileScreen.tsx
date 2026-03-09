@@ -163,7 +163,7 @@ export const ProfileScreen = () => {
                   <Text style={styles.boostActiveBtnText}>Boosted — {boostTimeLabel}</Text>
                 </View>
               ) : (
-                <LinearGradient colors={['#ff6b5b', '#e83a2a']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.boostBtn}>
+                <LinearGradient colors={['#ff6b5b', '#e83a2a']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.boostBtn} pointerEvents="none">
                   <Feather name="zap" size={14} color="#fff" />
                   <Text style={styles.boostBtnText}>Boost Profile</Text>
                 </LinearGradient>
