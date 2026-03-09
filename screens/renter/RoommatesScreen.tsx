@@ -11,7 +11,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { StorageService } from '../../utils/storage';
-import { RoommateProfile, Match } from '../../types/models';
+import { RoommateProfile, Match, InterestCard } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scaleFont, moderateScale, getResponsiveSpacing } from '../../utils/responsive';
 import { calculateCompatibility, getMatchQualityColor, getCleanlinessLabel, getSocialLevelLabel, getWorkScheduleLabel, getWorkStyleTag, validateProfileDataConsistency, formatMoveInDate, getGenderSymbol } from '../../utils/matchingAlgorithm';
@@ -38,7 +38,7 @@ const CARD_WIDTH = Math.min(SCREEN_WIDTH - Spacing.xxl, MAX_CARD_WIDTH);
 
 export const RoommatesScreen = () => {
   const { theme } = useTheme();
-  const { user, purchaseBoost, activateBoost, canBoost, purchaseUndoPass, canRewind, useRewind, canSuperLike, useSuperLike, blockUser, reportUser } = useAuth();
+  const { user, purchaseBoost, activateBoost, canBoost, canSendInterest, purchaseUndoPass, canRewind, useRewind, canSuperLike, useSuperLike, blockUser, reportUser } = useAuth();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { refreshUnreadCount } = useNotificationContext();
@@ -628,6 +628,38 @@ export const RoommatesScreen = () => {
   const handleUpgradeToPaid = () => {
     setShowPaywall(false);
     (navigation as any).navigate('Profile', { screen: 'Payment' });
+  };
+
+  const handleSendInterest = async (profile: RoommateProfile, isSuper: boolean = false) => {
+    if (!user || !profile) return;
+    const check = await canSendInterest();
+    if (!check.canSend) {
+      Alert.alert('Limit Reached', check.reason || 'You have reached your daily interest card limit. Upgrade your plan for more.');
+      return;
+    }
+    const card: InterestCard = {
+      id: `interest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      renterId: user.id,
+      renterName: user.name || 'Anonymous',
+      renterPhoto: user.photos?.[0],
+      hostId: profile.id,
+      propertyId: '',
+      propertyTitle: '',
+      compatibilityScore: profile.compatibility || 0,
+      budgetRange: user.profileData?.budget ? `$${user.profileData.budget}/mo` : 'Not set',
+      moveInDate: user.profileData?.preferences?.moveInDate || 'Flexible',
+      lifestyleTags: user.profileData?.preferences?.lifestyle || [],
+      personalNote: '',
+      status: 'pending',
+      isSuperInterest: isSuper,
+      createdAt: new Date().toISOString(),
+    };
+    await StorageService.addInterestCard(card);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Alert.alert(
+      isSuper ? 'Super Interest Sent!' : 'Interest Sent!',
+      `Your interest card has been sent to ${profile.name}. They'll see your compatibility and preferences.`
+    );
   };
 
   const handleBoostForPaidPlan = async () => {
@@ -1591,7 +1623,20 @@ export const RoommatesScreen = () => {
                 </View>
               ) : null}
 
-              <View style={[styles.detailSection, { paddingBottom: Spacing.xxl }]}>
+              <View style={[styles.detailSection, { paddingBottom: Spacing.xxl, gap: Spacing.md }]}>
+                <Pressable
+                  style={[styles.detailActionButton, { backgroundColor: '#ff6b5b' }]}
+                  onPress={() => {
+                    if (currentProfile) {
+                      handleSendInterest(currentProfile);
+                    }
+                  }}
+                >
+                  <Feather name="heart" size={20} color="#FFFFFF" />
+                  <ThemedText style={[Typography.h3, { color: '#FFFFFF', marginLeft: Spacing.md }]}>
+                    Send Interest Card
+                  </ThemedText>
+                </Pressable>
                 <Pressable
                   style={[styles.detailActionButton, { backgroundColor: theme.primary }]}
                   onPress={() => {
