@@ -769,7 +769,13 @@ export const RoommatesScreen = () => {
         </Pressable>
         <RoomdrLogo variant="horizontal" size="sm" />
         <View style={{ flexDirection: 'row', gap: 8 }}>
-          {!user?.boostData?.isBoosted || (user?.boostData?.boostExpiresAt && new Date(user.boostData.boostExpiresAt) <= new Date()) ? (
+          {user?.boostData?.isBoosted && user?.boostData?.boostExpiresAt && new Date(user.boostData.boostExpiresAt) > new Date() ? (
+            <View style={styles.navIconBtn}>
+              <View style={[styles.navIconBtnInner, { backgroundColor: '#FFD700' }]}>
+                <Feather name="zap" size={18} color="#000000" />
+              </View>
+            </View>
+          ) : (
             <Pressable onPress={() => {
               const plan = user?.subscription?.plan || 'basic';
               if (plan === 'basic') {
@@ -778,11 +784,11 @@ export const RoommatesScreen = () => {
                 handleBoostForPaidPlan();
               }
             }} style={styles.navIconBtn}>
-              <View style={[styles.navIconBtnInner, { backgroundColor: '#FFD700' }]}>
-                <Feather name="zap" size={18} color="#000000" />
+              <View style={[styles.navIconBtnInner, { backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }]}>
+                <Feather name="zap" size={18} color="#FFD700" />
               </View>
             </Pressable>
-          ) : null}
+          )}
           <Pressable onPress={() => (navigation as any).navigate('Profile', { screen: 'Notifications' })} style={styles.navIconBtn}>
             <View style={[styles.navIconBtnInner, { backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }]}>
               <Feather name="bell" size={18} color="#FFFFFF" />
