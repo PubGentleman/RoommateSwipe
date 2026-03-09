@@ -18,7 +18,7 @@ export interface ToastNotification {
   id: string;
   title: string;
   body: string;
-  type: 'match' | 'message' | 'group_invite' | 'group_accepted' | 'property_update' | 'property_rented' | 'application_status' | 'system' | 'super_like';
+  type: 'match' | 'message' | 'group_invite' | 'group_accepted' | 'property_update' | 'property_rented' | 'application_status' | 'system' | 'super_like' | 'interest_received' | 'interest_accepted' | 'interest_passed' | 'interest_expired';
   onPress?: () => void;
 }
 
@@ -39,6 +39,10 @@ const getIconForType = (type: string): string => {
     case 'property_update':
     case 'property_rented': return 'home';
     case 'application_status': return 'file-text';
+    case 'interest_received': return 'heart';
+    case 'interest_accepted': return 'check-circle';
+    case 'interest_passed': return 'x-circle';
+    case 'interest_expired': return 'clock';
     default: return 'bell';
   }
 };
@@ -52,6 +56,10 @@ const getColorForType = (type: string): string => {
     case 'group_accepted': return '#9B59B6';
     case 'property_update':
     case 'property_rented': return '#3498DB';
+    case 'interest_received': return '#ff6b5b';
+    case 'interest_accepted': return '#3ECF8E';
+    case 'interest_passed': return '#999999';
+    case 'interest_expired': return '#666666';
     default: return '#95A5A6';
   }
 };

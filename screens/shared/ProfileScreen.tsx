@@ -11,6 +11,7 @@ import type { ProfileStackParamList } from '../../navigation/ProfileStackNavigat
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { ProfileCompletionCard } from '../../components/ProfileCompletionCard';
 import { getVerificationLevel } from '../../components/VerificationBadge';
+import { StorageService } from '../../utils/storage';
 
 type ProfileScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'ProfileMain'>;
 
@@ -21,10 +22,16 @@ export const ProfileScreen = () => {
   const insets = useSafeAreaInsets();
   const [showPurchaseBoostModal, setShowPurchaseBoostModal] = useState(false);
   const [processingBoost, setProcessingBoost] = useState(false);
+  const [pendingInterestCount, setPendingInterestCount] = useState(0);
 
   useFocusEffect(
     React.useCallback(() => {
       checkAndUpdateBoostStatus();
+      if (user) {
+        StorageService.getInterestCardsForRenter(user.id).then(cards => {
+          setPendingInterestCount(cards.filter(c => c.status === 'pending').length);
+        });
+      }
     }, [user])
   );
 
@@ -170,6 +177,16 @@ export const ProfileScreen = () => {
               title="Edit Profile"
               subtitle="Name, bio, photos, preferences"
               onPress={() => navigation.navigate('ProfileQuestionnaire')}
+            />
+            <SettingsItem
+              iconName="heart"
+              iconColor="#ff6b5b"
+              iconBgColor="rgba(255,107,91,0.12)"
+              iconBorderColor="rgba(255,107,91,0.18)"
+              title="My Interests"
+              subtitle="Interest cards you've sent"
+              onPress={() => navigation.navigate('MyInterests')}
+              badge={pendingInterestCount}
             />
             <SettingsItem
               iconName="bell"

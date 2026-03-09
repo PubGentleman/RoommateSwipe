@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { User, RoommateProfile, Property, Group, Conversation, Message, Match, Application, Notification } from '../types/models';
+import { User, RoommateProfile, Property, Group, Conversation, Message, Match, Application, Notification, InterestCard } from '../types/models';
 
 const STORAGE_KEYS = {
   CURRENT_USER: '@roomdr/current_user',
@@ -16,6 +16,7 @@ const STORAGE_KEYS = {
   NOTIFICATIONS: '@roomdr/notifications',
   MOCK_DATA_VERSION: '@roomdr/mock_data_version',
   ONBOARDING_COMPLETED: '@roomdr/onboarding_completed',
+  INTEREST_CARDS: '@roomdr/interestCards',
 };
 
 let notificationIdCounter = 0;
@@ -1342,6 +1343,93 @@ export const StorageService = {
       console.error('[StorageService] Error deleting user:', error);
       throw error;
     }
+  },
+
+  async getInterestCards(): Promise<InterestCard[]> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.INTEREST_CARDS);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error('Error getting interest cards:', error);
+      return [];
+    }
+  },
+
+  async setInterestCards(cards: InterestCard[]): Promise<void> {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.INTEREST_CARDS, JSON.stringify(cards));
+    } catch (error) {
+      console.error('Error setting interest cards:', error);
+    }
+  },
+
+  async addInterestCard(card: InterestCard): Promise<void> {
+    try {
+      const cards = await this.getInterestCards();
+      cards.push(card);
+      await this.setInterestCards(cards);
+    } catch (error) {
+      console.error('Error adding interest card:', error);
+    }
+  },
+
+  async updateInterestCard(id: string, updates: Partial<InterestCard>): Promise<void> {
+    try {
+      const cards = await this.getInterestCards();
+      const index = cards.findIndex(c => c.id === id);
+      if (index >= 0) {
+        cards[index] = { ...cards[index], ...updates };
+        await this.setInterestCards(cards);
+      }
+    } catch (error) {
+      console.error('Error updating interest card:', error);
+    }
+  },
+
+  async getInterestCardsForHost(hostId: string): Promise<InterestCard[]> {
+    const cards = await this.getInterestCards();
+    return cards.filter(c => c.hostId === hostId);
+  },
+
+  async getInterestCardsForRenter(renterId: string): Promise<InterestCard[]> {
+    const cards = await this.getInterestCards();
+    return cards.filter(c => c.renterId === renterId);
+  },
+
+  async hasActiveInterest(renterId: string, propertyId: string): Promise<boolean> {
+    const cards = await this.getInterestCards();
+    return cards.some(c => c.renterId === renterId && c.propertyId === propertyId && (c.status === 'pending' || c.status === 'accepted'));
+  },
+
+  async expireOldInterestCards(): Promise<InterestCard[]> {
+    try {
+      const cards = await this.getInterestCards();
+      const now = Date.now();
+      const expiredCards: InterestCard[] = [];
+      const updated = cards.map(card => {
+        if (card.status === 'pending') {
+          const createdTime = new Date(card.createdAt).getTime();
+          if (now - createdTime > 24 * 60 * 60 * 1000) {
+            const expired = { ...card, status: 'expired' as const, respondedAt: new Date().toISOString() };
+            expiredCards.push(expired);
+            return expired;
+          }
+        }
+        return card;
+      });
+      if (expiredCards.length > 0) {
+        await this.setInterestCards(updated);
+      }
+      return expiredCards;
+    } catch (error) {
+      console.error('Error expiring interest cards:', error);
+      return [];
+    }
+  },
+
+  async getInterestCardForProperty(renterId: string, propertyId: string): Promise<InterestCard | null> {
+    const cards = await this.getInterestCards();
+    return cards.find(c => c.renterId === renterId && c.propertyId === propertyId) || null;
   },
 
   async isOnboardingCompleted(userId?: string): Promise<boolean> {

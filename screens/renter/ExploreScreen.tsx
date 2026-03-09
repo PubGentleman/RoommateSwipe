@@ -1,17 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Image, Pressable, FlatList, Modal, TextInput, ScrollView, Switch } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, StyleSheet, Image, Pressable, FlatList, Modal, TextInput, ScrollView, Switch, Alert, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import { ThemedText } from '../../components/ThemedText';
 import { ThemedView } from '../../components/ThemedView';
 import { WalkScoreBadge } from '../../components/WalkScoreBadge';
+import InterestCardSheet from '../../components/InterestCardSheet';
+import { InterestConfirmationModal } from '../../components/InterestConfirmationModal';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCityContext } from '../../contexts/CityContext';
 import { CityPickerModal, CityPillButton } from '../../components/CityPickerModal';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { StorageService } from '../../utils/storage';
-import { Property, PropertyFilter, User, RoommateProfile } from '../../types/models';
+import { Property, PropertyFilter, User, RoommateProfile, InterestCard } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { formatMoveInDate, calculateCompatibility, getMatchQualityColor, getGenderSymbol, formatLocation } from '../../utils/matchingAlgorithm';
@@ -25,7 +28,7 @@ const COMMON_AMENITIES = [
 
 export const ExploreScreen = () => {
   const { theme } = useTheme();
-  const { user } = useAuth();
+  const { user, canSendInterest, canSendSuperInterest } = useAuth();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [properties, setProperties] = useState<Property[]>([]);
@@ -45,6 +48,12 @@ export const ExploreScreen = () => {
   const [showCityPicker, setShowCityPicker] = useState(false);
   const { activeCity, recentCities, setActiveCity } = useCityContext();
   const [hostProfiles, setHostProfiles] = useState<Map<string, User>>(new Map());
+  const [interestMap, setInterestMap] = useState<Map<string, InterestCard>>(new Map());
+  const [showInterestSheet, setShowInterestSheet] = useState(false);
+  const [showInterestConfirmation, setShowInterestConfirmation] = useState(false);
+  const [sendingInterest, setSendingInterest] = useState(false);
+  const [isSuperInterest, setIsSuperInterest] = useState(false);
+  const [confirmationWasSuper, setConfirmationWasSuper] = useState(false);
 
   useEffect(() => {
     loadProperties();
@@ -98,6 +107,110 @@ export const ExploreScreen = () => {
       setHostProfiles(profileMap);
     } catch (err) {
       console.error('Error loading host profiles:', err);
+    }
+  };
+
+  const loadInterestCards = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const cards = await StorageService.getInterestCardsForRenter(user.id);
+      const map = new Map<string, InterestCard>();
+      cards.forEach(c => map.set(c.propertyId, c));
+      setInterestMap(map);
+    } catch (err) {
+      console.error('Error loading interest cards:', err);
+    }
+  }, [user?.id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadInterestCards();
+    }, [loadInterestCards])
+  );
+
+  const getPropertyCompatibility = (property: Property): number => {
+    if (!property.hostProfileId || !user) return 0;
+    const hostUser = hostProfiles.get(property.hostProfileId);
+    if (!hostUser) return 0;
+    const hostProfile = getUserAsRoommateProfile(hostUser);
+    if (!hostProfile) return 0;
+    return calculateCompatibility(user, hostProfile);
+  };
+
+  const handleInterestPress = async () => {
+    if (!user || !selectedProperty) return;
+    const result = await canSendInterest();
+    if (!result.canSend) {
+      Alert.alert('Daily Limit Reached', result.reason || 'Upgrade to send more interest cards.', [
+        { text: 'OK' },
+      ]);
+      return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setShowInterestSheet(true);
+  };
+
+  const handleSendInterest = async (note: string) => {
+    if (!user || !selectedProperty) return;
+    setSendingInterest(true);
+    try {
+      const compatibility = getPropertyCompatibility(selectedProperty);
+      const budgetMin = user.profileData?.budget || 0;
+      const budgetRange = budgetMin > 0 ? `$${budgetMin}/mo` : 'Not set';
+      const moveIn = user.profileData?.preferences?.moveInDate || 'Flexible';
+      const tags: string[] = [];
+      if (user.profileData?.preferences?.cleanliness === 'very_tidy') tags.push('Clean');
+      if (user.profileData?.preferences?.smoking === 'no') tags.push('Non-Smoker');
+      if (user.profileData?.preferences?.pets === 'have_pets' || user.profileData?.preferences?.pets === 'open_to_pets') tags.push('Pet Friendly');
+      if (user.profileData?.preferences?.sleepSchedule === 'early_sleeper') tags.push('Early Bird');
+      if (user.profileData?.preferences?.sleepSchedule === 'late_sleeper') tags.push('Night Owl');
+
+      const card: InterestCard = {
+        id: `interest_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        renterId: user.id,
+        renterName: user.name,
+        renterPhoto: user.profilePicture,
+        hostId: selectedProperty.hostId,
+        propertyId: selectedProperty.id,
+        propertyTitle: selectedProperty.title,
+        compatibilityScore: compatibility,
+        budgetRange,
+        moveInDate: moveIn,
+        lifestyleTags: tags.length > 0 ? tags : ['Flexible'],
+        personalNote: note,
+        status: 'pending',
+        isSuperInterest,
+        createdAt: new Date().toISOString(),
+      };
+
+      await StorageService.addInterestCard(card);
+      await StorageService.addNotification({
+        id: `notif_interest_${Date.now()}`,
+        userId: selectedProperty.hostId,
+        type: 'interest_received',
+        title: isSuperInterest ? 'Super Interest Received!' : 'New Interest!',
+        body: `${user.name} is interested in ${selectedProperty.title}`,
+        isRead: false,
+        createdAt: new Date(),
+        data: {
+          interestCardId: card.id,
+          propertyId: selectedProperty.id,
+          fromUserId: user.id,
+          fromUserName: user.name,
+          fromUserPhoto: user.profilePicture,
+        },
+      });
+
+      setShowInterestSheet(false);
+      setConfirmationWasSuper(isSuperInterest);
+      setShowInterestConfirmation(true);
+      await loadInterestCards();
+    } catch (err) {
+      console.error('Error sending interest:', err);
+      Alert.alert('Error', 'Failed to send interest. Please try again.');
+    } finally {
+      setSendingInterest(false);
+      setIsSuperInterest(false);
     }
   };
 
@@ -1089,6 +1202,78 @@ export const ExploreScreen = () => {
                     </View>
                   </View>
 
+                  <View style={[styles.detailSection, { paddingBottom: Spacing.xl }]}>
+                    {(() => {
+                      const interest = interestMap.get(selectedProperty.id);
+                      if (interest?.status === 'pending') {
+                        return (
+                          <View style={[styles.interestStatusBadge, { backgroundColor: '#FFA50020', borderColor: '#FFA500' }]}>
+                            <Feather name="clock" size={18} color="#FFA500" />
+                            <ThemedText style={{ color: '#FFA500', fontWeight: '700', marginLeft: Spacing.sm, fontSize: 15 }}>
+                              Pending Response
+                            </ThemedText>
+                          </View>
+                        );
+                      }
+                      if (interest?.status === 'accepted') {
+                        return (
+                          <Pressable
+                            style={[styles.interestButton, { backgroundColor: '#22c55e' }]}
+                            onPress={() => {
+                              setShowPropertyDetail(false);
+                              navigation.navigate('Messages' as never);
+                            }}
+                          >
+                            <Feather name="message-circle" size={18} color="#fff" />
+                            <ThemedText style={{ color: '#fff', fontWeight: '700', marginLeft: Spacing.sm, fontSize: 15 }}>
+                              Accepted — Chat Now
+                            </ThemedText>
+                          </Pressable>
+                        );
+                      }
+                      if (interest?.status === 'passed') {
+                        return (
+                          <View style={[styles.interestStatusBadge, { backgroundColor: '#66666620', borderColor: '#666' }]}>
+                            <Feather name="x-circle" size={18} color="#666" />
+                            <ThemedText style={{ color: '#666', fontWeight: '700', marginLeft: Spacing.sm, fontSize: 15 }}>
+                              Passed
+                            </ThemedText>
+                          </View>
+                        );
+                      }
+                      return (
+                        <View>
+                          <Pressable
+                            style={[styles.interestButton, { backgroundColor: '#ff6b5b' }]}
+                            onPress={handleInterestPress}
+                          >
+                            <Feather name="heart" size={18} color="#fff" />
+                            <ThemedText style={{ color: '#fff', fontWeight: '700', marginLeft: Spacing.sm, fontSize: 15 }}>
+                              I'm Interested
+                            </ThemedText>
+                            {canSendSuperInterest() ? (
+                              <Pressable
+                                onPress={(e) => {
+                                  e.stopPropagation();
+                                  setIsSuperInterest(!isSuperInterest);
+                                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                }}
+                                style={[styles.superInterestToggle, isSuperInterest ? { backgroundColor: '#FFD700' } : { backgroundColor: 'rgba(255,255,255,0.2)' }]}
+                              >
+                                <Feather name="star" size={14} color={isSuperInterest ? '#000' : '#fff'} />
+                              </Pressable>
+                            ) : null}
+                          </Pressable>
+                          {canSendSuperInterest() ? (
+                            <ThemedText style={{ color: isSuperInterest ? '#FFD700' : 'rgba(255,255,255,0.4)', fontSize: 11, textAlign: 'center', marginTop: 6 }}>
+                              {isSuperInterest ? 'Super Interest — Bumped to top!' : 'Tap the star for Super Interest'}
+                            </ThemedText>
+                          ) : null}
+                        </View>
+                      );
+                    })()}
+                  </View>
+
                 </>
               ) : null}
             </ScrollView>
@@ -1101,6 +1286,22 @@ export const ExploreScreen = () => {
         recentCities={recentCities}
         onCitySelect={(city) => { setActiveCity(city); setShowCityPicker(false); }}
         onClose={() => setShowCityPicker(false)}
+      />
+      {selectedProperty ? (
+        <InterestCardSheet
+          visible={showInterestSheet}
+          onClose={() => { setShowInterestSheet(false); setIsSuperInterest(false); }}
+          onSend={handleSendInterest}
+          property={selectedProperty}
+          compatibilityScore={getPropertyCompatibility(selectedProperty)}
+          isSuperInterest={isSuperInterest}
+          sending={sendingInterest}
+        />
+      ) : null}
+      <InterestConfirmationModal
+        visible={showInterestConfirmation}
+        onClose={() => setShowInterestConfirmation(false)}
+        isSuperInterest={confirmationWasSuper}
       />
     </View>
   );
@@ -1360,6 +1561,29 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.full,
     borderWidth: 1,
+  },
+  interestButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 14,
+  },
+  interestStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  superInterestToggle: {
+    marginLeft: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalFooter: {
     paddingHorizontal: Spacing.lg,

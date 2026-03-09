@@ -39,6 +39,8 @@ interface AuthContextType {
   getAdCredits: () => { rewinds: number; superLikes: number; boosts: number; messages: number };
   useAdCredit: (creditType: 'rewinds' | 'superLikes' | 'boosts' | 'messages') => Promise<boolean>;
   isBasicUser: () => boolean;
+  canSendInterest: () => Promise<{ canSend: boolean; remaining: number; reason?: string }>;
+  canSendSuperInterest: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -1156,8 +1158,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return true;
   };
 
+  const canSendInterest = async (): Promise<{ canSend: boolean; remaining: number; reason?: string }> => {
+    if (!user) return { canSend: false, remaining: 0, reason: 'Not logged in' };
+
+    const plan = user.subscription?.plan || 'basic';
+    const status = user.subscription?.status || 'active';
+
+    if ((plan === 'plus' || plan === 'elite') && status === 'active') {
+      return { canSend: true, remaining: -1 };
+    }
+
+    const DAILY_LIMIT = 5;
+    const cards = await StorageService.getInterestCardsForRenter(user.id);
+    const now = new Date();
+    const todayCards = cards.filter(card => {
+      const created = new Date(card.createdAt);
+      return created.getFullYear() === now.getFullYear() &&
+        created.getMonth() === now.getMonth() &&
+        created.getDate() === now.getDate();
+    });
+
+    const remaining = Math.max(0, DAILY_LIMIT - todayCards.length);
+    if (remaining <= 0) {
+      return { canSend: false, remaining: 0, reason: 'Daily limit reached. Upgrade to Plus or Elite for unlimited interests.' };
+    }
+
+    return { canSend: true, remaining };
+  };
+
+  const canSendSuperInterest = (): boolean => {
+    if (!user) return false;
+    const plan = user.subscription?.plan || 'basic';
+    const status = user.subscription?.status || 'active';
+    return (plan === 'plus' || plan === 'elite') && status === 'active';
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, reactivateSubscription, updateUser, blockUser: blockUserAction, unblockUser: unblockUserAction, reportUser: reportUserAction, isUserBlocked: isUserBlockedCheck, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike, watchAdForCredit, getAdCredits, useAdCredit, isBasicUser }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, reactivateSubscription, updateUser, blockUser: blockUserAction, unblockUser: unblockUserAction, reportUser: reportUserAction, isUserBlocked: isUserBlockedCheck, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike, watchAdForCredit, getAdCredits, useAdCredit, isBasicUser, canSendInterest, canSendSuperInterest }}>
       {children}
     </AuthContext.Provider>
   );

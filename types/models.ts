@@ -320,10 +320,29 @@ export interface User {
   };
 }
 
+export interface InterestCard {
+  id: string;
+  renterId: string;
+  renterName: string;
+  renterPhoto?: string;
+  hostId: string;
+  propertyId: string;
+  propertyTitle: string;
+  compatibilityScore: number;
+  budgetRange: string;
+  moveInDate: string;
+  lifestyleTags: string[];
+  personalNote: string;
+  status: 'pending' | 'accepted' | 'passed' | 'expired';
+  isSuperInterest: boolean;
+  createdAt: string;
+  respondedAt?: string;
+}
+
 export interface Notification {
   id: string;
   userId: string;
-  type: 'match' | 'message' | 'group_invite' | 'group_accepted' | 'property_update' | 'property_rented' | 'application_status' | 'system' | 'super_like';
+  type: 'match' | 'message' | 'group_invite' | 'group_accepted' | 'property_update' | 'property_rented' | 'application_status' | 'system' | 'super_like' | 'interest_received' | 'interest_accepted' | 'interest_passed' | 'interest_expired';
   title: string;
   body: string;
   isRead: boolean;
@@ -334,6 +353,7 @@ export interface Notification {
     groupId?: string;
     propertyId?: string;
     applicationId?: string;
+    interestCardId?: string;
     fromUserId?: string;
     fromUserName?: string;
     fromUserPhoto?: string;
