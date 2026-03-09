@@ -144,18 +144,24 @@ export const ProfileScreen = () => {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Subscription</Text>
           </View>
-          <Pressable style={styles.subCard} onPress={() => navigation.navigate('Plans')}>
+          <Pressable style={styles.subCard} onPress={() => navigation.navigate(user?.role === 'host' ? 'HostPricing' : 'Plans')}>
             <View style={styles.subLeft}>
               <Text style={styles.subLabel}>Current Plan</Text>
               <Text style={styles.subPlan}>
-                {user?.subscription?.plan === 'basic' ? 'Basic' : user?.subscription?.plan === 'plus' ? 'Plus' : user?.subscription?.plan === 'elite' ? 'Elite' : 'Basic'} {user?.subscription?.plan === 'basic' ? '· Free' : ''}
+                {user?.role === 'host'
+                  ? (user?.hostPlan === 'pro' ? 'Pro' : user?.hostPlan === 'business' ? 'Business' : 'Starter · Free')
+                  : (user?.subscription?.plan === 'basic' ? 'Basic' : user?.subscription?.plan === 'plus' ? 'Plus' : user?.subscription?.plan === 'elite' ? 'Elite' : 'Basic')
+                } {user?.role !== 'host' && user?.subscription?.plan === 'basic' ? '· Free' : ''}
               </Text>
               <Text style={styles.subDesc}>
-                {user?.subscription?.plan === 'basic' ? 'Upgrade to unlock unlimited matches' : 'You have full access'}
+                {user?.role === 'host'
+                  ? (user?.hostPlan === 'starter' || !user?.hostPlan ? 'Upgrade to reach more renters' : 'You have full access')
+                  : (user?.subscription?.plan === 'basic' ? 'Upgrade to unlock unlimited matches' : 'You have full access')
+                }
               </Text>
             </View>
-            {user?.subscription?.plan === 'basic' ? (
-              <Pressable onPress={() => navigation.navigate('Plans')}>
+            {(user?.role === 'host' ? (!user?.hostPlan || user?.hostPlan === 'starter') : user?.subscription?.plan === 'basic') ? (
+              <Pressable onPress={() => navigation.navigate(user?.role === 'host' ? 'HostPricing' : 'Plans')}>
                 <LinearGradient colors={['#ff6b5b', '#e83a2a']} style={styles.upgradeBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
                   <Text style={styles.upgradeBtnText}>Upgrade</Text>
                 </LinearGradient>

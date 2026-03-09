@@ -18,11 +18,13 @@ import { BlockedUsersScreen } from '../screens/shared/BlockedUsersScreen';
 import { NotificationPreferencesScreen } from '../screens/shared/NotificationPreferencesScreen';
 import { VerificationScreen } from '../screens/shared/VerificationScreen';
 import { MyInterestsScreen } from '../screens/shared/MyInterestsScreen';
+import { HostPricingScreen } from '../screens/host/HostPricingScreen';
 
 export type ProfileStackParamList = {
   ProfileMain: undefined;
   Payment: undefined;
   Plans: undefined;
+  HostPricing: undefined;
   EditProfile: undefined;
   ProfileQuestionnaire: { initialStep?: string } | undefined;
   Notifications: undefined;
@@ -84,6 +86,11 @@ export const ProfileStackNavigator = () => {
             </Pressable>
           ),
         })}
+      />
+      <Stack.Screen 
+        name="HostPricing" 
+        component={HostPricingScreen}
+        options={{ headerShown: false }}
       />
       <Stack.Screen 
         name="EditProfile" 
