@@ -656,6 +656,7 @@ const styles = StyleSheet.create({
 
   statChips: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 7,
     marginBottom: 12,
   },
