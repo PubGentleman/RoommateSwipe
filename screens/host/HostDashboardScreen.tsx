@@ -386,6 +386,10 @@ export const HostDashboardScreen = () => {
             <Feather name="bar-chart-2" size={15} color="rgba(255,255,255,0.6)" />
             <Text style={styles.qaSecondaryText}>Analytics</Text>
           </Pressable>
+          <Pressable style={styles.qaSecondary} onPress={() => navigation.navigate('HostPricing')}>
+            <Feather name="star" size={15} color={GOLD} />
+            <Text style={styles.qaSecondaryText}>Plans</Text>
+          </Pressable>
         </View>
       </ScrollView>
     </View>

@@ -6,6 +6,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
+import { PaywallSheet } from '../../components/PaywallSheet';
 import { StorageService } from '../../utils/storage';
 import { Property, InterestCard } from '../../types/models';
 
@@ -61,12 +62,13 @@ function formatListedAgo(listing: Property): string {
 }
 
 export const MyListingsScreen = () => {
-  const { user } = useAuth();
+  const { user, canAddListing, getHostPlan } = useAuth();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const [listings, setListings] = useState<Property[]>([]);
   const [inquiries, setInquiries] = useState<InterestCard[]>([]);
   const [filter, setFilter] = useState<FilterStatus>('all');
+  const [showHostPaywall, setShowHostPaywall] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -334,7 +336,16 @@ export const MyListingsScreen = () => {
             {listings.length} listing{listings.length !== 1 ? 's' : ''} · {activeCount} active
           </Text>
         </View>
-        <Pressable onPress={() => navigation.navigate('CreateEditListing')}>
+        <Pressable onPress={() => {
+          const activeListings = listings.filter(p => getListingStatus(p) !== 'rented').length;
+          const result = canAddListing(activeListings);
+          if (!result.allowed) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            setShowHostPaywall(true);
+            return;
+          }
+          navigation.navigate('CreateEditListing');
+        }}>
           <LinearGradient
             colors={[ACCENT, '#e83a2a']}
             start={{ x: 0, y: 0 }}
@@ -383,6 +394,21 @@ export const MyListingsScreen = () => {
           filteredListings.map(listing => renderListingCard(listing))
         )}
       </ScrollView>
+
+      <PaywallSheet
+        visible={showHostPaywall}
+        featureName="More Listings"
+        requiredPlan={getHostPlan() === 'starter' ? 'pro' : 'business'}
+        role="host"
+        onUpgrade={() => {
+          setShowHostPaywall(false);
+          const parent = navigation.getParent();
+          if (parent) {
+            parent.navigate('Dashboard', { screen: 'HostPricing' });
+          }
+        }}
+        onDismiss={() => setShowHostPaywall(false)}
+      />
     </View>
   );
 };

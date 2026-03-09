@@ -48,7 +48,23 @@ Animations are powered by React Native Reanimated, gestures by React Native Gest
 
 ## Authentication & Authorization
 
-The system uses mock authentication for demonstration, supporting role-based navigation and conditional access for `renter`, `host`, and `agent` roles. Three subscription tiers (Basic, Plus, Elite) are planned via Stripe integration. Privacy settings and account deletion are implemented.
+The system uses mock authentication for demonstration, supporting role-based navigation and conditional access for `renter`, `host`, and `agent` roles. Privacy settings and account deletion are implemented.
+
+## Subscription & Paywall System
+
+**Renter Tiers:** Basic (Free), Plus ($14.99/mo or $149.90/yr), Elite ($29.99/mo or $299.90/yr). Annual billing saves 2 months. 7-day free trial for Plus. Usage stats shown for Basic users (interest cards, rewinds, super likes). Elite highlighted as recommended.
+
+**Host Tiers:** Starter (Free, 1 listing, 5 inquiry responses/mo), Pro ($29.99/mo or $299.90/yr, 5 listings, unlimited responses, analytics, verified badge), Business ($79.99/mo or $799.90/yr, unlimited everything, priority, featured, advanced analytics). Pro highlighted as recommended.
+
+**One-Time Purchases:** Listing Boost ($4.99/7 days), Host Verification Badge ($9.99), Super Interest ($0.99/use).
+
+**Paywall System:** `PaywallSheet` component (`components/PaywallSheet.tsx`) — reusable modal bottom sheet triggered when users hit plan limits. Adapts for renter vs host tiers. Wired into ExploreScreen (interest card limits, advanced filters, Walk Score), MyListingsScreen (listing limits), and RoommatesScreen (AI Match Assistant).
+
+**Plan Badges:** `PlanBadge` component (`components/PlanBadge.tsx`) — gold "award" icon for Plus users, orange-red "zap" icon for Elite users. Shown in MessagesScreen, ChatScreen, RoommatesScreen cards, and MatchCelebrationModal.
+
+**AuthContext Host Functions:** `upgradeHostPlan`, `downgradeHostPlan`, `getHostPlan`, `canAddListing`, `canRespondToInquiry`, `useInquiryResponse`, `purchaseListingBoost`, `purchaseHostVerification`, `purchaseSuperInterest`. Host scheduled downgrades applied on login. All mutations persist to both currentUser and users list.
+
+**Key Files:** `screens/shared/PlansScreen.tsx` (renter plans), `screens/host/HostPricingScreen.tsx` (host plans), `components/PaywallSheet.tsx`, `components/PlanBadge.tsx`.
 
 ## Data Layer
 

@@ -8,6 +8,7 @@ import { ThemedView } from '../../components/ThemedView';
 import { WalkScoreBadge } from '../../components/WalkScoreBadge';
 import InterestCardSheet from '../../components/InterestCardSheet';
 import { InterestConfirmationModal } from '../../components/InterestConfirmationModal';
+import { PaywallSheet } from '../../components/PaywallSheet';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCityContext } from '../../contexts/CityContext';
@@ -37,7 +38,6 @@ export const ExploreScreen = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showFilterModal, setShowFilterModal] = useState(false);
-  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
   const [filters, setFilters] = useState<PropertyFilter>({});
   const [tempFilters, setTempFilters] = useState<PropertyFilter>({});
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
@@ -54,6 +54,9 @@ export const ExploreScreen = () => {
   const [sendingInterest, setSendingInterest] = useState(false);
   const [isSuperInterest, setIsSuperInterest] = useState(false);
   const [confirmationWasSuper, setConfirmationWasSuper] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [paywallFeature, setPaywallFeature] = useState('');
+  const [paywallPlan, setPaywallPlan] = useState<'plus' | 'elite'>('plus');
 
   useEffect(() => {
     loadProperties();
@@ -141,9 +144,10 @@ export const ExploreScreen = () => {
     if (!user || !selectedProperty) return;
     const result = await canSendInterest();
     if (!result.canSend) {
-      Alert.alert('Daily Limit Reached', result.reason || 'Upgrade to send more interest cards.', [
-        { text: 'OK' },
-      ]);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      setPaywallFeature('Unlimited Interest Cards');
+      setPaywallPlan('plus');
+      setShowPaywall(true);
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -311,7 +315,9 @@ export const ExploreScreen = () => {
     
     if (!hasActiveSubscription) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      setShowUpgradePrompt(true);
+      setPaywallFeature('Advanced Filters');
+      setPaywallPlan('plus');
+      setShowPaywall(true);
     } else {
       setTempFilters({ ...filters });
       setShowFilterModal(true);
@@ -496,7 +502,9 @@ export const ExploreScreen = () => {
                     }}
                     onPress={() => {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      setShowUpgradePrompt(true);
+                      setPaywallFeature('Walk Score');
+                      setPaywallPlan('plus');
+                      setShowPaywall(true);
                     }}
                   >
                     <Feather name="lock" size={20} color={theme.textSecondary} />
@@ -848,68 +856,17 @@ export const ExploreScreen = () => {
         </View>
       </Modal>
 
-      <Modal
-        visible={showUpgradePrompt}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowUpgradePrompt(false)}
-      >
-        <Pressable
-          style={styles.upgradeOverlay}
-          onPress={() => setShowUpgradePrompt(false)}
-        >
-          <Pressable
-            style={[styles.upgradeModal, { backgroundColor: theme.backgroundDefault }]}
-            onPress={e => e.stopPropagation()}
-          >
-            <View style={[styles.upgradeIconContainer, { backgroundColor: '#4CAF50' + '20' }]}>
-              <Feather name="user" size={32} color="#4CAF50" />
-            </View>
-            <ThemedText style={[Typography.h2, { textAlign: 'center', marginTop: Spacing.lg }]}>
-              Walk Score Feature
-            </ThemedText>
-            <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary, marginTop: Spacing.sm }]}>
-              Upgrade to Plus or Elite to see walkability ratings for all properties and make informed decisions about neighborhood accessibility.
-            </ThemedText>
-            <View style={styles.upgradeFeatures}>
-              <View style={styles.upgradeFeature}>
-                <Feather name="check" size={20} color={theme.success} />
-                <ThemedText style={[Typography.body, { marginLeft: Spacing.md }]}>
-                  See Walk Scores for all properties
-                </ThemedText>
-              </View>
-              <View style={styles.upgradeFeature}>
-                <Feather name="check" size={20} color={theme.success} />
-                <ThemedText style={[Typography.body, { marginLeft: Spacing.md }]}>
-                  Understand neighborhood walkability
-                </ThemedText>
-              </View>
-              <View style={styles.upgradeFeature}>
-                <Feather name="check" size={20} color={theme.success} />
-                <ThemedText style={[Typography.body, { marginLeft: Spacing.md }]}>
-                  Make informed housing decisions
-                </ThemedText>
-              </View>
-            </View>
-            <Pressable
-              style={[styles.upgradeButton, { backgroundColor: theme.primary }]}
-              onPress={() => {
-                setShowUpgradePrompt(false);
-                (navigation as any).navigate('Profile', { screen: 'Payment' });
-              }}
-            >
-              <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>
-                Upgrade Now
-              </ThemedText>
-            </Pressable>
-            <Pressable onPress={() => setShowUpgradePrompt(false)} style={{ marginTop: Spacing.md }}>
-              <ThemedText style={[Typography.body, { color: theme.textSecondary, fontWeight: '600' }]}>
-                Maybe Later
-              </ThemedText>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <PaywallSheet
+        visible={showPaywall}
+        featureName={paywallFeature}
+        requiredPlan={paywallPlan}
+        role="renter"
+        onUpgrade={() => {
+          setShowPaywall(false);
+          (navigation as any).navigate('Profile', { screen: 'Payment' });
+        }}
+        onDismiss={() => setShowPaywall(false)}
+      />
 
       <Modal
         visible={showPropertyDetail && selectedProperty != null}
@@ -1151,7 +1108,9 @@ export const ExploreScreen = () => {
                             onPress={() => {
                               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                               setShowPropertyDetail(false);
-                              setShowUpgradePrompt(true);
+                              setPaywallFeature('Walk Score');
+                              setPaywallPlan('plus');
+                              setShowPaywall(true);
                             }}
                           >
                             <View style={{

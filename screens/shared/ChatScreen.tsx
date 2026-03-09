@@ -10,6 +10,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { ReportBlockModal } from '../../components/ReportBlockModal';
+import { PlanBadge } from '../../components/PlanBadge';
 
 type ChatScreenProps = {
   route: {
@@ -33,6 +34,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [otherUser, setOtherUser] = useState<RoommateProfile | null>(routeOtherUser || null);
   const flatListRef = useRef<FlatList>(null);
   const [showReportBlockModal, setShowReportBlockModal] = useState(false);
+  const [otherUserPlan, setOtherUserPlan] = useState<string | undefined>();
 
   // Tab bar height for bottom padding
   const TAB_BAR_HEIGHT = 80;
@@ -60,12 +62,19 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         if (profile) {
           setOtherUser(profile);
         } else {
-          // Fallback: create minimal profile from conversation participant
           setOtherUser({
             id: conversation.participant.id,
             name: conversation.participant.name,
             photos: conversation.participant.photo ? [conversation.participant.photo] : [],
           } as RoommateProfile);
+        }
+      }
+
+      if (conversation.participant) {
+        const allUsers = await StorageService.getUsers();
+        const participantUser = allUsers.find(u => u.id === conversation.participant.id);
+        if (participantUser) {
+          setOtherUserPlan(participantUser.subscription?.plan);
         }
       }
     }
@@ -244,9 +253,12 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             ) : null}
           </View>
           <View style={{ flex: 1, marginLeft: Spacing.md }}>
-            <ThemedText style={[Typography.h3]}>
-              {otherUser.name}
-            </ThemedText>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <ThemedText style={[Typography.h3]}>
+                {otherUser.name}
+              </ThemedText>
+              <PlanBadge plan={otherUserPlan} size={15} />
+            </View>
             {canSeeOnlineStatus() ? (
               <ThemedText style={[Typography.caption, { color: isOnline ? theme.success : theme.textSecondary }]}>
                 {isOnline ? 'Online' : 'Offline'}

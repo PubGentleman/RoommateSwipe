@@ -41,6 +41,15 @@ interface AuthContextType {
   isBasicUser: () => boolean;
   canSendInterest: () => Promise<{ canSend: boolean; remaining: number; reason?: string }>;
   canSendSuperInterest: () => boolean;
+  upgradeHostPlan: (plan: 'pro' | 'business') => Promise<void>;
+  downgradeHostPlan: (plan: 'starter' | 'pro') => Promise<void>;
+  getHostPlan: () => 'starter' | 'pro' | 'business';
+  canAddListing: (currentCount: number) => { allowed: boolean; limit: number; reason?: string };
+  canRespondToInquiry: () => Promise<{ allowed: boolean; remaining: number; limit: number; reason?: string }>;
+  useInquiryResponse: () => Promise<void>;
+  purchaseListingBoost: (propertyId: string) => Promise<{ success: boolean; message: string }>;
+  purchaseHostVerification: () => Promise<{ success: boolean; message: string }>;
+  purchaseSuperInterest: () => Promise<{ success: boolean; message: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -54,42 +63,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const checkAndApplyScheduledChanges = async (user: User): Promise<User> => {
-    if (!user.subscription?.scheduledPlan || !user.subscription?.scheduledChangeDate) {
-      return user;
-    }
-
+    let updated = { ...user };
     const now = new Date();
-    const changeDate = user.subscription.scheduledChangeDate instanceof Date 
-      ? user.subscription.scheduledChangeDate 
-      : new Date(user.subscription.scheduledChangeDate);
 
-    if (isNaN(changeDate.getTime())) {
-      console.error('[Auth] Invalid scheduledChangeDate:', user.subscription.scheduledChangeDate);
-      return user;
+    if (user.subscription?.scheduledPlan && user.subscription?.scheduledChangeDate) {
+      const changeDate = user.subscription.scheduledChangeDate instanceof Date 
+        ? user.subscription.scheduledChangeDate 
+        : new Date(user.subscription.scheduledChangeDate);
+      if (!isNaN(changeDate.getTime()) && changeDate.getTime() <= now.getTime()) {
+        const newExpiresAt = new Date(changeDate.getTime() + 30 * 24 * 60 * 60 * 1000);
+        updated = {
+          ...updated,
+          subscription: {
+            plan: user.subscription.scheduledPlan,
+            status: 'active',
+            expiresAt: newExpiresAt,
+            scheduledPlan: undefined,
+            scheduledChangeDate: undefined,
+          },
+        };
+        console.log(`[Auth] Applied renter scheduled change to ${updated.subscription?.plan}`);
+      }
     }
 
-    if (changeDate.getTime() <= now.getTime()) {
-      const newExpiresAt = new Date(changeDate.getTime() + 30 * 24 * 60 * 60 * 1000);
-      
-      const updatedUser: User = {
-        ...user,
-        subscription: {
-          plan: user.subscription.scheduledPlan,
-          status: 'active',
-          expiresAt: newExpiresAt,
-          scheduledPlan: undefined,
-          scheduledChangeDate: undefined,
-        },
-      };
-      
-      await StorageService.setCurrentUser(updatedUser);
-      await StorageService.addOrUpdateUser(updatedUser);
-      console.log(`[Auth] Applied scheduled change to ${updatedUser.subscription?.plan}, new expiry: ${newExpiresAt.toISOString()}`);
-      
-      return updatedUser;
+    if (user.hostSubscription?.scheduledPlan && user.hostSubscription?.scheduledChangeDate) {
+      const changeDate = user.hostSubscription.scheduledChangeDate instanceof Date 
+        ? user.hostSubscription.scheduledChangeDate 
+        : new Date(user.hostSubscription.scheduledChangeDate as any);
+      if (!isNaN(changeDate.getTime()) && changeDate.getTime() <= now.getTime()) {
+        updated = {
+          ...updated,
+          hostSubscription: {
+            plan: user.hostSubscription.scheduledPlan,
+            status: 'active',
+            expiresAt: new Date(changeDate.getTime() + 30 * 24 * 60 * 60 * 1000),
+            scheduledPlan: undefined,
+            scheduledChangeDate: undefined,
+            billingCycle: user.hostSubscription.billingCycle || 'monthly',
+            inquiryResponsesUsed: 0,
+            lastInquiryResetDate: now.toISOString(),
+          },
+        };
+        console.log(`[Auth] Applied host scheduled change to ${updated.hostSubscription?.plan}`);
+      }
     }
 
-    return user;
+    if (updated !== user) {
+      await StorageService.setCurrentUser(updated);
+      await StorageService.addOrUpdateUser(updated);
+    }
+    return updated;
   };
 
   const loadUser = async () => {
@@ -1193,8 +1216,157 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return (plan === 'plus' || plan === 'elite') && status === 'active';
   };
 
+  const getHostPlan = (): 'starter' | 'pro' | 'business' => {
+    return user?.hostSubscription?.plan || 'starter';
+  };
+
+  const upgradeHostPlan = async (plan: 'pro' | 'business') => {
+    if (!user) return;
+    const expiresAt = new Date();
+    expiresAt.setMonth(expiresAt.getMonth() + 1);
+    const updated = {
+      ...user,
+      hostSubscription: {
+        ...user.hostSubscription,
+        plan,
+        status: 'active' as const,
+        expiresAt,
+        scheduledPlan: undefined,
+        scheduledChangeDate: undefined,
+        billingCycle: user.hostSubscription?.billingCycle || 'monthly' as const,
+        inquiryResponsesUsed: user.hostSubscription?.inquiryResponsesUsed || 0,
+        lastInquiryResetDate: user.hostSubscription?.lastInquiryResetDate || new Date().toISOString(),
+      },
+    };
+    await StorageService.setCurrentUser(updated);
+    await StorageService.addOrUpdateUser(updated);
+    setUser(updated);
+  };
+
+  const downgradeHostPlan = async (plan: 'starter' | 'pro') => {
+    if (!user) return;
+    const changeDate = user.hostSubscription?.expiresAt || new Date();
+    const updated = {
+      ...user,
+      hostSubscription: {
+        ...user.hostSubscription,
+        plan: user.hostSubscription?.plan || 'starter' as const,
+        status: 'active' as const,
+        scheduledPlan: plan,
+        scheduledChangeDate: changeDate,
+        billingCycle: user.hostSubscription?.billingCycle || 'monthly' as const,
+        inquiryResponsesUsed: user.hostSubscription?.inquiryResponsesUsed || 0,
+        lastInquiryResetDate: user.hostSubscription?.lastInquiryResetDate || new Date().toISOString(),
+      },
+    };
+    await StorageService.setCurrentUser(updated);
+    await StorageService.addOrUpdateUser(updated);
+    setUser(updated);
+  };
+
+  const canAddListing = (currentCount: number): { allowed: boolean; limit: number; reason?: string } => {
+    const hostPlan = getHostPlan();
+    if (hostPlan === 'business') return { allowed: true, limit: -1 };
+    if (hostPlan === 'pro') {
+      if (currentCount >= 5) return { allowed: false, limit: 5, reason: 'Pro plan allows up to 5 active listings. Upgrade to Business for unlimited.' };
+      return { allowed: true, limit: 5 };
+    }
+    if (currentCount >= 1) return { allowed: false, limit: 1, reason: 'Starter plan allows 1 active listing. Upgrade to Pro for up to 5.' };
+    return { allowed: true, limit: 1 };
+  };
+
+  const canRespondToInquiry = async (): Promise<{ allowed: boolean; remaining: number; limit: number; reason?: string }> => {
+    if (!user) return { allowed: false, remaining: 0, limit: 0, reason: 'Not logged in' };
+    const hostPlan = getHostPlan();
+    if (hostPlan === 'pro' || hostPlan === 'business') return { allowed: true, remaining: -1, limit: -1 };
+    const used = user.hostSubscription?.inquiryResponsesUsed || 0;
+    const lastReset = user.hostSubscription?.lastInquiryResetDate;
+    const now = new Date();
+    if (lastReset) {
+      const resetDate = new Date(lastReset);
+      if (now.getMonth() !== resetDate.getMonth() || now.getFullYear() !== resetDate.getFullYear()) {
+        const updated = {
+          ...user,
+          hostSubscription: { ...user.hostSubscription, plan: 'starter' as const, status: 'active' as const, inquiryResponsesUsed: 0, lastInquiryResetDate: now.toISOString(), billingCycle: 'monthly' as const },
+        };
+        await StorageService.setCurrentUser(updated);
+        await StorageService.addOrUpdateUser(updated);
+        setUser(updated);
+        return { allowed: true, remaining: 5, limit: 5 };
+      }
+    }
+    const remaining = Math.max(0, 5 - used);
+    if (remaining <= 0) return { allowed: false, remaining: 0, limit: 5, reason: 'Starter plan allows 5 inquiry responses per month. Upgrade to Pro for unlimited.' };
+    return { allowed: true, remaining, limit: 5 };
+  };
+
+  const useInquiryResponse = async () => {
+    if (!user) return;
+    const used = (user.hostSubscription?.inquiryResponsesUsed || 0) + 1;
+    const updated = {
+      ...user,
+      hostSubscription: {
+        ...user.hostSubscription,
+        plan: user.hostSubscription?.plan || 'starter' as const,
+        status: user.hostSubscription?.status || 'active' as const,
+        inquiryResponsesUsed: used,
+        lastInquiryResetDate: user.hostSubscription?.lastInquiryResetDate || new Date().toISOString(),
+        billingCycle: user.hostSubscription?.billingCycle || 'monthly' as const,
+      },
+    };
+    await StorageService.setCurrentUser(updated);
+    await StorageService.addOrUpdateUser(updated);
+    setUser(updated);
+  };
+
+  const purchaseListingBoost = async (propertyId: string): Promise<{ success: boolean; message: string }> => {
+    if (!user) return { success: false, message: 'Not logged in' };
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+    const currentBoosts = user.purchases?.listingBoosts || [];
+    const updated = {
+      ...user,
+      purchases: {
+        ...user.purchases,
+        listingBoosts: [...currentBoosts, { propertyId, expiresAt: expiresAt.toISOString() }],
+      },
+    };
+    await StorageService.setCurrentUser(updated);
+    await StorageService.addOrUpdateUser(updated);
+    setUser(updated);
+    return { success: true, message: 'Listing boosted for 7 days!' };
+  };
+
+  const purchaseHostVerification = async (): Promise<{ success: boolean; message: string }> => {
+    if (!user) return { success: false, message: 'Not logged in' };
+    if (user.purchases?.hostVerificationBadge) {
+      return { success: false, message: 'You already have the verification badge.' };
+    }
+    const updated = {
+      ...user,
+      purchases: { ...user.purchases, hostVerificationBadge: true },
+    };
+    await StorageService.setCurrentUser(updated);
+    await StorageService.addOrUpdateUser(updated);
+    setUser(updated);
+    return { success: true, message: 'Host Verification Badge activated!' };
+  };
+
+  const purchaseSuperInterest = async (): Promise<{ success: boolean; message: string }> => {
+    if (!user) return { success: false, message: 'Not logged in' };
+    const current = user.purchases?.superInterestsRemaining || 0;
+    const updated = {
+      ...user,
+      purchases: { ...user.purchases, superInterestsRemaining: current + 1 },
+    };
+    await StorageService.setCurrentUser(updated);
+    await StorageService.addOrUpdateUser(updated);
+    setUser(updated);
+    return { success: true, message: 'Super Interest purchased!' };
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, reactivateSubscription, updateUser, blockUser: blockUserAction, unblockUser: unblockUserAction, reportUser: reportUserAction, isUserBlocked: isUserBlockedCheck, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike, watchAdForCredit, getAdCredits, useAdCredit, isBasicUser, canSendInterest, canSendSuperInterest }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, reactivateSubscription, updateUser, blockUser: blockUserAction, unblockUser: unblockUserAction, reportUser: reportUserAction, isUserBlocked: isUserBlockedCheck, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike, watchAdForCredit, getAdCredits, useAdCredit, isBasicUser, canSendInterest, canSendSuperInterest, upgradeHostPlan, downgradeHostPlan, getHostPlan, canAddListing, canRespondToInquiry, useInquiryResponse, purchaseListingBoost, purchaseHostVerification, purchaseSuperInterest }}>
       {children}
     </AuthContext.Provider>
   );

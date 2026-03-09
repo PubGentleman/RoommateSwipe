@@ -15,6 +15,8 @@ import { Image } from 'expo-image';
 import { getVerificationLevel } from '../../components/VerificationBadge';
 import { calculateCompatibility } from '../../utils/matchingAlgorithm';
 import { LinearGradient } from 'expo-linear-gradient';
+import { PlanBadge } from '../../components/PlanBadge';
+import { User } from '../../types/models';
 
 type MessagesScreenNavigationProp = NativeStackNavigationProp<MessagesStackParamList, 'MessagesList'>;
 
@@ -41,6 +43,7 @@ export const MessagesScreen = () => {
   const { user } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [profilesMap, setProfilesMap] = useState<Map<string, RoommateProfile>>(new Map());
+  const [usersMap, setUsersMap] = useState<Map<string, User>>(new Map());
   const [newMatches, setNewMatches] = useState<{ profile: RoommateProfile; match: Match; compatibility: number }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -60,8 +63,11 @@ export const MessagesScreen = () => {
       let existingConversations = await StorageService.getConversations();
       const matches = await StorageService.getMatches();
       const profiles = await StorageService.getRoommateProfiles();
+      const allUsers = await StorageService.getUsers();
       const pMap = new Map(profiles.map(p => [p.id, p]));
+      const uMap = new Map(allUsers.map(u => [u.id, u]));
       setProfilesMap(pMap);
+      setUsersMap(uMap);
 
       const recentMatchProfiles: { profile: RoommateProfile; match: Match; compatibility: number }[] = [];
 
@@ -246,6 +252,8 @@ export const MessagesScreen = () => {
     const isNew = isNewMatch(item);
     const compatibility = getCompatibilityForConversation(item.participant.id);
     const profile = profilesMap.get(item.participant.id);
+    const participantUser = usersMap.get(item.participant.id);
+    const participantPlan = participantUser?.subscription?.plan;
     const isVerified = profile ? getVerificationLevel(profile.verification) >= 2 : false;
 
     return (
@@ -277,6 +285,7 @@ export const MessagesScreen = () => {
               <ThemedText style={[styles.convName, !hasUnread && !isNew ? styles.convNameRead : null]} numberOfLines={1}>
                 {item.participant.name}
               </ThemedText>
+              <PlanBadge plan={participantPlan} size={13} />
               {isVerified ? (
                 <Feather name="check-circle" size={14} color="#5b8cff" style={{ marginLeft: 4 }} />
               ) : null}

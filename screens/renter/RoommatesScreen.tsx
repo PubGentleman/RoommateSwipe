@@ -22,10 +22,12 @@ import { getZodiacSymbol, getZodiacCompatibilityLevel } from '../../utils/zodiac
 import { RewardedAdButton } from '../../components/AdBanner';
 import { ReportBlockModal } from '../../components/ReportBlockModal';
 import { MatchCelebrationModal } from '../../components/MatchCelebrationModal';
+import { PaywallSheet } from '../../components/PaywallSheet';
 import { VerificationBadgeInline, getVerificationLevel } from '../../components/VerificationBadge';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RoomdrLogo } from '../../components/RoomdrLogo';
 import { RoommateFilterSheet, MatchFilters, DEFAULT_FILTERS, getActiveFilterCount, getActiveFilterChips, removeFilterChip, loadSavedFilters, saveFilters, applyFiltersToProfiles } from '../../components/RoommateFilterSheet';
+import { PlanBadge } from '../../components/PlanBadge';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Limit card size for web/desktop viewing
@@ -43,7 +45,7 @@ export const RoommatesScreen = () => {
   const [swipedIds, setSwipedIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [profileUsers, setProfileUsers] = useState<Map<string, any>>(new Map());
-  const [showVIPModal, setShowVIPModal] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
   const [showPurchaseBoostModal, setShowPurchaseBoostModal] = useState(false);
   const [processingBoost, setProcessingBoost] = useState(false);
   const [lastSwipedProfile, setLastSwipedProfile] = useState<{ profile: RoommateProfile; action: 'like' | 'nope' | 'superlike' } | null>(null);
@@ -452,7 +454,7 @@ export const RoommatesScreen = () => {
     
     if (!isPaidMember) {
       console.log('[AI Assistant] Showing upgrade modal');
-      setShowVIPModal(true);
+      setShowPaywall(true);
       return;
     }
     
@@ -617,7 +619,7 @@ export const RoommatesScreen = () => {
   }
 
   const handleUpgradeToPaid = () => {
-    setShowVIPModal(false);
+    setShowPaywall(false);
     (navigation as any).navigate('Profile', { screen: 'Payment' });
   };
 
@@ -835,6 +837,7 @@ export const RoommatesScreen = () => {
                 <ThemedText style={styles.cardName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
                   {currentProfile.name}, {currentProfile.age}
                 </ThemedText>
+                <PlanBadge plan={subscriptionPlan} size={16} />
                 {getVerificationLevel(currentProfile.verification) >= 2 ? (
                   <View style={styles.verifiedCheckCard}>
                     <Feather name="check-circle" size={16} color="#2563EB" />
@@ -924,8 +927,10 @@ export const RoommatesScreen = () => {
         visible={showMatch}
         currentUserPhoto={user?.profilePicture}
         currentUserName={user?.name}
+        currentUserPlan={user?.subscription?.plan}
         matchedUserPhoto={matchedProfileData?.profile?.photos?.[0]}
         matchedUserName={matchedProfileData?.profile?.name}
+        matchedUserPlan={matchedProfileData?.profile ? profileUsers.get(matchedProfileData.profile.id)?.subscription?.plan : undefined}
         compatibility={matchedProfileData?.compatibility}
         onSendMessage={async () => {
           setShowMatch(false);
@@ -962,69 +967,14 @@ export const RoommatesScreen = () => {
         }}
       />
 
-      <Modal
-        visible={showVIPModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowVIPModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.vipModalContainer, { backgroundColor: theme.backgroundSecondary }]}>
-            <View style={[styles.vipModalHeader, { backgroundColor: theme.primary }]}>
-              <Feather name="cpu" size={32} color="#FFFFFF" />
-            </View>
-            
-            <View style={styles.vipModalContent}>
-              <ThemedText style={[Typography.h2, { textAlign: 'center', marginBottom: Spacing.sm }]}>
-                Plus Feature
-              </ThemedText>
-              <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary, marginBottom: Spacing.xl }]}>
-                AI Match Assistant is available for Plus and Elite members. Upgrade to get personalized roommate recommendations powered by AI!
-              </ThemedText>
-              
-              <View style={styles.vipFeaturesList}>
-                <View style={styles.vipFeatureItem}>
-                  <Feather name="check-circle" size={20} color={theme.success} />
-                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
-                    AI-powered match recommendations
-                  </ThemedText>
-                </View>
-                <View style={styles.vipFeatureItem}>
-                  <Feather name="check-circle" size={20} color={theme.success} />
-                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
-                    Personalized roommate insights
-                  </ThemedText>
-                </View>
-                <View style={styles.vipFeatureItem}>
-                  <Feather name="check-circle" size={20} color={theme.success} />
-                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
-                    Chat-based assistance 24/7
-                  </ThemedText>
-                </View>
-              </View>
-            </View>
-            
-            <View style={styles.vipModalActions}>
-              <Pressable
-                style={[styles.vipModalButton, { backgroundColor: theme.primary }]}
-                onPress={handleUpgradeToPaid}
-              >
-                <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
-                  Upgrade Now
-                </ThemedText>
-              </Pressable>
-              <Pressable
-                style={[styles.vipModalButtonSecondary, { borderColor: theme.border }]}
-                onPress={() => setShowVIPModal(false)}
-              >
-                <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
-                  Maybe Later
-                </ThemedText>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      <PaywallSheet
+        visible={showPaywall}
+        featureName="AI Match Assistant"
+        requiredPlan="plus"
+        role="renter"
+        onUpgrade={handleUpgradeToPaid}
+        onDismiss={() => setShowPaywall(false)}
+      />
 
       <Modal
         visible={showPurchaseBoostModal}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Pressable, Alert, Modal } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -20,9 +20,56 @@ const fmtDate = (d: Date | string) => {
   return `${mm}/${dd}/${yyyy}`;
 };
 
+const MONTHLY_PRICING = {
+  plus: 14.99,
+  elite: 29.99,
+};
+
+const ANNUAL_PRICING = {
+  plus: 149.90,
+  elite: 299.90,
+};
+
+const BASIC_FEATURES = [
+  '5 interest cards per day',
+  '3 active chats maximum',
+  'Create 1 group',
+  'Join 1 group',
+  'Browse listings',
+  'Basic matching',
+];
+
+const PLUS_FEATURES = [
+  'Unlimited interest cards',
+  '10 active chats',
+  '5 rewinds per day',
+  'See who viewed your profile',
+  'Unlimited groups',
+  'Advanced filters',
+  'Walk Score access',
+  'Online status visibility',
+  'AI match assistant',
+  '1 boost per week',
+  'Super Interest cards',
+  '7-day free trial for new users',
+];
+
+const ELITE_FEATURES = [
+  'Everything in Plus',
+  'Unlimited chats',
+  'Unlimited rewinds',
+  'See who liked you',
+  'Priority visibility boost',
+  'Boosted matching',
+  'Priority messaging (no match needed)',
+  'Featured listings',
+  'Advanced AI match assistant',
+  'Daily boosts included',
+];
+
 export const PlansScreen = () => {
   const { theme } = useTheme();
-  const { user, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, reactivateSubscription } = useAuth();
+  const { user, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, reactivateSubscription, canSendInterest, canRewind, canSuperLike } = useAuth();
   const navigation = useNavigation<PlansScreenNavigationProp>();
   
   const [showUpgradeConfirm, setShowUpgradeConfirm] = useState(false);
@@ -31,6 +78,8 @@ export const PlansScreen = () => {
   const [selectedPlan, setSelectedPlan] = useState<'plus' | 'elite' | null>(null);
   const [downgradeTo, setDowngradeTo] = useState<'basic' | 'plus' | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [isAnnual, setIsAnnual] = useState(false);
+  const [interestStats, setInterestStats] = useState<{ remaining: number; total: number }>({ remaining: 5, total: 5 });
 
   const currentPlan = user?.subscription?.plan || 'basic';
   const subscriptionStatus = user?.subscription?.status || 'active';
@@ -38,10 +87,26 @@ export const PlansScreen = () => {
   const scheduledChangeDate = user?.subscription?.scheduledChangeDate;
   const isPlus = currentPlan === 'plus';
   const isElite = currentPlan === 'elite';
-  
-  const PRICING = {
-    plus: 14.99,
-    elite: user?.role === 'renter' ? 49.99 : 99.00,
+
+  useEffect(() => {
+    const loadStats = async () => {
+      const result = await canSendInterest();
+      if (result.remaining >= 0) {
+        setInterestStats({ remaining: result.remaining, total: 5 });
+      } else {
+        setInterestStats({ remaining: -1, total: -1 });
+      }
+    };
+    loadStats();
+  }, []);
+
+  const getPrice = (plan: 'plus' | 'elite') => {
+    return isAnnual ? ANNUAL_PRICING[plan] : MONTHLY_PRICING[plan];
+  };
+
+  const getPriceLabel = (plan: 'plus' | 'elite') => {
+    const price = getPrice(plan);
+    return isAnnual ? `$${price.toFixed(2)}/year` : `$${price.toFixed(2)}/month`;
   };
 
   const handleUpgrade = (plan: 'plus' | 'elite') => {
@@ -151,12 +216,132 @@ export const PlansScreen = () => {
     setProcessing(false);
   };
 
+  const rewindInfo = canRewind();
+  const superLikeInfo = canSuperLike();
+
+  const renderUsageStats = () => {
+    if (currentPlan !== 'basic') return null;
+
+    const interestUsed = interestStats.total - interestStats.remaining;
+
+    return (
+      <View style={[styles.usageStatsContainer, { backgroundColor: '#1a1a1a', borderColor: theme.border }]}>
+        <ThemedText style={[Typography.h3, { marginBottom: Spacing.lg }]}>Daily Usage</ThemedText>
+        
+        <View style={styles.usageStat}>
+          <View style={styles.usageStatLeft}>
+            <Feather name="heart" size={16} color={theme.primary} />
+            <ThemedText style={[Typography.caption, { color: theme.text, marginLeft: Spacing.sm }]}>Interest Cards</ThemedText>
+          </View>
+          <View style={styles.usageStatRight}>
+            <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
+              {interestUsed} of {interestStats.total} used today
+            </ThemedText>
+            <View style={styles.progressBarBg}>
+              <View style={[styles.progressBarFill, { width: `${(interestUsed / interestStats.total) * 100}%`, backgroundColor: interestUsed >= interestStats.total ? '#EF4444' : theme.primary }]} />
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.usageStat}>
+          <View style={styles.usageStatLeft}>
+            <Feather name="rotate-ccw" size={16} color={theme.primary} />
+            <ThemedText style={[Typography.caption, { color: theme.text, marginLeft: Spacing.sm }]}>Rewinds</ThemedText>
+          </View>
+          <View style={styles.usageStatRight}>
+            <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
+              {rewindInfo.limit - rewindInfo.remaining} of {rewindInfo.limit} used today
+            </ThemedText>
+            <View style={styles.progressBarBg}>
+              <View style={[styles.progressBarFill, { width: `${((rewindInfo.limit - rewindInfo.remaining) / rewindInfo.limit) * 100}%`, backgroundColor: rewindInfo.remaining <= 0 ? '#EF4444' : theme.primary }]} />
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.usageStat}>
+          <View style={styles.usageStatLeft}>
+            <Feather name="star" size={16} color={theme.primary} />
+            <ThemedText style={[Typography.caption, { color: theme.text, marginLeft: Spacing.sm }]}>Super Likes</ThemedText>
+          </View>
+          <View style={styles.usageStatRight}>
+            <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
+              {superLikeInfo.limit - superLikeInfo.remaining} of {superLikeInfo.limit} used today
+            </ThemedText>
+            <View style={styles.progressBarBg}>
+              <View style={[styles.progressBarFill, { width: `${((superLikeInfo.limit - superLikeInfo.remaining) / superLikeInfo.limit) * 100}%`, backgroundColor: superLikeInfo.remaining <= 0 ? '#EF4444' : theme.primary }]} />
+            </View>
+          </View>
+        </View>
+
+        <ThemedText style={[Typography.small, { color: theme.textSecondary, marginTop: Spacing.md, textAlign: 'center' }]}>
+          Upgrade to Plus or Elite for unlimited usage
+        </ThemedText>
+      </View>
+    );
+  };
+
+  const renderTrialBanner = () => {
+    if (currentPlan !== 'basic') return null;
+
+    return (
+      <View style={[styles.trialBanner, { backgroundColor: theme.primary + '15', borderColor: theme.primary + '40' }]}>
+        <View style={styles.trialBannerContent}>
+          <Feather name="gift" size={22} color={theme.primary} />
+          <View style={{ flex: 1, marginLeft: Spacing.md }}>
+            <ThemedText style={[Typography.body, { fontWeight: '700', color: theme.primary }]}>
+              Try Plus Free for 7 Days
+            </ThemedText>
+            <ThemedText style={[Typography.small, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
+              Unlock unlimited interest cards, advanced filters, and AI matching. Cancel anytime.
+            </ThemedText>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  const renderBillingToggle = () => {
+    return (
+      <View style={styles.billingToggleContainer}>
+        <Pressable
+          style={[
+            styles.billingToggleOption,
+            !isAnnual ? styles.billingToggleActive : null,
+            !isAnnual ? { backgroundColor: theme.primary } : { backgroundColor: '#2a2a2a' },
+          ]}
+          onPress={() => setIsAnnual(false)}
+        >
+          <ThemedText style={[Typography.caption, { color: !isAnnual ? '#FFFFFF' : theme.textSecondary, fontWeight: '600' }]}>
+            Monthly
+          </ThemedText>
+        </Pressable>
+        <Pressable
+          style={[
+            styles.billingToggleOption,
+            isAnnual ? styles.billingToggleActive : null,
+            isAnnual ? { backgroundColor: theme.primary } : { backgroundColor: '#2a2a2a' },
+          ]}
+          onPress={() => setIsAnnual(true)}
+        >
+          <ThemedText style={[Typography.caption, { color: isAnnual ? '#FFFFFF' : theme.textSecondary, fontWeight: '600' }]}>
+            Annual
+          </ThemedText>
+          <View style={[styles.saveBadge, { backgroundColor: '#10B981' }]}>
+            <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '700', fontSize: 10 }]}>
+              SAVE 2 MONTHS
+            </ThemedText>
+          </View>
+        </Pressable>
+      </View>
+    );
+  };
+
   const renderPlanCard = (
     planType: 'basic' | 'plus' | 'elite',
-    price: string,
     features: string[],
     isCurrentPlan: boolean
   ) => {
+    const isRecommended = planType === 'elite';
     const planColors = {
       basic: '#1a1a1a',
       plus: theme.primary,
@@ -165,55 +350,87 @@ export const PlansScreen = () => {
     const bgColor = isCurrentPlan ? planColors[planType] : '#1a1a1a';
     const textColor = isCurrentPlan && planType !== 'basic' ? '#FFFFFF' : theme.text;
 
+    const priceLabel = planType === 'basic' ? 'Free' : getPriceLabel(planType);
+
     return (
-      <View key={planType} style={[styles.planCard, { backgroundColor: bgColor, borderColor: theme.border, borderWidth: isCurrentPlan ? 0 : 1 }]}>
-        <View style={styles.planHeader}>
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flexWrap: 'wrap' }}>
-              <ThemedText style={[Typography.h2, { color: textColor }]}>
-                {planType.charAt(0).toUpperCase() + planType.slice(1)}
-              </ThemedText>
-              {planType === 'elite' && <Feather name="award" size={20} color={isCurrentPlan ? '#FFD700' : '#7C3AED'} />}
-            </View>
-            <ThemedText style={[Typography.body, { color: isCurrentPlan && planType !== 'basic' ? 'rgba(255,255,255,0.9)' : theme.textSecondary, marginTop: Spacing.sm, marginBottom: Spacing.md }]}>
-              {price}
+      <View key={planType}>
+        {isRecommended ? (
+          <View style={[styles.recommendedBadge, { backgroundColor: '#7C3AED' }]}>
+            <Feather name="zap" size={14} color="#FFD700" />
+            <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '700', marginLeft: Spacing.xs }]}>
+              RECOMMENDED
             </ThemedText>
           </View>
-        </View>
-
-        <View style={styles.features}>
-          {features.map((feature, index) => (
-            <View key={index} style={styles.feature}>
-              <Feather name="check" size={18} color={isCurrentPlan && planType !== 'basic' ? '#FFFFFF' : theme.primary} />
-              <ThemedText style={[Typography.small, { marginLeft: Spacing.sm, color: textColor, flex: 1 }]}>
-                {feature}
+        ) : null}
+        <View style={[
+          styles.planCard,
+          { backgroundColor: bgColor, borderColor: isRecommended && !isCurrentPlan ? '#7C3AED' : theme.border, borderWidth: isRecommended ? 2 : 1 },
+          isRecommended ? { marginTop: 0 } : null,
+        ]}>
+          <View style={styles.planHeader}>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flexWrap: 'wrap' }}>
+                <ThemedText style={[Typography.h2, { color: textColor }]}>
+                  {planType.charAt(0).toUpperCase() + planType.slice(1)}
+                </ThemedText>
+                {planType === 'plus' ? <Feather name="award" size={20} color={isCurrentPlan ? '#FFD700' : theme.primary} /> : null}
+                {planType === 'elite' ? <Feather name="zap" size={20} color={isCurrentPlan ? '#FFD700' : '#7C3AED'} /> : null}
+              </View>
+              <ThemedText style={[Typography.body, { color: isCurrentPlan && planType !== 'basic' ? 'rgba(255,255,255,0.9)' : theme.textSecondary, marginTop: Spacing.sm, marginBottom: Spacing.md }]}>
+                {priceLabel}
               </ThemedText>
+              {isAnnual && planType !== 'basic' ? (
+                <ThemedText style={[Typography.small, { color: isCurrentPlan ? 'rgba(255,255,255,0.7)' : '#10B981', marginTop: -Spacing.sm, marginBottom: Spacing.md }]}>
+                  ${(MONTHLY_PRICING[planType] * 12 - ANNUAL_PRICING[planType]).toFixed(2)} saved vs monthly
+                </ThemedText>
+              ) : null}
             </View>
-          ))}
-        </View>
+          </View>
 
-        {isCurrentPlan ? (
-          <>
-            <View style={[styles.activeSubscription, { backgroundColor: planType === 'basic' ? theme.primary + '20' : 'rgba(255, 255, 255, 0.2)' }]}>
-              <Feather name="check-circle" size={18} color={planType === 'basic' ? theme.primary : '#FFFFFF'} />
-              <ThemedText style={[Typography.small, { color: planType === 'basic' ? theme.primary : '#FFFFFF', marginLeft: Spacing.sm, fontWeight: '600' }]}>
-                Current Plan
-              </ThemedText>
-            </View>
-            
-            {planType !== 'basic' && subscriptionStatus === 'active' && !scheduledPlan ? (
-              <View style={{ marginTop: Spacing.md, gap: Spacing.sm }}>
-                {planType === 'elite' ? (
-                  <>
-                    <Pressable
-                      style={[styles.downgradeButton, { borderColor: 'rgba(255,255,255,0.3)' }]}
-                      onPress={() => handleDowngrade('plus')}
-                      disabled={processing}
-                    >
-                      <ThemedText style={[Typography.small, { color: textColor }]}>
-                        Downgrade to Plus
-                      </ThemedText>
-                    </Pressable>
+          <View style={styles.features}>
+            {features.map((feature, index) => (
+              <View key={index} style={styles.feature}>
+                <Feather name="check" size={18} color={isCurrentPlan && planType !== 'basic' ? '#FFFFFF' : planType === 'elite' ? '#7C3AED' : theme.primary} />
+                <ThemedText style={[Typography.small, { marginLeft: Spacing.sm, color: textColor, flex: 1 }]}>
+                  {feature}
+                </ThemedText>
+              </View>
+            ))}
+          </View>
+
+          {isCurrentPlan ? (
+            <>
+              <View style={[styles.activeSubscription, { backgroundColor: planType === 'basic' ? theme.primary + '20' : 'rgba(255, 255, 255, 0.2)' }]}>
+                <Feather name="check-circle" size={18} color={planType === 'basic' ? theme.primary : '#FFFFFF'} />
+                <ThemedText style={[Typography.small, { color: planType === 'basic' ? theme.primary : '#FFFFFF', marginLeft: Spacing.sm, fontWeight: '600' }]}>
+                  Current Plan
+                </ThemedText>
+              </View>
+              
+              {planType !== 'basic' && subscriptionStatus === 'active' && !scheduledPlan ? (
+                <View style={{ marginTop: Spacing.md, gap: Spacing.sm }}>
+                  {planType === 'elite' ? (
+                    <>
+                      <Pressable
+                        style={[styles.downgradeButton, { borderColor: 'rgba(255,255,255,0.3)' }]}
+                        onPress={() => handleDowngrade('plus')}
+                        disabled={processing}
+                      >
+                        <ThemedText style={[Typography.small, { color: textColor }]}>
+                          Downgrade to Plus
+                        </ThemedText>
+                      </Pressable>
+                      <Pressable
+                        style={[styles.downgradeButton, { borderColor: 'rgba(255,255,255,0.3)' }]}
+                        onPress={() => handleDowngrade('basic')}
+                        disabled={processing}
+                      >
+                        <ThemedText style={[Typography.small, { color: textColor }]}>
+                          Downgrade to Basic
+                        </ThemedText>
+                      </Pressable>
+                    </>
+                  ) : planType === 'plus' ? (
                     <Pressable
                       style={[styles.downgradeButton, { borderColor: 'rgba(255,255,255,0.3)' }]}
                       onPress={() => handleDowngrade('basic')}
@@ -223,41 +440,31 @@ export const PlansScreen = () => {
                         Downgrade to Basic
                       </ThemedText>
                     </Pressable>
-                  </>
-                ) : planType === 'plus' ? (
+                  ) : null}
                   <Pressable
-                    style={[styles.downgradeButton, { borderColor: 'rgba(255,255,255,0.3)' }]}
-                    onPress={() => handleDowngrade('basic')}
+                    style={[styles.cancelButton, { borderColor: '#EF4444' }]}
+                    onPress={() => setShowCancelConfirm(true)}
                     disabled={processing}
                   >
-                    <ThemedText style={[Typography.small, { color: textColor }]}>
-                      Downgrade to Basic
+                    <ThemedText style={[Typography.small, { color: '#EF4444' }]}>
+                      Cancel Subscription
                     </ThemedText>
                   </Pressable>
-                ) : null}
-                <Pressable
-                  style={[styles.cancelButton, { borderColor: '#EF4444' }]}
-                  onPress={() => setShowCancelConfirm(true)}
-                  disabled={processing}
-                >
-                  <ThemedText style={[Typography.small, { color: '#EF4444' }]}>
-                    Cancel Subscription
-                  </ThemedText>
-                </Pressable>
-              </View>
-            ) : null}
-          </>
-        ) : planType !== 'basic' ? (
-          <Pressable
-            style={[styles.upgradeButton, { backgroundColor: planType === 'plus' ? theme.primary : '#7C3AED', opacity: (planType === 'plus' && isElite) ? 0.5 : 1 }]}
-            onPress={() => handleUpgrade(planType)}
-            disabled={processing || (planType === 'plus' && isElite)}
-          >
-            <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>
-              {processing ? 'Processing...' : (planType === 'plus' && isElite) ? 'Downgrade Not Available' : `Upgrade - ${price}`}
-            </ThemedText>
-          </Pressable>
-        ) : null}
+                </View>
+              ) : null}
+            </>
+          ) : planType !== 'basic' ? (
+            <Pressable
+              style={[styles.upgradeButton, { backgroundColor: planType === 'plus' ? theme.primary : '#7C3AED', opacity: (planType === 'plus' && isElite) ? 0.5 : 1 }]}
+              onPress={() => handleUpgrade(planType)}
+              disabled={processing || (planType === 'plus' && isElite)}
+            >
+              <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>
+                {processing ? 'Processing...' : (planType === 'plus' && isElite) ? 'Downgrade Not Available' : `Upgrade - ${priceLabel}`}
+              </ThemedText>
+            </Pressable>
+          ) : null}
+        </View>
       </View>
     );
   };
@@ -265,46 +472,18 @@ export const PlansScreen = () => {
   return (
     <ScreenScrollView style={{ backgroundColor: '#111111' }} contentContainerStyle={{ backgroundColor: '#111111' }}>
       <View style={styles.container}>
-        <ThemedText style={[Typography.h2, { marginBottom: Spacing.lg }]}>Choose Your Plan</ThemedText>
+        <ThemedText style={[Typography.h2, { marginBottom: Spacing.sm }]}>Choose Your Plan</ThemedText>
+        <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.xl }]}>
+          Find your perfect roommate faster with premium features
+        </ThemedText>
+
+        {renderTrialBanner()}
+        {renderUsageStats()}
+        {renderBillingToggle()}
         
-        {renderPlanCard('basic', '$0/month', [
-          'Unlimited messages (must match first)',
-          '3 active chats maximum',
-          'Create 1 group',
-          'Join 1 group',
-          'Browse listings',
-        ], currentPlan === 'basic')}
-
-        {renderPlanCard('plus', `$${PRICING.plus}/month`, [
-          'Unlimited messages',
-          '10 active chats',
-          '5 rewinds per day',
-          'See who viewed your profile',
-          'Unlimited groups',
-          'Advanced filters',
-          'Walk Score access',
-          'Online status visibility',
-          'AI match assistant',
-          '1 boost per week',
-        ], currentPlan === 'plus')}
-
-        {renderPlanCard(
-          'elite',
-          `$${PRICING.elite}/month ${user?.role === 'renter' ? '(Seekers)' : '(Hosts/Agents)'}`,
-          [
-            'Everything in Plus',
-            'Unlimited messages',
-            'Unlimited chats',
-            'Unlimited rewinds',
-            'See who liked you',
-            'Priority visibility boost',
-            'Boosted matching',
-            'Priority messaging (no match needed)',
-            'Featured listings',
-            'AI match assistant',
-          ],
-          currentPlan === 'elite'
-        )}
+        {renderPlanCard('basic', BASIC_FEATURES, currentPlan === 'basic')}
+        {renderPlanCard('plus', PLUS_FEATURES, currentPlan === 'plus')}
+        {renderPlanCard('elite', ELITE_FEATURES, currentPlan === 'elite')}
 
         {scheduledPlan && scheduledChangeDate ? (
           <View style={[styles.section, styles.scheduledChangeBanner, { backgroundColor: subscriptionStatus === 'cancelled' ? '#FEF2F2' : '#FFF7ED', borderColor: subscriptionStatus === 'cancelled' ? '#EF4444' : '#F97316' }]}>
@@ -352,7 +531,7 @@ export const PlansScreen = () => {
                 </ThemedText>
               </View>
               <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
-                ${isElite ? PRICING.elite : PRICING.plus}
+                ${isElite ? MONTHLY_PRICING.elite : MONTHLY_PRICING.plus}
               </ThemedText>
             </View>
           </View>
@@ -372,8 +551,8 @@ export const PlansScreen = () => {
             </ThemedText>
             <ThemedText style={[Typography.body, { color: theme.textSecondary, marginBottom: Spacing.xl }]}>
               {selectedPlan === 'plus' 
-                ? `Unlock unlimited groups and advanced features for $${PRICING.plus}/month.`
-                : `Get priority visibility, unlimited rewinds, and premium features for $${PRICING.elite}/month.`}
+                ? `Unlock unlimited interest cards, advanced filters, and AI matching for ${getPriceLabel('plus')}.${currentPlan === 'basic' ? '\n\nIncludes a 7-day free trial!' : ''}`
+                : `Get priority visibility, unlimited rewinds, and premium features for ${getPriceLabel('elite')}.`}
               {'\n\n'}Continue with upgrade?
             </ThemedText>
             <View style={styles.modalActions}>
@@ -480,6 +659,82 @@ export const PlansScreen = () => {
 const styles = StyleSheet.create({
   container: {
     padding: Spacing.lg,
+  },
+  trialBanner: {
+    borderRadius: BorderRadius.large,
+    padding: Spacing.lg,
+    marginBottom: Spacing.xl,
+    borderWidth: 1,
+  },
+  trialBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  usageStatsContainer: {
+    borderRadius: BorderRadius.large,
+    padding: Spacing.xl,
+    marginBottom: Spacing.xl,
+    borderWidth: 1,
+  },
+  usageStat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.md,
+  },
+  usageStatLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: 120,
+  },
+  usageStatRight: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
+  progressBarBg: {
+    width: '100%',
+    height: 4,
+    backgroundColor: '#333333',
+    borderRadius: 2,
+    marginTop: Spacing.xs,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  billingToggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#1a1a1a',
+    borderRadius: BorderRadius.medium,
+    padding: 4,
+    marginBottom: Spacing.xl,
+  },
+  billingToggleOption: {
+    flex: 1,
+    paddingVertical: Spacing.md,
+    alignItems: 'center',
+    borderRadius: BorderRadius.small,
+    position: 'relative',
+  },
+  billingToggleActive: {},
+  saveBadge: {
+    position: 'absolute',
+    top: -8,
+    right: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  recommendedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    borderTopLeftRadius: BorderRadius.large,
+    borderTopRightRadius: BorderRadius.large,
+    marginBottom: 0,
   },
   planCard: {
     padding: Spacing.xl,

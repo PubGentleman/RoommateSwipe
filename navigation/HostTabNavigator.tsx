@@ -11,6 +11,7 @@ import { CreateEditListingScreen } from '../screens/host/CreateEditListingScreen
 import { HostInquiriesScreen } from '../screens/host/HostInquiriesScreen';
 import { RoommatesScreen } from '../screens/renter/RoommatesScreen';
 import { HostAnalyticsScreen } from '../screens/host/HostAnalyticsScreen';
+import { HostPricingScreen } from '../screens/host/HostPricingScreen';
 import { MessagesStackNavigator } from './MessagesStackNavigator';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
 import { useTheme } from '../hooks/useTheme';
@@ -26,6 +27,7 @@ export type HostDashboardStackParamList = {
   CreateEditListing: { propertyId?: string };
   Analytics: undefined;
   Inquiries: undefined;
+  HostPricing: undefined;
 };
 
 export type HostTabParamList = {
@@ -47,6 +49,7 @@ function DashboardStackNavigator() {
       <DashboardStack.Screen name="CreateEditListing" component={CreateEditListingScreen} />
       <DashboardStack.Screen name="Analytics" component={HostAnalyticsScreen} />
       <DashboardStack.Screen name="Inquiries" component={HostInquiriesScreen} />
+      <DashboardStack.Screen name="HostPricing" component={HostPricingScreen} />
     </DashboardStack.Navigator>
   );
 }

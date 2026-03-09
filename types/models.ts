@@ -187,6 +187,22 @@ export interface User {
     expiresAt?: Date;
     scheduledPlan?: 'basic' | 'plus' | 'elite';
     scheduledChangeDate?: Date;
+    billingCycle?: 'monthly' | 'annual';
+  };
+  hostSubscription?: {
+    plan: 'starter' | 'pro' | 'business';
+    status: 'active' | 'cancelled' | 'expired';
+    expiresAt?: Date;
+    scheduledPlan?: 'starter' | 'pro' | 'business';
+    scheduledChangeDate?: Date;
+    billingCycle?: 'monthly' | 'annual';
+    inquiryResponsesUsed?: number;
+    lastInquiryResetDate?: string;
+  };
+  purchases?: {
+    listingBoosts?: Array<{ propertyId: string; expiresAt: string }>;
+    hostVerificationBadge?: boolean;
+    superInterestsRemaining?: number;
   };
   paymentMethods?: Array<{
     id: string;

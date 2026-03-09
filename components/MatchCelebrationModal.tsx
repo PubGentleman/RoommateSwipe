@@ -14,6 +14,7 @@ import { Feather } from '@expo/vector-icons';
 import { ThemedText } from './ThemedText';
 import { useTheme } from '../hooks/useTheme';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
+import { PlanBadge } from './PlanBadge';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -23,8 +24,10 @@ interface MatchCelebrationModalProps {
   visible: boolean;
   currentUserPhoto?: string;
   currentUserName?: string;
+  currentUserPlan?: string;
   matchedUserPhoto?: string;
   matchedUserName?: string;
+  matchedUserPlan?: string;
   compatibility?: number;
   onSendMessage: () => void;
   onKeepSwiping: () => void;
@@ -100,8 +103,10 @@ export const MatchCelebrationModal = ({
   visible,
   currentUserPhoto,
   currentUserName,
+  currentUserPlan,
   matchedUserPhoto,
   matchedUserName,
+  matchedUserPlan,
   compatibility,
   onSendMessage,
   onKeepSwiping,
@@ -233,9 +238,12 @@ export const MatchCelebrationModal = ({
                 </View>
               )}
             </View>
-            <ThemedText style={styles.photoName} numberOfLines={1}>
-              {currentUserName || 'You'}
-            </ThemedText>
+            <View style={styles.nameRow}>
+              <ThemedText style={styles.photoName} numberOfLines={1}>
+                {currentUserName || 'You'}
+              </ThemedText>
+              <PlanBadge plan={currentUserPlan} size={14} />
+            </View>
           </Animated.View>
 
           <Animated.View style={[styles.heartIconContainer, heartAnimStyle]}>
@@ -254,9 +262,12 @@ export const MatchCelebrationModal = ({
                 </View>
               )}
             </View>
-            <ThemedText style={styles.photoName} numberOfLines={1}>
-              {matchedUserName || 'Match'}
-            </ThemedText>
+            <View style={styles.nameRow}>
+              <ThemedText style={styles.photoName} numberOfLines={1}>
+                {matchedUserName || 'Match'}
+              </ThemedText>
+              <PlanBadge plan={matchedUserPlan} size={14} />
+            </View>
           </Animated.View>
         </View>
 
@@ -365,12 +376,17 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
-    marginTop: Spacing.sm,
     textAlign: 'center',
     maxWidth: 110,
     textShadowColor: 'rgba(0, 0, 0, 0.2)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: Spacing.sm,
   },
   heartIconContainer: {
     marginHorizontal: Spacing.md,
