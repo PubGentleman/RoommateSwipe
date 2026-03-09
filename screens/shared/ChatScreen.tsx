@@ -13,6 +13,7 @@ import { ReportBlockModal } from '../../components/ReportBlockModal';
 import { PlanBadge } from '../../components/PlanBadge';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
+import { useNotificationContext } from '../../contexts/NotificationContext';
 
 type ChatScreenProps = {
   route: {
@@ -29,6 +30,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const { theme } = useTheme();
   const { user, incrementMessageCount, canSendMessage, canStartNewChat, incrementActiveChatCount, watchAdForCredit, isBasicUser, blockUser, reportUser } = useAuth();
   const insets = useSafeAreaInsets();
+  const { refreshUnreadCount } = useNotificationContext();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [showGroupOption, setShowGroupOption] = useState(true);
@@ -195,6 +197,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             fromUserPhoto: user.profilePicture,
           },
         });
+        await refreshUnreadCount();
       }
       
       setMessages([...conversations[conversationIndex].messages]);

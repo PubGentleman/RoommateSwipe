@@ -10,12 +10,14 @@ import { StorageService } from '../../utils/storage';
 import { InterestCard, Conversation, Message } from '../../types/models';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
+import { useNotificationContext } from '../../contexts/NotificationContext';
 
 type FilterStatus = 'all' | 'pending' | 'accepted' | 'passed';
 
 export const HostInquiriesScreen = () => {
   const { theme } = useTheme();
   const { user, canRespondToInquiry, useInquiryResponse, getHostPlan } = useAuth();
+  const { refreshUnreadCount } = useNotificationContext();
   const [interestCards, setInterestCards] = useState<InterestCard[]>([]);
   const [filter, setFilter] = useState<FilterStatus>('all');
 
@@ -123,6 +125,7 @@ export const HostInquiriesScreen = () => {
       },
     });
 
+    await refreshUnreadCount();
     setInterestCards(prev =>
       prev.map(c => c.id === card.id ? { ...c, status: 'accepted' as const, respondedAt: now.toISOString() } : c)
     );
@@ -165,6 +168,7 @@ export const HostInquiriesScreen = () => {
       },
     });
 
+    await refreshUnreadCount();
     setInterestCards(prev =>
       prev.map(c => c.id === card.id ? { ...c, status: 'passed' as const, respondedAt: now.toISOString() } : c)
     );

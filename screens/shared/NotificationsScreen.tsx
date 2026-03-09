@@ -54,7 +54,7 @@ export const NotificationsScreen = () => {
     if (!notification.isRead) {
       await StorageService.markNotificationAsRead(notification.id);
       setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, isRead: true } : n));
-      refreshUnreadCount();
+      await refreshUnreadCount();
     }
 
     switch (notification.type) {
@@ -100,14 +100,14 @@ export const NotificationsScreen = () => {
   const handleDelete = async (notificationId: string) => {
     await StorageService.deleteNotification(notificationId);
     setNotifications(prev => prev.filter(n => n.id !== notificationId));
-    refreshUnreadCount();
+    await refreshUnreadCount();
   };
 
   const handleMarkAllAsRead = async () => {
     if (!user?.id) return;
     await StorageService.markAllNotificationsAsRead(user.id);
     setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-    refreshUnreadCount();
+    await refreshUnreadCount();
   };
 
   const getNotificationIcon = (type: Notification['type']) => {

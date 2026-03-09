@@ -24,6 +24,7 @@ import { getZodiacSymbol } from '../../utils/zodiacUtils';
 import { PropertyMapView } from '../../components/PropertyMapView';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
+import { useNotificationContext } from '../../contexts/NotificationContext';
 
 const COMMON_AMENITIES = [
   'Parking', 'Gym', 'Pool', 'Laundry', 'Pet Friendly',
@@ -69,6 +70,7 @@ export const ExploreScreen = () => {
   const { user, canSendInterest, canSendSuperInterest, canViewListing, useListingView } = useAuth();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const { refreshUnreadCount } = useNotificationContext();
   const [properties, setProperties] = useState<Property[]>([]);
   const [filteredProperties, setFilteredProperties] = useState<Property[]>([]);
   const [saved, setSaved] = useState<Set<string>>(new Set());
@@ -244,6 +246,7 @@ export const ExploreScreen = () => {
         },
       });
 
+      await refreshUnreadCount();
       setShowInterestSheet(false);
       setConfirmationWasSuper(isSuperInterest);
       setShowInterestConfirmation(true);

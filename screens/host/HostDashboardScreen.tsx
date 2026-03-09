@@ -8,6 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
 import { StorageService } from '../../utils/storage';
 import { Property, InterestCard, Message, Conversation } from '../../types/models';
+import { useNotificationContext } from '../../contexts/NotificationContext';
 
 const BG = '#111';
 const CARD_BG = '#1a1a1a';
@@ -60,6 +61,7 @@ function formatBudget(range?: string): string {
 
 export const HostDashboardScreen = () => {
   const { user, getHostPlan } = useAuth();
+  const { refreshUnreadCount } = useNotificationContext();
   const hostPlan = getHostPlan();
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
@@ -159,6 +161,7 @@ export const HostDashboardScreen = () => {
       data: { interestCardId: card.id, conversationId, propertyId: card.propertyId, fromUserId: card.renterId, fromUserName: card.renterName, fromUserPhoto: card.renterPhoto },
     });
 
+    await refreshUnreadCount();
     setInquiries(prev =>
       prev.map(c => c.id === card.id ? { ...c, status: 'accepted' as const, respondedAt: now.toISOString() } : c)
     );
@@ -185,6 +188,7 @@ export const HostDashboardScreen = () => {
       data: { interestCardId: card.id, propertyId: card.propertyId, fromUserId: user.id, fromUserName: user.name },
     });
 
+    await refreshUnreadCount();
     setInquiries(prev =>
       prev.map(c => c.id === card.id ? { ...c, status: 'passed' as const, respondedAt: now.toISOString() } : c)
     );

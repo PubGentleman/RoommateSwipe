@@ -7,11 +7,13 @@ import { useAuth } from '../../contexts/AuthContext';
 import { StorageService } from '../../utils/storage';
 import { InterestCard } from '../../types/models';
 import { PaywallSheet } from '../../components/PaywallSheet';
+import { useNotificationContext } from '../../contexts/NotificationContext';
 
 type TabType = 'sent' | 'received';
 
 export const MyInterestsScreen = () => {
   const { user, canSendInterest } = useAuth();
+  const { refreshUnreadCount } = useNotificationContext();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [interests, setInterests] = useState<InterestCard[]>([]);
@@ -41,6 +43,7 @@ export const MyInterestsScreen = () => {
           data: { interestCardId: card.id, propertyId: card.propertyId },
         });
       }
+      await refreshUnreadCount();
     }
     const cards = await StorageService.getInterestCardsForRenter(user.id);
     cards.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -130,6 +133,7 @@ export const MyInterestsScreen = () => {
       createdAt: new Date(),
       data: { interestCardId: newCard.id, propertyId: card.propertyId, fromUserId: user.id, fromUserName: user.name },
     });
+    await refreshUnreadCount();
     await loadInterests();
   };
 

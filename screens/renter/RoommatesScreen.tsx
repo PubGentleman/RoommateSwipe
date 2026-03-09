@@ -28,6 +28,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { RoomdrLogo } from '../../components/RoomdrLogo';
 import { RoommateFilterSheet, MatchFilters, DEFAULT_FILTERS, getActiveFilterCount, getActiveFilterChips, removeFilterChip, loadSavedFilters, saveFilters, applyFiltersToProfiles } from '../../components/RoommateFilterSheet';
 import { PlanBadge } from '../../components/PlanBadge';
+import { useNotificationContext } from '../../contexts/NotificationContext';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { RoomdrAISheet, AISheetContextData } from '../../components/RoomdrAISheet';
 
@@ -41,6 +42,7 @@ export const RoommatesScreen = () => {
   const { user, purchaseBoost, purchaseUndoPass, canRewind, useRewind, canSuperLike, useSuperLike, blockUser, reportUser } = useAuth();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const { refreshUnreadCount } = useNotificationContext();
   const [profiles, setProfiles] = useState<RoommateProfile[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showMatch, setShowMatch] = useState(false);
@@ -373,6 +375,7 @@ export const RoommatesScreen = () => {
           });
 
           setShowMatch(true);
+          await refreshUnreadCount();
         }
       }
     } catch (error) {
