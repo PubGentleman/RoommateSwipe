@@ -29,7 +29,6 @@ import { RoomdrLogo } from '../../components/RoomdrLogo';
 import { RoommateFilterSheet, MatchFilters, DEFAULT_FILTERS, getActiveFilterCount, getActiveFilterChips, removeFilterChip, loadSavedFilters, saveFilters, applyFiltersToProfiles } from '../../components/RoommateFilterSheet';
 import { PlanBadge } from '../../components/PlanBadge';
 import { useNotificationContext } from '../../contexts/NotificationContext';
-import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { RoomdrAISheet, AISheetContextData } from '../../components/RoomdrAISheet';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -768,8 +767,6 @@ export const RoommatesScreen = () => {
           </Pressable>
         </View>
       </View>
-
-      <AIFloatingButton onPress={() => setShowAISheet(true)} top={insets.top + 60} />
 
       {renderCitySelector()}
 
