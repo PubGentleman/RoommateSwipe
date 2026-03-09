@@ -839,13 +839,6 @@ export const RoommatesScreen = () => {
               style={[styles.cardGradient, { pointerEvents: 'none' }]}
             />
 
-            <Pressable
-              style={styles.flagBtn}
-              onPress={() => setShowReportBlockModal(true)}
-            >
-              <Feather name="flag" size={14} color="rgba(255,255,255,0.7)" />
-            </Pressable>
-
             {photosArray.length > 1 ? (
               <View style={styles.photoDots}>
                 {photosArray.map((_, idx) => (
@@ -912,6 +905,13 @@ export const RoommatesScreen = () => {
             </View>
           </Animated.View>
         </GestureDetector>
+
+        <Pressable
+          style={styles.flagBtn}
+          onPress={() => setShowReportBlockModal(true)}
+        >
+          <Feather name="flag" size={14} color="rgba(255,255,255,0.7)" />
+        </Pressable>
 
         <View style={styles.adBanner}>
           <View style={styles.adLeft}>
@@ -1783,7 +1783,8 @@ const styles = StyleSheet.create({
   flagBtn: {
     position: 'absolute',
     top: 14,
-    left: 14,
+    left: 30,
+    zIndex: 10,
     width: 36,
     height: 36,
     borderRadius: 18,
