@@ -17,6 +17,7 @@ import { calculateCompatibility } from '../../utils/matchingAlgorithm';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PlanBadge } from '../../components/PlanBadge';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
+import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { User } from '../../types/models';
 
 type MessagesScreenNavigationProp = NativeStackNavigationProp<MessagesStackParamList, 'MessagesList'>;
@@ -486,6 +487,7 @@ export const MessagesScreen = () => {
           },
         }}
       />
+      <AIFloatingButton onPress={() => setShowAISheet(true)} top={100} />
     </View>
   );
 };

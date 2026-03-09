@@ -5,7 +5,6 @@ import { LoginScreen } from '../screens/auth/LoginScreen';
 import { OnboardingScreen } from '../screens/shared/OnboardingScreen';
 import { RenterTabNavigator } from './RenterTabNavigator';
 import { HostTabNavigator } from './HostTabNavigator';
-import { AgentTabNavigator } from './AgentTabNavigator';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useTheme } from '../hooks/useTheme';
 import { StorageService } from '../utils/storage';
@@ -21,8 +20,6 @@ function RenterMain() { return <RenterTabNavigator />; }
 RenterMain.displayName = 'RenterMain';
 function HostMain() { return <HostTabNavigator />; }
 HostMain.displayName = 'HostMain';
-function AgentMain() { return <AgentTabNavigator />; }
-AgentMain.displayName = 'AgentMain';
 
 export const RootNavigator = () => {
   const { user, isLoading } = useAuth();
@@ -64,9 +61,7 @@ export const RootNavigator = () => {
 
   const MainComponent = user.role === 'host'
     ? HostMain
-    : user.role === 'agent'
-      ? AgentMain
-      : RenterMain;
+    : RenterMain;
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>

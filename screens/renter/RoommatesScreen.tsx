@@ -30,6 +30,7 @@ import { RoommateFilterSheet, MatchFilters, DEFAULT_FILTERS, getActiveFilterCoun
 import { PlanBadge } from '../../components/PlanBadge';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { RoomdrAISheet, AISheetContextData } from '../../components/RoomdrAISheet';
+import { AIFloatingButton } from '../../components/AIFloatingButton';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Limit card size for web/desktop viewing
@@ -864,10 +865,10 @@ export const RoommatesScreen = () => {
                     <ThemedText style={styles.tagDarkText}>${currentProfile.budget}/mo</ThemedText>
                   </View>
                 ) : null}
-                {getWorkStyleTag(currentProfile.lifestyle?.workSchedule) ? (
+                {getWorkStyleTag(currentProfile.profileData?.preferences?.workLocation) ? (
                   <View style={styles.tagDark}>
                     <Feather name="briefcase" size={12} color="rgba(255,255,255,0.85)" />
-                    <ThemedText style={styles.tagDarkText}>{getWorkStyleTag(currentProfile.lifestyle?.workSchedule)}</ThemedText>
+                    <ThemedText style={styles.tagDarkText}>{getWorkStyleTag(currentProfile.profileData?.preferences?.workLocation)}</ThemedText>
                   </View>
                 ) : null}
                 {currentProfile.preferences?.location ? (
@@ -1619,6 +1620,7 @@ export const RoommatesScreen = () => {
           },
         }}
       />
+      <AIFloatingButton onPress={() => setShowAISheet(true)} top={100} />
     </View>
   );
 };

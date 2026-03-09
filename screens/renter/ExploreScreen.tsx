@@ -23,6 +23,7 @@ import { formatMoveInDate, calculateCompatibility, getMatchQualityColor, getGend
 import { getZodiacSymbol } from '../../utils/zodiacUtils';
 import { PropertyMapView } from '../../components/PropertyMapView';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
+import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 
 const COMMON_AMENITIES = [
@@ -1056,7 +1057,7 @@ export const ExploreScreen = () => {
                       })()}
                       <View style={{ flex: 1, marginLeft: Spacing.md }}>
                         <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
-                          {selectedProperty.hostId?.startsWith('agent') ? 'Agent' : 'Host'}
+                          Host
                         </ThemedText>
                         <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
                           {(() => {
@@ -1410,6 +1411,7 @@ export const ExploreScreen = () => {
           },
         }}
       />
+      <AIFloatingButton onPress={() => setShowAISheet(true)} top={100} />
     </View>
   );
 };

@@ -33,7 +33,6 @@ The application is built with React Native and Expo using TypeScript, utilizing 
 **Key Features:**
 - **Renter:** Swipe-based matching, 1-on-1 messaging, group management, property exploration with advanced filters and map/list views, saved properties, profile view tracking, AI Match Assistant, animated match celebration, report/block system, notification feed, profile completion indicator, and a mutual interest flow (Interest Cards and Super Interest).
 - **Host:** Full host dashboard with statistics, listing management (create, edit, delete, pause, mark rented), dedicated Inquiries screen for interest card management, inquiry-based analytics, roommate matching (same UI as renters), and role switching.
-- **Agent:** Multi-property portfolio management, document verification, and a legal template library.
 
 **User Experience Enhancements:**
 - **Match Celebration:** An animated full-screen modal for mutual likes.
@@ -43,7 +42,7 @@ The application is built with React Native and Expo using TypeScript, utilizing 
 - **Profile Completion:** A component tracking progress across weighted profile fields.
 - **Identity Verification:** Users can verify identity via phone, government ID, social media, with optional background and income checks for elite users.
 - **Onboarding Tutorial:** A swipeable tutorial for new users.
-- **Roomdr AI Assistant:** A header-integrated red CPU button on every renter screen (Match, Groups, Explore, Messages, Profile, Chat) that opens a context-aware AI bottom sheet. The sheet dynamically adapts greetings, content cards, and insights based on the current screen context and live data (match compatibility, conversation stats, group analysis, profile completion, filter guidance). Supports 6 screen contexts with a context pill indicator in the header.
+- **Roomdr AI Assistant:** A floating coral-red CPU button (`AIFloatingButton`) positioned on every renter screen (Match, Groups, Explore, Messages, Profile) that opens a context-aware AI bottom sheet. The sheet dynamically adapts greetings, content cards, and insights based on the current screen context and live data (match compatibility, conversation stats, group analysis, profile completion, filter guidance). Supports 6 screen contexts with a context pill indicator in the header.
 - **Read Receipts:** Elite users can see message read status.
 - **Who Liked You:** Plus/Elite users can view received interest cards.
 
@@ -51,7 +50,7 @@ Animations are handled by React Native Reanimated, gestures by React Native Gest
 
 ## Authentication & Authorization
 
-Mock authentication supports role-based navigation and conditional access for `renter`, `host`, and `agent` roles. Privacy settings and account deletion are implemented.
+Mock authentication supports role-based navigation and conditional access for `renter` and `host` roles. Privacy settings and account deletion are implemented.
 
 ## Subscription & Paywall System
 

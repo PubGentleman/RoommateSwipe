@@ -24,7 +24,7 @@ export const AIFloatingButton = ({ onPress, top = 16 }: AIFloatingButtonProps) =
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       >
-        <Feather name="zap" size={20} color="#fff" />
+        <Feather name="cpu" size={20} color="#fff" />
       </LinearGradient>
     </Pressable>
   );

@@ -13,6 +13,7 @@ import { ProfileCompletionCard } from '../../components/ProfileCompletionCard';
 import { getVerificationLevel } from '../../components/VerificationBadge';
 import { StorageService } from '../../utils/storage';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
+import { AIFloatingButton } from '../../components/AIFloatingButton';
 
 type ProfileScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'ProfileMain'>;
 
@@ -377,6 +378,7 @@ export const ProfileScreen = () => {
           },
         }}
       />
+      <AIFloatingButton onPress={() => setShowAISheet(true)} top={100} />
     </View>
   );
 };

@@ -753,20 +753,19 @@ export const getWorkScheduleLabel = (schedule?: string | null): string => {
   return map[schedule.toLowerCase()] || schedule;
 };
 
-export const getWorkStyleTag = (workSchedule?: string): string | null => {
-  if (!workSchedule) return null;
-  const lower = workSchedule.toLowerCase();
-  if (lower.includes('remote') || lower.includes('home') || lower === 'wfh' || lower === 'wfh_fulltime') return 'Remote';
-  if (lower.includes('hybrid') || lower.includes('flex') || lower === 'flexible') return 'Hybrid';
-  if (lower.includes('office') || lower === 'office_fulltime') return 'Office';
-  if (lower.includes('shift') || lower === 'irregular' || lower === 'night_shift') return 'Shifts';
-  if (lower === 'freelance') return 'Freelance';
-  if (lower === 'student') return 'Student';
-  return workSchedule;
-};
+export function getWorkStyleTag(workLocation?: string): string | null {
+  if (!workLocation) return null;
+  const map: Record<string, string> = {
+    wfh_fulltime: 'Remote',
+    hybrid: 'Hybrid',
+    office_fulltime: 'Office',
+    irregular: 'Flexible',
+  };
+  return map[workLocation] ?? null;
+}
 
-export const validateProfileDataConsistency = (profile: { id: string; name?: string; bio?: string; lifestyle?: { workSchedule?: string } }) => {
-  const workStyle = profile.lifestyle?.workSchedule;
+export const validateProfileDataConsistency = (profile: { id: string; name?: string; bio?: string; profileData?: { preferences?: { workLocation?: string } } }) => {
+  const workStyle = profile.profileData?.preferences?.workLocation;
   const bio = profile.bio?.toLowerCase() || '';
   if (!workStyle || !bio) return;
 

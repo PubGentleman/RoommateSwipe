@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { StorageService } from '../utils/storage';
 import { User } from '../types/models';
 
-export type UserRole = 'renter' | 'host' | 'agent';
+export type UserRole = 'renter' | 'host';
 
 interface AuthContextType {
   user: User | null;

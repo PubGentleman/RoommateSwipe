@@ -48,7 +48,6 @@ export const LoginScreen = () => {
   const roles: { value: UserRole; label: string; icon: keyof typeof Feather.glyphMap }[] = [
     { value: 'renter', label: 'Renter', icon: 'search' },
     { value: 'host', label: 'Host', icon: 'home' },
-    { value: 'agent', label: 'Agent', icon: 'briefcase' },
   ];
 
   return (

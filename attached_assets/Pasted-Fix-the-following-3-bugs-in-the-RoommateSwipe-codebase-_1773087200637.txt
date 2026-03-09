@@ -1,0 +1,70 @@
+Fix the following 3 bugs in the RoommateSwipe codebase. Make all changes exactly as described.
+
+BUG 1 — AI Button Never Renders (AIFloatingButton not wired up)
+The AIFloatingButton component exists in components/AIFloatingButton.tsx but is imported on zero screens. All 5 screens already have showAISheet state and render <RoomdrAISheet> — they just have no button to open it. Fix this on all 5 screens:
+In components/AIFloatingButton.tsx, change the icon from Feather name="zap" to Feather name="cpu" to match the chip/processor icon already visible in the app. No other changes to that file.
+Then in each of these 5 files, add the import and the button:
+screens/renter/RoommatesScreen.tsx
+
+Add import at top: import { AIFloatingButton } from '../../components/AIFloatingButton';
+Inside the return JSX, just before the closing tag of the outermost <View>, add:
+
+tsx<AIFloatingButton onPress={() => setShowAISheet(true)} top={100} />
+screens/renter/ExploreScreen.tsx
+
+Add import at top: import { AIFloatingButton } from '../../components/AIFloatingButton';
+Inside the return JSX, just before the closing tag of the outermost <View>, add:
+
+tsx<AIFloatingButton onPress={() => setShowAISheet(true)} top={100} />
+screens/renter/GroupsScreen.tsx
+
+Add import at top: import { AIFloatingButton } from '../../components/AIFloatingButton';
+Inside the return JSX, just before the closing tag of the outermost <View>, add:
+
+tsx<AIFloatingButton onPress={() => setShowAISheet(true)} top={100} />
+screens/shared/MessagesScreen.tsx
+
+Add import at top: import { AIFloatingButton } from '../../components/AIFloatingButton';
+Inside the return JSX, just before the closing tag of the outermost <View>, add:
+
+tsx<AIFloatingButton onPress={() => setShowAISheet(true)} top={100} />
+screens/shared/ProfileScreen.tsx
+
+Add import at top: import { AIFloatingButton } from '../../components/AIFloatingButton';
+Inside the return JSX, just before the closing tag of the outermost <View>, add:
+
+tsx<AIFloatingButton onPress={() => setShowAISheet(true)} top={100} />
+
+BUG 2 — Work Style Tag Reads from Wrong Field
+In utils/matchingAlgorithm.ts, the function getWorkStyleTag() reads from lifestyle.workSchedule which is a free-text field with inconsistent values. The correct structured field is profileData.preferences.workLocation which uses the typed enum 'wfh_fulltime' | 'hybrid' | 'office_fulltime' | 'irregular'.
+Update getWorkStyleTag() to accept the structured enum and map it correctly. Replace the existing function with:
+tsexport function getWorkStyleTag(workLocation?: string): string | null {
+  if (!workLocation) return null;
+  const map: Record<string, string> = {
+    wfh_fulltime: 'Remote',
+    hybrid: 'Hybrid',
+    office_fulltime: 'Office',
+    irregular: 'Flexible',
+  };
+  return map[workLocation] ?? null;
+}
+Then in screens/renter/RoommatesScreen.tsx, find the call to getWorkStyleTag (around line 867) and change:
+tsxgetWorkStyleTag(currentProfile.lifestyle?.workSchedule)
+to:
+tsxgetWorkStyleTag(currentProfile.profileData?.preferences?.workLocation)
+Also update validateProfileDataConsistency() in matchingAlgorithm.ts — anywhere it reads lifestyle.workSchedule for work style validation, change it to read profileData?.preferences?.workLocation instead.
+
+BUG 3 — Remove Agent Role
+The agent role is unused and adds dead code. Remove it completely:
+types/models.ts — Find the role type definition and change:
+tsrole: 'renter' | 'host' | 'agent'
+to:
+tsrole: 'renter' | 'host'
+navigation/RootNavigator.tsx
+
+Remove the import line for AgentTabNavigator
+Remove any route or condition that checks role === 'agent' or renders AgentTabNavigator
+If there is a fallback that defaults to AgentTabNavigator, change it to default to RenterTabNavigator
+
+Delete the file navigation/AgentTabNavigator.tsx entirely.
+After deleting, do a project-wide search for any remaining references to AgentTabNavigator or role === 'agent' and remove them.
