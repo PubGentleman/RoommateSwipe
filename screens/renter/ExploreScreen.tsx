@@ -348,6 +348,11 @@ export const ExploreScreen = () => {
       filtered = filtered.filter(p => p.available);
     }
 
+    // MISSING FEATURE: Daily listing view limit (10/day) for Basic renter plan — no view cap enforced
+    // MISSING FEATURE: Boosted listing visibility — purchaseListingBoost sets expiry but boosted listings are not prioritized in sort (Host Pro)
+    // MISSING FEATURE: Pro host listings ranked higher than Starter listings in Explore results (Host Pro)
+    // MISSING FEATURE: Business host listings ranked above Pro listings in search results (Host Business)
+    // MISSING FEATURE: Featured listing slot for Business hosts — separate from regular feed (Host Business)
     filtered.sort((a, b) => {
       if (a.featured && !b.featured) return -1;
       if (!a.featured && b.featured) return 1;

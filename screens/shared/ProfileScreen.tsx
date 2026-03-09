@@ -84,6 +84,8 @@ export const ProfileScreen = () => {
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <View style={styles.topNav}>
+        {/* MISSING FEATURE: Verified host badge display on host profile — purchaseHostVerification sets flag but badge is never rendered here (Host Pro / One-time purchase) */}
+        {/* MISSING FEATURE: Dedicated support contact/chat option for Business hosts — no support UI exists (Host Business) */}
         <Text style={styles.topNavTitle}>My Profile</Text>
         <Pressable style={styles.iconBtn} onPress={() => navigation.navigate('PrivacySecurity')}>
           <Feather name="settings" size={16} color="rgba(255,255,255,0.7)" />

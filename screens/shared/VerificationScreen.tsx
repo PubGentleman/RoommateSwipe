@@ -12,6 +12,8 @@ import type { ProfileStackParamList } from '../../navigation/ProfileStackNavigat
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'Verification'>;
 
+// MISSING FEATURE: Background and income verification flow for Elite renter users — only phone, government ID, and social media verification exist (Renter Elite)
+// MISSING FEATURE: Host Verification Badge ($9.99) should trigger an actual ID verification flow here — currently purchaseHostVerification just sets a flag with no verification steps (One-time purchase)
 export function VerificationScreen({ navigation }: Props) {
   const { theme } = useTheme();
   const { user, updateUser } = useAuth();

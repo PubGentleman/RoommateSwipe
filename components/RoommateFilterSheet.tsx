@@ -158,6 +158,7 @@ interface Props {
   allProfiles: any[];
 }
 
+// PAYWALL MISSING: Lifestyle and schedule filters are accessible to all users — should be gated behind Plus/Elite for Roommate matching (Renter Plus)
 export const RoommateFilterSheet: React.FC<Props> = ({ visible, onClose, onApply, currentFilters, allProfiles }) => {
   const [filters, setFilters] = useState<MatchFilters>({ ...currentFilters });
 

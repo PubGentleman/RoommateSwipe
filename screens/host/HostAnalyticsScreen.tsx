@@ -14,6 +14,8 @@ const ACCENT = '#ff6b5b';
 const CARD_BG = '#1a1a1a';
 const BG = '#111';
 
+// PAYWALL MISSING: Analytics screen is not gated by host plan — Starter users can see full analytics including conversion funnel, inquiry counts, and accept rate. Starter should only see view counts. (Host Starter/Pro)
+// MISSING FEATURE: Advanced analytics differentiation for Business tier — no additional metrics beyond what Pro sees (Host Business)
 export const HostAnalyticsScreen = () => {
   const { user } = useAuth();
   const { theme } = useTheme();

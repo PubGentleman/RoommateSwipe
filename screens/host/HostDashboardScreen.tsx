@@ -248,6 +248,7 @@ export const HostDashboardScreen = () => {
             <Feather name="home" size={12} color={ACCENT} />
             <Text style={styles.hostBadgeText}>Host Mode</Text>
           </View>
+          {/* PAYWALL MISSING: Analytics navigation not gated — Starter hosts can access full analytics dashboard (Host Starter) */}
           <Pressable style={styles.periodPill} onPress={() => navigation.navigate('Analytics')}>
             <Feather name="clock" size={11} color="rgba(255,255,255,0.4)" />
             <Text style={styles.periodPillText}>Last 30 days</Text>

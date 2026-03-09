@@ -1181,6 +1181,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return true;
   };
 
+  // MISSING FEATURE: Weekly automatic profile boost for Elite users — no scheduled/automatic boost, only manual activation (Renter Elite)
+  // MISSING FEATURE: Background and income verification flow — VerificationScreen exists for ID/phone/social but no income or background check (Renter Elite)
   const canSendInterest = async (): Promise<{ canSend: boolean; remaining: number; reason?: string }> => {
     if (!user) return { canSend: false, remaining: 0, reason: 'Not logged in' };
 

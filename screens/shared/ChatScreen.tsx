@@ -167,6 +167,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       if (otherParticipantId && !blockedIds.includes(otherParticipantId)) {
         await StorageService.addNotification({
           id: `notif_msg_${Date.now()}`,
+          // MISSING FEATURE: Read receipts in chat — isRead field exists but no plan-gated UI shows read status to Elite users (Renter Elite)
           userId: otherParticipantId,
           type: 'message',
           title: 'New Message',
