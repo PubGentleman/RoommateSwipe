@@ -240,9 +240,10 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData }
         if (group) {
           const compat = contextData?.groups?.groupCompatibility || 0;
           const spots = contextData?.groups?.openSpots || 0;
-          const remoteCount = contextData?.groups?.memberProfiles?.filter(m =>
-            m.lifestyle?.workSchedule === 'remote' || m.lifestyle?.workSchedule === 'work_from_home'
-          ).length || 0;
+          const remoteCount = contextData?.groups?.memberProfiles?.filter(m => {
+            const ws = m.lifestyle?.workSchedule?.toLowerCase() || '';
+            return ws.includes('remote') || ws.includes('home') || ws === 'wfh' || ws === 'wfh_fulltime';
+          }).length || 0;
           let msg = `This group of ${group.members.length} is looking for ${spots > 0 ? `${spots} more` : 'members'} in ${group.preferredLocation || 'your area'}. Their combined lifestyle score with your profile is ${compat}%.`;
           if (remoteCount > 0) msg += ` ${remoteCount} member${remoteCount > 1 ? 's are' : ' is a'} remote worker${remoteCount > 1 ? 's' : ''} like you.`;
           return msg;
@@ -552,7 +553,7 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData }
               <View key={i} style={styles.memberTraitRow}>
                 <Text style={styles.memberName}>{m.name}</Text>
                 <Text style={styles.memberDetail}>
-                  {m.occupation || 'N/A'} · {m.lifestyle?.workSchedule === 'remote' || m.lifestyle?.workSchedule === 'work_from_home' ? 'Remote' : 'In-office'}
+                  {m.occupation || 'N/A'} · {(() => { const ws = m.lifestyle?.workSchedule?.toLowerCase() || ''; return ws.includes('remote') || ws.includes('home') || ws === 'wfh' || ws === 'wfh_fulltime' ? 'Remote' : m.lifestyle?.workSchedule || 'N/A'; })()}
                 </Text>
               </View>
             ))}

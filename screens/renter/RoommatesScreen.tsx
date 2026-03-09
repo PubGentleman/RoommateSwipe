@@ -14,7 +14,7 @@ import { StorageService } from '../../utils/storage';
 import { RoommateProfile, Match } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scaleFont, moderateScale, getResponsiveSpacing } from '../../utils/responsive';
-import { calculateCompatibility, getMatchQualityColor, getCleanlinessLabel, getSocialLevelLabel, getWorkScheduleLabel, formatMoveInDate, getGenderSymbol } from '../../utils/matchingAlgorithm';
+import { calculateCompatibility, getMatchQualityColor, getCleanlinessLabel, getSocialLevelLabel, getWorkScheduleLabel, getWorkStyleTag, validateProfileDataConsistency, formatMoveInDate, getGenderSymbol } from '../../utils/matchingAlgorithm';
 import { getCityFromNeighborhood } from '../../utils/locationData';
 import { useCityContext } from '../../contexts/CityContext';
 import { CityPickerModal, CityPillButton } from '../../components/CityPickerModal';
@@ -184,6 +184,7 @@ export const RoommatesScreen = () => {
         return (b.compatibility || 0) - (a.compatibility || 0);
       });
       
+      sortedProfiles.forEach(p => validateProfileDataConsistency(p));
       setProfiles(sortedProfiles);
       setCurrentIndex(0);
     } catch (error) {
@@ -857,18 +858,24 @@ export const RoommatesScreen = () => {
                 {currentProfile.bio}
               </ThemedText>
               <View style={styles.cardTags}>
-                <View style={styles.tagDark}>
-                  <Feather name="dollar-sign" size={12} color="rgba(255,255,255,0.85)" />
-                  <ThemedText style={styles.tagDarkText}>${currentProfile.budget}/mo</ThemedText>
-                </View>
-                <View style={styles.tagDark}>
-                  <Feather name="briefcase" size={12} color="rgba(255,255,255,0.85)" />
-                  <ThemedText style={styles.tagDarkText}>{currentProfile.lifestyle?.workSchedule === 'remote' ? 'Remote' : currentProfile.lifestyle?.workSchedule === 'hybrid' ? 'Hybrid' : 'Office'}</ThemedText>
-                </View>
-                <View style={styles.tagDark}>
-                  <Feather name="map-pin" size={12} color="rgba(255,255,255,0.85)" />
-                  <ThemedText style={styles.tagDarkText} numberOfLines={1}>{currentProfile.preferences?.location || 'NYC'}</ThemedText>
-                </View>
+                {currentProfile.budget ? (
+                  <View style={styles.tagDark}>
+                    <Feather name="dollar-sign" size={12} color="rgba(255,255,255,0.85)" />
+                    <ThemedText style={styles.tagDarkText}>${currentProfile.budget}/mo</ThemedText>
+                  </View>
+                ) : null}
+                {getWorkStyleTag(currentProfile.lifestyle?.workSchedule) ? (
+                  <View style={styles.tagDark}>
+                    <Feather name="briefcase" size={12} color="rgba(255,255,255,0.85)" />
+                    <ThemedText style={styles.tagDarkText}>{getWorkStyleTag(currentProfile.lifestyle?.workSchedule)}</ThemedText>
+                  </View>
+                ) : null}
+                {currentProfile.preferences?.location ? (
+                  <View style={styles.tagDark}>
+                    <Feather name="map-pin" size={12} color="rgba(255,255,255,0.85)" />
+                    <ThemedText style={styles.tagDarkText} numberOfLines={1}>{currentProfile.preferences.location}</ThemedText>
+                  </View>
+                ) : null}
                 <View style={styles.tagMatch}>
                   <Feather name="heart" size={12} color="#ff8070" />
                   <ThemedText style={styles.tagMatchText}>{currentProfile.compatibility || 50}% Match</ThemedText>

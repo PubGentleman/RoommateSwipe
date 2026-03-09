@@ -734,16 +734,49 @@ export const getSocialLevelLabel = (value: number): string => {
 /**
  * Format work schedule for display
  */
-export const getWorkScheduleLabel = (schedule: string): string => {
+export const getWorkScheduleLabel = (schedule?: string | null): string => {
+  if (!schedule) return 'Not specified';
   const map: Record<string, string> = {
     'wfh': 'Work from Home',
-    'office': 'In Office',
+    'wfh_fulltime': 'Remote',
+    'office': 'Office',
+    'office_fulltime': 'Office',
     'hybrid': 'Hybrid',
-    'irregular': 'Irregular Hours',
+    'irregular': 'Irregular',
     'night_shift': 'Night Shift',
-    'flexible': 'Flexible Schedule',
+    'flexible': 'Flexible',
+    'remote': 'Remote',
+    'shifts': 'Shifts',
+    'freelance': 'Freelance',
+    'student': 'Student',
   };
-  return map[schedule] || schedule;
+  return map[schedule.toLowerCase()] || schedule;
+};
+
+export const getWorkStyleTag = (workSchedule?: string): string | null => {
+  if (!workSchedule) return null;
+  const lower = workSchedule.toLowerCase();
+  if (lower.includes('remote') || lower.includes('home') || lower === 'wfh' || lower === 'wfh_fulltime') return 'Remote';
+  if (lower.includes('hybrid') || lower.includes('flex') || lower === 'flexible') return 'Hybrid';
+  if (lower.includes('office') || lower === 'office_fulltime') return 'Office';
+  if (lower.includes('shift') || lower === 'irregular' || lower === 'night_shift') return 'Shifts';
+  if (lower === 'freelance') return 'Freelance';
+  if (lower === 'student') return 'Student';
+  return workSchedule;
+};
+
+export const validateProfileDataConsistency = (profile: { id: string; name?: string; bio?: string; lifestyle?: { workSchedule?: string } }) => {
+  const workStyle = profile.lifestyle?.workSchedule;
+  const bio = profile.bio?.toLowerCase() || '';
+  if (!workStyle || !bio) return;
+
+  const tag = getWorkStyleTag(workStyle);
+  if (tag === 'Remote' && (bio.includes('office') && !bio.includes('home office'))) {
+    console.warn(`PROFILE DATA CONFLICT: workStyle tag contradicts bio text for user ${profile.id} (${profile.name || 'unknown'}). Tag: Remote, bio mentions "office".`);
+  }
+  if (tag === 'Office' && (bio.includes('work from home') || bio.includes('remote') || bio.includes('wfh'))) {
+    console.warn(`PROFILE DATA CONFLICT: workStyle tag contradicts bio text for user ${profile.id} (${profile.name || 'unknown'}). Tag: Office, bio mentions remote/WFH.`);
+  }
 };
 
 /**
