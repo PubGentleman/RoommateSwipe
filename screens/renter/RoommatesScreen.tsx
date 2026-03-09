@@ -30,7 +30,6 @@ import { RoommateFilterSheet, MatchFilters, DEFAULT_FILTERS, getActiveFilterCoun
 import { PlanBadge } from '../../components/PlanBadge';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { RoomdrAISheet, AISheetContextData } from '../../components/RoomdrAISheet';
-import { AIFloatingButton } from '../../components/AIFloatingButton';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Limit card size for web/desktop viewing
@@ -1620,7 +1619,6 @@ export const RoommatesScreen = () => {
           },
         }}
       />
-      <AIFloatingButton onPress={() => setShowAISheet(true)} top={100} />
     </View>
   );
 };

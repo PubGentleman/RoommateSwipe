@@ -23,7 +23,6 @@ import { formatMoveInDate, calculateCompatibility, getMatchQualityColor, getGend
 import { getZodiacSymbol } from '../../utils/zodiacUtils';
 import { PropertyMapView } from '../../components/PropertyMapView';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
-import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 
 const COMMON_AMENITIES = [
@@ -1411,7 +1410,6 @@ export const ExploreScreen = () => {
           },
         }}
       />
-      <AIFloatingButton onPress={() => setShowAISheet(true)} top={100} />
     </View>
   );
 };

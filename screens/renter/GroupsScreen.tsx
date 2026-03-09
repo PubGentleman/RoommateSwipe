@@ -22,7 +22,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useCityContext } from '../../contexts/CityContext';
 import { CityPickerModal, CityPillButton } from '../../components/CityPickerModal';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
-import { AIFloatingButton } from '../../components/AIFloatingButton';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - Spacing.xxl;
@@ -1564,7 +1563,6 @@ export const GroupsScreen = () => {
           },
         } : undefined}
       />
-      <AIFloatingButton onPress={() => setShowAISheet(true)} top={100} />
     </View>
   );
 };
