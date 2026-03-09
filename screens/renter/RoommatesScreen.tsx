@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, Image, Pressable, Dimensions, Modal, ScrollView } from 'react-native';
+import { View, StyleSheet, Image, Pressable, Dimensions, Modal, ScrollView, Alert } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, runOnJS, interpolate } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
@@ -38,7 +38,7 @@ const CARD_WIDTH = Math.min(SCREEN_WIDTH - Spacing.xxl, MAX_CARD_WIDTH);
 
 export const RoommatesScreen = () => {
   const { theme } = useTheme();
-  const { user, purchaseBoost, purchaseUndoPass, canRewind, useRewind, canSuperLike, useSuperLike, blockUser, reportUser } = useAuth();
+  const { user, purchaseBoost, activateBoost, canBoost, purchaseUndoPass, canRewind, useRewind, canSuperLike, useSuperLike, blockUser, reportUser } = useAuth();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { refreshUnreadCount } = useNotificationContext();
@@ -630,6 +630,21 @@ export const RoommatesScreen = () => {
     (navigation as any).navigate('Profile', { screen: 'Payment' });
   };
 
+  const handleBoostForPaidPlan = async () => {
+    const boostStatus = canBoost();
+    if (!boostStatus.canBoost) {
+      Alert.alert('Cannot Boost', boostStatus.reason || 'Boost is currently unavailable');
+      return;
+    }
+    const result = await activateBoost();
+    if (result.success) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('Boost Activated!', result.message);
+    } else {
+      Alert.alert('Cannot Boost', result.message);
+    }
+  };
+
   const handlePurchaseBoost = async () => {
     setProcessingBoost(true);
     const result = await purchaseBoost();
@@ -754,8 +769,15 @@ export const RoommatesScreen = () => {
         </Pressable>
         <RoomdrLogo variant="horizontal" size="sm" />
         <View style={{ flexDirection: 'row', gap: 8 }}>
-          {(user?.subscription?.plan || 'basic') === 'basic' && !user?.boostData?.isBoosted ? (
-            <Pressable onPress={() => setShowPurchaseBoostModal(true)} style={styles.navIconBtn}>
+          {!user?.boostData?.isBoosted || (user?.boostData?.boostExpiresAt && new Date(user.boostData.boostExpiresAt) <= new Date()) ? (
+            <Pressable onPress={() => {
+              const plan = user?.subscription?.plan || 'basic';
+              if (plan === 'basic') {
+                setShowPurchaseBoostModal(true);
+              } else {
+                handleBoostForPaidPlan();
+              }
+            }} style={styles.navIconBtn}>
               <View style={[styles.navIconBtnInner, { backgroundColor: '#FFD700' }]}>
                 <Feather name="zap" size={18} color="#000000" />
               </View>
