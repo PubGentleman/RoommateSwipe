@@ -15,6 +15,8 @@ import { Feather } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
+import { DatePickerModal } from '../../components/DatePickerModal';
+import { formatDate, isAtLeast18, getTierLimit } from '../../utils/dateUtils';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -134,17 +136,9 @@ export const ProfileQuestionnaireScreen = () => {
   const [photos, setPhotos] = useState<string[]>(user?.photos || (user?.profilePicture ? [user.profilePicture] : []));
   const [name, setName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
-  const [birthday, setBirthday] = useState(() => {
-    if (user?.birthday) {
-      const parts = user.birthday.split('-');
-      if (parts.length === 3 && parts[0].length === 4) {
-        return `${parts[1]}/${parts[2]}/${parts[0]}`;
-      }
-      return user.birthday.replace(/-/g, '/');
-    }
-    return '';
-  });
+  const [birthday, setBirthday] = useState(user?.birthday || '');
   const [birthdayError, setBirthdayError] = useState('');
+  const [showBirthdayPicker, setShowBirthdayPicker] = useState(false);
   const [bio, setBio] = useState(user?.profileData?.bio || '');
   const [budget, setBudget] = useState(user?.profileData?.budget?.toString() || '');
   const [lookingFor, setLookingFor] = useState<'room' | 'entire_apartment' | undefined>(user?.profileData?.lookingFor);
@@ -168,14 +162,8 @@ export const ProfileQuestionnaireScreen = () => {
   const [expenseGroceries, setExpenseGroceries] = useState<'split_equally' | 'buy_own' | 'shared_basics' | undefined>(user?.profileData?.preferences?.sharedExpenses?.groceries);
   const [expenseInternet, setExpenseInternet] = useState<'split_equally' | 'one_pays' | 'included_in_rent' | undefined>(user?.profileData?.preferences?.sharedExpenses?.internet);
   const [expenseCleaning, setExpenseCleaning] = useState<'split_equally' | 'take_turns' | 'hire_cleaner' | undefined>(user?.profileData?.preferences?.sharedExpenses?.cleaning);
-  const [moveInDate, setMoveInDate] = useState(() => {
-    const raw = user?.profileData?.preferences?.moveInDate || '';
-    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-      const [y, m, d] = raw.split('-');
-      return `${m}/${d}/${y}`;
-    }
-    return raw;
-  });
+  const [moveInDate, setMoveInDate] = useState(user?.profileData?.preferences?.moveInDate || '');
+  const [showMoveInPicker, setShowMoveInPicker] = useState(false);
   const [bedrooms, setBedrooms] = useState(user?.profileData?.preferences?.bedrooms?.toString() || '');
   const [bathrooms, setBathrooms] = useState(user?.profileData?.preferences?.bathrooms?.toString() || '');
   const [privateBathroom, setPrivateBathroom] = useState<boolean | undefined>(user?.profileData?.preferences?.privateBathroom);
@@ -190,24 +178,9 @@ export const ProfileQuestionnaireScreen = () => {
 
   const validateBirthday = (dateString: string): { valid: boolean; error: string } => {
     if (!dateString.trim()) return { valid: false, error: 'Please enter your date of birth' };
-    const dateRegex = /^(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])\/\d{4}$/;
-    if (!dateRegex.test(dateString)) return { valid: false, error: 'Invalid format. Use MM/DD/YYYY' };
-    const [month, day, year] = dateString.split('/').map(Number);
-    const date = new Date(year, month - 1, day);
-    if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
-      return { valid: false, error: 'Invalid date' };
-    }
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (date > today) return { valid: false, error: 'Date cannot be in the future' };
-    const age = Math.floor((today.getTime() - date.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
-    if (age < 18) return { valid: false, error: 'You must be at least 18 years old' };
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateString)) return { valid: false, error: 'Please select your date of birth' };
+    if (!isAtLeast18(dateString)) return { valid: false, error: 'You must be at least 18 years old' };
     return { valid: true, error: '' };
-  };
-
-  const convertToStorageFormat = (dateString: string): string => {
-    const [month, day, year] = dateString.split('/');
-    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
   };
 
   const pickImage = async () => {
@@ -316,16 +289,7 @@ export const ProfileQuestionnaireScreen = () => {
         if (!budget.trim()) { Alert.alert('Required', 'Please enter your monthly budget'); return false; }
         if (isNaN(parseInt(budget)) || parseInt(budget) <= 0) { Alert.alert('Error', 'Please enter a valid budget amount'); return false; }
         if (!lookingFor) { Alert.alert('Required', 'Please select what you are looking for'); return false; }
-        if (!moveInDate.trim()) { Alert.alert('Required', 'Please enter your move-in date'); return false; }
-        if (!/^\d{2}\/\d{2}\/\d{4}$/.test(moveInDate)) { Alert.alert('Error', 'Please enter a valid date (MM/DD/YYYY)'); return false; }
-        {
-          const [mm, dd, yyyy] = moveInDate.split('/').map(Number);
-          const entered = new Date(yyyy, mm - 1, dd);
-          const today = new Date(); today.setHours(0, 0, 0, 0);
-          if (entered < today) { Alert.alert('Error', 'Move-in date cannot be in the past'); return false; }
-          const maxDate = new Date(today); maxDate.setMonth(maxDate.getMonth() + 3);
-          if (entered > maxDate) { Alert.alert('Error', 'Move-in date cannot be more than 3 months from today'); return false; }
-        }
+        if (!moveInDate.trim()) { Alert.alert('Required', 'Please select your move-in date'); return false; }
         if (!bedrooms.trim()) { Alert.alert('Required', 'Please enter the number of bedrooms'); return false; }
         if (isNaN(parseInt(bedrooms)) || parseInt(bedrooms) <= 0) { Alert.alert('Error', 'Please enter a valid number of bedrooms'); return false; }
         if (!bathrooms.trim()) { Alert.alert('Required', 'Please enter the number of bathrooms'); return false; }
@@ -368,7 +332,7 @@ export const ProfileQuestionnaireScreen = () => {
     if (!validateCurrentStep()) return;
     setIsSaving(true);
 
-    const birthdayStorageFormat = birthday.trim() ? convertToStorageFormat(birthday) : user?.birthday;
+    const birthdayStorageFormat = birthday.trim() || user?.birthday;
     const zodiacSign = birthdayStorageFormat ? calculateZodiacFromBirthday(birthdayStorageFormat) : undefined;
 
     await updateUser({
@@ -489,30 +453,25 @@ export const ProfileQuestionnaireScreen = () => {
             </View>
             <View style={styles.inputGroup}>
               <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>Date of Birth *</ThemedText>
-              <TextInput
-                style={[styles.textInput, { backgroundColor: theme.backgroundDefault, borderColor: birthdayError ? theme.error : theme.border, color: theme.text }]}
-                value={birthday}
-                onChangeText={(text) => {
-                  const digits = text.replace(/\D/g, '');
-                  let formatted = '';
-                  if (digits.length <= 2) {
-                    formatted = digits;
-                  } else if (digits.length <= 4) {
-                    formatted = digits.slice(0, 2) + '/' + digits.slice(2);
-                  } else {
-                    formatted = digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/' + digits.slice(4, 8);
-                  }
-                  setBirthday(formatted);
-                  setBirthdayError('');
-                }}
-                placeholder="MM/DD/YYYY"
-                placeholderTextColor={theme.textSecondary}
-                keyboardType="number-pad"
-                maxLength={10}
-              />
+              <Pressable
+                style={[styles.textInput, { backgroundColor: theme.backgroundDefault, borderColor: birthdayError ? theme.error : theme.border, justifyContent: 'center' }]}
+                onPress={() => setShowBirthdayPicker(true)}
+              >
+                <ThemedText style={{ color: birthday ? theme.text : theme.textSecondary }}>
+                  {birthday ? formatDate(birthday) : 'Select your birthday'}
+                </ThemedText>
+              </Pressable>
               {birthdayError ? (
                 <ThemedText style={[Typography.small, { color: theme.error, marginTop: Spacing.xs }]}>{birthdayError}</ThemedText>
               ) : null}
+              <DatePickerModal
+                visible={showBirthdayPicker}
+                onClose={() => setShowBirthdayPicker(false)}
+                onConfirm={(date) => { setBirthday(date); setBirthdayError(''); }}
+                mode="birthday"
+                title="Enter Your Birthday"
+                initialDate={birthday || undefined}
+              />
             </View>
             <View style={styles.inputGroup}>
               <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>Interests</ThemedText>
@@ -666,25 +625,23 @@ export const ProfileQuestionnaireScreen = () => {
 
             <View style={styles.inputGroup}>
               <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.xs, marginTop: Spacing.md }]}>Move-in Date</ThemedText>
-              <TextInput
-                style={[styles.textInput, { backgroundColor: theme.backgroundDefault, borderColor: theme.border, color: theme.text }]}
-                value={moveInDate}
-                onChangeText={(text) => {
-                  const digits = text.replace(/\D/g, '');
-                  let formatted = '';
-                  if (digits.length <= 2) {
-                    formatted = digits;
-                  } else if (digits.length <= 4) {
-                    formatted = digits.slice(0, 2) + '/' + digits.slice(2);
-                  } else {
-                    formatted = digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/' + digits.slice(4, 8);
-                  }
-                  setMoveInDate(formatted);
-                }}
-                placeholder="MM/DD/YYYY"
-                placeholderTextColor={theme.textSecondary}
-                keyboardType="number-pad"
-                maxLength={10}
+              <Pressable
+                style={[styles.textInput, { backgroundColor: theme.backgroundDefault, borderColor: theme.border, justifyContent: 'center' }]}
+                onPress={() => setShowMoveInPicker(true)}
+              >
+                <ThemedText style={{ color: moveInDate ? theme.text : theme.textSecondary }}>
+                  {moveInDate ? formatDate(moveInDate) : 'Select move-in date'}
+                </ThemedText>
+              </Pressable>
+              <DatePickerModal
+                visible={showMoveInPicker}
+                onClose={() => setShowMoveInPicker(false)}
+                onConfirm={(date) => setMoveInDate(date)}
+                mode="moveIn"
+                title="Select Move-In Date"
+                initialDate={moveInDate || undefined}
+                tierLimit={getTierLimit((user?.subscription?.plan as 'basic' | 'plus' | 'elite') || 'basic')}
+                userPlan={(user?.subscription?.plan as 'basic' | 'plus' | 'elite') || 'basic'}
               />
             </View>
             <View style={styles.inputGroup}>

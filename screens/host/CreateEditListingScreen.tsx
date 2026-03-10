@@ -11,6 +11,8 @@ import { Property } from '../../types/models';
 import { US_STATES } from '../../utils/locationData';
 import { Spacing, BorderRadius } from '../../constants/theme';
 import { createListing as createListingSupa, updateListing as updateListingSupa, getListing, deleteListing as deleteListingSupa } from '../../services/listingService';
+import { DatePickerModal } from '../../components/DatePickerModal';
+import { formatDate } from '../../utils/dateUtils';
 
 type RouteParams = {
   CreateEditListing: { propertyId?: string };
@@ -58,6 +60,7 @@ export const CreateEditListingScreen = () => {
   const [neighborhood, setNeighborhood] = useState('');
   const [address, setAddress] = useState('');
   const [availableDate, setAvailableDate] = useState('');
+  const [showAvailableDatePicker, setShowAvailableDatePicker] = useState(false);
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [houseRules, setHouseRules] = useState('');
   const [photos, setPhotos] = useState<string[]>([]);
@@ -114,7 +117,7 @@ export const CreateEditListingScreen = () => {
     setState(prop.state);
     setNeighborhood(prop.neighborhood || '');
     setAddress(prop.address);
-    setAvailableDate(prop.availableDate ? new Date(prop.availableDate).toLocaleDateString() : '');
+    setAvailableDate(prop.availableDate ? new Date(prop.availableDate).toISOString().split('T')[0] : '');
     setSelectedAmenities(prop.amenities);
     setPhotos(prop.photos);
 
@@ -180,7 +183,7 @@ export const CreateEditListingScreen = () => {
         room_type: roomType,
         amenities: selectedAmenities,
         photos: photos.length > 0 ? photos : PLACEHOLDER_PHOTOS.slice(0, 1),
-        available_date: availableDate ? new Date(availableDate).toISOString() : undefined,
+        available_date: availableDate && availableDate !== 'flexible' ? new Date(availableDate).toISOString() : undefined,
         is_active: true,
         is_paused: false,
         is_rented: false,
@@ -474,12 +477,22 @@ export const CreateEditListingScreen = () => {
 
       <View style={styles.fieldContainer}>
         <ThemedText style={styles.label}>Available Date</ThemedText>
-        <TextInput
+        <Pressable
           style={inputStyle}
-          value={availableDate}
-          onChangeText={setAvailableDate}
-          placeholder="MM/DD/YYYY"
-          placeholderTextColor="#666"
+          onPress={() => setShowAvailableDatePicker(true)}
+        >
+          <ThemedText style={{ color: availableDate ? '#fff' : '#666' }}>
+            {availableDate ? formatDate(availableDate) : 'Select available date'}
+          </ThemedText>
+        </Pressable>
+        <DatePickerModal
+          visible={showAvailableDatePicker}
+          onClose={() => setShowAvailableDatePicker(false)}
+          onConfirm={(date) => setAvailableDate(date)}
+          mode="availability"
+          title="Select Available Date"
+          showFlexible
+          initialDate={availableDate || undefined}
         />
       </View>
 

@@ -1,0 +1,207 @@
+---
+
+**REPLIT PROMPT — Universal Date Picker Component**
+
+Create a single reusable date picker component that is used everywhere in the app where a date needs to be entered. Replace all existing date inputs, text fields, or inline date entry with this component.
+
+---
+
+**CREATE THE COMPONENT**
+
+Create `components/DatePickerModal.tsx` as a universal date picker used across the entire app.
+
+The component accepts these props:
+
+```ts
+interface DatePickerModalProps {
+  visible: boolean;
+  onClose: () => void;
+  onConfirm: (date: string) => void;
+  mode: 'moveIn' | 'birthday' | 'availability' | 'general';
+  title: string;
+  initialDate?: string;          // ISO date string
+  minDate?: string;              // ISO date string — no dates before this
+  maxDate?: string;              // ISO date string — no dates after this
+  showFlexible?: boolean;        // show "I'm Flexible" toggle (moveIn + availability only)
+  tierLimit?: 30 | 90 | 180;    // locked date range for search (moveIn only)
+  userPlan?: 'basic' | 'plus' | 'elite';
+}
+```
+
+---
+
+**VISUAL DESIGN**
+
+Modal slides up from the bottom of the screen with a smooth spring animation.
+
+Structure from top to bottom:
+- Drag handle bar — centered, `rgba(255,255,255,0.2)`, 40px wide, 4px tall, rounded
+- Title text — white, 18px bold, left aligned, e.g. "Select Move-In Date" or "Enter Your Birthday"
+- Flexible toggle row — only shown when `showFlexible` is true
+- Month navigation row — left arrow / **Month Year** / right arrow, coral arrows
+- Day of week headers — Sun Mon Tue Wed Thu Fri Sat, small gray text
+- Calendar grid — 6 rows of 7 days
+- Upsell banner row — only shown in `moveIn` mode for Basic/Plus users
+- Confirm and Clear buttons at the bottom
+
+Style:
+- Modal background: `#1a1a1a`
+- Rounded top corners: `borderRadius: 24`
+- Today's date: coral circle outline `#ff6b5b`
+- Selected date: filled coral circle `#ff6b5b`, white text
+- Past dates: `opacity: 0.3`, not tappable
+- Locked tier dates: `opacity: 0.3` with a small 🔒 overlaid, not tappable
+- Normal unselected dates: white text
+- Confirm button: coral gradient pill, full width
+- Clear button: ghost text link, centered below Confirm
+
+---
+
+**MODE BEHAVIOR**
+
+**`birthday` mode:**
+- `maxDate` automatically set to 18 years ago from today (must be 18+)
+- `minDate` automatically set to 100 years ago
+- No Flexible toggle
+- No tier limit or upsell banner
+- If user selects a date less than 18 years ago, show inline error: **"You must be at least 18 to use Roomdr"** in red below the calendar, do not allow confirm
+- Start the calendar view on the birth year — show a **year selector** above the month navigation so users can jump to their birth year without tapping back 20+ years. Year selector is a horizontal scrollable strip of years
+
+**`moveIn` mode:**
+- `minDate` = today
+- `maxDate` = today + tierLimit days (30, 90, or 180 based on plan)
+- Flexible toggle visible
+- Upsell banner visible for Basic and Plus users
+- Locked dates beyond tier limit show 🔒 and tooltip on tap
+
+**`availability` mode (host listing):**
+- `minDate` = today
+- No tier limit or upsell
+- Flexible toggle visible
+- No upsell banner
+
+**`general` mode:**
+- Uses whatever `minDate` and `maxDate` are passed in
+- No Flexible toggle
+- No upsell banner
+- No tier limit
+
+---
+
+**YEAR SELECTOR (birthday mode only)**
+
+Above the month/year navigation row, show a horizontally scrollable strip of years from current year minus 100 to current year minus 18. Each year is a pill — selected year has coral background, others are transparent with white text. Tapping a year jumps the calendar to January of that year.
+
+---
+
+**FLEXIBLE TOGGLE**
+
+When `showFlexible` is true and toggle is switched on:
+- Animate the calendar grid out (fade + slide up)
+- Show centered text: **"Showing all listings regardless of move-in date"**
+- Replace Confirm button with **"Apply Flexible"** coral button
+- Return `onConfirm('flexible')` when tapped
+
+---
+
+**TIER LOCK TOOLTIP**
+
+When a locked date is tapped in `moveIn` mode:
+- Show a small dark tooltip directly above the tapped date cell
+- Text based on user plan:
+  - Basic: **"Upgrade to Plus to search up to 90 days ahead"**
+  - Plus: **"Upgrade to Elite to search up to 6 months ahead"**
+- Tooltip auto-dismisses after 2 seconds
+- Do not select the date
+
+---
+
+**UPSELL BANNER**
+
+Show inside the modal just above the Confirm button in `moveIn` mode:
+- Basic: `"🔒 Search up to 90 days ahead with Plus — $14.99/mo"` + coral Upgrade link
+- Plus: `"🔒 Search up to 6 months ahead with Elite — $29.99/mo"` + coral Upgrade link
+- Elite: `"✅ Full 6-month search range unlocked"` in small green text
+- Tapping Upgrade closes the modal and navigates to Plans screen
+
+---
+
+**REPLACE ALL EXISTING DATE INPUTS**
+
+Search the entire codebase for every place a date is entered and replace with `<DatePickerModal>`. This includes:
+
+**Birthday / Date of Birth:**
+- `screens/shared/OnboardingScreen.tsx` — user's date of birth during sign up
+- `screens/shared/EditProfileScreen.tsx` — birthday field in profile editing
+- `screens/shared/ProfileQuestionnaireScreen.tsx` — any DOB field
+
+Use `mode="birthday"` for all of these.
+
+**Move-In Date:**
+- `screens/renter/ExploreScreen.tsx` — move-in date filter
+- `screens/renter/RoommatesScreen.tsx` — move-in date filter
+- Any filter panel or search modal
+
+Use `mode="moveIn"` with `tierLimit` and `userPlan` passed from `useAuth()`.
+
+**Listing Availability Date:**
+- Any host listing creation or edit screen
+- `screens/host/` — any screen with an available date field
+
+Use `mode="availability"` with `showFlexible={true}`.
+
+**Any other date fields found:**
+Use `mode="general"` with appropriate `minDate` and `maxDate`.
+
+For every replacement:
+- Remove the old text input, inline picker, or date string field
+- Add a tappable display row showing the current date value (or "Select date" placeholder in gray if empty)
+- When tapped, set a local `showDatePicker` boolean state to true to open the modal
+- On confirm, store the returned ISO date string in state and display it formatted as **"Mar 15, 2025"**
+- On clear, reset to null and show placeholder
+
+---
+
+**DATE DISPLAY FORMAT**
+
+Wherever a selected date is shown in the UI after selection, format it as:
+- **"Mar 15, 2025"** — not ISO format, not slashes
+
+Create a utility function `utils/dateUtils.ts`:
+
+```ts
+export const formatDate = (iso: string): string => {
+  if (iso === 'flexible') return 'Flexible';
+  const date = new Date(iso);
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+export const getMaxSearchDate = (plan: 'basic' | 'plus' | 'elite'): string => {
+  const days = plan === 'elite' ? 180 : plan === 'plus' ? 90 : 30;
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString().split('T')[0];
+};
+
+export const isAtLeast18 = (dob: string): boolean => {
+  const birth = new Date(dob);
+  const today = new Date();
+  const age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  return age > 18 || (age === 18 && m >= 0 && today.getDate() >= birth.getDate());
+};
+```
+
+---
+
+**After completing all changes, verify:**
+1. Tapping any date field anywhere in the app opens the DatePickerModal
+2. Birthday picker shows the year selector strip and blocks users under 18
+3. Move-in picker locks dates beyond the user's tier and shows the upsell banner
+4. Flexible toggle collapses the calendar and returns `'flexible'` on confirm
+5. Selected dates display as "Mar 15, 2025" format everywhere
+6. Host listing availability picker shows from today with flexible toggle
+7. No raw text inputs or old date pickers remain anywhere in the app
+8. App compiles with no TypeScript errors
+
+---
