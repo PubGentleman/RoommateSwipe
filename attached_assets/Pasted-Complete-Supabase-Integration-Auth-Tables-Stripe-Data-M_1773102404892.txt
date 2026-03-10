@@ -1,0 +1,391 @@
+Complete Supabase Integration: Auth, Tables, Stripe & Data Migration
+Supabase is already connected to this project. Complete all four integration steps below fully and in order. Do not stop between steps.
+
+STEP 1 — REPLACE MOCK AUTH WITH SUPABASE AUTH
+Replace the entire contents of context/AuthContext.tsx with a real Supabase Auth implementation.
+Remove:
+
+All hardcoded demo credentials (demo@roomdr.com, password)
+All Math.random() fake ID generation
+All mock user objects being set directly in state
+
+Replace with these real functions using supabase from lib/supabase.ts:
+signUp(email, password, role)
+tsconst { data, error } = await supabase.auth.signUp({ email, password });
+if (error) throw error;
+await supabase.from('users').insert({
+  id: data.user!.id,
+  email,
+  role,
+  created_at: new Date().toISOString()
+});
+signIn(email, password)
+tsconst { data, error } = await supabase.auth.signInWithPassword({ email, password });
+if (error) throw error;
+const { data: userData } = await supabase
+  .from('users')
+  .select('*')
+  .eq('id', data.user.id)
+  .single();
+setUser(userData);
+signOut()
+tsawait supabase.auth.signOut();
+setUser(null);
+setSession(null);
+Session persistence
+tsuseEffect(() => {
+  supabase.auth.getSession().then(({ data: { session } }) => {
+    setSession(session);
+    if (session) loadUser(session.user.id);
+  });
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    setSession(session);
+    if (session) loadUser(session.user.id);
+    else setUser(null);
+  });
+  return () => subscription.unsubscribe();
+}, []);
+Update OnboardingScreen.tsx and LoginScreen.tsx to use these real functions. Remove any auto-login or demo login buttons.
+
+STEP 2 — RUN DATABASE MIGRATIONS
+Create the file supabase/migrations/001_initial_schema.sql and write all 8 table definitions into it:
+sql-- Users
+create table if not exists public.users (
+  id uuid references auth.users(id) primary key,
+  email text unique not null,
+  role text check (role in ('renter', 'host')) not null default 'renter',
+  full_name text,
+  avatar_url text,
+  bio text,
+  age integer,
+  gender text,
+  location text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- Profiles (renter details)
+create table if not exists public.profiles (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.users(id) on delete cascade unique,
+  budget_min integer,
+  budget_max integer,
+  move_in_date date,
+  lease_duration text,
+  work_location text check (work_location in ('wfh_fulltime','hybrid','office_fulltime','irregular')),
+  cleanliness integer check (cleanliness between 1 and 5),
+  noise_level integer check (noise_level between 1 and 5),
+  sleep_schedule text,
+  pets text,
+  smoking boolean default false,
+  photos text[],
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- Listings (host properties)
+create table if not exists public.listings (
+  id uuid primary key default gen_random_uuid(),
+  host_id uuid references public.users(id) on delete cascade,
+  title text not null,
+  description text,
+  rent integer not null,
+  bedrooms integer,
+  bathrooms integer,
+  address text,
+  city text,
+  state text,
+  photos text[],
+  available_date date,
+  is_active boolean default true,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- Matches
+create table if not exists public.matches (
+  id uuid primary key default gen_random_uuid(),
+  user_id_1 uuid references public.users(id) on delete cascade,
+  user_id_2 uuid references public.users(id) on delete cascade,
+  match_type text check (match_type in ('mutual','super_interest','cold')) default 'mutual',
+  status text check (status in ('pending','matched','rejected')) default 'pending',
+  created_at timestamptz default now(),
+  unique(user_id_1, user_id_2)
+);
+
+-- Messages
+create table if not exists public.messages (
+  id uuid primary key default gen_random_uuid(),
+  match_id uuid references public.matches(id) on delete cascade,
+  sender_id uuid references public.users(id) on delete cascade,
+  content text not null,
+  read boolean default false,
+  created_at timestamptz default now()
+);
+
+-- Subscriptions
+create table if not exists public.subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.users(id) on delete cascade unique,
+  plan text check (plan in ('basic','plus','elite','starter','pro','business')) default 'basic',
+  billing_cycle text check (billing_cycle in ('monthly','3month','annual')),
+  stripe_customer_id text,
+  stripe_subscription_id text,
+  status text check (status in ('active','cancelled','past_due')) default 'active',
+  current_period_end timestamptz,
+  cancel_at_period_end boolean default false,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- Boosts
+create table if not exists public.boosts (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.users(id) on delete cascade,
+  is_active boolean default true,
+  expires_at timestamptz not null,
+  duration_hours integer check (duration_hours in (12,24,48)),
+  created_at timestamptz default now()
+);
+
+-- Super Interests
+create table if not exists public.super_interests (
+  id uuid primary key default gen_random_uuid(),
+  sender_id uuid references public.users(id) on delete cascade,
+  recipient_id uuid references public.users(id) on delete cascade,
+  created_at timestamptz default now(),
+  unique(sender_id, recipient_id)
+);
+Then enable Row Level Security on all tables:
+sqlalter table public.users enable row level security;
+alter table public.profiles enable row level security;
+alter table public.listings enable row level security;
+alter table public.matches enable row level security;
+alter table public.messages enable row level security;
+alter table public.subscriptions enable row level security;
+alter table public.boosts enable row level security;
+alter table public.super_interests enable row level security;
+
+-- Users
+create policy "Users view own record" on public.users for select using (auth.uid() = id);
+create policy "Users update own record" on public.users for update using (auth.uid() = id);
+create policy "Users insert own record" on public.users for insert with check (auth.uid() = id);
+
+-- Profiles
+create policy "Profiles viewable by authenticated" on public.profiles for select using (auth.role() = 'authenticated');
+create policy "Users manage own profile" on public.profiles for all using (auth.uid() = user_id);
+
+-- Listings
+create policy "Listings viewable by authenticated" on public.listings for select using (auth.role() = 'authenticated');
+create policy "Hosts manage own listings" on public.listings for all using (auth.uid() = host_id);
+
+-- Matches
+create policy "Users view own matches" on public.matches for select using (auth.uid() = user_id_1 or auth.uid() = user_id_2);
+create policy "Users create matches" on public.matches for insert with check (auth.uid() = user_id_1);
+
+-- Messages
+create policy "Match participants read messages" on public.messages for select using (
+  auth.uid() in (
+    select user_id_1 from public.matches where id = match_id
+    union
+    select user_id_2 from public.matches where id = match_id
+  )
+);
+create policy "Match participants send messages" on public.messages for insert with check (auth.uid() = sender_id);
+
+-- Subscriptions
+create policy "Users view own subscription" on public.subscriptions for select using (auth.uid() = user_id);
+create policy "Users update own subscription" on public.subscriptions for update using (auth.uid() = user_id);
+
+-- Boosts
+create policy "Users manage own boosts" on public.boosts for all using (auth.uid() = user_id);
+create policy "Boosts viewable by authenticated" on public.boosts for select using (auth.role() = 'authenticated');
+
+-- Super Interests
+create policy "Users manage own super interests" on public.super_interests for all using (auth.uid() = sender_id);
+create policy "Recipients can view super interests sent to them" on public.super_interests for select using (auth.uid() = recipient_id);
+
+STEP 3 — CREATE SERVICE LAYER & REPLACE MOCK DATA
+Create a services/ folder with these 7 files. Each file uses supabase from lib/supabase.ts. After creating each service, find every screen that imports from mockData.ts and replace it with the appropriate service call.
+services/profileService.ts
+tsexport const getProfile = async (userId: string) =>
+  supabase.from('profiles').select('*').eq('user_id', userId).single();
+
+export const updateProfile = async (userId: string, data: Partial<Profile>) =>
+  supabase.from('profiles').upsert({ user_id: userId, ...data, updated_at: new Date().toISOString() });
+
+export const getAllProfiles = async (city: string) =>
+  supabase.from('profiles').select('*, users(*)').eq('users.location', city);
+services/listingService.ts
+tsexport const getListings = async (city: string) =>
+  supabase.from('listings').select('*, users(*)').eq('city', city).eq('is_active', true);
+
+export const getMyListings = async (hostId: string) =>
+  supabase.from('listings').select('*').eq('host_id', hostId);
+
+export const createListing = async (data: Partial<Listing>) =>
+  supabase.from('listings').insert(data);
+
+export const updateListing = async (id: string, data: Partial<Listing>) =>
+  supabase.from('listings').update({ ...data, updated_at: new Date().toISOString() }).eq('id', id);
+
+export const deleteListing = async (id: string) =>
+  supabase.from('listings').delete().eq('id', id);
+services/matchService.ts
+tsexport const swipeRight = async (userId: string, targetId: string) => {
+  await supabase.from('matches').upsert({ user_id_1: userId, user_id_2: targetId, status: 'pending' });
+  const { data: mutual } = await supabase.from('matches')
+    .select('*').eq('user_id_1', targetId).eq('user_id_2', userId).eq('status', 'pending').single();
+  if (mutual) {
+    await supabase.from('matches').update({ status: 'matched' }).eq('id', mutual.id);
+    await supabase.from('matches').update({ status: 'matched' }).eq('user_id_1', userId).eq('user_id_2', targetId);
+    return { matched: true };
+  }
+  return { matched: false };
+};
+
+export const getMatches = async (userId: string) =>
+  supabase.from('matches').select('*, user_id_1(*, profiles(*)), user_id_2(*, profiles(*))')
+    .or(`user_id_1.eq.${userId},user_id_2.eq.${userId}`)
+    .eq('status', 'matched');
+services/messageService.ts
+tsexport const getMessages = async (matchId: string) =>
+  supabase.from('messages').select('*').eq('match_id', matchId).order('created_at', { ascending: true });
+
+export const sendMessage = async (matchId: string, senderId: string, content: string) =>
+  supabase.from('messages').insert({ match_id: matchId, sender_id: senderId, content });
+
+export const markAsRead = async (matchId: string, userId: string) =>
+  supabase.from('messages').update({ read: true }).eq('match_id', matchId).neq('sender_id', userId);
+services/subscriptionService.ts
+tsexport const getSubscription = async (userId: string) =>
+  supabase.from('subscriptions').select('*').eq('user_id', userId).single();
+
+export const updateSubscription = async (userId: string, data: Partial<Subscription>) =>
+  supabase.from('subscriptions').upsert({ user_id: userId, ...data, updated_at: new Date().toISOString() });
+services/boostService.ts
+tsexport const activateBoost = async (userId: string, durationHours: 12 | 24 | 48) => {
+  const expiresAt = new Date(Date.now() + durationHours * 60 * 60 * 1000).toISOString();
+  return supabase.from('boosts').insert({ user_id: userId, expires_at: expiresAt, duration_hours: durationHours, is_active: true });
+};
+
+export const getActiveBoost = async (userId: string) =>
+  supabase.from('boosts').select('*').eq('user_id', userId).eq('is_active', true).gt('expires_at', new Date().toISOString()).single();
+
+export const expireBoost = async (boostId: string) =>
+  supabase.from('boosts').update({ is_active: false }).eq('id', boostId);
+services/superInterestService.ts
+tsexport const sendSuperInterest = async (senderId: string, recipientId: string) =>
+  supabase.from('super_interests').insert({ sender_id: senderId, recipient_id: recipientId });
+
+export const getSuperInterestCount = async (userId: string) =>
+  supabase.from('super_interests').select('id', { count: 'exact' }).eq('sender_id', userId);
+
+export const hasSuperInterest = async (senderId: string, recipientId: string) =>
+  supabase.from('super_interests').select('id').eq('sender_id', senderId).eq('recipient_id', recipientId).single();
+After creating all 7 service files, search for every import of mockData across all screens and replace with the correct service function. Delete utils/mockData.ts once all references are removed.
+
+STEP 4 — WIRE UP STRIPE WEBHOOKS
+Create supabase/functions/stripe-webhook/index.ts:
+tsimport Stripe from 'https://esm.sh/stripe@12.0.0?target=deno';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!, { apiVersion: '2023-10-16' });
+const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+
+Deno.serve(async (req) => {
+  const signature = req.headers.get('stripe-signature')!;
+  const body = await req.text();
+
+  let event: Stripe.Event;
+  try {
+    event = stripe.webhooks.constructEvent(body, signature, Deno.env.get('STRIPE_WEBHOOK_SECRET')!);
+  } catch {
+    return new Response('Webhook signature invalid', { status: 400 });
+  }
+
+  const subscription = event.data.object as Stripe.Subscription;
+  const customerId = subscription.customer as string;
+
+  const { data: user } = await supabase
+    .from('subscriptions')
+    .select('user_id')
+    .eq('stripe_customer_id', customerId)
+    .single();
+
+  if (!user) return new Response('User not found', { status: 404 });
+
+  const updates: Record<string, any> = {
+    stripe_subscription_id: subscription.id,
+    current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+    cancel_at_period_end: subscription.cancel_at_period_end,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (event.type === 'customer.subscription.created' || event.type === 'customer.subscription.updated') {
+    updates.status = 'active';
+    updates.plan = subscription.metadata.plan ?? 'basic';
+    updates.billing_cycle = subscription.metadata.billing_cycle ?? 'monthly';
+  } else if (event.type === 'customer.subscription.deleted') {
+    updates.status = 'cancelled';
+    updates.plan = 'basic';
+  } else if (event.type === 'invoice.payment_failed') {
+    updates.status = 'past_due';
+  }
+
+  await supabase.from('subscriptions').update(updates).eq('user_id', user.user_id);
+
+  return new Response(JSON.stringify({ received: true }), { status: 200 });
+});
+Add these secrets to Supabase Edge Functions → Secrets:
+
+STRIPE_SECRET_KEY
+STRIPE_WEBHOOK_SECRET
+SUPABASE_SERVICE_ROLE_KEY
+
+
+STEP 5 — REALTIME CHAT
+In screens/shared/ChatScreen.tsx, replace local message state with Supabase Realtime:
+tsuseEffect(() => {
+  // Load existing messages
+  messageService.getMessages(matchId).then(({ data }) => setMessages(data ?? []));
+
+  // Subscribe to new messages
+  const channel = supabase
+    .channel(`match-${matchId}`)
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'messages',
+      filter: `match_id=eq.${matchId}`
+    }, (payload) => {
+      setMessages(prev => [...prev, payload.new as Message]);
+    })
+    .subscribe();
+
+  return () => { supabase.removeChannel(channel); };
+}, [matchId]);
+
+STEP 6 — SUPABASE STORAGE FOR PHOTOS
+In EditProfileScreen.tsx and any listing photo upload screen, replace local image state with Supabase Storage:
+tsconst uploadPhoto = async (uri: string, bucket: 'profile-photos' | 'listing-photos') => {
+  const fileName = `${user.id}-${Date.now()}.jpg`;
+  const response = await fetch(uri);
+  const blob = await response.blob();
+  const { error } = await supabase.storage.from(bucket).upload(fileName, blob, { contentType: 'image/jpeg' });
+  if (error) throw error;
+  const { data } = supabase.storage.from(bucket).getPublicUrl(fileName);
+  return data.publicUrl;
+};
+Call this function wherever profile or listing photos are selected. Store the returned public URL in the appropriate database table.
+
+FINAL VERIFICATION — After all 6 steps are complete, confirm:
+
+A brand new user can sign up with email and password — they appear in Supabase Authentication → Users
+Signing in loads real data from the database — no mock data anywhere
+All 8 tables are visible in Supabase Table Editor with RLS enabled
+Sending a chat message appears in the messages table in real time
+A Stripe webhook test event updates the subscriptions table correctly
+Profile photos upload to Supabase Storage and display on the profile screen
+utils/mockData.ts is deleted and no screen imports from it
+The app builds and runs with zero TypeScript errors

@@ -377,6 +377,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: {
+          full_name: name,
+          role,
+          city: 'New York',
+          state: 'NY',
+          neighborhood: 'Williamsburg',
+        },
+      },
     });
 
     if (error) {
@@ -384,23 +393,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     if (data.user) {
-      const { error: insertError } = await supabase
-        .from('users')
-        .insert({
-          id: data.user.id,
-          email,
-          full_name: name,
-          role,
-          onboarding_step: 'profile',
-          city: 'New York',
-          state: 'NY',
-          neighborhood: 'Williamsburg',
-        });
-
-      if (insertError) {
-        console.error('Error creating user record:', insertError);
-      }
-
       if (data.session) {
         await loadUserFromSupabase(data.session);
       } else {

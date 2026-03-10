@@ -13,7 +13,6 @@ import { getGroups as getGroupsFromSupabase, getMyGroups as getMyGroupsFromSupab
 import { useAuth } from '../../contexts/AuthContext';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { mockRoommateProfiles } from '../../utils/mockData';
 import { getGenderSymbol, calculateCompatibility } from '../../utils/matchingAlgorithm';
 import { getCityFromNeighborhood } from '../../utils/locationData';
 import { getVerificationLevel } from '../../components/VerificationBadge';
@@ -54,7 +53,8 @@ export const GroupsScreen = () => {
   const { activeCity, recentCities, setActiveCity } = useCityContext();
   const [showCityPicker, setShowCityPicker] = useState(false);
   const [showAISheet, setShowAISheet] = useState(false);
-  
+  const [profileCache, setProfileCache] = useState<RoommateProfile[]>([]);
+
   const [groupName, setGroupName] = useState('');
   const [groupDescription, setGroupDescription] = useState('');
   const [groupBudget, setGroupBudget] = useState('');
@@ -78,6 +78,8 @@ export const GroupsScreen = () => {
     
     try {
       setIsLoading(true);
+      const cachedProfiles = await StorageService.getRoommateProfiles();
+      setProfileCache(cachedProfiles);
       let userGroups: Group[] = [];
       let otherGroups: Group[] = [];
       
@@ -144,7 +146,7 @@ export const GroupsScreen = () => {
     if (!user) return 0;
     
     const memberProfiles = (group.members || [])
-      .map(id => mockRoommateProfiles.find(p => p.id === id))
+      .map(id => profileCache.find(p => p.id === id))
       .filter((p): p is RoommateProfile => p !== null && p !== undefined);
     
     if (memberProfiles.length === 0) return 0;
@@ -176,7 +178,7 @@ export const GroupsScreen = () => {
     const EXPANDED_SPACING = 110;
 
     const memberProfiles = (group.members || [])
-      .map(id => mockRoommateProfiles.find(p => p.id === id))
+      .map(id => profileCache.find(p => p.id === id))
       .filter((p): p is NonNullable<typeof p> => p !== null && p !== undefined)
       .slice(0, MAX_VISIBLE);
 
@@ -692,10 +694,10 @@ export const GroupsScreen = () => {
   const renderMyGroup = (group: Group) => {
     const isCreator = group.createdBy === user?.id;
     const memberProfiles = (group.members || [])
-      .map(id => mockRoommateProfiles.find(p => p.id === id))
+      .map(id => profileCache.find(p => p.id === id))
       .filter((p): p is NonNullable<typeof p> => p !== null && p !== undefined);
     const pendingProfiles = (group.pendingMembers || [])
-      .map(id => mockRoommateProfiles.find(p => p.id === id))
+      .map(id => profileCache.find(p => p.id === id))
       .filter((p): p is NonNullable<typeof p> => p !== null && p !== undefined);
 
     return (
@@ -877,7 +879,7 @@ export const GroupsScreen = () => {
       const compatibility = calculateGroupCompatibility(currentGroup);
       const spotsLeft = currentGroup.maxMembers - currentGroup.members.length;
       const memberProfiles = currentGroup.members
-        .map(id => mockRoommateProfiles.find(p => p.id === id))
+        .map(id => profileCache.find(p => p.id === id))
         .filter((p): p is NonNullable<typeof p> => !!p);
 
       return (
@@ -1445,7 +1447,7 @@ export const GroupsScreen = () => {
                   <View style={[styles.detailSection, { paddingBottom: Spacing.xxl }]}>
                     <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Members</ThemedText>
                     {currentGroup.members.map((memberId) => {
-                      const profile = mockRoommateProfiles.find(p => p.id === memberId);
+                      const profile = profileCache.find(p => p.id === memberId);
                       return profile ? (
                         <View key={memberId} style={styles.memberRow}>
                           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -1624,7 +1626,7 @@ export const GroupsScreen = () => {
             currentGroup: allGroups[currentIndex],
             groupCompatibility: calculateGroupCompatibility(allGroups[currentIndex]),
             memberProfiles: allGroups[currentIndex].members
-              .map(id => mockRoommateProfiles.find(p => p.id === id))
+              .map(id => profileCache.find(p => p.id === id))
               .filter((p): p is RoommateProfile => !!p),
             openSpots: allGroups[currentIndex].maxMembers - allGroups[currentIndex].members.length,
           },
