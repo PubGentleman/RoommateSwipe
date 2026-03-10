@@ -9,6 +9,7 @@ import { Typography, Spacing } from '../../constants/theme';
 import { getVerificationLevel, getVerificationLabel } from '../../components/VerificationBadge';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { ProfileStackParamList } from '../../navigation/ProfileStackNavigator';
+import { supabase } from '../../lib/supabase';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'Verification'>;
 
@@ -29,6 +30,22 @@ export function VerificationScreen({ navigation, route }: Props) {
   const [backgroundChecking, setBackgroundChecking] = useState(false);
   const [incomeVerifying, setIncomeVerifying] = useState(false);
   const [hostIdUploading, setHostIdUploading] = useState(false);
+
+  const syncVerificationToSupabase = async (verificationData: any) => {
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) return;
+      await supabase
+        .from('users')
+        .update({
+          verification: verificationData,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', authUser.id);
+    } catch (error) {
+      console.log('[Verification] Supabase sync failed:', error);
+    }
+  };
 
   const hostVerificationPaid = user?.purchases?.hostVerificationPaid === true;
   const hostVerificationBadge = user?.purchases?.hostVerificationBadge === true;
@@ -66,12 +83,14 @@ export function VerificationScreen({ navigation, route }: Props) {
       Alert.alert('Invalid Code', 'Please enter the verification code.');
       return;
     }
+    const newVerification = {
+      ...verification,
+      phone: { verified: true, verifiedAt: new Date() },
+    };
     await updateUser({
-      verification: {
-        ...verification,
-        phone: { verified: true, verifiedAt: new Date() },
-      },
+      verification: newVerification,
     });
+    await syncVerificationToSupabase(newVerification);
     setPhoneSent(false);
     setPhoneNumber('');
     setPhoneCode('');
@@ -81,12 +100,14 @@ export function VerificationScreen({ navigation, route }: Props) {
   const handleVerifyId = async () => {
     setIdUploading(true);
     setTimeout(async () => {
+      const newVerification = {
+        ...verification,
+        government_id: { verified: true, verifiedAt: new Date() },
+      };
       await updateUser({
-        verification: {
-          ...verification,
-          government_id: { verified: true, verifiedAt: new Date() },
-        },
+        verification: newVerification,
       });
+      await syncVerificationToSupabase(newVerification);
       setIdUploading(false);
       Alert.alert('ID Verified', 'Your government ID has been verified successfully.');
     }, 1500);
@@ -95,12 +116,14 @@ export function VerificationScreen({ navigation, route }: Props) {
   const handleVerifySocial = async (platform: 'instagram' | 'linkedin' | 'facebook') => {
     setSocialPlatform(platform);
     setTimeout(async () => {
+      const newVerification = {
+        ...verification,
+        social_media: { verified: true, verifiedAt: new Date(), platform },
+      };
       await updateUser({
-        verification: {
-          ...verification,
-          social_media: { verified: true, verifiedAt: new Date(), platform },
-        },
+        verification: newVerification,
       });
+      await syncVerificationToSupabase(newVerification);
       setSocialPlatform(null);
       Alert.alert('Social Media Verified', `Your ${platform.charAt(0).toUpperCase() + platform.slice(1)} account has been linked and verified.`);
     }, 1200);
@@ -118,12 +141,14 @@ export function VerificationScreen({ navigation, route }: Props) {
           onPress: async () => {
             setBackgroundChecking(true);
             setTimeout(async () => {
+              const newVerification = {
+                ...verification,
+                background_check: { verified: true, verifiedAt: new Date() },
+              };
               await updateUser({
-                verification: {
-                  ...verification,
-                  background_check: { verified: true, verifiedAt: new Date() },
-                },
+                verification: newVerification,
               });
+              await syncVerificationToSupabase(newVerification);
               setBackgroundChecking(false);
               Alert.alert('Background Verified', 'Your background check has been completed successfully.');
             }, 2000);
@@ -145,12 +170,14 @@ export function VerificationScreen({ navigation, route }: Props) {
           onPress: async () => {
             setIncomeVerifying(true);
             setTimeout(async () => {
+              const newVerification = {
+                ...verification,
+                income_verification: { verified: true, verifiedAt: new Date() },
+              };
               await updateUser({
-                verification: {
-                  ...verification,
-                  income_verification: { verified: true, verifiedAt: new Date() },
-                },
+                verification: newVerification,
               });
+              await syncVerificationToSupabase(newVerification);
               setIncomeVerifying(false);
               Alert.alert('Income Verified', 'Your income has been verified successfully.');
             }, 2000);

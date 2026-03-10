@@ -65,12 +65,20 @@ The app uses Supabase as the full backend:
 - `services/*.ts` — Service layer (profileService, discoverService, messageService, listingService, subscriptionService, boostService, superInterestService, groupService, notificationService, moderationService)
 - `supabase/migrations/001_schema.sql` — Database schema (run in Supabase SQL Editor)
 - `supabase/migrations/002_rls_policies.sql` — RLS policies (run in Supabase SQL Editor)
+- `supabase/migrations/003_auth_trigger.sql` — Auto-create users on signup trigger
+- `supabase/migrations/004_missing_columns.sql` — Additional columns for listings, groups, interest_cards, users
+- `supabase/migrations/005_missing_rls_policies.sql` — Missing RLS policies for UPDATE/INSERT operations
+- `supabase/functions/stripe-webhook/index.ts` — Stripe webhook handler (Supabase Edge Function)
 
 **Environment Variables:**
 - `EXPO_PUBLIC_SUPABASE_URL` — Supabase project URL
-- `EXPO_PUBLIC_SUPABASE_ANON_KEY` — Supabase anon public key (secret)
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY` — Supabase anon public key (secret, JWT format)
 
-**Hybrid Mode:** AuthContext uses Supabase Auth for login/register/logout with fallback to local AsyncStorage/mock data when Supabase is unreachable.
+**Data Pattern:** All screens attempt Supabase first, with StorageService fallback only on error (not on empty results). Coordinates are standardized to `{lat, lng}` format app-wide, with normalization at the read boundary.
+
+**Super Interests:** Consolidated to `interest_cards` table only (with `action: 'super_interest'`). The `super_interests` table exists but is no longer written to; `interest_cards` is the single source of truth.
+
+**Verification & Privacy:** Stored as JSONB columns (`verification`, `privacy_settings`) on the `users` table. Synced to Supabase on change.
 
 ## Authentication & Authorization
 

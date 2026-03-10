@@ -142,7 +142,7 @@ export const ExploreScreen = () => {
             hostName: l.host?.full_name || 'Host',
             existingRoommates: l.existing_roommates || [],
             availableDate: l.available_date ? new Date(l.available_date) : undefined,
-            coordinates: l.coordinates || undefined,
+            coordinates: l.coordinates ? (l.coordinates.lat !== undefined ? { lat: l.coordinates.lat, lng: l.coordinates.lng } : l.coordinates.latitude !== undefined ? { lat: l.coordinates.latitude, lng: l.coordinates.longitude } : undefined) : undefined,
           }));
           setProperties(mapped);
           setFilteredProperties(mapped);

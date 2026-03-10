@@ -17,7 +17,7 @@ export interface ListingData {
   is_active?: boolean;
   is_paused?: boolean;
   is_rented?: boolean;
-  coordinates?: { latitude: number; longitude: number };
+  coordinates?: { lat: number; lng: number };
 }
 
 export async function getListings(filters?: {

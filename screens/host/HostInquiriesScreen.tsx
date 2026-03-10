@@ -11,7 +11,7 @@ import { InterestCard, Conversation, Message } from '../../types/models';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { useNotificationContext } from '../../contexts/NotificationContext';
-import { getReceivedInterestCards } from '../../services/discoverService';
+import { getReceivedInterestCards, acceptInterestCard, rejectInterestCard } from '../../services/discoverService';
 
 type FilterStatus = 'all' | 'pending' | 'accepted' | 'passed';
 
@@ -88,13 +88,18 @@ export const HostInquiriesScreen = () => {
     }
     await useInquiryResponse();
 
-    await StorageService.updateInterestCard(card.id, {
-      status: 'accepted',
-      respondedAt: new Date().toISOString(),
-    });
+    const now = new Date();
+
+    try {
+      await acceptInterestCard(card.id, card.renterId);
+    } catch {
+      await StorageService.updateInterestCard(card.id, {
+        status: 'accepted',
+        respondedAt: now.toISOString(),
+      });
+    }
 
     const conversationId = `conv-interest-${card.id}`;
-    const now = new Date();
     const initialMessage: Message = {
       id: `msg-${Date.now()}`,
       senderId: 'system',
@@ -175,12 +180,17 @@ export const HostInquiriesScreen = () => {
     }
     await useInquiryResponse();
 
-    await StorageService.updateInterestCard(card.id, {
-      status: 'passed',
-      respondedAt: new Date().toISOString(),
-    });
-
     const now = new Date();
+
+    try {
+      await rejectInterestCard(card.id);
+    } catch {
+      await StorageService.updateInterestCard(card.id, {
+        status: 'passed',
+        respondedAt: now.toISOString(),
+      });
+    }
+
     await StorageService.addNotification({
       id: `notif-${Date.now()}-pass`,
       userId: card.renterId,

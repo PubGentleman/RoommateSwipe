@@ -21,7 +21,7 @@ export interface ProfileData {
   photos?: string[];
   private_bathroom?: boolean;
   bathrooms?: number;
-  coordinates?: { latitude: number; longitude: number };
+  coordinates?: { lat: number; lng: number };
 }
 
 export interface UserData {

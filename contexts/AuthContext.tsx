@@ -4,6 +4,7 @@ import { StorageService } from '../utils/storage';
 import { User, Notification } from '../types/models';
 import { supabase } from '../lib/supabase';
 import type { Session } from '@supabase/supabase-js';
+import { activateBoost as boostServiceActivateBoost, deactivateExpiredBoosts } from '../services/boostService';
 
 export type UserRole = 'renter' | 'host';
 
@@ -153,6 +154,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return updated;
   };
 
+  const normalizeCoordinates = (coords: any): { lat: number; lng: number } | undefined => {
+    if (!coords) return undefined;
+    if (typeof coords.lat === 'number' && typeof coords.lng === 'number') {
+      return { lat: coords.lat, lng: coords.lng };
+    }
+    if (typeof coords.latitude === 'number' && typeof coords.longitude === 'number') {
+      return { lat: coords.latitude, lng: coords.longitude };
+    }
+    return undefined;
+  };
+
   const mapSupabaseToUser = (supabaseUser: any, profile: any, subscription: any): User => {
     return {
       id: supabaseUser.id,
@@ -187,7 +199,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         neighborhood: supabaseUser.neighborhood,
         city: supabaseUser.city,
         state: supabaseUser.state,
-        coordinates: profile.coordinates,
+        coordinates: normalizeCoordinates(profile.coordinates),
         occupation: supabaseUser.occupation,
         interests: profile.interests,
         gender: supabaseUser.gender,
@@ -216,6 +228,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       },
       messageCount: 0,
       photos: profile?.photos || [],
+      verification: supabaseUser.verification || undefined,
+      privacySettings: supabaseUser.privacy_settings || undefined,
     };
   };
 
@@ -795,6 +809,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await StorageService.setCurrentUser(updatedUser);
     await StorageService.addOrUpdateUser(updatedUser);
     setUser(updatedUser);
+
+    try {
+      await boostServiceActivateBoost(durationHours);
+      console.log('[Auth] Boost synced to Supabase');
+    } catch (err) {
+      console.log('[Auth] Supabase boost sync failed, local state updated:', err);
+    }
     
     return { success: true, message: `Boost activated! Your profile will be prioritized for ${durationHours} hours.` };
   };
@@ -845,6 +866,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await StorageService.setCurrentUser(updatedUser);
         await StorageService.addOrUpdateUser(updatedUser);
         setUser(updatedUser);
+
+        try {
+          await deactivateExpiredBoosts();
+          console.log('[Auth] Expired boosts deactivated in Supabase');
+        } catch (err) {
+          console.log('[Auth] Supabase deactivate expired boosts failed:', err);
+        }
       }
     }
   };

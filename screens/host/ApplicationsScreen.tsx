@@ -10,6 +10,7 @@ import { StorageService } from '../../utils/storage';
 import { Application, Property } from '../../types/models';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
+import { getInterestCardsForHost, updateInterestCardStatus } from '../../services/discoverService';
 
 type FilterStatus = 'all' | 'pending' | 'approved' | 'rejected';
 
@@ -22,6 +23,32 @@ export const ApplicationsScreen = () => {
 
   const loadApplications = useCallback(async () => {
     if (!user) return;
+    try {
+      const supabaseCards = await getInterestCardsForHost();
+      if (supabaseCards) {
+        const mappedApps: Application[] = supabaseCards.map((card: any) => ({
+          id: card.id,
+          propertyId: card.listing_id || '',
+          propertyTitle: card.listing_title || 'Roommate Match',
+          applicantId: card.sender_id,
+          applicantName: card.sender?.full_name || 'Unknown',
+          applicantPhoto: card.sender?.avatar_url || '',
+          status: card.status === 'accepted' ? 'approved' : card.status === 'passed' ? 'rejected' : 'pending',
+          message: card.personal_note || '',
+          submittedDate: new Date(card.created_at),
+          notes: '',
+        }));
+        setApplications(mappedApps);
+        const notesMap: Record<string, string> = {};
+        mappedApps.forEach((a: Application) => {
+          if (a.notes) notesMap[a.id] = a.notes;
+        });
+        setEditingNotes(notesMap);
+        return;
+      }
+    } catch (error) {
+      console.log('[Applications] Supabase fetch failed, falling back to StorageService:', error);
+    }
     await StorageService.initializeWithMockData();
     await StorageService.assignPropertiesToHost(user.id, user.name);
     const allProperties = await StorageService.getProperties();
@@ -53,6 +80,12 @@ export const ApplicationsScreen = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const app = applications.find(a => a.id === appId);
     if (!app) return;
+    try {
+      const supabaseStatus = status === 'approved' ? 'accepted' : 'passed';
+      await updateInterestCardStatus(appId, supabaseStatus);
+    } catch (error) {
+      console.log('[Applications] Supabase status update failed, using StorageService:', error);
+    }
     const updated = { ...app, status };
     await StorageService.addOrUpdateApplication(updated);
     setApplications(prev => prev.map(a => a.id === appId ? updated : a));

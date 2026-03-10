@@ -142,6 +142,52 @@ export async function getReceivedInterestCards() {
   return data || [];
 }
 
+export async function acceptInterestCard(cardId: string, senderId: string) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const now = new Date().toISOString();
+
+  const { error: updateError } = await supabase
+    .from('interest_cards')
+    .update({ status: 'accepted', responded_at: now })
+    .eq('id', cardId);
+
+  if (updateError) throw updateError;
+
+  const userId1 = user.id < senderId ? user.id : senderId;
+  const userId2 = user.id < senderId ? senderId : user.id;
+
+  const { data: match, error: matchError } = await supabase
+    .from('matches')
+    .upsert({
+      user_id_1: userId1,
+      user_id_2: userId2,
+      match_type: 'mutual',
+      status: 'matched',
+    }, { onConflict: 'user_id_1,user_id_2' })
+    .select()
+    .single();
+
+  if (matchError) throw matchError;
+
+  return { match };
+}
+
+export async function rejectInterestCard(cardId: string) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const now = new Date().toISOString();
+
+  const { error } = await supabase
+    .from('interest_cards')
+    .update({ status: 'passed', responded_at: now })
+    .eq('id', cardId);
+
+  if (error) throw error;
+}
+
 async function incrementUsage(field: string) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
@@ -181,4 +227,44 @@ export async function getUsage() {
     .single();
 
   return data;
+}
+
+export async function getSentInterestCards() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data } = await supabase
+    .from('interest_cards')
+    .select('*, recipient:users!recipient_id(id, full_name, avatar_url, age, occupation, city)')
+    .eq('sender_id', user.id)
+    .in('action', ['like', 'super_interest'])
+    .order('created_at', { ascending: false });
+
+  return data || [];
+}
+
+export async function updateInterestCardStatus(cardId: string, status: 'accepted' | 'passed') {
+  const { data, error } = await supabase
+    .from('interest_cards')
+    .update({ status, responded_at: new Date().toISOString() })
+    .eq('id', cardId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function getInterestCardsForHost() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data } = await supabase
+    .from('interest_cards')
+    .select('*, sender:users!sender_id(id, full_name, avatar_url, age, occupation, city)')
+    .eq('recipient_id', user.id)
+    .in('action', ['like', 'super_interest'])
+    .order('created_at', { ascending: false });
+
+  return data || [];
 }

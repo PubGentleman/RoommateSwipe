@@ -10,6 +10,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
 import { Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { StorageService } from '../../utils/storage';
+import { supabase } from '../../lib/supabase';
 
 type PrivacySecurityScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'PrivacySecurity'>;
 
@@ -54,6 +55,19 @@ export const PrivacySecurityScreen = () => {
     await updateUser({
       privacySettings: updatedSettings,
     });
+
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({
+          privacy_settings: updatedSettings,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', user.id);
+      if (error) throw error;
+    } catch (error) {
+      console.log('[PrivacySecurity] Supabase privacy sync failed:', error);
+    }
   };
 
   const handleChangePassword = async () => {
@@ -105,6 +119,16 @@ export const PrivacySecurityScreen = () => {
     if (!user) return;
 
     setShowDeleteModal(false);
+
+    try {
+      await supabase.from('profiles').delete().eq('user_id', user.id);
+      await supabase.from('subscriptions').delete().eq('user_id', user.id);
+      await supabase.from('usage_tracking').delete().eq('user_id', user.id);
+      await supabase.from('notifications').delete().eq('user_id', user.id);
+      await supabase.from('users').delete().eq('id', user.id);
+    } catch (error) {
+      console.log('[PrivacySecurity] Supabase delete failed, continuing with local cleanup:', error);
+    }
 
     await StorageService.deleteUser(user.id);
 

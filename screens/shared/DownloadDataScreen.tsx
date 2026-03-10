@@ -8,54 +8,130 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { StorageService } from '../../utils/storage';
 import type { Conversation, Message, Match, Group, Property, Notification } from '../../types/models';
+import { supabase } from '../../lib/supabase';
 
 export const DownloadDataScreen = () => {
   const { theme } = useTheme();
   const { user } = useAuth();
   const [isGenerating, setIsGenerating] = useState(false);
 
+  const fetchFromSupabase = async () => {
+    const userId = user?.id;
+    if (!userId) return null;
+
+    const [
+      { data: userData },
+      { data: profileData },
+      { data: matchesData },
+      { data: messagesData },
+      { data: groupsData },
+      { data: notificationsData },
+      { data: listingsData },
+      { data: interestCardsData },
+    ] = await Promise.all([
+      supabase.from('users').select('*').eq('id', userId).single(),
+      supabase.from('profiles').select('*').eq('user_id', userId).single(),
+      supabase.from('matches').select('*').or(`user_id_1.eq.${userId},user_id_2.eq.${userId}`),
+      supabase.from('messages').select('*').eq('sender_id', userId),
+      supabase.from('group_members').select('group_id').eq('user_id', userId).then(async ({ data: memberships }) => {
+        if (!memberships || memberships.length === 0) return { data: [] };
+        const ids = memberships.map(m => m.group_id);
+        return supabase.from('groups').select('*').in('id', ids);
+      }),
+      supabase.from('notifications').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(100),
+      supabase.from('listings').select('*').eq('host_id', userId),
+      supabase.from('interest_cards').select('*').or(`sender_id.eq.${userId},recipient_id.eq.${userId}`),
+    ]);
+
+    return {
+      user: userData,
+      profile: profileData,
+      matches: matchesData || [],
+      messages: messagesData || [],
+      groups: groupsData || [],
+      notifications: notificationsData || [],
+      listings: listingsData || [],
+      interestCards: interestCardsData || [],
+    };
+  };
+
   const handleDownloadData = async () => {
     setIsGenerating(true);
     
     try {
-      const [conversations, matches, groups, properties, notifications] = await Promise.all([
-        StorageService.getConversations(),
-        StorageService.getMatches(),
-        StorageService.getGroups(),
-        StorageService.getProperties(),
-        StorageService.getNotifications(user?.id || ''),
-      ]);
-      
-      const exportData = {
-        exportDate: new Date().toISOString(),
-        userData: {
-          id: user?.id,
-          email: user?.email,
-          name: user?.name,
-          role: user?.role,
-          subscription: user?.subscription,
-          profileData: user?.profileData,
-          boostData: user?.boostData,
-          rewindData: user?.rewindData,
-        },
-        conversations: conversations || [],
-        matches: matches?.filter((m: Match) => 
-          m.userId1 === user?.id || m.userId2 === user?.id
-        ) || [],
-        groups: groups || [],
-        properties: properties?.filter((p: Property) => 
-          p.hostId === user?.id
-        ) || [],
-        notifications: notifications?.filter((n: Notification) => 
-          n.userId === user?.id
-        ) || [],
-      };
+      let exportData: any;
+
+      try {
+        const supabaseData = await fetchFromSupabase();
+        if (supabaseData && supabaseData.user) {
+          exportData = {
+            exportDate: new Date().toISOString(),
+            userData: {
+              id: supabaseData.user.id,
+              email: supabaseData.user.email,
+              name: supabaseData.user.full_name,
+              role: supabaseData.user.role,
+            },
+            profile: supabaseData.profile || {},
+            matches: supabaseData.matches,
+            messages: supabaseData.messages,
+            groups: supabaseData.groups,
+            notifications: supabaseData.notifications,
+            listings: supabaseData.listings,
+            interestCards: supabaseData.interestCards,
+          };
+        }
+      } catch (supabaseError) {
+        console.log('[DownloadData] Supabase fetch failed, falling back to StorageService:', supabaseError);
+      }
+
+      if (!exportData) {
+        const [conversations, matches, groups, properties, notifications] = await Promise.all([
+          StorageService.getConversations(),
+          StorageService.getMatches(),
+          StorageService.getGroups(),
+          StorageService.getProperties(),
+          StorageService.getNotifications(user?.id || ''),
+        ]);
+
+        exportData = {
+          exportDate: new Date().toISOString(),
+          userData: {
+            id: user?.id,
+            email: user?.email,
+            name: user?.name,
+            role: user?.role,
+            subscription: user?.subscription,
+            profileData: user?.profileData,
+            boostData: user?.boostData,
+            rewindData: user?.rewindData,
+          },
+          conversations: conversations || [],
+          matches: matches?.filter((m: Match) => 
+            m.userId1 === user?.id || m.userId2 === user?.id
+          ) || [],
+          groups: groups || [],
+          properties: properties?.filter((p: Property) => 
+            p.hostId === user?.id
+          ) || [],
+          notifications: notifications?.filter((n: Notification) => 
+            n.userId === user?.id
+          ) || [],
+        };
+      }
 
       const dataString = JSON.stringify(exportData, null, 2);
+      const itemCounts = {
+        conversations: exportData.conversations?.length || 0,
+        matches: exportData.matches?.length || 0,
+        groups: exportData.groups?.length || 0,
+        properties: exportData.properties?.length || exportData.listings?.length || 0,
+        notifications: exportData.notifications?.length || 0,
+      };
       
       Alert.alert(
         'Data Export Ready',
-        `Your data has been prepared (${Math.round(dataString.length / 1024)}KB). In a production app, this would be downloaded as a JSON file.\n\nIncludes:\n• Profile information\n• Conversations (${exportData.conversations.length})\n• Matches (${exportData.matches.length})\n• Groups (${exportData.groups.length})\n• Properties (${exportData.properties.length})\n• Notifications (${exportData.notifications.length})`,
+        `Your data has been prepared (${Math.round(dataString.length / 1024)}KB). In a production app, this would be downloaded as a JSON file.\n\nIncludes:\n• Profile information\n• Matches (${itemCounts.matches})\n• Groups (${itemCounts.groups})\n• Properties (${itemCounts.properties})\n• Notifications (${itemCounts.notifications})`,
         [
           {
             text: 'OK',
@@ -66,11 +142,7 @@ export const DownloadDataScreen = () => {
       
       console.log('[DownloadData] Export prepared:', {
         size: dataString.length,
-        conversations: exportData.conversations.length,
-        matches: exportData.matches.length,
-        groups: exportData.groups.length,
-        properties: exportData.properties.length,
-        notifications: exportData.notifications.length,
+        ...itemCounts,
       });
       
     } catch (error) {

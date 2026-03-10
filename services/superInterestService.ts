@@ -4,14 +4,6 @@ export async function sendSuperInterest(recipientId: string) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
-  const { data: si, error: siError } = await supabase
-    .from('super_interests')
-    .insert({ sender_id: user.id, recipient_id: recipientId })
-    .select()
-    .single();
-
-  if (siError) throw siError;
-
   const { data: ic, error: icError } = await supabase
     .from('interest_cards')
     .insert({ sender_id: user.id, recipient_id: recipientId, action: 'super_interest' })
@@ -39,7 +31,7 @@ export async function sendSuperInterest(recipientId: string) {
     .eq('status', 'matched')
     .single();
 
-  return { superInterest: si, interestCard: ic, match };
+  return { interestCard: ic, match };
 }
 
 export async function getSuperInterestsSentThisMonth() {
@@ -51,9 +43,10 @@ export async function getSuperInterestsSentThisMonth() {
   monthStart.setHours(0, 0, 0, 0);
 
   const { count } = await supabase
-    .from('super_interests')
+    .from('interest_cards')
     .select('*', { count: 'exact', head: true })
     .eq('sender_id', user.id)
+    .eq('action', 'super_interest')
     .gte('created_at', monthStart.toISOString());
 
   return count || 0;
@@ -64,9 +57,10 @@ export async function getReceivedSuperInterests() {
   if (!user) return [];
 
   const { data } = await supabase
-    .from('super_interests')
+    .from('interest_cards')
     .select('*, sender:users!sender_id(id, full_name, avatar_url, age, occupation, city)')
     .eq('recipient_id', user.id)
+    .eq('action', 'super_interest')
     .order('created_at', { ascending: false });
 
   return data || [];

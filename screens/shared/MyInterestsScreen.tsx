@@ -8,6 +8,7 @@ import { StorageService } from '../../utils/storage';
 import { InterestCard } from '../../types/models';
 import { PaywallSheet } from '../../components/PaywallSheet';
 import { useNotificationContext } from '../../contexts/NotificationContext';
+import { getSentInterestCards, getReceivedInterestCards, sendLike } from '../../services/discoverService';
 
 type TabType = 'sent' | 'received';
 
@@ -28,6 +29,64 @@ export const MyInterestsScreen = () => {
   const loadInterests = useCallback(async () => {
     if (!user) return;
     setLoading(true);
+    try {
+      const [supabaseSent, supabaseReceived] = await Promise.all([
+        getSentInterestCards(),
+        getReceivedInterestCards(),
+      ]);
+
+      if (supabaseSent.length > 0 || supabaseReceived.length > 0) {
+        const mappedSent: InterestCard[] = supabaseSent.map((card: any) => ({
+          id: card.id,
+          propertyId: card.listing_id || '',
+          propertyTitle: card.listing_title || 'Roommate Match',
+          hostId: card.recipient_id,
+          hostName: card.recipient?.full_name || '',
+          renterId: card.sender_id,
+          renterName: user.name,
+          renterPhoto: user.profilePicture,
+          status: card.status || 'pending',
+          isSuperInterest: card.action === 'super_interest',
+          compatibilityScore: card.compatibility_score || 0,
+          budgetRange: card.budget_range || '',
+          moveInDate: card.move_in_date || '',
+          lifestyleTags: card.lifestyle_tags || [],
+          personalNote: card.personal_note || '',
+          createdAt: card.created_at,
+          respondedAt: card.responded_at,
+        }));
+
+        const mappedReceived: InterestCard[] = supabaseReceived.map((card: any) => ({
+          id: card.id,
+          propertyId: card.listing_id || '',
+          propertyTitle: card.listing_title || 'Roommate Match',
+          hostId: card.recipient_id,
+          hostName: user.name,
+          renterId: card.sender_id,
+          renterName: card.sender?.full_name || '',
+          renterPhoto: card.sender?.avatar_url || '',
+          status: card.status || 'pending',
+          isSuperInterest: card.action === 'super_interest',
+          compatibilityScore: card.compatibility_score || 0,
+          budgetRange: card.budget_range || '',
+          moveInDate: card.move_in_date || '',
+          lifestyleTags: card.lifestyle_tags || [],
+          personalNote: card.personal_note || '',
+          createdAt: card.created_at,
+          respondedAt: card.responded_at,
+        }));
+
+        mappedSent.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        setInterests(mappedSent);
+        mappedReceived.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        setReceivedInterests(mappedReceived);
+        setLoading(false);
+        return;
+      }
+    } catch (error) {
+      console.log('[MyInterests] Supabase fetch failed, falling back to StorageService:', error);
+    }
+
     const expired = await StorageService.expireOldInterestCards();
     if (expired.length > 0) {
       for (const card of expired) {
@@ -114,6 +173,11 @@ export const MyInterestsScreen = () => {
     if (!limitCheck.canSend) {
       Alert.alert('Daily Limit Reached', limitCheck.reason || 'Upgrade to send more interest cards.', [{ text: 'OK' }]);
       return;
+    }
+    try {
+      await sendLike(card.hostId);
+    } catch (error) {
+      console.log('[MyInterests] Supabase resend failed, using StorageService:', error);
     }
     const newCard: InterestCard = {
       ...card,
