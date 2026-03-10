@@ -9,7 +9,6 @@ import { Typography, Spacing } from '../../constants/theme';
 import { getVerificationLevel, getVerificationLabel } from '../../components/VerificationBadge';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { ProfileStackParamList } from '../../navigation/ProfileStackNavigator';
-import { supabase } from '../../lib/supabase';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'Verification'>;
 
@@ -32,19 +31,7 @@ export function VerificationScreen({ navigation, route }: Props) {
   const [hostIdUploading, setHostIdUploading] = useState(false);
 
   const syncVerificationToSupabase = async (verificationData: any) => {
-    try {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) return;
-      await supabase
-        .from('users')
-        .update({
-          verification: verificationData,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', authUser.id);
-    } catch (error) {
-      console.log('[Verification] Supabase sync failed:', error);
-    }
+    await updateUser({ verification: verificationData });
   };
 
   const hostVerificationPaid = user?.purchases?.hostVerificationPaid === true;

@@ -55,19 +55,6 @@ export const PrivacySecurityScreen = () => {
     await updateUser({
       privacySettings: updatedSettings,
     });
-
-    try {
-      const { error } = await supabase
-        .from('users')
-        .update({
-          privacy_settings: updatedSettings,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', user.id);
-      if (error) throw error;
-    } catch (error) {
-      console.log('[PrivacySecurity] Supabase privacy sync failed:', error);
-    }
   };
 
   const handleChangePassword = async () => {

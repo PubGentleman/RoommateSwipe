@@ -688,6 +688,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     
     setUser(updatedUser);
+
+    const supabaseFields: Record<string, any> = {};
+    if (updates.verification !== undefined) supabaseFields.verification = updates.verification;
+    if (updates.privacySettings !== undefined) supabaseFields.privacy_settings = updates.privacySettings;
+    if (updates.name !== undefined) supabaseFields.full_name = updates.name;
+    if (updates.profilePicture !== undefined) supabaseFields.avatar_url = updates.profilePicture;
+    if (updates.profileData?.bio !== undefined) supabaseFields.bio = updates.profileData.bio;
+    if (updates.profileData?.occupation !== undefined) supabaseFields.occupation = updates.profileData.occupation;
+    if (updates.profileData?.location !== undefined) supabaseFields.location = updates.profileData.location;
+    if (updates.profileData?.neighborhood !== undefined) supabaseFields.neighborhood = updates.profileData.neighborhood;
+    if (updates.profileData?.city !== undefined) supabaseFields.city = updates.profileData.city;
+    if (updates.profileData?.state !== undefined) supabaseFields.state = updates.profileData.state;
+    if (updates.age !== undefined) supabaseFields.age = updates.age;
+    if (updates.birthday !== undefined) supabaseFields.birthday = updates.birthday;
+    if (updates.zodiacSign !== undefined) supabaseFields.zodiac_sign = updates.zodiacSign;
+    if (updates.gender !== undefined) supabaseFields.gender = updates.gender;
+
+    if (Object.keys(supabaseFields).length > 0) {
+      supabaseFields.updated_at = new Date().toISOString();
+      try {
+        const { error } = await supabase
+          .from('users')
+          .update(supabaseFields)
+          .eq('id', user.id);
+        if (error) {
+          console.log('[Auth] Supabase user sync failed:', error.message);
+        } else {
+          console.log('[Auth] Synced to Supabase:', Object.keys(supabaseFields).join(', '));
+        }
+      } catch (err) {
+        console.log('[Auth] Supabase user sync error:', err);
+      }
+    }
   };
 
   const incrementMessageCount = async () => {

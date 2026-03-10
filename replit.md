@@ -78,7 +78,7 @@ The app uses Supabase as the full backend:
 
 **Super Interests:** Consolidated to `interest_cards` table only (with `action: 'super_interest'`). The `super_interests` table exists but is no longer written to; `interest_cards` is the single source of truth.
 
-**Verification & Privacy:** Stored as JSONB columns (`verification`, `privacy_settings`) on the `users` table. Synced to Supabase on change.
+**Verification & Privacy:** Stored as JSONB columns (`verification`, `privacy_settings`) on the `users` table. Synced to Supabase automatically via centralized `updateUser()` in AuthContext — screens should not write to the `users` table directly.
 
 ## Authentication & Authorization
 
