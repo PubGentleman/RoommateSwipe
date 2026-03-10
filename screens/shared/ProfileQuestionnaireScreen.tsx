@@ -147,7 +147,7 @@ export const ProfileQuestionnaireScreen = () => {
   const [birthdayError, setBirthdayError] = useState('');
   const [bio, setBio] = useState(user?.profileData?.bio || '');
   const [budget, setBudget] = useState(user?.profileData?.budget?.toString() || '');
-  const [lookingFor, setLookingFor] = useState<'room' | 'entire_apartment'>(user?.profileData?.lookingFor || 'room');
+  const [lookingFor, setLookingFor] = useState<'room' | 'entire_apartment' | undefined>(user?.profileData?.lookingFor);
   const [location, setLocation] = useState(user?.profileData?.location || '');
   const [selectedState, setSelectedState] = useState(user?.profileData?.state || '');
   const [selectedCity, setSelectedCity] = useState(user?.profileData?.city || '');
@@ -155,19 +155,19 @@ export const ProfileQuestionnaireScreen = () => {
   const [occupation, setOccupation] = useState(user?.profileData?.occupation || '');
   const [interests, setInterests] = useState(user?.profileData?.interests || '');
   const [gender, setGender] = useState<'male' | 'female' | 'other' | undefined>(user?.profileData?.gender);
-  const [sleepSchedule, setSleepSchedule] = useState<'early_sleeper' | 'late_sleeper' | 'flexible' | 'irregular'>(user?.profileData?.preferences?.sleepSchedule || 'flexible');
-  const [cleanliness, setCleanliness] = useState<'very_tidy' | 'moderately_tidy' | 'relaxed'>(user?.profileData?.preferences?.cleanliness || 'moderately_tidy');
-  const [guestPolicy, setGuestPolicy] = useState<'rarely' | 'occasionally' | 'frequently' | 'prefer_no_guests'>(user?.profileData?.preferences?.guestPolicy || 'occasionally');
-  const [noiseTolerance, setNoiseTolerance] = useState<'prefer_quiet' | 'normal_noise' | 'loud_environments'>(user?.profileData?.preferences?.noiseTolerance || 'normal_noise');
-  const [smoking, setSmoking] = useState<'yes' | 'no' | 'only_outside'>(user?.profileData?.preferences?.smoking || 'no');
-  const [workLocation, setWorkLocation] = useState<'wfh_fulltime' | 'hybrid' | 'office_fulltime' | 'irregular'>(user?.profileData?.preferences?.workLocation || 'hybrid');
-  const [roommateRelationship, setRoommateRelationship] = useState<'respectful_coliving' | 'occasional_hangouts' | 'prefer_friends' | 'minimal_interaction'>(user?.profileData?.preferences?.roommateRelationship || 'respectful_coliving');
-  const [pets, setPets] = useState<'have_pets' | 'open_to_pets' | 'no_pets'>(user?.profileData?.preferences?.pets || 'open_to_pets');
+  const [sleepSchedule, setSleepSchedule] = useState<'early_sleeper' | 'late_sleeper' | 'flexible' | 'irregular' | undefined>(user?.profileData?.preferences?.sleepSchedule);
+  const [cleanliness, setCleanliness] = useState<'very_tidy' | 'moderately_tidy' | 'relaxed' | undefined>(user?.profileData?.preferences?.cleanliness);
+  const [guestPolicy, setGuestPolicy] = useState<'rarely' | 'occasionally' | 'frequently' | 'prefer_no_guests' | undefined>(user?.profileData?.preferences?.guestPolicy);
+  const [noiseTolerance, setNoiseTolerance] = useState<'prefer_quiet' | 'normal_noise' | 'loud_environments' | undefined>(user?.profileData?.preferences?.noiseTolerance);
+  const [smoking, setSmoking] = useState<'yes' | 'no' | 'only_outside' | undefined>(user?.profileData?.preferences?.smoking);
+  const [workLocation, setWorkLocation] = useState<'wfh_fulltime' | 'hybrid' | 'office_fulltime' | 'irregular' | undefined>(user?.profileData?.preferences?.workLocation);
+  const [roommateRelationship, setRoommateRelationship] = useState<'respectful_coliving' | 'occasional_hangouts' | 'prefer_friends' | 'minimal_interaction' | undefined>(user?.profileData?.preferences?.roommateRelationship);
+  const [pets, setPets] = useState<'have_pets' | 'open_to_pets' | 'no_pets' | undefined>(user?.profileData?.preferences?.pets);
   const [lifestyle, setLifestyle] = useState<Array<'active_gym' | 'homebody' | 'nightlife_social' | 'quiet_introverted' | 'creative_artistic' | 'professional_focused'>>(user?.profileData?.preferences?.lifestyle || []);
-  const [expenseUtilities, setExpenseUtilities] = useState<'split_equally' | 'usage_based' | 'included_in_rent'>(user?.profileData?.preferences?.sharedExpenses?.utilities || 'split_equally');
-  const [expenseGroceries, setExpenseGroceries] = useState<'split_equally' | 'buy_own' | 'shared_basics'>(user?.profileData?.preferences?.sharedExpenses?.groceries || 'buy_own');
-  const [expenseInternet, setExpenseInternet] = useState<'split_equally' | 'one_pays' | 'included_in_rent'>(user?.profileData?.preferences?.sharedExpenses?.internet || 'split_equally');
-  const [expenseCleaning, setExpenseCleaning] = useState<'split_equally' | 'take_turns' | 'hire_cleaner'>(user?.profileData?.preferences?.sharedExpenses?.cleaning || 'split_equally');
+  const [expenseUtilities, setExpenseUtilities] = useState<'split_equally' | 'usage_based' | 'included_in_rent' | undefined>(user?.profileData?.preferences?.sharedExpenses?.utilities);
+  const [expenseGroceries, setExpenseGroceries] = useState<'split_equally' | 'buy_own' | 'shared_basics' | undefined>(user?.profileData?.preferences?.sharedExpenses?.groceries);
+  const [expenseInternet, setExpenseInternet] = useState<'split_equally' | 'one_pays' | 'included_in_rent' | undefined>(user?.profileData?.preferences?.sharedExpenses?.internet);
+  const [expenseCleaning, setExpenseCleaning] = useState<'split_equally' | 'take_turns' | 'hire_cleaner' | undefined>(user?.profileData?.preferences?.sharedExpenses?.cleaning);
   const [moveInDate, setMoveInDate] = useState(() => {
     const raw = user?.profileData?.preferences?.moveInDate || '';
     if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
@@ -293,20 +293,29 @@ export const ProfileQuestionnaireScreen = () => {
         if (!bio.trim()) { Alert.alert('Required', 'Please write a short bio'); return false; }
         return true;
       case 'sleepSchedule':
+        if (!sleepSchedule) { Alert.alert('Required', 'Please select your sleep schedule'); return false; }
         return true;
       case 'cleanliness':
+        if (!cleanliness) { Alert.alert('Required', 'Please select your cleanliness level'); return false; }
         return true;
       case 'smoking':
+        if (!smoking) { Alert.alert('Required', 'Please select your smoking preference'); return false; }
         return true;
       case 'social':
+        if (!guestPolicy) { Alert.alert('Required', 'Please select your guest policy'); return false; }
+        if (!roommateRelationship) { Alert.alert('Required', 'Please select your roommate relationship preference'); return false; }
         return true;
       case 'noiseTolerance':
+        if (!noiseTolerance) { Alert.alert('Required', 'Please select your noise tolerance'); return false; }
         return true;
       case 'workPets':
+        if (!workLocation) { Alert.alert('Required', 'Please select your work location'); return false; }
+        if (!pets) { Alert.alert('Required', 'Please select your pet preference'); return false; }
         return true;
       case 'housing':
         if (!budget.trim()) { Alert.alert('Required', 'Please enter your monthly budget'); return false; }
         if (isNaN(parseInt(budget)) || parseInt(budget) <= 0) { Alert.alert('Error', 'Please enter a valid budget amount'); return false; }
+        if (!lookingFor) { Alert.alert('Required', 'Please select what you are looking for'); return false; }
         if (!moveInDate.trim()) { Alert.alert('Required', 'Please enter your move-in date'); return false; }
         if (!/^\d{2}\/\d{2}\/\d{4}$/.test(moveInDate)) { Alert.alert('Error', 'Please enter a valid date (MM/DD/YYYY)'); return false; }
         if (!bedrooms.trim()) { Alert.alert('Required', 'Please enter the number of bedrooms'); return false; }
@@ -319,6 +328,10 @@ export const ProfileQuestionnaireScreen = () => {
         if (lifestyle.length === 0) { Alert.alert('Required', 'Please select at least one lifestyle choice'); return false; }
         return true;
       case 'expenses':
+        if (!expenseUtilities) { Alert.alert('Required', 'Please select how to split utilities'); return false; }
+        if (!expenseGroceries) { Alert.alert('Required', 'Please select how to handle groceries'); return false; }
+        if (!expenseInternet) { Alert.alert('Required', 'Please select how to handle internet'); return false; }
+        if (!expenseCleaning) { Alert.alert('Required', 'Please select how to handle cleaning'); return false; }
         return true;
       default:
         return true;
