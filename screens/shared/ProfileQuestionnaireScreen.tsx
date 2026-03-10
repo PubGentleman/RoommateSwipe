@@ -318,6 +318,14 @@ export const ProfileQuestionnaireScreen = () => {
         if (!lookingFor) { Alert.alert('Required', 'Please select what you are looking for'); return false; }
         if (!moveInDate.trim()) { Alert.alert('Required', 'Please enter your move-in date'); return false; }
         if (!/^\d{2}\/\d{2}\/\d{4}$/.test(moveInDate)) { Alert.alert('Error', 'Please enter a valid date (MM/DD/YYYY)'); return false; }
+        {
+          const [mm, dd, yyyy] = moveInDate.split('/').map(Number);
+          const entered = new Date(yyyy, mm - 1, dd);
+          const today = new Date(); today.setHours(0, 0, 0, 0);
+          if (entered < today) { Alert.alert('Error', 'Move-in date cannot be in the past'); return false; }
+          const maxDate = new Date(today); maxDate.setMonth(maxDate.getMonth() + 3);
+          if (entered > maxDate) { Alert.alert('Error', 'Move-in date cannot be more than 3 months from today'); return false; }
+        }
         if (!bedrooms.trim()) { Alert.alert('Required', 'Please enter the number of bedrooms'); return false; }
         if (isNaN(parseInt(bedrooms)) || parseInt(bedrooms) <= 0) { Alert.alert('Error', 'Please enter a valid number of bedrooms'); return false; }
         if (!bathrooms.trim()) { Alert.alert('Required', 'Please enter the number of bathrooms'); return false; }
