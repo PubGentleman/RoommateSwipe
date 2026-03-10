@@ -8,7 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { RoomdrLogo } from '../../components/RoomdrLogo';
 
 export const LoginScreen = () => {
-  const { login, register } = useAuth();
+  const { login, register, resetPassword } = useAuth();
   const insets = useSafeAreaInsets();
   const [isSignUp, setIsSignUp] = useState(false);
   const [name, setName] = useState('');
@@ -179,7 +179,18 @@ export const LoginScreen = () => {
 
           {!isSignUp ? (
             <View style={styles.forgotRow}>
-              <Pressable hitSlop={8} onPress={() => Alert.alert('Reset Password', 'A password reset link has been sent to your email address.', [{ text: 'OK' }])}>
+              <Pressable hitSlop={8} onPress={async () => {
+                if (!email.trim()) {
+                  Alert.alert('Enter Email', 'Please enter your email address first, then tap Forgot Password.');
+                  return;
+                }
+                try {
+                  await resetPassword(email.trim());
+                  Alert.alert('Check Your Email', 'A password reset link has been sent to your email address.');
+                } catch (err: any) {
+                  Alert.alert('Error', err.message || 'Failed to send reset email. Please try again.');
+                }
+              }}>
                 <Text style={styles.forgotText}>Forgot password?</Text>
               </Pressable>
             </View>

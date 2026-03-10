@@ -79,8 +79,7 @@ export const ProfileViewsScreen = () => {
     <Pressable
       style={[styles.viewItem, { backgroundColor: '#1a1a1a', borderColor: '#333333' }]}
       onPress={() => {
-        // TODO: Navigate to viewer's profile
-        console.log('[ProfileViewsScreen] View profile:', item.viewerId);
+        (navigation as any).navigate('Roommates');
       }}
     >
       {item.viewerPhoto ? (
