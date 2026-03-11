@@ -24,7 +24,7 @@ Preferred communication style: Simple, everyday language.
 
 ## Core Functionality
 
-Roomdr implements a points-based compatibility algorithm (0-100 score) using 14 weighted factors, including location, budget, interest tag overlap, and conflicting lifestyle penalties. A sophisticated interest tag system allows users to select 3-10 tags from predefined categories, which are used in the matching algorithm and displayed on user profiles.
+Roomdr implements a points-based compatibility algorithm (0-100 score) using 15 weighted factors, including age (8 pts - primary factor), location (16 pts), budget (12 pts), sleep schedule (12 pts), cleanliness (12 pts), smoking (10 pts), move-in timeline (4 pts), work location (6 pts), guest policy (6 pts), noise tolerance (4 pts), pets (4 pts), roommate relationship (2 pts), shared expenses (2 pts), interest tag overlap (2 pts), and zodiac sign (2 pts). A sophisticated interest tag system allows users to select 3-10 tags from predefined categories, which are used in the matching algorithm and displayed on user profiles.
 
 ## Frontend Architecture
 

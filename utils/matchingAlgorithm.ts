@@ -44,29 +44,31 @@ export const formatLocation = (location: {
  * Uses ALL profile data with weighted scoring (Total: 100 points):
  * 
  * HIGH PRIORITY (Deal-breakers & Critical Factors):
+ * 0. Age: 8 points - Similar life stage strongly predicts roommate success
  * 1. Location: 16 points - Geographic compatibility (same/close neighborhoods prioritized)
  * 2. Budget: 12 points - Financial alignment (realistic matches)
  * 3. Sleep Schedule: 12 points - #1 reported conflict factor
  * 4. Cleanliness: 12 points - 40% of roommate issues
  * 5. Smoking/Substances: 10 points - Major deal-breaker
- * 6. Move-in Timeline: 6 points - Penalizes mismatched timelines (Jan vs June)
+ * 6. Move-in Timeline: 4 points - Penalizes mismatched timelines
  * 
  * MEDIUM PRIORITY (Lifestyle Compatibility):
- * 7. Work Location: 8 points - WFH needs quiet, Office needs flexibility
- * 8. Guest Policy: 8 points - Social behavior alignment
+ * 7. Work Location: 6 points - WFH needs quiet, Office needs flexibility
+ * 8. Guest Policy: 6 points - Social behavior alignment
  * 9. Noise Tolerance: 4 points - Daily comfort predictor
  * 10. Pets: 4 points - Prevents allergies/preferences conflicts
  * 
  * LOWER PRIORITY (Relationship & Interests):
  * 11. Roommate Relationship: 2 points - Social expectations
  * 12. Shared Expenses: 2 points - Alignment on splitting utilities, groceries, internet, cleaning
- * 13. Lifestyle Tags: 2 points - Shared interests/activities (reduced from 3 to accommodate zodiac, baseline 1 pt)
+ * 13. Lifestyle Tags: 2 points - Shared interests/activities (baseline 1 pt)
  * 14. Zodiac Sign: 2 points - Optional fun factor, element-based compatibility (only if both users have it)
  */
 
 export interface MatchScore {
   totalScore: number;
   breakdown: {
+    age: number;
     location: number;
     budget: number;
     sleepSchedule: number;
@@ -108,6 +110,7 @@ export const calculateDetailedCompatibility = (
   roommateProfile: RoommateProfile
 ): MatchScore => {
   const breakdown = {
+    age: 0,
     location: 0,
     budget: 0,
     sleepSchedule: 0,
@@ -139,14 +142,15 @@ export const calculateDetailedCompatibility = (
     // This preserves historical color thresholds (60-65% = orange/blue range)
     const neutralBreakdown = {
       ...breakdown,
+      age: 4,
       location: 10,
       budget: 8,
       sleepSchedule: 8,
       cleanliness: 8,
       smoking: 7,
-      moveInTimeline: 3,
-      workLocation: 5,
-      guestPolicy: 5,
+      moveInTimeline: 2,
+      workLocation: 3,
+      guestPolicy: 3,
       noiseTolerance: 3,
       pets: 3,
       roommateRelationship: 1,
@@ -156,6 +160,47 @@ export const calculateDetailedCompatibility = (
     };
     const neutralScore = Object.values(neutralBreakdown).reduce((sum, score) => sum + score, 0);
     return { totalScore: neutralScore, breakdown: neutralBreakdown, reasons };
+  }
+
+  // ========================================
+  // 0. AGE (8 points) - PRIMARY FACTOR
+  // Closer ages = higher compatibility; large gaps reduce score
+  // ========================================
+  const getUserAge = (): number | null => {
+    if (currentUser.age) return currentUser.age;
+    if (currentUser.birthday) {
+      const birth = new Date(currentUser.birthday);
+      const today = new Date();
+      let a = today.getFullYear() - birth.getFullYear();
+      const m = today.getMonth() - birth.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) a--;
+      return a;
+    }
+    return null;
+  };
+  const userAge = getUserAge();
+  const roommateAge = roommateProfile.age;
+
+  if (userAge && roommateAge) {
+    const ageDiff = Math.abs(userAge - roommateAge);
+    if (ageDiff <= 2) {
+      breakdown.age = 8;
+      reasons.strengths.push(`Very close in age (${userAge} & ${roommateAge}) - similar life stage`);
+    } else if (ageDiff <= 5) {
+      breakdown.age = 6;
+      reasons.strengths.push(`Similar age range (${userAge} & ${roommateAge})`);
+    } else if (ageDiff <= 10) {
+      breakdown.age = 4;
+      reasons.notes.push(`Moderate age difference (${ageDiff} years apart)`);
+    } else if (ageDiff <= 15) {
+      breakdown.age = 2;
+      reasons.concerns.push(`Notable age gap (${ageDiff} years) - may have different lifestyles`);
+    } else {
+      breakdown.age = 0;
+      reasons.concerns.push(`Large age difference (${ageDiff} years) - likely different life stages`);
+    }
+  } else {
+    breakdown.age = 4;
   }
 
   // ========================================
@@ -296,7 +341,7 @@ export const calculateDetailedCompatibility = (
   }
 
   // ========================================
-  // 6. MOVE-IN TIMELINE (6 points) - Scheduling Alignment
+  // 6. MOVE-IN TIMELINE (4 points) - Scheduling Alignment
   // ========================================
   const userMoveIn = userPrefs.moveInDate;
   const roommateMoveIn = roommateProfile.preferences?.moveInDate;
@@ -306,13 +351,13 @@ export const calculateDetailedCompatibility = (
     if (userDate && roommateDate) {
       const daysDiff = Math.abs(Math.round((userDate.getTime() - roommateDate.getTime()) / (1000 * 60 * 60 * 24)));
       if (daysDiff <= 14) {
-        breakdown.moveInTimeline = 6;
+        breakdown.moveInTimeline = 4;
         reasons.strengths.push(`Move-in dates within 2 weeks of each other`);
       } else if (daysDiff <= 30) {
-        breakdown.moveInTimeline = 5;
+        breakdown.moveInTimeline = 3;
         reasons.strengths.push(`Move-in dates within a month`);
       } else if (daysDiff <= 60) {
-        breakdown.moveInTimeline = 3;
+        breakdown.moveInTimeline = 2;
         reasons.notes.push(`Move-in dates about ${Math.round(daysDiff / 30)} months apart`);
       } else if (daysDiff <= 90) {
         breakdown.moveInTimeline = 1;
@@ -322,60 +367,60 @@ export const calculateDetailedCompatibility = (
         reasons.concerns.push(`Move-in timelines don't align (${Math.round(daysDiff / 30)}+ months apart)`);
       }
     } else {
-      breakdown.moveInTimeline = 3;
+      breakdown.moveInTimeline = 2;
     }
   } else {
-    breakdown.moveInTimeline = 3;
+    breakdown.moveInTimeline = 2;
   }
 
   // ========================================
-  // 7. WORK LOCATION (8 points) - Home/Office Balance
+  // 7. WORK LOCATION (6 points) - Home/Office Balance
   // ========================================
   if (userPrefs.workLocation) {
     const userWork = userPrefs.workLocation;
     const roommateWork = inferWorkLocation(roommateProfile);
     
     if (userWork === roommateWork) {
-      breakdown.workLocation = 8;
+      breakdown.workLocation = 6;
       reasons.strengths.push(`Same work arrangement (${formatWorkLocation(userWork)})`);
     } else if (userWork === 'hybrid' || roommateWork === 'hybrid') {
-      breakdown.workLocation = 6;
+      breakdown.workLocation = 4;
       reasons.notes.push(`Hybrid work provides flexibility`);
     } else if (
       (userWork === 'wfh_fulltime' && roommateWork === 'office_fulltime') ||
       (userWork === 'office_fulltime' && roommateWork === 'wfh_fulltime')
     ) {
-      breakdown.workLocation = 5;
+      breakdown.workLocation = 3;
       reasons.notes.push(`Different work locations - gives personal space during day`);
     } else {
-      breakdown.workLocation = 4;
+      breakdown.workLocation = 2;
     }
   } else {
-    breakdown.workLocation = 4;
+    breakdown.workLocation = 3;
   }
 
   // ========================================
-  // 7. GUEST POLICY (8 points) - Social Behavior
+  // 8. GUEST POLICY (6 points) - Social Behavior
   // ========================================
   if (userPrefs.guestPolicy) {
     const userGuests = userPrefs.guestPolicy;
     const roommateGuests = inferGuestPolicy(roommateProfile);
     
     if (userGuests === roommateGuests) {
-      breakdown.guestPolicy = 8;
+      breakdown.guestPolicy = 6;
       reasons.strengths.push(`Matching guest preferences (${formatGuestPolicy(userGuests)})`);
     } else if (userGuests === 'prefer_no_guests' || roommateGuests === 'prefer_no_guests') {
       breakdown.guestPolicy = 0;
       reasons.concerns.push(`Guest policy strongly differs`);
     } else if (isAdjacentGuestPolicy(userGuests, roommateGuests)) {
-      breakdown.guestPolicy = 5;
+      breakdown.guestPolicy = 4;
       reasons.notes.push(`Guest frequency tolerance may work`);
     } else {
-      breakdown.guestPolicy = 2;
+      breakdown.guestPolicy = 1;
       reasons.concerns.push(`Guest policy mismatch`);
     }
   } else {
-    breakdown.guestPolicy = 4;
+    breakdown.guestPolicy = 3;
   }
 
   // ========================================
