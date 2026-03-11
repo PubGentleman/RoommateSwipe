@@ -112,7 +112,7 @@ const STEP_SUBTITLES: Record<StepId, string> = {
 
 export const ProfileQuestionnaireScreen = () => {
   const { theme } = useTheme();
-  const { user, updateUser, completeOnboardingStep } = useAuth();
+  const { user, updateUser, completeOnboardingStep, logout } = useAuth();
   const navigation = useNavigation();
   const route = useRoute();
   const insets = useSafeAreaInsets();
@@ -323,7 +323,16 @@ export const ProfileQuestionnaireScreen = () => {
     if (currentFilteredIndex > 0) {
       setDirection('back');
       setCurrentFilteredIndex(currentFilteredIndex - 1);
-    } else if (user?.onboardingStep !== 'profile') {
+    } else if (user?.onboardingStep === 'profile') {
+      Alert.alert(
+        'Go Back',
+        'This will return you to the login screen. Any progress will not be saved.',
+        [
+          { text: 'Stay', style: 'cancel' },
+          { text: 'Go Back', style: 'destructive', onPress: () => logout() },
+        ]
+      );
+    } else {
       navigation.goBack();
     }
   };
