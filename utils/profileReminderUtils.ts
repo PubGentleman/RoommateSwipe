@@ -96,20 +96,21 @@ export const getProfileGaps = (user: User): ProfileGap[] => {
 
 export const getCompletionPercentage = (user: User): number => {
   let score = 0;
+  const total = 100;
   if (user.photos?.length || user.profilePicture) score += 10;
   if (user.profileData?.bio && user.profileData.bio.trim().length >= 20) score += 10;
-  if (user.profileData?.occupation) score += 10;
+  if (user.birthday) score += 10;
+  if (user.profileData?.occupation && user.profileData.occupation.trim().length > 0) score += 10;
   const interests = user.profileData?.interests;
   if (Array.isArray(interests) && interests.length >= 3) score += 15;
   const prefs = user.profileData?.preferences;
   if (prefs?.cleanliness && prefs?.noiseTolerance) score += 10;
   if (prefs?.sleepSchedule) score += 5;
-  if (prefs?.pets) score += 5;
   if (prefs?.smoking) score += 5;
+  if (prefs?.pets) score += 5;
   if (prefs?.workLocation || prefs?.workSchedule) score += 10;
   if (prefs?.moveInDate || user.profileData?.moveInDate) score += 10;
-  if (user.birthday) score += 10;
-  return Math.min(score, 100);
+  return Math.min(Math.round((score / total) * 100), 100);
 };
 
 export const validateInterestTags = (

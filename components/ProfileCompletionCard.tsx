@@ -27,7 +27,7 @@ const PROFILE_FIELDS: ProfileField[] = [
     icon: 'camera',
     tip: 'with a photo',
     boostText: '3x more matches',
-    weight: 20,
+    weight: 10,
     check: (u) => !!(u.photos?.length || u.profilePicture),
   },
   {
@@ -36,8 +36,8 @@ const PROFILE_FIELDS: ProfileField[] = [
     icon: 'edit-2',
     tip: 'with a bio',
     boostText: '20% more messages',
-    weight: 15,
-    check: (u) => !!(u.profileData?.bio && u.profileData.bio.trim().length > 0),
+    weight: 10,
+    check: (u) => !!(u.profileData?.bio && u.profileData.bio.trim().length >= 20),
   },
   {
     key: 'birthday',
@@ -49,27 +49,11 @@ const PROFILE_FIELDS: ProfileField[] = [
     check: (u) => !!u.birthday,
   },
   {
-    key: 'budget',
-    label: 'Set Your Budget',
-    icon: 'dollar-sign',
-    tip: 'Better financial compatibility',
-    weight: 10,
-    check: (u) => !!(u.profileData?.budget && u.profileData.budget > 0),
-  },
-  {
-    key: 'location',
-    label: 'Add Location',
-    icon: 'map-pin',
-    tip: 'Find nearby roommates',
-    weight: 10,
-    check: (u) => !!(u.profileData?.city || u.profileData?.neighborhood || u.profileData?.location),
-  },
-  {
     key: 'occupation',
     label: 'Add Occupation',
     icon: 'briefcase',
     tip: 'Build trust with potential matches',
-    weight: 5,
+    weight: 10,
     check: (u) => !!(u.profileData?.occupation && u.profileData.occupation.trim().length > 0),
   },
   {
@@ -77,24 +61,27 @@ const PROFILE_FIELDS: ProfileField[] = [
     label: 'Add Interests',
     icon: 'heart',
     tip: 'Connect over shared hobbies',
-    weight: 5,
-    check: (u) => !!(u.profileData?.interests && u.profileData.interests.trim().length > 0),
+    weight: 15,
+    check: (u) => {
+      const interests = u.profileData?.interests;
+      return Array.isArray(interests) && interests.length >= 3;
+    },
+  },
+  {
+    key: 'cleanliness',
+    label: 'Cleanliness & Noise',
+    icon: 'droplet',
+    tip: 'Avoid 40% of roommate conflicts',
+    weight: 10,
+    check: (u) => !!(u.profileData?.preferences?.cleanliness && u.profileData?.preferences?.noiseTolerance),
   },
   {
     key: 'sleepSchedule',
     label: 'Sleep Schedule',
     icon: 'moon',
     tip: 'Lifestyle compatibility matching',
-    weight: 10,
+    weight: 5,
     check: (u) => !!u.profileData?.preferences?.sleepSchedule,
-  },
-  {
-    key: 'cleanliness',
-    label: 'Cleanliness Level',
-    icon: 'droplet',
-    tip: 'Avoid 40% of roommate conflicts',
-    weight: 10,
-    check: (u) => !!u.profileData?.preferences?.cleanliness,
   },
   {
     key: 'smoking',
@@ -103,6 +90,30 @@ const PROFILE_FIELDS: ProfileField[] = [
     tip: 'Deal-breaker matching',
     weight: 5,
     check: (u) => !!u.profileData?.preferences?.smoking,
+  },
+  {
+    key: 'pets',
+    label: 'Pet Preferences',
+    icon: 'github',
+    tip: 'Important for compatibility',
+    weight: 5,
+    check: (u) => !!u.profileData?.preferences?.pets,
+  },
+  {
+    key: 'work',
+    label: 'Work Info',
+    icon: 'briefcase',
+    tip: 'Match with similar schedules',
+    weight: 10,
+    check: (u) => !!(u.profileData?.preferences?.workLocation || u.profileData?.preferences?.workSchedule),
+  },
+  {
+    key: 'moveInDate',
+    label: 'Move-in Date',
+    icon: 'calendar',
+    tip: 'Find roommates on your timeline',
+    weight: 10,
+    check: (u) => !!(u.profileData?.preferences?.moveInDate || u.profileData?.moveInDate),
   },
 ];
 
@@ -122,7 +133,7 @@ function getCompletionData(user: User) {
     }
   }
 
-  const percentage = Math.round((completedWeight / TOTAL_WEIGHT) * 100);
+  const percentage = Math.min(Math.round((completedWeight / TOTAL_WEIGHT) * 100), 100);
   return { percentage, missing, completed, total: PROFILE_FIELDS.length, completedCount: completed.length };
 }
 
@@ -133,10 +144,13 @@ const FIELD_TO_STEP: Record<string, string> = {
   budget: 'housing',
   location: 'locationOccupation',
   occupation: 'locationOccupation',
-  interests: 'lifestyle',
+  interests: 'interests',
   sleepSchedule: 'sleepSchedule',
   cleanliness: 'cleanliness',
   smoking: 'smoking',
+  pets: 'workPets',
+  work: 'workPets',
+  moveInDate: 'housing',
 };
 
 interface ProfileCompletionCardProps {
@@ -233,7 +247,7 @@ export const ProfileCompletionCard = ({ user, onEditProfile }: ProfileCompletion
   );
 };
 
-export { getCompletionData, PROFILE_FIELDS };
+export { getCompletionData, PROFILE_FIELDS, TOTAL_WEIGHT };
 
 const styles = StyleSheet.create({
   card: {

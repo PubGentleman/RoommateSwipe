@@ -177,7 +177,7 @@ export const ProfileScreen = () => {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Profile Strength</Text>
-              <Pressable onPress={() => navigation.navigate('ProfileQuestionnaire')}>
+              <Pressable onPress={() => { setShowAISheet(true); setAiSheetContext('profile_reminder'); }}>
                 <Text style={styles.sectionAction}>View all</Text>
               </Pressable>
             </View>
