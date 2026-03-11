@@ -26,6 +26,7 @@ export const ProfileScreen = () => {
   const [processingBoost, setProcessingBoost] = useState(false);
   const [pendingInterestCount, setPendingInterestCount] = useState(0);
   const [showAISheet, setShowAISheet] = useState(false);
+  const [aiSheetContext, setAiSheetContext] = useState<'profile' | 'profile_reminder'>('profile');
   const [devTapCount, setDevTapCount] = useState(0);
   const [devTapTimer, setDevTapTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
 
@@ -180,7 +181,7 @@ export const ProfileScreen = () => {
                 <Text style={styles.sectionAction}>View all</Text>
               </Pressable>
             </View>
-            <ProfileCompletionCard user={user} onEditProfile={(missingSteps) => navigation.navigate('ProfileQuestionnaire', missingSteps?.length ? { missingSteps } : undefined)} />
+            <ProfileCompletionCard user={user} onEditProfile={() => { setShowAISheet(true); setAiSheetContext('profile_reminder'); }} />
           </View>
         ) : null}
 
@@ -522,12 +523,15 @@ export const ProfileScreen = () => {
 
       <RoomdrAISheet
         visible={showAISheet}
-        onDismiss={() => setShowAISheet(false)}
-        screenContext="profile"
-        contextData={{
+        onDismiss={() => { setShowAISheet(false); setAiSheetContext('profile'); }}
+        screenContext={aiSheetContext}
+        contextData={aiSheetContext === 'profile' ? {
           profile: {
             savedListingsCount: 0,
           },
+        } : undefined}
+        onNavigate={(screen, params) => {
+          navigation.navigate(screen as any, params);
         }}
       />
     </View>

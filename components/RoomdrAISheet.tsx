@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { Spacing } from '../constants/theme';
 import { calculateDetailedCompatibility } from '../utils/matchingAlgorithm';
+import { getProfileGaps, getCompletionPercentage, getMatchMultiplier, GAP_MESSAGES } from '../utils/profileReminderUtils';
 import type { RoommateProfile, User, Message, Group, Conversation } from '../types/models';
 import * as Haptics from 'expo-haptics';
 
@@ -16,7 +17,7 @@ const GREEN = '#2ecc71';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const SHEET_HEIGHT = SCREEN_HEIGHT * 0.8;
 
-export type ScreenContext = 'match' | 'chat' | 'explore' | 'messages' | 'groups' | 'profile';
+export type ScreenContext = 'match' | 'chat' | 'explore' | 'messages' | 'groups' | 'profile' | 'profile_reminder';
 
 interface MatchContextData {
   currentProfile?: RoommateProfile;
@@ -60,6 +61,11 @@ interface ProfileContextData {
   savedListingsCount?: number;
 }
 
+interface ProfileReminderContextData {
+  heading?: string;
+  subtext?: string;
+}
+
 export interface AISheetContextData {
   match?: MatchContextData;
   chat?: ChatContextData;
@@ -67,6 +73,7 @@ export interface AISheetContextData {
   messages?: MessagesContextData;
   groups?: GroupsContextData;
   profile?: ProfileContextData;
+  profileReminder?: ProfileReminderContextData;
 }
 
 interface RoomdrAISheetProps {
@@ -74,6 +81,7 @@ interface RoomdrAISheetProps {
   onDismiss: () => void;
   screenContext: ScreenContext;
   contextData?: AISheetContextData;
+  onNavigate?: (screen: string, params?: Record<string, any>) => void;
 }
 
 const PROFILE_FIELDS = [
@@ -96,6 +104,7 @@ const CONTEXT_LABELS: Record<ScreenContext, { label: string; icon: keyof typeof 
   chat: { label: 'Chat', icon: 'message-circle' },
   messages: { label: 'Messages', icon: 'inbox' },
   profile: { label: 'Profile', icon: 'user' },
+  profile_reminder: { label: 'AI Tip', icon: 'zap' },
 };
 
 const MATCH_MULTIPLIERS: Record<string, number> = {
@@ -160,7 +169,7 @@ const InsightCard = ({ icon, title, body, id, onFeedback, actionChip }: {
   </View>
 );
 
-export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData }: RoomdrAISheetProps) => {
+export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData, onNavigate }: RoomdrAISheetProps) => {
   const insets = useSafeAreaInsets();
   const { user, updateUser } = useAuth();
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
@@ -610,6 +619,87 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData }
     );
   };
 
+  const getProfileReminderContent = () => {
+    if (!user) return null;
+    const gaps = getProfileGaps(user);
+    const completion = getCompletionPercentage(user);
+    const multiplier = getMatchMultiplier(completion);
+    const heading = contextData?.profileReminder?.heading || 'Boost Your Matches';
+    const subtext = contextData?.profileReminder?.subtext || "Here's what's holding back your profile";
+
+    if (completion === 100) {
+      return (
+        <View style={styles.contextCard}>
+          <View style={{ alignItems: 'center', paddingVertical: Spacing.lg }}>
+            <View style={[styles.reminderIconCircle, { backgroundColor: 'rgba(46,204,113,0.15)' }]}>
+              <Feather name="check-circle" size={28} color={GREEN} />
+            </View>
+            <Text style={[styles.contextTitle, { fontSize: 18, marginTop: Spacing.md }]}>Your profile is fully optimized!</Text>
+            <Text style={[styles.contextBody, { textAlign: 'center', marginTop: 6 }]}>
+              You're appearing in all relevant searches. Keep swiping!
+            </Text>
+            <Pressable
+              style={[styles.reminderFixBtn, { marginTop: Spacing.lg, backgroundColor: GREEN }]}
+              onPress={onDismiss}
+            >
+              <Text style={styles.reminderFixText}>Got it</Text>
+            </Pressable>
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <View>
+        <View style={{ marginBottom: Spacing.md }}>
+          <View style={styles.reminderChip}>
+            <Feather name="zap" size={10} color={ACCENT} />
+            <Text style={styles.reminderChipText}>AI Tip</Text>
+          </View>
+          <Text style={[styles.contextTitle, { fontSize: 20, marginTop: 8 }]}>{heading}</Text>
+          <Text style={[styles.contextBody, { marginTop: 4 }]}>{subtext}</Text>
+        </View>
+
+        {gaps.map((gap) => (
+          <View key={gap.field} style={styles.reminderGapCard}>
+            <View style={styles.reminderIconCircle}>
+              <Feather name={gap.icon} size={16} color={ACCENT} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.reminderGapLabel}>{gap.label}</Text>
+              <Text style={styles.reminderGapImpact}>{GAP_MESSAGES[gap.field] || gap.impact}</Text>
+            </View>
+            <Pressable
+              style={styles.reminderFixBtn}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                onDismiss();
+                if (onNavigate && gap.screenParams) {
+                  onNavigate(gap.screen, gap.screenParams);
+                }
+              }}
+            >
+              <Text style={styles.reminderFixText}>Fix</Text>
+              <Feather name="arrow-right" size={12} color="#fff" />
+            </Pressable>
+          </View>
+        ))}
+
+        <View style={styles.reminderCompletionBar}>
+          <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>
+            Your profile is {completion}% complete
+          </Text>
+          <View style={styles.reminderProgressTrack}>
+            <View style={[styles.reminderProgressFill, { width: `${completion}%` }]} />
+          </View>
+          <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 4 }}>
+            Complete profile to get {multiplier}x more matches
+          </Text>
+        </View>
+      </View>
+    );
+  };
+
   const renderContextContent = () => {
     switch (screenContext) {
       case 'match': return getMatchContextContent();
@@ -618,6 +708,7 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData }
       case 'messages': return getMessagesContextContent();
       case 'groups': return getGroupsContextContent();
       case 'profile': return getProfileContextContent();
+      case 'profile_reminder': return getProfileReminderContent();
       default: return null;
     }
   };
@@ -701,13 +792,15 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData }
           </View>
 
           <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-            <View style={styles.greetingCard}>
-              <Text style={styles.greetingText}>{getGreeting()}</Text>
-            </View>
+            {screenContext !== 'profile_reminder' ? (
+              <View style={styles.greetingCard}>
+                <Text style={styles.greetingText}>{getGreeting()}</Text>
+              </View>
+            ) : null}
 
             {renderContextContent()}
 
-            {insights.length > 0 ? (
+            {screenContext !== 'profile_reminder' && insights.length > 0 ? (
               <>
                 <Text style={styles.sectionLabel}>YOUR INSIGHTS</Text>
                 {insights.map(insight => (
@@ -1100,5 +1193,80 @@ const styles = StyleSheet.create({
     fontSize: 10,
     width: 28,
     textAlign: 'right',
+  },
+  reminderChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,107,91,0.15)',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
+  },
+  reminderChipText: {
+    color: ACCENT,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  reminderGapCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: CARD_BG,
+    borderRadius: 14,
+    padding: Spacing.md,
+    marginBottom: 8,
+  },
+  reminderIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,107,91,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reminderGapLabel: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  reminderGapImpact: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  reminderFixBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: ACCENT,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  reminderFixText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  reminderCompletionBar: {
+    backgroundColor: CARD_BG,
+    borderRadius: 14,
+    padding: Spacing.md,
+    marginTop: 8,
+  },
+  reminderProgressTrack: {
+    height: 8,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 4,
+    marginTop: 8,
+    overflow: 'hidden',
+  },
+  reminderProgressFill: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: ACCENT,
   },
 });

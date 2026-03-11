@@ -37,7 +37,8 @@ The application is built with React Native and Expo using TypeScript, featuring 
 **User Experience Enhancements:**
 - **Match Celebration:** Animated full-screen modal for mutual likes.
 - **Profile Questionnaire:** A 13-step guided process with progress tracking and per-step validation.
-- **Roomdr AI Assistant:** A floating, context-aware AI button providing dynamic greetings, content cards, and insights based on the current screen and live data.
+- **Roomdr AI Assistant:** A floating, context-aware AI button providing dynamic greetings, content cards, and insights based on the current screen and live data. Includes a `profile_reminder` mode that shows profile completion gaps with personalized messages and "Fix" buttons navigating to the correct questionnaire step.
+- **AI Profile Completion Reminders:** Smart triggers show profile gap reminders via the AI sheet: (1) after 5 swipes with no match (once per session), (2) daily nudge on first Match screen open if profile < 80% complete, (3) tapping ProfileCompletionCard on Profile screen, (4) after sending first-ever message. Tracking via AsyncStorage keys: `lastProfileReminderDate:${userId}`, `swipeReminderShownThisSession` (ref-based), `firstMessageReminderShown:${userId}`.
 - **Roommate Interaction System:** Three types: Swipe Right (free), Super Interest (notifies recipient), and Cold Messaging (Elite only).
 - **Profile Boost System:** Tier-based boosts (12-48 hours) increase profile visibility.
 - **Identity Verification:** Options for phone, government ID, social media, and optional background/income checks for Elite users.
