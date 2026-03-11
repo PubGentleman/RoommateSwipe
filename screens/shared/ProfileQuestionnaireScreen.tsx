@@ -3,6 +3,7 @@ import {
   View,
   StyleSheet,
   Pressable,
+  TouchableOpacity,
   Alert,
   TextInput,
   ScrollView,
@@ -586,6 +587,14 @@ export const ProfileQuestionnaireScreen = () => {
             <SelectionCard icon="user-check" title="Occasionally" isSelected={guestPolicy === 'occasionally'} onPress={() => setGuestPolicy('occasionally')} index={1} />
             <SelectionCard icon="users" title="Frequently" isSelected={guestPolicy === 'frequently'} onPress={() => setGuestPolicy('frequently')} index={2} />
             <SelectionCard icon="x" title="Prefer No Guests" isSelected={guestPolicy === 'prefer_no_guests'} onPress={() => setGuestPolicy('prefer_no_guests')} index={3} />
+
+            <View style={{ height: Spacing.xl }} />
+
+            <ThemedText style={[Typography.h3, { marginBottom: Spacing.md, color: theme.text }]}>Roommate Relationship</ThemedText>
+            <SelectionCard icon="shield" title="Respectful Co-living" subtitle="Keep things friendly but independent" isSelected={roommateRelationship === 'respectful_coliving'} onPress={() => setRoommateRelationship('respectful_coliving')} index={0} />
+            <SelectionCard icon="coffee" title="Occasional Hangouts" subtitle="Grab a meal or watch a show together sometimes" isSelected={roommateRelationship === 'occasional_hangouts'} onPress={() => setRoommateRelationship('occasional_hangouts')} index={1} />
+            <SelectionCard icon="heart" title="Prefer Friends" subtitle="Looking for a roommate who becomes a friend" isSelected={roommateRelationship === 'prefer_friends'} onPress={() => setRoommateRelationship('prefer_friends')} index={2} />
+            <SelectionCard icon="minimize-2" title="Minimal Interaction" subtitle="Prefer to keep to myself" isSelected={roommateRelationship === 'minimal_interaction'} onPress={() => setRoommateRelationship('minimal_interaction')} index={3} />
           </View>
         );
 
@@ -743,9 +752,9 @@ export const ProfileQuestionnaireScreen = () => {
     >
       <View style={{ paddingTop: insets.top }}>
         <View style={styles.navHeader}>
-          <Pressable onPress={goBack} style={styles.navButton} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+          <TouchableOpacity onPress={goBack} style={styles.navButton} activeOpacity={0.6} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
             <Feather name="arrow-left" size={24} color={theme.text} />
-          </Pressable>
+          </TouchableOpacity>
           <ThemedText style={[Typography.h3, { flex: 1, textAlign: 'center' }]}>
             {isMissingMode ? `${currentFilteredIndex + 1} of ${stepsToShow.length}` : (currentFilteredIndex === 0 ? 'Edit Profile' : '')}
           </ThemedText>
