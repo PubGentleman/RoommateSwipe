@@ -14,6 +14,7 @@ interface AuthContextType {
   login: (email: string, password: string, role: UserRole) => Promise<void>;
   register: (email: string, password: string, name: string, role: UserRole) => Promise<void>;
   logout: () => Promise<void>;
+  abandonSignup: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   upgradeToPlus: (billingCycle?: 'monthly' | '3month' | 'annual') => Promise<void>;
   upgradeToElite: (billingCycle?: 'monthly' | '3month' | 'annual') => Promise<void>;
@@ -266,6 +267,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .eq('user_id', session.user.id)
         .single();
 
+      if (userData.onboarding_step === 'abandoned') {
+        await supabase.from('users').update({ onboarding_step: 'profile' }).eq('id', session.user.id);
+        userData.onboarding_step = 'profile';
+      }
+
       let mappedUser = mapSupabaseToUser(userData, profileData, subscriptionData);
       mappedUser = await checkAndApplyScheduledChanges(mappedUser);
 
@@ -449,6 +455,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
+    await supabase.auth.signOut();
+    await StorageService.logoutAndReset();
+    setUser(null);
+  };
+
+  const abandonSignup = async () => {
+    try {
+      const userId = user?.id;
+      if (userId) {
+        const { error: profileErr } = await supabase.from('profiles').delete().eq('user_id', userId);
+        if (profileErr) console.log('[abandonSignup] Profile cleanup failed:', profileErr.message);
+
+        const { error: userErr } = await supabase.from('users').update({ onboarding_step: 'abandoned' }).eq('id', userId);
+        if (userErr) console.log('[abandonSignup] User update failed:', userErr.message);
+      }
+    } catch (err) {
+      console.log('[abandonSignup] Cleanup error:', err);
+    }
     await supabase.auth.signOut();
     await StorageService.logoutAndReset();
     setUser(null);
@@ -1814,7 +1838,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout, resetPassword, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, cancelSubscriptionAtPeriodEnd, reactivateSubscription, getSubscriptionDetails, updateUser, blockUser: blockUserAction, unblockUser: unblockUserAction, reportUser: reportUserAction, isUserBlocked: isUserBlockedCheck, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike, watchAdForCredit, getAdCredits, useAdCredit, isBasicUser, canViewListing, useListingView, canSendInterest, canSendSuperInterest, useSuperInterestCredit, canSendColdMessage, useColdMessage, getSuperInterestCount, upgradeHostPlan, downgradeHostPlan, getHostPlan, canAddListing, canRespondToInquiry, useInquiryResponse, purchaseListingBoost, purchaseHostVerification, purchaseSuperInterest, completeOnboardingStep }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout, abandonSignup, resetPassword, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, cancelSubscriptionAtPeriodEnd, reactivateSubscription, getSubscriptionDetails, updateUser, blockUser: blockUserAction, unblockUser: unblockUserAction, reportUser: reportUserAction, isUserBlocked: isUserBlockedCheck, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike, watchAdForCredit, getAdCredits, useAdCredit, isBasicUser, canViewListing, useListingView, canSendInterest, canSendSuperInterest, useSuperInterestCredit, canSendColdMessage, useColdMessage, getSuperInterestCount, upgradeHostPlan, downgradeHostPlan, getHostPlan, canAddListing, canRespondToInquiry, useInquiryResponse, purchaseListingBoost, purchaseHostVerification, purchaseSuperInterest, completeOnboardingStep }}>
       {children}
     </AuthContext.Provider>
   );

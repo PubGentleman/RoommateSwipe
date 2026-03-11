@@ -115,7 +115,7 @@ const STEP_SUBTITLES: Record<StepId, string> = {
 
 export const ProfileQuestionnaireScreen = () => {
   const { theme } = useTheme();
-  const { user, updateUser, completeOnboardingStep, logout } = useAuth();
+  const { user, updateUser, completeOnboardingStep, logout, abandonSignup } = useAuth();
   const navigation = useNavigation();
   const route = useRoute();
   const insets = useSafeAreaInsets();
@@ -324,7 +324,7 @@ export const ProfileQuestionnaireScreen = () => {
           'This will return you to the login screen. Any progress will not be saved.',
           [
             { text: 'Stay', style: 'cancel' },
-            { text: 'Go Back', style: 'destructive', onPress: () => logout() },
+            { text: 'Go Back', style: 'destructive', onPress: () => abandonSignup() },
           ]
         );
       } else {

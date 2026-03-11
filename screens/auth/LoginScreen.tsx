@@ -150,6 +150,9 @@ export const LoginScreen = () => {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
+                textContentType={isSignUp ? 'newPassword' : 'password'}
+                autoComplete={isSignUp ? 'new-password' : 'password'}
+                passwordRules="minlength: 6;"
               />
               <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn} hitSlop={8}>
                 <Feather name={showPassword ? 'eye-off' : 'eye'} size={16} color="rgba(255,255,255,0.22)" />
@@ -169,6 +172,8 @@ export const LoginScreen = () => {
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   secureTextEntry={!showConfirmPassword}
+                  textContentType="newPassword"
+                  autoComplete="new-password"
                 />
                 <Pressable onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeBtn} hitSlop={8}>
                   <Feather name={showConfirmPassword ? 'eye-off' : 'eye'} size={16} color="rgba(255,255,255,0.22)" />
