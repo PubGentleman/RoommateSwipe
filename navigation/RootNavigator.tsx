@@ -7,6 +7,7 @@ import { ProfileQuestionnaireScreen } from '../screens/shared/ProfileQuestionnai
 import { PlanSelectionScreen } from '../screens/shared/PlanSelectionScreen';
 import { RenterTabNavigator } from './RenterTabNavigator';
 import { HostTabNavigator } from './HostTabNavigator';
+import { ProfileReminderOverlay } from '../components/ProfileReminderOverlay';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useTheme } from '../hooks/useTheme';
 import { StorageService } from '../utils/storage';
@@ -86,9 +87,12 @@ export const RootNavigator = () => {
     : RenterMain;
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Main" component={MainComponent} />
-    </Stack.Navigator>
+    <>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="Main" component={MainComponent} />
+      </Stack.Navigator>
+      <ProfileReminderOverlay />
+    </>
   );
 };
 

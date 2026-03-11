@@ -13,7 +13,6 @@ import { ReportBlockModal } from '../../components/ReportBlockModal';
 import { PlanBadge } from '../../components/PlanBadge';
 import { RoomdrAISheet, ScreenContext } from '../../components/RoomdrAISheet';
 import { useNotificationContext } from '../../contexts/NotificationContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getMessages as getSupabaseMessages, sendMessage as sendSupabaseMessage, markMessagesAsRead as markSupabaseMessagesAsRead, subscribeToMessages } from '../../services/messageService';
 
 type ChatScreenProps = {
@@ -41,7 +40,6 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [showReportBlockModal, setShowReportBlockModal] = useState(false);
   const [showAISheet, setShowAISheet] = useState(false);
   const [aiSheetContext, setAiSheetContext] = useState<ScreenContext>('chat');
-  const [aiSheetReminderData, setAiSheetReminderData] = useState<{ heading?: string; subtext?: string } | undefined>();
   const [otherUserPlan, setOtherUserPlan] = useState<string | undefined>();
   const [isColdMessage, setIsColdMessage] = useState(false);
   const [coldMessageResponded, setColdMessageResponded] = useState(false);
@@ -303,25 +301,6 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         await refreshUnreadCount();
       }
       
-      const newMessageCount = (user.messageCount || 0) + 1;
-      if (newMessageCount === 1) {
-        const checkFirstMessageReminder = async () => {
-          try {
-            const key = `firstMessageReminderShown:${user.id}`;
-            const shown = await AsyncStorage.getItem(key);
-            if (shown) return;
-            await AsyncStorage.setItem(key, 'true');
-            setAiSheetContext('profile_reminder');
-            setAiSheetReminderData({
-              heading: 'Great first message!',
-              subtext: 'Complete your profile so they can learn more about you before replying',
-            });
-            setShowAISheet(true);
-          } catch {}
-        };
-        checkFirstMessageReminder();
-      }
-
       setMessages([...conversations[conversationIndex].messages]);
       setInputText('');
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
@@ -531,17 +510,15 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
 
       <RoomdrAISheet
         visible={showAISheet}
-        onDismiss={() => { setShowAISheet(false); setAiSheetContext('chat'); setAiSheetReminderData(undefined); }}
+        onDismiss={() => { setShowAISheet(false); setAiSheetContext('chat'); }}
         screenContext={aiSheetContext}
-        contextData={aiSheetContext === 'chat' ? {
+        contextData={{
           chat: {
             otherUserName: otherUser?.name,
             otherUserProfile: otherUser || undefined,
             messages: messages,
             onSuggestMessage: (text) => setInputText(text),
           },
-        } : {
-          profileReminder: aiSheetReminderData,
         }}
         onNavigate={(screen, params) => {
           if (screen === 'ProfileQuestionnaire') {

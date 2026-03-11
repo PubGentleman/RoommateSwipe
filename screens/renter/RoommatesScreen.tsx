@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { View, StyleSheet, Image, Pressable, Dimensions, Modal, ScrollView, Alert, Text } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, withSequence, runOnJS, interpolate } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
@@ -32,8 +31,7 @@ import { RoomdrLogo } from '../../components/RoomdrLogo';
 import { RoommateFilterSheet, MatchFilters, DEFAULT_FILTERS, getActiveFilterCount, getActiveFilterChips, removeFilterChip, loadSavedFilters, saveFilters, applyFiltersToProfiles } from '../../components/RoommateFilterSheet';
 import { PlanBadge } from '../../components/PlanBadge';
 import { useNotificationContext } from '../../contexts/NotificationContext';
-import { RoomdrAISheet, AISheetContextData } from '../../components/RoomdrAISheet';
-import { getCompletionPercentage } from '../../utils/profileReminderUtils';
+import { RoomdrAISheet } from '../../components/RoomdrAISheet';
 import { getSwipeDeck, sendLike, sendPass, undoLastAction } from '../../services/discoverService';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -78,10 +76,7 @@ export const RoommatesScreen = () => {
   const [unfilteredCount, setUnfilteredCount] = useState(0);
   const [unfilteredProfiles, setUnfilteredProfiles] = useState<RoommateProfile[]>([]);
   const [showAISheet, setShowAISheet] = useState(false);
-  const [aiSheetContext, setAiSheetContext] = useState<'match' | 'profile_reminder'>('match');
-  const swipesSinceMatchRef = useRef(0);
-  const swipeReminderShownRef = useRef(false);
-  const dailyNudgeCheckedRef = useRef(false);
+  const [aiSheetContext, setAiSheetContext] = useState<'match'>('match');
 
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -124,26 +119,6 @@ export const RoommatesScreen = () => {
     React.useCallback(() => {
       console.log('[RoommatesScreen] Screen focused, reloading profiles to get latest photos');
       loadProfiles();
-
-      if (!dailyNudgeCheckedRef.current && user) {
-        dailyNudgeCheckedRef.current = true;
-        const checkDailyNudge = async () => {
-          try {
-            const completion = getCompletionPercentage(user);
-            if (completion >= 80) return;
-            const today = new Date().toISOString().split('T')[0];
-            const key = `lastProfileReminderDate:${user.id}`;
-            const lastShown = await AsyncStorage.getItem(key);
-            if (lastShown === today) return;
-            await AsyncStorage.setItem(key, today);
-            setTimeout(() => {
-              setAiSheetContext('profile_reminder');
-              setShowAISheet(true);
-            }, 1500);
-          } catch {}
-        };
-        checkDailyNudge();
-      }
     }, [activeCity, user])
   );
 
@@ -425,7 +400,6 @@ export const RoommatesScreen = () => {
         const hasMatch = usedSupabase ? !!supabaseResult?.match : await StorageService.checkReciprocalLike(userId, profileId);
         
         if (hasMatch) {
-          swipesSinceMatchRef.current = 0;
           if (!usedSupabase) {
             const match: Match = {
               id: `match_${Date.now()}`,
@@ -484,17 +458,7 @@ export const RoommatesScreen = () => {
 
           setShowMatch(true);
           await refreshUnreadCount();
-        } else {
-          swipesSinceMatchRef.current += 1;
         }
-      } else {
-        swipesSinceMatchRef.current += 1;
-      }
-
-      if (swipesSinceMatchRef.current > 0 && swipesSinceMatchRef.current % 5 === 0 && !swipeReminderShownRef.current) {
-        swipeReminderShownRef.current = true;
-        setAiSheetContext('profile_reminder');
-        setShowAISheet(true);
       }
     } catch (error) {
       console.error('[RoommatesScreen] Error processing swipe:', error);
@@ -1945,13 +1909,13 @@ export const RoommatesScreen = () => {
 
       <RoomdrAISheet
         visible={showAISheet}
-        onDismiss={() => { setShowAISheet(false); setAiSheetContext('match'); }}
-        screenContext={aiSheetContext}
-        contextData={aiSheetContext === 'match' ? {
+        onDismiss={() => setShowAISheet(false)}
+        screenContext="match"
+        contextData={{
           match: {
             currentProfile: profiles[currentIndex] || undefined,
           },
-        } : undefined}
+        }}
         onNavigate={(screen, params) => {
           if (screen === 'ProfileQuestionnaire') {
             (navigation as any).navigate('Profile', { screen: 'ProfileQuestionnaire', params });

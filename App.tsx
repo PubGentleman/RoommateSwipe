@@ -11,6 +11,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { AuthProvider } from "./contexts/AuthContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import { CityProvider } from "./contexts/CityContext";
+import { ProfileReminderProvider } from "./contexts/ProfileReminderContext";
 import { StorageService } from "./utils/storage";
 
 export default function App() {
@@ -36,12 +37,14 @@ export default function App() {
           <KeyboardProvider>
             <AuthProvider>
               <CityProvider>
-                <NotificationProvider>
-                  <NavigationContainer>
-                    <RootNavigator />
-                  </NavigationContainer>
-                  <StatusBar style="auto" />
-                </NotificationProvider>
+                <ProfileReminderProvider>
+                  <NotificationProvider>
+                    <NavigationContainer>
+                      <RootNavigator />
+                    </NavigationContainer>
+                    <StatusBar style="auto" />
+                  </NotificationProvider>
+                </ProfileReminderProvider>
               </CityProvider>
             </AuthProvider>
           </KeyboardProvider>
