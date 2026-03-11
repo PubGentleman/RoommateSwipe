@@ -77,6 +77,83 @@ export const INTEREST_TAGS = {
   },
 };
 
+export const OCCUPATION_TAGS = {
+  tech: {
+    label: 'Tech & Engineering',
+    icon: 'monitor',
+    tags: [
+      { id: 'software_engineer', label: 'Software Engineer' },
+      { id: 'data_scientist', label: 'Data Scientist' },
+      { id: 'product_manager', label: 'Product Manager' },
+      { id: 'ux_designer', label: 'UX / UI Designer' },
+      { id: 'it_support', label: 'IT Support' },
+      { id: 'devops', label: 'DevOps / SysAdmin' },
+    ],
+  },
+  business: {
+    label: 'Business & Finance',
+    icon: 'briefcase',
+    tags: [
+      { id: 'finance', label: 'Finance / Banking' },
+      { id: 'consulting', label: 'Consulting' },
+      { id: 'marketing', label: 'Marketing' },
+      { id: 'sales', label: 'Sales' },
+      { id: 'accounting', label: 'Accounting' },
+      { id: 'entrepreneur', label: 'Entrepreneur' },
+      { id: 'real_estate', label: 'Real Estate' },
+    ],
+  },
+  creative: {
+    label: 'Creative & Media',
+    icon: 'camera',
+    tags: [
+      { id: 'graphic_designer', label: 'Graphic Designer' },
+      { id: 'writer', label: 'Writer / Journalist' },
+      { id: 'photographer_pro', label: 'Photographer' },
+      { id: 'musician_pro', label: 'Musician' },
+      { id: 'filmmaker', label: 'Filmmaker' },
+      { id: 'content_creator', label: 'Content Creator' },
+    ],
+  },
+  health: {
+    label: 'Healthcare & Science',
+    icon: 'activity',
+    tags: [
+      { id: 'nurse', label: 'Nurse' },
+      { id: 'doctor', label: 'Doctor' },
+      { id: 'therapist', label: 'Therapist / Counselor' },
+      { id: 'researcher', label: 'Researcher' },
+      { id: 'pharmacist', label: 'Pharmacist' },
+      { id: 'lab_tech', label: 'Lab Technician' },
+    ],
+  },
+  service: {
+    label: 'Service & Trades',
+    icon: 'tool',
+    tags: [
+      { id: 'teacher', label: 'Teacher / Professor' },
+      { id: 'social_worker', label: 'Social Worker' },
+      { id: 'chef', label: 'Chef / Culinary' },
+      { id: 'tradesperson', label: 'Trades / Construction' },
+      { id: 'retail', label: 'Retail' },
+      { id: 'hospitality', label: 'Hospitality' },
+      { id: 'government', label: 'Government / Public Sector' },
+    ],
+  },
+  other: {
+    label: 'Other',
+    icon: 'grid',
+    tags: [
+      { id: 'student_occ', label: 'Student' },
+      { id: 'freelancer', label: 'Freelancer' },
+      { id: 'between_jobs', label: 'Between Jobs' },
+      { id: 'military', label: 'Military / Veteran' },
+      { id: 'retired', label: 'Retired' },
+      { id: 'other_occupation', label: 'Other' },
+    ],
+  },
+};
+
 export type TagCategory = keyof typeof INTEREST_TAGS;
 export type TagId = string;
 export const MIN_TAGS = 3;
@@ -84,6 +161,10 @@ export const MAX_TAGS = 10;
 
 export const getTagLabel = (tagId: string): string => {
   for (const category of Object.values(INTEREST_TAGS)) {
+    const tag = category.tags.find((t) => t.id === tagId);
+    if (tag) return tag.label;
+  }
+  for (const category of Object.values(OCCUPATION_TAGS)) {
     const tag = category.tags.find((t) => t.id === tagId);
     if (tag) return tag.label;
   }

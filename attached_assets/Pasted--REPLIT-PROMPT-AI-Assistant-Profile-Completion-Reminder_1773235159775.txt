@@ -1,0 +1,195 @@
+---
+
+**REPLIT PROMPT — AI Assistant Profile Completion Reminders**
+
+Add smart AI-powered reminders inside the existing `RoomdrAISheet` component that nudge users to complete their profile based on what is missing and how it affects their matches. The AI reminder should feel personal and helpful — not generic or pushy.
+
+---
+
+**PART 1 — AI REMINDER LOGIC**
+
+Create `utils/profileReminderUtils.ts`:
+
+```ts
+export interface ProfileGap {
+  field: string;
+  label: string;
+  impact: string;
+  screen: string;
+  screenParams?: Record<string, any>;
+}
+
+export const getProfileGaps = (profile: Profile, user: User): ProfileGap[] => {
+  const gaps: ProfileGap[] = [];
+
+  if (!profile?.photos?.length) gaps.push({
+    field: 'photo',
+    label: 'Profile Photo',
+    impact: 'Profiles with photos get 8x more matches',
+    screen: 'ProfileCompletion',
+    screenParams: { startStep: 0 }
+  });
+
+  if (!profile?.bio || profile.bio.length < 20) gaps.push({
+    field: 'bio',
+    label: 'About Me',
+    impact: 'A bio helps roommates know if you are a good fit before swiping',
+    screen: 'ProfileCompletion',
+    screenParams: { startStep: 1 }
+  });
+
+  if (!profile?.occupation) gaps.push({
+    field: 'occupation',
+    label: 'Occupation',
+    impact: 'Occupation helps match you with roommates who have compatible schedules',
+    screen: 'ProfileCompletion',
+    screenParams: { startStep: 2 }
+  });
+
+  if (!profile?.interests || profile.interests.length < 3) gaps.push({
+    field: 'interests',
+    label: 'Interest Tags',
+    impact: 'Shared interests increase your compatibility score by up to 20%',
+    screen: 'ProfileCompletion',
+    screenParams: { startStep: 3 }
+  });
+
+  if (!profile?.cleanliness || !profile?.noise_level) gaps.push({
+    field: 'living_style',
+    label: 'Living Style',
+    impact: 'Cleanliness and noise preferences are the top cause of roommate conflicts',
+    screen: 'ProfileCompletion',
+    screenParams: { startStep: 4 }
+  });
+
+  if (!profile?.pets || !profile?.smoking) gaps.push({
+    field: 'preferences',
+    label: 'Living Preferences',
+    impact: 'Pet and smoking preferences filter out incompatible matches instantly',
+    screen: 'ProfileCompletion',
+    screenParams: { startStep: 5 }
+  });
+
+  return gaps;
+};
+
+export const getCompletionPercentage = (profile: Profile): number => {
+  let score = 0;
+  if (profile?.photos?.length) score += 10;
+  if (profile?.bio?.length >= 20) score += 10;
+  if (profile?.occupation) score += 10;
+  if (profile?.interests?.length >= 3) score += 15;
+  if (profile?.cleanliness && profile?.noise_level) score += 10;
+  if (profile?.sleep_schedule) score += 5;
+  if (profile?.pets) score += 5;
+  if (profile?.smoking !== undefined) score += 5;
+  if (profile?.work_location) score += 10;
+  if (profile?.lease_duration) score += 10;
+  return Math.min(score, 100);
+};
+```
+
+---
+
+**PART 2 — ADD REMINDER CONTEXT TO AI SHEET**
+
+In `components/RoomdrAISheet.tsx`, add a new screen context called `'profile_reminder'` to the existing `ScreenContext` type:
+
+```ts
+type ScreenContext = 'match' | 'chat' | 'explore' | 'messages' | 'groups' | 'profile' | 'profile_reminder';
+```
+
+When `screenContext === 'profile_reminder'`, the AI sheet displays a special reminder mode instead of the standard assistant UI.
+
+In this mode the sheet shows:
+
+**Header:**
+- Small coral chip label: **"AI Tip"**
+- Heading: **"Boost Your Matches"** in white, 20px bold
+- Subtext: **"Here's what's holding back your profile"** in gray
+
+**Gap Cards:**
+For each gap returned by `getProfileGaps()`, render a card with:
+- Left side: coral circle with a relevant Feather icon (`image` for photo, `file-text` for bio, `briefcase` for occupation, `tag` for interests, `home` for living style, `sliders` for preferences)
+- Center: gap label in white bold, impact text in gray below it
+- Right side: coral **"Fix →"** button that navigates to `ProfileCompletion` screen at the correct step
+
+**Completion Bar at bottom of sheet:**
+- **"Your profile is [X]% complete"** in white
+- Coral filled progress bar
+- **"Complete profile to get [Y]x more matches"** — where Y is calculated:
+  - Under 40%: 5x
+  - 40–70%: 3x
+  - 70–90%: 2x
+  - 90–99%: 1.5x
+  - 100%: show **"Your profile is fully optimized ✅"** instead
+
+**If profile is 100% complete**, show a different state:
+- Green checkmark icon
+- **"Your profile is fully optimized!"** heading
+- **"You're appearing in all relevant searches. Keep swiping!"** subtext
+- Dismiss button
+
+---
+
+**PART 3 — TRIGGER POINTS**
+
+Add the AI profile reminder trigger in these 4 places:
+
+**1. Match Screen — after 5 swipes with no match**
+In `RoommatesScreen.tsx`, track a swipe counter in state. After every 5 consecutive swipes with no mutual match, automatically open the AI sheet with `screenContext="profile_reminder"`. Show a max of once per session — do not show again if already shown.
+
+**2. Profile Screen — tapping the completion bar**
+In `ProfileScreen.tsx`, when the user taps anywhere on the `<ProfileCompletionBar>` component, open the AI sheet with `screenContext="profile_reminder"` instead of navigating directly to the completion flow. The AI sheet then shows the gaps with Fix buttons that navigate to the correct step.
+
+**3. Match Screen — daily first open nudge**
+In `RoommatesScreen.tsx`, on the first time the screen is opened each calendar day, check if profile completion is under 80%. If it is, show the AI sheet automatically after a 1.5 second delay with `screenContext="profile_reminder"`. Store the last shown date in AsyncStorage as `lastProfileReminderDate`. Only show once per day.
+
+**4. Messages Screen — first message sent**
+In `MessagesScreen.tsx` or `ChatScreen.tsx`, after the user sends their very first ever message (check `user.totalMessagesSent === 1`), show a congratulations message in the AI sheet followed by the profile completion reminder. Sheet heading: **"Great first message! 🎉"**, subtext: **"Complete your profile so they can learn more about you before replying"**, then show the gap cards below.
+
+---
+
+**PART 4 — AI MESSAGE TONE**
+
+The AI reminder messages should feel personal, not robotic. Use these exact copy strings for each gap type in the sheet:
+
+```ts
+export const GAP_MESSAGES: Record<string, string> = {
+  photo: "Profiles without a photo are skipped 8 out of 10 times. Add one now to start getting noticed.",
+  bio: "Your bio is your first impression. Even 2-3 sentences about yourself makes a huge difference.",
+  occupation: "Knowing your occupation helps match you with roommates who keep similar hours.",
+  interests: "You haven't added your interests yet. Shared interests are one of the top factors in successful roommate matches.",
+  living_style: "Cleanliness and noise level mismatches are the #1 reason roommates don't work out. Tell us your style.",
+  preferences: "Pet and smoking preferences help filter out incompatible matches before you even see them.",
+};
+```
+
+---
+
+**PART 5 — ASYNCSTORAGE TRACKING**
+
+Use `AsyncStorage` to track reminder state and avoid over-notifying:
+
+```ts
+// Keys
+'lastProfileReminderDate'   // ISO date string — used for daily nudge
+'swipeReminderShownThisSession'  // boolean string — reset on app restart
+'firstMessageReminderShown' // boolean string — one time only
+```
+
+Before showing any automatic reminder, check these keys and skip if already shown according to the rules above.
+
+---
+
+**After completing all changes, verify:**
+1. After 5 swipes with no match the AI sheet opens automatically showing profile gaps
+2. The daily nudge shows on first Match screen open if profile is under 80% — only once per day
+3. Tapping the profile completion bar opens the AI sheet instead of going directly to the completion screen
+4. Each gap card shows the correct impact message and navigates to the right step when Fix is tapped
+5. After the first message sent, the AI sheet shows the congratulations + completion reminder
+6. A 100% complete profile shows the optimized state with no gap cards
+7. The daily nudge does not show more than once per calendar day
+8. App compiles with no TypeScript errors
+
+---

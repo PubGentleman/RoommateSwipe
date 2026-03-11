@@ -17,6 +17,7 @@ import { updateUser as supabaseUpdateUser, updateProfile as supabaseUpdateProfil
 import { DatePickerModal } from '../../components/DatePickerModal';
 import { formatDate, isAtLeast18, getTierLimit } from '../../utils/dateUtils';
 import { TagSelector } from '../../components/TagSelector';
+import { OCCUPATION_TAGS } from '../../constants/interestTags';
 
 const DraggablePhoto = ({ photo, index, photos, theme, onRemove, onReorder }: any) => {
   const translateX = useSharedValue(0);
@@ -556,12 +557,13 @@ export const EditProfileScreen = () => {
             <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>
               Occupation
             </ThemedText>
-            <TextInput
-              style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
-              placeholder="e.g., Software Engineer, Student"
-              placeholderTextColor={theme.textSecondary}
-              value={occupation}
-              onChangeText={setOccupation}
+            <ThemedText style={{ fontSize: 13, color: theme.textSecondary, marginBottom: Spacing.sm }}>Select the option that best describes what you do</ThemedText>
+            <TagSelector
+              tags={OCCUPATION_TAGS}
+              singleSelect
+              showCount={false}
+              selectedTags={occupation ? [occupation] : []}
+              onChange={(tags) => setOccupation(tags[0] ?? '')}
             />
           </View>
 

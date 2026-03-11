@@ -1055,7 +1055,7 @@ export const RoommatesScreen = () => {
                 <ThemedText style={styles.superInterestCardLabel}>Sent you a Super Interest</ThemedText>
               ) : null}
               <ThemedText style={styles.cardJob} numberOfLines={1}>
-                {currentProfile.occupation} {currentProfile.preferences?.location ? `\u00B7 ${currentProfile.preferences.location}` : ''}
+                {getTagLabel(currentProfile.occupation) || currentProfile.occupation} {currentProfile.preferences?.location ? `\u00B7 ${currentProfile.preferences.location}` : ''}
               </ThemedText>
               <ThemedText style={styles.cardBio} numberOfLines={2}>
                 {currentProfile.bio}
@@ -1667,7 +1667,7 @@ export const RoommatesScreen = () => {
                   ) : null}
                 </View>
                 <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
-                  {currentProfile.occupation}
+                  {getTagLabel(currentProfile.occupation) || currentProfile.occupation}
                 </ThemedText>
               </View>
 

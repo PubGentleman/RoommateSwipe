@@ -19,7 +19,7 @@ import { Image } from 'expo-image';
 import { DatePickerModal } from '../../components/DatePickerModal';
 import { formatDate, isAtLeast18, getTierLimit } from '../../utils/dateUtils';
 import { TagSelector } from '../../components/TagSelector';
-import { MIN_TAGS } from '../../constants/interestTags';
+import { MIN_TAGS, OCCUPATION_TAGS } from '../../constants/interestTags';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -253,7 +253,6 @@ export const ProfileQuestionnaireScreen = () => {
         return true;
       case 'locationOccupation':
         if (!selectedCity && !location.trim()) { Alert.alert('Required', 'Please select a location'); return false; }
-        if (!occupation.trim()) { Alert.alert('Required', 'Please enter your occupation'); return false; }
         return true;
       case 'bio':
         if (!bio.trim()) { Alert.alert('Required', 'Please write a short bio'); return false; }
@@ -502,12 +501,13 @@ export const ProfileQuestionnaireScreen = () => {
             />
             <View style={[styles.inputGroup, { marginTop: Spacing.lg }]}>
               <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>Occupation</ThemedText>
-              <TextInput
-                style={[styles.textInput, { backgroundColor: theme.backgroundDefault, borderColor: theme.border, color: theme.text }]}
-                value={occupation}
-                onChangeText={setOccupation}
-                placeholder="Software Engineer"
-                placeholderTextColor={theme.textSecondary}
+              <ThemedText style={{ fontSize: 13, color: theme.textSecondary, marginBottom: Spacing.sm }}>Select the option that best describes what you do</ThemedText>
+              <TagSelector
+                tags={OCCUPATION_TAGS}
+                singleSelect
+                showCount={false}
+                selectedTags={occupation ? [occupation] : []}
+                onChange={(tags) => setOccupation(tags[0] ?? '')}
               />
             </View>
           </View>

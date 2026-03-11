@@ -14,12 +14,16 @@ import { ThemedText } from './ThemedText';
 import { Spacing, BorderRadius } from '../constants/theme';
 import { INTEREST_TAGS, MIN_TAGS, MAX_TAGS } from '../constants/interestTags';
 
+type TagMap = Record<string, { label: string; icon: string; tags: { id: string; label: string }[] }>;
+
 interface TagSelectorProps {
   selectedTags: string[];
   onChange: (tags: string[]) => void;
   minTags?: number;
   maxTags?: number;
   showCount?: boolean;
+  tags?: TagMap;
+  singleSelect?: boolean;
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -77,6 +81,8 @@ export const TagSelector: React.FC<TagSelectorProps> = ({
   minTags = MIN_TAGS,
   maxTags = MAX_TAGS,
   showCount = false,
+  tags,
+  singleSelect = false,
 }) => {
   const { theme } = useTheme();
   const counterShake = useSharedValue(0);
@@ -86,6 +92,10 @@ export const TagSelector: React.FC<TagSelectorProps> = ({
   }));
 
   const toggleTag = useCallback((tagId: string) => {
+    if (singleSelect) {
+      onChange(selectedTags.includes(tagId) ? [] : [tagId]);
+      return;
+    }
     if (selectedTags.includes(tagId)) {
       onChange(selectedTags.filter((t) => t !== tagId));
     } else {
@@ -106,7 +116,7 @@ export const TagSelector: React.FC<TagSelectorProps> = ({
       }
       onChange([...selectedTags, tagId]);
     }
-  }, [selectedTags, onChange, maxTags, counterShake]);
+  }, [selectedTags, onChange, maxTags, counterShake, singleSelect]);
 
   const count = selectedTags.length;
   const progress = count / maxTags;
@@ -119,7 +129,7 @@ export const TagSelector: React.FC<TagSelectorProps> = ({
     ? '#ff6b5b'
     : theme.text;
 
-  const categories = Object.entries(INTEREST_TAGS);
+  const categories = Object.entries(tags || INTEREST_TAGS);
 
   return (
     <View>
