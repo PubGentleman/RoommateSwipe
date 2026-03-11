@@ -12,7 +12,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { StorageService } from '../../utils/storage';
 import { RoommateProfile, Match, InterestCard } from '../../types/models';
-import { isBoostExpired } from '../../utils/boostUtils';
+import { isBoostExpired, getBoostDuration, getBoostTimeRemaining } from '../../utils/boostUtils';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scaleFont, moderateScale, getResponsiveSpacing } from '../../utils/responsive';
 import { calculateCompatibility, getMatchQualityColor, getCleanlinessLabel, getSocialLevelLabel, getWorkScheduleLabel, getWorkStyleTag, validateProfileDataConsistency, formatMoveInDate, getGenderSymbol } from '../../utils/matchingAlgorithm';
@@ -41,7 +41,7 @@ const CARD_WIDTH = Math.min(SCREEN_WIDTH - Spacing.xxl, MAX_CARD_WIDTH);
 
 export const RoommatesScreen = () => {
   const { theme } = useTheme();
-  const { user, canSendInterest, purchaseUndoPass, canRewind, useRewind, canSuperLike, useSuperLike, blockUser, reportUser, canSendSuperInterest, useSuperInterestCredit, getSuperInterestCount, purchaseSuperInterest, canSendColdMessage } = useAuth();
+  const { user, canSendInterest, purchaseUndoPass, canRewind, useRewind, canSuperLike, useSuperLike, blockUser, reportUser, canSendSuperInterest, useSuperInterestCredit, getSuperInterestCount, purchaseSuperInterest, canSendColdMessage, activateBoost, canBoost, purchaseBoost, checkAndUpdateBoostStatus } = useAuth();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { refreshUnreadCount } = useNotificationContext();
@@ -77,6 +77,9 @@ export const RoommatesScreen = () => {
   const [unfilteredProfiles, setUnfilteredProfiles] = useState<RoommateProfile[]>([]);
   const [showAISheet, setShowAISheet] = useState(false);
   const [aiSheetContext, setAiSheetContext] = useState<'match'>('match');
+  const [showBoostModal, setShowBoostModal] = useState(false);
+  const [processingBoost, setProcessingBoost] = useState(false);
+  const [boostTimeLabel, setBoostTimeLabel] = useState('');
 
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -947,14 +950,10 @@ export const RoommatesScreen = () => {
         <RoomdrLogo variant="horizontal" size="sm" />
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <Pressable onPress={() => {
-            const myBoostActive = user?.boostData?.isBoosted && user?.boostData?.boostExpiresAt && !isBoostExpired(String(user.boostData.boostExpiresAt));
-            if (myBoostActive) {
-              const expiresAt = new Date(user!.boostData!.boostExpiresAt!);
-              const hoursLeft = Math.max(0, Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60)));
-              Alert.alert('Boost Active', `Your profile is boosted! ${hoursLeft} hour${hoursLeft !== 1 ? 's' : ''} remaining.`);
-            } else {
-              (navigation as any).navigate('Profile', { screen: 'ProfileMain' });
+            if (user?.boostData?.isBoosted && user?.boostData?.boostExpiresAt && !isBoostExpired(String(user.boostData.boostExpiresAt))) {
+              setBoostTimeLabel(getBoostTimeRemaining(user.boostData.boostExpiresAt));
             }
+            setShowBoostModal(true);
           }} style={styles.navIconBtn}>
             <View style={[styles.navIconBtnInner, user?.boostData?.isBoosted && user?.boostData?.boostExpiresAt && !isBoostExpired(String(user.boostData.boostExpiresAt))
               ? { backgroundColor: '#FFD700' }
@@ -1233,7 +1232,150 @@ export const RoommatesScreen = () => {
         onDismiss={() => setShowPaywall(false)}
       />
 
-      
+      <Modal visible={showBoostModal} animationType="slide" transparent onRequestClose={() => setShowBoostModal(false)}>
+        <Pressable style={[styles.modalOverlay, { justifyContent: 'flex-end', padding: 0 }]} onPress={() => setShowBoostModal(false)}>
+          <Pressable style={styles.boostSheet} onPress={() => {}}>
+            <View style={styles.boostSheetHandle} />
+            {(() => {
+              const plan = user?.subscription?.plan || 'basic';
+              const boostCheck = canBoost();
+              const duration = getBoostDuration(plan);
+              const boostActive = user?.boostData?.isBoosted && user?.boostData?.boostExpiresAt && !isBoostExpired(String(user.boostData.boostExpiresAt));
+
+              const handleBoostConfirm = async (paid?: boolean) => {
+                setProcessingBoost(true);
+                const result = paid ? await purchaseBoost() : await activateBoost();
+                setProcessingBoost(false);
+                if (result.success) {
+                  setShowBoostModal(false);
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                } else {
+                  Alert.alert('Cannot Boost', result.message);
+                }
+              };
+
+              if (boostActive) {
+                return (
+                  <>
+                    <View style={styles.boostSheetHeader}>
+                      <View style={styles.boostSheetIconWrap}>
+                        <Feather name="zap" size={28} color="#FFD700" />
+                      </View>
+                      <Text style={styles.boostSheetTitle}>Boost Already Active</Text>
+                      <Text style={styles.boostSheetDesc}>{boostTimeLabel}</Text>
+                    </View>
+                    {plan === 'elite' ? (
+                      <Text style={styles.boostSheetNote}>You can activate a new boost once this one expires</Text>
+                    ) : null}
+                    <Pressable style={styles.boostSheetDismiss} onPress={() => setShowBoostModal(false)}>
+                      <Text style={styles.boostSheetDismissText}>Got it</Text>
+                    </Pressable>
+                  </>
+                );
+              }
+
+              if (plan === 'basic') {
+                return (
+                  <>
+                    <View style={styles.boostSheetHeader}>
+                      <View style={styles.boostSheetIconWrap}>
+                        <Feather name="zap" size={28} color="#ff6b5b" />
+                      </View>
+                      <Text style={styles.boostSheetTitle}>Boost Your Profile</Text>
+                      <Text style={styles.boostSheetDesc}>Your profile appears near the top of swipe decks for {duration} hours</Text>
+                    </View>
+                    <View style={styles.boostSheetPriceRow}>
+                      <Text style={styles.boostSheetPrice}>$4.99</Text>
+                      <Text style={styles.boostSheetPriceSub}>{duration} hours of priority placement</Text>
+                    </View>
+                    <Pressable
+                      style={[styles.boostSheetCta, { opacity: processingBoost ? 0.7 : 1 }]}
+                      onPress={() => handleBoostConfirm(true)}
+                      disabled={processingBoost}
+                    >
+                      <LinearGradient colors={['#ff6b5b', '#e83a2a']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.boostSheetCtaGrad}>
+                        <Text style={styles.boostSheetCtaText}>{processingBoost ? 'Processing...' : 'Boost for $4.99'}</Text>
+                      </LinearGradient>
+                    </Pressable>
+                    <Pressable style={styles.boostSheetDismiss} onPress={() => setShowBoostModal(false)}>
+                      <Text style={styles.boostSheetDismissText}>Cancel</Text>
+                    </Pressable>
+                  </>
+                );
+              }
+
+              if (plan === 'plus') {
+                const hasFree = boostCheck.hasFreeBoost;
+                return (
+                  <>
+                    <View style={styles.boostSheetHeader}>
+                      <View style={styles.boostSheetIconWrap}>
+                        <Feather name="zap" size={28} color={hasFree ? '#3ECF8E' : '#FFD700'} />
+                      </View>
+                      <Text style={styles.boostSheetTitle}>{hasFree ? 'Boost Your Profile — Free with Plus' : 'Free Boost Used'}</Text>
+                      <Text style={styles.boostSheetDesc}>
+                        {hasFree
+                          ? `Your profile appears near the top of swipe decks for ${duration} hours`
+                          : boostCheck.nextAvailableAt
+                            ? `Your next free boost is available on ${new Date(boostCheck.nextAvailableAt).toLocaleDateString()}`
+                            : 'Your free boost is on cooldown'}
+                      </Text>
+                    </View>
+                    {hasFree ? (
+                      <Pressable
+                        style={[styles.boostSheetCta, { opacity: processingBoost ? 0.7 : 1 }]}
+                        onPress={() => handleBoostConfirm(false)}
+                        disabled={processingBoost}
+                      >
+                        <LinearGradient colors={['#3ECF8E', '#2bb878']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.boostSheetCtaGrad}>
+                          <Text style={styles.boostSheetCtaText}>{processingBoost ? 'Activating...' : 'Activate Free Boost'}</Text>
+                        </LinearGradient>
+                      </Pressable>
+                    ) : (
+                      <Pressable
+                        style={[styles.boostSheetCta, { opacity: processingBoost ? 0.7 : 1 }]}
+                        onPress={() => handleBoostConfirm(true)}
+                        disabled={processingBoost}
+                      >
+                        <LinearGradient colors={['#ff6b5b', '#e83a2a']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.boostSheetCtaGrad}>
+                          <Text style={styles.boostSheetCtaText}>{processingBoost ? 'Processing...' : 'Boost now for $4.99 (12 hours)'}</Text>
+                        </LinearGradient>
+                      </Pressable>
+                    )}
+                    <Pressable style={styles.boostSheetDismiss} onPress={() => setShowBoostModal(false)}>
+                      <Text style={styles.boostSheetDismissText}>Cancel</Text>
+                    </Pressable>
+                  </>
+                );
+              }
+
+              return (
+                <>
+                  <View style={styles.boostSheetHeader}>
+                    <View style={[styles.boostSheetIconWrap, { backgroundColor: 'rgba(255,215,0,0.15)' }]}>
+                      <Feather name="zap" size={28} color="#FFD700" />
+                    </View>
+                    <Text style={styles.boostSheetTitle}>Boost Your Profile — Unlimited with Elite</Text>
+                    <Text style={styles.boostSheetDesc}>Your profile appears near the top of swipe decks for {duration} hours</Text>
+                  </View>
+                  <Pressable
+                    style={[styles.boostSheetCta, { opacity: processingBoost ? 0.7 : 1 }]}
+                    onPress={() => handleBoostConfirm(false)}
+                    disabled={processingBoost}
+                  >
+                    <LinearGradient colors={['#FFD700', '#f0c000']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.boostSheetCtaGrad}>
+                      <Text style={[styles.boostSheetCtaText, { color: '#000' }]}>{processingBoost ? 'Activating...' : 'Activate Boost'}</Text>
+                    </LinearGradient>
+                  </Pressable>
+                  <Pressable style={styles.boostSheetDismiss} onPress={() => setShowBoostModal(false)}>
+                    <Text style={styles.boostSheetDismissText}>Cancel</Text>
+                  </Pressable>
+                </>
+              );
+            })()}
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <Modal
         visible={showUndoUpgradeModal}
@@ -2568,5 +2710,98 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  boostSheet: {
+    backgroundColor: '#1a1a1a',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+    paddingTop: 12,
+  },
+  boostSheetHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignSelf: 'center' as const,
+    marginBottom: 20,
+  },
+  boostSheetHeader: {
+    alignItems: 'center' as const,
+    marginBottom: 20,
+  },
+  boostSheetIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,107,91,0.15)',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    marginBottom: 14,
+  },
+  boostSheetTitle: {
+    fontSize: 19,
+    fontWeight: '800' as const,
+    color: '#fff',
+    textAlign: 'center' as const,
+    marginBottom: 6,
+  },
+  boostSheetDesc: {
+    fontSize: 13.5,
+    color: 'rgba(255,255,255,0.5)',
+    textAlign: 'center' as const,
+    lineHeight: 19,
+  },
+  boostSheetNote: {
+    fontSize: 12.5,
+    color: 'rgba(255,255,255,0.4)',
+    textAlign: 'center' as const,
+    marginBottom: 16,
+  },
+  boostSheetPriceRow: {
+    alignItems: 'center' as const,
+    marginBottom: 18,
+    paddingVertical: 14,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+  },
+  boostSheetPrice: {
+    fontSize: 26,
+    fontWeight: '800' as const,
+    color: '#ff6b5b',
+    marginBottom: 2,
+  },
+  boostSheetPriceSub: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.4)',
+  },
+  boostSheetCta: {
+    borderRadius: 14,
+    overflow: 'hidden' as const,
+    marginBottom: 10,
+  },
+  boostSheetCtaGrad: {
+    height: 50,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    borderRadius: 14,
+  },
+  boostSheetCtaText: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    color: '#fff',
+  },
+  boostSheetDismiss: {
+    height: 44,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  boostSheetDismissText: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: 'rgba(255,255,255,0.4)',
   },
 });
