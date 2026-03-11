@@ -112,6 +112,27 @@ export const getCompletionPercentage = (user: User): number => {
   return Math.min(score, 100);
 };
 
+export const validateInterestTags = (
+  selectedTags: string[],
+  tagIdsByCategory: Record<string, string[]>,
+): { valid: boolean; message: string } => {
+  const requiredCategories = ['lifestyle', 'habits', 'hobbies'];
+  const missing: string[] = [];
+  for (const cat of requiredCategories) {
+    const ids = tagIdsByCategory[cat] || [];
+    if (!selectedTags.some(t => ids.includes(t))) {
+      missing.push(cat.charAt(0).toUpperCase() + cat.slice(1));
+    }
+  }
+  if (missing.length > 0) {
+    return { valid: false, message: `Pick at least 1 from: ${missing.join(', ')}` };
+  }
+  if (selectedTags.length < 3) {
+    return { valid: false, message: `Pick at least 3 tags to continue` };
+  }
+  return { valid: true, message: '' };
+};
+
 export const getMatchMultiplier = (percentage: number): number => {
   if (percentage < 40) return 5;
   if (percentage <= 70) return 3;

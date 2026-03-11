@@ -16,8 +16,8 @@ import { calculateZodiacFromBirthday } from '../../utils/zodiacUtils';
 import { updateUser as supabaseUpdateUser, updateProfile as supabaseUpdateProfile, uploadProfilePhoto } from '../../services/profileService';
 import { DatePickerModal } from '../../components/DatePickerModal';
 import { formatDate, isAtLeast18, getTierLimit } from '../../utils/dateUtils';
-import { TagSelector } from '../../components/TagSelector';
-import { OCCUPATION_TAGS } from '../../constants/interestTags';
+import { OccupationBarSelector } from '../../components/OccupationBarSelector';
+import { InterestCategoryBars } from '../../components/InterestCategoryBars';
 
 const DraggablePhoto = ({ photo, index, photos, theme, onRemove, onReorder }: any) => {
   const translateX = useSharedValue(0);
@@ -558,12 +558,9 @@ export const EditProfileScreen = () => {
               Occupation
             </ThemedText>
             <ThemedText style={{ fontSize: 13, color: theme.textSecondary, marginBottom: Spacing.sm }}>Select the option that best describes what you do</ThemedText>
-            <TagSelector
-              tags={OCCUPATION_TAGS}
-              singleSelect
-              showCount={false}
-              selectedTags={occupation ? [occupation] : []}
-              onChange={(tags) => setOccupation(tags[0] ?? '')}
+            <OccupationBarSelector
+              selectedOccupation={occupation}
+              onChange={setOccupation}
             />
           </View>
 
@@ -571,12 +568,10 @@ export const EditProfileScreen = () => {
             <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
               Interests & Lifestyle
             </ThemedText>
-            <TagSelector
+            <InterestCategoryBars
               selectedTags={interests}
               onChange={setInterests}
-              minTags={3}
               maxTags={10}
-              showCount
             />
           </View>
 

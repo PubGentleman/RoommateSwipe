@@ -18,8 +18,10 @@ import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
 import { DatePickerModal } from '../../components/DatePickerModal';
 import { formatDate, isAtLeast18, getTierLimit } from '../../utils/dateUtils';
-import { TagSelector } from '../../components/TagSelector';
-import { MIN_TAGS, OCCUPATION_TAGS } from '../../constants/interestTags';
+import { OccupationBarSelector } from '../../components/OccupationBarSelector';
+import { InterestCategoryBars } from '../../components/InterestCategoryBars';
+import { INTEREST_TAGS, MIN_TAGS } from '../../constants/interestTags';
+import { validateInterestTags } from '../../utils/profileReminderUtils';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -288,9 +290,15 @@ export const ProfileQuestionnaireScreen = () => {
         if (isNaN(parseInt(bathrooms)) || parseInt(bathrooms) <= 0) { Alert.alert('Error', 'Please enter a valid number of bathrooms'); return false; }
         if (privateBathroom === undefined) { Alert.alert('Required', 'Please select your bathroom preference'); return false; }
         return true;
-      case 'interests':
-        if (interests.length < MIN_TAGS) { Alert.alert('Required', `Please select at least ${MIN_TAGS} interest tags`); return false; }
+      case 'interests': {
+        const tagIdsByCategory: Record<string, string[]> = {};
+        for (const [key, cat] of Object.entries(INTEREST_TAGS)) {
+          tagIdsByCategory[key] = cat.tags.map(t => t.id);
+        }
+        const result = validateInterestTags(interests, tagIdsByCategory);
+        if (!result.valid) { Alert.alert('Required', result.message); return false; }
         return true;
+      }
       case 'expenses':
         if (!expenseUtilities) { Alert.alert('Required', 'Please select how to split utilities'); return false; }
         if (!expenseGroceries) { Alert.alert('Required', 'Please select how to handle groceries'); return false; }
@@ -502,12 +510,9 @@ export const ProfileQuestionnaireScreen = () => {
             <View style={[styles.inputGroup, { marginTop: Spacing.lg }]}>
               <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>Occupation</ThemedText>
               <ThemedText style={{ fontSize: 13, color: theme.textSecondary, marginBottom: Spacing.sm }}>Select the option that best describes what you do</ThemedText>
-              <TagSelector
-                tags={OCCUPATION_TAGS}
-                singleSelect
-                showCount={false}
-                selectedTags={occupation ? [occupation] : []}
-                onChange={(tags) => setOccupation(tags[0] ?? '')}
+              <OccupationBarSelector
+                selectedOccupation={occupation}
+                onChange={setOccupation}
               />
             </View>
           </View>
@@ -678,12 +683,10 @@ export const ProfileQuestionnaireScreen = () => {
       case 'interests':
         return (
           <View style={styles.stepInner}>
-            <TagSelector
+            <InterestCategoryBars
               selectedTags={interests}
               onChange={setInterests}
-              minTags={MIN_TAGS}
               maxTags={10}
-              showCount
             />
           </View>
         );
