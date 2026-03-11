@@ -16,6 +16,7 @@ import { calculateZodiacFromBirthday } from '../../utils/zodiacUtils';
 import { updateUser as supabaseUpdateUser, updateProfile as supabaseUpdateProfile, uploadProfilePhoto } from '../../services/profileService';
 import { DatePickerModal } from '../../components/DatePickerModal';
 import { formatDate, isAtLeast18, getTierLimit } from '../../utils/dateUtils';
+import { TagSelector } from '../../components/TagSelector';
 
 const DraggablePhoto = ({ photo, index, photos, theme, onRemove, onReorder }: any) => {
   const translateX = useSharedValue(0);
@@ -131,7 +132,9 @@ export const EditProfileScreen = () => {
   const [lookingFor, setLookingFor] = useState<'room' | 'entire_apartment'>(user?.profileData?.lookingFor || 'room');
   const [location, setLocation] = useState(user?.profileData?.location || '');
   const [occupation, setOccupation] = useState(user?.profileData?.occupation || '');
-  const [interests, setInterests] = useState(user?.profileData?.interests || '');
+  const [interests, setInterests] = useState<string[]>(
+    Array.isArray(user?.profileData?.interests) ? user.profileData.interests : []
+  );
   const [gender, setGender] = useState<'male' | 'female' | 'other' | undefined>(user?.profileData?.gender);
   
   const [sleepSchedule, setSleepSchedule] = useState<'early_sleeper' | 'late_sleeper' | 'flexible' | 'irregular'>(user?.profileData?.preferences?.sleepSchedule || 'flexible');
@@ -142,7 +145,6 @@ export const EditProfileScreen = () => {
   const [workLocation, setWorkLocation] = useState<'wfh_fulltime' | 'hybrid' | 'office_fulltime' | 'irregular'>(user?.profileData?.preferences?.workLocation || 'hybrid');
   const [roommateRelationship, setRoommateRelationship] = useState<'respectful_coliving' | 'occasional_hangouts' | 'prefer_friends' | 'minimal_interaction'>(user?.profileData?.preferences?.roommateRelationship || 'respectful_coliving');
   const [pets, setPets] = useState<'have_pets' | 'open_to_pets' | 'no_pets'>(user?.profileData?.preferences?.pets || 'open_to_pets');
-  const [lifestyle, setLifestyle] = useState<Array<'active_gym' | 'homebody' | 'nightlife_social' | 'quiet_introverted' | 'creative_artistic' | 'professional_focused'>>(user?.profileData?.preferences?.lifestyle || []);
   const [expenseUtilities, setExpenseUtilities] = useState<'split_equally' | 'usage_based' | 'included_in_rent'>(user?.profileData?.preferences?.sharedExpenses?.utilities || 'split_equally');
   const [expenseGroceries, setExpenseGroceries] = useState<'split_equally' | 'buy_own' | 'shared_basics'>(user?.profileData?.preferences?.sharedExpenses?.groceries || 'buy_own');
   const [expenseInternet, setExpenseInternet] = useState<'split_equally' | 'one_pays' | 'included_in_rent'>(user?.profileData?.preferences?.sharedExpenses?.internet || 'split_equally');
@@ -229,18 +231,6 @@ export const EditProfileScreen = () => {
   };
 
 
-  const toggleLifestyle = (item: 'active_gym' | 'homebody' | 'nightlife_social' | 'quiet_introverted' | 'creative_artistic' | 'professional_focused') => {
-    if (lifestyle.includes(item)) {
-      setLifestyle(lifestyle.filter(l => l !== item));
-    } else {
-      if (lifestyle.length < 3) {
-        setLifestyle([...lifestyle, item]);
-      } else {
-        Alert.alert('Maximum Reached', 'You can select up to 3 lifestyle choices');
-      }
-    }
-  };
-
   const validateBirthday = (dateString: string): { valid: boolean; error: string } => {
     if (!dateString.trim()) return { valid: false, error: 'Please select your date of birth' };
     if (!isAtLeast18(dateString)) return { valid: false, error: 'You must be at least 18 years old' };
@@ -310,7 +300,7 @@ export const EditProfileScreen = () => {
       await supabaseUpdateProfile({
         budget_min: budget.trim() ? parseInt(budget) : undefined,
         looking_for: lookingFor,
-        interests: interests.trim() ? interests.split(',').map(i => i.trim()) : undefined,
+        interests: interests.length > 0 ? interests : undefined,
         photos: uploadedPhotoUrls,
         sleep_schedule: sleepSchedule,
         cleanliness: cleanliness === 'very_tidy' ? 5 : cleanliness === 'moderately_tidy' ? 3 : 1,
@@ -341,7 +331,7 @@ export const EditProfileScreen = () => {
         lookingFor,
         location: location.trim() || undefined,
         occupation: occupation.trim() || undefined,
-        interests: interests.trim() || undefined,
+        interests: interests.length > 0 ? interests : undefined,
         gender,
         preferences: {
           sleepSchedule,
@@ -352,7 +342,6 @@ export const EditProfileScreen = () => {
           workLocation,
           roommateRelationship,
           pets,
-          lifestyle,
           moveInDate: moveInDate.trim() || undefined,
           bedrooms: bedrooms.trim() ? parseInt(bedrooms) : undefined,
           sharedExpenses: {
@@ -577,15 +566,15 @@ export const EditProfileScreen = () => {
           </View>
 
           <View style={styles.inputGroup}>
-            <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>
-              Interests
+            <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
+              Interests & Lifestyle
             </ThemedText>
-            <TextInput
-              style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
-              placeholder="e.g., Fitness, Cooking, Gaming"
-              placeholderTextColor={theme.textSecondary}
-              value={interests}
-              onChangeText={setInterests}
+            <TagSelector
+              selectedTags={interests}
+              onChange={setInterests}
+              minTags={3}
+              maxTags={10}
+              showCount
             />
           </View>
 
@@ -778,23 +767,6 @@ export const EditProfileScreen = () => {
             </View>
           </View>
 
-          {/* Lifestyle */}
-          <View style={styles.inputGroup}>
-            <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
-              What describes your lifestyle best? (Choose up to 3)
-            </ThemedText>
-            <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.sm }]}>
-              Selected: {lifestyle.length}/3
-            </ThemedText>
-            <View style={styles.optionsRow}>
-              <OptionButton label="Very Active / Gym" value="active_gym" isSelected={lifestyle.includes('active_gym')} onPress={() => toggleLifestyle('active_gym')} />
-              <OptionButton label="Homebody" value="homebody" isSelected={lifestyle.includes('homebody')} onPress={() => toggleLifestyle('homebody')} />
-              <OptionButton label="Nightlife / Social" value="nightlife_social" isSelected={lifestyle.includes('nightlife_social')} onPress={() => toggleLifestyle('nightlife_social')} />
-              <OptionButton label="Quiet / Introverted" value="quiet_introverted" isSelected={lifestyle.includes('quiet_introverted')} onPress={() => toggleLifestyle('quiet_introverted')} />
-              <OptionButton label="Creative / Artistic" value="creative_artistic" isSelected={lifestyle.includes('creative_artistic')} onPress={() => toggleLifestyle('creative_artistic')} />
-              <OptionButton label="Professional-focused" value="professional_focused" isSelected={lifestyle.includes('professional_focused')} onPress={() => toggleLifestyle('professional_focused')} />
-            </View>
-          </View>
         </View>
 
         {/* Shared Expenses */}

@@ -490,26 +490,44 @@ export const calculateDetailedCompatibility = (
   }
 
   // ========================================
-  // 13. LIFESTYLE TAGS (2 points) - Shared Interests
-  // Max reduced from 3 to 2 points to accommodate zodiac sign (2 pts)
-  // Baseline maintained at 1 point for compatibility with pre-zodiac scoring
+  // 13. INTEREST TAGS (2 points) - Tag-based compatibility
+  // Uses new interest tag system with overlap scoring and conflict penalties
   // ========================================
-  if (userPrefs.lifestyle && userPrefs.lifestyle.length > 0) {
-    const userLifestyles = userPrefs.lifestyle;
-    const roommateLifestyles = inferLifestyleTags(roommateProfile);
-    
-    const overlaps = userLifestyles.filter(tag => roommateLifestyles.includes(tag));
-    
-    if (overlaps.length >= 2) {
-      breakdown.lifestyle = 2;
-      reasons.strengths.push(`Shared interests: ${overlaps.join(', ')}`);
-    } else if (overlaps.length === 1) {
-      breakdown.lifestyle = 1;
-      reasons.notes.push(`Some shared interests: ${overlaps.join(', ')}`);
+  const userInterests: string[] = Array.isArray(currentUser.profileData?.interests) ? currentUser.profileData.interests : [];
+  const roommateInterests: string[] = Array.isArray(roommateProfile.profileData?.interests) ? roommateProfile.profileData.interests : [];
+
+  if (userInterests.length > 0 && roommateInterests.length > 0) {
+    const userSet = new Set(userInterests);
+    const overlap = roommateInterests.filter(tag => userSet.has(tag));
+    const maxPossible = Math.min(userInterests.length, roommateInterests.length);
+    const interestScore = maxPossible > 0 ? (overlap.length / maxPossible) * 2 : 0;
+    breakdown.lifestyle = Math.round(interestScore * 10) / 10;
+
+    if (overlap.length >= 3) {
+      reasons.strengths.push(`${overlap.length} shared interests`);
+    } else if (overlap.length > 0) {
+      reasons.notes.push(`${overlap.length} shared interest${overlap.length > 1 ? 's' : ''}`);
     } else {
-      breakdown.lifestyle = 1;
-      reasons.notes.push(`Different lifestyle interests`);
+      reasons.notes.push('No shared interest tags');
     }
+
+    const CONFLICTING_PAIRS = [
+      ['smoker', 'non_smoker'],
+      ['pet_friendly', 'no_pets_tag'],
+      ['early_bird', 'night_owl'],
+      ['host_gatherings', 'rarely_guests'],
+    ];
+
+    CONFLICTING_PAIRS.forEach(([tag1, tag2]) => {
+      const u1Has1 = userInterests.includes(tag1);
+      const u1Has2 = userInterests.includes(tag2);
+      const u2Has1 = roommateInterests.includes(tag1);
+      const u2Has2 = roommateInterests.includes(tag2);
+      if ((u1Has1 && u2Has2) || (u1Has2 && u2Has1)) {
+        breakdown.lifestyle = Math.max(0, breakdown.lifestyle - 1);
+        reasons.concerns.push(`Conflicting preferences detected`);
+      }
+    });
   } else {
     breakdown.lifestyle = 1;
   }

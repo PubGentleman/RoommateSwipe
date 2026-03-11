@@ -16,6 +16,7 @@ import { isBoostExpired } from '../../utils/boostUtils';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scaleFont, moderateScale, getResponsiveSpacing } from '../../utils/responsive';
 import { calculateCompatibility, getMatchQualityColor, getCleanlinessLabel, getSocialLevelLabel, getWorkScheduleLabel, getWorkStyleTag, validateProfileDataConsistency, formatMoveInDate, getGenderSymbol } from '../../utils/matchingAlgorithm';
+import { getTagLabel, INTEREST_TAGS } from '../../constants/interestTags';
 import { getCityFromNeighborhood } from '../../utils/locationData';
 import { useCityContext } from '../../contexts/CityContext';
 import { CityPickerModal, CityPillButton } from '../../components/CityPickerModal';
@@ -158,6 +159,9 @@ export const RoommatesScreen = () => {
             zodiacSign: p.profile?.zodiac_sign,
             moveInDate: p.profile?.move_in_date,
             verified: p.profile?.verified || false,
+            profileData: {
+              interests: Array.isArray(p.profile?.interests) ? p.profile.interests : [],
+            },
           })) as RoommateProfile[];
           usedSupabase = true;
           console.log('[RoommatesScreen] Loaded profiles from Supabase:', allProfiles.length);
@@ -1080,6 +1084,24 @@ export const RoommatesScreen = () => {
                   <ThemedText style={styles.tagMatchText}>{currentProfile.compatibility || 50}% Match</ThemedText>
                 </View>
               </View>
+              {(() => {
+                const myTags: string[] = (user?.profileData?.interests as string[]) || [];
+                const theirTags: string[] = (currentProfile.profileData?.interests as string[]) || (currentProfile as any).interests || [];
+                const shared = myTags.filter(t => theirTags.includes(t)).slice(0, 3);
+                if (shared.length === 0) return null;
+                return (
+                  <View style={{ marginTop: 6 }}>
+                    <ThemedText style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 3 }}>You both</ThemedText>
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                      {shared.map(tagId => (
+                        <View key={tagId} style={{ backgroundColor: 'rgba(255,107,91,0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 }}>
+                          <ThemedText style={{ fontSize: 11, color: '#ff6b5b', fontWeight: '600' }}>{getTagLabel(tagId)}</ThemedText>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                );
+              })()}
             </View>
           </Animated.View>
         </GestureDetector>
@@ -1753,6 +1775,47 @@ export const RoommatesScreen = () => {
                   </View>
                 </View>
               </View>
+
+              {(() => {
+                const profileTags: string[] = (currentProfile.profileData?.interests as string[]) || (currentProfile as any).interests || [];
+                const myTags: string[] = (user?.profileData?.interests as string[]) || [];
+                const myTagSet = new Set(myTags);
+                if (profileTags.length === 0) return null;
+                return (
+                  <View style={styles.detailSection}>
+                    <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Interests</ThemedText>
+                    {Object.entries(INTEREST_TAGS).map(([catKey, cat]) => {
+                      const catTags = cat.tags.filter(t => profileTags.includes(t.id));
+                      if (catTags.length === 0) return null;
+                      return (
+                        <View key={catKey} style={{ marginBottom: Spacing.md }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                            <Feather name={cat.icon as any} size={14} color={theme.textSecondary} />
+                            <ThemedText style={{ fontSize: 12, color: theme.textSecondary, fontWeight: '600' }}>{cat.label}</ThemedText>
+                          </View>
+                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                            {catTags.map(tag => {
+                              const isShared = myTagSet.has(tag.id);
+                              return (
+                                <View key={tag.id} style={{
+                                  paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12,
+                                  backgroundColor: isShared ? 'rgba(255,107,91,0.15)' : 'rgba(255,255,255,0.08)',
+                                  borderWidth: isShared ? 0 : 1,
+                                  borderColor: 'rgba(255,255,255,0.15)',
+                                }}>
+                                  <ThemedText style={{ fontSize: 12, fontWeight: '500', color: isShared ? '#ff6b5b' : '#FFFFFF' }}>
+                                    {tag.label}
+                                  </ThemedText>
+                                </View>
+                              );
+                            })}
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                );
+              })()}
 
               <View style={[styles.detailSection, { paddingBottom: Spacing.xxl }]}>
                 <View style={[styles.matchBadge, { backgroundColor: getMatchQualityColor(currentProfile.compatibility || 50) + '20' }]}>

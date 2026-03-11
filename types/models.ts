@@ -29,6 +29,11 @@ export interface RoommateProfile {
   };
   verification?: VerificationStatus;
   compatibility?: number;
+  profileData?: {
+    interests?: string[];
+    preferences?: Record<string, any>;
+    [key: string]: any;
+  };
 }
 
 export interface Property {
@@ -313,7 +318,7 @@ export interface User {
       lng: number;
     };
     occupation?: string;
-    interests?: string;
+    interests?: string[];
     gender?: 'male' | 'female' | 'other';
     preferences?: {
       sleepSchedule?: 'early_sleeper' | 'late_sleeper' | 'flexible' | 'irregular';

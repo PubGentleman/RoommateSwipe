@@ -18,6 +18,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
 import { DatePickerModal } from '../../components/DatePickerModal';
 import { formatDate, isAtLeast18, getTierLimit } from '../../utils/dateUtils';
+import { TagSelector } from '../../components/TagSelector';
+import { MIN_TAGS } from '../../constants/interestTags';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -57,7 +59,7 @@ type StepId =
   | 'noiseTolerance'
   | 'workPets'
   | 'housing'
-  | 'lifestyle'
+  | 'interests'
   | 'expenses';
 
 const STEP_ORDER: StepId[] = [
@@ -73,7 +75,7 @@ const STEP_ORDER: StepId[] = [
   'noiseTolerance',
   'workPets',
   'housing',
-  'lifestyle',
+  'interests',
   'expenses',
 ];
 
@@ -90,7 +92,7 @@ const STEP_TITLES: Record<StepId, string> = {
   noiseTolerance: 'Noise Tolerance',
   workPets: 'Work & Pets',
   housing: 'Housing Preferences',
-  lifestyle: 'Your Lifestyle',
+  interests: 'Interests & Lifestyle',
   expenses: 'Shared Expenses',
 };
 
@@ -107,7 +109,7 @@ const STEP_SUBTITLES: Record<StepId, string> = {
   noiseTolerance: 'How much noise can you handle?',
   workPets: 'Where do you work and how do you feel about pets?',
   housing: 'What are your housing needs?',
-  lifestyle: 'Pick up to 3 that describe you best.',
+  interests: 'Pick at least 3 tags that match your lifestyle. This helps us find your perfect roommate.',
   expenses: 'How would you like to split shared costs?',
 };
 
@@ -148,7 +150,6 @@ export const ProfileQuestionnaireScreen = () => {
   const [selectedCity, setSelectedCity] = useState(user?.profileData?.city || '');
   const [selectedNeighborhood, setSelectedNeighborhood] = useState(user?.profileData?.neighborhood || '');
   const [occupation, setOccupation] = useState(user?.profileData?.occupation || '');
-  const [interests, setInterests] = useState(user?.profileData?.interests || '');
   const [gender, setGender] = useState<'male' | 'female' | 'other' | undefined>(user?.profileData?.gender);
   const [sleepSchedule, setSleepSchedule] = useState<'early_sleeper' | 'late_sleeper' | 'flexible' | 'irregular' | undefined>(user?.profileData?.preferences?.sleepSchedule);
   const [cleanliness, setCleanliness] = useState<'very_tidy' | 'moderately_tidy' | 'relaxed' | undefined>(user?.profileData?.preferences?.cleanliness);
@@ -158,7 +159,7 @@ export const ProfileQuestionnaireScreen = () => {
   const [workLocation, setWorkLocation] = useState<'wfh_fulltime' | 'hybrid' | 'office_fulltime' | 'irregular' | undefined>(user?.profileData?.preferences?.workLocation);
   const [roommateRelationship, setRoommateRelationship] = useState<'respectful_coliving' | 'occasional_hangouts' | 'prefer_friends' | 'minimal_interaction' | undefined>(user?.profileData?.preferences?.roommateRelationship);
   const [pets, setPets] = useState<'have_pets' | 'open_to_pets' | 'no_pets' | undefined>(user?.profileData?.preferences?.pets);
-  const [lifestyle, setLifestyle] = useState<Array<'active_gym' | 'homebody' | 'nightlife_social' | 'quiet_introverted' | 'creative_artistic' | 'professional_focused'>>(user?.profileData?.preferences?.lifestyle || []);
+  const [interests, setInterests] = useState<string[]>(user?.profileData?.interests || []);
   const [expenseUtilities, setExpenseUtilities] = useState<'split_equally' | 'usage_based' | 'included_in_rent' | undefined>(user?.profileData?.preferences?.sharedExpenses?.utilities);
   const [expenseGroceries, setExpenseGroceries] = useState<'split_equally' | 'buy_own' | 'shared_basics' | undefined>(user?.profileData?.preferences?.sharedExpenses?.groceries);
   const [expenseInternet, setExpenseInternet] = useState<'split_equally' | 'one_pays' | 'included_in_rent' | undefined>(user?.profileData?.preferences?.sharedExpenses?.internet);
@@ -231,15 +232,6 @@ export const ProfileQuestionnaireScreen = () => {
     }
   };
 
-  const toggleLifestyle = (item: typeof lifestyle[number]) => {
-    if (lifestyle.includes(item)) {
-      setLifestyle(lifestyle.filter(l => l !== item));
-    } else if (lifestyle.length < 3) {
-      setLifestyle([...lifestyle, item]);
-    } else {
-      Alert.alert('Maximum Reached', 'You can select up to 3 lifestyle choices');
-    }
-  };
 
   const validateCurrentStep = (): boolean => {
     const stepId = STEP_ORDER[currentStep];
@@ -297,8 +289,8 @@ export const ProfileQuestionnaireScreen = () => {
         if (isNaN(parseInt(bathrooms)) || parseInt(bathrooms) <= 0) { Alert.alert('Error', 'Please enter a valid number of bathrooms'); return false; }
         if (privateBathroom === undefined) { Alert.alert('Required', 'Please select your bathroom preference'); return false; }
         return true;
-      case 'lifestyle':
-        if (lifestyle.length === 0) { Alert.alert('Required', 'Please select at least one lifestyle choice'); return false; }
+      case 'interests':
+        if (interests.length < MIN_TAGS) { Alert.alert('Required', `Please select at least ${MIN_TAGS} interest tags`); return false; }
         return true;
       case 'expenses':
         if (!expenseUtilities) { Alert.alert('Required', 'Please select how to split utilities'); return false; }
@@ -365,7 +357,7 @@ export const ProfileQuestionnaireScreen = () => {
         state: selectedState || undefined,
         coordinates: selectedNeighborhood ? getCoordinatesFromNeighborhood(selectedNeighborhood) || undefined : undefined,
         occupation: occupation.trim() || undefined,
-        interests: interests.trim() || undefined,
+        interests: interests.length > 0 ? interests : undefined,
         gender,
         preferences: {
           sleepSchedule,
@@ -376,7 +368,6 @@ export const ProfileQuestionnaireScreen = () => {
           workLocation,
           roommateRelationship,
           pets,
-          lifestyle,
           moveInDate: moveInDate.trim() || undefined,
           bedrooms: bedrooms.trim() ? parseInt(bedrooms) : undefined,
           bathrooms: bathrooms.trim() ? parseInt(bathrooms) : undefined,
@@ -484,16 +475,6 @@ export const ProfileQuestionnaireScreen = () => {
                 mode="birthday"
                 title="Enter Your Birthday"
                 initialDate={birthday || undefined}
-              />
-            </View>
-            <View style={styles.inputGroup}>
-              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>Interests</ThemedText>
-              <TextInput
-                style={[styles.textInput, { backgroundColor: theme.backgroundDefault, borderColor: theme.border, color: theme.text }]}
-                value={interests}
-                onChangeText={setInterests}
-                placeholder="Fitness, Cooking, Music..."
-                placeholderTextColor={theme.textSecondary}
               />
             </View>
           </View>
@@ -694,18 +675,16 @@ export const ProfileQuestionnaireScreen = () => {
           </View>
         );
 
-      case 'lifestyle':
+      case 'interests':
         return (
           <View style={styles.stepInner}>
-            <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.md }]}>
-              {lifestyle.length}/3 selected
-            </ThemedText>
-            <SelectionCard icon="activity" title="Very Active / Gym" isSelected={lifestyle.includes('active_gym')} onPress={() => toggleLifestyle('active_gym')} index={0} multiSelect />
-            <SelectionCard icon="home" title="Homebody" isSelected={lifestyle.includes('homebody')} onPress={() => toggleLifestyle('homebody')} index={1} multiSelect />
-            <SelectionCard icon="music" title="Nightlife / Social" isSelected={lifestyle.includes('nightlife_social')} onPress={() => toggleLifestyle('nightlife_social')} index={2} multiSelect />
-            <SelectionCard icon="book" title="Quiet / Introverted" isSelected={lifestyle.includes('quiet_introverted')} onPress={() => toggleLifestyle('quiet_introverted')} index={3} multiSelect />
-            <SelectionCard icon="edit-3" title="Creative / Artistic" isSelected={lifestyle.includes('creative_artistic')} onPress={() => toggleLifestyle('creative_artistic')} index={4} multiSelect />
-            <SelectionCard icon="trending-up" title="Professional-focused" isSelected={lifestyle.includes('professional_focused')} onPress={() => toggleLifestyle('professional_focused')} index={5} multiSelect />
+            <TagSelector
+              selectedTags={interests}
+              onChange={setInterests}
+              minTags={MIN_TAGS}
+              maxTags={10}
+              showCount
+            />
           </View>
         );
 

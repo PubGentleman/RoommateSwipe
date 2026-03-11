@@ -1,0 +1,259 @@
+---
+
+**REPLIT PROMPT — Interest Tag Selector System**
+
+Build a fully structured interest tag selector system for Roomdr. Create the reusable component, wire it into the profile questionnaire and edit profile screens, and connect the selected tags to the matching algorithm. Complete all parts fully.
+
+---
+
+**PART 1 — CREATE THE TAG DATA FILE**
+
+Create `constants/interestTags.ts` with all tags organized by category:
+
+```ts
+export const INTEREST_TAGS = {
+  lifestyle: {
+    label: 'Lifestyle',
+    icon: 'sun',
+    tags: [
+      { id: 'early_bird', label: 'Early Bird' },
+      { id: 'night_owl', label: 'Night Owl' },
+      { id: 'homebody', label: 'Homebody' },
+      { id: 'social_butterfly', label: 'Social Butterfly' },
+      { id: 'introvert', label: 'Introvert' },
+      { id: 'extrovert', label: 'Extrovert' },
+      { id: 'remote_worker', label: 'Remote Worker' },
+      { id: 'student', label: 'Student' },
+      { id: 'fitness_lover', label: 'Fitness Lover' },
+      { id: 'foodie', label: 'Foodie' },
+      { id: 'minimalist', label: 'Minimalist' },
+      { id: 'plant_parent', label: 'Plant Parent' },
+    ]
+  },
+  habits: {
+    label: 'Habits',
+    icon: 'clock',
+    tags: [
+      { id: 'super_clean', label: 'Super Clean' },
+      { id: 'pretty_clean', label: 'Pretty Clean' },
+      { id: 'relaxed_clean', label: 'Relaxed' },
+      { id: 'no_shoes_inside', label: 'No Shoes Inside' },
+      { id: 'early_sleeper', label: 'Early Sleeper' },
+      { id: 'late_sleeper', label: 'Late Sleeper' },
+      { id: 'quiet_hours', label: 'Quiet Hours' },
+      { id: 'open_door', label: 'Open Door Policy' },
+    ]
+  },
+  hobbies: {
+    label: 'Hobbies',
+    icon: 'heart',
+    tags: [
+      { id: 'gaming', label: 'Gaming' },
+      { id: 'cooking', label: 'Cooking' },
+      { id: 'music', label: 'Music' },
+      { id: 'reading', label: 'Reading' },
+      { id: 'art', label: 'Art' },
+      { id: 'photography', label: 'Photography' },
+      { id: 'travel', label: 'Travel' },
+      { id: 'yoga', label: 'Yoga' },
+      { id: 'hiking', label: 'Hiking' },
+      { id: 'movies', label: 'Movies' },
+      { id: 'sports', label: 'Sports' },
+      { id: 'podcasts', label: 'Podcasts' },
+    ]
+  },
+  social: {
+    label: 'Social',
+    icon: 'users',
+    tags: [
+      { id: 'host_gatherings', label: 'Host Gatherings' },
+      { id: 'rarely_guests', label: 'Rarely Have Guests' },
+      { id: 'occasional_guests', label: 'Occasional Guests' },
+      { id: 'pet_friendly', label: 'Pet Friendly' },
+      { id: 'no_pets', label: 'No Pets' },
+      { id: 'smoker', label: 'Smoker' },
+      { id: 'non_smoker', label: 'Non-Smoker' },
+      { id: 'cannabis_friendly', label: '420 Friendly' },
+    ]
+  },
+  diet: {
+    label: 'Diet',
+    icon: 'coffee',
+    tags: [
+      { id: 'vegan', label: 'Vegan' },
+      { id: 'vegetarian', label: 'Vegetarian' },
+      { id: 'halal', label: 'Halal' },
+      { id: 'kosher', label: 'Kosher' },
+      { id: 'gluten_free', label: 'Gluten Free' },
+      { id: 'no_diet_preference', label: 'No Preference' },
+    ]
+  }
+};
+
+export type TagId = string;
+export const MIN_TAGS = 3;
+export const MAX_TAGS = 10;
+```
+
+---
+
+**PART 2 — CREATE THE TAG SELECTOR COMPONENT**
+
+Create `components/TagSelector.tsx`:
+
+Props:
+```ts
+interface TagSelectorProps {
+  selectedTags: string[];
+  onChange: (tags: string[]) => void;
+  minTags?: number;    // default 3
+  maxTags?: number;    // default 10
+  showCount?: boolean; // show "X / 10 selected" counter
+}
+```
+
+Layout:
+- Scrollable vertical list of category sections
+- Each category has a section header with a Feather icon and category label in white, 16px bold
+- Below each header, a wrapping row of tag pills
+- Each tag pill is a rounded pill shape, 32px height, horizontal padding 14px
+- **Unselected:** `rgba(255,255,255,0.08)` background, white border `rgba(255,255,255,0.15)`, white text
+- **Selected:** coral gradient background `['#ff6b5b', '#e83a2a']`, no border, white text, small ✓ checkmark before the label
+- Tapping a selected tag deselects it
+- Tapping an unselected tag when at `maxTags` limit: shake animation on the counter and show a brief toast: **"Max 10 tags selected — remove one to add another"**
+- Smooth scale animation (0.95 → 1.0) on each tag when tapped
+
+Counter display at the top of the component when `showCount` is true:
+- **"3 / 10 selected"** — gray text when under minimum
+- **"5 / 10 selected"** — white text when at or above minimum
+- **"10 / 10 selected"** — coral text when at maximum
+- Below the counter, a thin progress bar filling coral based on selected count
+
+Minimum tag validation:
+- If fewer than `minTags` are selected, the counter text turns red and shows: **"Pick at least 3 to continue"**
+- The confirm/save button in the parent screen should be disabled until minimum is met
+
+---
+
+**PART 3 — ADD TO PROFILE QUESTIONNAIRE**
+
+In `screens/shared/ProfileQuestionnaireScreen.tsx`:
+
+Add a new step in the questionnaire flow called **"Your Vibe"** or **"Interests & Lifestyle"**. This step appears after the basic profile info steps and before the final submit step.
+
+The step shows:
+- Heading: **"What describes you?"** in white, 24px bold
+- Subtext: **"Pick at least 3 tags that match your lifestyle. This helps us find your perfect roommate."** in gray
+- The full `<TagSelector>` component with `minTags={3}` `maxTags={10}` `showCount={true}`
+- A **"Continue"** coral button at the bottom — disabled and grayed out until at least 3 tags are selected
+- When Continue is tapped with valid selections, save `selectedTags` to the profile state and advance to the next step
+
+---
+
+**PART 4 — ADD TO EDIT PROFILE**
+
+In `screens/shared/EditProfileScreen.tsx`:
+
+Add an **"Interests & Lifestyle"** section with:
+- A section header matching the existing edit profile section style
+- The `<TagSelector>` component pre-populated with the user's existing saved tags
+- Auto-save on change — whenever the selected tags change, debounce 800ms then call `profileService.updateProfile()` with the new tags array
+- Show a small **"Saved"** confirmation text in coral that fades out after 1.5 seconds when auto-save completes
+
+---
+
+**PART 5 — UPDATE DATABASE**
+
+Add `interests text[]` column to the `profiles` table in Supabase:
+
+```sql
+alter table public.profiles add column if not exists interests text[] default '{}';
+```
+
+Update `services/profileService.ts` to include `interests` in all select and upsert queries.
+
+---
+
+**PART 6 — WIRE INTO MATCHING ALGORITHM**
+
+In `utils/matchingAlgorithm.ts`, add interest tag overlap scoring to the `calculateCompatibility()` function:
+
+```ts
+const calculateInterestScore = (
+  user1Tags: string[],
+  user2Tags: string[]
+): number => {
+  if (!user1Tags?.length || !user2Tags?.length) return 0;
+  const set1 = new Set(user1Tags);
+  const overlap = user2Tags.filter(tag => set1.has(tag)).length;
+  const maxPossible = Math.min(user1Tags.length, user2Tags.length);
+  return maxPossible > 0 ? (overlap / maxPossible) * 100 : 0;
+};
+```
+
+Add this to the overall compatibility score with a **20% weighting**:
+
+```ts
+const interestScore = calculateInterestScore(
+  user1.profile?.interests ?? [],
+  user2.profile?.interests ?? []
+);
+
+// Add to total score
+totalScore += interestScore * 0.20;
+```
+
+Also add specific tag compatibility bonuses — if both users share tags that are directly conflicting when mismatched, apply a penalty instead of a bonus:
+
+```ts
+const CONFLICTING_PAIRS = [
+  ['smoker', 'non_smoker'],
+  ['pet_friendly', 'no_pets'],
+  ['early_bird', 'night_owl'],
+  ['host_gatherings', 'rarely_guests'],
+];
+
+CONFLICTING_PAIRS.forEach(([tag1, tag2]) => {
+  const u1HasTag1 = user1Tags.includes(tag1);
+  const u1HasTag2 = user1Tags.includes(tag2);
+  const u2HasTag1 = user2Tags.includes(tag1);
+  const u2HasTag2 = user2Tags.includes(tag2);
+
+  // If one user is a smoker and the other is non-smoker, apply -15 penalty
+  if ((u1HasTag1 && u2HasTag2) || (u1HasTag2 && u2HasTag1)) {
+    totalScore -= 15;
+  }
+});
+```
+
+---
+
+**PART 7 — DISPLAY TAGS ON PROFILE CARDS**
+
+In `screens/renter/RoommatesScreen.tsx`, on each profile card show the top 3 matching interest tags between the viewer and the profile being shown:
+
+- Below the existing profile info, add a row of up to 3 tag pills
+- Only show tags that **both users share** — these are the overlap tags
+- Style them with a subtle coral tint background `rgba(255,107,91,0.15)` and coral text
+- If no shared tags, show nothing — do not show a placeholder
+- Add a small ✨ emoji before the first shared tag pill row with label **"You both"** in tiny gray text above the pills
+
+On the full profile view / expanded card:
+- Show ALL of the profile's selected tags organized by category
+- Shared tags highlighted in coral
+- Non-shared tags in the standard white pill style
+
+---
+
+**After completing all changes, verify:**
+1. The tag selector appears in the profile questionnaire with a minimum of 3 required
+2. The Continue button is disabled until 3 tags are selected
+3. Selecting more than 10 tags shows the max toast and does not add more
+4. Tags save correctly to the `interests` column in Supabase
+5. Edit profile screen pre-populates with existing saved tags and auto-saves changes
+6. Shared tags appear on profile cards in the swipe deck highlighted in coral
+7. Compatibility score changes based on interest tag overlap
+8. Conflicting tags like smoker/non-smoker apply a score penalty
+9. App compiles with no TypeScript errors
+
+---
