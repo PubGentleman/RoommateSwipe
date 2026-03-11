@@ -20,6 +20,11 @@ export default function App() {
         await StorageService.forceReloadMockData();
         alert('Mock data reloaded! Please refresh the page to see changes.');
       };
+      (window as any).resetApp = async () => {
+        await StorageService.clearAllData();
+        alert('All app data cleared! Refreshing...');
+        window.location.reload();
+      };
       console.log('[App] To reload all mock data, run: window.reloadMockData()');
     }
   }, []);

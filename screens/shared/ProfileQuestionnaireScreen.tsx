@@ -81,6 +81,14 @@ const STEP_ORDER: StepId[] = [
   'expenses',
 ];
 
+const ONBOARDING_STEPS: StepId[] = [
+  'photos',
+  'basicInfo',
+  'gender',
+  'locationOccupation',
+  'bio',
+];
+
 const STEP_TITLES: Record<StepId, string> = {
   photos: 'Add Your Photos',
   basicInfo: 'About You',
@@ -122,6 +130,7 @@ export const ProfileQuestionnaireScreen = () => {
   const route = useRoute();
   const insets = useSafeAreaInsets();
 
+  const isOnboarding = user?.onboardingStep === 'profile';
   const missingStepsParam = (route.params as any)?.missingSteps as string[] | undefined;
   const filteredSteps = React.useMemo(() => {
     if (missingStepsParam?.length) {
@@ -130,9 +139,9 @@ export const ProfileQuestionnaireScreen = () => {
     return null;
   }, []);
   const isMissingMode = !!filteredSteps;
-  const stepsToShow = filteredSteps || STEP_ORDER;
+  const stepsToShow = filteredSteps || (isOnboarding ? ONBOARDING_STEPS : STEP_ORDER);
   const [currentFilteredIndex, setCurrentFilteredIndex] = useState(0);
-  const currentStep = isMissingMode
+  const currentStep = (isMissingMode || isOnboarding)
     ? STEP_ORDER.indexOf(stepsToShow[currentFilteredIndex])
     : currentFilteredIndex;
   const [direction, setDirection] = useState<'forward' | 'back'>('forward');
@@ -738,7 +747,7 @@ export const ProfileQuestionnaireScreen = () => {
             <Feather name="arrow-left" size={24} color={theme.text} />
           </TouchableOpacity>
           <ThemedText style={[Typography.h3, { flex: 1, textAlign: 'center' }]}>
-            {isMissingMode ? `${currentFilteredIndex + 1} of ${stepsToShow.length}` : (currentFilteredIndex === 0 ? 'Edit Profile' : '')}
+            {isMissingMode ? `${currentFilteredIndex + 1} of ${stepsToShow.length}` : (currentFilteredIndex === 0 ? (isOnboarding ? 'Create Profile' : 'Edit Profile') : '')}
           </ThemedText>
           {isMissingMode ? (
             <Pressable onPress={() => navigation.goBack()} style={styles.navButton}>
