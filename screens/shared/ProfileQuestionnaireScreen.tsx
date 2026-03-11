@@ -320,20 +320,23 @@ export const ProfileQuestionnaireScreen = () => {
   };
 
   const goBack = () => {
+    console.log('[ProfileQuestionnaire] goBack pressed, currentFilteredIndex:', currentFilteredIndex, 'onboardingStep:', user?.onboardingStep);
     if (currentFilteredIndex > 0) {
       setDirection('back');
       setCurrentFilteredIndex(currentFilteredIndex - 1);
-    } else if (user?.onboardingStep === 'profile') {
-      Alert.alert(
-        'Go Back',
-        'This will return you to the login screen. Any progress will not be saved.',
-        [
-          { text: 'Stay', style: 'cancel' },
-          { text: 'Go Back', style: 'destructive', onPress: () => logout() },
-        ]
-      );
     } else {
-      navigation.goBack();
+      if (user?.onboardingStep === 'profile') {
+        Alert.alert(
+          'Go Back',
+          'This will return you to the login screen. Any progress will not be saved.',
+          [
+            { text: 'Stay', style: 'cancel' },
+            { text: 'Go Back', style: 'destructive', onPress: () => logout() },
+          ]
+        );
+      } else {
+        navigation.goBack();
+      }
     }
   };
 
@@ -740,7 +743,7 @@ export const ProfileQuestionnaireScreen = () => {
     >
       <View style={{ paddingTop: insets.top }}>
         <View style={styles.navHeader}>
-          <Pressable onPress={goBack} style={styles.navButton}>
+          <Pressable onPress={goBack} style={styles.navButton} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
             <Feather name="arrow-left" size={24} color={theme.text} />
           </Pressable>
           <ThemedText style={[Typography.h3, { flex: 1, textAlign: 'center' }]}>
@@ -820,6 +823,7 @@ const styles = StyleSheet.create({
     height: 44,
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 10,
   },
   scrollContent: {
     flex: 1,
