@@ -181,7 +181,9 @@ export const ProfileScreen = () => {
                 <Text style={styles.sectionAction}>View all</Text>
               </Pressable>
             </View>
-            <ProfileCompletionCard user={user} onEditProfile={() => { setShowAISheet(true); setAiSheetContext('profile_reminder'); }} />
+            <ProfileCompletionCard user={user} onEditProfile={(missingSteps) => {
+              navigation.navigate('ProfileQuestionnaire', { missingSteps });
+            }} />
           </View>
         ) : null}
 
