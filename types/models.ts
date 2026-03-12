@@ -283,6 +283,13 @@ export interface User {
   messageCount?: number;
   coldMessagesUsedThisMonth?: number;
   coldMessagesResetDate?: string;
+  messagingData?: {
+    dailyMessageCount: number;
+    dailyMessageResetDate: string;
+    activeChatsCount: number;
+    coldMessagesUsedThisMonth: number;
+    coldMessagesResetDate: string;
+  };
   superInterestData?: {
     usedThisMonth: number;
     lastResetDate: string;

@@ -16,6 +16,8 @@ import { useNotificationContext } from '../../contexts/NotificationContext';
 import { getMessages as getSupabaseMessages, sendMessage as sendSupabaseMessage, markMessagesAsRead as markSupabaseMessagesAsRead, subscribeToMessages } from '../../services/messageService';
 import { acceptInquiry, declineInquiry } from '../../services/groupService';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence } from 'react-native-reanimated';
+import { AdBanner } from '../../components/AdBanner';
+import { getDailyMessageCount, MESSAGING_LIMITS, getTimeUntilMidnight } from '../../utils/messagingUtils';
 
 type ChatScreenProps = {
   route: {
@@ -48,6 +50,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [isColdMessage, setIsColdMessage] = useState(false);
   const [coldMessageResponded, setColdMessageResponded] = useState(false);
   const [showColdMessageBlockSheet, setShowColdMessageBlockSheet] = useState(false);
+  const [showDailyLimitModal, setShowDailyLimitModal] = useState(false);
+  const [showChatLimitModal, setShowChatLimitModal] = useState(false);
 
   const [inquiryStatus, setInquiryStatus] = useState<'pending' | 'accepted' | 'declined'>(
     inquiryGroup?.inquiryStatus || inquiryGroup?.inquiry_status || 'pending'
@@ -62,6 +66,10 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     backgroundColor: `rgba(255,107,91,${addressFlashOpacity.value})`,
   }));
   const isHost = isInquiryChat && user?.id === inquiryGroup?.hostId;
+  const userPlan = (user?.subscription?.plan || 'basic') as 'basic' | 'plus' | 'elite';
+  const dailyCount = user ? getDailyMessageCount(user) : 0;
+  const dailyLimit = MESSAGING_LIMITS[userPlan].dailyMessages;
+  const isEliteUser = () => userPlan === 'elite';
 
   const handleAcceptInquiry = async () => {
     if (!inquiryGroup?.id) return;
@@ -139,12 +147,6 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     const userPlan = user?.subscription?.plan || 'basic';
     const userStatus = user?.subscription?.status || 'active';
     return (userPlan === 'plus' || userPlan === 'elite') && userStatus === 'active';
-  };
-
-  const isEliteUser = () => {
-    const userPlan = user?.subscription?.plan || 'basic';
-    const userStatus = user?.subscription?.status || 'active';
-    return userPlan === 'elite' && userStatus === 'active';
   };
 
   const matchIdFromConversation = conversationId.startsWith('conv_') ? conversationId.slice(5) : conversationId;
@@ -267,32 +269,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     }
 
     if (!canSendMessage()) {
-      const alertButtons: any[] = [
-        { text: 'Maybe Later', style: 'cancel' },
-      ];
-
-      if (isBasicUser()) {
-        alertButtons.push({
-          text: 'Watch Ad (+5 Messages)',
-          onPress: async () => {
-            const success = await watchAdForCredit('messages');
-            if (success) {
-              Alert.alert('Messages Earned', 'You earned 5 bonus messages by watching an ad!');
-            }
-          },
-        });
-      }
-
-      alertButtons.push({
-        text: 'View Plans',
-        onPress: () => navigation.navigate('Profile', { screen: 'Payment' }),
-      });
-
-      Alert.alert(
-        'Message Limit Reached',
-        `You've reached your limit of 50 messages on the basic plan. Watch an ad for 5 bonus messages or upgrade for unlimited messaging!`,
-        alertButtons
-      );
+      setShowDailyLimitModal(true);
       return;
     }
 
@@ -308,17 +285,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         const chatCheck = await canStartNewChat(conversationId);
         
         if (!chatCheck.canStart) {
-          Alert.alert(
-            'Active Chat Limit Reached',
-            chatCheck.reason || 'Cannot start a new chat',
-            [
-              { text: 'Maybe Later', style: 'cancel' },
-              {
-                text: 'View Plans',
-                onPress: () => navigation.navigate('Profile', { screen: 'Payment' }),
-              },
-            ]
-          );
+          setShowChatLimitModal(true);
           return;
         }
       }
@@ -716,6 +683,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         />
       </View>
 
+      <AdBanner placement="chat_bottom" userPlan={userPlan} />
       <View style={[styles.inputContainer, { backgroundColor: theme.backgroundRoot, paddingBottom: TAB_BAR_HEIGHT }]}>
         <TextInput
           style={[
@@ -734,21 +702,38 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           returnKeyType="send"
           multiline
           maxLength={500}
-          editable={!inquiryGroup?.isArchived}
+          editable={!inquiryGroup?.isArchived && canSendMessage()}
         />
         <Pressable
           onPress={sendMessage}
           style={[
             styles.sendButton,
             {
-              backgroundColor: inputText.trim() ? theme.primary : theme.backgroundSecondary,
+              backgroundColor: inputText.trim() && canSendMessage() ? theme.primary : theme.backgroundSecondary,
             },
           ]}
-          disabled={!inputText.trim()}
+          disabled={!inputText.trim() || !canSendMessage()}
         >
           <Feather name="send" size={20} color="#FFFFFF" />
         </Pressable>
       </View>
+      {userPlan === 'basic' && (
+        <View style={{ backgroundColor: theme.backgroundRoot, paddingBottom: 2, paddingHorizontal: 16 }}>
+          {dailyCount >= dailyLimit ? (
+            <ThemedText style={{ fontSize: 11, color: '#ef4444', textAlign: 'center' }}>
+              No messages left today — resets at midnight
+            </ThemedText>
+          ) : dailyLimit - dailyCount <= 5 ? (
+            <ThemedText style={{ fontSize: 11, color: '#ff6b5b', textAlign: 'center' }}>
+              {dailyLimit - dailyCount} messages left today
+            </ThemedText>
+          ) : (
+            <ThemedText style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>
+              {dailyCount} / {dailyLimit} messages today
+            </ThemedText>
+          )}
+        </View>
+      )}
 
       <RoomdrAISheet
         visible={showAISheet}
@@ -820,6 +805,77 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             <Pressable
               style={{ paddingVertical: 14, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: theme.border }}
               onPress={() => setShowColdMessageBlockSheet(false)}
+            >
+              <ThemedText style={[Typography.h3, { color: theme.textSecondary }]}>Maybe Later</ThemedText>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+      <Modal visible={showDailyLimitModal} transparent animationType="fade" onRequestClose={() => setShowDailyLimitModal(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: theme.backgroundSecondary, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: insets.bottom + 24 }}>
+            <View style={{ alignItems: 'center', marginBottom: 16 }}>
+              <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: theme.border, marginBottom: 16 }} />
+              <Feather name="message-circle" size={32} color="#ff6b5b" />
+            </View>
+            <ThemedText style={[Typography.h2, { textAlign: 'center', marginBottom: 8 }]}>
+              Daily Message Limit
+            </ThemedText>
+            <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary, marginBottom: 24 }]}>
+              {userPlan === 'basic'
+                ? `You've used all 20 messages for today. Resets at midnight or upgrade for more.`
+                : `You've used all 200 messages for today. Upgrade to Elite for unlimited messaging.`}
+            </ThemedText>
+            <Pressable
+              style={{ backgroundColor: theme.primary, paddingVertical: 14, borderRadius: 12, alignItems: 'center', marginBottom: 12 }}
+              onPress={() => {
+                setShowDailyLimitModal(false);
+                (navigation as any).navigate('Profile', { screen: 'Payment' });
+              }}
+            >
+              <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
+                {userPlan === 'basic' ? 'Upgrade to Plus (200/day)' : 'Upgrade to Elite (Unlimited)'}
+              </ThemedText>
+            </Pressable>
+            <Pressable
+              style={{ paddingVertical: 14, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: theme.border }}
+              onPress={() => setShowDailyLimitModal(false)}
+            >
+              <ThemedText style={[Typography.h3, { color: theme.textSecondary }]}>Maybe Later</ThemedText>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showChatLimitModal} transparent animationType="fade" onRequestClose={() => setShowChatLimitModal(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: theme.backgroundSecondary, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: insets.bottom + 24 }}>
+            <View style={{ alignItems: 'center', marginBottom: 16 }}>
+              <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: theme.border, marginBottom: 16 }} />
+              <Feather name="users" size={32} color="#ff6b5b" />
+            </View>
+            <ThemedText style={[Typography.h2, { textAlign: 'center', marginBottom: 8 }]}>
+              Active Chat Limit
+            </ThemedText>
+            <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary, marginBottom: 24 }]}>
+              {userPlan === 'basic'
+                ? 'Basic users can have 3 active chats at once. Close a chat to start a new one, or upgrade.'
+                : `You've reached your 10 active chat limit. Upgrade to Elite for unlimited chats.`}
+            </ThemedText>
+            <Pressable
+              style={{ backgroundColor: theme.primary, paddingVertical: 14, borderRadius: 12, alignItems: 'center', marginBottom: 12 }}
+              onPress={() => {
+                setShowChatLimitModal(false);
+                (navigation as any).navigate('Profile', { screen: 'Payment' });
+              }}
+            >
+              <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
+                {userPlan === 'basic' ? 'Upgrade to Plus (10 chats)' : 'Upgrade to Elite (Unlimited)'}
+              </ThemedText>
+            </Pressable>
+            <Pressable
+              style={{ paddingVertical: 14, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: theme.border }}
+              onPress={() => setShowChatLimitModal(false)}
             >
               <ThemedText style={[Typography.h3, { color: theme.textSecondary }]}>Maybe Later</ThemedText>
             </Pressable>

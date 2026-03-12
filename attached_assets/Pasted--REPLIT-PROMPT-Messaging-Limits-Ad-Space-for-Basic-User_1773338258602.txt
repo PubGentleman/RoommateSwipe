@@ -1,0 +1,222 @@
+---
+
+**REPLIT PROMPT — Messaging Limits + Ad Space for Basic Users**
+
+Implement the full messaging limit system across all tiers. Basic users see ad banners in the app but cannot watch ads to earn credits. Complete all parts fully.
+
+---
+
+**PART 1 — UPDATE TYPES**
+
+In `types/models.ts`, add messaging usage tracking to the User object:
+
+```ts
+messagingData?: {
+  dailyMessageCount: number;
+  dailyMessageResetDate: string;   // ISO date string — resets midnight daily
+  activeChatsCount: number;
+  coldMessagesUsedThisMonth: number;
+  coldMessagesResetDate: string;
+}
+```
+
+---
+
+**PART 2 — MESSAGING LIMITS BY TIER**
+
+```ts
+export const MESSAGING_LIMITS = {
+  basic: {
+    dailyMessages: 20,
+    activeChats: 3,
+    coldMessaging: false,
+  },
+  plus: {
+    dailyMessages: 200,
+    activeChats: 10,
+    coldMessaging: false,
+  },
+  elite: {
+    dailyMessages: Infinity,
+    activeChats: Infinity,
+    coldMessaging: true,
+  },
+};
+```
+
+---
+
+**PART 3 — MESSAGING LIMIT LOGIC**
+
+Create `utils/messagingUtils.ts`:
+
+```ts
+export const canSendMessage = (
+  user: User,
+  plan: 'basic' | 'plus' | 'elite'
+): { allowed: boolean; reason?: string } => {
+  const limits = MESSAGING_LIMITS[plan];
+
+  // Reset daily count if new day
+  const today = new Date().toISOString().split('T')[0];
+  const resetDate = user.messagingData?.dailyMessageResetDate?.split('T')[0];
+  const dailyCount = resetDate === today 
+    ? (user.messagingData?.dailyMessageCount ?? 0) 
+    : 0;
+
+  if (plan !== 'elite' && dailyCount >= limits.dailyMessages) {
+    return {
+      allowed: false,
+      reason: `daily_limit`
+    };
+  }
+
+  return { allowed: true };
+};
+
+export const canStartNewChat = (
+  user: User,
+  plan: 'basic' | 'plus' | 'elite'
+): { allowed: boolean; reason?: string } => {
+  const limits = MESSAGING_LIMITS[plan];
+  const activeChats = user.messagingData?.activeChatsCount ?? 0;
+
+  if (activeChats >= limits.activeChats) {
+    return {
+      allowed: false,
+      reason: 'chat_limit'
+    };
+  }
+
+  return { allowed: true };
+};
+```
+
+---
+
+**PART 4 — ENFORCE LIMITS IN CHAT**
+
+In `screens/shared/ChatScreen.tsx`:
+
+Before sending any message, call `canSendMessage()`. If not allowed:
+- Disable the send button
+- Show a bottom sheet modal based on the reason:
+
+**Daily limit hit modal:**
+- Header: **"Daily Message Limit Reached"**
+- Subtext: **"Basic users get 20 messages per day. Your limit resets at midnight."**
+- Show a countdown timer: **"Resets in [Xh Xm]"** counting down to midnight
+- Two options:
+  - **"Upgrade to Plus"** — coral filled button — navigates to Plans screen
+  - **"Maybe Later"** — gray text link — dismisses modal
+- No "watch an ad" option — remove entirely
+
+**Active chat limit modal:**
+- Header: **"Chat Limit Reached"**
+- Subtext: **"Basic users can have 3 active chats at once. Close a chat to start a new one."**
+- Two options:
+  - **"Upgrade to Plus"** — coral filled button — 10 active chats
+  - **"Manage Chats"** — gray outlined button — navigates to Messages screen
+
+After every successfully sent message, increment `messagingData.dailyMessageCount` in Supabase and update `dailyMessageResetDate` to today if it changed.
+
+---
+
+**PART 5 — MESSAGE COUNTER UI**
+
+In `screens/shared/ChatScreen.tsx`, for Basic users only show a subtle message counter below the text input bar:
+
+- **"[X] / 20 messages today"** in small gray text
+- When under 5 remaining: text turns coral and shows **"[X] messages left today"**
+- When 0 remaining: text turns red **"No messages left today — resets at midnight"** and send button is disabled
+- Plus and Elite users see no counter at all
+
+---
+
+**PART 6 — ACTIVE CHAT LIMIT ON MESSAGES SCREEN**
+
+In `screens/shared/MessagesScreen.tsx`:
+
+When a Basic user tries to open or start a new chat that would exceed 3 active chats:
+- Show the chat limit modal described in Part 4
+- Do not navigate into the chat
+
+Show a subtle indicator in the Messages screen header for Basic users:
+- **"[X] / 3 chats active"** in small gray text next to the screen title
+- When at limit: turns coral **"3 / 3 — upgrade for more"** with a coral upgrade link
+
+---
+
+**PART 7 — AD BANNERS FOR BASIC USERS**
+
+Basic users see non-interactive ad banners in the app. These are display ads only — no watching, no credit earning. Implement ad banner placements in these locations:
+
+**Create `components/AdBanner.tsx`:**
+
+```ts
+interface AdBannerProps {
+  placement: 'messages_top' | 'explore_bottom' | 'groups_top' | 'chat_bottom';
+  userPlan: 'basic' | 'plus' | 'elite';
+}
+```
+
+- Only renders when `userPlan === 'basic'` — returns null for Plus and Elite
+- Style: full width, 60px height, `#1a1a1a` background, subtle `rgba(255,255,255,0.06)` border top and bottom
+- Contains a placeholder ad layout:
+  - Small **"Ad"** label in gray, 10px, top left corner
+  - Centered placeholder text: **"Advertisement"** in gray italic
+  - This is the ad slot — real ad network (AdMob, etc.) can be dropped in here later
+- No tap interaction — purely display
+
+**Ad banner placements:**
+
+`screens/shared/MessagesScreen.tsx` — add `<AdBanner placement="messages_top" />` at the very top of the screen below the header
+
+`screens/renter/ExploreScreen.tsx` — add `<AdBanner placement="explore_bottom" />` fixed at the bottom above the tab bar
+
+`screens/renter/GroupsScreen.tsx` — add `<AdBanner placement="groups_top" />` below the screen header
+
+`screens/shared/ChatScreen.tsx` — add `<AdBanner placement="chat_bottom" />` just above the message input bar — it pushes the input bar up slightly
+
+**Ad banner dismiss behavior:**
+- No dismiss button — the ad is always visible for Basic users
+- When a Basic user upgrades to Plus or Elite, all ad banners disappear immediately
+
+---
+
+**PART 8 — UPGRADE PROMPT ON AD BANNER**
+
+Add a small **"Remove Ads — Upgrade to Plus"** coral text link at the far right of every ad banner. Tapping it navigates to the Plans screen. This is the only interactive element on the banner.
+
+---
+
+**PART 9 — RESET LOGIC**
+
+On app launch and whenever the app comes to foreground, run this check in `AuthContext`:
+
+```ts
+const today = new Date().toISOString().split('T')[0];
+const resetDate = user.messagingData?.dailyMessageResetDate?.split('T')[0];
+
+if (resetDate !== today) {
+  await supabase.from('users').update({
+    'messagingData.dailyMessageCount': 0,
+    'messagingData.dailyMessageResetDate': new Date().toISOString()
+  }).eq('id', user.id);
+}
+```
+
+---
+
+**After completing all changes, verify:**
+1. Basic user hitting 20 messages sees the daily limit modal with upgrade option only — no ad watch option
+2. Basic user with 3 active chats cannot open a new chat — sees the chat limit modal
+3. Message counter shows below the input bar for Basic users only
+4. Ad banners appear in Messages, Explore, Groups, and Chat screens for Basic users
+5. Ad banners are completely invisible for Plus and Elite users
+6. "Remove Ads — Upgrade to Plus" link on each banner navigates to Plans screen
+7. Daily message count resets at midnight automatically
+8. Plus and Elite users see no counters, no banners, no limit modals
+9. App compiles with no TypeScript errors
+
+---

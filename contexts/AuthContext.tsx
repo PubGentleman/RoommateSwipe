@@ -329,7 +329,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 : undefined,
             };
           }
-          setUser(currentUser);
+          const resetUser = await resetDailyMessagesIfNeeded(currentUser);
+          setUser(resetUser);
         }
         setIsLoading(false);
       }
@@ -777,34 +778,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const incrementMessageCount = async () => {
-    if (!user) return;
-    
-    const currentCount = user.messageCount || 0;
-    const plan = user.subscription?.plan || 'basic';
-
-    if (plan === 'basic' && currentCount >= 50 && user.adCredits && user.adCredits.messages > 0) {
-      const updatedUser: User = {
-        ...user,
-        messageCount: currentCount + 1,
-        adCredits: {
-          ...user.adCredits,
-          messages: user.adCredits.messages - 1,
+  const resetDailyMessagesIfNeeded = async (u: User): Promise<User> => {
+    const today = new Date().toISOString().split('T')[0];
+    const resetDate = u.messagingData?.dailyMessageResetDate?.split('T')[0];
+    if (resetDate !== today) {
+      const updated: User = {
+        ...u,
+        messagingData: {
+          dailyMessageCount: 0,
+          dailyMessageResetDate: new Date().toISOString(),
+          activeChatsCount: u.messagingData?.activeChatsCount ?? 0,
+          coldMessagesUsedThisMonth: u.messagingData?.coldMessagesUsedThisMonth ?? 0,
+          coldMessagesResetDate: u.messagingData?.coldMessagesResetDate ?? new Date().toISOString(),
         },
       };
-      
-      await StorageService.setCurrentUser(updatedUser);
-      await StorageService.addOrUpdateUser(updatedUser);
-      setUser(updatedUser);
-      console.log('[Auth] Ad credit message consumed. Remaining:', updatedUser.adCredits!.messages);
-      return;
+      await StorageService.setCurrentUser(updated);
+      await StorageService.addOrUpdateUser(updated);
+      return updated;
     }
+    return u;
+  };
+
+  const incrementMessageCount = async () => {
+    if (!user) return;
+
+    const today = new Date().toISOString().split('T')[0];
+    const resetDate = user.messagingData?.dailyMessageResetDate?.split('T')[0];
+    const currentDaily = resetDate === today ? (user.messagingData?.dailyMessageCount ?? 0) : 0;
 
     const updatedUser: User = {
       ...user,
-      messageCount: currentCount + 1,
+      messageCount: (user.messageCount || 0) + 1,
+      messagingData: {
+        dailyMessageCount: currentDaily + 1,
+        dailyMessageResetDate: new Date().toISOString(),
+        activeChatsCount: user.messagingData?.activeChatsCount ?? 0,
+        coldMessagesUsedThisMonth: user.messagingData?.coldMessagesUsedThisMonth ?? 0,
+        coldMessagesResetDate: user.messagingData?.coldMessagesResetDate ?? new Date().toISOString(),
+      },
     };
-    
+
     await StorageService.setCurrentUser(updatedUser);
     await StorageService.addOrUpdateUser(updatedUser);
     setUser(updatedUser);
@@ -812,20 +825,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const canSendMessage = (): boolean => {
     if (!user) return false;
-    
+
     const plan = user.subscription?.plan || 'basic';
-    if (plan === 'plus' || plan === 'elite') {
-      return true;
-    }
-    
-    const messageCount = user.messageCount || 0;
-    if (messageCount < 50) return true;
+    if (plan === 'elite') return true;
 
-    if (user.adCredits && user.adCredits.messages > 0) {
-      return true;
-    }
+    const today = new Date().toISOString().split('T')[0];
+    const resetDate = user.messagingData?.dailyMessageResetDate?.split('T')[0];
+    const dailyCount = resetDate === today ? (user.messagingData?.dailyMessageCount ?? 0) : 0;
 
-    return false;
+    const limit = plan === 'plus' ? 200 : 20;
+    return dailyCount < limit;
   };
 
   const canBoost = (): { canBoost: boolean; reason?: string; requiresPayment?: boolean; nextAvailableAt?: string; hasFreeBoost?: boolean } => {
@@ -1011,12 +1020,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const getActiveChatLimit = (): number => {
     if (!user) return 3;
-    
     const userPlan = user.subscription?.plan || 'basic';
-    const userStatus = user.subscription?.status || 'active';
-    
-    if (userStatus !== 'active') return 3;
-    
     if (userPlan === 'elite') return Infinity;
     if (userPlan === 'plus') return 10;
     return 3;
@@ -1028,33 +1032,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     const limit = getActiveChatLimit();
-    
     if (limit === Infinity) {
-      return { canStart: true, limit, current: user.activeChatsCount || 0 };
+      return { canStart: true, limit, current: user.messagingData?.activeChatsCount || 0 };
     }
 
     const conversations = await StorageService.getConversations();
     const activeChats = conversations.filter(conv => {
       if (!conv.messages || conv.messages.length === 0) return false;
-      
-      const userSentMessage = conv.messages.some(msg => msg.senderId === user.id);
-      return userSentMessage;
+      return conv.messages.some(msg => msg.senderId === user.id);
     });
 
     const current = activeChats.length;
     const isCurrentChatActive = activeChats.some(conv => conv.id === conversationId);
-    
+
     if (isCurrentChatActive || current < limit) {
       return { canStart: true, limit, current };
     }
 
     const userPlan = user.subscription?.plan || 'basic';
-    const planName = userPlan.charAt(0).toUpperCase() + userPlan.slice(1);
-    return { 
-      canStart: false, 
-      limit, 
+    return {
+      canStart: false,
+      limit,
       current,
-      reason: `You've reached your active chat limit (${current}/${limit}). Upgrade to ${userPlan === 'basic' ? 'Plus (10 chats)' : 'Elite (unlimited)'} for more!` 
+      reason: userPlan === 'basic'
+        ? 'Basic users can have 3 active chats at once. Close a chat to start a new one.'
+        : `You've reached your active chat limit (${current}/${limit}). Upgrade to Elite for unlimited chats!`,
     };
   };
 
@@ -1068,17 +1070,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     const newCount = activeChats.length;
-    
     const updatedUser: User = {
       ...user,
       activeChatsCount: newCount,
+      messagingData: {
+        ...user.messagingData!,
+        dailyMessageCount: user.messagingData?.dailyMessageCount ?? 0,
+        dailyMessageResetDate: user.messagingData?.dailyMessageResetDate ?? new Date().toISOString(),
+        activeChatsCount: newCount,
+        coldMessagesUsedThisMonth: user.messagingData?.coldMessagesUsedThisMonth ?? 0,
+        coldMessagesResetDate: user.messagingData?.coldMessagesResetDate ?? new Date().toISOString(),
+      },
     };
-    
+
     await StorageService.setCurrentUser(updatedUser);
     await StorageService.addOrUpdateUser(updatedUser);
     setUser(updatedUser);
-    
-    console.log('[Auth] Active chats updated:', newCount);
   };
 
   const canRewind = (): { canRewind: boolean; remaining: number; limit: number; message?: string } => {
