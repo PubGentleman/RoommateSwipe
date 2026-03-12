@@ -340,6 +340,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const login = async (email: string, password: string, role: UserRole) => {
+    if (email === 'demo@roomdr.com') {
+      await StorageService.initializeWithMockData();
+      const currentUser = await StorageService.getCurrentUser();
+      if (currentUser) {
+        if (currentUser.messageCount === undefined) {
+          currentUser.messageCount = 0;
+        }
+        if (currentUser.subscription) {
+          currentUser.subscription = {
+            ...currentUser.subscription,
+            expiresAt: currentUser.subscription.expiresAt
+              ? new Date(currentUser.subscription.expiresAt)
+              : undefined,
+            scheduledChangeDate: currentUser.subscription.scheduledChangeDate
+              ? new Date(currentUser.subscription.scheduledChangeDate)
+              : undefined,
+          };
+        }
+        currentUser.role = role;
+        setUser(currentUser);
+      }
+      return;
+    }
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
