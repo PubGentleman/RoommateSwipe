@@ -7,9 +7,9 @@ import * as Haptics from 'expo-haptics';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
 import { Spacing, BorderRadius, Typography } from '../../constants/theme';
-import { Group, RoommateProfile } from '../../types/models';
+import { Group, RoommateProfile, GroupType } from '../../types/models';
 import { StorageService } from '../../utils/storage';
-import { getGroups as getGroupsFromSupabase, getMyGroups as getMyGroupsFromSupabase, joinGroup as joinGroupSupabase, leaveGroup as leaveGroupSupabase, createGroup as createGroupSupabase } from '../../services/groupService';
+import { getGroups as getGroupsFromSupabase, getMyGroups as getMyGroupsFromSupabase, getMyInquiryGroups as getMyInquiryGroupsFromSupabase, joinGroup as joinGroupSupabase, leaveGroup as leaveGroupSupabase, createGroup as createGroupSupabase, archiveGroup as archiveGroupSupabase } from '../../services/groupService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -54,6 +54,8 @@ export const GroupsScreen = () => {
   const [showCityPicker, setShowCityPicker] = useState(false);
   const [showAISheet, setShowAISheet] = useState(false);
   const [profileCache, setProfileCache] = useState<RoommateProfile[]>([]);
+  const [inquiryGroups, setInquiryGroups] = useState<any[]>([]);
+  const [showPastInquiries, setShowPastInquiries] = useState(false);
 
   const [groupName, setGroupName] = useState('');
   const [groupDescription, setGroupDescription] = useState('');
@@ -84,13 +86,15 @@ export const GroupsScreen = () => {
       let otherGroups: Group[] = [];
       
       try {
-        const [supabaseGroups, supabaseMyGroups] = await Promise.all([
-          getGroupsFromSupabase(activeCity || undefined),
-          getMyGroupsFromSupabase(),
+        const [supabaseGroups, supabaseMyGroups, supabaseInquiryGroups] = await Promise.all([
+          getGroupsFromSupabase(activeCity || undefined, 'roommate'),
+          getMyGroupsFromSupabase('roommate'),
+          getMyInquiryGroupsFromSupabase(),
         ]);
         const myGroupIds = new Set((supabaseMyGroups || []).map((g: any) => g.id));
-        userGroups = (supabaseMyGroups || []).map((g: any) => ({
+        const mapGroup = (g: any): Group => ({
           id: g.id,
+          type: g.type || 'roommate',
           name: g.name,
           description: g.description,
           members: [],
@@ -100,21 +104,20 @@ export const GroupsScreen = () => {
           maxMembers: g.max_members || 4,
           createdAt: new Date(g.created_at),
           createdBy: g.created_by,
-        }));
+          listingId: g.listing_id,
+          hostId: g.host_id,
+          listingAddress: g.listing_address,
+          isArchived: g.is_archived || false,
+        });
+        userGroups = (supabaseMyGroups || []).map(mapGroup);
         otherGroups = (supabaseGroups || [])
           .filter((g: any) => !myGroupIds.has(g.id))
-          .map((g: any) => ({
-            id: g.id,
-            name: g.name,
-            description: g.description,
-            members: [],
-            pendingMembers: [],
-            budget: g.budget_min || 0,
-            preferredLocation: g.city || '',
-            maxMembers: g.max_members || 4,
-            createdAt: new Date(g.created_at),
-            createdBy: g.created_by,
-          }));
+          .map(mapGroup);
+        setInquiryGroups((supabaseInquiryGroups || []).map((g: any) => ({
+          ...mapGroup(g),
+          hostName: g.creator?.full_name || 'Host',
+          memberCount: g.members?.[0]?.count || 0,
+        })));
       } catch (supabaseError) {
         console.warn('[GroupsScreen] Supabase failed, falling back to StorageService:', supabaseError);
         const groups = await StorageService.getGroups();
@@ -691,6 +694,73 @@ export const GroupsScreen = () => {
     loadGroups();
   };
 
+  const handleArchiveInquiry = async (group: any) => {
+    Alert.alert(
+      'Archive Inquiry',
+      `Archive the inquiry for "${group.listingAddress || group.name}"? The chat will become read-only.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Archive',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await archiveGroupSupabase(group.id);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              loadGroups();
+            } catch (err) {
+              console.error('Failed to archive inquiry:', err);
+              Alert.alert('Error', 'Failed to archive inquiry');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const renderInquiryGroup = (group: any) => {
+    return (
+      <Pressable
+        key={group.id}
+        style={[styles.myGroupCard, { backgroundColor: theme.backgroundDefault }]}
+        onPress={() => {
+          navigation.navigate('Messages', {
+            screen: 'Chat',
+            params: { conversationId: `inquiry_${group.id}`, inquiryGroup: group },
+          });
+        }}
+        onLongPress={() => {
+          if (!group.isArchived) handleArchiveInquiry(group);
+        }}
+      >
+        <View style={styles.groupHeader}>
+          <View style={[styles.groupIcon, { backgroundColor: 'rgba(255,107,91,0.15)' }]}>
+            <Feather name="home" size={20} color="#ff6b5b" />
+          </View>
+          <View style={styles.groupInfo}>
+            <ThemedText style={[Typography.h3]} numberOfLines={1}>
+              {group.listingAddress || group.name}
+            </ThemedText>
+            <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
+              With {group.hostName || 'Host'} · {group.memberCount || 0} members
+            </ThemedText>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            {group.isArchived ? (
+              <View style={[styles.inquiryBadge, { backgroundColor: 'rgba(255,255,255,0.08)' }]}>
+                <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>Archived</ThemedText>
+              </View>
+            ) : (
+              <View style={[styles.inquiryBadge, { backgroundColor: 'rgba(62,207,142,0.15)' }]}>
+                <ThemedText style={[Typography.small, { color: '#3ECF8E' }]}>Active</ThemedText>
+              </View>
+            )}
+          </View>
+        </View>
+      </Pressable>
+    );
+  };
+
   const renderMyGroup = (group: Group) => {
     const isCreator = group.createdBy === user?.id;
     const memberProfiles = (group.members || [])
@@ -834,19 +904,8 @@ export const GroupsScreen = () => {
     }
 
     if (activeTab === 'my-groups') {
-      if (myGroups.length === 0) {
-        return (
-          <View style={styles.emptyState}>
-            <Feather name="users" size={64} color={theme.textSecondary} />
-            <ThemedText style={[Typography.h3, { color: theme.textSecondary, marginTop: Spacing.lg }]}>
-              No Groups Yet
-            </ThemedText>
-            <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.sm, textAlign: 'center' }]}>
-              Create a group or discover groups to join!
-            </ThemedText>
-          </View>
-        );
-      }
+      const activeInquiries = inquiryGroups.filter(g => !g.isArchived);
+      const archivedInquiries = inquiryGroups.filter(g => g.isArchived);
 
       return (
         <ScrollView 
@@ -854,7 +913,59 @@ export const GroupsScreen = () => {
           contentContainerStyle={styles.myGroupsList}
           showsVerticalScrollIndicator={false}
         >
-          {myGroups.map(group => renderMyGroup(group))}
+          <View style={styles.sectionHeader}>
+            <Feather name="users" size={16} color="#ff6b5b" />
+            <ThemedText style={[Typography.h3, { marginLeft: 8 }]}>My Roommate Groups</ThemedText>
+          </View>
+          {myGroups.length === 0 ? (
+            <View style={[styles.emptyState, { paddingVertical: 30 }]}>
+              <Feather name="users" size={40} color={theme.textSecondary} />
+              <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.sm, textAlign: 'center' }]}>
+                No groups yet — create or discover one!
+              </ThemedText>
+            </View>
+          ) : (
+            myGroups.map(group => renderMyGroup(group))
+          )}
+
+          <View style={[styles.sectionHeader, { marginTop: 24 }]}>
+            <Feather name="home" size={16} color="#ff6b5b" />
+            <ThemedText style={[Typography.h3, { marginLeft: 8 }]}>Listing Inquiries</ThemedText>
+          </View>
+          {activeInquiries.length === 0 ? (
+            <View style={[styles.emptyState, { paddingVertical: 30 }]}>
+              <Feather name="home" size={40} color={theme.textSecondary} />
+              <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.sm, textAlign: 'center' }]}>
+                No listing inquiries yet
+              </ThemedText>
+              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginTop: 4, textAlign: 'center' }]}>
+                Tap "Inquire Together" on any listing to start one
+              </ThemedText>
+            </View>
+          ) : (
+            activeInquiries.map(group => renderInquiryGroup(group))
+          )}
+
+          {archivedInquiries.length > 0 ? (
+            <>
+              <Pressable
+                style={[styles.sectionHeader, { marginTop: 24 }]}
+                onPress={() => setShowPastInquiries(!showPastInquiries)}
+              >
+                <Feather name="archive" size={16} color={theme.textSecondary} />
+                <ThemedText style={[Typography.caption, { marginLeft: 8, color: theme.textSecondary }]}>
+                  Past Inquiries ({archivedInquiries.length})
+                </ThemedText>
+                <Feather
+                  name={showPastInquiries ? 'chevron-up' : 'chevron-down'}
+                  size={16}
+                  color={theme.textSecondary}
+                  style={{ marginLeft: 'auto' }}
+                />
+              </Pressable>
+              {showPastInquiries ? archivedInquiries.map(group => renderInquiryGroup(group)) : null}
+            </>
+          ) : null}
         </ScrollView>
       );
     }
@@ -2280,5 +2391,16 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 3,
     elevation: 2,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  inquiryBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
 });

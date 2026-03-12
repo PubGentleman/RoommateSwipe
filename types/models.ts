@@ -81,19 +81,40 @@ export interface PropertyFilter {
   availableFrom?: Date;
 }
 
+export type GroupType = 'roommate' | 'listing_inquiry';
+
+export interface GroupMember {
+  userId: string;
+  role: 'renter' | 'host';
+  joinedAt: string;
+  isHost: boolean;
+  user?: {
+    id: string;
+    full_name?: string;
+    avatar_url?: string;
+    age?: number;
+    occupation?: string;
+  };
+}
+
 export interface Group {
   id: string;
+  type: GroupType;
   name: string;
   description?: string;
-  members: string[];
+  members: string[] | GroupMember[];
   pendingMembers: string[];
   maxMembers: number;
-  budget: number; // Minimum monthly budget per person
-  apartmentPrice?: number; // Total apartment price
-  bedrooms?: number; // Number of bedrooms
+  budget: number;
+  apartmentPrice?: number;
+  bedrooms?: number;
   preferredLocation: string;
   createdAt: Date;
   createdBy: string;
+  listingId?: string;
+  hostId?: string;
+  listingAddress?: string;
+  isArchived: boolean;
 }
 
 export interface Message {

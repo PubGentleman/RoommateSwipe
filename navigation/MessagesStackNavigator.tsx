@@ -9,7 +9,8 @@ export type MessagesStackParamList = {
   MessagesList: undefined;
   Chat: {
     conversationId: string;
-    otherUser: RoommateProfile;
+    otherUser?: RoommateProfile;
+    inquiryGroup?: any;
   };
   CreateGroup: {
     matchedUserId: string;

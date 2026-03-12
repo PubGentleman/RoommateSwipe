@@ -19,6 +19,8 @@ import { PlanBadge } from '../../components/PlanBadge';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
 import { User } from '../../types/models';
 import { getConversations as getSupabaseConversations, subscribeToAllMessages } from '../../services/messageService';
+import { getMyInquiryGroups } from '../../services/groupService';
+import { Group } from '../../types/models';
 
 type MessagesScreenNavigationProp = NativeStackNavigationProp<MessagesStackParamList, 'MessagesList'>;
 
@@ -52,6 +54,7 @@ export const MessagesScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [showAISheet, setShowAISheet] = useState(false);
+  const [inquiryGroups, setInquiryGroups] = useState<Group[]>([]);
 
   useEffect(() => {
     if (!user) return;
@@ -171,6 +174,12 @@ export const MessagesScreen = () => {
       userConversations.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
       await StorageService.setConversations(existingConversations);
       setConversations(userConversations);
+      try {
+        const groups = await getMyInquiryGroups();
+        setInquiryGroups(groups.filter((g: Group) => !g.isArchived));
+      } catch (e) {
+        console.warn('Failed to load inquiry groups:', e);
+      }
     } catch (error) {
       console.error('Error loading conversations:', error);
     } finally {
@@ -407,8 +416,49 @@ export const MessagesScreen = () => {
     );
   };
 
+  const navigateToInquiryChat = (group: Group) => {
+    navigation.navigate('Chat', {
+      conversationId: `inquiry_${group.id}`,
+      inquiryGroup: group,
+    });
+  };
+
+  const renderInquiryItem = (group: Group) => (
+    <Pressable
+      key={group.id}
+      style={styles.inquiryItem}
+      onPress={() => navigateToInquiryChat(group)}
+    >
+      <View style={styles.inquiryIconWrap}>
+        <Feather name="home" size={18} color="#ff6b5b" />
+      </View>
+      <View style={{ flex: 1 }}>
+        <ThemedText style={{ fontSize: 14, fontWeight: '600', color: '#fff' }} numberOfLines={1}>
+          {group.name || group.listingAddress || 'Listing Inquiry'}
+        </ThemedText>
+        <ThemedText style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 2 }} numberOfLines={1}>
+          {group.listingAddress || 'No address'}
+        </ThemedText>
+      </View>
+      <View style={styles.inquiryMembersBadge}>
+        <Feather name="users" size={12} color="rgba(255,255,255,0.5)" />
+        <ThemedText style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginLeft: 4 }}>
+          {group.members?.length || 0}
+        </ThemedText>
+      </View>
+      <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.3)" style={{ marginLeft: 8 }} />
+    </Pressable>
+  );
+
   const renderHeader = () => (
     <View>
+      {inquiryGroups.length > 0 ? (
+        <>
+          <ThemedText style={styles.sectionLabel}>Listing Inquiries</ThemedText>
+          {inquiryGroups.map(g => renderInquiryItem(g))}
+          <View style={styles.divider} />
+        </>
+      ) : null}
       {newMatches.length > 0 ? (
         <>
           <ThemedText style={styles.sectionLabel}>New Matches</ThemedText>
@@ -894,5 +944,28 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.25)',
     lineHeight: 18,
     textAlign: 'center',
+  },
+  inquiryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+  },
+  inquiryIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,107,91,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  inquiryMembersBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.06)',
   },
 });

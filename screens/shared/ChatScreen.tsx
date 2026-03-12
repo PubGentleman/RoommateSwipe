@@ -20,13 +20,15 @@ type ChatScreenProps = {
     params: {
       conversationId: string;
       otherUser?: RoommateProfile;
+      inquiryGroup?: any;
     };
   };
   navigation: any;
 };
 
 export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
-  const { conversationId, otherUser: routeOtherUser } = route.params;
+  const { conversationId, otherUser: routeOtherUser, inquiryGroup } = route.params;
+  const isInquiryChat = !!inquiryGroup || conversationId.startsWith('inquiry_');
   const { theme } = useTheme();
   const { user, incrementMessageCount, canSendMessage, canStartNewChat, incrementActiveChatCount, watchAdForCredit, isBasicUser, blockUser, reportUser, canSendColdMessage, useColdMessage } = useAuth();
   const insets = useSafeAreaInsets();
@@ -319,6 +321,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     const isOwnMessage = item.senderId === user?.id;
     const showReadReceipt = isOwnMessage && isEliteUser();
     const isRead = item.readAt || item.read;
+    const isHostMessage = isInquiryChat && inquiryGroup?.hostId && item.senderId === inquiryGroup.hostId;
     return (
       <View
         style={[
@@ -326,11 +329,21 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           isOwnMessage ? styles.ownMessage : styles.otherMessage,
         ]}
       >
+        {isHostMessage && !isOwnMessage ? (
+          <View style={styles.hostBadge}>
+            <Feather name="home" size={10} color="#ff6b5b" />
+            <ThemedText style={styles.hostBadgeText}>Host</ThemedText>
+          </View>
+        ) : null}
         <View
           style={[
             styles.messageBubble,
             {
-              backgroundColor: isOwnMessage ? theme.primary : theme.backgroundSecondary,
+              backgroundColor: isOwnMessage
+                ? theme.primary
+                : isHostMessage
+                  ? 'rgba(255,107,91,0.15)'
+                  : theme.backgroundSecondary,
             },
           ]}
         >
@@ -367,8 +380,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     );
   };
 
-  // Guard: wait for otherUser to load
-  if (!otherUser) {
+  if (!otherUser && !isInquiryChat) {
     return (
       <View style={[styles.container, { backgroundColor: theme.backgroundRoot, justifyContent: 'center', alignItems: 'center' }]}>
         <ThemedText>Loading...</ThemedText>
@@ -382,52 +394,114 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={0}
     >
-      <View style={[styles.header, { backgroundColor: theme.backgroundRoot, paddingTop: insets.top + Spacing.lg }]}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Feather name="arrow-left" size={24} color={theme.text} />
-        </Pressable>
-        <View style={styles.headerCenter}>
-          <View style={styles.avatarWrapper}>
-            <Image source={{ uri: otherUser.photos?.[0] }} style={styles.headerAvatar} />
-            {canSeeOnlineStatus() && isOnline ? (
-              <View style={[styles.headerOnlineIndicator, { backgroundColor: theme.success }]} />
-            ) : null}
-          </View>
-          <View style={{ flex: 1, marginLeft: Spacing.md }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <ThemedText style={[Typography.h3]}>
-                {otherUser.name}
-              </ThemedText>
-              <PlanBadge plan={otherUserPlan} size={15} />
+      {isInquiryChat ? (
+        <>
+          <View style={[styles.header, { backgroundColor: 'rgba(255,107,91,0.06)', paddingTop: insets.top + Spacing.lg }]}>
+            <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
+              <Feather name="arrow-left" size={24} color={theme.text} />
+            </Pressable>
+            <View style={[styles.headerCenter, { flex: 1 }]}>
+              <Feather name="home" size={18} color="#ff6b5b" />
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <ThemedText style={{ fontSize: 11, color: '#ff6b5b', fontWeight: '600' }}>
+                  Listing Inquiry
+                </ThemedText>
+                <ThemedText style={[Typography.h3]} numberOfLines={1}>
+                  {inquiryGroup?.listingAddress || 'Listing'}
+                </ThemedText>
+              </View>
             </View>
-            {canSeeOnlineStatus() ? (
-              <ThemedText style={[Typography.caption, { color: isOnline ? theme.success : theme.textSecondary }]}>
-                {isOnline ? 'Online' : 'Offline'}
+            <Pressable onPress={() => {
+              const options: any[] = [
+                { text: 'Leave Inquiry', style: 'destructive', onPress: () => {
+                  Alert.alert('Leave Inquiry', 'Are you sure? If all renters leave, this inquiry will be archived.', [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Leave', style: 'destructive', onPress: () => navigation.goBack() },
+                  ]);
+                }},
+                { text: 'Report Host', onPress: () => setShowReportBlockModal(true) },
+                { text: 'Cancel', style: 'cancel' },
+              ];
+              Alert.alert('Options', undefined, options);
+            }} style={styles.moreButton}>
+              <Feather name="more-vertical" size={24} color={theme.text} />
+            </Pressable>
+          </View>
+          {inquiryGroup?.listingAddress ? (
+            <View style={styles.pinnedListingCard}>
+              <View style={styles.pinnedListingThumbWrap}>
+                <Feather name="home" size={20} color="#ff6b5b" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <ThemedText style={{ fontSize: 13, fontWeight: '600', color: '#fff' }} numberOfLines={1}>
+                  {inquiryGroup.name || inquiryGroup.listingAddress}
+                </ThemedText>
+                <ThemedText style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                  {inquiryGroup.listingAddress}
+                </ThemedText>
+              </View>
+              <Pressable onPress={() => {}} style={{ paddingLeft: 8 }}>
+                <ThemedText style={{ fontSize: 12, color: '#ff6b5b', fontWeight: '600' }}>View Listing</ThemedText>
+              </Pressable>
+            </View>
+          ) : null}
+          {inquiryGroup?.isArchived ? (
+            <View style={styles.archivedBanner}>
+              <Feather name="archive" size={14} color="rgba(255,255,255,0.5)" />
+              <ThemedText style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginLeft: 8 }}>
+                This inquiry has been archived — no new messages can be sent
               </ThemedText>
-            ) : null}
+            </View>
+          ) : null}
+        </>
+      ) : (
+        <View style={[styles.header, { backgroundColor: theme.backgroundRoot, paddingTop: insets.top + Spacing.lg }]}>
+          <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Feather name="arrow-left" size={24} color={theme.text} />
+          </Pressable>
+          <View style={styles.headerCenter}>
+            <View style={styles.avatarWrapper}>
+              <Image source={{ uri: otherUser.photos?.[0] }} style={styles.headerAvatar} />
+              {canSeeOnlineStatus() && isOnline ? (
+                <View style={[styles.headerOnlineIndicator, { backgroundColor: theme.success }]} />
+              ) : null}
+            </View>
+            <View style={{ flex: 1, marginLeft: Spacing.md }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <ThemedText style={[Typography.h3]}>
+                  {otherUser.name}
+                </ThemedText>
+                <PlanBadge plan={otherUserPlan} size={15} />
+              </View>
+              {canSeeOnlineStatus() ? (
+                <ThemedText style={[Typography.caption, { color: isOnline ? theme.success : theme.textSecondary }]}>
+                  {isOnline ? 'Online' : 'Offline'}
+                </ThemedText>
+              ) : null}
+            </View>
           </View>
+          <Pressable onPress={() => setShowAISheet(true)} style={styles.aiNavBtn}>
+            <View style={styles.aiNavBtnInner}>
+              <Feather name="cpu" size={16} color="#FFFFFF" />
+            </View>
+          </Pressable>
+          <Pressable onPress={() => {
+            Alert.alert(
+              'Options',
+              undefined,
+              [
+                { text: 'Create Group', onPress: handleCreateGroup },
+                { text: 'Report / Block', onPress: () => setShowReportBlockModal(true) },
+                { text: 'Cancel', style: 'cancel' },
+              ]
+            );
+          }} style={styles.moreButton}>
+            <Feather name="more-vertical" size={24} color={theme.text} />
+          </Pressable>
         </View>
-        <Pressable onPress={() => setShowAISheet(true)} style={styles.aiNavBtn}>
-          <View style={styles.aiNavBtnInner}>
-            <Feather name="cpu" size={16} color="#FFFFFF" />
-          </View>
-        </Pressable>
-        <Pressable onPress={() => {
-          Alert.alert(
-            'Options',
-            undefined,
-            [
-              { text: 'Create Group', onPress: handleCreateGroup },
-              { text: 'Report / Block', onPress: () => setShowReportBlockModal(true) },
-              { text: 'Cancel', style: 'cancel' },
-            ]
-          );
-        }} style={styles.moreButton}>
-          <Feather name="more-vertical" size={24} color={theme.text} />
-        </Pressable>
-      </View>
+      )}
 
-      {!canSeeOnlineStatus() ? (
+      {!isInquiryChat && !canSeeOnlineStatus() ? (
         <Pressable
           style={[styles.premiumBanner, { backgroundColor: theme.backgroundSecondary }]}
           onPress={() => (navigation as any).navigate('Profile', { screen: 'Payment' })}
@@ -440,7 +514,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         </Pressable>
       ) : null}
 
-      {showGroupOption ? (
+      {!isInquiryChat && showGroupOption && otherUser ? (
         <Pressable
           style={[styles.groupBanner, { backgroundColor: theme.primary }]}
           onPress={handleCreateGroup}
@@ -484,7 +558,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
               color: theme.text,
             },
           ]}
-          placeholder="Type a message..."
+          placeholder={inquiryGroup?.isArchived ? 'This inquiry is archived' : 'Type a message...'}
           placeholderTextColor={theme.textSecondary}
           value={inputText}
           onChangeText={setInputText}
@@ -493,6 +567,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           returnKeyType="send"
           multiline
           maxLength={500}
+          editable={!inquiryGroup?.isArchived}
         />
         <Pressable
           onPress={sendMessage}
@@ -724,5 +799,48 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  pinnedListingCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(255,107,91,0.06)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  pinnedListingThumbWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,107,91,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  archivedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  hostBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,107,91,0.1)',
+    alignSelf: 'flex-start',
+  },
+  hostBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#ff6b5b',
+    marginLeft: 4,
   },
 });

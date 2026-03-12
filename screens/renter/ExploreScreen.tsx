@@ -25,6 +25,8 @@ import { getZodiacSymbol } from '../../utils/zodiacUtils';
 import { PropertyMapView } from '../../components/PropertyMapView';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
 import { useNotificationContext } from '../../contexts/NotificationContext';
+import { getMyRoommateGroups, createListingInquiryGroup } from '../../services/groupService';
+import { Group } from '../../types/models';
 
 const COMMON_AMENITIES = [
   'Parking', 'Gym', 'Pool', 'Laundry', 'Pet Friendly',
@@ -98,6 +100,11 @@ export const ExploreScreen = () => {
   const [paywallPlan, setPaywallPlan] = useState<'plus' | 'elite'>('plus');
   const [activeQuickFilters, setActiveQuickFilters] = useState<Set<string>>(new Set(['bestMatch']));
   const [showAISheet, setShowAISheet] = useState(false);
+  const [showInquireModal, setShowInquireModal] = useState(false);
+  const [inquireProperty, setInquireProperty] = useState<Property | null>(null);
+  const [roommateGroups, setRoommateGroups] = useState<any[]>([]);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [creatingInquiry, setCreatingInquiry] = useState(false);
 
   useEffect(() => {
     loadProperties();
@@ -530,6 +537,48 @@ export const ExploreScreen = () => {
 
   const isBasic = (user?.subscription?.plan || 'basic') === 'basic';
 
+  const handleInquireTogether = async (property: Property) => {
+    try {
+      const groups = await getMyRoommateGroups();
+      setRoommateGroups(groups || []);
+      setInquireProperty(property);
+      setSelectedGroupId(null);
+      setShowInquireModal(true);
+    } catch (err) {
+      const localGroups = await StorageService.getGroups();
+      const myGrps = localGroups.filter(g => g.members.includes(user?.id || ''));
+      setRoommateGroups(myGrps);
+      setInquireProperty(property);
+      setSelectedGroupId(null);
+      setShowInquireModal(true);
+    }
+  };
+
+  const handleSendInquiry = async () => {
+    if (!selectedGroupId || !inquireProperty) return;
+    setCreatingInquiry(true);
+    try {
+      const address = inquireProperty.location || inquireProperty.title || 'Listing';
+      const selectedGroup = roommateGroups.find(g => g.id === selectedGroupId);
+      const groupName = `${selectedGroup?.name || 'Group'} — ${address}`;
+      await createListingInquiryGroup(
+        inquireProperty.id,
+        inquireProperty.hostProfileId || '',
+        address,
+        selectedGroupId,
+        groupName
+      );
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setShowInquireModal(false);
+      Alert.alert('Inquiry Sent', `Your group inquiry for "${address}" has been sent to the host.`);
+    } catch (err) {
+      console.error('Failed to create inquiry group:', err);
+      Alert.alert('Error', 'Failed to send inquiry. Please try again.');
+    } finally {
+      setCreatingInquiry(false);
+    }
+  };
+
   const renderProperty = ({ item }: { item: Property }) => {
     const hostUser = item.hostProfileId ? hostProfiles.get(item.hostProfileId) : null;
     const hostProfile = hostUser ? getUserAsRoommateProfile(hostUser) : null;
@@ -656,12 +705,23 @@ export const ExploreScreen = () => {
               <Text style={styles.respBadgeText}>Fast reply</Text>
             </View>
           </View>
-          {isBasic ? (
+          {!isBasic ? (
+            <Pressable
+              style={styles.inquireTogetherBtn}
+              onPress={(e) => {
+                e.stopPropagation?.();
+                handleInquireTogether(item);
+              }}
+            >
+              <Feather name="users" size={14} color={ACCENT} />
+              <Text style={styles.inquireTogetherText}>Inquire Together</Text>
+            </Pressable>
+          ) : (
             <View style={styles.premiumRow}>
               <Feather name="lock" size={13} color="rgba(255,215,0,0.6)" />
               <Text style={styles.premiumText}>Upgrade to Plus to contact host & schedule a tour</Text>
             </View>
-          ) : null}
+          )}
         </View>
       </Pressable>
     );
@@ -1034,6 +1094,96 @@ export const ExploreScreen = () => {
         }}
         onDismiss={() => setShowPaywall(false)}
       />
+
+      <Modal
+        visible={showInquireModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowInquireModal(false)}
+      >
+        <Pressable
+          style={styles.inquireModalOverlay}
+          onPress={() => setShowInquireModal(false)}
+        >
+          <Pressable style={styles.inquireSheet} onPress={() => {}}>
+            <View style={styles.inquireSheetHandle} />
+            <Text style={styles.inquireSheetTitle}>Start a Group Inquiry</Text>
+            <Text style={styles.inquireSheetDesc}>
+              Invite your roommate group to discuss this listing with the host
+            </Text>
+            {inquireProperty ? (
+              <View style={styles.inquireListingPreview}>
+                <Image source={{ uri: inquireProperty.photos?.[0] }} style={styles.inquireListingThumb} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inquireListingTitle} numberOfLines={1}>{inquireProperty.title}</Text>
+                  <Text style={styles.inquireListingPrice}>${inquireProperty.price?.toLocaleString()}/mo</Text>
+                </View>
+              </View>
+            ) : null}
+            {roommateGroups.length === 0 ? (
+              <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+                <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, textAlign: 'center' }}>
+                  You need a roommate group first
+                </Text>
+                <Pressable
+                  onPress={() => {
+                    setShowInquireModal(false);
+                    (navigation as any).navigate('Groups');
+                  }}
+                  style={{ marginTop: 10 }}
+                >
+                  <Text style={{ color: ACCENT, fontSize: 14, fontWeight: '600' }}>Create Group →</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <>
+                <ScrollView style={{ maxHeight: 200, marginVertical: 12 }}>
+                  {roommateGroups.map((group: any) => (
+                    <Pressable
+                      key={group.id}
+                      style={[
+                        styles.inquireGroupRow,
+                        selectedGroupId === group.id && styles.inquireGroupRowSelected,
+                      ]}
+                      onPress={() => setSelectedGroupId(group.id)}
+                    >
+                      <Feather name="users" size={18} color={selectedGroupId === group.id ? ACCENT : 'rgba(255,255,255,0.4)'} />
+                      <View style={{ flex: 1, marginLeft: 12 }}>
+                        <Text style={styles.inquireGroupName}>{group.name}</Text>
+                        <Text style={styles.inquireGroupCount}>
+                          {group.members?.[0]?.count || group.members?.length || 0} members
+                        </Text>
+                      </View>
+                      {selectedGroupId === group.id ? (
+                        <Feather name="check-circle" size={20} color={ACCENT} />
+                      ) : null}
+                    </Pressable>
+                  ))}
+                </ScrollView>
+                <Pressable
+                  style={[styles.inquireSendBtn, { opacity: selectedGroupId && !creatingInquiry ? 1 : 0.5 }]}
+                  onPress={handleSendInquiry}
+                  disabled={!selectedGroupId || creatingInquiry}
+                >
+                  <LinearGradient
+                    colors={[ACCENT, '#e83a2a']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.inquireSendBtnGrad}
+                  >
+                    <Text style={styles.inquireSendBtnText}>
+                      {creatingInquiry ? 'Sending...' : 'Send Inquiry'}
+                    </Text>
+                  </LinearGradient>
+                </Pressable>
+              </>
+            )}
+            <Pressable style={styles.inquireCancelBtn} onPress={() => setShowInquireModal(false)}>
+              <Text style={styles.inquireCancelText}>Cancel</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <Modal
         visible={showPropertyDetail && selectedProperty != null}
@@ -2163,5 +2313,135 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
+  },
+  inquireTogetherBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 10,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.35)',
+    backgroundColor: 'rgba(255,107,91,0.06)',
+  },
+  inquireTogetherText: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: '#ff6b5b',
+  },
+  inquireModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end' as const,
+  },
+  inquireSheet: {
+    backgroundColor: '#1a1a1a',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+    paddingTop: 12,
+  },
+  inquireSheetHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignSelf: 'center' as const,
+    marginBottom: 20,
+  },
+  inquireSheetTitle: {
+    fontSize: 19,
+    fontWeight: '800' as const,
+    color: '#fff',
+    textAlign: 'center' as const,
+    marginBottom: 6,
+  },
+  inquireSheetDesc: {
+    fontSize: 13.5,
+    color: 'rgba(255,255,255,0.5)',
+    textAlign: 'center' as const,
+    lineHeight: 19,
+    marginBottom: 16,
+  },
+  inquireListingPreview: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 12,
+    padding: 12,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    marginBottom: 12,
+  },
+  inquireListingThumb: {
+    width: 56,
+    height: 56,
+    borderRadius: 10,
+  },
+  inquireListingTitle: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: '#fff',
+  },
+  inquireListingPrice: {
+    fontSize: 13,
+    color: '#ff6b5b',
+    fontWeight: '700' as const,
+    marginTop: 2,
+  },
+  inquireGroupRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  inquireGroupRowSelected: {
+    borderColor: '#ff6b5b',
+    backgroundColor: 'rgba(255,107,91,0.08)',
+  },
+  inquireGroupName: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: '#fff',
+  },
+  inquireGroupCount: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.4)',
+    marginTop: 2,
+  },
+  inquireSendBtn: {
+    borderRadius: 14,
+    overflow: 'hidden' as const,
+    marginTop: 4,
+  },
+  inquireSendBtnGrad: {
+    height: 50,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    borderRadius: 14,
+  },
+  inquireSendBtnText: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    color: '#fff',
+  },
+  inquireCancelBtn: {
+    height: 44,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    marginTop: 4,
+  },
+  inquireCancelText: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: 'rgba(255,255,255,0.4)',
   },
 });
