@@ -1,0 +1,364 @@
+---
+
+**REPLIT PROMPT — Post-Onboarding AI Personality Refinement System**
+
+Do not touch the existing personality quiz in onboarding. Leave it completely as it is. This prompt adds a separate AI-driven refinement system that runs after the user has been using the app, using the existing personality questions to refine match quality over time. The goal is to improve matches for users who are struggling to find good ones.
+
+---
+
+**IMPORTANT — DO NOT TOUCH ONBOARDING**
+
+- Do not modify the existing personality quiz in the questionnaire
+- Do not change any onboarding steps, questions, or flow
+- Do not delete or modify any existing personality question components
+- This is a completely separate system that runs independently after onboarding is complete
+
+---
+
+**PART 1 — REFINEMENT TRIGGER CONDITIONS**
+
+Create `utils/refinementEngine.ts`:
+
+```ts
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Storage keys
+const SWIPE_COUNT_KEY = 'refinementSwipeCount';
+const SESSION_START_KEY = 'refinementSessionStart';
+const LAST_QUESTION_KEY = 'lastRefinementQuestionTime';
+const QUESTIONS_ASKED_KEY = 'refinementQuestionsAsked';
+
+// Thresholds
+const MIN_SWIPES_BEFORE_FIRST_QUESTION = 20;  // must swipe at least 20 times
+const MIN_SESSION_MINUTES = 15;                // must be in app 15+ minutes
+const SWIPES_BETWEEN_QUESTIONS = 30;           // ask again every 30 swipes after first
+const HOURS_BETWEEN_QUESTIONS = 3;             // minimum 3 hours between questions
+const LOW_MATCH_RATE_THRESHOLD = 0.15;         // under 15% right swipe rate = struggling
+
+export const trackSwipe = async (): Promise<void> => {
+  const current = parseInt(await AsyncStorage.getItem(SWIPE_COUNT_KEY) ?? '0');
+  await AsyncStorage.setItem(SWIPE_COUNT_KEY, (current + 1).toString());
+};
+
+export const startSession = async (): Promise<void> => {
+  const existing = await AsyncStorage.getItem(SESSION_START_KEY);
+  if (!existing) {
+    await AsyncStorage.setItem(SESSION_START_KEY, Date.now().toString());
+  }
+};
+
+export const getSessionMinutes = async (): Promise<number> => {
+  const start = await AsyncStorage.getItem(SESSION_START_KEY);
+  if (!start) return 0;
+  return (Date.now() - parseInt(start)) / (1000 * 60);
+};
+
+export const getTotalSwipes = async (): Promise<number> => {
+  return parseInt(await AsyncStorage.getItem(SWIPE_COUNT_KEY) ?? '0');
+};
+
+export const getQuestionsAsked = async (): Promise<string[]> => {
+  const raw = await AsyncStorage.getItem(QUESTIONS_ASKED_KEY);
+  return raw ? JSON.parse(raw) : [];
+};
+
+export const markQuestionAsked = async (questionId: string): Promise<void> => {
+  const asked = await getQuestionsAsked();
+  asked.push(questionId);
+  await AsyncStorage.setItem(QUESTIONS_ASKED_KEY, JSON.stringify(asked));
+  await AsyncStorage.setItem(LAST_QUESTION_KEY, Date.now().toString());
+};
+
+export const hoursSinceLastQuestion = async (): Promise<number> => {
+  const last = await AsyncStorage.getItem(LAST_QUESTION_KEY);
+  if (!last) return Infinity;
+  return (Date.now() - parseInt(last)) / (1000 * 60 * 60);
+};
+
+export const shouldShowRefinementQuestion = async (
+  rightSwipes: number,
+  totalSwipes: number,
+  personalityAnswers: Record<string, string>,
+  allQuestionsAnswered: boolean
+): Promise<boolean> => {
+  // Never show if all questions already answered
+  if (allQuestionsAnswered) return false;
+
+  const swipeCount = await getTotalSwipes();
+  const sessionMins = await getSessionMinutes();
+  const hoursSinceLast = await hoursSinceLastQuestion();
+  const questionsAsked = await getQuestionsAsked();
+  const matchRate = totalSwipes > 0 ? rightSwipes / totalSwipes : 1;
+
+  // First question conditions — must meet ALL of these
+  if (questionsAsked.length === 0) {
+    return (
+      swipeCount >= MIN_SWIPES_BEFORE_FIRST_QUESTION &&
+      sessionMins >= MIN_SESSION_MINUTES &&
+      matchRate <= LOW_MATCH_RATE_THRESHOLD
+    );
+  }
+
+  // Subsequent questions — space them out by swipes AND time
+  const swipesSinceLast = swipeCount % SWIPES_BETWEEN_QUESTIONS;
+  return (
+    swipesSinceLast === 0 &&
+    hoursSinceLast >= HOURS_BETWEEN_QUESTIONS
+  );
+};
+```
+
+---
+
+**PART 2 — REFINEMENT QUESTIONS**
+
+Create `utils/refinementQuestions.ts` using the exact same question content already in the existing personality quiz — copy the question text and answer values directly from the existing components:
+
+```ts
+export interface RefinementQuestion {
+  id: string;
+  aiMessage: string;
+  followUpMessage: string;
+  options: { value: string; label: string; emoji: string }[];
+  profileField: string;
+}
+
+export const REFINEMENT_QUESTIONS: RefinementQuestion[] = [
+  {
+    id: 'sleepSchedule',
+    aiMessage: "I noticed you haven't found a great match yet — let me ask you something that might help. What's your sleep schedule like? 🌙",
+    followUpMessage: "Got it. I'll start filtering for people with compatible schedules.",
+    options: [
+      // Copy exact options from existing sleepSchedule question in the quiz
+    ],
+    profileField: 'sleepSchedule'
+  },
+  {
+    id: 'guestPreference',
+    aiMessage: "Let me refine your matches a bit more. How do you feel about guests at home? This is one of the top causes of roommate friction. 🏠",
+    followUpMessage: "Perfect. I'll weight this heavily in your upcoming matches.",
+    options: [
+      // Copy exact options from existing guestPreference question
+    ],
+    profileField: 'guestPreference'
+  },
+  {
+    id: 'communicationStyle',
+    aiMessage: "One more thing that could improve your matches — how do you prefer to handle issues with a roommate? 💬",
+    followUpMessage: "Noted. Compatible communication styles make a big difference.",
+    options: [
+      // Copy exact options from existing communicationStyle question
+    ],
+    profileField: 'communicationStyle'
+  },
+  {
+    id: 'weekendStyle',
+    aiMessage: "Your matches are getting better. Last refinement — what does a typical weekend at home look like for you? 🏠",
+    followUpMessage: "Great. Your match quality should improve significantly now.",
+    options: [
+      // Copy exact options from existing weekendStyle question
+    ],
+    profileField: 'weekendStyle'
+  },
+  {
+    id: 'noiseLevel',
+    aiMessage: "Hey — how do you feel about noise levels at home? Music, TV, people talking? 🎵",
+    followUpMessage: "Makes sense. I'll factor that into your matches going forward.",
+    options: [
+      // Copy exact options from existing noiseLevel question if it exists
+      { value: 'silent', label: 'Very quiet please', emoji: '🤫' },
+      { value: 'moderate', label: 'Some noise is fine', emoji: '🎵' },
+      { value: 'lively', label: 'Love a lively home', emoji: '🎉' },
+    ],
+    profileField: 'noiseLevel'
+  }
+];
+
+export const getNextRefinementQuestion = (
+  alreadyAsked: string[],
+  personalityAnswers: Record<string, string>
+): RefinementQuestion | null => {
+  return REFINEMENT_QUESTIONS.find(q =>
+    !alreadyAsked.includes(q.id) &&
+    !personalityAnswers?.[q.profileField]
+  ) ?? null;
+};
+```
+
+---
+
+**PART 3 — AI SHEET REFINEMENT MODE**
+
+In `components/RoomdrAISheet.tsx` add `'refinement'` to the existing `ScreenContext` type:
+
+```ts
+type ScreenContext = 'match' | 'chat' | 'explore' | 'messages' | 'groups' | 'profile' | 'profile_reminder' | 'refinement';
+```
+
+Add prop:
+```ts
+refinementQuestion?: RefinementQuestion;
+```
+
+When `screenContext === 'refinement'` render this inside the sheet:
+
+**Layout:**
+- Small coral chip: **"Improving your matches ✨"**
+- AI message bubble — `#1e1e1e` rounded card, `refinementQuestion.aiMessage` in white, 16px
+- Below bubble: answer options stacked vertically
+- Each option: full width, `#1e1e1e` bg, `rgba(255,255,255,0.08)` border, 54px height, emoji left, label white, chevron right gray
+- When option tapped:
+  1. Coral fill animation for 500ms
+  2. Message bubble content changes to `refinementQuestion.followUpMessage` in green
+  3. Wait 1.2 seconds
+  4. Sheet dismisses automatically
+- **"Not now"** small gray text at bottom — dismisses, resets cooldown to 3 hours
+
+---
+
+**PART 4 — WIRE TRIGGERS INTO RoommatesScreen**
+
+In `screens/renter/RoommatesScreen.tsx`:
+
+**On screen mount — start session timer:**
+```ts
+useEffect(() => {
+  startSession();
+}, []);
+```
+
+**Track every swipe — add to existing swipe handler:**
+```ts
+const handleSwipe = async (direction: 'left' | 'right') => {
+  // ... existing swipe logic ...
+  await trackSwipe();
+  await checkRefinementTrigger();
+};
+```
+
+**Add refinement check function:**
+```ts
+const checkRefinementTrigger = async () => {
+  if (showAISheet) return; // don't interrupt if sheet already open
+
+  const totalSwipes = profiles.length; // or existing swipe counter
+  const rightSwipeCount = likedProfiles.length; // or existing liked counter
+  const alreadyAsked = await getQuestionsAsked();
+  const allDone = alreadyAsked.length >= REFINEMENT_QUESTIONS.length;
+
+  const should = await shouldShowRefinementQuestion(
+    rightSwipeCount,
+    totalSwipes,
+    user?.personalityAnswers ?? {},
+    allDone
+  );
+
+  if (should) {
+    const question = getNextRefinementQuestion(
+      alreadyAsked,
+      user?.personalityAnswers ?? {}
+    );
+    if (question) {
+      setTimeout(() => {
+        setRefinementQuestion(question);
+        setAIContext('refinement');
+        setShowAISheet(true);
+      }, 800); // small delay after swipe animation
+    }
+  }
+};
+```
+
+Add state:
+```ts
+const [refinementQuestion, setRefinementQuestion] = useState<RefinementQuestion | null>(null);
+const [aiContext, setAIContext] = useState<ScreenContext>('match');
+```
+
+Update `<RoomdrAISheet>` render:
+```tsx
+<RoomdrAISheet
+  visible={showAISheet}
+  onDismiss={() => setShowAISheet(false)}
+  screenContext={aiContext}
+  refinementQuestion={refinementQuestion}
+/>
+```
+
+---
+
+**PART 5 — SAVE ANSWERS AND IMPROVE SCORES**
+
+In `components/RoomdrAISheet.tsx`, when a refinement answer is saved:
+
+```ts
+const handleRefinementAnswer = async (question: RefinementQuestion, value: string) => {
+  // Save to profile in Supabase
+  const updatedAnswers = {
+    ...user?.personalityAnswers,
+    [question.profileField]: value,
+    [`${question.profileField}_source`]: 'ai_refinement',
+    [`${question.profileField}_collectedAt`]: new Date().toISOString(),
+  };
+
+  await supabase
+    .from('profiles')
+    .update({ personality_answers: updatedAnswers })
+    .eq('user_id', user.id);
+
+  // Mark question as asked so it never repeats
+  await markQuestionAsked(question.id);
+
+  // Update auth context with new answers
+  updateUser({ personalityAnswers: updatedAnswers });
+};
+```
+
+---
+
+**PART 6 — SUBTLE MATCH IMPROVEMENT NOTIFICATION**
+
+After an answer is saved, the next time the user opens the Match screen show a single dismissible banner at the top for 4 seconds then auto-hide:
+
+```tsx
+{showRefinementBanner && (
+  <Animated.View style={[styles.refinementBanner, { opacity: bannerOpacity }]}>
+    <Feather name="trending-up" size={14} color="#ff6b5b" />
+    <Text style={styles.refinementBannerText}>
+      ✨ Your matches have been refined based on your answer
+    </Text>
+  </Animated.View>
+)}
+```
+
+Style: `rgba(255,107,91,0.1)` background, coral border, white text, auto-dismisses after 4 seconds.
+
+---
+
+**PART 7 — MATCHING ALGORITHM UPDATE**
+
+In `matchingAlgorithm.ts`, update `calculatePersonalityScore()` to handle answers collected from both onboarding AND ai refinement — they are stored in the same `personality_answers` field so no change to data access is needed. Just ensure the scoring handles partial answers gracefully:
+
+```ts
+// Only score fields where BOTH users have an answer
+// Return neutral 50 for any field either user hasn't answered yet
+// This means early users get neutral scoring until refinement answers come in
+```
+
+Keep the existing 15% weighting. Do not change any other part of the algorithm.
+
+---
+
+**After completing all changes verify:**
+1. The existing onboarding personality quiz is completely unchanged
+2. No personality questions appear before the user starts swiping
+3. The first refinement question only appears after 20+ swipes AND 15+ minutes AND low match rate
+4. Subsequent questions are spaced at least 3 hours apart AND 30 swipes apart
+5. Tapping an answer saves it, shows the follow-up message, and dismisses after 1.2 seconds
+6. Tapping "Not now" resets cooldown to 3 hours without saving
+7. The refinement banner appears on the match screen after an answer is saved
+8. Once all refinement questions are answered the system stops asking entirely
+9. Answers collected via refinement feed into the compatibility score the same way as onboarding answers
+10. App compiles with zero TypeScript errors
+
+---

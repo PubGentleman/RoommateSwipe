@@ -80,13 +80,11 @@ export const RoommatesScreen = () => {
   const [showBoostModal, setShowBoostModal] = useState(false);
   const [processingBoost, setProcessingBoost] = useState(false);
   const [boostTimeLabel, setBoostTimeLabel] = useState('');
-
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const rotation = useSharedValue(0);
   const cardOpacity = useSharedValue(1);
   const isAnimatingSwipe = useSharedValue(false);
-
   const animatedCardStyle = useAnimatedStyle(() => ({
     opacity: cardOpacity.value,
     transform: [
@@ -1096,8 +1094,10 @@ export const RoommatesScreen = () => {
                 </View>
               </View>
               {(() => {
-                const myTags: string[] = (user?.profileData?.interests as string[]) || [];
-                const theirTags: string[] = (currentProfile.profileData?.interests as string[]) || (currentProfile as any).interests || [];
+                const rawMyTags = user?.profileData?.interests;
+                const myTags: string[] = Array.isArray(rawMyTags) ? rawMyTags : [];
+                const rawTheirTags = (currentProfile.profileData?.interests) || (currentProfile as any).interests;
+                const theirTags: string[] = Array.isArray(rawTheirTags) ? rawTheirTags : [];
                 const shared = myTags.filter(t => theirTags.includes(t)).slice(0, 3);
                 if (shared.length === 0) return null;
                 return (
@@ -1931,8 +1931,10 @@ export const RoommatesScreen = () => {
               </View>
 
               {(() => {
-                const profileTags: string[] = (currentProfile.profileData?.interests as string[]) || (currentProfile as any).interests || [];
-                const myTags: string[] = (user?.profileData?.interests as string[]) || [];
+                const rawProfileTags = (currentProfile.profileData?.interests) || (currentProfile as any).interests;
+                const profileTags: string[] = Array.isArray(rawProfileTags) ? rawProfileTags : [];
+                const rawMyTags2 = user?.profileData?.interests;
+                const myTags: string[] = Array.isArray(rawMyTags2) ? rawMyTags2 : [];
                 const myTagSet = new Set(myTags);
                 if (profileTags.length === 0) return null;
                 return (
