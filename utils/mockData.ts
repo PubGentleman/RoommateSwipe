@@ -2006,6 +2006,8 @@ export const mockGroups: Group[] = [
     budget: 2800,
     preferredLocation: 'Financial District',
     createdAt: new Date('2024-01-15'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '1',
   },
   {
@@ -2018,6 +2020,8 @@ export const mockGroups: Group[] = [
     budget: 2000,
     preferredLocation: 'Williamsburg',
     createdAt: new Date('2024-01-20'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '3',
   },
   {
@@ -2030,6 +2034,8 @@ export const mockGroups: Group[] = [
     budget: 2200,
     preferredLocation: 'Park Slope',
     createdAt: new Date('2024-02-01'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '4',
   },
   {
@@ -2042,6 +2048,8 @@ export const mockGroups: Group[] = [
     budget: 1600,
     preferredLocation: 'Greenwich Village',
     createdAt: new Date('2024-02-05'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '5',
   },
   {
@@ -2054,6 +2062,8 @@ export const mockGroups: Group[] = [
     budget: 2500,
     preferredLocation: 'Financial District',
     createdAt: new Date('2024-02-10'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '6',
   },
   {
@@ -2066,6 +2076,8 @@ export const mockGroups: Group[] = [
     budget: 2100,
     preferredLocation: 'Astoria',
     createdAt: new Date('2024-02-12'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '7',
   },
   {
@@ -2078,6 +2090,8 @@ export const mockGroups: Group[] = [
     budget: 2400,
     preferredLocation: 'Bushwick',
     createdAt: new Date('2024-02-15'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '8',
   },
   {
@@ -2090,6 +2104,8 @@ export const mockGroups: Group[] = [
     budget: 1900,
     preferredLocation: 'Crown Heights',
     createdAt: new Date('2024-02-18'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '9',
   },
   {
@@ -2102,6 +2118,8 @@ export const mockGroups: Group[] = [
     budget: 2300,
     preferredLocation: 'SoHo',
     createdAt: new Date('2024-02-20'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '10',
   },
   {
@@ -2114,6 +2132,8 @@ export const mockGroups: Group[] = [
     budget: 1400,
     preferredLocation: 'East Village',
     createdAt: new Date('2024-02-22'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '11',
   },
   {
@@ -2126,6 +2146,8 @@ export const mockGroups: Group[] = [
     budget: 2000,
     preferredLocation: 'Chelsea',
     createdAt: new Date('2024-03-01'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '12',
   },
   {
@@ -2138,6 +2160,8 @@ export const mockGroups: Group[] = [
     budget: 1800,
     preferredLocation: 'Lower East Side',
     createdAt: new Date('2024-03-03'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '10',
   },
   {
@@ -2150,6 +2174,8 @@ export const mockGroups: Group[] = [
     budget: 2200,
     preferredLocation: 'Tribeca',
     createdAt: new Date('2024-03-05'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '13',
   },
   {
@@ -2162,6 +2188,8 @@ export const mockGroups: Group[] = [
     budget: 2100,
     preferredLocation: 'West Village',
     createdAt: new Date('2024-03-08'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '18',
   },
   {
@@ -2174,6 +2202,8 @@ export const mockGroups: Group[] = [
     budget: 1700,
     preferredLocation: 'Greenpoint',
     createdAt: new Date('2024-03-10'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '9',
   },
   {
@@ -2186,6 +2216,8 @@ export const mockGroups: Group[] = [
     budget: 2300,
     preferredLocation: 'Upper East Side',
     createdAt: new Date('2024-03-12'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '14',
   },
   {
@@ -2198,6 +2230,8 @@ export const mockGroups: Group[] = [
     budget: 1900,
     preferredLocation: 'Upper West Side',
     createdAt: new Date('2024-03-15'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '15',
   },
   {
@@ -2210,6 +2244,8 @@ export const mockGroups: Group[] = [
     budget: 1600,
     preferredLocation: 'Midtown',
     createdAt: new Date('2024-03-18'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '16',
   },
   {
@@ -2222,6 +2258,8 @@ export const mockGroups: Group[] = [
     budget: 2000,
     preferredLocation: 'Park Slope',
     createdAt: new Date('2024-03-20'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '17',
   },
   {
@@ -2234,6 +2272,8 @@ export const mockGroups: Group[] = [
     budget: 2200,
     preferredLocation: 'Williamsburg',
     createdAt: new Date('2024-03-22'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '20',
   },
   {
@@ -2246,6 +2286,8 @@ export const mockGroups: Group[] = [
     budget: 1750,
     preferredLocation: 'DUMBO',
     createdAt: new Date('2024-03-25'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '8',
   },
   {
@@ -2258,6 +2300,8 @@ export const mockGroups: Group[] = [
     budget: 1850,
     preferredLocation: 'Hell\'s Kitchen',
     createdAt: new Date('2024-03-28'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '3',
   },
   {
@@ -2270,6 +2314,8 @@ export const mockGroups: Group[] = [
     budget: 1650,
     preferredLocation: 'Brooklyn Heights',
     createdAt: new Date('2024-04-01'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '3',
   },
   {
@@ -2282,6 +2328,8 @@ export const mockGroups: Group[] = [
     budget: 1900,
     preferredLocation: 'East Village',
     createdAt: new Date('2024-04-03'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '14',
   },
   {
@@ -2294,6 +2342,8 @@ export const mockGroups: Group[] = [
     budget: 2400,
     preferredLocation: 'Tribeca',
     createdAt: new Date('2024-04-05'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '1',
   },
   {
@@ -2306,6 +2356,8 @@ export const mockGroups: Group[] = [
     budget: 2600,
     preferredLocation: 'Silver Lake',
     createdAt: new Date('2024-04-10'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '21',
   },
   {
@@ -2318,6 +2370,8 @@ export const mockGroups: Group[] = [
     budget: 3000,
     preferredLocation: 'Mission District',
     createdAt: new Date('2024-04-12'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '22',
   },
   {
@@ -2330,6 +2384,8 @@ export const mockGroups: Group[] = [
     budget: 1800,
     preferredLocation: 'Wicker Park',
     createdAt: new Date('2024-04-15'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '23',
   },
   {
@@ -2342,6 +2398,8 @@ export const mockGroups: Group[] = [
     budget: 2200,
     preferredLocation: 'Coconut Grove',
     createdAt: new Date('2024-04-18'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '24',
   },
   {
@@ -2354,6 +2412,8 @@ export const mockGroups: Group[] = [
     budget: 2500,
     preferredLocation: 'Capitol Hill Seattle',
     createdAt: new Date('2024-04-20'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '25',
   },
   {
@@ -2366,6 +2426,8 @@ export const mockGroups: Group[] = [
     budget: 1400,
     preferredLocation: 'Hyde Park',
     createdAt: new Date('2024-04-22'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '26',
   },
   ...extraGroups,

@@ -936,6 +936,8 @@ export const extraGroups: Group[] = [
     budget: 2000,
     preferredLocation: 'Brickell',
     createdAt: new Date('2024-04-25'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '5',
   },
   {
@@ -948,6 +950,8 @@ export const extraGroups: Group[] = [
     budget: 1600,
     preferredLocation: 'Lincoln Park',
     createdAt: new Date('2024-04-28'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '4',
   },
   {
@@ -960,6 +964,8 @@ export const extraGroups: Group[] = [
     budget: 2400,
     preferredLocation: 'Castro',
     createdAt: new Date('2024-05-01'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '11',
   },
   {
@@ -972,6 +978,8 @@ export const extraGroups: Group[] = [
     budget: 1200,
     preferredLocation: 'Cambridge',
     createdAt: new Date('2024-05-05'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '26',
   },
   {
@@ -984,6 +992,8 @@ export const extraGroups: Group[] = [
     budget: 1800,
     preferredLocation: 'Silver Lake',
     createdAt: new Date('2024-05-08'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '3',
   },
   {
@@ -996,6 +1006,8 @@ export const extraGroups: Group[] = [
     budget: 1500,
     preferredLocation: 'East Austin',
     createdAt: new Date('2024-05-10'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '6',
   },
   {
@@ -1008,6 +1020,8 @@ export const extraGroups: Group[] = [
     budget: 1700,
     preferredLocation: 'Back Bay',
     createdAt: new Date('2024-05-12'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '15',
   },
   {
@@ -1020,6 +1034,8 @@ export const extraGroups: Group[] = [
     budget: 2200,
     preferredLocation: 'Lakeview',
     createdAt: new Date('2024-05-15'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '2',
   },
   {
@@ -1032,6 +1048,8 @@ export const extraGroups: Group[] = [
     budget: 1400,
     preferredLocation: 'The Heights Houston',
     createdAt: new Date('2024-05-18'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '9',
   },
   {
@@ -1044,6 +1062,8 @@ export const extraGroups: Group[] = [
     budget: 1600,
     preferredLocation: 'Montrose',
     createdAt: new Date('2024-05-20'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '5',
   },
   {
@@ -1056,6 +1076,8 @@ export const extraGroups: Group[] = [
     budget: 2000,
     preferredLocation: 'RiNo',
     createdAt: new Date('2024-05-22'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '1',
   },
   {
@@ -1068,6 +1090,8 @@ export const extraGroups: Group[] = [
     budget: 2300,
     preferredLocation: 'Washington Park',
     createdAt: new Date('2024-05-25'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '25',
   },
   {
@@ -1080,6 +1104,8 @@ export const extraGroups: Group[] = [
     budget: 2100,
     preferredLocation: 'Wynwood',
     createdAt: new Date('2024-05-28'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '24',
   },
   {
@@ -1092,6 +1118,8 @@ export const extraGroups: Group[] = [
     budget: 1800,
     preferredLocation: 'Old Fourth Ward',
     createdAt: new Date('2024-06-01'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '23',
   },
   {
@@ -1104,6 +1132,8 @@ export const extraGroups: Group[] = [
     budget: 3000,
     preferredLocation: 'SOMA',
     createdAt: new Date('2024-06-05'),
+    type: 'roommate' as const,
+    isArchived: false,
     createdBy: '8',
   },
 ];

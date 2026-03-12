@@ -100,6 +100,12 @@ export const GroupsScreen = () => {
           members: [],
           pendingMembers: [],
           budget: g.budget_min || 0,
+          budgetMin: g.budget_min,
+          budgetMax: g.budget_max,
+          city: g.city,
+          state: g.state,
+          moveInDate: g.move_in_date,
+          photoUrl: g.photo_url,
           preferredLocation: g.city || '',
           maxMembers: g.max_members || 4,
           createdAt: new Date(g.created_at),
@@ -108,6 +114,7 @@ export const GroupsScreen = () => {
           hostId: g.host_id,
           listingAddress: g.listing_address,
           isArchived: g.is_archived || false,
+          memberCount: g.members?.[0]?.count || 0,
         });
         userGroups = (supabaseMyGroups || []).map(mapGroup);
         otherGroups = (supabaseGroups || [])

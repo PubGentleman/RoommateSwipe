@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { GroupType } from '../types/models';
+import { GroupType, GroupMember } from '../types/models';
 
 export interface GroupData {
   name: string;
@@ -15,6 +15,7 @@ export interface GroupData {
   listing_id?: string;
   host_id?: string;
   listing_address?: string;
+  is_archived?: boolean;
 }
 
 export async function getGroups(city?: string, type?: GroupType) {
@@ -262,7 +263,20 @@ export async function deleteGroup(id: string) {
   if (error) throw error;
 }
 
-export async function getGroupMembers(groupId: string) {
+export function mapGroupMember(row: any): GroupMember {
+  return {
+    id: row.id,
+    groupId: row.group_id,
+    userId: row.user_id,
+    role: row.role || 'member',
+    isHost: row.is_host || false,
+    status: row.status || 'active',
+    joinedAt: row.created_at,
+    user: row.user,
+  };
+}
+
+export async function getGroupMembers(groupId: string): Promise<GroupMember[]> {
   const { data, error } = await supabase
     .from('group_members')
     .select(`
@@ -274,5 +288,5 @@ export async function getGroupMembers(groupId: string) {
     .order('is_host', { ascending: false });
 
   if (error) throw error;
-  return data || [];
+  return (data || []).map(mapGroupMember);
 }

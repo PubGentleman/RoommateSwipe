@@ -31,8 +31,8 @@ Roomdr implements a points-based compatibility algorithm (0-100 score) using 15 
 The application is built with React Native and Expo using TypeScript, featuring React Navigation for role-based access (Renter, Host, Agent/Landlord) and a theme system supporting light/dark modes.
 
 **Key Features:**
-- **Renter:** Swipe-based matching, 1-on-1 messaging, group management, property exploration with advanced filters and map/list views, saved properties, profile view tracking, AI Match Assistant, animated match celebration, report/block system, notification feed, profile completion indicator, mutual interest flow, and cold messaging (Elite).
-- **Host:** Full host dashboard with statistics, listing management (create, edit, delete, pause, mark rented), dedicated Inquiries screen, inquiry-based analytics, and role switching.
+- **Renter:** Swipe-based matching, 1-on-1 messaging, group management (Roommate Groups + Listing Inquiry Groups), property exploration with advanced filters and map/list views, saved properties, profile view tracking, AI Match Assistant, animated match celebration, report/block system, notification feed, profile completion indicator, mutual interest flow, cold messaging (Elite), and "Inquire Together" group listing inquiries.
+- **Host:** Full host dashboard with statistics, listing management (create, edit, delete, pause, mark rented), dedicated Inquiries screen, inquiry-based analytics, listing inquiry group chat participation, and role switching.
 
 **User Experience Enhancements:**
 - **Match Celebration:** Animated full-screen modal for mutual likes.
@@ -70,7 +70,9 @@ The application features tiered subscription plans for both renters (Basic, Plus
 
 ## Data Layer
 
-The data layer uses Supabase PostgreSQL, supported by local AsyncStorage for caching. TypeScript interfaces define core models like `User`, `RoommateProfile`, `Property`, `Group`, `Conversation`, `Message`, `Match`, and `InterestCard`. Service files abstract database operations.
+The data layer uses Supabase PostgreSQL, supported by local AsyncStorage for caching. TypeScript interfaces define core models like `User`, `RoommateProfile`, `Property`, `Group`, `GroupMember`, `Conversation`, `Message`, `Match`, and `InterestCard`. Service files abstract database operations.
+
+**Group System:** Two group types — `roommate` (renter-only swipe/join groups) and `listing_inquiry` (renter group + host in one chat, created via "Inquire Together" on listing cards). `GroupMember` tracks `role` (admin/member), `isHost`, and `status` (active/pending/left/removed). Inquiry groups can be archived (read-only). `groupService.ts` provides all group CRUD, membership, and archive operations.
 
 ## UI/UX and Branding
 

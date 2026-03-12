@@ -83,17 +83,24 @@ export interface PropertyFilter {
 
 export type GroupType = 'roommate' | 'listing_inquiry';
 
+export type GroupMemberRole = 'admin' | 'member';
+export type GroupMemberStatus = 'active' | 'left' | 'removed';
+
 export interface GroupMember {
+  id?: string;
+  groupId: string;
   userId: string;
-  role: 'renter' | 'host';
-  joinedAt: string;
+  role: GroupMemberRole;
   isHost: boolean;
+  status: GroupMemberStatus;
+  joinedAt?: string;
   user?: {
     id: string;
     full_name?: string;
     avatar_url?: string;
     age?: number;
     occupation?: string;
+    role?: string;
   };
 }
 
@@ -105,9 +112,13 @@ export interface Group {
   members: string[] | GroupMember[];
   pendingMembers: string[];
   maxMembers: number;
+  city?: string;
+  state?: string;
+  budgetMin?: number;
+  budgetMax?: number;
   budget: number;
-  apartmentPrice?: number;
-  bedrooms?: number;
+  moveInDate?: string;
+  photoUrl?: string;
   preferredLocation: string;
   createdAt: Date;
   createdBy: string;
@@ -115,6 +126,8 @@ export interface Group {
   hostId?: string;
   listingAddress?: string;
   isArchived: boolean;
+  hostName?: string;
+  memberCount?: number;
 }
 
 export interface Message {
