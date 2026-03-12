@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { View, StyleSheet, Image, Pressable, Dimensions, Modal, ScrollView, Alert, Text } from 'react-native';
+import { View, StyleSheet, Image, Pressable, Dimensions, Modal, ScrollView, Alert, Text, Animated as RNAnimated } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, withSequence, runOnJS, interpolate } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
@@ -32,6 +32,10 @@ import { RoommateFilterSheet, MatchFilters, DEFAULT_FILTERS, getActiveFilterCoun
 import { PlanBadge } from '../../components/PlanBadge';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
+import type { ScreenContext } from '../../components/RoomdrAISheet';
+import { trackSwipe, startSession, shouldShowRefinementQuestion, getQuestionsAsked } from '../../utils/refinementEngine';
+import { getNextRefinementQuestion, REFINEMENT_QUESTIONS } from '../../utils/refinementQuestions';
+import type { RefinementQuestion } from '../../utils/refinementQuestions';
 import { getSwipeDeck, sendLike, sendPass, undoLastAction } from '../../services/discoverService';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -76,7 +80,12 @@ export const RoommatesScreen = () => {
   const [unfilteredCount, setUnfilteredCount] = useState(0);
   const [unfilteredProfiles, setUnfilteredProfiles] = useState<RoommateProfile[]>([]);
   const [showAISheet, setShowAISheet] = useState(false);
-  const [aiSheetContext, setAiSheetContext] = useState<'match'>('match');
+  const [aiSheetContext, setAiSheetContext] = useState<ScreenContext>('match');
+  const [refinementQuestion, setRefinementQuestion] = useState<RefinementQuestion | null>(null);
+  const [showRefinementBanner, setShowRefinementBanner] = useState(false);
+  const refinementBannerOpacity = useRef(new RNAnimated.Value(0)).current;
+  const [rightSwipeCount, setRightSwipeCount] = useState(0);
+  const [totalSwipeCount, setTotalSwipeCount] = useState(0);
   const [showBoostModal, setShowBoostModal] = useState(false);
   const [processingBoost, setProcessingBoost] = useState(false);
   const [boostTimeLabel, setBoostTimeLabel] = useState('');
@@ -113,8 +122,59 @@ export const RoommatesScreen = () => {
   }, [cityInitialized, activeCity]);
 
   useEffect(() => {
+    startSession();
+  }, []);
+
+  useEffect(() => {
     loadProfiles();
   }, [activeCity, matchFilters]);
+
+  const checkRefinementTrigger = async () => {
+    if (showAISheet) return;
+
+    const alreadyAsked = await getQuestionsAsked();
+    const allDone = alreadyAsked.length >= REFINEMENT_QUESTIONS.length;
+
+    const should = await shouldShowRefinementQuestion(
+      rightSwipeCount,
+      totalSwipeCount,
+      user?.profileData?.personalityAnswers ?? {},
+      allDone
+    );
+
+    if (should) {
+      const question = getNextRefinementQuestion(
+        alreadyAsked,
+        user?.profileData?.personalityAnswers ?? {}
+      );
+      if (question) {
+        setTimeout(() => {
+          setRefinementQuestion(question);
+          setAiSheetContext('refinement');
+          setShowAISheet(true);
+        }, 800);
+      }
+    }
+  };
+
+  const showRefinementBannerBriefly = () => {
+    setShowRefinementBanner(true);
+    RNAnimated.timing(refinementBannerOpacity, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setTimeout(() => {
+        RNAnimated.timing(refinementBannerOpacity, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }).start(() => {
+          setShowRefinementBanner(false);
+        });
+      }, 4000);
+    });
+  };
 
   useFocusEffect(
     React.useCallback(() => {

@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { View, StyleSheet, Pressable, Modal, ScrollView, Dimensions, Text } from 'react-native';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { View, StyleSheet, Pressable, Modal, ScrollView, Dimensions, Text, Animated as RNAnimated } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,6 +7,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { Spacing } from '../constants/theme';
 import { calculateDetailedCompatibility } from '../utils/matchingAlgorithm';
 import { getProfileGaps, getCompletionPercentage, getMatchMultiplier, GAP_MESSAGES } from '../utils/profileReminderUtils';
+import { markQuestionAsked, resetRefinementCooldown } from '../utils/refinementEngine';
+import { StorageService } from '../utils/storage';
+import type { RefinementQuestion } from '../utils/refinementQuestions';
 import type { RoommateProfile, User, Message, Group, Conversation } from '../types/models';
 import * as Haptics from 'expo-haptics';
 
@@ -17,7 +20,7 @@ const GREEN = '#2ecc71';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const SHEET_HEIGHT = SCREEN_HEIGHT * 0.8;
 
-export type ScreenContext = 'match' | 'chat' | 'explore' | 'messages' | 'groups' | 'profile' | 'profile_reminder';
+export type ScreenContext = 'match' | 'chat' | 'explore' | 'messages' | 'groups' | 'profile' | 'profile_reminder' | 'refinement';
 
 interface MatchContextData {
   currentProfile?: RoommateProfile;
@@ -82,6 +85,8 @@ interface RoomdrAISheetProps {
   screenContext: ScreenContext;
   contextData?: AISheetContextData;
   onNavigate?: (screen: string, params?: Record<string, any>) => void;
+  refinementQuestion?: RefinementQuestion | null;
+  onRefinementAnswered?: () => void;
 }
 
 const PROFILE_FIELDS = [
@@ -105,6 +110,7 @@ const CONTEXT_LABELS: Record<ScreenContext, { label: string; icon: keyof typeof 
   messages: { label: 'Messages', icon: 'inbox' },
   profile: { label: 'Profile', icon: 'user' },
   profile_reminder: { label: 'AI Tip', icon: 'zap' },
+  refinement: { label: 'Improving Matches', icon: 'trending-up' },
 };
 
 const MATCH_MULTIPLIERS: Record<string, number> = {
@@ -169,10 +175,62 @@ const InsightCard = ({ icon, title, body, id, onFeedback, actionChip }: {
   </View>
 );
 
-export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData, onNavigate }: RoomdrAISheetProps) => {
+export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData, onNavigate, refinementQuestion, onRefinementAnswered }: RoomdrAISheetProps) => {
   const insets = useSafeAreaInsets();
   const { user, updateUser } = useAuth();
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+  const [refinementAnswered, setRefinementAnswered] = useState(false);
+  const [refinementSelectedValue, setRefinementSelectedValue] = useState<string | null>(null);
+  const optionFillAnim = useRef(new RNAnimated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible && screenContext === 'refinement') {
+      setRefinementAnswered(false);
+      setRefinementSelectedValue(null);
+      optionFillAnim.setValue(0);
+    }
+  }, [visible, screenContext]);
+
+  const handleRefinementAnswer = async (question: RefinementQuestion, value: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setRefinementSelectedValue(value);
+
+    RNAnimated.timing(optionFillAnim, {
+      toValue: 1,
+      duration: 500,
+      useNativeDriver: false,
+    }).start(async () => {
+      setRefinementAnswered(true);
+
+      if (user) {
+        const updatedAnswers = {
+          ...user.profileData?.personalityAnswers,
+          [question.profileField]: value,
+          [`${question.profileField}_source`]: 'ai_refinement',
+          [`${question.profileField}_collectedAt`]: new Date().toISOString(),
+        };
+
+        await updateUser({
+          profileData: {
+            ...user.profileData,
+            personalityAnswers: updatedAnswers,
+          },
+        } as any);
+
+        await markQuestionAsked(question.id);
+        onRefinementAnswered?.();
+      }
+
+      setTimeout(() => {
+        onDismiss();
+      }, 1200);
+    });
+  };
+
+  const handleRefinementNotNow = async () => {
+    await resetRefinementCooldown();
+    onDismiss();
+  };
 
   const handleFeedback = async (id: string, positive: boolean) => {
     if (!user) return;
@@ -700,6 +758,59 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData, 
     );
   };
 
+  const getRefinementContent = () => {
+    if (!refinementQuestion) return null;
+
+    return (
+      <View>
+        <View style={styles.refinementChip}>
+          <Feather name="trending-up" size={10} color={ACCENT} />
+          <Text style={styles.refinementChipText}>Improving your matches ✨</Text>
+        </View>
+
+        <View style={styles.refinementBubble}>
+          <Text style={styles.refinementBubbleText}>
+            {refinementAnswered ? refinementQuestion.followUpMessage : refinementQuestion.aiMessage}
+          </Text>
+        </View>
+
+        {!refinementAnswered ? (
+          <View style={styles.refinementOptions}>
+            {refinementQuestion.options.map((opt) => {
+              const isSelected = refinementSelectedValue === opt.value;
+              const fillWidth = isSelected ? optionFillAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: ['0%', '100%'],
+              }) : '0%';
+
+              return (
+                <Pressable
+                  key={opt.value}
+                  style={styles.refinementOption}
+                  onPress={() => handleRefinementAnswer(refinementQuestion, opt.value)}
+                  disabled={refinementSelectedValue !== null}
+                >
+                  {isSelected ? (
+                    <RNAnimated.View style={[styles.refinementOptionFill, { width: fillWidth }]} />
+                  ) : null}
+                  <Text style={styles.refinementOptionEmoji}>{opt.emoji}</Text>
+                  <Text style={styles.refinementOptionLabel}>{opt.label}</Text>
+                  <Feather name="chevron-right" size={14} color="rgba(255,255,255,0.3)" />
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
+
+        {!refinementAnswered && refinementSelectedValue === null ? (
+          <Pressable onPress={handleRefinementNotNow} style={styles.refinementNotNow}>
+            <Text style={styles.refinementNotNowText}>Not now</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    );
+  };
+
   const renderContextContent = () => {
     switch (screenContext) {
       case 'match': return getMatchContextContent();
@@ -709,6 +820,7 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData, 
       case 'groups': return getGroupsContextContent();
       case 'profile': return getProfileContextContent();
       case 'profile_reminder': return getProfileReminderContent();
+      case 'refinement': return getRefinementContent();
       default: return null;
     }
   };
@@ -792,7 +904,7 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData, 
           </View>
 
           <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-            {screenContext !== 'profile_reminder' ? (
+            {screenContext !== 'profile_reminder' && screenContext !== 'refinement' ? (
               <View style={styles.greetingCard}>
                 <Text style={styles.greetingText}>{getGreeting()}</Text>
               </View>
@@ -800,7 +912,7 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData, 
 
             {renderContextContent()}
 
-            {screenContext !== 'profile_reminder' && insights.length > 0 ? (
+            {screenContext !== 'profile_reminder' && screenContext !== 'refinement' && insights.length > 0 ? (
               <>
                 <Text style={styles.sectionLabel}>YOUR INSIGHTS</Text>
                 {insights.map(insight => (
@@ -1268,5 +1380,73 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: ACCENT,
+  },
+  refinementChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,107,91,0.15)',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
+    marginBottom: 12,
+  },
+  refinementChipText: {
+    color: ACCENT,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  refinementBubble: {
+    backgroundColor: '#1e1e1e',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+  },
+  refinementBubbleText: {
+    color: '#fff',
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  refinementOptions: {
+    gap: 8,
+  },
+  refinementOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1e1e1e',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 14,
+    height: 54,
+    paddingHorizontal: 14,
+    gap: 10,
+    overflow: 'hidden',
+  },
+  refinementOptionFill: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255,107,91,0.2)',
+    borderRadius: 14,
+  },
+  refinementOptionEmoji: {
+    fontSize: 20,
+  },
+  refinementOptionLabel: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  refinementNotNow: {
+    alignSelf: 'center',
+    paddingVertical: 12,
+    marginTop: 8,
+  },
+  refinementNotNowText: {
+    color: 'rgba(255,255,255,0.35)',
+    fontSize: 13,
   },
 });
