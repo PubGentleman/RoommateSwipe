@@ -343,7 +343,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string, role: UserRole) => {
     if (email === 'demo@roomdr.com') {
       await StorageService.initializeWithMockData();
-      const currentUser = await StorageService.getCurrentUser();
+      let currentUser = await StorageService.getCurrentUser();
+      if (!currentUser) {
+        const allUsers = await StorageService.getUsers();
+        if (allUsers.length > 0) {
+          currentUser = allUsers[0];
+          await StorageService.setCurrentUser(currentUser);
+        }
+      }
       if (currentUser) {
         if (currentUser.messageCount === undefined) {
           currentUser.messageCount = 0;
@@ -360,6 +367,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           };
         }
         currentUser.role = role;
+        currentUser.onboardingStep = 'complete';
         setUser(currentUser);
       }
       return;
