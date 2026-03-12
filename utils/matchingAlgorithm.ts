@@ -13,28 +13,27 @@ export const formatLocation = (location: {
   city?: string;
   state?: string;
   address?: string;
-}): string => {
-  // Priority 1: Neighborhood + City
+}, revealed: boolean = false): string => {
+  if (revealed && location.address) {
+    return `${location.address}${location.city ? ', ' + location.city : ''}${location.state ? ', ' + location.state : ''}`;
+  }
+
   if (location.neighborhood && location.city) {
     return `${location.neighborhood}, ${location.city}`;
   }
   
-  // Priority 2: Just neighborhood (if available)
   if (location.neighborhood) {
     return location.neighborhood;
   }
   
-  // Priority 3: City + State
   if (location.city && location.state) {
     return `${location.city}, ${location.state}`;
   }
   
-  // Priority 4: Just city
   if (location.city) {
     return location.city;
   }
   
-  // Fallback: Use address (should be avoided for privacy, but better than nothing)
   return location.address || 'Location not specified';
 };
 

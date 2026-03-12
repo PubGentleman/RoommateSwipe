@@ -128,6 +128,9 @@ export interface Group {
   isArchived: boolean;
   hostName?: string;
   memberCount?: number;
+  inquiryStatus?: 'pending' | 'accepted' | 'declined';
+  addressRevealed?: boolean;
+  listingPhoto?: string;
 }
 
 export interface Message {

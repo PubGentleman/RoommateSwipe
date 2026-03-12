@@ -185,6 +185,8 @@ export const MessagesScreen = () => {
           hostName: g.host?.full_name || g.hostName || 'Host',
           memberCount: g.members?.[0]?.count || g.memberCount || 0,
           listingPhoto: g.listing?.photos?.[0] || g.listingPhoto,
+          inquiryStatus: g.inquiry_status || g.inquiryStatus || 'pending',
+          addressRevealed: g.address_revealed || g.addressRevealed || false,
         }));
         setInquiryGroups(mapped.filter((g: any) => !g.isArchived));
       } catch (e) {
@@ -451,18 +453,40 @@ export const MessagesScreen = () => {
         )}
         <View style={{ flex: 1 }}>
           <ThemedText style={{ fontSize: 14, fontWeight: '600', color: '#fff' }} numberOfLines={1}>
-            {group.name || group.listingAddress || 'Listing Inquiry'}
+            {group.addressRevealed
+              ? (group.name || group.listingAddress || 'Listing Inquiry')
+              : (group.listingAddress?.split(',').slice(-2).join(',').trim() || group.name || 'Listing Inquiry')}
           </ThemedText>
-          <ThemedText style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 2 }} numberOfLines={1}>
-            {group.listingAddress || 'No address'}
-          </ThemedText>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+            <Feather
+              name={group.addressRevealed ? 'unlock' : 'lock'}
+              size={9}
+              color={group.addressRevealed ? '#ff6b5b' : 'rgba(255,255,255,0.35)'}
+              style={{ marginRight: 4 }}
+            />
+            <ThemedText style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }} numberOfLines={1}>
+              {group.addressRevealed
+                ? (group.listingAddress || 'No address')
+                : (group.listingAddress?.split(',').slice(-2).join(',').trim() || 'No address')}
+            </ThemedText>
+          </View>
         </View>
-        <View style={styles.inquiryMembersBadge}>
-          <Feather name="users" size={12} color="rgba(255,255,255,0.5)" />
-          <ThemedText style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginLeft: 4 }}>
-            {count}
-          </ThemedText>
-        </View>
+        {group.inquiryStatus === 'accepted' ? (
+          <View style={[styles.inquiryStatusPill, { backgroundColor: 'rgba(255,107,91,0.15)' }]}>
+            <ThemedText style={{ fontSize: 10, color: '#ff6b5b', fontWeight: '600' }}>Accepted</ThemedText>
+          </View>
+        ) : group.inquiryStatus === 'declined' ? (
+          <View style={[styles.inquiryStatusPill, { backgroundColor: 'rgba(239,68,68,0.15)' }]}>
+            <ThemedText style={{ fontSize: 10, color: '#ef4444', fontWeight: '600' }}>Declined</ThemedText>
+          </View>
+        ) : (
+          <View style={styles.inquiryMembersBadge}>
+            <Feather name="users" size={12} color="rgba(255,255,255,0.5)" />
+            <ThemedText style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginLeft: 4 }}>
+              {count}
+            </ThemedText>
+          </View>
+        )}
         <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.3)" style={{ marginLeft: 8 }} />
       </Pressable>
     );
@@ -983,6 +1007,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
+  },
+  inquiryStatusPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
   inquiryMembersBadge: {
     flexDirection: 'row',

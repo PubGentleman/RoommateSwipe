@@ -278,6 +278,63 @@ export function mapGroupMember(row: any): GroupMember {
   };
 }
 
+export async function acceptInquiry(groupId: string, hostUserId: string) {
+  const { data: group } = await supabase
+    .from('groups')
+    .select('host_id, type, inquiry_status')
+    .eq('id', groupId)
+    .single();
+  if (!group || group.host_id !== hostUserId) throw new Error('Only the host can accept inquiries');
+  if (group.type !== 'listing_inquiry') throw new Error('Not an inquiry group');
+  if (group.inquiry_status !== 'pending') throw new Error('Inquiry already resolved');
+
+  const { data, error } = await supabase
+    .from('groups')
+    .update({
+      inquiry_status: 'accepted',
+      address_revealed: true,
+    })
+    .eq('id', groupId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function declineInquiry(groupId: string, hostUserId: string) {
+  const { data: group } = await supabase
+    .from('groups')
+    .select('host_id, type, inquiry_status')
+    .eq('id', groupId)
+    .single();
+  if (!group || group.host_id !== hostUserId) throw new Error('Only the host can decline inquiries');
+  if (group.type !== 'listing_inquiry') throw new Error('Not an inquiry group');
+  if (group.inquiry_status !== 'pending') throw new Error('Inquiry already resolved');
+
+  const { data, error } = await supabase
+    .from('groups')
+    .update({
+      inquiry_status: 'declined',
+    })
+    .eq('id', groupId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function getInquiryStatus(groupId: string): Promise<{ inquiryStatus: string; addressRevealed: boolean }> {
+  const { data } = await supabase
+    .from('groups')
+    .select('inquiry_status, address_revealed')
+    .eq('id', groupId)
+    .single();
+  return {
+    inquiryStatus: data?.inquiry_status ?? 'pending',
+    addressRevealed: data?.address_revealed ?? false,
+  };
+}
+
 export async function getGroupMembers(groupId: string): Promise<GroupMember[]> {
   const { data, error } = await supabase
     .from('group_members')

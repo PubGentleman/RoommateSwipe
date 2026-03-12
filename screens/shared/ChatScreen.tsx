@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Pressable, FlatList, TextInput, KeyboardAvoidingView, Platform, Alert, Modal } from 'react-native';
+import { View, StyleSheet, Pressable, FlatList, TextInput, KeyboardAvoidingView, Platform, Alert, Modal, Linking } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
@@ -14,6 +14,8 @@ import { PlanBadge } from '../../components/PlanBadge';
 import { RoomdrAISheet, ScreenContext } from '../../components/RoomdrAISheet';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { getMessages as getSupabaseMessages, sendMessage as sendSupabaseMessage, markMessagesAsRead as markSupabaseMessagesAsRead, subscribeToMessages } from '../../services/messageService';
+import { acceptInquiry, declineInquiry } from '../../services/groupService';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence } from 'react-native-reanimated';
 
 type ChatScreenProps = {
   route: {
@@ -46,6 +48,89 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [isColdMessage, setIsColdMessage] = useState(false);
   const [coldMessageResponded, setColdMessageResponded] = useState(false);
   const [showColdMessageBlockSheet, setShowColdMessageBlockSheet] = useState(false);
+
+  const [inquiryStatus, setInquiryStatus] = useState<'pending' | 'accepted' | 'declined'>(
+    inquiryGroup?.inquiryStatus || inquiryGroup?.inquiry_status || 'pending'
+  );
+  const [addressRevealed, setAddressRevealed] = useState<boolean>(
+    inquiryGroup?.addressRevealed || inquiryGroup?.address_revealed || false
+  );
+  const [isAccepting, setIsAccepting] = useState(false);
+  const [isDeclining, setIsDeclining] = useState(false);
+  const addressFlashOpacity = useSharedValue(0);
+  const addressFlashStyle = useAnimatedStyle(() => ({
+    backgroundColor: `rgba(255,107,91,${addressFlashOpacity.value})`,
+  }));
+  const isHost = isInquiryChat && user?.id === inquiryGroup?.hostId;
+
+  const handleAcceptInquiry = async () => {
+    if (!inquiryGroup?.id) return;
+    setIsAccepting(true);
+    try {
+      await acceptInquiry(inquiryGroup.id, user?.id || '');
+      setInquiryStatus('accepted');
+      setAddressRevealed(true);
+      addressFlashOpacity.value = withSequence(
+        withTiming(0.4, { duration: 200 }),
+        withTiming(0, { duration: 800 })
+      );
+      const systemMsg: Message = {
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+        senderId: 'system',
+        text: 'Host accepted your inquiry. The full address has been shared with your group.',
+        content: 'Host accepted your inquiry. The full address has been shared with your group.',
+        timestamp: new Date(),
+        read: true,
+      };
+      setMessages(prev => [...prev, systemMsg]);
+    } catch (err) {
+      console.error('Failed to accept inquiry:', err);
+      Alert.alert('Error', 'Failed to accept inquiry. Please try again.');
+    } finally {
+      setIsAccepting(false);
+    }
+  };
+
+  const handleDeclineInquiry = async () => {
+    if (!inquiryGroup?.id) return;
+    Alert.alert('Decline Inquiry', 'Are you sure you want to decline this inquiry?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Decline', style: 'destructive', onPress: async () => {
+          setIsDeclining(true);
+          try {
+            await declineInquiry(inquiryGroup.id, user?.id || '');
+            setInquiryStatus('declined');
+            const systemMsg: Message = {
+              id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+              senderId: 'system',
+              text: 'The host has declined this inquiry.',
+              content: 'The host has declined this inquiry.',
+              timestamp: new Date(),
+              read: true,
+            };
+            setMessages(prev => [...prev, systemMsg]);
+          } catch (err) {
+            console.error('Failed to decline inquiry:', err);
+            Alert.alert('Error', 'Failed to decline inquiry. Please try again.');
+          } finally {
+            setIsDeclining(false);
+          }
+        }
+      },
+    ]);
+  };
+
+  const openDirections = () => {
+    if (!inquiryGroup?.listingAddress) return;
+    const address = encodeURIComponent(inquiryGroup.listingAddress);
+    const url = Platform.OS === 'ios'
+      ? `maps:?q=${address}`
+      : `geo:0,0?q=${address}`;
+    Linking.openURL(url).catch(() => {
+      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${address}`);
+    });
+  };
 
   // Tab bar height for bottom padding
   const TAB_BAR_HEIGHT = 80;
@@ -318,6 +403,15 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   };
 
   const renderMessage = ({ item }: { item: Message }) => {
+    if (item.senderId === 'system') {
+      return (
+        <View style={styles.systemMessageContainer}>
+          <View style={styles.systemMessageBubble}>
+            <ThemedText style={styles.systemMessageText}>{item.text}</ThemedText>
+          </View>
+        </View>
+      );
+    }
     const isOwnMessage = item.senderId === user?.id;
     const showReadReceipt = isOwnMessage && isEliteUser();
     const isRead = item.readAt || item.read;
@@ -408,7 +502,9 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
                   Listing Inquiry
                 </ThemedText>
                 <ThemedText style={[Typography.h3]} numberOfLines={1}>
-                  {inquiryGroup?.listingAddress || 'Listing'}
+                  {addressRevealed
+                    ? (inquiryGroup?.listingAddress || 'Listing')
+                    : (inquiryGroup?.listingAddress?.split(',').slice(-2).join(',').trim() || 'Listing')}
                 </ThemedText>
               </View>
             </View>
@@ -428,8 +524,46 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
               <Feather name="more-vertical" size={24} color={theme.text} />
             </Pressable>
           </View>
+          {isHost && inquiryStatus === 'pending' ? (
+            <View style={styles.hostActionBar}>
+              <View style={{ flex: 1 }}>
+                <ThemedText style={{ fontSize: 13, fontWeight: '600', color: '#fff' }}>
+                  {inquiryGroup?.memberCount || 'Renters'} renter{(inquiryGroup?.memberCount || 0) !== 1 ? 's' : ''} want to view this listing
+                </ThemedText>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <Pressable
+                  onPress={handleAcceptInquiry}
+                  disabled={isAccepting}
+                  style={styles.acceptButton}
+                >
+                  <Feather name="check" size={14} color="#fff" />
+                  <ThemedText style={{ fontSize: 12, fontWeight: '700', color: '#fff', marginLeft: 4 }}>
+                    {isAccepting ? '...' : 'Accept'}
+                  </ThemedText>
+                </Pressable>
+                <Pressable
+                  onPress={handleDeclineInquiry}
+                  disabled={isDeclining}
+                  style={styles.declineButton}
+                >
+                  <Feather name="x" size={14} color="rgba(255,255,255,0.7)" />
+                  <ThemedText style={{ fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.7)', marginLeft: 4 }}>
+                    {isDeclining ? '...' : 'Decline'}
+                  </ThemedText>
+                </Pressable>
+              </View>
+            </View>
+          ) : isHost && inquiryStatus !== 'pending' ? (
+            <View style={[styles.hostActionBar, { backgroundColor: inquiryStatus === 'accepted' ? 'rgba(62,207,142,0.12)' : 'rgba(239,68,68,0.12)' }]}>
+              <Feather name={inquiryStatus === 'accepted' ? 'check-circle' : 'x-circle'} size={16} color={inquiryStatus === 'accepted' ? '#3ECF8E' : '#ef4444'} />
+              <ThemedText style={{ fontSize: 13, fontWeight: '600', color: inquiryStatus === 'accepted' ? '#3ECF8E' : '#ef4444', marginLeft: 8 }}>
+                {inquiryStatus === 'accepted' ? 'Inquiry accepted — address shared' : 'Inquiry declined'}
+              </ThemedText>
+            </View>
+          ) : null}
           {inquiryGroup?.listingAddress ? (
-            <View style={styles.pinnedListingCard}>
+            <Animated.View style={[styles.pinnedListingCard, addressFlashStyle]}>
               {inquiryGroup.listingPhoto ? (
                 <Image source={{ uri: inquiryGroup.listingPhoto }} style={styles.pinnedListingThumb} />
               ) : (
@@ -441,9 +575,30 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
                 <ThemedText style={{ fontSize: 13, fontWeight: '600', color: '#fff' }} numberOfLines={1}>
                   {inquiryGroup.name || inquiryGroup.listingAddress}
                 </ThemedText>
-                <ThemedText style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
-                  {inquiryGroup.listingAddress}
-                </ThemedText>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                  <Feather
+                    name={addressRevealed ? 'unlock' : 'lock'}
+                    size={10}
+                    color={addressRevealed ? '#ff6b5b' : 'rgba(255,255,255,0.4)'}
+                    style={{ marginRight: 4 }}
+                  />
+                  <ThemedText style={{ fontSize: 12, color: addressRevealed ? '#fff' : 'rgba(255,255,255,0.5)' }} numberOfLines={1}>
+                    {addressRevealed
+                      ? inquiryGroup.listingAddress
+                      : (inquiryGroup.listingAddress?.split(',').slice(-2).join(',').trim() || inquiryGroup.listingAddress)}
+                  </ThemedText>
+                </View>
+                {!addressRevealed && inquiryStatus === 'pending' ? (
+                  <ThemedText style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>
+                    Full address shared after host accepts
+                  </ThemedText>
+                ) : null}
+                {addressRevealed ? (
+                  <Pressable onPress={openDirections} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                    <ThemedText style={{ fontSize: 11, color: '#ff6b5b', fontWeight: '600' }}>Get Directions</ThemedText>
+                    <Feather name="arrow-right" size={11} color="#ff6b5b" style={{ marginLeft: 2 }} />
+                  </Pressable>
+                ) : null}
               </View>
               <Pressable onPress={() => {
                 if (inquiryGroup?.listingId) {
@@ -455,7 +610,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
               }} style={{ paddingLeft: 8 }}>
                 <ThemedText style={{ fontSize: 12, color: '#ff6b5b', fontWeight: '600' }}>View Listing</ThemedText>
               </Pressable>
-            </View>
+            </Animated.View>
           ) : null}
           {inquiryGroup?.isArchived ? (
             <View style={styles.archivedBanner}>
@@ -860,5 +1015,47 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#ff6b5b',
     marginLeft: 4,
+  },
+  hostActionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(255,107,91,0.1)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  acceptButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ff6b5b',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  declineButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  systemMessageContainer: {
+    alignItems: 'center',
+    marginVertical: 12,
+  },
+  systemMessageBubble: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+    maxWidth: '85%',
+  },
+  systemMessageText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.5)',
+    textAlign: 'center' as const,
   },
 });

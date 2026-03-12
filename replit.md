@@ -72,7 +72,9 @@ The application features tiered subscription plans for both renters (Basic, Plus
 
 The data layer uses Supabase PostgreSQL, supported by local AsyncStorage for caching. TypeScript interfaces define core models like `User`, `RoommateProfile`, `Property`, `Group`, `GroupMember`, `Conversation`, `Message`, `Match`, and `InterestCard`. Service files abstract database operations.
 
-**Group System:** Two group types — `roommate` (renter-only swipe/join groups) and `listing_inquiry` (renter group + host in one chat, created via "Inquire Together" on listing cards). `GroupMember` tracks `role` (admin/member), `isHost`, and `status` (active/pending/left/removed). Inquiry groups can be archived (read-only). `groupService.ts` provides all group CRUD, membership, and archive operations.
+**Group System:** Two group types — `roommate` (renter-only swipe/join groups) and `listing_inquiry` (renter group + host in one chat, created via "Inquire Together" on listing cards). `GroupMember` tracks `role` (admin/member), `isHost`, and `status` (active/pending/left/removed). Inquiry groups can be archived (read-only). `groupService.ts` provides all group CRUD, membership, archive, accept/decline operations.
+
+**Address Reveal System:** Full property addresses are hidden until the host accepts an inquiry. Before acceptance, renters see neighborhood + city only with a lock icon. After acceptance: full address revealed with coral flash animation, "Get Directions" link opens Maps, and system message confirms the reveal. Host sees Accept/Decline action bar at top of inquiry chat. Declined inquiries show status and offer archive. `formatLocation()` in `matchingAlgorithm.ts` accepts `revealed` param. ExploreScreen listing cards always pass `revealed: false`. DB fields: `groups.inquiry_status` (pending/accepted/declined), `groups.address_revealed` (boolean). Migration: `008_inquiry_status.sql`.
 
 ## UI/UX and Branding
 

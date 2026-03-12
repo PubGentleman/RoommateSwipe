@@ -117,6 +117,8 @@ export const GroupsScreen = () => {
           memberCount: g.members?.[0]?.count || 0,
           hostName: g.host?.full_name || g.creator?.full_name || 'Host',
           listingPhoto: g.listing?.photos?.[0] || undefined,
+          inquiryStatus: g.inquiry_status || 'pending',
+          addressRevealed: g.address_revealed || false,
         });
         userGroups = (supabaseMyGroups || []).map(mapGroup);
         otherGroups = (supabaseGroups || [])
@@ -748,7 +750,9 @@ export const GroupsScreen = () => {
           )}
           <View style={styles.groupInfo}>
             <ThemedText style={[Typography.h3]} numberOfLines={1}>
-              {group.listingAddress || group.name}
+              {group.addressRevealed
+                ? (group.listingAddress || group.name)
+                : (group.listingAddress?.split(',').slice(-2).join(',').trim() || group.name)}
             </ThemedText>
             <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
               With {group.hostName || 'Host'} · {group.memberCount || 0} members
@@ -759,9 +763,17 @@ export const GroupsScreen = () => {
               <View style={[styles.inquiryBadge, { backgroundColor: 'rgba(255,255,255,0.08)' }]}>
                 <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>Archived</ThemedText>
               </View>
+            ) : group.inquiryStatus === 'accepted' ? (
+              <View style={[styles.inquiryBadge, { backgroundColor: 'rgba(255,107,91,0.15)' }]}>
+                <ThemedText style={[Typography.small, { color: '#ff6b5b' }]}>Address Unlocked 🔓</ThemedText>
+              </View>
+            ) : group.inquiryStatus === 'declined' ? (
+              <View style={[styles.inquiryBadge, { backgroundColor: 'rgba(239,68,68,0.15)' }]}>
+                <ThemedText style={[Typography.small, { color: '#ef4444' }]}>Declined</ThemedText>
+              </View>
             ) : (
-              <View style={[styles.inquiryBadge, { backgroundColor: 'rgba(62,207,142,0.15)' }]}>
-                <ThemedText style={[Typography.small, { color: '#3ECF8E' }]}>Active</ThemedText>
+              <View style={[styles.inquiryBadge, { backgroundColor: 'rgba(255,255,255,0.08)' }]}>
+                <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>Pending</ThemedText>
               </View>
             )}
           </View>
