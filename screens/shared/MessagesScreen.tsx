@@ -176,7 +176,17 @@ export const MessagesScreen = () => {
       setConversations(userConversations);
       try {
         const groups = await getMyInquiryGroups();
-        setInquiryGroups(groups.filter((g: Group) => !g.isArchived));
+        const mapped = groups.map((g: any) => ({
+          ...g,
+          listingAddress: g.listing_address || g.listingAddress,
+          listingId: g.listing_id || g.listingId,
+          hostId: g.host_id || g.hostId,
+          isArchived: g.is_archived || g.isArchived || false,
+          hostName: g.host?.full_name || g.hostName || 'Host',
+          memberCount: g.members?.[0]?.count || g.memberCount || 0,
+          listingPhoto: g.listing?.photos?.[0] || g.listingPhoto,
+        }));
+        setInquiryGroups(mapped.filter((g: any) => !g.isArchived));
       } catch (e) {
         console.warn('Failed to load inquiry groups:', e);
       }
@@ -423,32 +433,40 @@ export const MessagesScreen = () => {
     });
   };
 
-  const renderInquiryItem = (group: Group) => (
-    <Pressable
-      key={group.id}
-      style={styles.inquiryItem}
-      onPress={() => navigateToInquiryChat(group)}
-    >
-      <View style={styles.inquiryIconWrap}>
-        <Feather name="home" size={18} color="#ff6b5b" />
-      </View>
-      <View style={{ flex: 1 }}>
-        <ThemedText style={{ fontSize: 14, fontWeight: '600', color: '#fff' }} numberOfLines={1}>
-          {group.name || group.listingAddress || 'Listing Inquiry'}
-        </ThemedText>
-        <ThemedText style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 2 }} numberOfLines={1}>
-          {group.listingAddress || 'No address'}
-        </ThemedText>
-      </View>
-      <View style={styles.inquiryMembersBadge}>
-        <Feather name="users" size={12} color="rgba(255,255,255,0.5)" />
-        <ThemedText style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginLeft: 4 }}>
-          {group.members?.length || 0}
-        </ThemedText>
-      </View>
-      <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.3)" style={{ marginLeft: 8 }} />
-    </Pressable>
-  );
+  const renderInquiryItem = (group: any) => {
+    const photo = group.listingPhoto || group.listing?.photos?.[0];
+    const count = group.memberCount || (Array.isArray(group.members) ? group.members.length : 0);
+    return (
+      <Pressable
+        key={group.id}
+        style={styles.inquiryItem}
+        onPress={() => navigateToInquiryChat(group)}
+      >
+        {photo ? (
+          <Image source={{ uri: photo }} style={styles.inquiryThumb} />
+        ) : (
+          <View style={styles.inquiryIconWrap}>
+            <Feather name="home" size={18} color="#ff6b5b" />
+          </View>
+        )}
+        <View style={{ flex: 1 }}>
+          <ThemedText style={{ fontSize: 14, fontWeight: '600', color: '#fff' }} numberOfLines={1}>
+            {group.name || group.listingAddress || 'Listing Inquiry'}
+          </ThemedText>
+          <ThemedText style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 2 }} numberOfLines={1}>
+            {group.listingAddress || 'No address'}
+          </ThemedText>
+        </View>
+        <View style={styles.inquiryMembersBadge}>
+          <Feather name="users" size={12} color="rgba(255,255,255,0.5)" />
+          <ThemedText style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginLeft: 4 }}>
+            {count}
+          </ThemedText>
+        </View>
+        <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.3)" style={{ marginLeft: 8 }} />
+      </Pressable>
+    );
+  };
 
   const renderHeader = () => (
     <View>
@@ -950,6 +968,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 22,
     paddingVertical: 12,
+  },
+  inquiryThumb: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    marginRight: 12,
   },
   inquiryIconWrap: {
     width: 44,

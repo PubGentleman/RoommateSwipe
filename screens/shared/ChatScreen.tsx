@@ -345,6 +345,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
                   ? 'rgba(255,107,91,0.15)'
                   : theme.backgroundSecondary,
             },
+            isHostMessage && !isOwnMessage ? { borderLeftWidth: 3, borderLeftColor: '#ff6b5b' } : null,
           ]}
         >
           <ThemedText
@@ -429,9 +430,13 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           </View>
           {inquiryGroup?.listingAddress ? (
             <View style={styles.pinnedListingCard}>
-              <View style={styles.pinnedListingThumbWrap}>
-                <Feather name="home" size={20} color="#ff6b5b" />
-              </View>
+              {inquiryGroup.listingPhoto ? (
+                <Image source={{ uri: inquiryGroup.listingPhoto }} style={styles.pinnedListingThumb} />
+              ) : (
+                <View style={styles.pinnedListingThumbWrap}>
+                  <Feather name="home" size={20} color="#ff6b5b" />
+                </View>
+              )}
               <View style={{ flex: 1 }}>
                 <ThemedText style={{ fontSize: 13, fontWeight: '600', color: '#fff' }} numberOfLines={1}>
                   {inquiryGroup.name || inquiryGroup.listingAddress}
@@ -440,7 +445,14 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
                   {inquiryGroup.listingAddress}
                 </ThemedText>
               </View>
-              <Pressable onPress={() => {}} style={{ paddingLeft: 8 }}>
+              <Pressable onPress={() => {
+                if (inquiryGroup?.listingId) {
+                  (navigation as any).navigate('RenterTabs', {
+                    screen: 'Explore',
+                    params: { viewListingId: inquiryGroup.listingId },
+                  });
+                }
+              }} style={{ paddingLeft: 8 }}>
                 <ThemedText style={{ fontSize: 12, color: '#ff6b5b', fontWeight: '600' }}>View Listing</ThemedText>
               </Pressable>
             </View>
@@ -808,6 +820,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,107,91,0.06)',
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  pinnedListingThumb: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    marginRight: 12,
   },
   pinnedListingThumbWrap: {
     width: 44,

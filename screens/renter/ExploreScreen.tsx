@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, Image, Pressable, FlatList, Modal, TextInput, ScrollView, Switch, Alert, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ThemedText } from '../../components/ThemedText';
@@ -71,6 +71,7 @@ export const ExploreScreen = () => {
   const { theme } = useTheme();
   const { user, canSendInterest, canSendSuperInterest, canViewListing, useListingView } = useAuth();
   const navigation = useNavigation();
+  const route = useRoute<any>();
   const insets = useSafeAreaInsets();
   const { refreshUnreadCount } = useNotificationContext();
   const [properties, setProperties] = useState<Property[]>([]);
@@ -217,6 +218,18 @@ export const ExploreScreen = () => {
       loadInterestCards();
     }, [loadInterestCards])
   );
+
+  useEffect(() => {
+    const viewListingId = route.params?.viewListingId;
+    if (viewListingId && properties.length > 0) {
+      const listing = properties.find(p => p.id === viewListingId);
+      if (listing) {
+        setSelectedProperty(listing);
+        setShowPropertyDetail(true);
+      }
+      navigation.setParams({ viewListingId: undefined } as any);
+    }
+  }, [route.params?.viewListingId, properties]);
 
   const getPropertyCompatibility = (property: Property): number => {
     if (!property.hostProfileId || !user) return 0;
@@ -561,7 +574,7 @@ export const ExploreScreen = () => {
       const address = inquireProperty.location || inquireProperty.title || 'Listing';
       const selectedGroup = roommateGroups.find(g => g.id === selectedGroupId);
       const groupName = `${selectedGroup?.name || 'Group'} — ${address}`;
-      await createListingInquiryGroup(
+      const newGroup = await createListingInquiryGroup(
         inquireProperty.id,
         inquireProperty.hostProfileId || '',
         address,
@@ -570,7 +583,23 @@ export const ExploreScreen = () => {
       );
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setShowInquireModal(false);
-      Alert.alert('Inquiry Sent', `Your group inquiry for "${address}" has been sent to the host.`);
+      const listingPhoto = inquireProperty.photos?.[0] || inquireProperty.imageUrl || undefined;
+      (navigation as any).navigate('Messages', {
+        screen: 'Chat',
+        params: {
+          conversationId: `inquiry_${newGroup.id}`,
+          inquiryGroup: {
+            ...newGroup,
+            name: groupName,
+            listingAddress: address,
+            listingId: inquireProperty.id,
+            hostId: inquireProperty.hostProfileId,
+            listingPhoto,
+            isArchived: false,
+            type: 'listing_inquiry',
+          },
+        },
+      });
     } catch (err) {
       console.error('Failed to create inquiry group:', err);
       Alert.alert('Error', 'Failed to send inquiry. Please try again.');

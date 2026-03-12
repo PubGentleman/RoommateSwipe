@@ -92,7 +92,7 @@ export const GroupsScreen = () => {
           getMyInquiryGroupsFromSupabase(),
         ]);
         const myGroupIds = new Set((supabaseMyGroups || []).map((g: any) => g.id));
-        const mapGroup = (g: any): Group => ({
+        const mapGroup = (g: any): Group & { listingPhoto?: string } => ({
           id: g.id,
           type: g.type || 'roommate',
           name: g.name,
@@ -115,16 +115,14 @@ export const GroupsScreen = () => {
           listingAddress: g.listing_address,
           isArchived: g.is_archived || false,
           memberCount: g.members?.[0]?.count || 0,
+          hostName: g.host?.full_name || g.creator?.full_name || 'Host',
+          listingPhoto: g.listing?.photos?.[0] || undefined,
         });
         userGroups = (supabaseMyGroups || []).map(mapGroup);
         otherGroups = (supabaseGroups || [])
           .filter((g: any) => !myGroupIds.has(g.id))
           .map(mapGroup);
-        setInquiryGroups((supabaseInquiryGroups || []).map((g: any) => ({
-          ...mapGroup(g),
-          hostName: g.creator?.full_name || 'Host',
-          memberCount: g.members?.[0]?.count || 0,
-        })));
+        setInquiryGroups((supabaseInquiryGroups || []).map(mapGroup));
       } catch (supabaseError) {
         console.warn('[GroupsScreen] Supabase failed, falling back to StorageService:', supabaseError);
         const groups = await StorageService.getGroups();
@@ -741,9 +739,13 @@ export const GroupsScreen = () => {
         }}
       >
         <View style={styles.groupHeader}>
-          <View style={[styles.groupIcon, { backgroundColor: 'rgba(255,107,91,0.15)' }]}>
-            <Feather name="home" size={20} color="#ff6b5b" />
-          </View>
+          {(group as any).listingPhoto ? (
+            <Image source={{ uri: (group as any).listingPhoto }} style={[styles.groupIcon, { borderRadius: 12 }]} />
+          ) : (
+            <View style={[styles.groupIcon, { backgroundColor: 'rgba(255,107,91,0.15)' }]}>
+              <Feather name="home" size={20} color="#ff6b5b" />
+            </View>
+          )}
           <View style={styles.groupInfo}>
             <ThemedText style={[Typography.h3]} numberOfLines={1}>
               {group.listingAddress || group.name}

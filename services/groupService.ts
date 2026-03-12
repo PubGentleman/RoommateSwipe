@@ -70,7 +70,9 @@ export async function getMyGroups(type?: GroupType) {
     .select(`
       *,
       members:group_members(count),
-      creator:users!created_by(id, full_name, avatar_url)
+      creator:users!created_by(id, full_name, avatar_url),
+      listing:listings(id, title, photos, rent),
+      host:users!host_id(id, full_name, avatar_url)
     `)
     .in('id', groupIds);
 
