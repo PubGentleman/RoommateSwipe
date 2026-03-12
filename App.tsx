@@ -13,20 +13,25 @@ import { NotificationProvider } from "./contexts/NotificationContext";
 import { CityProvider } from "./contexts/CityContext";
 import { ProfileReminderProvider } from "./contexts/ProfileReminderContext";
 import { StorageService } from "./utils/storage";
+import { isDev } from "./utils/dataUtils";
 
 export default function App() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      (window as any).reloadMockData = async () => {
-        await StorageService.forceReloadMockData();
-        alert('Mock data reloaded! Please refresh the page to see changes.');
-      };
+      if (isDev()) {
+        (window as any).reloadMockData = async () => {
+          await StorageService.forceReloadMockData();
+          alert('Mock data reloaded! Please refresh the page to see changes.');
+        };
+        console.log('[App] Dev mode — mock data enabled. Run: window.reloadMockData()');
+      } else {
+        console.log('[App] Production mode — mock data disabled');
+      }
       (window as any).resetApp = async () => {
         await StorageService.clearAllData();
         alert('All app data cleared! Refreshing...');
         window.location.reload();
       };
-      console.log('[App] To reload all mock data, run: window.reloadMockData()');
     }
   }, []);
 

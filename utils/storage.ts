@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User, RoommateProfile, Property, Group, Conversation, Message, Match, Application, Notification, InterestCard } from '../types/models';
+import { shouldLoadMockData } from './dataUtils';
 
 const STORAGE_KEYS = {
   CURRENT_USER: '@roomdr/current_user',
@@ -804,6 +805,11 @@ export const StorageService = {
 
   async initializeWithMockData(): Promise<void> {
     try {
+      if (!shouldLoadMockData()) {
+        console.log('[StorageService] Production mode — skipping mock data initialization');
+        return;
+      }
+
       const { MOCK_DATA_VERSION, mockRoommateProfiles, mockProperties, mockGroups, mockProfileUsers, mockConversations, mockApplications } = await import('./mockData');
       
       const storedVersion = await AsyncStorage.getItem(STORAGE_KEYS.MOCK_DATA_VERSION);
@@ -873,6 +879,11 @@ export const StorageService = {
 
   async forceReloadMockData(): Promise<void> {
     try {
+      if (!shouldLoadMockData()) {
+        console.log('[StorageService] Production mode — mock data reload blocked');
+        return;
+      }
+
       console.log('[StorageService] Force reloading all mock data...');
       const { mockRoommateProfiles, mockProperties, mockGroups, mockProfileUsers, mockConversations, mockApplications } = await import('./mockData');
       
