@@ -24,7 +24,7 @@ Preferred communication style: Simple, everyday language.
 
 ## Core Functionality
 
-Roomdr implements a points-based compatibility algorithm (0-100 score) using 15 weighted factors, including age (8 pts - primary factor), location (16 pts), budget (12 pts), sleep schedule (12 pts), cleanliness (12 pts), smoking (10 pts), move-in timeline (4 pts), work location (6 pts), guest policy (6 pts), noise tolerance (4 pts), pets (4 pts), roommate relationship (2 pts), shared expenses (2 pts), interest tag overlap (2 pts), and zodiac sign (2 pts). A sophisticated interest tag system allows users to select 3-10 tags from predefined categories, which are used in the matching algorithm and displayed on user profiles.
+Roomdr implements a points-based compatibility algorithm (0-100+ score) using 16 weighted factors, including age (8 pts - primary factor), location (16 pts), budget (12 pts), sleep schedule (12 pts), cleanliness (12 pts), smoking (10 pts), move-in timeline (4 pts), work location (6 pts), guest policy (6 pts), noise tolerance (4 pts), pets (4 pts), roommate relationship (2 pts), shared expenses (2 pts), interest tag overlap (2 pts), zodiac sign (2 pts), and personality compatibility (~15 pts, 15% weighting via 5-question quiz). A sophisticated interest tag system allows users to select 3-10 tags from predefined categories, which are used in the matching algorithm and displayed on user profiles.
 
 ## Frontend Architecture
 
@@ -41,7 +41,10 @@ The application is built with React Native and Expo using TypeScript, featuring 
 - **AI Profile Completion Reminders:** Centralized escalating reminder system via `ProfileReminderContext`. Three stages: (1) first reminder after 5 minutes of app usage, (2) second reminder 30 minutes after dismissing the first, (3) third/final reminder next day in-app + email via Supabase edge function `send-profile-reminder-email`. After the third dismissal, no more automatic reminders. Reminders auto-cancel if profile reaches 100% completion. Manual trigger via ProfileCompletionCard on Profile screen still available. State persisted in AsyncStorage with keys: `profileReminder_${userId}_stage`, `profileReminder_${userId}_firstDismissedAt`, `profileReminder_${userId}_nextDayDate`.
 - **Roommate Interaction System:** Three types: Swipe Right (free), Super Interest (notifies recipient), and Cold Messaging (Elite only).
 - **Profile Boost System:** Tier-based boosts (12-48 hours) increase profile visibility.
-- **Identity Verification:** Options for phone, government ID, social media, and optional background/income checks for Elite users.
+- **Identity Verification:** Options for phone, government ID, social media, and optional background/income checks for Elite users. Dev shortcuts available via `isDev` flag.
+- **References System:** ProfileScreen shows references section with author name, relationship type, star rating, review text, and verified badge. Users can request references via email. Reference count badge shown on swipe cards.
+- **Background Check:** One-time $9.99 purchase on ProfileScreen. Status tracked (none/pending/clear/flagged). Green shield badge on swipe cards for cleared users. Dev shortcut to mark as cleared.
+- **Personality Quiz:** 5-question personality questionnaire step (conflict resolution, energy level, space preference, schedule style, social preference). Results feed into `calculatePersonalityScore()` in matching algorithm with 15% weighting.
 - **Onboarding Tutorial:** Swipeable tutorial for new users.
 - **App Diagnostics:** Hidden screen for health checks.
 - **Read Receipts:** For Elite users.

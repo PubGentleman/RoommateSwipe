@@ -46,7 +46,7 @@ import { LocationPicker } from '../../components/LocationPicker';
 import { getCoordinatesFromNeighborhood } from '../../utils/locationData';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const TOTAL_STEPS = 14;
+const TOTAL_STEPS = 15;
 
 type StepId =
   | 'photos'
@@ -62,7 +62,8 @@ type StepId =
   | 'workPets'
   | 'housing'
   | 'interests'
-  | 'expenses';
+  | 'expenses'
+  | 'personality';
 
 const STEP_ORDER: StepId[] = [
   'photos',
@@ -79,6 +80,7 @@ const STEP_ORDER: StepId[] = [
   'housing',
   'interests',
   'expenses',
+  'personality',
 ];
 
 const ONBOARDING_STEPS: StepId[] = [
@@ -104,6 +106,7 @@ const STEP_TITLES: Record<StepId, string> = {
   housing: 'Housing Preferences',
   interests: 'Interests & Lifestyle',
   expenses: 'Shared Expenses',
+  personality: 'One Last Thing',
 };
 
 const STEP_SUBTITLES: Record<StepId, string> = {
@@ -121,6 +124,7 @@ const STEP_SUBTITLES: Record<StepId, string> = {
   housing: 'What are your housing needs?',
   interests: 'Pick at least 3 tags that match your lifestyle. This helps us find your perfect roommate.',
   expenses: 'How would you like to split shared costs?',
+  personality: '5 quick questions to find your best matches',
 };
 
 export const ProfileQuestionnaireScreen = () => {
@@ -180,6 +184,10 @@ export const ProfileQuestionnaireScreen = () => {
   const [bedrooms, setBedrooms] = useState(user?.profileData?.preferences?.bedrooms?.toString() || '');
   const [bathrooms, setBathrooms] = useState(user?.profileData?.preferences?.bathrooms?.toString() || '');
   const [privateBathroom, setPrivateBathroom] = useState<boolean | undefined>(user?.profileData?.preferences?.privateBathroom);
+
+  const [personalityAnswers, setPersonalityAnswers] = useState<Record<string, string>>(
+    user?.profileData?.personalityAnswers || {}
+  );
 
   useEffect(() => {
     if (user?.photos && user.photos.length > 0) {
@@ -314,6 +322,12 @@ export const ProfileQuestionnaireScreen = () => {
         if (!expenseInternet) { Alert.alert('Required', 'Please select how to handle internet'); return false; }
         if (!expenseCleaning) { Alert.alert('Required', 'Please select how to handle cleaning'); return false; }
         return true;
+      case 'personality':
+        if (Object.keys(personalityAnswers).length < 5) {
+          Alert.alert('Required', 'Please answer all 5 questions');
+          return false;
+        }
+        return true;
       default:
         return true;
     }
@@ -375,6 +389,7 @@ export const ProfileQuestionnaireScreen = () => {
         occupation: occupation.trim() || undefined,
         interests: interests.length > 0 ? interests : undefined,
         gender,
+        personalityAnswers: Object.keys(personalityAnswers).length > 0 ? personalityAnswers : undefined,
         preferences: {
           sleepSchedule,
           cleanliness,
@@ -727,6 +742,97 @@ export const ProfileQuestionnaireScreen = () => {
             <SelectionCard icon="award" title="Hire a Cleaner" isSelected={expenseCleaning === 'hire_cleaner'} onPress={() => setExpenseCleaning('hire_cleaner')} index={2} />
           </View>
         );
+
+      case 'personality': {
+        const PERSONALITY_QUESTIONS = [
+          {
+            id: 'q1',
+            question: 'When you get home after a long day:',
+            options: [
+              { value: 'alone', emoji: '🛋️', label: 'Decompress alone quietly' },
+              { value: 'music', emoji: '🎵', label: 'Put on music and unwind' },
+              { value: 'social', emoji: '📱', label: 'Call friends or family' },
+              { value: 'kitchen', emoji: '🍳', label: 'Cook and relax in the kitchen' },
+            ],
+          },
+          {
+            id: 'q2',
+            question: 'Your ideal weekend at home:',
+            options: [
+              { value: 'clean', emoji: '🧹', label: 'Deep clean and organize' },
+              { value: 'chill', emoji: '🎮', label: 'Games, movies, total chill' },
+              { value: 'social', emoji: '🏠', label: 'Have people over' },
+              { value: 'out', emoji: '🚶', label: 'Out most of the time' },
+            ],
+          },
+          {
+            id: 'q3',
+            question: 'Shared spaces should be:',
+            options: [
+              { value: 'spotless', emoji: '✨', label: 'Spotless — clean as you go' },
+              { value: 'tidy', emoji: '👍', label: 'Tidy — cleaned weekly' },
+              { value: 'relaxed', emoji: '😌', label: 'Relaxed — cleaned when needed' },
+              { value: 'doesnt_matter', emoji: '🤷', label: "Doesn't bother me" },
+            ],
+          },
+          {
+            id: 'q4',
+            question: 'Guests at home:',
+            options: [
+              { value: 'advance', emoji: '❌', label: 'Always let me know in advance' },
+              { value: 'headsup', emoji: '👋', label: 'Occasionally fine with a heads up' },
+              { value: 'open', emoji: '✅', label: 'Come anytime' },
+              { value: 'love', emoji: '🎉', label: 'Love it, the more the merrier' },
+            ],
+          },
+          {
+            id: 'q5',
+            question: 'Your communication style:',
+            options: [
+              { value: 'text', emoji: '💬', label: 'Text everything' },
+              { value: 'direct', emoji: '🗣️', label: 'Direct — face to face' },
+              { value: 'meeting', emoji: '📋', label: 'Group house meeting' },
+              { value: 'flow', emoji: '😎', label: 'Go with the flow' },
+            ],
+          },
+        ];
+
+        return (
+          <View style={styles.stepInner}>
+            {PERSONALITY_QUESTIONS.map((q) => (
+              <View key={q.id} style={{ marginBottom: 20 }}>
+                <ThemedText style={[Typography.body, { fontWeight: '600', marginBottom: 10, color: theme.text }]}>{q.question}</ThemedText>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {q.options.map((opt) => {
+                    const isSelected = personalityAnswers[q.id] === opt.value;
+                    return (
+                      <Pressable
+                        key={opt.value}
+                        onPress={() => setPersonalityAnswers(prev => ({ ...prev, [q.id]: opt.value }))}
+                        style={{
+                          flex: 1,
+                          minWidth: '45%',
+                          backgroundColor: isSelected ? 'rgba(255,107,91,0.1)' : '#1e1e1e',
+                          borderWidth: 1,
+                          borderColor: isSelected ? '#ff6b5b' : 'rgba(255,255,255,0.08)',
+                          borderRadius: 12,
+                          padding: 12,
+                          alignItems: 'center',
+                        }}
+                      >
+                        <Text style={{ fontSize: 24, marginBottom: 4 }}>{opt.emoji}</Text>
+                        <Text style={{ color: isSelected ? '#ff6b5b' : 'rgba(255,255,255,0.7)', fontSize: 12, textAlign: 'center', fontWeight: isSelected ? '600' : '400' }}>
+                          {opt.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            ))}
+          </View>
+        );
+      }
 
       default:
         return null;

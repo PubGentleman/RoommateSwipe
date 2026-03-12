@@ -90,3 +90,9 @@ value = "0"
 
 [userenv.shared]
 EXPO_PUBLIC_SUPABASE_URL = "https://lnjupgvvsbdooomvdjho.supabase.co"
+
+[userenv.development]
+EXPO_PUBLIC_ENV = "development"
+
+[userenv.production]
+EXPO_PUBLIC_ENV = "production"

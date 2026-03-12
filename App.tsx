@@ -18,7 +18,7 @@ import { isDev } from "./utils/dataUtils";
 export default function App() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      if (isDev()) {
+      if (isDev) {
         (window as any).reloadMockData = async () => {
           await StorageService.forceReloadMockData();
           alert('Mock data reloaded! Please refresh the page to see changes.');

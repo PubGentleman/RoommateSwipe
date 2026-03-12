@@ -15,6 +15,17 @@ Deno.serve(async (req) => {
     return new Response('Webhook signature invalid', { status: 400 });
   }
 
+  if (event.type === 'identity.verification_session.verified') {
+    const session = event.data.object as any;
+    await supabase.from('users')
+      .update({
+        identity_verified: true,
+        identity_verified_at: new Date().toISOString(),
+      })
+      .eq('id', session.metadata.user_id);
+    return new Response(JSON.stringify({ received: true }), { status: 200 });
+  }
+
   const subscription = event.data.object as Stripe.Subscription;
   const customerId = subscription.customer as string;
 

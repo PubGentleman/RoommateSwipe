@@ -64,6 +64,45 @@ export const formatLocation = (location: {
  * 14. Zodiac Sign: 2 points - Optional fun factor, element-based compatibility (only if both users have it)
  */
 
+const COMPATIBLE_PERSONALITY: Record<string, string[]> = {
+  q1_alone: ['q1_alone', 'q1_music'],
+  q1_music: ['q1_alone', 'q1_music'],
+  q1_social: ['q1_social', 'q1_kitchen'],
+  q1_kitchen: ['q1_social', 'q1_kitchen'],
+  q2_clean: ['q2_clean'],
+  q2_chill: ['q2_chill', 'q2_out'],
+  q2_social: ['q2_social'],
+  q2_out: ['q2_chill', 'q2_out'],
+  q3_spotless: ['q3_spotless', 'q3_tidy'],
+  q3_tidy: ['q3_spotless', 'q3_tidy'],
+  q3_relaxed: ['q3_relaxed', 'q3_doesnt_matter'],
+  q3_doesnt_matter: ['q3_relaxed', 'q3_doesnt_matter'],
+  q4_advance: ['q4_advance', 'q4_headsup'],
+  q4_headsup: ['q4_advance', 'q4_headsup'],
+  q4_open: ['q4_open', 'q4_love'],
+  q4_love: ['q4_open', 'q4_love'],
+  q5_text: ['q5_text', 'q5_flow'],
+  q5_flow: ['q5_text', 'q5_flow'],
+  q5_direct: ['q5_direct', 'q5_meeting'],
+  q5_meeting: ['q5_direct', 'q5_meeting'],
+};
+
+const calculatePersonalityScore = (
+  answers1: Record<string, string> | undefined,
+  answers2: Record<string, string> | undefined
+): number => {
+  if (!answers1 || !answers2) return 50;
+  let matches = 0;
+  let total = 0;
+  Object.keys(answers1).forEach(q => {
+    const key = `${q}_${answers1[q]}`;
+    const val2 = `${q}_${answers2[q]}`;
+    if (COMPATIBLE_PERSONALITY[key]?.includes(val2)) matches++;
+    total++;
+  });
+  return total > 0 ? (matches / total) * 100 : 50;
+};
+
 export interface MatchScore {
   totalScore: number;
   breakdown: {
@@ -82,6 +121,7 @@ export interface MatchScore {
     sharedExpenses: number;
     lifestyle: number;
     zodiac: number;
+    personality: number;
   };
   reasons: {
     strengths: string[];
@@ -124,6 +164,7 @@ export const calculateDetailedCompatibility = (
     sharedExpenses: 0,
     lifestyle: 1,
     zodiac: 0,
+    personality: 0,
   };
 
   const reasons = {
@@ -156,6 +197,7 @@ export const calculateDetailedCompatibility = (
       sharedExpenses: 1,
       lifestyle: 1,
       zodiac: 0,
+      personality: 7,
     };
     const neutralScore = Object.values(neutralBreakdown).reduce((sum, score) => sum + score, 0);
     return { totalScore: neutralScore, breakdown: neutralBreakdown, reasons };
@@ -587,6 +629,21 @@ export const calculateDetailedCompatibility = (
     // Note: No reason added - this is a fun factor, not a deal-breaker
   } else {
     breakdown.zodiac = 0;
+  }
+
+  // ========================================
+  // 15. PERSONALITY COMPATIBILITY (15% weighting, ~15 points max)
+  // Uses 5-question compatibility quiz answers
+  // ========================================
+  const personalityRaw = calculatePersonalityScore(
+    currentUser.profileData?.personalityAnswers,
+    roommateProfile.personalityAnswers as Record<string, string> | undefined
+  );
+  breakdown.personality = Math.round(personalityRaw * 0.15 * 10) / 10;
+  if (personalityRaw >= 80) {
+    reasons.strengths.push('Very compatible personality and living style');
+  } else if (personalityRaw <= 30) {
+    reasons.concerns.push('Different personality preferences and living style');
   }
 
   // Calculate total score

@@ -7,6 +7,7 @@ import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
 import { Spacing, BorderRadius, Typography } from '../../constants/theme';
+import { isDev } from '../../utils/envUtils';
 
 export const PaymentScreen = () => {
   const { theme } = useTheme();
@@ -64,7 +65,7 @@ export const PaymentScreen = () => {
     const brand = cardFirstDigit === '4' ? 'Visa' : cardFirstDigit === '5' ? 'Mastercard' : 'Card';
 
     const newPaymentMethod = {
-      id: `pm_${Math.random().toString(36).substr(2, 9)}`,
+      id: isDev ? `pm_dev_${Date.now().toString(36)}` : `pm_${Date.now().toString(36)}`,
       type: 'card' as const,
       last4,
       brand,

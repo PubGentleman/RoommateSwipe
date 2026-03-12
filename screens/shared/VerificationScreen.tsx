@@ -7,6 +7,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
 import { Typography, Spacing } from '../../constants/theme';
 import { getVerificationLevel, getVerificationLabel } from '../../components/VerificationBadge';
+import { isDev } from '../../utils/envUtils';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { ProfileStackParamList } from '../../navigation/ProfileStackNavigator';
 
@@ -206,6 +207,44 @@ export function VerificationScreen({ navigation, route }: Props) {
             Verified profiles get up to 3x more matches and appear more trustworthy to other users.
           </ThemedText>
         </View>
+
+        {isDev && (
+          <View style={[styles.verificationItem, { backgroundColor: '#1a1a1a', borderColor: '#ff6b5b' }]}>
+            <ThemedText style={[Typography.body, { fontWeight: '700', color: '#ff6b5b', marginBottom: 8 }]}>[DEV] Quick Actions</ThemedText>
+            <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+              <Pressable
+                style={[styles.actionButton, { backgroundColor: '#ff6b5b', flex: 1, minWidth: 120 }]}
+                onPress={async () => {
+                  const newVerification = {
+                    ...verification,
+                    phone: { verified: true, verifiedAt: new Date() },
+                    government_id: { verified: true, verifiedAt: new Date() },
+                    social_media: { verified: true, verifiedAt: new Date(), platform: 'instagram' },
+                  };
+                  await updateUser({ verification: newVerification });
+                  Alert.alert('Dev Mode', 'All verifications marked as complete');
+                }}
+              >
+                <Feather name="check-circle" size={14} color="#fff" style={{ marginRight: 4 }} />
+                <ThemedText style={[Typography.small, { color: '#fff', fontWeight: '600' }]}>Skip All Verification</ThemedText>
+              </Pressable>
+              <Pressable
+                style={[styles.actionButton, { backgroundColor: '#22c55e', flex: 1, minWidth: 120 }]}
+                onPress={async () => {
+                  const newVerification = {
+                    ...verification,
+                    background_check: { verified: true, verifiedAt: new Date() },
+                  };
+                  await updateUser({ verification: newVerification });
+                  Alert.alert('Dev Mode', 'Background check marked as cleared');
+                }}
+              >
+                <Feather name="shield" size={14} color="#fff" style={{ marginRight: 4 }} />
+                <ThemedText style={[Typography.small, { color: '#fff', fontWeight: '600' }]}>Mark BG Cleared</ThemedText>
+              </Pressable>
+            </View>
+          </View>
+        )}
 
         <View style={[styles.verificationItem, { backgroundColor: '#1a1a1a', borderColor: '#333333' }]}>
           <View style={styles.verificationHeader}>

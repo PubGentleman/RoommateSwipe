@@ -1,10 +1,10 @@
-const isDevelopment = process.env.EXPO_PUBLIC_ENV !== 'production';
+import { isDev } from './envUtils';
 
-export const isDev = (): boolean => isDevelopment;
+export { isDev } from './envUtils';
 
 export const getMockFallback = <T>(mockData: T, realData: T | null | undefined): T | null => {
   if (realData !== null && realData !== undefined) return realData;
-  if (isDevelopment) {
+  if (isDev) {
     console.warn('[DEV ONLY] Using mock data fallback');
     return mockData;
   }
@@ -12,5 +12,5 @@ export const getMockFallback = <T>(mockData: T, realData: T | null | undefined):
 };
 
 export const shouldLoadMockData = (): boolean => {
-  return isDevelopment;
+  return isDev;
 };

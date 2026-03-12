@@ -1050,6 +1050,17 @@ export const RoommatesScreen = () => {
                     <Feather name="check-circle" size={16} color="#2563EB" />
                   </View>
                 ) : null}
+                {(currentProfile as any).references?.length > 0 ? (
+                  <View style={styles.refBadgeCard}>
+                    <Feather name="star" size={12} color="#FFD700" />
+                    <ThemedText style={styles.refBadgeText}>{(currentProfile as any).references.length}</ThemedText>
+                  </View>
+                ) : null}
+                {(currentProfile as any).background_check_status === 'clear' ? (
+                  <View style={styles.bgBadgeCard}>
+                    <Feather name="shield" size={12} color="#22c55e" />
+                  </View>
+                ) : null}
               </View>
               {user?.receivedSuperLikes?.some((sl: { superLikerId: string }) => sl.superLikerId === currentProfile.id) ? (
                 <ThemedText style={styles.superInterestCardLabel}>Sent you a Super Interest</ThemedText>
@@ -2280,6 +2291,27 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(37, 99, 235, 0.2)',
     borderRadius: 10,
     padding: 2,
+  },
+  refBadgeCard: {
+    marginLeft: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(255,215,0,0.15)',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  refBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFD700',
+  },
+  bgBadgeCard: {
+    marginLeft: 5,
+    backgroundColor: 'rgba(34,197,94,0.15)',
+    borderRadius: 10,
+    padding: 3,
   },
   cardName: {
     fontSize: 26,

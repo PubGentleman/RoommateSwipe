@@ -46,6 +46,11 @@ export const mockProfileUsers: User[] = [
         sharedExpenses: { utilities: 'split_equally', groceries: 'buy_own', internet: 'split_equally', cleaning: 'take_turns' },
       },
     },
+    personalityAnswers: { q1: 'alone', q2: 'clean', q3: 'spotless', q4: 'advance', q5: 'direct' },
+    references: [
+      { id: 'ref-s1', recipientId: '1', authorName: 'Alex Thompson', authorEmail: 'alex@email.com', authorRelationship: 'past_roommate', rating: 5, review: 'Excellent roommate! Very clean and respectful.', isVerified: true, createdAt: '2025-06-15' },
+    ],
+    background_check_status: 'clear' as const,
   },
   {
     id: '2',
@@ -87,6 +92,11 @@ export const mockProfileUsers: User[] = [
         sharedExpenses: { utilities: 'split_equally', groceries: 'split_equally', internet: 'split_equally', cleaning: 'hire_cleaner' },
       },
     },
+    personalityAnswers: { q1: 'social', q2: 'social', q3: 'relaxed', q4: 'love', q5: 'flow' },
+    references: [
+      { id: 'ref-m1', recipientId: '2', authorName: 'David Lee', authorEmail: 'david@email.com', authorRelationship: 'landlord', rating: 4, review: 'Great tenant, always on time with rent.', isVerified: true, createdAt: '2025-04-10' },
+    ],
+    background_check_status: 'none' as const,
   },
   {
     id: '3',
@@ -128,6 +138,8 @@ export const mockProfileUsers: User[] = [
         lifestyle: ['creative_artistic', 'quiet_introverted', 'homebody'],
       },
     },
+    personalityAnswers: { q1: 'alone', q2: 'chill', q3: 'tidy', q4: 'headsup', q5: 'text' },
+    background_check_status: 'none' as const,
   },
   {
     id: '4',
@@ -168,6 +180,11 @@ export const mockProfileUsers: User[] = [
         lifestyle: ['creative_artistic', 'professional_focused'],
       },
     },
+    personalityAnswers: { q1: 'music', q2: 'chill', q3: 'relaxed', q4: 'open', q5: 'flow' },
+    references: [
+      { id: 'ref-b1', recipientId: '4', authorName: 'Lisa Wang', authorEmail: 'lisa@email.com', authorRelationship: 'colleague', rating: 5, review: 'Bob is a wonderful person. Very easy-going.', isVerified: true, createdAt: '2025-02-18' },
+    ],
+    background_check_status: 'clear' as const,
   },
   {
     id: '5',
@@ -210,6 +227,12 @@ export const mockProfileUsers: User[] = [
         lifestyle: ['active_gym', 'quiet_introverted'],
       },
     },
+    personalityAnswers: { q1: 'alone', q2: 'clean', q3: 'spotless', q4: 'advance', q5: 'text' },
+    references: [
+      { id: 'ref-j1', recipientId: '5', authorName: 'Sarah Kim', authorEmail: 'sarah.k@email.com', authorRelationship: 'past_roommate', rating: 5, review: 'Jessica was the best roommate I ever had. So considerate!', isVerified: true, createdAt: '2025-05-20' },
+      { id: 'ref-j2', recipientId: '5', authorName: 'Dr. Patel', authorEmail: 'patel@email.com', authorRelationship: 'colleague', rating: 4, isVerified: false, createdAt: '2025-03-15' },
+    ],
+    background_check_status: 'clear' as const,
   },
   {
     id: '6',
@@ -425,6 +448,10 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       social_media: { verified: true, verifiedAt: new Date('2024-11-02'), platform: 'linkedin' },
     },
     compatibility: 92,
+    personalityAnswers: { q1: 'alone', q2: 'clean', q3: 'spotless', q4: 'advance', q5: 'direct' },
+    references: [
+      { id: 'ref-rp1', recipientId: '1', authorName: 'Alex Thompson', authorEmail: 'alex@email.com', authorRelationship: 'past_roommate', rating: 5, review: 'Excellent roommate!', isVerified: true, createdAt: '2025-06-15' },
+    ],
   },
   {
     id: '2',
@@ -460,6 +487,10 @@ export const mockRoommateProfiles: RoommateProfile[] = [
       phone: { verified: true, verifiedAt: new Date('2024-10-15') },
     },
     compatibility: 85,
+    personalityAnswers: { q1: 'social', q2: 'social', q3: 'relaxed', q4: 'love', q5: 'flow' },
+    references: [
+      { id: 'ref-rp2', recipientId: '2', authorName: 'David Lee', authorEmail: 'david@email.com', authorRelationship: 'landlord', rating: 4, review: 'Great tenant.', isVerified: true, createdAt: '2025-04-10' },
+    ],
   },
   {
     id: '3',

@@ -29,11 +29,13 @@ export interface RoommateProfile {
   };
   verification?: VerificationStatus;
   compatibility?: number;
+  personalityAnswers?: Record<string, string>;
   profileData?: {
     interests?: string[];
     preferences?: Record<string, any>;
     [key: string]: any;
   };
+  references?: Reference[];
 }
 
 export interface Property {
@@ -364,6 +366,7 @@ export interface User {
     occupation?: string;
     interests?: string[];
     gender?: 'male' | 'female' | 'other';
+    personalityAnswers?: Record<string, string>;
     preferences?: {
       sleepSchedule?: 'early_sleeper' | 'late_sleeper' | 'flexible' | 'irregular';
       cleanliness?: 'very_tidy' | 'moderately_tidy' | 'relaxed';
@@ -386,6 +389,12 @@ export interface User {
       };
     };
   };
+  personalityAnswers?: Record<string, string>;
+  references?: Reference[];
+  identity_verified?: boolean;
+  identity_verified_at?: string;
+  background_check_status?: 'none' | 'pending' | 'clear' | 'flagged';
+  background_check_completed_at?: string;
   notificationPreferences?: {
     matches: boolean;
     superLikes: boolean;
@@ -460,4 +469,16 @@ export interface Notification {
     fromUserName?: string;
     fromUserPhoto?: string;
   };
+}
+
+export interface Reference {
+  id: string;
+  recipientId: string;
+  authorName: string;
+  authorEmail: string;
+  authorRelationship: 'past_roommate' | 'landlord' | 'colleague' | 'friend';
+  rating: number;
+  review?: string;
+  isVerified: boolean;
+  createdAt: string;
 }
