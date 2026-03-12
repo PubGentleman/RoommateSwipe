@@ -1,0 +1,551 @@
+Working on Tier 1 and Tier 2 prompts. I'll write them all in one organized response.
+
+---
+
+## TIER 1 — CRITICAL FIXES
+
+---
+
+**PROMPT 1 — Real Stripe Payment Integration**
+
+Replace all simulated payment processing with real Stripe. Find and remove every instance of `Math.random()` being used to generate payment IDs and every mock payment confirmation.
+
+Install the Stripe React Native SDK:
+```bash
+npx expo install @stripe/stripe-react-native
+```
+
+In `app.json` / `app.config.js` add:
+```json
+{
+  "plugins": [
+    ["@stripe/stripe-react-native", {
+      "merchantIdentifier": "merchant.com.roomdr",
+      "enableGooglePay": true
+    }]
+  ]
+}
+```
+
+Create `lib/stripe.ts`:
+```ts
+import { initStripe } from '@stripe/stripe-react-native';
+
+export const initializeStripe = async () => {
+  await initStripe({
+    publishableKey: process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY!,
+    merchantIdentifier: 'merchant.com.roomdr',
+  });
+};
+```
+
+Call `initializeStripe()` in `App.tsx` on mount.
+
+Create `services/paymentService.ts`:
+```ts
+import { createPaymentMethod, confirmPayment } from '@stripe/stripe-react-native';
+import { supabase } from '../lib/supabase';
+
+export const createPaymentIntent = async (
+  amount: number,
+  currency: string = 'usd',
+  metadata: Record<string, string> = {}
+) => {
+  const { data, error } = await supabase.functions.invoke('create-payment-intent', {
+    body: { amount, currency, metadata }
+  });
+  if (error) throw error;
+  return data;
+};
+
+export const processSubscription = async (
+  priceId: string,
+  customerId: string
+) => {
+  const { data, error } = await supabase.functions.invoke('create-subscription', {
+    body: { priceId, customerId }
+  });
+  if (error) throw error;
+  return data;
+};
+```
+
+Create Supabase Edge Function `supabase/functions/create-payment-intent/index.ts`:
+```ts
+import Stripe from 'https://esm.sh/stripe@12.0.0?target=deno';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!);
+
+Deno.serve(async (req) => {
+  const { amount, currency, metadata } = await req.json();
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount: Math.round(amount * 100),
+    currency,
+    metadata,
+    automatic_payment_methods: { enabled: true },
+  });
+  return new Response(
+    JSON.stringify({ clientSecret: paymentIntent.client_secret }),
+    { headers: { 'Content-Type': 'application/json' } }
+  );
+});
+```
+
+Create Supabase Edge Function `supabase/functions/create-subscription/index.ts`:
+```ts
+import Stripe from 'https://esm.sh/stripe@12.0.0?target=deno';
+
+const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!);
+
+Deno.serve(async (req) => {
+  const { priceId, customerId } = await req.json();
+  const subscription = await stripe.subscriptions.create({
+    customer: customerId,
+    items: [{ price: priceId }],
+    payment_behavior: 'default_incomplete',
+    expand: ['latest_invoice.payment_intent'],
+  });
+  const invoice = subscription.latest_invoice as Stripe.Invoice;
+  const paymentIntent = invoice.payment_intent as Stripe.PaymentIntent;
+  return new Response(
+    JSON.stringify({ 
+      subscriptionId: subscription.id,
+      clientSecret: paymentIntent.client_secret 
+    }),
+    { headers: { 'Content-Type': 'application/json' } }
+  );
+});
+```
+
+In `screens/shared/PaymentScreen.tsx`, replace all mock payment logic with:
+```ts
+import { useStripe } from '@stripe/stripe-react-native';
+import { createPaymentIntent } from '../../services/paymentService';
+
+const { initPaymentSheet, presentPaymentSheet } = useStripe();
+
+const handlePayment = async () => {
+  try {
+    setLoading(true);
+    const { clientSecret } = await createPaymentIntent(amount, 'usd', {
+      userId: user.id,
+      plan: selectedPlan,
+      billingCycle: selectedCycle
+    });
+
+    const { error: initError } = await initPaymentSheet({
+      paymentIntentClientSecret: clientSecret,
+      merchantDisplayName: 'Roomdr',
+      style: 'alwaysDark',
+      googlePay: { merchantCountryCode: 'US', testEnv: false },
+      applePay: { merchantCountryCode: 'US' },
+    });
+
+    if (initError) throw initError;
+
+    const { error: paymentError } = await presentPaymentSheet();
+    if (paymentError) throw paymentError;
+
+    // Payment succeeded — update subscription in Supabase
+    await subscriptionService.updateSubscription(user.id, {
+      plan: selectedPlan,
+      billing_cycle: selectedCycle,
+      status: 'active',
+    });
+
+    navigation.navigate('PaymentSuccess');
+  } catch (error) {
+    Alert.alert('Payment failed', error.message);
+  } finally {
+    setLoading(false);
+  }
+};
+```
+
+Do the same replacement in `PlansScreen.tsx`, `RoommatesScreen.tsx` boost purchase flow, `GroupsScreen.tsx` super interest purchase flow, and anywhere else `Math.random()` generates a payment ID.
+
+Add these to Supabase Edge Function secrets:
+- `STRIPE_SECRET_KEY`
+- `STRIPE_PUBLISHABLE_KEY`
+
+Add to `.env`:
+```
+EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...
+```
+
+---
+
+**PROMPT 2 — Remove Mock Data Fallbacks**
+
+Search the entire codebase and remove all mock data fallbacks from production code.
+
+Find every file that imports from `utils/mockData.ts` or `utils/mockProfiles.ts` or any similar mock data file. For each import:
+
+1. Remove the import line
+2. Find where mock data is used as a fallback (e.g., `data ?? mockProfiles`) and replace with a proper empty state instead
+3. If a screen shows mock data when the real API returns nothing, replace with a proper empty state UI showing "No results yet" with an appropriate icon
+
+Empty state pattern to use:
+```tsx
+if (!data || data.length === 0) {
+  return (
+    <View style={styles.emptyState}>
+      <Feather name="inbox" size={48} color="rgba(255,255,255,0.3)" />
+      <Text style={styles.emptyTitle}>Nothing here yet</Text>
+      <Text style={styles.emptySubtext}>Check back soon</Text>
+    </View>
+  );
+}
+```
+
+After removing all usages, delete these files entirely:
+- `utils/mockData.ts`
+- `utils/mockProfiles.ts`
+- Any other file with "mock" or "fake" or "dummy" in the name
+
+Do a final search for `mockData`, `mockProfiles`, `fakeUser`, `testUser`, `dummyData` across all files to confirm zero remaining references.
+
+---
+
+**PROMPT 3 — Remove All Console Logs**
+
+Search the entire codebase and remove every `console.log`, `console.warn`, `console.error`, and `console.info` statement.
+
+Run this search:
+```
+grep -rn "console\." --include="*.ts" --include="*.tsx"
+```
+
+For each result:
+- If it is a debug log — delete the line entirely
+- If it is error logging that is genuinely useful — replace with a no-op comment for now: `// TODO: Add proper error monitoring`
+
+After removing all console statements, install a proper logger:
+```bash
+npm install @sentry/react-native
+```
+
+In `App.tsx` initialize Sentry:
+```ts
+import * as Sentry from '@sentry/react-native';
+
+Sentry.init({
+  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+  enableInExpoDevelopment: false,
+  debug: false,
+});
+```
+
+Replace the 3 most important error catch blocks in the app (auth errors, payment errors, matching errors) with:
+```ts
+Sentry.captureException(error);
+```
+
+Add `EXPO_PUBLIC_SENTRY_DSN` to `.env` — get the DSN by creating a free project at sentry.io.
+
+---
+
+**PROMPT 4 — Real ID Verification with Stripe Identity**
+
+The `VerificationScreen` exists with UI but has no backend. Wire it up using Stripe Identity which is already available since Stripe is integrated.
+
+Create Supabase Edge Function `supabase/functions/create-verification-session/index.ts`:
+```ts
+import Stripe from 'https://esm.sh/stripe@12.0.0?target=deno';
+
+const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!);
+
+Deno.serve(async (req) => {
+  const { userId } = await req.json();
+  const verificationSession = await stripe.identity.verificationSessions.create({
+    type: 'document',
+    metadata: { user_id: userId },
+    options: {
+      document: {
+        allowed_types: ['driving_license', 'passport', 'id_card'],
+        require_id_number: false,
+        require_live_capture: true,
+        require_matching_selfie: true,
+      }
+    }
+  });
+  return new Response(
+    JSON.stringify({ 
+      sessionId: verificationSession.id,
+      clientSecret: verificationSession.client_secret 
+    }),
+    { headers: { 'Content-Type': 'application/json' } }
+  );
+});
+```
+
+Add `identity_verified boolean default false` and `identity_verified_at timestamptz` columns to the `users` table:
+```sql
+alter table public.users add column if not exists identity_verified boolean default false;
+alter table public.users add column if not exists identity_verified_at timestamptz;
+```
+
+In `screens/shared/VerificationScreen.tsx` replace the placeholder UI with:
+```ts
+const handleStartVerification = async () => {
+  setLoading(true);
+  try {
+    const { data } = await supabase.functions.invoke('create-verification-session', {
+      body: { userId: user.id }
+    });
+    // Open Stripe Identity verification flow via WebBrowser
+    const result = await WebBrowser.openAuthSessionAsync(
+      `https://verify.stripe.com/start#${data.clientSecret}`,
+      'roomdr://verification-complete'
+    );
+    if (result.type === 'success') {
+      // Webhook will update identity_verified — poll for status
+      await pollVerificationStatus();
+    }
+  } catch (error) {
+    Alert.alert('Verification failed', error.message);
+  } finally {
+    setLoading(false);
+  }
+};
+```
+
+Handle the Stripe Identity webhook in the existing stripe-webhook Edge Function — add this event:
+```ts
+if (event.type === 'identity.verification_session.verified') {
+  const session = event.data.object;
+  await supabase.from('users')
+    .update({ 
+      identity_verified: true,
+      identity_verified_at: new Date().toISOString()
+    })
+    .eq('id', session.metadata.user_id);
+}
+```
+
+On verified user profiles, show a blue **"✓ ID Verified"** badge next to their name on profile cards and in the chat header.
+
+---
+
+## TIER 2 — COMPETITIVE FEATURES
+
+---
+
+**PROMPT 5 — Map View for Listings in Explore Screen**
+
+Add a map view toggle to `ExploreScreen.tsx` so renters can see listings plotted on a city map.
+
+Install dependencies:
+```bash
+npx expo install react-native-maps
+```
+
+In `ExploreScreen.tsx`, add a toggle button in the header:
+- Left option: **☰ List** — current card view
+- Right option: **⊞ Map** — new map view
+- Style as a segmented control pill, coral background on active option
+
+**Map View Component — create `components/ListingsMap.tsx`:**
+```tsx
+import MapView, { Marker, Callout } from 'react-native-maps';
+
+export const ListingsMap = ({ listings, onListingPress }) => {
+  return (
+    <MapView
+      style={{ flex: 1 }}
+      initialRegion={{
+        latitude: cityCoords.lat,
+        longitude: cityCoords.lng,
+        latitudeDelta: 0.0922,
+        longitudeDelta: 0.0421,
+      }}
+      userInterfaceStyle="dark"
+    >
+      {listings.map(listing => (
+        <Marker
+          key={listing.id}
+          coordinate={{ 
+            latitude: listing.lat, 
+            longitude: listing.lng 
+          }}
+          onPress={() => onListingPress(listing)}
+        >
+          <View style={styles.pricePin}>
+            <Text style={styles.pricePinText}>${listing.rent}</Text>
+          </View>
+          <Callout onPress={() => onListingPress(listing)}>
+            <View style={styles.callout}>
+              <Text style={styles.calloutTitle}>{listing.title}</Text>
+              <Text style={styles.calloutSubtext}>{listing.neighborhood}</Text>
+            </View>
+          </Callout>
+        </Marker>
+      ))}
+    </MapView>
+  );
+};
+```
+
+Price pin style — each listing shows as a coral rounded pill displaying the rent price (e.g., **$1,400**). Tapped pin expands to show listing title and neighborhood. Tapping the callout opens the full listing detail screen.
+
+Add `lat` and `lng` columns to the listings table:
+```sql
+alter table public.listings add column if not exists lat numeric;
+alter table public.listings add column if not exists lng numeric;
+```
+
+When a host creates a listing with an address, geocode it automatically using a Supabase Edge Function that calls the Google Maps Geocoding API and stores the coordinates.
+
+---
+
+**PROMPT 6 — Personality Compatibility Quiz**
+
+Add a short 5-question personality quiz during onboarding that feeds a compatibility bonus into the matching algorithm.
+
+Add a new onboarding step after Occupation called **"Quick Compatibility Quiz"**:
+
+Heading: **"Last quick thing"**
+Subtext: **"5 questions to help us find your best matches"**
+
+The 5 questions with selectable answer cards:
+
+**Q1 — When you come home after work you usually:**
+- 🛋️ Decompress alone quietly
+- 🎵 Put on music and unwind
+- 📱 Call friends or family
+- 🍳 Cook and relax in the kitchen
+
+**Q2 — Your ideal weekend at home is:**
+- 🧹 Deep clean and organize
+- 🎮 Games, movies, total chill
+- 🏠 Host friends or have people over
+- 🚶 Out most of the time, barely home
+
+**Q3 — How do you feel about shared spaces:**
+- ✨ Spotless — I clean as I go
+- 👍 Tidy — clean weekly
+- 😌 Relaxed — clean when needed
+- 🤷 Doesn't bother me either way
+
+**Q4 — Unexpected guests at home:**
+- ❌ Please let me know in advance
+- 👋 Occasionally fine, just a heads up
+- ✅ Come anytime, door's open
+- 🎉 Love it, more the merrier
+
+**Q5 — Your communication style with roommates:**
+- 💬 Text everything, avoid confrontation
+- 🗣️ Direct — say it as it is
+- 📋 House meeting to discuss things
+- 😎 Go with the flow, rarely an issue
+
+Each question shows 4 large tappable answer cards. Selected card gets a coral border and background tint. Must answer all 5 to continue — no skip option.
+
+Store answers as `personalityAnswers: Record<string, string>` on the profile.
+
+In `matchingAlgorithm.ts` add a personality score function with **15% weighting**:
+```ts
+const COMPATIBLE_PAIRS: Record<string, string[]> = {
+  'q1_alone': ['q1_alone', 'q1_music'],
+  'q1_social': ['q1_social', 'q1_kitchen'],
+  'q2_clean': ['q2_clean'],
+  'q2_chill': ['q2_chill', 'q2_out'],
+  'q2_social': ['q2_social'],
+  'q3_spotless': ['q3_spotless', 'q3_tidy'],
+  'q3_relaxed': ['q3_relaxed', 'q3_doesnt_matter'],
+  'q4_advance': ['q4_advance', 'q4_headsup'],
+  'q4_open': ['q4_open', 'q4_love'],
+};
+
+const calculatePersonalityScore = (answers1, answers2): number => {
+  let matches = 0;
+  let total = 0;
+  Object.keys(answers1).forEach(q => {
+    const a1 = `${q}_${answers1[q]}`;
+    const a2 = `${q}_${answers2[q]}`;
+    const compatible = COMPATIBLE_PAIRS[a1]?.includes(a2);
+    if (compatible) matches++;
+    total++;
+  });
+  return total > 0 ? (matches / total) * 100 : 50;
+};
+```
+
+---
+
+**PROMPT 7 — Roommate References System**
+
+Add a social proof system where users can request references from past roommates, landlords, or colleagues.
+
+Add `references` table to Supabase:
+```sql
+create table public.references (
+  id uuid primary key default gen_random_uuid(),
+  recipient_id uuid references public.users(id) on delete cascade,
+  author_name text not null,
+  author_email text not null,
+  author_relationship text check (
+    author_relationship in ('past_roommate', 'landlord', 'colleague', 'friend')
+  ),
+  rating integer check (rating between 1 and 5),
+  review text,
+  is_verified boolean default false,
+  created_at timestamptz default now()
+);
+```
+
+In `screens/shared/ProfileScreen.tsx` add a **"References"** section below the interests section showing:
+- Star rating average
+- Up to 3 reference cards each showing: author name, relationship badge, star rating, review excerpt
+- **"View all [X] references"** link if more than 3
+- **"Request a Reference"** coral outline button
+
+**Request Reference Flow:**
+Tapping "Request a Reference" opens a bottom sheet with:
+- Text input for the person's email address
+- Relationship selector: Past Roommate / Landlord / Colleague / Friend
+- **"Send Request"** coral button
+
+This sends an email via Supabase Edge Function to the provided email with a unique link to a simple web form where they fill out the rating and review. On submission, the reference is added to the database and a notification is sent to the user.
+
+On profile cards in the swipe deck, users with 3+ references show a small **"⭐ Referenced"** badge next to their name.
+
+---
+
+**PROMPT 8 — Basic Background Check Option**
+
+Add an optional background check users can purchase to boost their credibility. Use the Checkr API.
+
+Add a **"Background Check"** option to the profile completion section:
+
+- A card showing: **"Background Check — $9.99 one time"**
+- Subtext: **"Shows a verified badge on your profile — builds trust with hosts and roommates"**
+- **"Get Verified"** coral button
+
+Create Supabase Edge Function `supabase/functions/initiate-background-check/index.ts` that calls the Checkr API to create a candidate and invitation link.
+
+Add columns to `users` table:
+```sql
+alter table public.users add column if not exists background_check_status 
+  text check (background_check_status in ('none', 'pending', 'clear', 'flagged')) 
+  default 'none';
+alter table public.users add column if not exists background_check_completed_at timestamptz;
+```
+
+Users with a `clear` background check show a green **"✓ Background Checked"** badge on their profile card and full profile view. This badge appears next to the ID verified badge if both are completed.
+
+Handle the Checkr webhook to update status when the report completes.
+
+---
+
+After completing all 8 prompts verify:
+1. Real Stripe payments process without any Math.random() IDs
+2. Zero mock data imports remain in any screen file
+3. Zero console.log statements remain in the codebase
+4. ID verification badge appears on verified profiles
+5. Map view toggles correctly in Explore with coral price pins
+6. Personality quiz appears in onboarding and feeds matching score
+7. References section appears on profiles and request flow works
+8. Background check badge appears for cleared users
+9. App compiles with zero TypeScript errors
