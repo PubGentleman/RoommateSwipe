@@ -67,6 +67,44 @@ export const ProfileScreen = () => {
     setShowRefSheet(false);
   };
 
+  const handleRefTap = async (ref: Reference) => {
+    try {
+      const conversations = await StorageService.getConversations();
+      const refConvId = `ref-conv-${ref.id}`;
+      let existing = conversations.find(c => c.id === refConvId);
+      if (!existing) {
+        const newConv = {
+          id: refConvId,
+          participant: {
+            id: `ref-user-${ref.id}`,
+            name: ref.authorName,
+            photo: undefined,
+            online: false,
+          },
+          lastMessage: ref.review || 'Reference conversation',
+          timestamp: new Date(ref.createdAt),
+          unread: 0,
+          messages: ref.review ? [{
+            id: `ref-msg-${ref.id}`,
+            senderId: `ref-user-${ref.id}`,
+            text: ref.review,
+            content: ref.review,
+            timestamp: new Date(ref.createdAt),
+            read: true,
+          }] : [],
+        };
+        await StorageService.addOrUpdateConversation(newConv as any);
+        existing = newConv as any;
+      }
+      (navigation as any).navigate('Messages', {
+        screen: 'Chat',
+        params: { conversationId: refConvId },
+      });
+    } catch (error) {
+      console.error('Error navigating to reference chat:', error);
+    }
+  };
+
   const handleDevTap = () => {
     const newCount = devTapCount + 1;
     if (devTapTimer) clearTimeout(devTapTimer);
@@ -246,7 +284,11 @@ export const ProfileScreen = () => {
               ) : null}
             </View>
             {mockReferences.slice(0, 3).map((ref) => (
-              <View key={ref.id} style={styles.refCard}>
+              <Pressable
+                key={ref.id}
+                style={({ pressed }) => [styles.refCard, pressed && { opacity: 0.7 }]}
+                onPress={() => handleRefTap(ref)}
+              >
                 <View style={styles.refCardHeader}>
                   <View style={styles.refAuthorRow}>
                     <View style={[styles.refAvatar, { backgroundColor: relationshipColors[ref.authorRelationship] || '#666' }]}>
@@ -269,7 +311,11 @@ export const ProfileScreen = () => {
                   </View>
                 </View>
                 {ref.review ? <Text style={styles.refReview}>"{ref.review}"</Text> : null}
-              </View>
+                <View style={styles.refTapHint}>
+                  <Feather name="message-circle" size={12} color="rgba(255,255,255,0.4)" />
+                  <Text style={styles.refTapHintText}>Tap to message</Text>
+                </View>
+              </Pressable>
             ))}
           </View>
         ) : null}
@@ -1354,6 +1400,17 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginTop: 10,
     fontStyle: 'italic',
+  },
+  refTapHint: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 4,
+    marginTop: 8,
+    alignSelf: 'flex-end' as const,
+  },
+  refTapHintText: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.4)',
   },
   bgCheckCard: {
     flexDirection: 'row',
