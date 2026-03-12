@@ -35,7 +35,8 @@ interface InterestCategoryBarsProps {
   maxTags?: number;
 }
 
-export const InterestCategoryBars = ({ selectedTags, onChange, maxTags = 10 }: InterestCategoryBarsProps) => {
+export const InterestCategoryBars = ({ selectedTags: rawSelectedTags, onChange, maxTags = 10 }: InterestCategoryBarsProps) => {
+  const selectedTags = Array.isArray(rawSelectedTags) ? rawSelectedTags : [];
   const [openCategory, setOpenCategory] = useState<CategoryKey | null>(null);
   const [tempSelection, setTempSelection] = useState<string[]>([]);
   const insets = useSafeAreaInsets();
