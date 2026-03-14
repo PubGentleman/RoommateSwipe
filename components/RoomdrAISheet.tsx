@@ -10,6 +10,7 @@ import { getProfileGaps, getCompletionPercentage, getMatchMultiplier, GAP_MESSAG
 import { markQuestionAsked, resetRefinementCooldown } from '../utils/refinementEngine';
 import { StorageService } from '../utils/storage';
 import { thumbsUp, thumbsDown, shouldShowInsight } from '../utils/aiInsightFeedback';
+import { shouldRecalculate, cacheInsight, getTriggerVersion, onInsightTrigger } from '../utils/insightRefresh';
 import type { RefinementQuestion } from '../utils/refinementQuestions';
 import type { RoommateProfile, User, Message, Group, Conversation } from '../types/models';
 import * as Haptics from 'expo-haptics';
@@ -176,7 +177,7 @@ function getInsightBorderColor(insightType: string, value?: number): string {
   return URGENCY_GREY;
 }
 
-const InsightCard = ({ icon, title, body, id, onFeedback, actionChip, urgencyValue }: {
+const InsightCard = ({ icon, title, body, id, onFeedback, actionChip, urgencyValue, onTap, isRecalculating }: {
   icon: keyof typeof Feather.glyphMap;
   title: string;
   body: string;
@@ -184,8 +185,11 @@ const InsightCard = ({ icon, title, body, id, onFeedback, actionChip, urgencyVal
   onFeedback?: (id: string, positive: boolean) => void;
   actionChip?: { label: string; onPress: () => void };
   urgencyValue?: number;
+  onTap?: () => void;
+  isRecalculating?: boolean;
 }) => {
   const slideAnim = useRef(new RNAnimated.Value(0)).current;
+  const tapOpacity = useRef(new RNAnimated.Value(1)).current;
   const [removed, setRemoved] = useState(false);
 
   const handleDown = () => {
@@ -195,38 +199,59 @@ const InsightCard = ({ icon, title, body, id, onFeedback, actionChip, urgencyVal
     onFeedback?.(id, false);
   };
 
+  const handleCardTap = () => {
+    if (!onTap) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    RNAnimated.sequence([
+      RNAnimated.timing(tapOpacity, { toValue: 0.7, duration: 100, useNativeDriver: true }),
+      RNAnimated.timing(tapOpacity, { toValue: 1, duration: 100, useNativeDriver: true }),
+    ]).start(() => {
+      onTap();
+    });
+  };
+
   if (removed) return null;
 
   const borderColor = getInsightBorderColor(id, urgencyValue);
 
   return (
-    <RNAnimated.View style={[
-      styles.insightCard,
-      { borderLeftWidth: 3, borderLeftColor: borderColor },
-      { opacity: slideAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
-        transform: [{ translateY: slideAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 40] }) }] },
-    ]}>
-      <View style={styles.insightHeader}>
-        <View style={styles.insightIconBox}>
-          <Feather name={icon} size={14} color={ACCENT} />
+    <Pressable onPress={handleCardTap} disabled={!onTap}>
+      <RNAnimated.View style={[
+        styles.insightCard,
+        { borderLeftWidth: 3, borderLeftColor: borderColor },
+        { opacity: RNAnimated.multiply(
+            slideAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
+            tapOpacity
+          ),
+          transform: [{ translateY: slideAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 40] }) }] },
+      ]}>
+        <View style={styles.insightHeader}>
+          <View style={styles.insightIconBox}>
+            <Feather name={icon} size={14} color={ACCENT} />
+          </View>
+          <Text style={[styles.insightTitle, { flex: 1 }]}>{title}</Text>
+          {isRecalculating ? (
+            <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>updating...</Text>
+          ) : onTap ? (
+            <Feather name="chevron-right" size={14} color="#888888" />
+          ) : null}
         </View>
-        <Text style={styles.insightTitle}>{title}</Text>
-      </View>
-      <Text style={styles.insightBody}>{body}</Text>
-      {actionChip ? (
-        <Pressable style={styles.actionChip} onPress={actionChip.onPress}>
-          <Text style={styles.actionChipText}>{actionChip.label}</Text>
-          <Feather name="arrow-right" size={12} color={ACCENT} />
-        </Pressable>
-      ) : null}
-      <FeedbackThumbs id={id} onFeedback={(thumbId, positive) => {
-        if (positive) {
-          onFeedback?.(thumbId, true);
-        } else {
-          handleDown();
-        }
-      }} />
-    </RNAnimated.View>
+        <Text style={styles.insightBody}>{body}</Text>
+        {actionChip ? (
+          <Pressable style={styles.actionChip} onPress={actionChip.onPress}>
+            <Text style={styles.actionChipText}>{actionChip.label}</Text>
+            <Feather name="arrow-right" size={12} color={ACCENT} />
+          </Pressable>
+        ) : null}
+        <FeedbackThumbs id={id} onFeedback={(thumbId, positive) => {
+          if (positive) {
+            onFeedback?.(thumbId, true);
+          } else {
+            handleDown();
+          }
+        }} />
+      </RNAnimated.View>
+    </Pressable>
   );
 };
 
@@ -236,6 +261,7 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData, 
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
   const [hiddenInsightTypes, setHiddenInsightTypes] = useState<Set<string>>(new Set());
   const [insightsReady, setInsightsReady] = useState(false);
+  const [recalculating, setRecalculating] = useState<Set<string>>(new Set());
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastOpacity = useRef(new RNAnimated.Value(0)).current;
   const [refinementAnswered, setRefinementAnswered] = useState(false);
@@ -259,11 +285,46 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData, 
           if (!show) hidden.add(t);
         }
         setHiddenInsightTypes(hidden);
+
+        const insightTypes = ['profile-completion', 'match-rate', 'pool-impact', 'response-rate'];
+        const needsRecalc = new Set<string>();
+        for (const t of insightTypes) {
+          if (hidden.has(t)) continue;
+          const version = getTriggerVersion({ userId: user?.id, type: t });
+          const needs = await shouldRecalculate(t, version);
+          if (needs) needsRecalc.add(t);
+        }
+        setRecalculating(needsRecalc);
         setInsightsReady(true);
+
+        for (const t of needsRecalc) {
+          const version = getTriggerVersion({ userId: user?.id, type: t });
+          await cacheInsight(t, { recalculated: true }, version);
+        }
+        setRecalculating(new Set());
       };
       loadHidden();
     }
   }, [visible, screenContext]);
+
+  useEffect(() => {
+    const unsub = onInsightTrigger((_triggerType, affectedTypes) => {
+      if (!visible) return;
+      setRecalculating(prev => {
+        const next = new Set(prev);
+        affectedTypes.forEach(t => next.add(t));
+        return next;
+      });
+      setTimeout(() => {
+        setRecalculating(prev => {
+          const next = new Set(prev);
+          affectedTypes.forEach(t => next.delete(t));
+          return next;
+        });
+      }, 500);
+    });
+    return unsub;
+  }, [visible]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -273,6 +334,33 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData, 
       RNAnimated.delay(1800),
       RNAnimated.timing(toastOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
     ]).start(() => setToastMessage(null));
+  };
+
+  const safeNavigate = (screen: string, params?: Record<string, any>) => {
+    onDismiss();
+    setTimeout(() => {
+      try {
+        onNavigate?.(screen, params);
+      } catch {
+        showToast('Coming soon');
+      }
+    }, 300);
+  };
+
+  const getFieldToStep = (fieldLabel: string): string | undefined => {
+    const map: Record<string, string> = {
+      'Profile Photo': 'photos',
+      'Bio': 'bio',
+      'Birthday': 'basicInfo',
+      'Budget': 'budget',
+      'Location': 'location',
+      'Occupation': 'location',
+      'Interests': 'interests',
+      'Sleep Schedule': 'sleepSchedule',
+      'Cleanliness': 'cleanliness',
+      'Smoking Pref': 'smoking',
+    };
+    return map[fieldLabel];
   };
 
   const handleRefinementAnswer = async (question: RefinementQuestion, value: string) => {
@@ -911,19 +999,30 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData, 
   };
 
   const getInsights = () => {
-    const insights: { icon: keyof typeof Feather.glyphMap; title: string; body: string; id: string; actionChip?: { label: string; onPress: () => void }; urgencyValue?: number }[] = [];
+    type InsightItem = {
+      icon: keyof typeof Feather.glyphMap;
+      title: string;
+      body: string;
+      id: string;
+      actionChip?: { label: string; onPress: () => void };
+      urgencyValue?: number;
+      onTap?: () => void;
+    };
+    const insights: InsightItem[] = [];
 
     const isVisible = (id: string) => !isDismissed(id) && !hiddenInsightTypes.has(id);
 
     if (isVisible('profile-completion') && profileCompletion.score < 100) {
       const topMissing = profileCompletion.missing.slice(0, 2);
       const multiplier = MATCH_MULTIPLIERS[topMissing[0]] || 1.5;
+      const firstMissingStep = getFieldToStep(topMissing[0]);
       insights.push({
         icon: 'user',
         title: 'Profile Completion',
         body: `Your profile is ${profileCompletion.score}% complete. Adding ${topMissing.join(' and ').toLowerCase()} could get you ${multiplier}x more matches.`,
         id: 'profile-completion',
         urgencyValue: profileCompletion.score,
+        onTap: () => safeNavigate('ProfileQuestionnaire', firstMissingStep ? { initialStep: firstMissingStep } : undefined),
       });
     }
 
@@ -936,6 +1035,7 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData, 
         body: `${rate}% this week (${change >= 0 ? '+' : ''}${change}% vs last week). ${change >= 0 ? 'Keep it up!' : 'Complete your profile to improve.'}`,
         id: 'match-rate',
         urgencyValue: change,
+        onTap: () => safeNavigate('Roommates', { showStats: true }),
       });
     }
 
@@ -944,11 +1044,14 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData, 
         user?.profileData?.preferences?.smoking === 'no' ? 32 : 15;
       const poolFactor = user?.profileData?.preferences?.pets === 'no_pets' ? "'no pets' preference" :
         user?.profileData?.preferences?.smoking === 'no' ? "'non-smoker' preference" : 'your filter selections';
+      const highlightFilter = user?.profileData?.preferences?.pets === 'no_pets' ? 'pets' :
+        user?.profileData?.preferences?.smoking === 'no' ? 'smoking' : undefined;
       insights.push({
         icon: 'alert-circle',
         title: 'Match Pool Impact',
         body: `Your ${poolFactor} reduces your match pool by ${poolReduction}% in your city. Consider adjusting if you want more options.`,
         id: 'pool-impact',
+        onTap: () => safeNavigate('EditProfile', highlightFilter ? { highlightFilter } : undefined),
       });
     }
 
@@ -960,6 +1063,7 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData, 
         body: `Your response rate is ${responseRate}%. ${responseRate >= 80 ? 'Excellent — you reply quickly!' : 'Try responding within 24 hours to boost your visibility.'}`,
         id: 'response-rate',
         urgencyValue: responseRate,
+        onTap: () => safeNavigate('Messages', { filter: 'unanswered' }),
       });
     }
 
@@ -1016,13 +1120,15 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData, 
                       onFeedback={handleFeedback}
                       actionChip={insight.actionChip}
                       urgencyValue={insight.urgencyValue}
+                      onTap={insight.onTap}
+                      isRecalculating={recalculating.has(insight.id)}
                     />
                   ))}
                 </>
               ) : (
                 <View style={styles.emptyInsightsContainer}>
-                  <Feather name="check-circle" size={24} color="rgba(255,255,255,0.25)" />
-                  <Text style={styles.emptyInsightsText}>All caught up — no new insights right now.</Text>
+                  <Feather name="inbox" size={24} color="rgba(255,255,255,0.25)" />
+                  <Text style={styles.emptyInsightsText}>No new insights right now. Keep using the app and check back soon.</Text>
                 </View>
               )
             ) : null}

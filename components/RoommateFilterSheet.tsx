@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemedText } from './ThemedText';
 import { Spacing, BorderRadius } from '../constants/theme';
+import { dispatchInsightTrigger } from '../utils/insightRefresh';
 
 const ACCENT = '#ff6b5b';
 const FILTERS_KEY = 'roomdr_match_filters';
@@ -107,6 +108,7 @@ export const loadSavedFilters = async (): Promise<MatchFilters> => {
 export const saveFilters = async (filters: MatchFilters) => {
   try {
     await AsyncStorage.setItem(FILTERS_KEY, JSON.stringify(filters));
+    dispatchInsightTrigger('filter_change');
   } catch {}
 };
 

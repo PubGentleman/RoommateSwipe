@@ -18,6 +18,7 @@ import { acceptInquiry, declineInquiry } from '../../services/groupService';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence } from 'react-native-reanimated';
 import { AdBanner } from '../../components/AdBanner';
 import { getDailyMessageCount, MESSAGING_LIMITS, getTimeUntilMidnight } from '../../utils/messagingUtils';
+import { dispatchInsightTrigger } from '../../utils/insightRefresh';
 
 type ChatScreenProps = {
   route: {
@@ -322,7 +323,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       conversations[conversationIndex].lastMessage = newMessage.text || '';
       await StorageService.setConversations(conversations);
       await incrementMessageCount();
-      
+      dispatchInsightTrigger('message_activity');
+
       if (isFirstMessageFromUser) {
         await incrementActiveChatCount(conversationId);
         if (isColdMessage && !coldMessageResponded) {

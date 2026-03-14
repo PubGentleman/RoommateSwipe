@@ -14,6 +14,7 @@ import { CityProvider } from "./contexts/CityContext";
 import { ProfileReminderProvider } from "./contexts/ProfileReminderContext";
 import { StorageService } from "./utils/storage";
 import { isDev } from "./utils/dataUtils";
+import { checkDailyTrigger } from "./utils/insightRefresh";
 
 export default function App() {
   useEffect(() => {
@@ -33,6 +34,7 @@ export default function App() {
         window.location.reload();
       };
     }
+    checkDailyTrigger();
   }, []);
 
   return (

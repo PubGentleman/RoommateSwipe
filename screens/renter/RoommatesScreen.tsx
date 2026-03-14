@@ -13,6 +13,7 @@ import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme
 import { StorageService } from '../../utils/storage';
 import { RoommateProfile, Match, InterestCard } from '../../types/models';
 import { isBoostExpired, getBoostDuration, getBoostTimeRemaining } from '../../utils/boostUtils';
+import { dispatchInsightTrigger } from '../../utils/insightRefresh';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scaleFont, moderateScale, getResponsiveSpacing } from '../../utils/responsive';
 import { calculateCompatibility, getMatchQualityColor, getCleanlinessLabel, getSocialLevelLabel, getWorkScheduleLabel, getWorkStyleTag, validateProfileDataConsistency, formatMoveInDate, getGenderSymbol } from '../../utils/matchingAlgorithm';
@@ -180,6 +181,9 @@ export const RoommatesScreen = () => {
     React.useCallback(() => {
       console.log('[RoommatesScreen] Screen focused, reloading profiles to get latest photos');
       loadProfiles();
+      return () => {
+        dispatchInsightTrigger('swipe_session_end');
+      };
     }, [activeCity, user])
   );
 

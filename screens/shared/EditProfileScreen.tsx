@@ -17,6 +17,7 @@ import { updateUser as supabaseUpdateUser, updateProfile as supabaseUpdateProfil
 import { DatePickerModal } from '../../components/DatePickerModal';
 import { formatDate, isAtLeast18, getTierLimit } from '../../utils/dateUtils';
 import { OccupationBarSelector } from '../../components/OccupationBarSelector';
+import { dispatchInsightTrigger } from '../../utils/insightRefresh';
 import { InterestCategoryBars } from '../../components/InterestCategoryBars';
 
 const DraggablePhoto = ({ photo, index, photos, theme, onRemove, onReorder }: any) => {
@@ -355,6 +356,7 @@ export const EditProfileScreen = () => {
       },
     });
     console.log('[EditProfileScreen] Profile saved successfully');
+    dispatchInsightTrigger('profile_change');
 
     setIsSaving(false);
     Alert.alert('Success', 'Profile updated successfully');
