@@ -95,6 +95,8 @@ const calculatePersonalityScore = (
   let matches = 0;
   let total = 0;
   Object.keys(answers1).forEach(q => {
+    if (q.endsWith('_source') || q.endsWith('_collectedAt')) return;
+    if (!answers2[q]) return;
     const key = `${q}_${answers1[q]}`;
     const val2 = `${q}_${answers2[q]}`;
     if (COMPATIBLE_PERSONALITY[key]?.includes(val2)) matches++;
