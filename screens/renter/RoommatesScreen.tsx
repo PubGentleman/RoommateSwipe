@@ -521,6 +521,12 @@ export const RoommatesScreen = () => {
           await refreshUnreadCount();
         }
       }
+      trackSwipe();
+      setTotalSwipeCount(prev => prev + 1);
+      if (action === 'like' || action === 'superlike') {
+        setRightSwipeCount(prev => prev + 1);
+      }
+      checkRefinementTrigger();
     } catch (error) {
       console.error('[RoommatesScreen] Error processing swipe:', error);
     }
@@ -2122,14 +2128,28 @@ export const RoommatesScreen = () => {
         userPlan={user?.subscription?.plan || 'basic'}
       />
 
+      {showRefinementBanner ? (
+        <RNAnimated.View style={{ position: 'absolute', top: 100, left: 20, right: 20, opacity: refinementBannerOpacity, zIndex: 200, backgroundColor: 'rgba(255,107,91,0.15)', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: 'rgba(255,107,91,0.3)', alignItems: 'center' }}>
+          <Text style={{ color: '#ff6b5b', fontSize: 14, fontWeight: '600', textAlign: 'center' }}>AI is learning your preferences to find better matches</Text>
+        </RNAnimated.View>
+      ) : null}
+
       <RoomdrAISheet
         visible={showAISheet}
-        onDismiss={() => setShowAISheet(false)}
-        screenContext="match"
+        onDismiss={() => {
+          setShowAISheet(false);
+          setAiSheetContext('match');
+          setRefinementQuestion(null);
+        }}
+        screenContext={aiSheetContext}
         contextData={{
           match: {
             currentProfile: profiles[currentIndex] || undefined,
           },
+        }}
+        refinementQuestion={refinementQuestion}
+        onRefinementAnswered={() => {
+          showRefinementBannerBriefly();
         }}
         onNavigate={(screen, params) => {
           if (screen === 'ProfileQuestionnaire') {
