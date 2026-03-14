@@ -47,6 +47,9 @@ export const CreateGroupScreen = ({ route, navigation }: CreateGroupScreenProps)
     try {
       setIsCreating(true);
       
+      const userBudget = user?.profileData?.budget || 2000;
+      const userLocation = user?.profileData?.city || user?.profileData?.neighborhood || 'Your City';
+
       const newGroup: Group = {
         id: `group_${Date.now()}`,
         name: groupName.trim(),
@@ -54,8 +57,8 @@ export const CreateGroupScreen = ({ route, navigation }: CreateGroupScreenProps)
         members: [user.id, matchedUserId],
         pendingMembers: [],
         maxMembers: membersCount,
-        budget: 2000,
-        preferredLocation: 'San Francisco Bay Area',
+        budget: userBudget,
+        preferredLocation: userLocation,
         createdAt: new Date(),
         createdBy: user.id,
       };
@@ -65,8 +68,8 @@ export const CreateGroupScreen = ({ route, navigation }: CreateGroupScreenProps)
           name: groupName.trim(),
           description: description.trim() || `A group looking for roommates`,
           max_members: membersCount,
-          budget_min: 2000,
-          city: 'San Francisco Bay Area',
+          budget_min: userBudget,
+          city: userLocation,
         });
       } catch (supabaseError) {
         console.warn('[CreateGroupScreen] Supabase createGroup failed, falling back to StorageService:', supabaseError);

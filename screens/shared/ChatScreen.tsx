@@ -14,6 +14,7 @@ import { PlanBadge } from '../../components/PlanBadge';
 import { RoomdrAISheet, ScreenContext } from '../../components/RoomdrAISheet';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { getMessages as getSupabaseMessages, sendMessage as sendSupabaseMessage, markMessagesAsRead as markSupabaseMessagesAsRead, subscribeToMessages } from '../../services/messageService';
+import { recordMessageActivity } from '../../utils/aiMemory';
 import { acceptInquiry, declineInquiry } from '../../services/groupService';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence } from 'react-native-reanimated';
 import { AdBanner } from '../../components/AdBanner';
@@ -324,6 +325,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       await StorageService.setConversations(conversations);
       await incrementMessageCount();
       dispatchInsightTrigger('message_activity');
+      recordMessageActivity(conversationId).catch(() => {});
 
       if (isFirstMessageFromUser) {
         await incrementActiveChatCount(conversationId);

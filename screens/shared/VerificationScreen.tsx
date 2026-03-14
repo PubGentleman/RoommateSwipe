@@ -8,6 +8,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Typography, Spacing } from '../../constants/theme';
 import { getVerificationLevel, getVerificationLabel } from '../../components/VerificationBadge';
 import { isDev } from '../../utils/envUtils';
+import { supabase } from '../../lib/supabase';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { ProfileStackParamList } from '../../navigation/ProfileStackNavigator';
 
@@ -57,13 +58,27 @@ export function VerificationScreen({ navigation, route }: Props) {
     }, 1500);
   };
 
-  const handleSendPhoneCode = () => {
+  const handleSendPhoneCode = async () => {
     if (phoneNumber.length < 10) {
       Alert.alert('Invalid Number', 'Please enter a valid phone number.');
       return;
     }
-    setPhoneSent(true);
-    Alert.alert('Code Sent', 'A verification code has been sent to your phone number.');
+    if (isDev) {
+      setTimeout(() => { setPhoneSent(true); }, 500);
+      Alert.alert('Code Sent', 'A verification code has been sent to your phone number.');
+      return;
+    }
+    try {
+      const { error } = await supabase.auth.signInWithOtp({ phone: phoneNumber });
+      if (error) {
+        Alert.alert('Error', error.message || 'Failed to send verification code.');
+        return;
+      }
+      setPhoneSent(true);
+      Alert.alert('Code Sent', 'A verification code has been sent to your phone number.');
+    } catch (err) {
+      Alert.alert('Error', 'Failed to send verification code. Please try again.');
+    }
   };
 
   const handleVerifyPhone = async () => {
@@ -71,18 +86,40 @@ export function VerificationScreen({ navigation, route }: Props) {
       Alert.alert('Invalid Code', 'Please enter the verification code.');
       return;
     }
-    const newVerification = {
-      ...verification,
-      phone: { verified: true, verifiedAt: new Date() },
-    };
-    await updateUser({
-      verification: newVerification,
-    });
-    await syncVerificationToSupabase(newVerification);
-    setPhoneSent(false);
-    setPhoneNumber('');
-    setPhoneCode('');
-    Alert.alert('Phone Verified', 'Your phone number has been verified successfully.');
+    if (isDev) {
+      const newVerification = {
+        ...verification,
+        phone: { verified: true, verifiedAt: new Date() },
+      };
+      await updateUser({ verification: newVerification });
+      await syncVerificationToSupabase(newVerification);
+      setPhoneSent(false);
+      setPhoneNumber('');
+      setPhoneCode('');
+      Alert.alert('Phone Verified', 'Your phone number has been verified successfully.');
+      return;
+    }
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        phone: phoneNumber, token: phoneCode, type: 'sms',
+      });
+      if (error) {
+        Alert.alert('Error', error.message || 'Invalid verification code.');
+        return;
+      }
+      const newVerification = {
+        ...verification,
+        phone: { verified: true, verifiedAt: new Date() },
+      };
+      await updateUser({ verification: newVerification });
+      await syncVerificationToSupabase(newVerification);
+      setPhoneSent(false);
+      setPhoneNumber('');
+      setPhoneCode('');
+      Alert.alert('Phone Verified', 'Your phone number has been verified successfully.');
+    } catch (err) {
+      Alert.alert('Error', 'Failed to verify code. Please try again.');
+    }
   };
 
   const handleVerifyId = async () => {

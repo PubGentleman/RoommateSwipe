@@ -448,6 +448,7 @@ export interface InterestCard {
   isSuperInterest: boolean;
   createdAt: string;
   respondedAt?: string;
+  groupId?: string;
 }
 
 export interface Notification {

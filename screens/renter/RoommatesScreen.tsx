@@ -38,6 +38,8 @@ import { trackSwipe, startSession, shouldShowRefinementQuestion, getQuestionsAsk
 import { getNextRefinementQuestion, REFINEMENT_QUESTIONS } from '../../utils/refinementQuestions';
 import type { RefinementQuestion } from '../../utils/refinementQuestions';
 import { getSwipeDeck, sendLike, sendPass, undoLastAction } from '../../services/discoverService';
+import { recordSwipe, getAIMemory } from '../../utils/aiMemory';
+import { getNextMicroQuestion } from '../../utils/aiMicroQuestions';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Limit card size for web/desktop viewing
@@ -156,6 +158,32 @@ export const RoommatesScreen = () => {
         }, 800);
       }
     }
+  };
+
+  const checkMicroQuestionTrigger = async () => {
+    if (showAISheet || !user) return;
+    try {
+      const mem = await getAIMemory();
+      if (mem.rightSwipes % 25 !== 0 || mem.rightSwipes === 0) return;
+      if (mem.lastRefinementTimestamp) {
+        const hoursSince = (Date.now() - new Date(mem.lastRefinementTimestamp).getTime()) / (1000 * 60 * 60);
+        if (hoursSince < 3) return;
+      }
+      const nextQ = getNextMicroQuestion(user);
+      if (!nextQ) return;
+      const asRefinement: RefinementQuestion = {
+        id: nextQ.id,
+        aiMessage: nextQ.question,
+        followUpMessage: 'Thanks for sharing! This helps us refine your matches.',
+        options: [],
+        profileField: nextQ.category,
+      };
+      setTimeout(() => {
+        setRefinementQuestion(asRefinement);
+        setAiSheetContext('refinement');
+        setShowAISheet(true);
+      }, 800);
+    } catch {}
   };
 
   const showRefinementBannerBriefly = () => {
@@ -527,8 +555,15 @@ export const RoommatesScreen = () => {
       }
       trackSwipe();
       setTotalSwipeCount(prev => prev + 1);
-      if (action === 'like' || action === 'superlike') {
+      const isRight = action === 'like' || action === 'superlike';
+      if (isRight) {
         setRightSwipeCount(prev => prev + 1);
+      }
+      const matchedProfile = profiles.find(p => p.id === profileId);
+      const score = matchedProfile?.compatibility;
+      recordSwipe(isRight, score).catch(() => {});
+      if (isRight) {
+        checkMicroQuestionTrigger().catch(() => {});
       }
       checkRefinementTrigger();
     } catch (error) {

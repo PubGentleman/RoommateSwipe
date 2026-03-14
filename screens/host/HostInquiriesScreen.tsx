@@ -12,6 +12,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { getReceivedInterestCards, acceptInterestCard, rejectInterestCard } from '../../services/discoverService';
+import { updateGroup } from '../../services/groupService';
 
 type FilterStatus = 'all' | 'pending' | 'accepted' | 'passed';
 
@@ -43,6 +44,7 @@ export const HostInquiriesScreen = () => {
         personalNote: c.personal_note || '',
         createdAt: c.created_at || new Date().toISOString(),
         respondedAt: c.responded_at,
+        groupId: c.group_id || undefined,
       }));
       const sorted = [...mapped].sort((a, b) => {
         if (a.isSuperInterest && !b.isSuperInterest) return -1;
@@ -97,6 +99,17 @@ export const HostInquiriesScreen = () => {
         status: 'accepted',
         respondedAt: now.toISOString(),
       });
+    }
+
+    if (card.groupId) {
+      try {
+        await updateGroup(card.groupId, {
+          address_revealed: true,
+          inquiry_status: 'accepted',
+        });
+      } catch {
+        console.warn('[HostInquiriesScreen] Failed to update group address reveal');
+      }
     }
 
     const conversationId = `conv-interest-${card.id}`;

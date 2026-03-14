@@ -16,6 +16,8 @@ export interface GroupData {
   host_id?: string;
   listing_address?: string;
   is_archived?: boolean;
+  address_revealed?: boolean;
+  inquiry_status?: 'pending' | 'accepted' | 'declined';
 }
 
 export async function getGroups(city?: string, type?: GroupType) {
