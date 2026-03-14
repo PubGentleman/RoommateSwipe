@@ -98,7 +98,7 @@ export const LoginScreen = () => {
                     </LinearGradient>
                   ) : (
                     <View style={styles.roleBtn}>
-                      <Feather name={role.icon} size={14} color="rgba(255,255,255,0.35)" />
+                      <Feather name={role.icon} size={14} color="rgba(255,255,255,0.5)" />
                       <Text style={styles.roleBtnText}>{role.label}</Text>
                     </View>
                   )}
@@ -113,11 +113,11 @@ export const LoginScreen = () => {
             <View style={styles.field}>
               <Text style={styles.fieldLabel}>FULL NAME</Text>
               <View style={styles.inputWrap}>
-                <Feather name="user" size={16} color="rgba(255,255,255,0.22)" style={styles.inputIcon} />
+                <Feather name="user" size={16} color="rgba(255,255,255,0.35)" style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
                   placeholder="Your full name"
-                  placeholderTextColor="rgba(255,255,255,0.18)"
+                  placeholderTextColor="rgba(255,255,255,0.35)"
                   value={name}
                   onChangeText={setName}
                   autoCapitalize="words"
@@ -129,11 +129,11 @@ export const LoginScreen = () => {
           <View style={styles.field}>
             <Text style={styles.fieldLabel}>EMAIL</Text>
             <View style={styles.inputWrap}>
-              <Feather name="mail" size={16} color="rgba(255,255,255,0.22)" style={styles.inputIcon} />
+              <Feather name="mail" size={16} color="rgba(255,255,255,0.35)" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="you@example.com"
-                placeholderTextColor="rgba(255,255,255,0.18)"
+                placeholderTextColor="rgba(255,255,255,0.35)"
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -145,11 +145,11 @@ export const LoginScreen = () => {
           <View style={styles.field}>
             <Text style={styles.fieldLabel}>PASSWORD</Text>
             <View style={styles.inputWrap}>
-              <Feather name="lock" size={16} color="rgba(255,255,255,0.22)" style={styles.inputIcon} />
+              <Feather name="lock" size={16} color="rgba(255,255,255,0.35)" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder={isSignUp ? 'Create a password' : String.fromCharCode(8226).repeat(8)}
-                placeholderTextColor="rgba(255,255,255,0.18)"
+                placeholderTextColor="rgba(255,255,255,0.35)"
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
@@ -158,7 +158,7 @@ export const LoginScreen = () => {
                 passwordRules="minlength: 6;"
               />
               <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn} hitSlop={8}>
-                <Feather name={showPassword ? 'eye-off' : 'eye'} size={16} color="rgba(255,255,255,0.22)" />
+                <Feather name={showPassword ? 'eye-off' : 'eye'} size={16} color="rgba(255,255,255,0.35)" />
               </Pressable>
             </View>
           </View>
@@ -167,11 +167,11 @@ export const LoginScreen = () => {
             <View style={styles.field}>
               <Text style={styles.fieldLabel}>CONFIRM PASSWORD</Text>
               <View style={styles.inputWrap}>
-                <Feather name="lock" size={16} color="rgba(255,255,255,0.22)" style={styles.inputIcon} />
+                <Feather name="lock" size={16} color="rgba(255,255,255,0.35)" style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
                   placeholder="Confirm your password"
-                  placeholderTextColor="rgba(255,255,255,0.18)"
+                  placeholderTextColor="rgba(255,255,255,0.35)"
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   secureTextEntry={!showConfirmPassword}
@@ -179,7 +179,7 @@ export const LoginScreen = () => {
                   autoComplete="new-password"
                 />
                 <Pressable onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeBtn} hitSlop={8}>
-                  <Feather name={showConfirmPassword ? 'eye-off' : 'eye'} size={16} color="rgba(255,255,255,0.22)" />
+                  <Feather name={showConfirmPassword ? 'eye-off' : 'eye'} size={16} color="rgba(255,255,255,0.35)" />
                 </Pressable>
               </View>
             </View>
@@ -285,10 +285,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   headingSub: {
-    fontSize: 13.5,
+    fontSize: 14,
     fontWeight: '400',
-    color: 'rgba(255,255,255,0.35)',
-    lineHeight: 20,
+    color: 'rgba(255,255,255,0.55)',
+    lineHeight: 21,
     textAlign: 'center',
   },
   content: {
@@ -298,7 +298,7 @@ const styles = StyleSheet.create({
   roleLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.3)',
+    color: 'rgba(255,255,255,0.5)',
     letterSpacing: 1,
     marginBottom: 9,
   },
@@ -325,9 +325,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   roleBtnText: {
-    fontSize: 12.5,
+    fontSize: 13,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.35)',
+    color: 'rgba(255,255,255,0.5)',
   },
   divider: {
     height: 1,
@@ -340,22 +340,23 @@ const styles = StyleSheet.create({
   fieldLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.4)',
+    color: 'rgba(255,255,255,0.6)',
     letterSpacing: 0.6,
     marginBottom: 7,
   },
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.055)',
+    backgroundColor: 'rgba(255,255,255,0.07)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: 'rgba(255,255,255,0.12)',
     borderRadius: 14,
   },
   inputIcon: {
     position: 'absolute',
     left: 14,
     zIndex: 1,
+    color: 'rgba(255,255,255,0.35)',
   },
   input: {
     flex: 1,
@@ -426,7 +427,7 @@ const styles = StyleSheet.create({
   orText: {
     fontSize: 10.5,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.2)',
+    color: 'rgba(255,255,255,0.35)',
     letterSpacing: 0.6,
   },
   socialRow: {
@@ -438,9 +439,9 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 48,
     borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.055)',
+    backgroundColor: 'rgba(255,255,255,0.07)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.09)',
+    borderColor: 'rgba(255,255,255,0.12)',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -458,7 +459,7 @@ const styles = StyleSheet.create({
   },
   switchText: {
     fontSize: 13,
-    color: 'rgba(255,255,255,0.3)',
+    color: 'rgba(255,255,255,0.5)',
   },
   switchLink: {
     fontSize: 13,
