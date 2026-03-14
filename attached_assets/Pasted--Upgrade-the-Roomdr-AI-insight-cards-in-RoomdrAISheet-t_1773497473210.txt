@@ -1,0 +1,177 @@
+```
+Upgrade the Roomdr AI insight cards in RoomdrAISheet.tsx to be tappable 
+with deep navigation links, and update the insight refresh logic to be 
+trigger-based (not random). Do not remove any existing AI logic or mock data.
+
+────────────────────────────────────────
+PART 1 — TRIGGER-BASED INSIGHT REFRESH
+────────────────────────────────────────
+
+Insights should never update randomly. Each insight card has a specific 
+trigger that causes it to recalculate. Implement the following:
+
+Create a new file: utils/insightRefresh.ts
+
+Each insight has a trigger type and a staleness window:
+
+const INSIGHT_TRIGGERS = {
+  profile_completion: {
+    trigger: 'profile_change',      // recalculate when any profile field updates
+    staleAfterHours: null,          // never goes stale — only updates on change
+  },
+  match_rate: {
+    trigger: 'swipe_session_end',   // recalculate after each swiping session
+    staleAfterHours: 24,            // refresh daily minimum
+  },
+  match_pool_impact: {
+    trigger: 'filter_change',       // recalculate when preferences/filters change
+    staleAfterHours: null,          // only updates on change
+  },
+  response_rate: {
+    trigger: 'message_activity',    // recalculate after sending or ignoring a message
+    staleAfterHours: 24,            // refresh daily minimum
+  },
+  profile_tips: {
+    trigger: 'profile_change',
+    staleAfterHours: null,
+  },
+  chat_coaching: {
+    trigger: 'message_activity',
+    staleAfterHours: 48,
+  },
+  move_in_timeline: {
+    trigger: 'daily',               // recalculate every day automatically
+    staleAfterHours: 24,
+  },
+  safety_briefing: {
+    trigger: 'chat_keyword',        // triggers on "meet", "visit", "come by", etc.
+    staleAfterHours: null,
+  },
+};
+
+Store the last calculated timestamp and value for each insight in AsyncStorage 
+under the key 'roomdr_ai_insight_cache'.
+
+interface InsightCache {
+  [insightType: string]: {
+    lastCalculated: string;  // ISO timestamp
+    value: any;              // the computed insight data
+    triggerVersion: string;  // hash or timestamp of the data that was used
+  }
+}
+
+Export these functions:
+
+export async function shouldRecalculate(insightType: string, currentTriggerVersion: string): Promise<boolean>
+// Returns true if: never calculated before, OR staleAfterHours has passed, 
+// OR triggerVersion has changed
+
+export async function cacheInsight(insightType: string, value: any, triggerVersion: string): Promise<void>
+// Saves computed insight to AsyncStorage cache
+
+export async function getCachedInsight(insightType: string): Promise<any | null>
+// Returns cached value or null
+
+Call shouldRecalculate() when the AI sheet opens. Only recompute insights 
+where it returns true. Show cached values instantly for all others — 
+this makes the sheet feel fast and not loading every time.
+
+Dispatch trigger events from these locations in the app:
+- After any profile field is saved → dispatch 'profile_change'
+- After the user leaves the swipe screen → dispatch 'swipe_session_end'  
+- After preferences/filters are saved → dispatch 'filter_change'
+- After a message is sent or a conversation is opened → dispatch 'message_activity'
+- Every time the app opens (AppState active) → dispatch 'daily' if 24hrs have passed
+
+Use a simple event emitter or call insightRefresh.triggerRecalculation(type) 
+directly at each dispatch point.
+
+────────────────────────────────────────
+PART 2 — TAPPABLE INSIGHT CARDS WITH DEEP LINKS
+────────────────────────────────────────
+
+Wrap each insight card in a TouchableOpacity. Each card taps to a specific 
+destination. Use the navigation prop already available in RoomdrAISheet.tsx.
+
+Close the AI sheet first (call the existing onClose or setVisible(false)), 
+then navigate. Add a small right-facing chevron icon on each card to signal 
+it's tappable:
+  <Feather name="chevron-right" size={14} color="#888888" />
+  Position it at the far right of the card header row.
+
+Card tap destinations:
+
+PROFILE COMPLETION card:
+- Navigate to the specific onboarding/profile step that has the first 
+  missing field
+- If the missing field is 'birthday' → navigate to the birthday step
+- If missing 'occupation' → navigate to the Location & Work step
+- If missing 'lifestyle tags' → navigate to the Interests & Lifestyle step
+- Use the existing ProfileCompletionScreen or the relevant onboarding step
+- Pass the specific field as a param: navigation.navigate('ProfileCompletion', 
+  { focusField: missingFields[0] })
+
+MATCH RATE card:
+- Navigate to a match stats view or the swipe screen with stats mode open
+- navigation.navigate('Roommates', { showStats: true })
+
+MATCH POOL IMPACT card:
+- Navigate directly to preferences/filter settings
+- navigation.navigate('Preferences') or the equivalent filter screen
+- Highlight the specific preference causing the pool reduction 
+  (pass as param: { highlightFilter: 'pets' })
+
+RESPONSE RATE card:
+- Navigate to the Messages screen filtered to show only unanswered matches
+- navigation.navigate('Messages', { filter: 'unanswered' })
+
+PROFILE TIPS card:
+- Same as Profile Completion — navigate to the first incomplete step
+
+CHAT COACHING card:
+- Navigate to the specific cold conversation identified by the AI
+- navigation.navigate('Chat', { chatId: coldConversationId })
+
+MOVE-IN TIMELINE card:
+- Navigate to the Roommates/swipe screen showing only matches available 
+  around the move-in date
+- navigation.navigate('Roommates', { filterByMoveIn: true })
+
+SAFETY BRIEFING card:
+- Navigate to the chat where the in-person meeting keywords were detected
+- navigation.navigate('Chat', { chatId: safetyBriefingChatId })
+
+────────────────────────────────────────
+PART 3 — TAP FEEDBACK AND EMPTY STATE
+────────────────────────────────────────
+
+On card tap:
+- Show a brief ripple or opacity flash (0.7 opacity for 100ms) before navigating
+- Close the AI sheet with a smooth dismiss animation before pushing the 
+  new screen
+
+If a card's navigation target doesn't exist yet or the screen isn't built:
+- Show a toast: "Coming soon" instead of navigating
+- Do not throw an error or crash
+
+If all insight cards are either hidden (thumbs down) or have no data:
+- Show a centered empty state inside the sheet:
+  Icon: Feather "inbox" in grey
+  Text: "No new insights right now. Keep using the app and check back soon."
+
+────────────────────────────────────────
+IMPORTANT RULES
+────────────────────────────────────────
+
+- Do not make insights update randomly or on a timer — only on real triggers
+- Cached insights must load instantly when the sheet opens (no spinner)
+- Only show a loading indicator on cards that are actively recalculating
+- All AsyncStorage keys prefixed with 'roomdr_ai_'
+- All navigation calls must be wrapped in try/catch to prevent crashes 
+  if a screen hasn't been built yet
+- Chevron icon must only show on tappable cards (all cards listed above)
+- Mock data and isDev guards must remain intact throughout
+- Test each card tap individually to confirm it navigates to the correct screen
+```
+
+This locks in real trigger-based refreshing so insights only update when something actually changes, and makes every card a one-tap shortcut straight to the fix.
