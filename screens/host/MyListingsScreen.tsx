@@ -94,15 +94,19 @@ export const MyListingsScreen = () => {
           availableDate: l.available_date ? new Date(l.available_date) : undefined,
           amenities: l.amenities || [],
           photos: l.photos || [],
-          available: l.is_active && !l.is_paused,
+          available: (l.is_active ?? true) && !(l.is_paused ?? false),
           hostId: l.host_id || user.id,
           hostName: user.name,
           featured: l.is_featured || false,
-          rentedDate: l.is_rented ? new Date() : undefined,
+          rentedDate: (l.is_rented ?? false) ? new Date() : undefined,
         }));
         setListings(mapped);
       } else {
-        setListings([]);
+        await StorageService.initializeWithMockData();
+        await StorageService.assignPropertiesToHost(user.id, user.name);
+        const allProperties = await StorageService.getProperties();
+        const myListings = allProperties.filter(p => p.hostId === user.id);
+        setListings(myListings);
       }
     } catch {
       await StorageService.initializeWithMockData();

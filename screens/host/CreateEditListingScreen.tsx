@@ -220,7 +220,29 @@ export const CreateEditListingScreen = () => {
         };
         await StorageService.addOrUpdateProperty(property);
       }
-      navigation.goBack();
+      if (!isEditing) {
+        Alert.alert(
+          'Listing Posted!',
+          'Your listing is now live. You can manage it from the Listings tab.',
+          [
+            {
+              text: 'View My Listings',
+              onPress: () => {
+                const parentNav = navigation.getParent();
+                if (parentNav) {
+                  parentNav.navigate('Listings');
+                } else {
+                  navigation.goBack();
+                }
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert('Saved', 'Your listing has been updated.', [
+          { text: 'OK', onPress: () => navigation.goBack() },
+        ]);
+      }
     } catch (error) {
       Alert.alert('Error', 'Failed to save listing');
     } finally {

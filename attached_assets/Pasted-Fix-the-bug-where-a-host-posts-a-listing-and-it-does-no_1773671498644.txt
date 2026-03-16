@@ -1,0 +1,121 @@
+Fix the bug where a host posts a listing and it does not appear in 
+their My Listings screen. There are 4 causes. Fix all of them.
+Do not remove mock data or isDev guards.
+
+────────────────────────────────────────
+FIX 1 — MyListingsScreen: fall back to StorageService when Supabase 
+returns empty (not just when it errors)
+────────────────────────────────────────
+
+In screens/host/MyListingsScreen.tsx, find the loadData function.
+
+Current logic:
+  const supaListings = await getMyListings();
+  if (supaListings && supaListings.length > 0) {
+    // map and setListings
+  } else {
+    setListings([]); // ← BUG: ignores local storage
+  }
+
+Change the else branch to ALSO check StorageService:
+  if (supaListings && supaListings.length > 0) {
+    // map and setListings (keep existing mapping code unchanged)
+  } else {
+    // Supabase returned nothing — check local storage fallback
+    await StorageService.initializeWithMockData();
+    await StorageService.assignPropertiesToHost(user.id, user.name);
+    const allProperties = await StorageService.getProperties();
+    const myListings = allProperties.filter(p => p.hostId === user.id);
+    setListings(myListings);
+  }
+
+This ensures listings saved to local storage (when Supabase fails) 
+still appear on screen.
+
+────────────────────────────────────────
+FIX 2 — CreateEditListingScreen: navigate to Listings tab after saving
+────────────────────────────────────────
+
+In screens/host/CreateEditListingScreen.tsx, find the handleSave function.
+
+After a successful save (just before the finally block), replace:
+  navigation.goBack();
+
+With this logic:
+  // After creating a new listing, go directly to the Listings tab
+  // so the host can see it immediately
+  if (!isEditing) {
+    // Try to navigate to the Listings tab in the host navigator
+    const parentNav = navigation.getParent();
+    if (parentNav) {
+      parentNav.navigate('Listings');
+    } else {
+      navigation.goBack();
+    }
+  } else {
+    // For edits, just go back as before
+    navigation.goBack();
+  }
+
+────────────────────────────────────────
+FIX 3 — Add null safety to is_paused and is_rented mapping
+────────────────────────────────────────
+
+In screens/host/MyListingsScreen.tsx, inside the Supabase data 
+mapping block, find:
+  available: l.is_active && !l.is_paused,
+
+Change to:
+  available: (l.is_active ?? true) && !(l.is_paused ?? false),
+
+And find:
+  rentedDate: l.is_rented ? new Date() : undefined,
+
+Change to:
+  rentedDate: (l.is_rented ?? false) ? new Date() : undefined,
+
+────────────────────────────────────────
+FIX 4 — Show success feedback after saving a listing
+────────────────────────────────────────
+
+In screens/host/CreateEditListingScreen.tsx, after the save 
+succeeds and before navigation, add an Alert confirmation 
+for new listings only:
+
+  if (!isEditing) {
+    Alert.alert(
+      '🎉 Listing Posted!',
+      'Your listing is now live. You can manage it from the Listings tab.',
+      [
+        {
+          text: 'View My Listings',
+          onPress: () => {
+            const parentNav = navigation.getParent();
+            if (parentNav) {
+              parentNav.navigate('Listings');
+            } else {
+              navigation.goBack();
+            }
+          }
+        }
+      ]
+    );
+  } else {
+    Alert.alert('Saved', 'Your listing has been updated.', [
+      { text: 'OK', onPress: () => navigation.goBack() }
+    ]);
+  }
+
+Remove the standalone navigation.goBack() call that currently 
+sits after the try/catch — the Alert's onPress now handles navigation.
+
+────────────────────────────────────────
+IMPORTANT RULES
+────────────────────────────────────────
+- Do not change the Supabase createListing or getMyListings 
+  service functions
+- Do not remove the StorageService fallback in the catch block — 
+  keep it as a third-level fallback
+- Do not remove mock data or isDev guards anywhere
+- Test by creating a new listing and confirming it appears in 
+  the Listings tab immediately after the alert is dismissed
