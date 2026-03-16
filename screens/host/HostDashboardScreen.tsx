@@ -323,10 +323,9 @@ export const HostDashboardScreen = () => {
           <Text style={styles.greetingTitle}>Host Dashboard</Text>
           {hostSub ? (
             <Text style={styles.planSummaryText}>
-              {isFreePlan(hostSub.plan) ? 'Free Plan \u00B7 Upgrade to unlock all features' :
-               hostSub.plan === 'starter' ? 'Host Starter \u00B7 $19.99/mo' :
-               hostSub.plan === 'pro' ? 'Host Pro \u00B7 $49.99/mo' :
-               `Host Business \u00B7 $99/mo \u00B7 ${activeCount} listings active`}
+              {isFreePlan(hostSub.plan) || hostSub.plan === 'starter' ? 'Starter Plan \u00B7 Upgrade to unlock all features' :
+               hostSub.plan === 'pro' ? 'Pro \u00B7 $29.99/mo' :
+               `Business \u00B7 $79.99/mo \u00B7 ${activeCount} listings active`}
             </Text>
           ) : null}
         </View>
