@@ -266,6 +266,29 @@ export const StorageService = {
     }
   },
 
+  async getVisibleRenterGroups(): Promise<any[]> {
+    try {
+      const groups = await this.getGroups();
+      const roommateGroups = groups.filter(g => !g.type || g.type === 'roommate');
+      return roommateGroups
+        .filter(g => !g.isArchived)
+        .map(g => ({
+          groupId: g.id,
+          memberCount: g.members?.length || 2,
+          budgetMin: (g as any).budgetMin ?? (g as any).budget_min ?? 1500,
+          budgetMax: (g as any).budgetMax ?? (g as any).budget_max ?? 2500,
+          moveInDate: (g as any).moveInDate ?? (g as any).move_in_date ?? 'Flexible',
+          neighborhoods: (g as any).neighborhoods ?? [],
+          lifestyleTags: (g as any).lifestyleTags ?? (g as any).lifestyle_tags ?? [],
+          occupationTypes: (g as any).occupationTypes ?? (g as any).occupation_types ?? [],
+          createdAt: g.createdAt instanceof Date ? g.createdAt.toISOString() : g.createdAt,
+        }));
+    } catch (error) {
+      console.error('Error getting visible renter groups:', error);
+      return [];
+    }
+  },
+
   async getGroups(): Promise<Group[]> {
     try {
       const data = await AsyncStorage.getItem(STORAGE_KEYS.GROUPS);
