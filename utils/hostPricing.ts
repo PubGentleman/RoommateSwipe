@@ -7,16 +7,54 @@ export const HOST_PLANS: Record<HostPlanType, {
   overagePerListing: number;
   freeBoosts: number;
   freeBoostDuration: '24h' | '72h' | '7d' | null;
-  features: string[];
+  simultaneousBoosts: number;
+  features: { included: string[]; locked: string[] };
 }> = {
-  none: {
-    label: 'Free',
+  free: {
+    label: 'Host Free',
     price: 0,
-    listingsIncluded: 0,
+    listingsIncluded: 1,
     overagePerListing: 0,
     freeBoosts: 0,
     freeBoostDuration: null,
-    features: [],
+    simultaneousBoosts: 0,
+    features: {
+      included: [
+        '1 active listing',
+        'Basic inquiry management',
+        'Standard placement in search',
+      ],
+      locked: [
+        'Renter group browsing',
+        'AI assistant',
+        'Listing boosts',
+        'Compatibility scores',
+        'Verified host badge',
+      ],
+    },
+  },
+  none: {
+    label: 'Host Free',
+    price: 0,
+    listingsIncluded: 1,
+    overagePerListing: 0,
+    freeBoosts: 0,
+    freeBoostDuration: null,
+    simultaneousBoosts: 0,
+    features: {
+      included: [
+        '1 active listing',
+        'Basic inquiry management',
+        'Standard placement in search',
+      ],
+      locked: [
+        'Renter group browsing',
+        'AI assistant',
+        'Listing boosts',
+        'Compatibility scores',
+        'Verified host badge',
+      ],
+    },
   },
   starter: {
     label: 'Host Starter',
@@ -25,13 +63,19 @@ export const HOST_PLANS: Record<HostPlanType, {
     overagePerListing: 0,
     freeBoosts: 1,
     freeBoostDuration: '24h',
-    features: [
-      '1 active listing',
-      'Renter group browsing',
-      'AI assistant (host modes)',
-      '1 free 24-hour boost/month',
-      'Verified host badge',
-    ],
+    simultaneousBoosts: 1,
+    features: {
+      included: [
+        '1 active listing',
+        'Renter group browsing',
+        'AI assistant (host modes)',
+        '1 free 24-hr boost per month',
+        'Verified host badge',
+        'Inquiry management',
+        'Compatibility scores',
+      ],
+      locked: [],
+    },
   },
   pro: {
     label: 'Host Pro',
@@ -40,15 +84,20 @@ export const HOST_PLANS: Record<HostPlanType, {
     overagePerListing: 0,
     freeBoosts: 2,
     freeBoostDuration: '72h',
-    features: [
-      'Up to 5 active listings',
-      'Priority placement in search',
-      'Renter group browsing',
-      'AI assistant (host modes)',
-      '2 free 72-hour boosts/month',
-      'Advanced analytics',
-      'Verified host badge',
-    ],
+    simultaneousBoosts: 3,
+    features: {
+      included: [
+        'Up to 5 active listings',
+        'Priority placement in search',
+        'Renter group browsing',
+        'AI assistant (host modes)',
+        '2 free 72-hr boosts per month',
+        'Up to 3 simultaneous boosts',
+        'Advanced analytics',
+        'Response rate tracking',
+      ],
+      locked: [],
+    },
   },
   business: {
     label: 'Host Business',
@@ -57,15 +106,21 @@ export const HOST_PLANS: Record<HostPlanType, {
     overagePerListing: 5,
     freeBoosts: 2,
     freeBoostDuration: '7d',
-    features: [
-      'Up to 15 active listings (+$5/listing after)',
-      'Priority placement in search',
-      'Renter group browsing',
-      'Verified agent badge (requires license)',
-      'Bulk messaging tools',
-      'Full analytics suite',
-      '2 free 7-day boosts/month',
-    ],
+    simultaneousBoosts: 10,
+    features: {
+      included: [
+        'Up to 15 active listings',
+        '+$5/mo per listing after 15',
+        '2 free 7-day boosts per month',
+        'Up to 10 simultaneous boosts',
+        'Bulk boost across listings',
+        'Full analytics suite',
+        'Bulk messaging tools',
+        'Agent verification badge (add-on)',
+        'Priority support',
+      ],
+      locked: [],
+    },
   },
 };
 
@@ -82,7 +137,12 @@ export const BOOST_OPTIONS: Array<{
 
 export const AGENT_VERIFICATION_FEE = 9.99;
 
+export function isFreePlan(plan: HostPlanType): boolean {
+  return plan === 'free' || plan === 'none';
+}
+
 export function calculateHostMonthlyCost(plan: HostPlanType, activeListings: number): number {
+  if (isFreePlan(plan)) return 0;
   const p = HOST_PLANS[plan];
   const base = p.price;
   const overage = Math.max(0, activeListings - p.listingsIncluded) * p.overagePerListing;
@@ -91,9 +151,6 @@ export function calculateHostMonthlyCost(plan: HostPlanType, activeListings: num
 
 export function canAddListingCheck(subscription: HostSubscriptionData): { allowed: boolean; message: string } {
   const plan = HOST_PLANS[subscription.plan];
-  if (subscription.plan === 'none') {
-    return { allowed: false, message: 'You need a host subscription to post listings.' };
-  }
   if (subscription.plan === 'business') {
     if (subscription.activeListingCount >= subscription.listingsIncluded) {
       const overageCost = (subscription.activeListingCount - subscription.listingsIncluded + 1) * plan.overagePerListing;
@@ -102,9 +159,10 @@ export function canAddListingCheck(subscription: HostSubscriptionData): { allowe
     return { allowed: true, message: '' };
   }
   if (subscription.activeListingCount >= plan.listingsIncluded) {
+    const upgradeTo = isFreePlan(subscription.plan) ? 'Starter' : subscription.plan === 'starter' ? 'Pro' : 'Business';
     return {
       allowed: false,
-      message: `Your ${plan.label} plan allows up to ${plan.listingsIncluded} active listing${plan.listingsIncluded > 1 ? 's' : ''}. Upgrade to add more.`,
+      message: `Your ${plan.label} plan allows up to ${plan.listingsIncluded} active listing${plan.listingsIncluded > 1 ? 's' : ''}. Upgrade to ${upgradeTo} to add more.`,
     };
   }
   return { allowed: true, message: '' };
@@ -122,13 +180,13 @@ export function isListingBoosted(listing: Property): boolean {
 
 export function getDefaultHostSubscription(): HostSubscriptionData {
   return {
-    plan: 'none',
-    listingsIncluded: 0,
+    plan: 'free',
+    listingsIncluded: 1,
     activeListingCount: 0,
     overagePerListing: 0,
     monthlyPrice: 0,
     freeBoostsRemaining: 0,
-    freeBoostDuration: '24h',
+    freeBoostDuration: null,
     isVerifiedAgent: false,
     agentVerificationPaid: false,
   };
@@ -143,10 +201,10 @@ export function subscriptionFromPlan(plan: HostPlanType, existing?: Partial<Host
     overagePerListing: planData.overagePerListing,
     monthlyPrice: planData.price,
     freeBoostsRemaining: planData.freeBoosts,
-    freeBoostDuration: (planData.freeBoostDuration || '24h') as '24h' | '72h' | '7d',
+    freeBoostDuration: (planData.freeBoostDuration || null) as '24h' | '72h' | '7d' | null,
     isVerifiedAgent: existing?.isVerifiedAgent || false,
     agentVerificationPaid: existing?.agentVerificationPaid || false,
-    renewalDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    renewalDate: isFreePlan(plan) ? undefined : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
   };
 }
 

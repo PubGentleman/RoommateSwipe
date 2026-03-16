@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, StyleSheet, Pressable, Text, ScrollView, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -13,13 +13,16 @@ import { getMyListings } from '../../services/listingService';
 import { getReceivedInterestCards } from '../../services/discoverService';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
 import { HostPlanBadge } from '../../components/HostPlanBadge';
-import { canAddListingCheck } from '../../utils/hostPricing';
+import { canAddListingCheck, isFreePlan } from '../../utils/hostPricing';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const BG = '#111';
 const CARD_BG = '#1a1a1a';
 const ACCENT = '#ff6b5b';
 const GREEN = '#2ecc71';
 const GOLD = '#ffd700';
+const PURPLE = '#a855f7';
+const UPGRADE_BANNER_KEY = 'hostFreeBannerDismissedAt';
 
 const AVATAR_GRADIENTS: [string, string][] = [
   ['#667eea', '#764ba2'],
@@ -75,6 +78,25 @@ export const HostDashboardScreen = () => {
   const [messageCount, setMessageCount] = useState(0);
   const [showAISheet, setShowAISheet] = useState(false);
   const [hostSub, setHostSub] = useState<HostSubscriptionData | null>(null);
+  const [showUpgradeBanner, setShowUpgradeBanner] = useState(false);
+
+  useEffect(() => {
+    if (hostSub && isFreePlan(hostSub.plan)) {
+      AsyncStorage.getItem(UPGRADE_BANNER_KEY).then(val => {
+        if (!val) { setShowUpgradeBanner(true); return; }
+        const dismissed = parseInt(val, 10);
+        if (Date.now() - dismissed > 24 * 60 * 60 * 1000) setShowUpgradeBanner(true);
+        else setShowUpgradeBanner(false);
+      });
+    } else {
+      setShowUpgradeBanner(false);
+    }
+  }, [hostSub]);
+
+  const dismissUpgradeBanner = () => {
+    AsyncStorage.setItem(UPGRADE_BANNER_KEY, Date.now().toString());
+    setShowUpgradeBanner(false);
+  };
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -324,6 +346,28 @@ export const HostDashboardScreen = () => {
         contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
         showsVerticalScrollIndicator={false}
       >
+        {showUpgradeBanner ? (
+          <View style={styles.upgradeBanner}>
+            <View style={styles.upgradeBannerContent}>
+              <Feather name="zap" size={16} color={PURPLE} />
+              <Text style={styles.upgradeBannerText}>
+                You're on the Free plan. Upgrade to browse renter groups and fill your room faster.
+              </Text>
+            </View>
+            <View style={styles.upgradeBannerActions}>
+              <Pressable style={styles.remindBtn} onPress={dismissUpgradeBanner}>
+                <Text style={styles.remindBtnText}>Remind me later</Text>
+              </Pressable>
+              <Pressable
+                style={styles.seePlansBtn}
+                onPress={() => navigation.navigate('HostSubscription')}
+              >
+                <Text style={styles.seePlansBtnText}>See Plans</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
+
         <View style={styles.roleRow}>
           <View style={styles.hostBadge}>
             <Feather name="home" size={12} color={ACCENT} />
@@ -812,4 +856,43 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: ACCENT,
   },
+  upgradeBanner: {
+    backgroundColor: 'rgba(168,85,247,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(168,85,247,0.2)',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+  },
+  upgradeBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginBottom: 12,
+  },
+  upgradeBannerText: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.7)',
+    flex: 1,
+    lineHeight: 19,
+  },
+  upgradeBannerActions: {
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'flex-end',
+  },
+  remindBtn: {
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  remindBtnText: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.4)' },
+  seePlansBtn: {
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    backgroundColor: 'rgba(168,85,247,0.2)',
+  },
+  seePlansBtnText: { fontSize: 12, fontWeight: '700', color: '#a855f7' },
 });

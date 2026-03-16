@@ -57,7 +57,7 @@ interface AuthContextType {
   getSuperInterestCount: () => number;
   upgradeHostPlan: (plan: 'pro' | 'business', billingCycle?: 'monthly' | '3month' | 'annual') => Promise<void>;
   downgradeHostPlan: (plan: 'starter' | 'pro') => Promise<void>;
-  getHostPlan: () => 'starter' | 'pro' | 'business';
+  getHostPlan: () => 'free' | 'starter' | 'pro' | 'business';
   canAddListing: (currentCount: number) => { allowed: boolean; limit: number; reason?: string };
   canRespondToInquiry: () => Promise<{ allowed: boolean; remaining: number; limit: number; reason?: string }>;
   useInquiryResponse: () => Promise<void>;
@@ -186,7 +186,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         billingHistory: [],
       },
       hostSubscription: supabaseUser.role === 'host' ? {
-        plan: subscription?.plan || 'starter',
+        plan: subscription?.plan || 'free',
         status: subscription?.status || 'active',
         billingCycle: subscription?.billing_cycle || 'monthly',
         inquiryResponsesUsed: 0,
@@ -1715,8 +1715,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(updated);
   };
 
-  const getHostPlan = (): 'starter' | 'pro' | 'business' => {
-    return user?.hostSubscription?.plan || 'starter';
+  const getHostPlan = (): 'free' | 'starter' | 'pro' | 'business' => {
+    const plan = user?.hostSubscription?.plan;
+    if (!plan) return 'free';
+    return plan;
   };
 
   const upgradeHostPlan = async (plan: 'pro' | 'business', billingCycle: 'monthly' | '3month' | 'annual' = 'monthly') => {
@@ -1758,7 +1760,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ...user,
       hostSubscription: {
         ...user.hostSubscription,
-        plan: user.hostSubscription?.plan || 'starter' as const,
+        plan: user.hostSubscription?.plan || 'free' as const,
         status: 'active' as const,
         scheduledPlan: plan,
         scheduledChangeDate: changeDate,
@@ -1774,7 +1776,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const canAddListing = (currentCount: number): { allowed: boolean; limit: number; reason?: string } => {
     const hostPlan = getHostPlan();
-    const planLimits: Record<string, number> = { starter: 1, pro: 5, business: 15 };
+    const planLimits: Record<string, number> = { free: 1, starter: 1, pro: 5, business: 15 };
     const limit = planLimits[hostPlan] || 1;
     if (hostPlan === 'business') {
       if (currentCount >= limit) {
@@ -1783,8 +1785,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { allowed: true, limit };
     }
     if (currentCount >= limit) {
-      const nextPlan = hostPlan === 'starter' ? 'Pro' : 'Business';
-      return { allowed: false, limit, reason: `${hostPlan.charAt(0).toUpperCase() + hostPlan.slice(1)} plan allows up to ${limit} active listing${limit > 1 ? 's' : ''}. Upgrade to ${nextPlan} for more.` };
+      const nextPlan = hostPlan === 'free' ? 'Starter' : hostPlan === 'starter' ? 'Pro' : 'Business';
+      return { allowed: false, limit, reason: `${hostPlan === 'free' ? 'Free' : hostPlan.charAt(0).toUpperCase() + hostPlan.slice(1)} plan allows up to ${limit} active listing${limit > 1 ? 's' : ''}. Upgrade to ${nextPlan} for more.` };
     }
     return { allowed: true, limit };
   };
@@ -1801,7 +1803,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (now.getMonth() !== resetDate.getMonth() || now.getFullYear() !== resetDate.getFullYear()) {
         const updated = {
           ...user,
-          hostSubscription: { ...user.hostSubscription, plan: 'starter' as const, status: 'active' as const, inquiryResponsesUsed: 0, lastInquiryResetDate: now.toISOString(), billingCycle: 'monthly' as const },
+          hostSubscription: { ...user.hostSubscription, plan: user.hostSubscription?.plan || 'free' as const, status: 'active' as const, inquiryResponsesUsed: 0, lastInquiryResetDate: now.toISOString(), billingCycle: user.hostSubscription?.billingCycle || 'monthly' as const },
         };
         await StorageService.setCurrentUser(updated);
         await StorageService.addOrUpdateUser(updated);
@@ -1821,7 +1823,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ...user,
       hostSubscription: {
         ...user.hostSubscription,
-        plan: user.hostSubscription?.plan || 'starter' as const,
+        plan: user.hostSubscription?.plan || 'free' as const,
         status: user.hostSubscription?.status || 'active' as const,
         inquiryResponsesUsed: used,
         lastInquiryResetDate: user.hostSubscription?.lastInquiryResetDate || new Date().toISOString(),

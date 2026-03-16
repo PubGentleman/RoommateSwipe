@@ -10,7 +10,8 @@ interface Props {
 }
 
 const PLAN_CONFIG: Record<HostPlanType, { color: string; bg: string; label: string }> = {
-  none: { color: '#999', bg: 'rgba(153,153,153,0.15)', label: 'No Plan' },
+  free: { color: '#888', bg: '#1A1A1A', label: 'Free' },
+  none: { color: '#888', bg: '#1A1A1A', label: 'Free' },
   starter: { color: '#5b8cff', bg: 'rgba(91,140,255,0.15)', label: 'Starter' },
   pro: { color: '#a855f7', bg: 'rgba(168,85,247,0.15)', label: 'Pro' },
   business: { color: '#ffd700', bg: 'rgba(255,215,0,0.15)', label: 'Business' },

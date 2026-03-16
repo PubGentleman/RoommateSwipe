@@ -38,7 +38,7 @@ export interface RoommateProfile {
   references?: Reference[];
 }
 
-export type HostPlanType = 'none' | 'starter' | 'pro' | 'business';
+export type HostPlanType = 'free' | 'none' | 'starter' | 'pro' | 'business';
 
 export interface HostSubscriptionData {
   plan: HostPlanType;
@@ -47,7 +47,7 @@ export interface HostSubscriptionData {
   overagePerListing: number;
   monthlyPrice: number;
   freeBoostsRemaining: number;
-  freeBoostDuration: '24h' | '72h' | '7d';
+  freeBoostDuration: '24h' | '72h' | '7d' | null;
   isVerifiedAgent: boolean;
   agentVerificationPaid: boolean;
   renewalDate?: string;
@@ -276,7 +276,7 @@ export interface User {
     billingHistory?: Array<{ date: string; amount: number; description: string }>;
   };
   hostSubscription?: {
-    plan: 'starter' | 'pro' | 'business';
+    plan: 'free' | 'starter' | 'pro' | 'business';
     status: 'active' | 'cancelled' | 'cancelling' | 'expired';
     expiresAt?: Date;
     scheduledPlan?: 'starter' | 'pro' | 'business';

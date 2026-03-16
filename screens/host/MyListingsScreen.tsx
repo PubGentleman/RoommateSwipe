@@ -12,7 +12,7 @@ import { Property, InterestCard, HostSubscriptionData } from '../../types/models
 import { getMyListings, updateListing, deleteListing as deleteListingSupa } from '../../services/listingService';
 import { getReceivedInterestCards } from '../../services/discoverService';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
-import { isListingBoosted, canAddListingCheck } from '../../utils/hostPricing';
+import { isListingBoosted, canAddListingCheck, isFreePlan } from '../../utils/hostPricing';
 
 const BG = '#111';
 const CARD_BG = '#1a1a1a';
@@ -420,13 +420,15 @@ export const MyListingsScreen = () => {
             </Pressable>
             {status === 'active' ? (
               <>
-                <Pressable
-                  style={styles.actBoost}
-                  onPress={() => navigation.navigate('ListingBoost', { listingId: listing.id })}
-                >
-                  <Feather name="zap" size={13} color="#a855f7" />
-                  <Text style={styles.actBoostText}>Boost</Text>
-                </Pressable>
+                {!isFreePlan(getHostPlan() as any) ? (
+                  <Pressable
+                    style={styles.actBoost}
+                    onPress={() => navigation.navigate('ListingBoost', { listingId: listing.id })}
+                  >
+                    <Feather name="zap" size={13} color="#a855f7" />
+                    <Text style={styles.actBoostText}>Boost</Text>
+                  </Pressable>
+                ) : null}
                 <Pressable style={styles.actPause} onPress={() => pauseListing(listing.id)}>
                   <Feather name="pause" size={13} color={ORANGE} />
                   <Text style={styles.actPauseText}>Pause</Text>

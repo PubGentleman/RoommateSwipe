@@ -1039,7 +1039,29 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData, 
     const total = contextData?.host?.totalListings || 0;
     const views = contextData?.host?.totalViews || 0;
     const rate = contextData?.host?.responseRate || 0;
-    const plan = contextData?.host?.planName || 'starter';
+    const plan = contextData?.host?.planName || 'free';
+
+    if (plan === 'free' || plan === 'none') {
+      return (
+        <>
+          <View style={{ backgroundColor: 'rgba(168,85,247,0.08)', borderRadius: 14, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(168,85,247,0.15)' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <Feather name="lock" size={16} color="#a855f7" />
+              <Text style={{ fontSize: 15, fontWeight: '700', color: '#fff' }}>AI Insights Locked</Text>
+            </View>
+            <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: 19, marginBottom: 12 }}>
+              AI insights are available on Starter and above
+            </Text>
+            <Pressable
+              onPress={() => { onDismiss(); onNavigate?.('HostSubscription'); }}
+              style={{ alignSelf: 'flex-start', backgroundColor: 'rgba(168,85,247,0.2)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10 }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#a855f7' }}>Upgrade</Text>
+            </Pressable>
+          </View>
+        </>
+      );
+    }
 
     return (
       <>
@@ -1093,7 +1115,7 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData, 
           body={`You're on the ${plan} plan. ${plan === 'starter' ? 'Upgrade to Pro to list up to 5 properties and unlock priority placement.' : plan === 'pro' ? 'Upgrade to Business for unlimited listings and full analytics.' : 'You have access to all host features.'}`}
           id="host-plan"
           onFeedback={handleFeedback}
-          onTap={() => { onDismiss(); onNavigate?.('HostPricing'); }}
+          onTap={() => { onDismiss(); onNavigate?.('HostSubscription'); }}
         />
       </>
     );

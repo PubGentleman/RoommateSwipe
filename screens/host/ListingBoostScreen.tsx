@@ -8,7 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
 import { StorageService } from '../../utils/storage';
 import { Property, HostSubscriptionData, ListingBoost } from '../../types/models';
-import { BOOST_OPTIONS, calculateBoostExpiry, isListingBoosted, getBoostTimeRemaining } from '../../utils/hostPricing';
+import { BOOST_OPTIONS, calculateBoostExpiry, isListingBoosted, getBoostTimeRemaining, isFreePlan } from '../../utils/hostPricing';
 import { getListing } from '../../services/listingService';
 
 const isDev = __DEV__;
@@ -74,6 +74,33 @@ export const ListingBoostScreen = () => {
   const isBoosted = listing ? isListingBoosted(listing) : false;
   const hasActiveBoostElsewhere = existingBoost && existingBoost.listingId !== listingId;
   const hasFreeBoosts = hostSub && hostSub.freeBoostsRemaining > 0;
+  const isOnFreePlan = hostSub && isFreePlan(hostSub.plan);
+
+  if (isOnFreePlan && hostSub) {
+    return (
+      <View style={[{ flex: 1, backgroundColor: BG }, { paddingTop: insets.top }]}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 12 }}>
+          <Pressable onPress={() => navigation.goBack()} style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.07)', alignItems: 'center', justifyContent: 'center' }}>
+            <Feather name="arrow-left" size={22} color="#fff" />
+          </Pressable>
+          <Text style={{ fontSize: 18, fontWeight: '700', color: '#fff' }}>Boost Listing</Text>
+        </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 }}>
+          <Feather name="lock" size={40} color={PURPLE} />
+          <Text style={{ fontSize: 18, fontWeight: '700', color: '#fff', marginTop: 16, textAlign: 'center' }}>Boosts Available on Starter+</Text>
+          <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginTop: 8, textAlign: 'center', lineHeight: 20 }}>
+            Upgrade to a paid plan to boost your listings and get more visibility.
+          </Text>
+          <Pressable
+            onPress={() => navigation.navigate('HostSubscription')}
+            style={{ marginTop: 20, backgroundColor: 'rgba(168,85,247,0.2)', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 }}
+          >
+            <Text style={{ fontSize: 15, fontWeight: '700', color: PURPLE }}>See Plans</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
 
   const applyBoost = async (duration: '24h' | '72h' | '7d', useFree: boolean) => {
     if (!user || !listing || !hostSub) return;
