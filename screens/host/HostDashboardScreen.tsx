@@ -321,6 +321,14 @@ export const HostDashboardScreen = () => {
             {hostSub ? <HostPlanBadge plan={hostSub.plan} isVerifiedAgent={hostSub.isVerifiedAgent} /> : null}
           </View>
           <Text style={styles.greetingTitle}>Host Dashboard</Text>
+          {hostSub ? (
+            <Text style={styles.planSummaryText}>
+              {isFreePlan(hostSub.plan) ? 'Free Plan \u00B7 Upgrade to unlock all features' :
+               hostSub.plan === 'starter' ? 'Host Starter \u00B7 $19.99/mo' :
+               hostSub.plan === 'pro' ? 'Host Pro \u00B7 $49.99/mo' :
+               `Host Business \u00B7 $99/mo \u00B7 ${activeCount} listings active`}
+            </Text>
+          ) : null}
         </View>
         <View style={styles.navActions}>
           <Pressable style={styles.iconBtn} onPress={() => setShowAISheet(true)}>
@@ -579,6 +587,7 @@ const styles = StyleSheet.create({
   },
   greetingSub: { fontSize: 12, color: 'rgba(255,255,255,0.35)', fontWeight: '500', marginBottom: 2 },
   greetingTitle: { fontSize: 20, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
+  planSummaryText: { fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: 2 },
   navActions: { flexDirection: 'row', gap: 8 },
   iconBtn: {
     width: 38, height: 38, borderRadius: 19,

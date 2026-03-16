@@ -17,28 +17,71 @@ const ACCENT = '#ff6b5b';
 const GOLD = '#ffd700';
 const PURPLE = '#a855f7';
 
-const PLAN_ORDER: HostPlanType[] = ['free', 'starter', 'pro', 'business'];
-const PLAN_COLORS: Record<string, [string, string]> = {
-  free: ['#666', '#444'],
-  none: ['#666', '#444'],
-  starter: ['#5b8cff', '#3b6ce8'],
-  pro: [PURPLE, '#8b3bd4'],
-  business: [GOLD, '#d4a800'],
-};
+interface PlanDisplayInfo {
+  id: HostPlanType;
+  subtitle: string;
+  badge: string;
+  badgeColor: string;
+  ctaLabel: string;
+  isPopular: boolean;
+  gradientColors: [string, string];
+  icon: 'user' | 'home' | 'trending-up' | 'briefcase';
+}
+
+const PLAN_DISPLAY: PlanDisplayInfo[] = [
+  {
+    id: 'free',
+    subtitle: 'Just getting started',
+    badge: 'Free',
+    badgeColor: '#888888',
+    ctaLabel: 'Get Started Free',
+    isPopular: false,
+    gradientColors: ['#666', '#444'],
+    icon: 'user',
+  },
+  {
+    id: 'starter',
+    subtitle: 'Homeowner with 1 room to fill',
+    badge: 'Individual',
+    badgeColor: '#60A5FA',
+    ctaLabel: 'Get Started',
+    isPopular: false,
+    gradientColors: ['#5b8cff', '#3b6ce8'],
+    icon: 'home',
+  },
+  {
+    id: 'pro',
+    subtitle: 'Own 2-5 units or rooms',
+    badge: 'Most Popular',
+    badgeColor: '#A78BFA',
+    ctaLabel: 'Get Started',
+    isPopular: true,
+    gradientColors: [PURPLE, '#8b3bd4'],
+    icon: 'trending-up',
+  },
+  {
+    id: 'business',
+    subtitle: 'Landlord or property manager',
+    badge: 'Professional',
+    badgeColor: '#FBBF24',
+    ctaLabel: 'Get Started',
+    isPopular: false,
+    gradientColors: [GOLD, '#d4a800'],
+    icon: 'briefcase',
+  },
+];
 
 export const HostSubscriptionScreen = () => {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { user, updateUser } = useAuth();
   const [hostSub, setHostSub] = useState<HostSubscriptionData | null>(null);
-  const [selectedPlan, setSelectedPlan] = useState<HostPlanType>('free');
   const [wantsAgentVerification, setWantsAgentVerification] = useState(false);
 
   useEffect(() => {
     if (!user) return;
     StorageService.getHostSubscription(user.id).then(sub => {
       setHostSub(sub);
-      setSelectedPlan(sub.plan);
       setWantsAgentVerification(sub.agentVerificationPaid);
     });
   }, [user]);
@@ -59,7 +102,6 @@ export const HostSubscriptionScreen = () => {
       }
       await StorageService.updateHostSubscription(user.id, newSub);
       setHostSub(newSub);
-      setSelectedPlan(plan);
       await updateUser({
         hostSubscription: {
           ...user.hostSubscription,
@@ -121,6 +163,122 @@ export const HostSubscriptionScreen = () => {
 
   const currentPlanIsFree = isFreePlan(hostSub.plan);
 
+  const renderPlanCard = (display: PlanDisplayInfo) => {
+    const planKey = display.id;
+    const plan = HOST_PLANS[planKey];
+    const isCurrentPlan = hostSub.plan === planKey || (isFreePlan(hostSub.plan) && isFreePlan(planKey));
+    const isFree = isFreePlan(planKey);
+    const colors = display.gradientColors;
+
+    const getCTAStyle = () => {
+      if (isCurrentPlan) return 'disabled';
+      if (isFree && !currentPlanIsFree) return 'outlined';
+      if (isFree && currentPlanIsFree) return 'disabled';
+      return 'gradient';
+    };
+
+    const ctaStyle = getCTAStyle();
+    const ctaText = isCurrentPlan ? 'Current Plan' : (isFree && !currentPlanIsFree) ? 'Downgrade' : display.ctaLabel;
+
+    return (
+      <View
+        key={planKey}
+        style={[
+          styles.planCard,
+          isCurrentPlan ? { borderColor: colors[0], borderWidth: 2 } : null,
+        ]}
+      >
+        <View style={styles.badgeRow}>
+          <View style={[styles.tierBadge, { backgroundColor: `${display.badgeColor}20` }]}>
+            <Text style={[styles.tierBadgeText, { color: display.badgeColor }]}>{display.badge}</Text>
+          </View>
+          {isCurrentPlan ? (
+            <View style={styles.currentLabel}>
+              <Feather name="check-circle" size={12} color={ACCENT} />
+              <Text style={styles.currentLabelText}>Your current plan</Text>
+            </View>
+          ) : null}
+        </View>
+
+        <View style={styles.planHeader}>
+          <LinearGradient colors={colors} style={styles.planIcon}>
+            <Feather name={display.icon} size={18} color="#fff" />
+          </LinearGradient>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.planName}>{plan.label}</Text>
+            <Text style={styles.planSubtitle}>{display.subtitle}</Text>
+          </View>
+        </View>
+
+        <View style={styles.priceRow}>
+          <Text style={styles.planPrice}>
+            {plan.price === 0 ? '$0' : `$${plan.price}`}
+          </Text>
+          <Text style={styles.pricePeriod}>/mo</Text>
+          {isFree ? (
+            <Text style={styles.noCreditCard}>No credit card required</Text>
+          ) : null}
+        </View>
+
+        {planKey === 'business' ? (
+          <View style={styles.overageNote}>
+            <Feather name="alert-circle" size={12} color={GOLD} />
+            <Text style={styles.overageNoteText}>+$5/listing/mo after 15 included</Text>
+          </View>
+        ) : null}
+
+        <View style={styles.listingCap}>
+          <Feather name="layers" size={14} color={colors[0]} />
+          <Text style={[styles.listingCapText, { color: colors[0] }]}>
+            {plan.listingsIncluded} listing{plan.listingsIncluded > 1 ? 's' : ''} included
+          </Text>
+        </View>
+
+        <View style={styles.featureList}>
+          {plan.features.included.map((f, i) => (
+            <View key={i} style={styles.featureRow}>
+              <Feather name="check" size={14} color={isFree ? '#888' : colors[0]} />
+              <Text style={[styles.featureText, isFree ? { color: 'rgba(255,255,255,0.5)' } : null]}>{f}</Text>
+            </View>
+          ))}
+          {plan.features.locked.map((f, i) => (
+            <View key={`locked-${i}`} style={styles.featureRow}>
+              <Feather name="x" size={14} color="rgba(255,255,255,0.15)" />
+              <Text style={styles.lockedFeatureText}>{f}</Text>
+            </View>
+          ))}
+        </View>
+
+        {ctaStyle === 'gradient' ? (
+          <Pressable onPress={() => handleSelectPlan(planKey)}>
+            <LinearGradient colors={colors} style={styles.ctaBtn}>
+              <Text style={styles.ctaBtnText}>{ctaText}</Text>
+            </LinearGradient>
+          </Pressable>
+        ) : ctaStyle === 'outlined' ? (
+          <Pressable onPress={() => handleSelectPlan(planKey)}>
+            <View style={styles.ctaBtnOutlined}>
+              <Text style={styles.ctaBtnOutlinedText}>{ctaText}</Text>
+            </View>
+          </Pressable>
+        ) : (
+          <View style={styles.ctaBtnDisabled}>
+            <Text style={styles.ctaBtnDisabledText}>{ctaText}</Text>
+          </View>
+        )}
+
+        {isFree && currentPlanIsFree ? (
+          <View style={styles.upgradeNudge}>
+            <Feather name="info" size={14} color={PURPLE} />
+            <Text style={styles.upgradeNudgeText}>
+              Upgrade to Starter to browse renter groups and fill your room faster
+            </Text>
+          </View>
+        ) : null}
+      </View>
+    );
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: BG }]}>
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
@@ -132,113 +290,9 @@ export const HostSubscriptionScreen = () => {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {PLAN_ORDER.map(planKey => {
-          const plan = HOST_PLANS[planKey];
-          const isCurrentPlan = hostSub.plan === planKey || (isFreePlan(hostSub.plan) && isFreePlan(planKey));
-          const isSelected = selectedPlan === planKey || (isFreePlan(selectedPlan) && isFreePlan(planKey));
-          const colors = PLAN_COLORS[planKey] || PLAN_COLORS.free;
-          const isMostPopular = planKey === 'pro';
-          const isFree = isFreePlan(planKey);
+        {PLAN_DISPLAY.map(renderPlanCard)}
 
-          return (
-            <Pressable
-              key={planKey}
-              style={[
-                styles.planCard,
-                isSelected && !isFree ? { borderColor: colors[0], borderWidth: 2 } : null,
-                isCurrentPlan ? { borderColor: colors[0], borderWidth: 2 } : null,
-              ]}
-              onPress={() => setSelectedPlan(planKey)}
-            >
-              {isMostPopular ? (
-                <View style={styles.popularBadge}>
-                  <Feather name="star" size={10} color={GOLD} />
-                  <Text style={styles.popularText}>Most Popular</Text>
-                </View>
-              ) : null}
-
-              <View style={styles.planHeader}>
-                <LinearGradient colors={colors} style={styles.planIcon}>
-                  <Feather
-                    name={isFree ? 'user' : planKey === 'starter' ? 'home' : planKey === 'pro' ? 'trending-up' : 'briefcase'}
-                    size={18}
-                    color="#fff"
-                  />
-                </LinearGradient>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.planName}>{plan.label}</Text>
-                  <Text style={styles.planPrice}>
-                    {plan.price === 0 ? '$0/mo' : `$${plan.price}/mo`}
-                  </Text>
-                  {isFree ? (
-                    <Text style={styles.noCreditCard}>No credit card required</Text>
-                  ) : null}
-                </View>
-                {isCurrentPlan ? (
-                  <View style={[styles.currentBadge, isFree ? { backgroundColor: 'rgba(136,136,136,0.15)' } : null]}>
-                    <Text style={[styles.currentBadgeText, isFree ? { color: '#888' } : null]}>
-                      Current
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-
-              <View style={styles.listingCap}>
-                <Feather name="layers" size={14} color={colors[0]} />
-                <Text style={[styles.listingCapText, { color: colors[0] }]}>
-                  {plan.listingsIncluded} listing{plan.listingsIncluded > 1 ? 's' : ''} included
-                </Text>
-                {planKey === 'business' ? (
-                  <Text style={styles.overageText}>+$5/listing after</Text>
-                ) : null}
-              </View>
-
-              <View style={styles.featureList}>
-                {plan.features.included.map((f, i) => (
-                  <View key={i} style={styles.featureRow}>
-                    <Feather name="check" size={14} color={colors[0]} />
-                    <Text style={styles.featureText}>{f}</Text>
-                  </View>
-                ))}
-                {plan.features.locked.map((f, i) => (
-                  <View key={`locked-${i}`} style={styles.featureRow}>
-                    <Feather name="x" size={14} color="rgba(255,255,255,0.2)" />
-                    <Text style={styles.lockedFeatureText}>{f}</Text>
-                  </View>
-                ))}
-              </View>
-
-              {isFree && !isCurrentPlan ? (
-                <Pressable onPress={() => handleSelectPlan(planKey)}>
-                  <View style={styles.downgradeBtn}>
-                    <Text style={styles.downgradeBtnText}>Downgrade</Text>
-                  </View>
-                </Pressable>
-              ) : null}
-
-              {isFree && currentPlanIsFree ? (
-                <View style={styles.upgradeNudge}>
-                  <Feather name="info" size={14} color={PURPLE} />
-                  <Text style={styles.upgradeNudgeText}>
-                    Hosts on Starter fill rooms faster with renter group access
-                  </Text>
-                </View>
-              ) : null}
-
-              {!isFree && !isCurrentPlan && isSelected ? (
-                <Pressable onPress={() => handleSelectPlan(planKey)}>
-                  <LinearGradient colors={colors} style={styles.selectBtn}>
-                    <Text style={styles.selectBtnText}>
-                      {currentPlanIsFree ? 'Upgrade' : 'Switch Plan'}
-                    </Text>
-                  </LinearGradient>
-                </Pressable>
-              ) : null}
-            </Pressable>
-          );
-        })}
-
-        {selectedPlan === 'business' && !hostSub.agentVerificationPaid ? (
+        {hostSub.plan === 'business' && !hostSub.agentVerificationPaid ? (
           <Pressable style={styles.agentCard} onPress={handleAgentVerification}>
             <View style={styles.agentHeader}>
               <View style={styles.agentIcon}>
@@ -312,38 +366,58 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.06)',
   },
-  popularBadge: {
+  badgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,215,0,0.12)',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  tierBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    marginBottom: 10,
+  },
+  tierBadgeText: { fontSize: 11, fontWeight: '700' },
+  currentLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 4,
   },
-  popularText: { fontSize: 10, fontWeight: '700', color: GOLD },
+  currentLabelText: { fontSize: 11, fontWeight: '600', color: ACCENT },
   planHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   planIcon: {
     width: 40, height: 40, borderRadius: 12,
     alignItems: 'center', justifyContent: 'center',
   },
   planName: { fontSize: 16, fontWeight: '700', color: '#fff' },
-  planPrice: { fontSize: 13, color: 'rgba(255,255,255,0.5)', marginTop: 1 },
-  noCreditCard: { fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 2 },
-  currentBadge: {
-    backgroundColor: 'rgba(255,107,91,0.15)',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+  planSubtitle: { fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: 2 },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 2,
+    marginBottom: 10,
+    paddingLeft: 4,
   },
-  currentBadgeText: { fontSize: 11, fontWeight: '700', color: ACCENT },
+  planPrice: { fontSize: 28, fontWeight: '800', color: '#fff' },
+  pricePeriod: { fontSize: 14, color: 'rgba(255,255,255,0.4)', fontWeight: '500' },
+  noCreditCard: { fontSize: 11, color: 'rgba(255,255,255,0.3)', marginLeft: 10, alignSelf: 'center' },
+  overageNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(251,191,36,0.08)',
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(251,191,36,0.15)',
+  },
+  overageNoteText: { fontSize: 11, color: '#FBBF24', fontWeight: '600' },
   listingCap: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -352,27 +426,34 @@ const styles = StyleSheet.create({
     paddingLeft: 4,
   },
   listingCapText: { fontSize: 13, fontWeight: '600' },
-  overageText: { fontSize: 11, color: 'rgba(255,255,255,0.35)', marginLeft: 4 },
   featureList: { gap: 8, marginBottom: 14 },
   featureRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 4 },
   featureText: { fontSize: 13, color: 'rgba(255,255,255,0.7)', flex: 1 },
-  lockedFeatureText: { fontSize: 13, color: 'rgba(255,255,255,0.25)', flex: 1 },
-  selectBtn: {
-    height: 44,
+  lockedFeatureText: { fontSize: 13, color: 'rgba(255,255,255,0.2)', flex: 1 },
+  ctaBtn: {
+    height: 48,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  selectBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
-  downgradeBtn: {
-    height: 44,
+  ctaBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  ctaBtnOutlined: {
+    height: 48,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.15)',
   },
-  downgradeBtnText: { fontSize: 15, fontWeight: '700', color: 'rgba(255,255,255,0.5)' },
+  ctaBtnOutlinedText: { fontSize: 15, fontWeight: '700', color: 'rgba(255,255,255,0.5)' },
+  ctaBtnDisabled: {
+    height: 48,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  ctaBtnDisabledText: { fontSize: 15, fontWeight: '700', color: 'rgba(255,255,255,0.25)' },
   upgradeNudge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -380,7 +461,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(168,85,247,0.08)',
     borderRadius: 10,
     padding: 12,
-    marginTop: 4,
+    marginTop: 10,
     borderWidth: 1,
     borderColor: 'rgba(168,85,247,0.15)',
   },
