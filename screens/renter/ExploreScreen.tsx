@@ -422,7 +422,10 @@ export const ExploreScreen = () => {
       return 1;
     };
 
-    const isListingBoosted = (property: Property) => {
+    const isPropertyBoosted = (property: Property) => {
+      if (property.listingBoost?.isActive && new Date(property.listingBoost.expiresAt) > new Date()) {
+        return true;
+      }
       const host = property.hostProfileId ? hostProfiles.get(property.hostProfileId) : null;
       if (!(host as any)?.purchases?.listingBoosts) return false;
       const now = new Date();
@@ -432,13 +435,23 @@ export const ExploreScreen = () => {
       );
     };
 
+    const isFeaturedBoosted = (property: Property) => {
+      return isPropertyBoosted(property) && property.listingBoost?.includesFeaturedBadge === true;
+    };
+
     filtered.sort((a, b) => {
       if (a.featured && !b.featured) return -1;
       if (!a.featured && b.featured) return 1;
 
-      const boostedA = isListingBoosted(a) ? 1 : 0;
-      const boostedB = isListingBoosted(b) ? 1 : 0;
-      if (boostedA !== boostedB) return boostedB - boostedA;
+      const aFeatured = isFeaturedBoosted(a);
+      const bFeatured = isFeaturedBoosted(b);
+      if (aFeatured && !bFeatured) return -1;
+      if (!aFeatured && bFeatured) return 1;
+
+      const aBoosted = isPropertyBoosted(a) && !aFeatured;
+      const bBoosted = isPropertyBoosted(b) && !bFeatured;
+      if (aBoosted && !bBoosted) return -1;
+      if (!aBoosted && bBoosted) return 1;
 
       const planA = getHostPlanPriority(a);
       const planB = getHostPlanPriority(b);
@@ -655,6 +668,15 @@ export const ExploreScreen = () => {
               <View style={styles.tagFeatured}>
                 <Feather name="star" size={9} color="#ffd700" />
                 <Text style={[styles.tagText, { color: '#ffd700', marginLeft: 3 }]}>FEATURED</Text>
+              </View>
+            ) : null}
+            {!item.featured &&
+             item.listingBoost?.isActive &&
+             item.listingBoost?.includesFeaturedBadge &&
+             new Date(item.listingBoost.expiresAt) > new Date() ? (
+              <View style={styles.boostFeaturedBadge}>
+                <Feather name="star" size={9} color="#fff" />
+                <Text style={[styles.tagText, { color: '#fff', marginLeft: 3 }]}>FEATURED</Text>
               </View>
             ) : null}
           </View>
@@ -1862,6 +1884,14 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(46,204,113,0.35)',
     paddingHorizontal: 8,
     paddingVertical: 3,
+    borderRadius: 6,
+  },
+  boostFeaturedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#7B5EA7',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 6,
   },
   tagFeatured: {

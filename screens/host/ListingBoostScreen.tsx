@@ -8,7 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
 import { StorageService } from '../../utils/storage';
 import { Property, HostSubscriptionData, ListingBoost } from '../../types/models';
-import { BOOST_OPTIONS, calculateBoostExpiry, isListingBoosted, getBoostTimeRemaining, isFreePlan } from '../../utils/hostPricing';
+import { BOOST_OPTIONS, calculateBoostExpiry, isListingBoosted, getBoostTimeRemaining, isFreePlan, createBoostRecord } from '../../utils/hostPricing';
 import { getListing } from '../../services/listingService';
 
 const isDev = __DEV__;
@@ -17,6 +17,7 @@ const CARD_BG = '#1a1a1a';
 const ACCENT = '#ff6b5b';
 const PURPLE = '#a855f7';
 const GOLD = '#ffd700';
+const ROOMDR_PURPLE = '#7B5EA7';
 
 export const ListingBoostScreen = () => {
   const navigation = useNavigation<any>();
@@ -28,7 +29,7 @@ export const ListingBoostScreen = () => {
   const [listing, setListing] = useState<Property | null>(null);
   const [hostSub, setHostSub] = useState<HostSubscriptionData | null>(null);
   const [existingBoost, setExistingBoost] = useState<ListingBoost | null>(null);
-  const [selectedDuration, setSelectedDuration] = useState<'24h' | '72h' | '7d' | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -102,7 +103,7 @@ export const ListingBoostScreen = () => {
     );
   }
 
-  const applyBoost = async (duration: '24h' | '72h' | '7d', useFree: boolean) => {
+  const applyBoost = async (optionId: string, useFree: boolean) => {
     if (!user || !listing || !hostSub) return;
 
     if (hasActiveBoostElsewhere) {
@@ -110,27 +111,22 @@ export const ListingBoostScreen = () => {
       return;
     }
 
-    const option = BOOST_OPTIONS.find(o => o.duration === duration);
+    const option = BOOST_OPTIONS.find(o => o.id === optionId);
     if (!option) return;
 
     const doApply = async () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      const boost: ListingBoost = {
-        listingId: listing.id,
-        duration,
-        price: useFree ? 0 : option.price,
-        startedAt: new Date().toISOString(),
-        expiresAt: calculateBoostExpiry(duration),
-        isActive: true,
-        usedFreeboost: useFree,
-      };
+      const boost = createBoostRecord(listing.id, option, useFree);
       await StorageService.applyListingBoost(listing.id, boost);
       if (useFree && hostSub.freeBoostsRemaining > 0) {
         await StorageService.updateHostSubscription(user.id, {
           freeBoostsRemaining: hostSub.freeBoostsRemaining - 1,
         });
       }
-      Alert.alert('Listing Boosted!', `Your listing will be featured for ${option.label.toLowerCase()}.`, [
+      const resultLabel = option.includesFeaturedBadge
+        ? `Your listing is now featured for ${option.duration === '72h' ? '3 days' : '7 days'} with a Featured badge!`
+        : `Your listing has been boosted to the top of search for 24 hours.`;
+      Alert.alert('Boost Applied!', resultLabel, [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     };
@@ -147,7 +143,7 @@ export const ListingBoostScreen = () => {
     } else if (isDev) {
       Alert.alert(
         'Dev Mode',
-        `Payment would process via Stripe: $${option.price} for ${option.label}.`,
+        `Payment would process via Stripe: $${option.price} for ${option.label}.${option.includesFeaturedBadge ? ' Includes Featured badge.' : ''}`,
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Confirm (Mock)', onPress: doApply },
@@ -187,10 +183,18 @@ export const ListingBoostScreen = () => {
           <View style={styles.activeBoostCard}>
             <LinearGradient colors={[PURPLE, '#7c3aed']} style={styles.activeBoostGradient}>
               <Feather name="zap" size={24} color="#fff" />
-              <Text style={styles.activeBoostTitle}>Boost Active</Text>
+              <Text style={styles.activeBoostTitle}>
+                {listing.listingBoost.includesFeaturedBadge ? 'Featured Boost Active' : 'Boost Active'}
+              </Text>
               <Text style={styles.activeBoostExpiry}>
                 {getBoostTimeRemaining(listing.listingBoost)}
               </Text>
+              {listing.listingBoost.includesFeaturedBadge ? (
+                <View style={styles.activeBoostBadgeRow}>
+                  <Feather name="star" size={12} color={GOLD} />
+                  <Text style={styles.activeBoostBadgeText}>Featured badge is showing on your listing</Text>
+                </View>
+              ) : null}
             </LinearGradient>
           </View>
         ) : null}
@@ -207,7 +211,10 @@ export const ListingBoostScreen = () => {
         {!isBoosted && hasFreeBoosts ? (
           <Pressable
             style={styles.freeBoostBanner}
-            onPress={() => applyBoost(hostSub.freeBoostDuration, true)}
+            onPress={() => {
+              const freeOption = BOOST_OPTIONS.find(o => o.duration === hostSub.freeBoostDuration);
+              if (freeOption) applyBoost(freeOption.id, true);
+            }}
           >
             <LinearGradient colors={['rgba(168,85,247,0.15)', 'rgba(168,85,247,0.05)']} style={styles.freeBoostGradient}>
               <View style={styles.freeBoostContent}>
@@ -230,54 +237,93 @@ export const ListingBoostScreen = () => {
           <View style={styles.optionsSection}>
             <Text style={styles.sectionTitle}>Boost Options</Text>
             {BOOST_OPTIONS.map(option => {
-              const isSelected = selectedDuration === option.duration;
-              const isBestValue = option.duration === '72h';
+              const isSelected = selectedId === option.id;
               return (
                 <Pressable
-                  key={option.duration}
+                  key={option.id}
                   style={[
                     styles.optionCard,
                     isSelected ? { borderColor: PURPLE, borderWidth: 2 } : null,
-                    (hasActiveBoostElsewhere) ? { opacity: 0.5 } : null,
+                    option.highlight ? { borderColor: 'rgba(168,85,247,0.3)', borderWidth: 1.5 } : null,
+                    hasActiveBoostElsewhere ? { opacity: 0.5 } : null,
                   ]}
                   onPress={() => {
                     if (hasActiveBoostElsewhere) return;
-                    setSelectedDuration(option.duration);
+                    setSelectedId(option.id);
                   }}
                 >
-                  {isBestValue ? (
+                  {option.highlight ? (
                     <View style={styles.bestValueBadge}>
+                      <Feather name="star" size={9} color={PURPLE} />
                       <Text style={styles.bestValueText}>Best Value</Text>
                     </View>
                   ) : null}
-                  <View style={styles.optionRow}>
-                    <View style={styles.optionLeft}>
-                      <Feather name="zap" size={16} color={isSelected ? PURPLE : 'rgba(255,255,255,0.4)'} />
-                      <View>
-                        <Text style={styles.optionLabel}>{option.label}</Text>
-                        <Text style={styles.optionDesc}>{option.description}</Text>
+
+                  <View style={styles.optionTopRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.optionLabel}>{option.label}</Text>
+                      <View style={styles.durationChip}>
+                        <Text style={styles.durationChipText}>
+                          {option.duration === '24h' ? '24 HOURS' : option.duration === '72h' ? '72 HOURS' : '7 DAYS'}
+                        </Text>
                       </View>
                     </View>
                     <Text style={[styles.optionPrice, isSelected ? { color: PURPLE } : null]}>
                       ${option.price}
                     </Text>
                   </View>
+
+                  <Text style={styles.optionDesc}>{option.description}</Text>
+
+                  <View style={styles.optionPerks}>
+                    <View style={styles.perkRow}>
+                      <Feather name="map-pin" size={12} color={ROOMDR_PURPLE} />
+                      <Text style={styles.perkText}>Top placement in search</Text>
+                    </View>
+                    {option.includesFeaturedBadge ? (
+                      <View style={styles.perkRow}>
+                        <Feather name="star" size={12} color={GOLD} />
+                        <Text style={[styles.perkText, { color: GOLD }]}>Featured badge on listing card</Text>
+                      </View>
+                    ) : (
+                      <View style={styles.perkRow}>
+                        <Feather name="minus" size={12} color="rgba(255,255,255,0.2)" />
+                        <Text style={[styles.perkText, { color: 'rgba(255,255,255,0.25)' }]}>No badge</Text>
+                      </View>
+                    )}
+                  </View>
                 </Pressable>
               );
             })}
 
-            {selectedDuration && !hasActiveBoostElsewhere ? (
-              <Pressable onPress={() => applyBoost(selectedDuration, false)}>
+            {selectedId && !hasActiveBoostElsewhere ? (
+              <Pressable onPress={() => applyBoost(selectedId, false)}>
                 <LinearGradient colors={[PURPLE, '#7c3aed']} style={styles.purchaseBtn}>
                   <Feather name="zap" size={16} color="#fff" />
                   <Text style={styles.purchaseBtnText}>
-                    Purchase Boost — ${BOOST_OPTIONS.find(o => o.duration === selectedDuration)?.price}
+                    Purchase {BOOST_OPTIONS.find(o => o.id === selectedId)?.label} — ${BOOST_OPTIONS.find(o => o.id === selectedId)?.price}
                   </Text>
                 </LinearGradient>
               </Pressable>
             ) : null}
           </View>
         ) : null}
+
+        <View style={styles.explainerBox}>
+          <View style={styles.explainerHeader}>
+            <Feather name="info" size={14} color="rgba(255,255,255,0.5)" />
+            <Text style={styles.explainerTitle}>What's the difference?</Text>
+          </View>
+          <Text style={styles.explainerText}>
+            Boost = your listing ranks higher in search so more renters see it.
+          </Text>
+          <Text style={styles.explainerText}>
+            Featured = your listing gets a visible badge so renters click it over others.
+          </Text>
+          <Text style={[styles.explainerText, { color: 'rgba(255,255,255,0.5)', marginTop: 4 }]}>
+            Featured Boost and Extended Featured include both.
+          </Text>
+        </View>
 
         <Text style={styles.notice}>
           One boost active at a time. Boosts cannot be cancelled once applied.
@@ -309,7 +355,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: CARD_BG,
+    backgroundColor: '#1a1a1a',
     borderRadius: 14,
     padding: 16,
     marginBottom: 16,
@@ -330,6 +376,17 @@ const styles = StyleSheet.create({
   },
   activeBoostTitle: { fontSize: 18, fontWeight: '800', color: '#fff' },
   activeBoostExpiry: { fontSize: 14, color: 'rgba(255,255,255,0.8)' },
+  activeBoostBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+    backgroundColor: 'rgba(255,215,0,0.15)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  activeBoostBadgeText: { fontSize: 12, fontWeight: '600', color: GOLD },
   warningCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -364,7 +421,7 @@ const styles = StyleSheet.create({
   optionsSection: { marginBottom: 16 },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: '#fff', marginBottom: 12 },
   optionCard: {
-    backgroundColor: CARD_BG,
+    backgroundColor: '#1a1a1a',
     borderRadius: 14,
     padding: 16,
     marginBottom: 10,
@@ -373,22 +430,37 @@ const styles = StyleSheet.create({
   },
   bestValueBadge: {
     alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     backgroundColor: 'rgba(168,85,247,0.15)',
     borderRadius: 6,
     paddingHorizontal: 8,
-    paddingVertical: 2,
-    marginBottom: 8,
+    paddingVertical: 3,
+    marginBottom: 10,
   },
   bestValueText: { fontSize: 10, fontWeight: '700', color: PURPLE },
-  optionRow: {
+  optionTopRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
+    marginBottom: 6,
   },
-  optionLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
-  optionLabel: { fontSize: 14, fontWeight: '600', color: '#fff' },
-  optionDesc: { fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 1 },
-  optionPrice: { fontSize: 16, fontWeight: '700', color: 'rgba(255,255,255,0.7)' },
+  optionLabel: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  durationChip: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginTop: 4,
+  },
+  durationChipText: { fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.4)', letterSpacing: 0.5 },
+  optionDesc: { fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: 18, marginBottom: 10 },
+  optionPrice: { fontSize: 20, fontWeight: '800', color: 'rgba(255,255,255,0.7)' },
+  optionPerks: { gap: 6 },
+  perkRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  perkText: { fontSize: 12, color: 'rgba(255,255,255,0.55)', fontWeight: '500' },
   purchaseBtn: {
     height: 48,
     borderRadius: 14,
@@ -399,11 +471,27 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   purchaseBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  explainerBox: {
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  explainerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  explainerTitle: { fontSize: 13, fontWeight: '700', color: 'rgba(255,255,255,0.6)' },
+  explainerText: { fontSize: 12, color: 'rgba(255,255,255,0.35)', lineHeight: 17 },
   notice: {
     fontSize: 12,
     color: 'rgba(255,255,255,0.25)',
     textAlign: 'center',
-    marginTop: 8,
+    marginTop: 12,
     lineHeight: 16,
   },
 });

@@ -124,15 +124,37 @@ export const HOST_PLANS: Record<HostPlanType, {
   },
 };
 
-export const BOOST_OPTIONS: Array<{
-  duration: '24h' | '72h' | '7d';
-  label: string;
-  price: number;
-  description: string;
-}> = [
-  { duration: '24h', label: '24-Hour Boost', price: 4.99, description: 'Jump to top of search for 1 day' },
-  { duration: '72h', label: '72-Hour Boost', price: 9.99, description: 'Featured badge for 3 days — best value' },
-  { duration: '7d', label: '7-Day Boost', price: 19.99, description: 'Sustained visibility for a full week' },
+export const BOOST_OPTIONS = [
+  {
+    id: 'quick' as const,
+    duration: '24h' as const,
+    label: 'Quick Boost',
+    price: 4.99,
+    description: 'Jump to the top of search in your city for 24 hours',
+    includesFeaturedBadge: false,
+    badgeLabel: null as string | null,
+    highlight: false,
+  },
+  {
+    id: 'featured' as const,
+    duration: '72h' as const,
+    label: 'Featured Boost',
+    price: 9.99,
+    description: 'Top placement + Featured badge on your listing card for 3 days',
+    includesFeaturedBadge: true,
+    badgeLabel: 'Featured' as string | null,
+    highlight: true,
+  },
+  {
+    id: 'extended' as const,
+    duration: '7d' as const,
+    label: 'Extended Featured',
+    price: 19.99,
+    description: 'Top placement + Featured badge sustained for a full week',
+    includesFeaturedBadge: true,
+    badgeLabel: 'Featured' as string | null,
+    highlight: false,
+  },
 ];
 
 export const AGENT_VERIFICATION_FEE = 9.99;
@@ -176,6 +198,24 @@ export function calculateBoostExpiry(duration: '24h' | '72h' | '7d'): string {
 export function isListingBoosted(listing: Property): boolean {
   if (!listing.listingBoost?.isActive) return false;
   return new Date(listing.listingBoost.expiresAt) > new Date();
+}
+
+export function createBoostRecord(
+  listingId: string,
+  option: typeof BOOST_OPTIONS[0],
+  usedFreeBoost: boolean
+): ListingBoost {
+  return {
+    listingId,
+    duration: option.duration,
+    price: usedFreeBoost ? 0 : option.price,
+    startedAt: new Date().toISOString(),
+    expiresAt: calculateBoostExpiry(option.duration),
+    isActive: true,
+    usedFreeboost: usedFreeBoost,
+    includesFeaturedBadge: option.includesFeaturedBadge,
+    badgeLabel: option.badgeLabel,
+  };
 }
 
 export function getDefaultHostSubscription(): HostSubscriptionData {

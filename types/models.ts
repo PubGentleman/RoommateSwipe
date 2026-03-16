@@ -61,6 +61,8 @@ export interface ListingBoost {
   expiresAt: string;
   isActive: boolean;
   usedFreeboost: boolean;
+  includesFeaturedBadge: boolean;
+  badgeLabel: string | null;
 }
 
 export interface Property {

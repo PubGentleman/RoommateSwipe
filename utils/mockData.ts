@@ -4,7 +4,7 @@ import { additionalProfiles } from './additionalProfiles';
 import { extraProfiles } from './extraProfiles';
 import { extraConversations, extraProperties, extraGroups, extraApplications } from './extraMockData';
 
-export const MOCK_DATA_VERSION = '2.1.0';
+export const MOCK_DATA_VERSION = '2.2.0';
 
 export const mockProfileUsers: User[] = [
   {
@@ -1333,6 +1333,17 @@ export const mockProperties: Property[] = [
     ],
     hostProfileId: '1',
     walkScore: 94,
+    listingBoost: {
+      listingId: '2',
+      duration: '24h',
+      price: 4.99,
+      startedAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+      expiresAt: new Date(Date.now() + 20 * 60 * 60 * 1000).toISOString(),
+      isActive: true,
+      usedFreeboost: false,
+      includesFeaturedBadge: false,
+      badgeLabel: null,
+    },
   },
   {
     id: '3',
@@ -1384,6 +1395,17 @@ export const mockProperties: Property[] = [
     ],
     hostProfileId: '2',
     walkScore: 88,
+    listingBoost: {
+      listingId: '4',
+      duration: '72h',
+      price: 9.99,
+      startedAt: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
+      expiresAt: new Date(Date.now() + 60 * 60 * 60 * 1000).toISOString(),
+      isActive: true,
+      usedFreeboost: false,
+      includesFeaturedBadge: true,
+      badgeLabel: 'Featured',
+    },
   },
   {
     id: '5',
@@ -1434,6 +1456,17 @@ export const mockProperties: Property[] = [
     ],
     hostProfileId: '3',
     walkScore: 93,
+    listingBoost: {
+      listingId: '6',
+      duration: '7d',
+      price: 19.99,
+      startedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+      expiresAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+      isActive: true,
+      usedFreeboost: false,
+      includesFeaturedBadge: true,
+      badgeLabel: 'Featured',
+    },
   },
   {
     id: '7',

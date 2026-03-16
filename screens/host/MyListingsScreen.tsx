@@ -297,9 +297,23 @@ export const MyListingsScreen = () => {
             </View>
           ) : null}
           {isListingBoosted(listing) ? (
-            <View style={styles.boostedPill}>
-              <Feather name="zap" size={10} color="#a855f7" />
-              <Text style={styles.boostedPillText}>Boosted</Text>
+            <View style={[
+              styles.boostedPill,
+              listing.listingBoost?.includesFeaturedBadge
+                ? { backgroundColor: 'rgba(123,94,167,0.3)', borderColor: 'rgba(123,94,167,0.5)' }
+                : null,
+            ]}>
+              <Feather
+                name={listing.listingBoost?.includesFeaturedBadge ? 'star' : 'zap'}
+                size={10}
+                color={listing.listingBoost?.includesFeaturedBadge ? '#ffd700' : '#a855f7'}
+              />
+              <Text style={[
+                styles.boostedPillText,
+                listing.listingBoost?.includesFeaturedBadge ? { color: '#ffd700' } : null,
+              ]}>
+                {listing.listingBoost?.includesFeaturedBadge ? 'Featured' : 'Boosted'}
+              </Text>
             </View>
           ) : null}
         </Pressable>
