@@ -32,7 +32,7 @@ The application is built with React Native and Expo using TypeScript, featuring 
 
 **Key Features:**
 - **Renter:** Swipe-based matching, 1-on-1 messaging, group management (Roommate Groups + Listing Inquiry Groups), property exploration with advanced filters and map/list views, saved properties, profile view tracking, AI Match Assistant, animated match celebration, report/block system, notification feed, profile completion indicator, mutual interest flow, cold messaging (Elite), and "Inquire Together" group listing inquiries.
-- **Host:** Full host dashboard with statistics, listing management (create, edit, delete, pause, mark rented), dedicated Inquiries screen, inquiry-based analytics, listing inquiry group chat participation, and role switching.
+- **Host:** Full host dashboard with statistics and plan badge, listing management (create, edit, delete, pause, mark rented, boost), dedicated Inquiries screen, inquiry-based analytics, listing inquiry group chat participation, host subscription management (HostSubscriptionScreen), per-listing boosts (ListingBoostScreen), listing cap enforcement with overage for Business plan, and role switching.
 
 **User Experience Enhancements:**
 - **Match Celebration:** Animated full-screen modal for mutual likes.
@@ -70,7 +70,7 @@ Supabase Auth manages user authentication, with an `AuthContext` handling sessio
 
 ## Subscription & Paywall System
 
-The application features tiered subscription plans for both renters (Basic, Plus, Elite) and hosts (Starter, Pro, Business), including one-time purchases. A `PaywallSheet` component prompts users for upgrades when limits are reached. Billing cycles include monthly, 3-month, and annual options. Dedicated screens for Renter Subscription, Host Pricing, and Manage Subscription provide detailed plan information, upgrade/downgrade options, and billing history.
+The application features tiered subscription plans for both renters (Basic, Plus, Elite) and hosts (None/Starter $19.99/Pro $49.99/Business $99), including one-time purchases. A `PaywallSheet` component prompts users for upgrades when limits are reached. Billing cycles include monthly, 3-month, and annual options. Dedicated screens for Renter Subscription, Host Subscription (`HostSubscriptionScreen` with 4 plan cards, agent verification add-on), Listing Boost (`ListingBoostScreen` with 24h/$4.99, 72h/$9.99, 7d/$19.99 options + free boost banner), and Manage Subscription provide detailed plan information, upgrade/downgrade options, and billing history. Host plan limits: Starter=1 listing, Pro=5, Business=15 (+$5/listing overage). `utils/hostPricing.ts` centralizes plan constants and helpers. `HostPlanBadge` component shows plan tier in dashboard header. Listing cap checks enforced in MyListingsScreen, CreateEditListingScreen, and HostDashboardScreen quick actions.
 
 ## Data Layer
 

@@ -12,6 +12,8 @@ import { HostInquiriesScreen } from '../screens/host/HostInquiriesScreen';
 import { RoommatesScreen } from '../screens/renter/RoommatesScreen';
 import { HostAnalyticsScreen } from '../screens/host/HostAnalyticsScreen';
 import { HostPricingScreen } from '../screens/host/HostPricingScreen';
+import { HostSubscriptionScreen } from '../screens/host/HostSubscriptionScreen';
+import { ListingBoostScreen } from '../screens/host/ListingBoostScreen';
 import { MessagesStackNavigator } from './MessagesStackNavigator';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
 import { useTheme } from '../hooks/useTheme';
@@ -20,6 +22,7 @@ import { useNotificationContext } from '../contexts/NotificationContext';
 export type HostListingsStackParamList = {
   MyListings: undefined;
   CreateEditListing: { propertyId?: string };
+  ListingBoost: { listingId: string };
 };
 
 export type HostDashboardStackParamList = {
@@ -28,6 +31,8 @@ export type HostDashboardStackParamList = {
   Analytics: undefined;
   Inquiries: undefined;
   HostPricing: undefined;
+  HostSubscription: undefined;
+  ListingBoost: { listingId: string };
 };
 
 export type HostTabParamList = {
@@ -50,6 +55,8 @@ function DashboardStackNavigator() {
       <DashboardStack.Screen name="Analytics" component={HostAnalyticsScreen} />
       <DashboardStack.Screen name="Inquiries" component={HostInquiriesScreen} />
       <DashboardStack.Screen name="HostPricing" component={HostPricingScreen} />
+      <DashboardStack.Screen name="HostSubscription" component={HostSubscriptionScreen} />
+      <DashboardStack.Screen name="ListingBoost" component={ListingBoostScreen} />
     </DashboardStack.Navigator>
   );
 }
@@ -59,6 +66,7 @@ function ListingsStackNavigator() {
     <ListingsStack.Navigator screenOptions={{ headerShown: false }}>
       <ListingsStack.Screen name="MyListings" component={MyListingsScreen} />
       <ListingsStack.Screen name="CreateEditListing" component={CreateEditListingScreen} />
+      <ListingsStack.Screen name="ListingBoost" component={ListingBoostScreen} />
     </ListingsStack.Navigator>
   );
 }

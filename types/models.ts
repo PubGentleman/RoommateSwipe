@@ -38,6 +38,31 @@ export interface RoommateProfile {
   references?: Reference[];
 }
 
+export type HostPlanType = 'none' | 'starter' | 'pro' | 'business';
+
+export interface HostSubscriptionData {
+  plan: HostPlanType;
+  listingsIncluded: number;
+  activeListingCount: number;
+  overagePerListing: number;
+  monthlyPrice: number;
+  freeBoostsRemaining: number;
+  freeBoostDuration: '24h' | '72h' | '7d';
+  isVerifiedAgent: boolean;
+  agentVerificationPaid: boolean;
+  renewalDate?: string;
+}
+
+export interface ListingBoost {
+  listingId: string;
+  duration: '24h' | '72h' | '7d';
+  price: number;
+  startedAt: string;
+  expiresAt: string;
+  isActive: boolean;
+  usedFreeboost: boolean;
+}
+
 export interface Property {
   id: string;
   title: string;
@@ -71,6 +96,7 @@ export interface Property {
   }>;
   hostProfileId?: string;
   walkScore?: number;
+  listingBoost?: ListingBoost;
 }
 
 export interface PropertyFilter {

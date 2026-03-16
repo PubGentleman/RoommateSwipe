@@ -7,7 +7,8 @@ import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
 import { StorageService } from '../../utils/storage';
-import { Property } from '../../types/models';
+import { Property, HostSubscriptionData } from '../../types/models';
+import { canAddListingCheck } from '../../utils/hostPricing';
 import { US_STATES } from '../../utils/locationData';
 import { Spacing, BorderRadius } from '../../constants/theme';
 import { createListing as createListingSupa, updateListing as updateListingSupa, getListing, deleteListing as deleteListingSupa } from '../../services/listingService';
@@ -41,10 +42,11 @@ export const CreateEditListingScreen = () => {
   const navigation = useNavigation();
   const route = useRoute<RouteProp<RouteParams, 'CreateEditListing'>>();
   const { theme } = useTheme();
-  const { user } = useAuth();
+  const { user, getHostPlan } = useAuth();
 
   const propertyId = route.params?.propertyId;
   const isEditing = !!propertyId;
+  const [hostSub, setHostSub] = useState<HostSubscriptionData | null>(null);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -70,7 +72,10 @@ export const CreateEditListingScreen = () => {
     if (isEditing) {
       loadProperty();
     }
-  }, [propertyId]);
+    if (user) {
+      StorageService.getHostSubscription(user.id).then(sub => setHostSub(sub));
+    }
+  }, [propertyId, user]);
 
   const loadProperty = async () => {
     if (!propertyId) return;
@@ -158,6 +163,26 @@ export const CreateEditListingScreen = () => {
     if (!city.trim()) {
       Alert.alert('Required', 'Please select a city');
       return;
+    }
+
+    if (!isEditing && hostSub) {
+      const capResult = canAddListingCheck(hostSub);
+      if (!capResult.allowed) {
+        Alert.alert('Listing Limit Reached', capResult.message, [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Upgrade Plan', onPress: () => navigation.goBack() },
+        ]);
+        return;
+      }
+      if (capResult.message) {
+        const confirmed = await new Promise<boolean>((resolve) => {
+          Alert.alert('Overage Notice', capResult.message, [
+            { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+            { text: 'Continue', onPress: () => resolve(true) },
+          ]);
+        });
+        if (!confirmed) return;
+      }
     }
 
     setSaving(true);

@@ -1774,13 +1774,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const canAddListing = (currentCount: number): { allowed: boolean; limit: number; reason?: string } => {
     const hostPlan = getHostPlan();
-    if (hostPlan === 'business') return { allowed: true, limit: -1 };
-    if (hostPlan === 'pro') {
-      if (currentCount >= 5) return { allowed: false, limit: 5, reason: 'Pro plan allows up to 5 active listings. Upgrade to Business for unlimited.' };
-      return { allowed: true, limit: 5 };
+    const planLimits: Record<string, number> = { starter: 1, pro: 5, business: 15 };
+    const limit = planLimits[hostPlan] || 1;
+    if (hostPlan === 'business') {
+      if (currentCount >= limit) {
+        return { allowed: true, limit, reason: `This listing will add $5/mo overage to your Business plan.` };
+      }
+      return { allowed: true, limit };
     }
-    if (currentCount >= 1) return { allowed: false, limit: 1, reason: 'Starter plan allows 1 active listing. Upgrade to Pro for up to 5.' };
-    return { allowed: true, limit: 1 };
+    if (currentCount >= limit) {
+      const nextPlan = hostPlan === 'starter' ? 'Pro' : 'Business';
+      return { allowed: false, limit, reason: `${hostPlan.charAt(0).toUpperCase() + hostPlan.slice(1)} plan allows up to ${limit} active listing${limit > 1 ? 's' : ''}. Upgrade to ${nextPlan} for more.` };
+    }
+    return { allowed: true, limit };
   };
 
   const canRespondToInquiry = async (): Promise<{ allowed: boolean; remaining: number; limit: number; reason?: string }> => {

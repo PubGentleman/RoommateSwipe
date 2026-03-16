@@ -1,0 +1,10 @@
+ALTER TABLE users ADD COLUMN IF NOT EXISTS host_plan TEXT DEFAULT 'none';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS host_listings_included INTEGER DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS host_free_boosts_remaining INTEGER DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS host_is_verified_agent BOOLEAN DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS host_agent_verification_paid BOOLEAN DEFAULT false;
+
+ALTER TABLE listings ADD COLUMN IF NOT EXISTS boost_active BOOLEAN DEFAULT false;
+ALTER TABLE listings ADD COLUMN IF NOT EXISTS boost_expires_at TIMESTAMPTZ;
+ALTER TABLE listings ADD COLUMN IF NOT EXISTS boost_duration TEXT;
+ALTER TABLE listings ADD COLUMN IF NOT EXISTS boost_used_freeboost BOOLEAN DEFAULT false;

@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { User, RoommateProfile, Property, Group, Conversation, Message, Match, Application, Notification, InterestCard } from '../types/models';
+import { User, RoommateProfile, Property, Group, Conversation, Message, Match, Application, Notification, InterestCard, HostSubscriptionData, ListingBoost } from '../types/models';
+import { getDefaultHostSubscription } from './hostPricing';
 import { shouldLoadMockData } from './dataUtils';
 
 const STORAGE_KEYS = {
@@ -18,6 +19,7 @@ const STORAGE_KEYS = {
   MOCK_DATA_VERSION: '@roomdr/mock_data_version',
   ONBOARDING_COMPLETED: '@roomdr/onboarding_completed',
   INTEREST_CARDS: '@roomdr/interestCards',
+  HOST_SUBSCRIPTIONS: '@roomdr/host_subscriptions',
 };
 
 let notificationIdCounter = 0;
@@ -1457,6 +1459,56 @@ export const StorageService = {
       await AsyncStorage.setItem(key, completed ? 'true' : 'false');
     } catch (error) {
       console.error('[StorageService] Error saving onboarding status:', error);
+    }
+  },
+
+  async getHostSubscription(userId: string): Promise<HostSubscriptionData> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.HOST_SUBSCRIPTIONS);
+      const subs: Record<string, HostSubscriptionData> = data ? JSON.parse(data) : {};
+      return subs[userId] || getDefaultHostSubscription();
+    } catch {
+      return getDefaultHostSubscription();
+    }
+  },
+
+  async updateHostSubscription(userId: string, sub: Partial<HostSubscriptionData>): Promise<void> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.HOST_SUBSCRIPTIONS);
+      const subs: Record<string, HostSubscriptionData> = data ? JSON.parse(data) : {};
+      const existing = subs[userId] || getDefaultHostSubscription();
+      subs[userId] = { ...existing, ...sub };
+      await AsyncStorage.setItem(STORAGE_KEYS.HOST_SUBSCRIPTIONS, JSON.stringify(subs));
+    } catch (error) {
+      console.error('[StorageService] Error updating host subscription:', error);
+    }
+  },
+
+  async applyListingBoost(listingId: string, boost: ListingBoost): Promise<void> {
+    try {
+      const properties = await this.getProperties();
+      const index = properties.findIndex(p => p.id === listingId);
+      if (index >= 0) {
+        properties[index] = { ...properties[index], listingBoost: boost };
+        await AsyncStorage.setItem(STORAGE_KEYS.PROPERTIES, JSON.stringify(properties));
+      }
+    } catch (error) {
+      console.error('[StorageService] Error applying listing boost:', error);
+    }
+  },
+
+  async getActiveBoostForHost(hostId: string): Promise<ListingBoost | null> {
+    try {
+      const properties = await this.getProperties();
+      const hostProperties = properties.filter(p => p.hostId === hostId);
+      for (const prop of hostProperties) {
+        if (prop.listingBoost?.isActive && new Date(prop.listingBoost.expiresAt) > new Date()) {
+          return prop.listingBoost;
+        }
+      }
+      return null;
+    } catch {
+      return null;
     }
   },
 };

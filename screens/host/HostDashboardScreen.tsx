@@ -7,11 +7,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
 import { StorageService } from '../../utils/storage';
-import { Property, InterestCard, Message, Conversation } from '../../types/models';
+import { Property, InterestCard, Message, Conversation, HostSubscriptionData } from '../../types/models';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { getMyListings } from '../../services/listingService';
 import { getReceivedInterestCards } from '../../services/discoverService';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
+import { HostPlanBadge } from '../../components/HostPlanBadge';
+import { canAddListingCheck } from '../../utils/hostPricing';
 
 const BG = '#111';
 const CARD_BG = '#1a1a1a';
@@ -72,6 +74,7 @@ export const HostDashboardScreen = () => {
   const [inquiries, setInquiries] = useState<InterestCard[]>([]);
   const [messageCount, setMessageCount] = useState(0);
   const [showAISheet, setShowAISheet] = useState(false);
+  const [hostSub, setHostSub] = useState<HostSubscriptionData | null>(null);
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -143,6 +146,9 @@ export const HostDashboardScreen = () => {
       const interestCards = await StorageService.getInterestCardsForHost(user.id);
       setInquiries(interestCards);
     }
+
+    const sub = await StorageService.getHostSubscription(user.id);
+    setHostSub(sub);
   }, [user]);
 
   useFocusEffect(
@@ -288,7 +294,10 @@ export const HostDashboardScreen = () => {
     <View style={[styles.container, { backgroundColor: BG }]}>
       <View style={[styles.topNav, { paddingTop: insets.top + 14 }]}>
         <View>
-          <Text style={styles.greetingSub}>{getGreeting()}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={styles.greetingSub}>{getGreeting()}</Text>
+            {hostSub ? <HostPlanBadge plan={hostSub.plan} isVerifiedAgent={hostSub.isVerifiedAgent} /> : null}
+          </View>
           <Text style={styles.greetingTitle}>Host Dashboard</Text>
         </View>
         <View style={styles.navActions}>
@@ -439,7 +448,20 @@ export const HostDashboardScreen = () => {
           <Text style={styles.sectionTitle}>QUICK ACTIONS</Text>
         </View>
         <View style={styles.quickActions}>
-          <Pressable style={styles.qaPrimary} onPress={() => navigation.navigate('CreateEditListing')}>
+          <Pressable style={styles.qaPrimary} onPress={() => {
+            if (hostSub) {
+              const result = canAddListingCheck({ ...hostSub, activeListingCount: activeCount });
+              if (!result.allowed) {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                Alert.alert('Listing Limit Reached', result.message, [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Upgrade Plan', onPress: () => navigation.navigate('HostSubscription') },
+                ]);
+                return;
+              }
+            }
+            navigation.navigate('CreateEditListing');
+          }}>
             <LinearGradient
               colors={[ACCENT, '#e83a2a']}
               start={{ x: 0, y: 0 }}
@@ -463,7 +485,7 @@ export const HostDashboardScreen = () => {
               </View>
             ) : null}
           </Pressable>
-          <Pressable style={styles.qaSecondary} onPress={() => navigation.navigate('HostPricing')}>
+          <Pressable style={styles.qaSecondary} onPress={() => navigation.navigate('HostSubscription')}>
             <Feather name="star" size={15} color={GOLD} />
             <Text style={styles.qaSecondaryText}>Plans</Text>
           </Pressable>

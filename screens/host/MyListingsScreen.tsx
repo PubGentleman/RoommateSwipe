@@ -8,10 +8,11 @@ import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
 import { PaywallSheet } from '../../components/PaywallSheet';
 import { StorageService } from '../../utils/storage';
-import { Property, InterestCard } from '../../types/models';
+import { Property, InterestCard, HostSubscriptionData } from '../../types/models';
 import { getMyListings, updateListing, deleteListing as deleteListingSupa } from '../../services/listingService';
 import { getReceivedInterestCards } from '../../services/discoverService';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
+import { isListingBoosted, canAddListingCheck } from '../../utils/hostPricing';
 
 const BG = '#111';
 const CARD_BG = '#1a1a1a';
@@ -65,7 +66,7 @@ function formatListedAgo(listing: Property): string {
 }
 
 export const MyListingsScreen = () => {
-  const { user, canAddListing, getHostPlan } = useAuth();
+  const { user, getHostPlan } = useAuth();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const [listings, setListings] = useState<Property[]>([]);
@@ -73,6 +74,7 @@ export const MyListingsScreen = () => {
   const [filter, setFilter] = useState<FilterStatus>('all');
   const [showHostPaywall, setShowHostPaywall] = useState(false);
   const [showAISheet, setShowAISheet] = useState(false);
+  const [hostSub, setHostSub] = useState<HostSubscriptionData | null>(null);
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -143,6 +145,9 @@ export const MyListingsScreen = () => {
       const cards = await StorageService.getInterestCardsForHost(user.id);
       setInquiries(cards);
     }
+
+    const sub = await StorageService.getHostSubscription(user.id);
+    setHostSub(sub);
   }, [user]);
 
   useFocusEffect(
@@ -291,6 +296,12 @@ export const MyListingsScreen = () => {
               <Text style={styles.boostBadgeText}>Featured</Text>
             </View>
           ) : null}
+          {isListingBoosted(listing) ? (
+            <View style={styles.boostedPill}>
+              <Feather name="zap" size={10} color="#a855f7" />
+              <Text style={styles.boostedPillText}>Boosted</Text>
+            </View>
+          ) : null}
         </Pressable>
 
         <View style={styles.cardBody}>
@@ -409,6 +420,13 @@ export const MyListingsScreen = () => {
             </Pressable>
             {status === 'active' ? (
               <>
+                <Pressable
+                  style={styles.actBoost}
+                  onPress={() => navigation.navigate('ListingBoost', { listingId: listing.id })}
+                >
+                  <Feather name="zap" size={13} color="#a855f7" />
+                  <Text style={styles.actBoostText}>Boost</Text>
+                </Pressable>
                 <Pressable style={styles.actPause} onPress={() => pauseListing(listing.id)}>
                   <Feather name="pause" size={13} color={ORANGE} />
                   <Text style={styles.actPauseText}>Pause</Text>
@@ -452,12 +470,27 @@ export const MyListingsScreen = () => {
             </LinearGradient>
           </Pressable>
         <Pressable onPress={() => {
-          const activeListings = listings.filter(p => getListingStatus(p) !== 'rented').length;
-          const result = canAddListing(activeListings);
-          if (!result.allowed) {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-            setShowHostPaywall(true);
-            return;
+          if (hostSub) {
+            const updatedSub = { ...hostSub, activeListingCount: activeCount };
+            const result = canAddListingCheck(updatedSub);
+            if (!result.allowed) {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+              Alert.alert('Listing Limit Reached', result.message, [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Upgrade Plan', onPress: () => {
+                  const parent = navigation.getParent();
+                  if (parent) parent.navigate('Dashboard', { screen: 'HostSubscription' });
+                }},
+              ]);
+              return;
+            }
+            if (result.message) {
+              Alert.alert('Overage Notice', result.message, [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Continue', onPress: () => navigation.navigate('CreateEditListing') },
+              ]);
+              return;
+            }
           }
           navigation.navigate('CreateEditListing');
         }}>
@@ -703,6 +736,25 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: GOLD,
   },
+  boostedPill: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    backgroundColor: 'rgba(168,85,247,0.25)',
+    borderWidth: 1,
+    borderColor: 'rgba(168,85,247,0.4)',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  boostedPillText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#a855f7',
+  },
 
   cardBody: { padding: 14, paddingHorizontal: 15 },
   cardTitleRow: {
@@ -898,6 +950,19 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.1)',
   },
   actEditText: { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.7)' },
+  actBoost: {
+    flex: 1,
+    height: 36,
+    borderRadius: 11,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(168,85,247,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(168,85,247,0.2)',
+  },
+  actBoostText: { fontSize: 12, fontWeight: '700', color: '#a855f7' },
   actPause: {
     flex: 1,
     height: 36,
