@@ -11,6 +11,7 @@ import { Property, InterestCard, Message, Conversation } from '../../types/model
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { getMyListings } from '../../services/listingService';
 import { getReceivedInterestCards } from '../../services/discoverService';
+import { RoomdrAISheet } from '../../components/RoomdrAISheet';
 
 const BG = '#111';
 const CARD_BG = '#1a1a1a';
@@ -70,6 +71,7 @@ export const HostDashboardScreen = () => {
   const [listings, setListings] = useState<Property[]>([]);
   const [inquiries, setInquiries] = useState<InterestCard[]>([]);
   const [messageCount, setMessageCount] = useState(0);
+  const [showAISheet, setShowAISheet] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -290,6 +292,14 @@ export const HostDashboardScreen = () => {
           <Text style={styles.greetingTitle}>Host Dashboard</Text>
         </View>
         <View style={styles.navActions}>
+          <Pressable style={styles.iconBtn} onPress={() => setShowAISheet(true)}>
+            <LinearGradient
+              colors={['#ff6b5b', '#e83a2a']}
+              style={styles.aiGradientBtn}
+            >
+              <Feather name="cpu" size={18} color="#FFFFFF" />
+            </LinearGradient>
+          </Pressable>
           <Pressable style={styles.iconBtn} onPress={() => navigation.navigate('Inquiries')}>
             <Feather name="bell" size={16} color="rgba(255,255,255,0.6)" />
             {pendingInquiries > 0 ? <View style={styles.notifDot} /> : null}
@@ -471,6 +481,23 @@ export const HostDashboardScreen = () => {
           ) : null}
         </View>
       </ScrollView>
+      <RoomdrAISheet
+        visible={showAISheet}
+        onDismiss={() => setShowAISheet(false)}
+        screenContext="host_dashboard"
+        contextData={{
+          host: {
+            totalListings: listings.length,
+            activeListings: listings.filter(l => l.available).length,
+            totalInquiries: inquiries.length,
+            pendingInquiries: inquiries.filter(c => c.status === 'pending').length,
+            planName: hostPlan || 'starter',
+          }
+        }}
+        onNavigate={(screen, params) => {
+          try { navigation.navigate(screen as any, params); } catch {}
+        }}
+      />
     </View>
   );
 };
@@ -491,6 +518,10 @@ const styles = StyleSheet.create({
     width: 38, height: 38, borderRadius: 19,
     backgroundColor: 'rgba(255,255,255,0.07)',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  aiGradientBtn: {
+    width: 38, height: 38, borderRadius: 19,
     alignItems: 'center', justifyContent: 'center',
   },
   notifDot: {

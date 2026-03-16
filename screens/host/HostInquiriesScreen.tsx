@@ -8,11 +8,13 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { StorageService } from '../../utils/storage';
 import { InterestCard, Conversation, Message } from '../../types/models';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { getReceivedInterestCards, acceptInterestCard, rejectInterestCard } from '../../services/discoverService';
 import { updateGroup } from '../../services/groupService';
+import { RoomdrAISheet } from '../../components/RoomdrAISheet';
 
 type FilterStatus = 'all' | 'pending' | 'accepted' | 'passed';
 
@@ -20,8 +22,10 @@ export const HostInquiriesScreen = () => {
   const { theme } = useTheme();
   const { user, canRespondToInquiry, useInquiryResponse, getHostPlan } = useAuth();
   const { refreshUnreadCount } = useNotificationContext();
+  const navigation = useNavigation<any>();
   const [interestCards, setInterestCards] = useState<InterestCard[]>([]);
   const [filter, setFilter] = useState<FilterStatus>('all');
+  const [showAISheet, setShowAISheet] = useState(false);
 
   const loadInterestCards = useCallback(async () => {
     if (!user) return;
@@ -363,13 +367,23 @@ export const HostInquiriesScreen = () => {
       <View style={styles.container}>
         <View style={styles.headerRow}>
           <ThemedText style={[Typography.h2]}>Inquiries</ThemedText>
-          {pendingCount > 0 ? (
-            <View style={styles.pendingBadge}>
-              <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '700' }]}>
-                {pendingCount} pending
-              </ThemedText>
-            </View>
-          ) : null}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            {pendingCount > 0 ? (
+              <View style={styles.pendingBadge}>
+                <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '700' }]}>
+                  {pendingCount} pending
+                </ThemedText>
+              </View>
+            ) : null}
+            <Pressable onPress={() => setShowAISheet(true)}>
+              <LinearGradient
+                colors={['#ff6b5b', '#e83a2a']}
+                style={styles.aiGradientBtn}
+              >
+                <Feather name="cpu" size={18} color="#FFFFFF" />
+              </LinearGradient>
+            </Pressable>
+          </View>
         </View>
 
         <View style={styles.filterRow}>
@@ -410,6 +424,24 @@ export const HostInquiriesScreen = () => {
           filtered.map(card => renderCard(card))
         )}
       </View>
+      <RoomdrAISheet
+        visible={showAISheet}
+        onDismiss={() => setShowAISheet(false)}
+        screenContext="host_inquiries"
+        contextData={{
+          host: {
+            totalInquiries: interestCards.length,
+            pendingInquiries: interestCards.filter(c => c.status === 'pending').length,
+            responseRate: interestCards.length > 0
+              ? Math.round((interestCards.filter(c => c.status !== 'pending').length / interestCards.length) * 100)
+              : 0,
+            planName: getHostPlan() || 'starter',
+          }
+        }}
+        onNavigate={(screen, params) => {
+          try { navigation.navigate(screen as any, params); } catch {}
+        }}
+      />
     </ScreenScrollView>
   );
 };
@@ -423,6 +455,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: Spacing.lg,
+  },
+  aiGradientBtn: {
+    width: 38, height: 38, borderRadius: 19,
+    alignItems: 'center', justifyContent: 'center',
   },
   pendingBadge: {
     backgroundColor: '#ff6b5b',

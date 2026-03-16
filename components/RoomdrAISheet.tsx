@@ -25,7 +25,7 @@ const URGENCY_GREY = '#3A3A3A';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const SHEET_HEIGHT = SCREEN_HEIGHT * 0.8;
 
-export type ScreenContext = 'match' | 'chat' | 'explore' | 'messages' | 'groups' | 'profile' | 'profile_reminder' | 'refinement';
+export type ScreenContext = 'match' | 'chat' | 'explore' | 'messages' | 'groups' | 'profile' | 'profile_reminder' | 'refinement' | 'host_dashboard' | 'host_listings' | 'host_inquiries';
 
 interface MatchContextData {
   currentProfile?: RoommateProfile;
@@ -74,6 +74,16 @@ interface ProfileReminderContextData {
   subtext?: string;
 }
 
+interface HostContextData {
+  totalListings?: number;
+  activeListings?: number;
+  totalInquiries?: number;
+  pendingInquiries?: number;
+  totalViews?: number;
+  responseRate?: number;
+  planName?: string;
+}
+
 export interface AISheetContextData {
   match?: MatchContextData;
   chat?: ChatContextData;
@@ -82,6 +92,7 @@ export interface AISheetContextData {
   groups?: GroupsContextData;
   profile?: ProfileContextData;
   profileReminder?: ProfileReminderContextData;
+  host?: HostContextData;
 }
 
 interface RoomdrAISheetProps {
@@ -116,6 +127,9 @@ const CONTEXT_LABELS: Record<ScreenContext, { label: string; icon: keyof typeof 
   profile: { label: 'Profile', icon: 'user' },
   profile_reminder: { label: 'AI Tip', icon: 'zap' },
   refinement: { label: 'Improving Matches', icon: 'trending-up' },
+  host_dashboard: { label: 'Dashboard', icon: 'grid' },
+  host_listings: { label: 'My Listings', icon: 'home' },
+  host_inquiries: { label: 'Inquiries', icon: 'inbox' },
 };
 
 const MATCH_MULTIPLIERS: Record<string, number> = {
@@ -521,6 +535,41 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData, 
           return `Your profile is ${profileCompletion.score}% complete. Adding ${topMissing.toLowerCase().startsWith('a') ? 'an' : 'a'} ${topMissing.toLowerCase()} gets ${multiplier}x more matches.`;
         }
         return `${name ? name + ', y' : 'Y'}our profile is 100% complete. You're getting maximum visibility.`;
+      }
+      case 'host_dashboard': {
+        const pending = contextData?.host?.pendingInquiries || 0;
+        const active = contextData?.host?.activeListings || 0;
+        if (pending > 0) {
+          return `You have ${pending} pending inquir${pending !== 1 ? 'ies' : 'y'} waiting for a response. Responding within 24 hours increases your acceptance rate.`;
+        }
+        if (active > 0) {
+          return `You have ${active} active listing${active !== 1 ? 's' : ''}. Keep your availability up to date to attract the right renters.`;
+        }
+        return `Welcome back${name ? ', ' + name : ''}. Post your first listing to start receiving inquiries from matched renters.`;
+      }
+      case 'host_listings': {
+        const active = contextData?.host?.activeListings || 0;
+        const views = contextData?.host?.totalViews || 0;
+        const total = contextData?.host?.totalListings || 0;
+        if (total === 0) {
+          return `You don't have any listings yet. Create one now and start receiving inquiries from renters in your city.`;
+        }
+        if (active > 0 && views < 20) {
+          return `Your listing${active > 1 ? 's are' : ' is'} live but getting low views. Try adding more photos or boosting visibility.`;
+        }
+        return `You have ${active} active listing${active !== 1 ? 's' : ''} with ${views} total views. Looking good — keep responding to inquiries quickly.`;
+      }
+      case 'host_inquiries': {
+        const pending = contextData?.host?.pendingInquiries || 0;
+        const total = contextData?.host?.totalInquiries || 0;
+        const rate = contextData?.host?.responseRate || 0;
+        if (pending > 0) {
+          return `${pending} renter${pending !== 1 ? 's are' : ' is'} waiting for your response. Hosts who respond within 24 hours get 3x more matches.`;
+        }
+        if (total === 0) {
+          return `No inquiries yet. Make sure your listing has clear photos, an accurate price, and is marked as active.`;
+        }
+        return `Your response rate is ${rate}%. ${rate >= 80 ? 'Excellent — renters love responsive hosts.' : 'Try to respond faster to improve your host ranking.'}`;
       }
       default:
         return 'How can I help you today?';
@@ -984,6 +1033,72 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData, 
     );
   };
 
+  const getHostContextContent = () => {
+    const pending = contextData?.host?.pendingInquiries || 0;
+    const active = contextData?.host?.activeListings || 0;
+    const total = contextData?.host?.totalListings || 0;
+    const views = contextData?.host?.totalViews || 0;
+    const rate = contextData?.host?.responseRate || 0;
+    const plan = contextData?.host?.planName || 'starter';
+
+    return (
+      <>
+        {pending > 0 && !isDismissed('host-pending') ? (
+          <InsightCard
+            icon="inbox"
+            title="Pending Inquiries"
+            body={`${pending} renter${pending !== 1 ? 's are' : ' is'} waiting for your response. Hosts who respond quickly rank higher in search results.`}
+            id="host-pending"
+            onFeedback={handleFeedback}
+            urgencyValue={-1}
+            onTap={() => { onDismiss(); onNavigate?.('Inquiries'); }}
+          />
+        ) : null}
+        {total === 0 && !isDismissed('host-no-listings') ? (
+          <InsightCard
+            icon="home"
+            title="No Listings Yet"
+            body="Post your first listing to start receiving inquiries. Add clear photos and a competitive price to attract the best matches."
+            id="host-no-listings"
+            onFeedback={handleFeedback}
+            urgencyValue={-1}
+            onTap={() => { onDismiss(); onNavigate?.('CreateEditListing'); }}
+          />
+        ) : null}
+        {active > 0 && views < 20 && !isDismissed('host-low-views') ? (
+          <InsightCard
+            icon="eye"
+            title="Low Listing Views"
+            body={`Your listing${active > 1 ? 's are' : ' is'} getting fewer than 20 views. Add more photos, improve your description, or activate a boost.`}
+            id="host-low-views"
+            onFeedback={handleFeedback}
+            urgencyValue={views}
+            onTap={() => { onDismiss(); onNavigate?.('MyListings'); }}
+          />
+        ) : null}
+        {rate > 0 && rate < 70 && !isDismissed('host-response-rate') ? (
+          <InsightCard
+            icon="clock"
+            title="Response Rate"
+            body={`Your response rate is ${rate}%. Aim for 80%+ to get a 'Responsive Host' badge that increases your inquiry volume.`}
+            id="host-response-rate"
+            onFeedback={handleFeedback}
+            urgencyValue={rate}
+            onTap={() => { onDismiss(); onNavigate?.('Inquiries'); }}
+          />
+        ) : null}
+        <InsightCard
+          icon="trending-up"
+          title="Host Plan"
+          body={`You're on the ${plan} plan. ${plan === 'starter' ? 'Upgrade to Pro to list up to 5 properties and unlock priority placement.' : plan === 'pro' ? 'Upgrade to Business for unlimited listings and full analytics.' : 'You have access to all host features.'}`}
+          id="host-plan"
+          onFeedback={handleFeedback}
+          onTap={() => { onDismiss(); onNavigate?.('HostPricing'); }}
+        />
+      </>
+    );
+  };
+
   const renderContextContent = () => {
     switch (screenContext) {
       case 'match': return getMatchContextContent();
@@ -994,6 +1109,9 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData, 
       case 'profile': return getProfileContextContent();
       case 'profile_reminder': return getProfileReminderContent();
       case 'refinement': return getRefinementContent();
+      case 'host_dashboard':
+      case 'host_listings':
+      case 'host_inquiries': return getHostContextContent();
       default: return null;
     }
   };

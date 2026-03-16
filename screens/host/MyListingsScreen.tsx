@@ -11,6 +11,7 @@ import { StorageService } from '../../utils/storage';
 import { Property, InterestCard } from '../../types/models';
 import { getMyListings, updateListing, deleteListing as deleteListingSupa } from '../../services/listingService';
 import { getReceivedInterestCards } from '../../services/discoverService';
+import { RoomdrAISheet } from '../../components/RoomdrAISheet';
 
 const BG = '#111';
 const CARD_BG = '#1a1a1a';
@@ -71,6 +72,7 @@ export const MyListingsScreen = () => {
   const [inquiries, setInquiries] = useState<InterestCard[]>([]);
   const [filter, setFilter] = useState<FilterStatus>('all');
   const [showHostPaywall, setShowHostPaywall] = useState(false);
+  const [showAISheet, setShowAISheet] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -440,6 +442,15 @@ export const MyListingsScreen = () => {
             {listings.length} listing{listings.length !== 1 ? 's' : ''} · {activeCount} active
           </Text>
         </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Pressable onPress={() => setShowAISheet(true)}>
+            <LinearGradient
+              colors={[ACCENT, '#e83a2a']}
+              style={styles.aiGradientBtn}
+            >
+              <Feather name="cpu" size={18} color="#fff" />
+            </LinearGradient>
+          </Pressable>
         <Pressable onPress={() => {
           const activeListings = listings.filter(p => getListingStatus(p) !== 'rented').length;
           const result = canAddListing(activeListings);
@@ -460,6 +471,7 @@ export const MyListingsScreen = () => {
             <Text style={styles.addBtnText}>Add Listing</Text>
           </LinearGradient>
         </Pressable>
+        </View>
       </View>
 
       <View style={styles.filterTabs}>
@@ -499,6 +511,24 @@ export const MyListingsScreen = () => {
         )}
       </ScrollView>
 
+      <RoomdrAISheet
+        visible={showAISheet}
+        onDismiss={() => setShowAISheet(false)}
+        screenContext="host_listings"
+        contextData={{
+          host: {
+            totalListings: listings.length,
+            activeListings: listings.filter(p => getListingStatus(p) === 'active').length,
+            totalInquiries: inquiries.length,
+            pendingInquiries: inquiries.filter(c => c.status === 'pending').length,
+            totalViews: listings.reduce((sum, l) => sum + (l.listingViewData?.viewsToday || 0), 0),
+            planName: getHostPlan() || 'starter',
+          }
+        }}
+        onNavigate={(screen, params) => {
+          try { navigation.navigate(screen as any, params); } catch {}
+        }}
+      />
       <PaywallSheet
         visible={showHostPaywall}
         featureName="More Listings"
@@ -528,6 +558,10 @@ const styles = StyleSheet.create({
   },
   topTitle: { fontSize: 22, fontWeight: '800', color: '#fff', letterSpacing: -0.4 },
   topSub: { fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: 1 },
+  aiGradientBtn: {
+    width: 38, height: 38, borderRadius: 19,
+    alignItems: 'center', justifyContent: 'center',
+  },
   addBtn: {
     height: 38,
     borderRadius: 20,
