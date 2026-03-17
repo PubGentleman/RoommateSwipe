@@ -616,10 +616,10 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
               </View>
               <Pressable onPress={() => {
                 if (inquiryGroup?.listingId) {
-                  (navigation as any).navigate('RenterTabs', {
-                    screen: 'Explore',
-                    params: { viewListingId: inquiryGroup.listingId },
-                  });
+                  const tabNav = navigation.getParent();
+                  if (tabNav) {
+                    tabNav.navigate('Explore', { viewListingId: inquiryGroup.listingId });
+                  }
                 }
               }} style={{ paddingLeft: 8 }}>
                 <ThemedText style={{ fontSize: 12, color: '#ff6b5b', fontWeight: '600' }}>View Listing</ThemedText>

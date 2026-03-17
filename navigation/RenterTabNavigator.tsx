@@ -13,7 +13,7 @@ import { useTheme } from '../hooks/useTheme';
 import { useNotificationContext } from '../contexts/NotificationContext';
 
 export type RenterTabParamList = {
-  Explore: undefined;
+  Explore: { viewListingId?: string } | undefined;
   Roommates: undefined;
   Groups: undefined;
   Messages: undefined;
