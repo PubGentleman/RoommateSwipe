@@ -1060,7 +1060,10 @@ export const RoommatesScreen = () => {
     );
     
     if (existingConversation) {
-      (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: existingConversation.id } });
+      (navigation as any).navigate('Messages', { screen: 'MessagesList' });
+      setTimeout(() => {
+        (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: existingConversation.id } });
+      }, 50);
     } else {
       const newConversation: any = {
         id: `conv-${currentProfile.id}-${Date.now()}`,
@@ -1077,7 +1080,10 @@ export const RoommatesScreen = () => {
         matchType: isCold ? 'cold' : 'mutual',
       };
       await StorageService.addOrUpdateConversation(newConversation);
-      (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: newConversation.id } });
+      (navigation as any).navigate('Messages', { screen: 'MessagesList' });
+      setTimeout(() => {
+        (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: newConversation.id } });
+      }, 50);
     }
     
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -1384,7 +1390,10 @@ export const RoommatesScreen = () => {
               c.participant.id === matchedProfileData.profile.id
             );
             if (existingConversation) {
-              (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: existingConversation.id } });
+              (navigation as any).navigate('Messages', { screen: 'MessagesList' });
+              setTimeout(() => {
+                (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: existingConversation.id } });
+              }, 50);
             } else {
               const storedMatches = await StorageService.getMatches();
               const thisMatch = storedMatches.find(m =>
@@ -1406,7 +1415,10 @@ export const RoommatesScreen = () => {
                 matchType: (thisMatch?.matchType || 'mutual') as 'mutual' | 'super_interest' | 'cold',
               };
               await StorageService.addOrUpdateConversation(newConversation);
-              (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: newConversation.id } });
+              (navigation as any).navigate('Messages', { screen: 'MessagesList' });
+              setTimeout(() => {
+                (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: newConversation.id } });
+              }, 50);
             }
           }
         }}

@@ -1,0 +1,230 @@
+# Replit Prompt: Fix All Broken Buttons & Navigation (Based on Actual Code Audit)
+
+---
+
+## OVERVIEW
+
+The following bugs were found by auditing the actual source code. Fix each one exactly as described. Do NOT change anything else — only the specific lines/functions listed below.
+
+---
+
+## BUG #1 — CRASH: `ListingBoostScreen.tsx` — "See Plans" crashes from Listings tab
+
+**File:** `screens/host/ListingBoostScreen.tsx`
+
+**Problem:** When a free-plan host opens `ListingBoostScreen` from the **Listings tab** (via `MyListings → ListingBoost`), the "See Plans" upgrade button calls `navigation.navigate('HostSubscription')`. But `HostSubscription` is NOT registered in the `ListingsStack` — only in `DashboardStack`. This crashes the app.
+
+**Find this code (around line 96):**
+```tsx
+onPress={() => navigation.navigate('HostSubscription')}
+```
+
+**Replace with:**
+```tsx
+onPress={() => {
+  const parent = navigation.getParent();
+  if (parent) {
+    parent.navigate('Dashboard', { screen: 'HostSubscription' });
+  }
+}}
+```
+
+---
+
+## BUG #2 — WRONG ACTION: `MyListingsScreen.tsx` — "Boost to get noticed" calls wrong function
+
+**File:** `screens/host/MyListingsScreen.tsx`
+
+**Problem:** In the empty-inquiries row, tapping "Boost to get noticed" calls `toggleFeatured(listing.id)` — this incorrectly toggles the featured status instead of navigating to the boost screen.
+
+**Find this code (around line 383):**
+```tsx
+onPress={() => toggleFeatured(listing.id)}
+```
+(This is inside the `style={styles.inquiryRowEmpty}` Pressable with the "Boost to get noticed" text)
+
+**Replace with:**
+```tsx
+onPress={() => navigation.navigate('ListingBoost', { listingId: listing.id })}
+```
+
+---
+
+## BUG #3 — WRONG DESTINATION: `HostDashboardScreen.tsx` — Bell icon goes to Inquiries, not Notifications
+
+**File:** `screens/host/HostDashboardScreen.tsx`
+
+**Problem:** The bell/notification icon in the header navigates to `'Inquiries'` (a stack screen). A bell icon should navigate to a notifications screen. Users tapping the bell expect to see notifications, not inquiry cards.
+
+**Find this code (around line 342):**
+```tsx
+<Pressable style={styles.iconBtn} onPress={() => navigation.navigate('Inquiries')}>
+  <Feather name="bell" size={16} color="rgba(255,255,255,0.6)" />
+```
+
+**Replace with:**
+```tsx
+<Pressable style={styles.iconBtn} onPress={() => navigateToTab('Profile', { screen: 'Notifications' })}>
+  <Feather name="bell" size={16} color="rgba(255,255,255,0.6)" />
+```
+
+If `navigateToTab` doesn't support params, use:
+```tsx
+<Pressable style={styles.iconBtn} onPress={() => {
+  const parent = navigation.getParent();
+  if (parent) parent.navigate('Profile', { screen: 'Notifications' });
+}}>
+  <Feather name="bell" size={16} color="rgba(255,255,255,0.6)" />
+```
+
+---
+
+## BUG #4 — WRONG ACTION: `CreateEditListingScreen.tsx` — "Upgrade Plan" in cap-limit alert calls `goBack()`
+
+**File:** `screens/host/CreateEditListingScreen.tsx`
+
+**Problem:** When a host tries to add a listing but is over their plan's listing cap, an Alert fires with an "Upgrade Plan" button. That button currently calls `navigation.goBack()` — it should send the user to the subscription/upgrade screen instead.
+
+**Find this code (around line 173):**
+```tsx
+{ text: 'Upgrade Plan', onPress: () => navigation.goBack() },
+```
+
+**Replace with:**
+```tsx
+{
+  text: 'Upgrade Plan',
+  onPress: () => {
+    const parent = navigation.getParent();
+    if (parent) {
+      parent.navigate('Dashboard', { screen: 'HostSubscription' });
+    } else {
+      navigation.navigate('HostSubscription' as any);
+    }
+  },
+},
+```
+
+---
+
+## BUG #5 — WRONG SCREEN: `ProfileScreen.tsx` — "Upgrade" button inside subscription card always goes to renter Plans screen
+
+**File:** `screens/shared/ProfileScreen.tsx`
+
+**Problem:** Inside the subscription section, there is an "Upgrade" Pressable (around line 441) that always navigates to `'Plans'` — which is the renter plan selection screen. For hosts, this should navigate to `'HostPricing'` instead.
+
+**Find this code (around line 441):**
+```tsx
+<Pressable onPress={() => navigation.navigate('Plans')}>
+```
+(This is the one inside the subscription card section, NOT the other subscription buttons)
+
+**Replace with:**
+```tsx
+<Pressable onPress={() => navigation.navigate(user?.role === 'host' ? 'HostPricing' : 'Plans')}>
+```
+
+---
+
+## BUG #6 — WRONG SCREEN: `ProfileScreen.tsx` — Host subscription card goes to old `HostPricingScreen` instead of new `HostSubscriptionScreen`
+
+**File:** `screens/shared/ProfileScreen.tsx` and `navigation/ProfileStackNavigator.tsx`
+
+**Problem:** When a host taps the subscription card (lines 381 and 398), they're sent to `HostPricingScreen` — the old pricing screen. The new subscription management screen is `HostSubscriptionScreen`, which currently only lives in DashboardStack and is unreachable from the Profile tab.
+
+### Step 1 — Add `HostSubscriptionScreen` to `ProfileStackNavigator`
+
+**File:** `navigation/ProfileStackNavigator.tsx`
+
+Add the import at the top:
+```tsx
+import { HostSubscriptionScreen } from '../screens/host/HostSubscriptionScreen';
+```
+
+Add `HostSubscription` to the type param list:
+```tsx
+export type ProfileStackParamList = {
+  // ... existing params ...
+  HostSubscription: undefined;  // ADD THIS
+};
+```
+
+Add the screen inside the Navigator:
+```tsx
+<Stack.Screen
+  name="HostSubscription"
+  component={HostSubscriptionScreen}
+  options={{ headerShown: false }}
+/>
+```
+
+### Step 2 — Update ProfileScreen to navigate to new screen
+
+**File:** `screens/shared/ProfileScreen.tsx`
+
+**Find (around line 381):**
+```tsx
+onPress={() => navigation.navigate(user?.role === 'host' ? 'HostPricing' : 'Plans')}
+```
+
+**Replace with:**
+```tsx
+onPress={() => navigation.navigate(user?.role === 'host' ? 'HostSubscription' : 'Plans')}
+```
+
+**Find the second instance (around line 398):**
+```tsx
+<Pressable onPress={() => navigation.navigate(user?.role === 'host' ? 'HostPricing' : 'Plans')}>
+```
+
+**Replace with:**
+```tsx
+<Pressable onPress={() => navigation.navigate(user?.role === 'host' ? 'HostSubscription' : 'Plans')}>
+```
+
+---
+
+## BUG #7 — WRONG DESTINATION: `HostDashboardScreen.tsx` — "Plans" quick action navigates within DashboardStack only
+
+**File:** `screens/host/HostDashboardScreen.tsx`
+
+**Problem:** The "Plans" quick action button (around line 540) calls `navigation.navigate('HostSubscription')` which works from DashboardMain (since it's in the same DashboardStack). This is actually fine — no code change needed here. ✓
+
+---
+
+## BUG #8 — CONFIRM: All `onPress={() => {}}` patterns are intentional
+
+The following `onPress={() => {}}` patterns found in the codebase are **intentional stop-propagation** patterns on modal sheet inner containers. They prevent taps inside the sheet from dismissing it by bubbling to the overlay. Do NOT change these:
+
+- `screens/shared/ProfileScreen.tsx:583` — boost modal inner sheet
+- `screens/shared/ProfileScreen.tsx:715` — reference request sheet
+- `screens/shared/ManageSubscriptionScreen.tsx:154` — cancel confirmation sheet
+- `screens/renter/RoommatesScreen.tsx:1353` — profile boost modal sheet
+- `screens/renter/ExploreScreen.tsx:1159` — inquiry modal sheet
+- `components/DatePickerModal.tsx:277` — date picker sheet
+- `components/PaywallSheet.tsx:124` — paywall sheet
+
+These are all correct and should remain as `onPress={() => {}}`.
+
+---
+
+## SUMMARY OF CHANGES
+
+| # | File | Line(s) | Issue | Fix |
+|---|---|---|---|---|
+| 1 | `ListingBoostScreen.tsx` | ~96 | Crashes from ListingsStack | Use `getParent().navigate('Dashboard', { screen: 'HostSubscription' })` |
+| 2 | `MyListingsScreen.tsx` | ~383 | "Boost to get noticed" calls `toggleFeatured` | Navigate to `ListingBoost` screen instead |
+| 3 | `HostDashboardScreen.tsx` | ~342 | Bell goes to Inquiries | Navigate to Notifications |
+| 4 | `CreateEditListingScreen.tsx` | ~173 | "Upgrade Plan" goes back instead of upgrading | Navigate to HostSubscription via parent |
+| 5 | `ProfileScreen.tsx` | ~441 | "Upgrade" hardcoded to renter Plans | Respect user role |
+| 6 | `ProfileScreen.tsx` + `ProfileStackNavigator.tsx` | ~381, ~398 | Hosts sent to old HostPricingScreen | Add HostSubscription to ProfileStack, update navigation |
+
+---
+
+## DO NOT CHANGE
+
+- Do NOT modify any `onPress={() => {}}` on modal sheet containers (these are intentional)
+- Do NOT touch renter pricing screens (`PlansScreen`, renter subscription flow)
+- Do NOT modify `isDev` guards or mock data
+- Do NOT change any Supabase queries or storage logic
+- Do NOT change any other navigation that is already working correctly

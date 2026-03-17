@@ -432,9 +432,11 @@ export const GroupsScreen = () => {
     );
     
     if (existingConversation) {
-      navigation.navigate('Messages', { screen: 'Chat', params: { conversationId: existingConversation.id } });
+      (navigation as any).navigate('Messages', { screen: 'MessagesList' });
+      setTimeout(() => {
+        (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: existingConversation.id } });
+      }, 50);
     } else {
-      // Get target user profile
       const roommateProfiles = await StorageService.getRoommateProfiles();
       const targetProfile = roommateProfiles.find(p => p.id === targetUserId);
       
@@ -454,7 +456,10 @@ export const GroupsScreen = () => {
         messages: [],
       };
       await StorageService.addOrUpdateConversation(newConversation);
-      navigation.navigate('Messages', { screen: 'Chat', params: { conversationId: newConversation.id } });
+      (navigation as any).navigate('Messages', { screen: 'MessagesList' });
+      setTimeout(() => {
+        (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: newConversation.id } });
+      }, 50);
     }
     
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

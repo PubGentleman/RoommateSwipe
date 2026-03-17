@@ -163,7 +163,10 @@ export const MyInterestsScreen = () => {
     const conversations = await StorageService.getConversations();
     const existing = conversations.find(c => c.id === conversationId);
     if (existing) {
-      (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: existing.id } });
+      (navigation as any).navigate('Messages', { screen: 'MessagesList' });
+      setTimeout(() => {
+        (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: existing.id } });
+      }, 50);
     }
   };
 

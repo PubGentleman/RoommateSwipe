@@ -1,0 +1,439 @@
+# Replit Prompt: Show Sent Inquiries as Chat Threads in Renter's Messages Tab
+
+---
+
+## OVERVIEW
+
+When a renter sends an inquiry on a listing, it should immediately appear as a chat thread in their Messages tab. Right now the inquiry disappears after sending and the renter has no way to track it, follow up, or know when the host responds. This needs to be fixed so every inquiry creates a visible, trackable conversation thread from the moment it's sent.
+
+---
+
+## HOW IT SHOULD WORK
+
+1. Renter sends inquiry on a listing (solo or as a group)
+2. A chat thread is created immediately in their Messages tab with status "Pending"
+3. The thread shows the listing photo, title, price, and when the inquiry was sent
+4. If the host **accepts** → thread becomes a live two-way conversation, status changes to "Accepted"
+5. If the host **declines** → thread is archived with "Not available" note, status changes to "Declined"
+6. If it's a group inquiry → all group members see the same thread
+
+---
+
+## CHANGES NEEDED
+
+---
+
+### 1. `screens/renter/ExploreScreen.tsx` — Create chat thread when inquiry is sent
+
+In the `handleSendInquiry` function, after the inquiry is successfully created, immediately create a conversation/chat thread so it shows up in the renter's Messages tab.
+
+**Find the `handleSendInquiry` function** and add thread creation after the inquiry is saved:
+
+```tsx
+const handleSendInquiry = async () => {
+  if (!inquireProperty || !user) return;
+
+  const isSoloInquiry = roommateGroups.length === 0 && !selectedGroupId;
+  if (!isSoloInquiry && !selectedGroupId) return;
+
+  setCreatingInquiry(true);
+  try {
+    const groupIdToUse = isSoloInquiry ? `solo-${user.id}` : selectedGroupId;
+    const inquiryId = `inquiry-${Date.now()}`;
+
+    // Save the inquiry record
+    await StorageService.createInquiry({
+      id: inquiryId,
+      propertyId: inquireProperty.id,
+      groupId: groupIdToUse,
+      renterId: user.id,
+      renterName: user.name || 'Renter',
+      renterPhoto: user.profilePhoto || '',
+      personalNote: '',
+      isSoloInquiry,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    });
+
+    // CREATE CHAT THREAD — so it shows in Messages tab immediately
+    const conversationId = `inquiry-conv-${inquiryId}`;
+    const systemMessage = {
+      id: `msg-${Date.now()}`,
+      senderId: 'system',
+      text: `You inquired about this listing. Waiting for the host to respond.`,
+      content: `You inquired about this listing. Waiting for the host to respond.`,
+      timestamp: new Date(),
+      read: true,
+    };
+
+    const newConversation = {
+      id: conversationId,
+      inquiryId,
+      propertyId: inquireProperty.id,
+      listingTitle: inquireProperty.title,
+      listingPhoto: inquireProperty.photos?.[0] || '',
+      listingPrice: inquireProperty.price,
+      hostId: inquireProperty.hostId,
+      hostName: inquireProperty.hostName || 'Host',
+      hostPhoto: inquireProperty.hostProfilePhoto || '',
+      participant: {
+        id: inquireProperty.hostId,
+        name: inquireProperty.hostName || 'Host',
+        photo: inquireProperty.hostProfilePhoto || '',
+        online: false,
+      },
+      lastMessage: 'Inquiry sent — awaiting response',
+      lastMessageTime: new Date(),
+      unreadCount: 0,
+      inquiryStatus: 'pending' as const,  // 'pending' | 'accepted' | 'declined'
+      isInquiryThread: true,
+      groupId: groupIdToUse,
+      isSoloInquiry,
+      messages: [systemMessage],
+      createdAt: new Date().toISOString(),
+    };
+
+    await StorageService.addOrUpdateConversation(newConversation);
+
+    setShowInquireModal(false);
+    setSelectedGroupId(null);
+
+    Alert.alert(
+      'Inquiry Sent!',
+      'Track your inquiry in the Messages tab.',
+      [
+        {
+          text: 'View in Messages',
+          onPress: () => (navigation as any).navigate('Messages'),
+        },
+        { text: 'OK' },
+      ]
+    );
+  } catch (error) {
+    Alert.alert('Error', 'Failed to send inquiry. Please try again.');
+  } finally {
+    setCreatingInquiry(false);
+  }
+};
+```
+
+---
+
+### 2. `screens/shared/MessagesScreen.tsx` — Display inquiry threads with status pills
+
+Inquiry-based threads need to look different from regular chat threads. They should show the listing info and a status pill (Pending / Accepted / Declined).
+
+**Find the conversation list item render function** (the one that renders each row in the messages list) and update it to handle inquiry threads:
+
+```tsx
+const renderConversationItem = ({ item }: { item: Conversation }) => {
+  // Inquiry thread — special card layout
+  if (item.isInquiryThread) {
+    const statusColor =
+      item.inquiryStatus === 'accepted' ? '#2ecc71' :
+      item.inquiryStatus === 'declined' ? '#ff4757' :
+      '#ffd700'; // pending = gold
+
+    const statusLabel =
+      item.inquiryStatus === 'accepted' ? 'Accepted' :
+      item.inquiryStatus === 'declined' ? 'Not Available' :
+      'Pending';
+
+    return (
+      <Pressable
+        style={styles.inquiryThreadRow}
+        onPress={() => navigateToInquiryChat(item)}
+      >
+        {/* Listing thumbnail */}
+        {item.listingPhoto ? (
+          <Image source={{ uri: item.listingPhoto }} style={styles.inquiryThumb} />
+        ) : (
+          <View style={[styles.inquiryThumb, { backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center' }]}>
+            <Feather name="home" size={20} color="rgba(255,255,255,0.3)" />
+          </View>
+        )}
+
+        <View style={styles.inquiryThreadInfo}>
+          <View style={styles.inquiryThreadTop}>
+            <Text style={styles.inquiryThreadTitle} numberOfLines={1}>
+              {item.listingTitle || 'Listing Inquiry'}
+            </Text>
+            {/* Status pill */}
+            <View style={[styles.statusPill, { backgroundColor: statusColor + '22', borderColor: statusColor + '55' }]}>
+              <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+              <Text style={[styles.statusPillText, { color: statusColor }]}>{statusLabel}</Text>
+            </View>
+          </View>
+
+          <Text style={styles.inquiryThreadPrice}>
+            {item.listingPrice ? `$${item.listingPrice.toLocaleString()}/mo` : ''}
+            {item.hostName ? `  ·  ${item.hostName}` : ''}
+          </Text>
+
+          <Text style={styles.inquiryThreadLastMsg} numberOfLines={1}>
+            {item.lastMessage}
+          </Text>
+        </View>
+      </Pressable>
+    );
+  }
+
+  // Regular conversation — existing render logic unchanged
+  // ... keep existing render code here ...
+};
+```
+
+Add these styles to `MessagesScreen` StyleSheet:
+```tsx
+inquiryThreadRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingHorizontal: 16,
+  paddingVertical: 12,
+  borderBottomWidth: 1,
+  borderBottomColor: 'rgba(255,255,255,0.06)',
+  gap: 12,
+},
+inquiryThumb: {
+  width: 52,
+  height: 52,
+  borderRadius: 10,
+},
+inquiryThreadInfo: {
+  flex: 1,
+  gap: 3,
+},
+inquiryThreadTop: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 8,
+},
+inquiryThreadTitle: {
+  color: '#fff',
+  fontWeight: '600',
+  fontSize: 14,
+  flex: 1,
+},
+statusPill: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingHorizontal: 8,
+  paddingVertical: 3,
+  borderRadius: 20,
+  borderWidth: 1,
+  gap: 4,
+},
+statusDot: {
+  width: 6,
+  height: 6,
+  borderRadius: 3,
+},
+statusPillText: {
+  fontSize: 11,
+  fontWeight: '600',
+},
+inquiryThreadPrice: {
+  color: 'rgba(255,255,255,0.4)',
+  fontSize: 12,
+},
+inquiryThreadLastMsg: {
+  color: 'rgba(255,255,255,0.5)',
+  fontSize: 12,
+},
+```
+
+---
+
+### 3. `screens/shared/MessagesScreen.tsx` — Add "Inquiries" section header above inquiry threads
+
+Separate inquiry threads from regular DM conversations visually by showing them in a labeled section.
+
+**Find where conversations are rendered** and split them into two groups before rendering:
+
+```tsx
+// Split conversations into inquiry threads and regular chats
+const inquiryThreads = conversations.filter(c => c.isInquiryThread);
+const regularChats = conversations.filter(c => !c.isInquiryThread);
+```
+
+Then in the render, show inquiries first with a section header:
+
+```tsx
+{inquiryThreads.length > 0 && (
+  <>
+    <View style={styles.sectionHeader}>
+      <Text style={styles.sectionHeaderText}>LISTING INQUIRIES</Text>
+    </View>
+    {inquiryThreads.map(item => renderConversationItem({ item }))}
+  </>
+)}
+
+{regularChats.length > 0 && (
+  <>
+    <View style={styles.sectionHeader}>
+      <Text style={styles.sectionHeaderText}>MESSAGES</Text>
+    </View>
+    {regularChats.map(item => renderConversationItem({ item }))}
+  </>
+)}
+```
+
+Add section header styles:
+```tsx
+sectionHeader: {
+  paddingHorizontal: 16,
+  paddingTop: 18,
+  paddingBottom: 6,
+},
+sectionHeaderText: {
+  fontSize: 11,
+  fontWeight: '700',
+  color: 'rgba(255,255,255,0.3)',
+  letterSpacing: 1,
+},
+```
+
+---
+
+### 4. `screens/shared/ChatScreen.tsx` — Show listing details banner in inquiry chat threads
+
+When a renter opens an inquiry thread, show a listing info banner at the top of the chat so they always know which listing the conversation is about.
+
+**Find the chat screen header/content area** and add a listing banner when `inquiryGroup?.isInquiryThread` is true:
+
+```tsx
+{route.params?.inquiryGroup?.isInquiryThread && route.params.inquiryGroup.listingPhoto ? (
+  <Pressable
+    style={styles.listingBanner}
+    onPress={() => {/* optionally navigate to listing detail */}}
+  >
+    <Image
+      source={{ uri: route.params.inquiryGroup.listingPhoto }}
+      style={styles.listingBannerThumb}
+    />
+    <View style={styles.listingBannerInfo}>
+      <Text style={styles.listingBannerTitle} numberOfLines={1}>
+        {route.params.inquiryGroup.listingTitle}
+      </Text>
+      <Text style={styles.listingBannerPrice}>
+        {route.params.inquiryGroup.listingPrice
+          ? `$${route.params.inquiryGroup.listingPrice.toLocaleString()}/mo`
+          : ''}
+      </Text>
+    </View>
+    {/* Status pill */}
+    {(() => {
+      const status = route.params.inquiryGroup.inquiryStatus || 'pending';
+      const color = status === 'accepted' ? '#2ecc71' : status === 'declined' ? '#ff4757' : '#ffd700';
+      const label = status === 'accepted' ? 'Accepted' : status === 'declined' ? 'Not Available' : 'Pending';
+      return (
+        <View style={[styles.listingBannerStatus, { backgroundColor: color + '22', borderColor: color + '55' }]}>
+          <Text style={[styles.listingBannerStatusText, { color }]}>{label}</Text>
+        </View>
+      );
+    })()}
+  </Pressable>
+) : null}
+```
+
+Add styles:
+```tsx
+listingBanner: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: 'rgba(255,255,255,0.05)',
+  borderBottomWidth: 1,
+  borderBottomColor: 'rgba(255,255,255,0.08)',
+  paddingHorizontal: 16,
+  paddingVertical: 10,
+  gap: 12,
+},
+listingBannerThumb: {
+  width: 44,
+  height: 44,
+  borderRadius: 8,
+},
+listingBannerInfo: {
+  flex: 1,
+},
+listingBannerTitle: {
+  color: '#fff',
+  fontWeight: '600',
+  fontSize: 13,
+},
+listingBannerPrice: {
+  color: 'rgba(255,255,255,0.4)',
+  fontSize: 12,
+  marginTop: 1,
+},
+listingBannerStatus: {
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+  borderRadius: 20,
+  borderWidth: 1,
+},
+listingBannerStatusText: {
+  fontSize: 11,
+  fontWeight: '600',
+},
+```
+
+---
+
+### 5. Host side — Update inquiry status in the thread when host accepts or declines
+
+**File:** `screens/host/HostInquiriesScreen.tsx`
+
+When a host accepts or declines an inquiry, update the corresponding conversation thread's `inquiryStatus` so the renter's Messages tab reflects the change in real time.
+
+**Find `handleAcceptInterest`** and add a status update after acceptance:
+
+```tsx
+const handleAcceptInterest = async (card: InterestCard) => {
+  // ... existing accept logic ...
+
+  // UPDATE the renter's inquiry thread status to 'accepted'
+  const conversationId = `inquiry-conv-inquiry-${card.id}`;
+  await StorageService.updateConversation(conversationId, {
+    inquiryStatus: 'accepted',
+    lastMessage: 'Host accepted your inquiry! Say hello.',
+  });
+};
+```
+
+**Find `handlePassInterest`** and add a status update after declining:
+
+```tsx
+const handlePassInterest = async (card: InterestCard) => {
+  // ... existing pass/decline logic ...
+
+  // UPDATE the renter's inquiry thread status to 'declined'
+  const conversationId = `inquiry-conv-inquiry-${card.id}`;
+  await StorageService.updateConversation(conversationId, {
+    inquiryStatus: 'declined',
+    lastMessage: 'This listing is no longer available for your group.',
+  });
+};
+```
+
+---
+
+## FULL FLOW AFTER THIS FIX
+
+1. Renter taps Inquire on listing → sends inquiry
+2. **Immediately** — a thread appears in their Messages tab under "LISTING INQUIRIES" with a gold "Pending" pill
+3. Renter taps the thread — sees the listing banner + a system message: "You inquired about this listing. Waiting for the host to respond."
+4. Host accepts → thread updates to green "Accepted" pill, new system message: "Host accepted your inquiry! Say hello." — live chat is now open
+5. Host declines → thread updates to red "Not Available" pill, archived but visible
+6. Group inquiry → all group members see the same thread in their Messages tab
+
+---
+
+## DO NOT CHANGE
+
+- Do not modify existing direct message (DM) conversation rendering
+- Do not modify the host-side ChatScreen Accept/Decline button logic (it already works)
+- Do not change isDev mock data guards
+- Do not modify Supabase schema — use StorageService for all operations
+- Keep the existing `navigateToInquiryChat` function — just make sure it works for the new thread format

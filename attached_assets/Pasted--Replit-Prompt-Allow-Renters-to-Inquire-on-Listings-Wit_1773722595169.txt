@@ -1,0 +1,222 @@
+# Replit Prompt: Allow Renters to Inquire on Listings Without a Group
+
+---
+
+## PROBLEM
+
+In `screens/renter/ExploreScreen.tsx`, the inquiry modal currently blocks renters who don't have a roommate group. It shows "You need a roommate group first" and prevents them from sending an inquiry. This is wrong — a renter should be able to inquire as an individual without needing a group.
+
+---
+
+## WHAT TO CHANGE
+
+### File: `screens/renter/ExploreScreen.tsx`
+
+Find the inquiry modal section (inside `showInquireModal`). It currently looks like this:
+
+```tsx
+{roommateGroups.length === 0 ? (
+  <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+    <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, textAlign: 'center' }}>
+      You need a roommate group first
+    </Text>
+    <Pressable
+      onPress={() => {
+        setShowInquireModal(false);
+        (navigation as any).navigate('Groups');
+      }}
+      style={{ marginTop: 10 }}
+    >
+      <Text style={{ color: ACCENT, fontSize: 14, fontWeight: '600' }}>Create Group →</Text>
+    </Pressable>
+  </View>
+) : (
+  // group selection UI + Send Inquiry button
+)}
+```
+
+**Replace the entire conditional block** with this new logic:
+
+```tsx
+{roommateGroups.length === 0 ? (
+  // No group — allow solo inquiry
+  <View style={{ paddingVertical: 12 }}>
+    <View style={{
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(255,107,91,0.1)',
+      borderRadius: 12,
+      padding: 14,
+      marginBottom: 16,
+      gap: 10,
+    }}>
+      <Feather name="user" size={18} color={ACCENT} />
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>
+          Inquiring as an Individual
+        </Text>
+        <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 2 }}>
+          You can add roommates to a group later
+        </Text>
+      </View>
+    </View>
+    <Pressable
+      style={[styles.inquireSendBtn]}
+      onPress={handleSendInquiry}
+      disabled={creatingInquiry}
+    >
+      <LinearGradient
+        colors={[ACCENT, '#e83a2a']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.inquireSendBtnGrad}
+      >
+        <Text style={styles.inquireSendBtnText}>
+          {creatingInquiry ? 'Sending...' : 'Send Inquiry'}
+        </Text>
+      </LinearGradient>
+    </Pressable>
+  </View>
+) : (
+  <>
+    <ScrollView style={{ maxHeight: 200, marginVertical: 12 }}>
+      {roommateGroups.map((group: any) => (
+        <Pressable
+          key={group.id}
+          style={[
+            styles.inquireGroupRow,
+            selectedGroupId === group.id && styles.inquireGroupRowSelected,
+          ]}
+          onPress={() => setSelectedGroupId(group.id)}
+        >
+          <Feather name="users" size={18} color={selectedGroupId === group.id ? ACCENT : 'rgba(255,255,255,0.4)'} />
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <Text style={styles.inquireGroupName}>{group.name}</Text>
+            <Text style={styles.inquireGroupCount}>
+              {group.members?.[0]?.count || group.members?.length || 0} members
+            </Text>
+          </View>
+          {selectedGroupId === group.id ? (
+            <Feather name="check-circle" size={20} color={ACCENT} />
+          ) : null}
+        </Pressable>
+      ))}
+    </ScrollView>
+    <Pressable
+      style={[styles.inquireSendBtn, { opacity: selectedGroupId && !creatingInquiry ? 1 : 0.5 }]}
+      onPress={handleSendInquiry}
+      disabled={!selectedGroupId || creatingInquiry}
+    >
+      <LinearGradient
+        colors={[ACCENT, '#e83a2a']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.inquireSendBtnGrad}
+      >
+        <Text style={styles.inquireSendBtnText}>
+          {creatingInquiry ? 'Sending...' : 'Send Inquiry'}
+        </Text>
+      </LinearGradient>
+    </Pressable>
+  </>
+)}
+```
+
+---
+
+### Update `handleSendInquiry` to support solo inquiries
+
+Find the `handleSendInquiry` function in `ExploreScreen.tsx`.
+
+Update it so that when `roommateGroups.length === 0` (no group), it sends the inquiry using the renter's individual profile instead of a group ID.
+
+The function should:
+1. If `selectedGroupId` is set — use it as the group for the inquiry (existing behavior)
+2. If `selectedGroupId` is null AND `roommateGroups.length === 0` — proceed with a solo inquiry using the current user's ID as the "group" identifier
+
+```tsx
+const handleSendInquiry = async () => {
+  if (!inquireProperty || !user) return;
+
+  // Solo inquiry: no group exists, use individual renter
+  const isSoloInquiry = roommateGroups.length === 0 && !selectedGroupId;
+
+  if (!isSoloInquiry && !selectedGroupId) return; // has groups but none selected
+
+  setCreatingInquiry(true);
+  try {
+    const groupIdToUse = isSoloInquiry ? `solo-${user.id}` : selectedGroupId;
+
+    // Create the inquiry record
+    await StorageService.createInquiry({
+      propertyId: inquireProperty.id,
+      groupId: groupIdToUse,
+      renterId: user.id,
+      renterName: user.name || 'Renter',
+      renterPhoto: user.profilePhoto || '',
+      personalNote: '',
+      isSoloInquiry,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    });
+
+    setShowInquireModal(false);
+    setSelectedGroupId(null);
+
+    Alert.alert(
+      'Inquiry Sent!',
+      isSoloInquiry
+        ? 'The host has been notified. You\'ll hear back in your Messages tab.'
+        : 'Your group\'s inquiry has been sent. The host will respond in your Messages tab.',
+      [{ text: 'OK' }]
+    );
+  } catch (error) {
+    Alert.alert('Error', 'Failed to send inquiry. Please try again.');
+  } finally {
+    setCreatingInquiry(false);
+  }
+};
+```
+
+---
+
+### Also update the modal title text
+
+Find the modal title and description text:
+
+```tsx
+<Text style={styles.inquireSheetTitle}>Start a Group Inquiry</Text>
+<Text style={styles.inquireSheetDesc}>
+  Invite your roommate group to discuss this listing with the host
+</Text>
+```
+
+Replace with dynamic text that changes based on whether the renter has a group:
+
+```tsx
+<Text style={styles.inquireSheetTitle}>
+  {roommateGroups.length === 0 ? 'Inquire on This Listing' : 'Send a Group Inquiry'}
+</Text>
+<Text style={styles.inquireSheetDesc}>
+  {roommateGroups.length === 0
+    ? 'Send your details to the host to express interest'
+    : 'Select which group to represent in this inquiry'}
+</Text>
+```
+
+---
+
+## WHAT THIS DOES
+
+- Renters with **no group** see a "Inquiring as an Individual" info card and can send immediately — no friction
+- Renters **with a group** still pick which group to use (existing behavior, unchanged)
+- The inquiry is created either way — host sees it in their Inquiries screen
+- Solo inquiries are flagged with `isSoloInquiry: true` so the host can see the context
+- Success alert message is personalized based on solo vs group inquiry
+
+## DO NOT CHANGE
+
+- Do not modify anything in the host-side inquiry flow
+- Do not change `StorageService` schema beyond adding `isSoloInquiry` as an optional field
+- Do not change the Supabase inquiry table structure — keep `isSoloInquiry` as a local/storage-only field for now
+- Do not remove the "Create Group →" shortcut — instead, keep it as a secondary option below the solo inquiry card

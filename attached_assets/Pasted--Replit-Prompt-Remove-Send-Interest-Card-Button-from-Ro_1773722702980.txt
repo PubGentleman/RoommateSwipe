@@ -1,0 +1,85 @@
+# Replit Prompt: Remove "Send Interest Card" Button from Roommates Screen
+
+---
+
+## OVERVIEW
+
+The "Send Interest Card" button in the Roommates tab profile detail view is redundant — swiping right already handles expressing interest and feeds into the match system correctly. Remove the button entirely. Keep "Send Message" only.
+
+---
+
+## CHANGES NEEDED
+
+---
+
+### 1. `screens/renter/RoommatesScreen.tsx` — Remove "Send Interest Card" button
+
+Find the profile detail modal section with the two action buttons at the bottom (around line 2110–2130):
+
+```tsx
+// DELETE this entire Pressable block:
+<Pressable
+  style={[styles.detailActionButton, { backgroundColor: '#ff6b5b' }]}
+  onPress={() => {
+    if (currentProfile) {
+      handleSendInterest(currentProfile);
+    }
+  }}
+>
+  <Feather name="heart" size={20} color="#FFFFFF" />
+  <ThemedText style={[Typography.h3, { color: '#FFFFFF', marginLeft: Spacing.md }]}>
+    Send Interest Card
+  </ThemedText>
+</Pressable>
+```
+
+Keep the "Send Message" button exactly as it is — do not change it.
+
+---
+
+### 2. `screens/renter/RoommatesScreen.tsx` — Remove unused handleSendInterest function
+
+Find and delete the `handleSendInterest` function (around line 901):
+
+```tsx
+// DELETE this entire function:
+const handleSendInterest = async (profile: RoommateProfile, isSuper: boolean = false) => {
+  if (!user || !profile) return;
+  const check = await canSendInterest();
+  if (!check.canSend) {
+    Alert.alert('Limit Reached', check.reason || 'You have reached your daily interest card limit. Upgrade your plan for more.');
+    return;
+  }
+  const card: InterestCard = { ... };
+  await StorageService.addInterestCard(card);
+  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  Alert.alert(
+    isSuper ? 'Super Interest Sent!' : 'Interest Sent!',
+    `Your interest card has been sent to ${profile.name}. They'll see your compatibility and preferences.`
+  );
+};
+```
+
+---
+
+### 3. `screens/renter/RoommatesScreen.tsx` — Remove canSendInterest import if no longer used
+
+Check if `canSendInterest` is used anywhere else in `RoommatesScreen.tsx`. If it is only used in `handleSendInterest`, remove it from the destructured imports at the top:
+
+```tsx
+// Find:
+const { user, canSendInterest, canSendSuperInterest, ... } = useAuth();
+
+// If canSendInterest is no longer used anywhere, remove it:
+const { user, canSendSuperInterest, ... } = useAuth();
+```
+
+---
+
+## DO NOT CHANGE
+
+- Do not remove or modify the swipe right / like functionality
+- Do not remove or modify the "Send Message" button
+- Do not remove or modify the Super Interest toggle or `handleSuperInterest` on the swipe card itself
+- Do not touch anything in ExploreScreen or the listing interest flow
+- Do not modify `canSendInterest` in AuthContext

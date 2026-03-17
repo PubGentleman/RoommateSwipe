@@ -107,8 +107,12 @@ function HostCustomTabBar({ state, descriptors, navigation }: BottomTabBarProps)
               target: route.key,
               canPreventDefault: true,
             });
-            if (!isFocused && !event.defaultPrevented) {
-              navigation.navigate(route.name);
+            if (!event.defaultPrevented) {
+              if (route.name === 'Messages') {
+                navigation.navigate('Messages' as any, { screen: 'MessagesList' } as any);
+              } else if (!isFocused) {
+                navigation.navigate(route.name);
+              }
             }
           };
 
