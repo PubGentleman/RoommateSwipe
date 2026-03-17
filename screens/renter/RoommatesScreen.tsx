@@ -1074,6 +1074,20 @@ export const RoommatesScreen = () => {
         ? `conv_${thisMatch.id}`
         : `conv-cold-${currentProfile.id}`;
 
+      const compatibility = user ? calculateCompatibility(user, currentProfile) : 0;
+      const systemText = isCold
+        ? `You sent a direct message request to ${currentProfile.name}.`
+        : `You matched with ${currentProfile.name}! Say hello.`;
+
+      const systemMessage = {
+        id: `msg-sys-${Date.now()}`,
+        senderId: 'system',
+        text: systemText,
+        content: systemText,
+        timestamp: new Date(),
+        read: true,
+      };
+
       const newConversation: any = {
         id: conversationId,
         participant: {
@@ -1082,13 +1096,37 @@ export const RoommatesScreen = () => {
           photo: currentProfile.photos?.[0] || currentProfile.profilePicture || '',
           online: false,
         },
-        lastMessage: '',
+        lastMessage: isCold ? 'Direct message request sent' : 'You matched! Say hello.',
+        lastMessageTime: new Date(),
         timestamp: new Date(),
+        unreadCount: 0,
         unread: 0,
-        messages: [],
+        messages: [systemMessage],
         matchType: isCold ? 'cold' : 'mutual',
+        isInquiryThread: true,
+        inquiryStatus: isCold ? 'pending' : 'accepted',
+        hostName: currentProfile.name,
+        hostPhoto: currentProfile.photos?.[0] || currentProfile.profilePicture || '',
+        compatibilityScore: compatibility,
+        createdAt: new Date().toISOString(),
       };
       await StorageService.addOrUpdateConversation(newConversation);
+
+      await StorageService.addNotification({
+        id: `notif_msg_${Date.now()}`,
+        userId: currentProfile.id,
+        type: isCold ? 'cold_message' : 'new_match_message',
+        title: isCold ? 'New Message Request' : 'New Match!',
+        body: `${user.name} wants to chat with you`,
+        isRead: false,
+        createdAt: new Date(),
+        data: {
+          conversationId,
+          fromUserId: user.id,
+          fromUserName: user.name,
+          fromUserPhoto: user.profilePicture,
+        },
+      });
     }
 
     const profileForChat = currentProfile;
@@ -1426,6 +1464,17 @@ export const RoommatesScreen = () => {
                 ? `conv_${thisMatch.id}`
                 : `conv-match-${profile.id}`;
 
+              const compatibility = user ? calculateCompatibility(user, profile) : 0;
+              const systemText = `You matched with ${profile.name}! Say hello.`;
+              const systemMessage = {
+                id: `msg-sys-${Date.now()}`,
+                senderId: 'system',
+                text: systemText,
+                content: systemText,
+                timestamp: new Date(),
+                read: true,
+              };
+
               const newConversation = {
                 id: conversationId,
                 participant: {
@@ -1434,13 +1483,37 @@ export const RoommatesScreen = () => {
                   photo: profile.photos?.[0] || '',
                   online: false,
                 },
-                lastMessage: '',
+                lastMessage: 'You matched! Say hello.',
+                lastMessageTime: new Date(),
                 timestamp: new Date(),
+                unreadCount: 0,
                 unread: 0,
-                messages: [],
+                messages: [systemMessage],
                 matchType: (thisMatch?.matchType || 'mutual') as 'mutual' | 'super_interest' | 'cold',
+                isInquiryThread: true,
+                inquiryStatus: 'accepted' as const,
+                hostName: profile.name,
+                hostPhoto: profile.photos?.[0] || '',
+                compatibilityScore: compatibility,
+                createdAt: new Date().toISOString(),
               };
               await StorageService.addOrUpdateConversation(newConversation);
+
+              await StorageService.addNotification({
+                id: `notif_match_msg_${Date.now()}`,
+                userId: profile.id,
+                type: 'new_match_message',
+                title: 'New Match!',
+                body: `${user?.name} wants to chat with you`,
+                isRead: false,
+                createdAt: new Date(),
+                data: {
+                  conversationId,
+                  fromUserId: user?.id,
+                  fromUserName: user?.name,
+                  fromUserPhoto: user?.profilePicture,
+                },
+              });
             }
 
             const tabNavigation = (navigation as any).getParent();
