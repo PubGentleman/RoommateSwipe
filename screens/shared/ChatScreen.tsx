@@ -276,93 +276,123 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     }
 
     const conversations = await StorageService.getConversations();
-    const conversationIndex = conversations.findIndex(c => c.id === conversationId);
-    
-    if (conversationIndex >= 0) {
-      const isFirstMessageFromUser = !conversations[conversationIndex].messages?.some(
-        msg => msg.senderId === user.id
-      );
+    let conversationIndex = conversations.findIndex(c => c.id === conversationId);
 
-      if (isFirstMessageFromUser) {
-        const chatCheck = await canStartNewChat(conversationId);
-        
-        if (!chatCheck.canStart) {
-          setShowChatLimitModal(true);
-          return;
-        }
-      }
-
-      let newMessage: Message;
-      let sentViaSupabase = false;
-
-      try {
-        const supaMsg = await sendSupabaseMessage(matchIdFromConversation, inputText.trim());
-        newMessage = {
-          id: supaMsg.id,
-          senderId: supaMsg.sender_id,
-          text: supaMsg.content,
-          content: supaMsg.content,
-          timestamp: new Date(supaMsg.created_at),
-          read: false,
-        };
-        sentViaSupabase = true;
-      } catch (supaError) {
-        console.warn('Supabase sendMessage failed, falling back to StorageService:', supaError);
-        newMessage = {
-          id: `msg_${Date.now()}`,
-          senderId: user.id,
-          text: inputText.trim(),
-          timestamp: new Date(),
-        };
-      }
-
-      if (!conversations[conversationIndex].messages) {
-        conversations[conversationIndex].messages = [];
-      }
-      conversations[conversationIndex].messages.push(newMessage);
-      conversations[conversationIndex].timestamp = new Date();
-      conversations[conversationIndex].lastMessage = newMessage.text || '';
+    if (conversationIndex < 0) {
+      const newConversation: any = {
+        id: conversationId,
+        participant: otherUser
+          ? {
+              id: otherUser.id,
+              name: otherUser.name,
+              photo: otherUser.photos?.[0] || otherUser.profilePicture || '',
+              online: false,
+            }
+          : { id: '', name: 'Unknown', photo: '', online: false },
+        participants: otherUser ? [user.id, otherUser.id] : [user.id],
+        messages: [],
+        lastMessage: '',
+        timestamp: new Date(),
+        unreadCount: 0,
+        createdAt: new Date().toISOString(),
+        isInquiryThread: inquiryGroup?.isInquiryThread || false,
+        isSuperInterest: inquiryGroup?.isSuperInterest || false,
+        inquiryStatus: inquiryGroup?.inquiryStatus || undefined,
+        listingTitle: inquiryGroup?.listingTitle || undefined,
+        listingPhoto: inquiryGroup?.listingPhoto || undefined,
+        listingPrice: inquiryGroup?.listingPrice || undefined,
+        hostId: inquiryGroup?.hostId || undefined,
+        hostName: inquiryGroup?.hostName || undefined,
+      };
+      conversations.push(newConversation);
+      conversationIndex = conversations.length - 1;
       await StorageService.setConversations(conversations);
-      await incrementMessageCount();
-      dispatchInsightTrigger('message_activity');
-      recordMessageActivity(conversationId).catch(() => {});
-
-      if (isFirstMessageFromUser) {
-        await incrementActiveChatCount(conversationId);
-        if (isColdMessage && !coldMessageResponded) {
-          await useColdMessage();
-          conversations[conversationIndex].matchType = 'cold';
-          await StorageService.setConversations(conversations);
-        }
-      }
-
-      const otherParticipantId = conversations[conversationIndex].participants?.find(
-        (p: string) => p !== user.id
-      );
-      const blockedIds = user.blockedUsers || [];
-      if (otherParticipantId && !blockedIds.includes(otherParticipantId)) {
-        await StorageService.addNotification({
-          id: `notif_msg_${Date.now()}`,
-          userId: otherParticipantId,
-          type: 'message',
-          title: 'New Message',
-          body: `${user.name || 'Someone'}: ${inputText.trim().substring(0, 80)}${inputText.trim().length > 80 ? '...' : ''}`,
-          isRead: false,
-          createdAt: new Date(),
-          data: {
-            conversationId,
-            fromUserId: user.id,
-            fromUserName: user.name,
-            fromUserPhoto: user.profilePicture,
-          },
-        });
-        await refreshUnreadCount();
-      }
-      
-      setMessages([...conversations[conversationIndex].messages]);
-      setInputText('');
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     }
+
+    const isFirstMessageFromUser = !conversations[conversationIndex].messages?.some(
+      msg => msg.senderId === user.id
+    );
+
+    if (isFirstMessageFromUser) {
+      const chatCheck = await canStartNewChat(conversationId);
+      if (!chatCheck.canStart) {
+        setShowChatLimitModal(true);
+        return;
+      }
+    }
+
+    let newMessage: Message;
+    let sentViaSupabase = false;
+
+    try {
+      const supaMsg = await sendSupabaseMessage(matchIdFromConversation, inputText.trim());
+      newMessage = {
+        id: supaMsg.id,
+        senderId: supaMsg.sender_id,
+        text: supaMsg.content,
+        content: supaMsg.content,
+        timestamp: new Date(supaMsg.created_at),
+        read: false,
+      };
+      sentViaSupabase = true;
+    } catch (supaError) {
+      console.warn('Supabase sendMessage failed, falling back to StorageService:', supaError);
+      newMessage = {
+        id: `msg_${Date.now()}`,
+        senderId: user.id,
+        text: inputText.trim(),
+        content: inputText.trim(),
+        timestamp: new Date(),
+        read: false,
+      };
+    }
+
+    if (!conversations[conversationIndex].messages) {
+      conversations[conversationIndex].messages = [];
+    }
+    conversations[conversationIndex].messages.push(newMessage);
+    conversations[conversationIndex].timestamp = new Date();
+    conversations[conversationIndex].lastMessage = newMessage.text || '';
+    await StorageService.setConversations(conversations);
+    await incrementMessageCount();
+    dispatchInsightTrigger('message_activity');
+    recordMessageActivity(conversationId).catch(() => {});
+
+    if (isFirstMessageFromUser) {
+      await incrementActiveChatCount(conversationId);
+      if (isColdMessage && !coldMessageResponded) {
+        await useColdMessage();
+        conversations[conversationIndex].matchType = 'cold';
+        await StorageService.setConversations(conversations);
+      }
+    }
+
+    const otherParticipantId = conversations[conversationIndex].participants?.find(
+      (p: string) => p !== user.id
+    ) || conversations[conversationIndex].participant?.id;
+    const blockedIds = user.blockedUsers || [];
+    if (otherParticipantId && !blockedIds.includes(otherParticipantId)) {
+      await StorageService.addNotification({
+        id: `notif_msg_${Date.now()}`,
+        userId: otherParticipantId,
+        type: 'message',
+        title: 'New Message',
+        body: `${user.name || 'Someone'}: ${inputText.trim().substring(0, 80)}${inputText.trim().length > 80 ? '...' : ''}`,
+        isRead: false,
+        createdAt: new Date(),
+        data: {
+          conversationId,
+          fromUserId: user.id,
+          fromUserName: user.name,
+          fromUserPhoto: user.profilePicture,
+        },
+      });
+      await refreshUnreadCount();
+    }
+
+    setMessages(prev => [...prev, newMessage]);
+    setInputText('');
+    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
   };
 
   const handleCreateGroup = () => {
