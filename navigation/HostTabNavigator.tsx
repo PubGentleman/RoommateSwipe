@@ -188,8 +188,8 @@ export const HostTabNavigator = () => {
     >
       <Tab.Screen name="Dashboard" component={DashboardStackNavigator} />
       <Tab.Screen name="Listings" component={ListingsStackNavigator} />
-      <Tab.Screen name="Groups" component={BrowseRenterGroupsScreen} />
       <Tab.Screen name="Roommates" component={RoommatesScreen} />
+      <Tab.Screen name="Groups" component={BrowseRenterGroupsScreen} />
       <Tab.Screen name="Messages" component={MessagesStackNavigator} />
       <Tab.Screen name="Profile" component={ProfileStackNavigator} />
     </Tab.Navigator>
