@@ -1033,7 +1033,7 @@ export const RoommatesScreen = () => {
     if (hasMatch) {
       handleSendDirectMessage(false);
     } else {
-      const coldCheck = canSendColdMessage();
+      const coldCheck = await canSendColdMessage();
       if (!coldCheck.canSend) {
         Alert.alert(
           'Daily Limit Reached',
@@ -2221,7 +2221,7 @@ export const RoommatesScreen = () => {
                       setShowProfileDetail(false);
                       setTimeout(() => handleSendDirectMessage(false), 200);
                     } else {
-                      const coldCheck = canSendColdMessage();
+                      const coldCheck = await canSendColdMessage();
                       if (!coldCheck.canSend) {
                         Alert.alert(
                           'Daily Limit Reached',

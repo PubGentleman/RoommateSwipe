@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { StorageService } from '../utils/storage';
+import { getDailyColdMessageLimit, getDailyColdMessageCount } from '../utils/messagingUtils';
 import { User, Notification } from '../types/models';
 import { supabase } from '../lib/supabase';
 import type { Session } from '@supabase/supabase-js';
@@ -52,7 +53,7 @@ interface AuthContextType {
   canSendInterest: () => Promise<{ canSend: boolean; remaining: number; reason?: string }>;
   canSendSuperInterest: () => { canSend: boolean; remaining: number; reason?: string };
   useSuperInterestCredit: () => Promise<void>;
-  canSendColdMessage: () => { canSend: boolean; remaining: number; reason?: string };
+  canSendColdMessage: () => Promise<{ canSend: boolean; remaining: number; reason?: string }>;
   useColdMessage: () => Promise<void>;
   getSuperInterestCount: () => number;
   upgradeHostPlan: (plan: 'starter' | 'pro' | 'business', billingCycle?: 'monthly' | '3month' | 'annual') => Promise<void>;
@@ -1680,22 +1681,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(updated);
   };
 
-  const canSendColdMessage = (): { canSend: boolean; remaining: number; reason?: string } => {
+  const canSendColdMessage = async (): Promise<{ canSend: boolean; remaining: number; reason?: string }> => {
     if (!user) return { canSend: false, remaining: 0, reason: 'Not logged in' };
     const plan = user.subscription?.plan || 'basic';
-    const coldLimits: Record<string, number> = { basic: 3, starter: 5, plus: 5, pro: 10, elite: Infinity };
-    const limit = coldLimits[plan] ?? 3;
+    const limit = getDailyColdMessageLimit(plan);
     if (limit === Infinity) return { canSend: true, remaining: Infinity };
-    const now = new Date();
-    let used = user.coldMessagesUsedThisMonth || 0;
-    const resetDate = user.coldMessagesResetDate ? new Date(user.coldMessagesResetDate) : null;
-    const today = new Date().toISOString().split('T')[0];
-    const resetDay = resetDate ? resetDate.toISOString().split('T')[0] : null;
-    if (!resetDay || resetDay !== today) {
-      used = 0;
+    const count = await getDailyColdMessageCount(user.id);
+    const remaining = Math.max(0, limit - count);
+    if (remaining <= 0) {
+      return { canSend: false, remaining: 0, reason: `You've used all ${limit} free messages for today. Resets at midnight.` };
     }
-    const remaining = Math.max(0, limit - used);
-    if (remaining <= 0) return { canSend: false, remaining: 0, reason: `You've used all ${limit} messages for today. Resets at midnight.` };
     return { canSend: true, remaining };
   };
 

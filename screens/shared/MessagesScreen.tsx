@@ -508,7 +508,7 @@ export const MessagesScreen = () => {
               </ThemedText>
               <PlanBadge plan={participantPlan} size={13} />
               {convMatchType === 'cold' ? (
-                <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 6, backgroundColor: theme.primary + '33' }}>
+                <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 6, alignSelf: 'center', backgroundColor: theme.primary + '22' }}>
                   <ThemedText style={{ fontSize: 10, fontWeight: '600', color: theme.primary }}>
                     Unmatched
                   </ThemedText>

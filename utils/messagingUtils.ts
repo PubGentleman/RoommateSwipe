@@ -1,15 +1,40 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User } from '../types/models';
+
+export const COLD_MESSAGE_LIMITS: Record<string, number> = {
+  basic: 3,
+  plus: 10,
+  elite: Infinity,
+};
+
+export function getDailyColdMessageLimit(plan: string): number {
+  return COLD_MESSAGE_LIMITS[plan] ?? 3;
+}
+
+export async function getDailyColdMessageCount(userId: string): Promise<number> {
+  const today = new Date().toISOString().split('T')[0];
+  const key = `cold_msg_count_${userId}_${today}`;
+  const stored = await AsyncStorage.getItem(key);
+  return stored ? parseInt(stored, 10) : 0;
+}
+
+export async function incrementDailyColdMessageCount(userId: string): Promise<void> {
+  const today = new Date().toISOString().split('T')[0];
+  const key = `cold_msg_count_${userId}_${today}`;
+  const current = await getDailyColdMessageCount(userId);
+  await AsyncStorage.setItem(key, String(current + 1));
+}
 
 export const MESSAGING_LIMITS = {
   basic: {
     dailyMessages: 20,
     activeChats: 3,
-    coldMessaging: false,
+    coldMessaging: true,
   },
   plus: {
     dailyMessages: 200,
     activeChats: 10,
-    coldMessaging: false,
+    coldMessaging: true,
   },
   elite: {
     dailyMessages: Infinity,

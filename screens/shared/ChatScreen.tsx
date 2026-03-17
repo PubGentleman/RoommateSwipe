@@ -18,7 +18,7 @@ import { recordMessageActivity } from '../../utils/aiMemory';
 import { acceptInquiry, declineInquiry } from '../../services/groupService';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence } from 'react-native-reanimated';
 import { AdBanner } from '../../components/AdBanner';
-import { getDailyMessageCount, MESSAGING_LIMITS, getTimeUntilMidnight } from '../../utils/messagingUtils';
+import { getDailyMessageCount, MESSAGING_LIMITS, getTimeUntilMidnight, incrementDailyColdMessageCount } from '../../utils/messagingUtils';
 import { dispatchInsightTrigger } from '../../utils/insightRefresh';
 
 type ChatScreenProps = {
@@ -256,7 +256,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         setIsColdMessage(true);
         const otherResponded = loadedMessages.some(m => m.senderId === conversation.participant.id);
         setColdMessageResponded(otherResponded);
-        const coldCheck = canSendColdMessage();
+        const coldCheck = await canSendColdMessage();
         setColdMessagesRemaining(coldCheck.remaining === Infinity ? 999 : coldCheck.remaining);
       }
     }
@@ -266,7 +266,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     if (!inputText.trim() || !user) return;
 
     if (isColdMessage && !coldMessageResponded) {
-      const coldCheck = canSendColdMessage();
+      const coldCheck = await canSendColdMessage();
       if (!coldCheck.canSend) {
         Alert.alert(
           'Daily Limit Reached',
@@ -372,9 +372,10 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       await incrementActiveChatCount(conversationId);
       if (isColdMessage && !coldMessageResponded) {
         await useColdMessage();
+        await incrementDailyColdMessageCount(user.id);
         conversations[conversationIndex].matchType = 'cold';
         await StorageService.setConversations(conversations);
-        const updatedColdCheck = canSendColdMessage();
+        const updatedColdCheck = await canSendColdMessage();
         setColdMessagesRemaining(updatedColdCheck.remaining === Infinity ? 999 : updatedColdCheck.remaining);
       }
     }
@@ -733,7 +734,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       {isColdMessage && !coldMessageResponded ? (
         <View style={{ paddingHorizontal: Spacing.lg, paddingVertical: Spacing.xs, backgroundColor: theme.backgroundRoot }}>
           <ThemedText style={[Typography.caption, { color: theme.textSecondary, textAlign: 'center' }]}>
-            Not matched yet — {coldMessagesRemaining >= 999 ? 'unlimited' : coldMessagesRemaining} cold message{coldMessagesRemaining !== 1 ? 's' : ''} left today
+            Not matched yet · {coldMessagesRemaining >= 999 ? 'unlimited' : coldMessagesRemaining} message{coldMessagesRemaining !== 1 ? 's' : ''} left today
           </ThemedText>
         </View>
       ) : null}
