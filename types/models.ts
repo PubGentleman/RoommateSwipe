@@ -198,6 +198,7 @@ export interface Conversation {
   propertyId?: string;
   groupId?: string;
   isSoloInquiry?: boolean;
+  isSuperInterest?: boolean;
 }
 
 export interface Application {

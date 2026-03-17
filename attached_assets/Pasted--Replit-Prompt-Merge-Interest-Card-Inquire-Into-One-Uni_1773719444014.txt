@@ -1,0 +1,471 @@
+# Replit Prompt: Merge Interest Card + Inquire Into One Unified "I'm Interested" Flow
+
+---
+
+## OVERVIEW
+
+The app currently has two separate ways for a renter to express interest in a listing — "Send Interest" (InterestCard) and "Inquire" (group inquiry). They do essentially the same thing and having both confuses renters. This prompt removes the separate Interest Card flow and replaces both with a single unified action: **"I'm Interested."**
+
+The new flow:
+1. Renter taps "I'm Interested" on a listing
+2. A single bottom sheet opens showing their profile snapshot (budget, move-in, lifestyle tags) with an optional note field
+3. They tap Send — one action creates the inquiry, packages their profile info for the host, and immediately opens a chat thread in their Messages tab
+4. Super Interest remains as the paid upgrade to this same single action — same flow, gold styling, pinned to top of host's inquiries
+
+---
+
+## STEP 1 — Remove the old InterestCardSheet and separate Inquire button from ExploreScreen
+
+**File:** `screens/renter/ExploreScreen.tsx`
+
+### Remove the separate Inquire button
+Find the "Inquire" / group inquiry button in the property detail view and remove it. There should now be only ONE button: "I'm Interested."
+
+### Remove InterestCardSheet import and usage
+Delete:
+```tsx
+import InterestCardSheet from '../../components/InterestCardSheet';
+```
+
+Remove the `InterestCardSheet` component from the render (near the bottom of the file):
+```tsx
+// DELETE this entire block:
+{selectedProperty ? (
+  <InterestCardSheet
+    visible={showInterestSheet}
+    onClose={() => { setShowInterestSheet(false); setIsSuperInterest(false); }}
+    onSend={handleSendInterest}
+    property={selectedProperty}
+    compatibilityScore={getPropertyCompatibility(selectedProperty)}
+    isSuperInterest={isSuperInterest}
+    sending={sendingInterest}
+  />
+) : null}
+```
+
+### Remove old state variables no longer needed
+Remove:
+```tsx
+const [showInterestSheet, setShowInterestSheet] = useState(false);
+const [showInquireModal, setShowInquireModal] = useState(false);
+const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+const [creatingInquiry, setCreatingInquiry] = useState(false);
+```
+
+Replace with:
+```tsx
+const [showUnifiedInterestSheet, setShowUnifiedInterestSheet] = useState(false);
+const [sendingInterest, setSendingInterest] = useState(false);
+```
+
+---
+
+## STEP 2 — Build the new Unified Interest Sheet inside ExploreScreen
+
+Replace the old `handleInterestPress` and `handleSendInterest` functions with this unified version:
+
+```tsx
+const handleInterestPress = async () => {
+  if (!user || !selectedProperty) return;
+
+  // Check send limit (basic = 5/day, plus/elite = unlimited)
+  const result = await canSendInterest();
+  if (!result.canSend) {
+    setPaywallFeature('Unlimited Interests');
+    setPaywallPlan('plus');
+    setShowPaywall(true);
+    return;
+  }
+
+  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  setShowUnifiedInterestSheet(true);
+};
+
+const handleSendUnifiedInterest = async (note: string) => {
+  if (!user || !selectedProperty) return;
+  setSendingInterest(true);
+
+  try {
+    const interestId = `interest_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const conversationId = `interest-conv-${interestId}`;
+
+    // Build renter profile snapshot for host
+    const budgetMin = user.profileData?.budget || 0;
+    const budgetRange = budgetMin > 0 ? `$${budgetMin}/mo` : 'Not set';
+    const moveIn = user.profileData?.preferences?.moveInDate || 'Flexible';
+    const compatibility = getPropertyCompatibility(selectedProperty);
+    const tags: string[] = [];
+    if (user.profileData?.preferences?.cleanliness === 'very_tidy') tags.push('Clean');
+    if (user.profileData?.preferences?.smoking === 'no') tags.push('Non-Smoker');
+    if (user.profileData?.preferences?.pets === 'have_pets' || user.profileData?.preferences?.pets === 'open_to_pets') tags.push('Pet Friendly');
+    if (user.profileData?.preferences?.sleepSchedule === 'early_sleeper') tags.push('Early Bird');
+    if (user.profileData?.preferences?.sleepSchedule === 'late_sleeper') tags.push('Night Owl');
+    if (user.profileData?.preferences?.workLocation === 'wfh_fulltime') tags.push('Remote Worker');
+
+    // 1. Save interest/inquiry record
+    const interestRecord = {
+      id: interestId,
+      renterId: user.id,
+      renterName: user.name,
+      renterPhoto: user.profilePicture || '',
+      hostId: selectedProperty.hostId,
+      propertyId: selectedProperty.id,
+      propertyTitle: selectedProperty.title,
+      compatibilityScore: compatibility,
+      budgetRange,
+      moveInDate: moveIn,
+      lifestyleTags: tags.length > 0 ? tags : ['Flexible'],
+      personalNote: note,
+      status: 'pending' as const,
+      isSuperInterest,
+      createdAt: new Date().toISOString(),
+    };
+    await StorageService.addInterestCard(interestRecord);
+
+    // 2. Create chat thread immediately in renter's Messages tab
+    const systemMessageText = isSuperInterest
+      ? '⭐ You sent a Super Interest. The host will see this at the top of their list.'
+      : 'You expressed interest in this listing. Waiting for the host to respond.';
+
+    const conversation = {
+      id: conversationId,
+      interestId,
+      propertyId: selectedProperty.id,
+      listingTitle: selectedProperty.title,
+      listingPhoto: selectedProperty.photos?.[0] || '',
+      listingPrice: selectedProperty.price,
+      hostId: selectedProperty.hostId,
+      hostName: selectedProperty.hostName || 'Host',
+      hostPhoto: selectedProperty.hostProfilePhoto || '',
+      participant: {
+        id: selectedProperty.hostId,
+        name: selectedProperty.hostName || 'Host',
+        photo: selectedProperty.hostProfilePhoto || '',
+        online: false,
+      },
+      lastMessage: isSuperInterest ? '⭐ Super Interest sent' : 'Interest sent — awaiting response',
+      lastMessageTime: new Date(),
+      unreadCount: 0,
+      inquiryStatus: 'pending' as const,
+      isInquiryThread: true,
+      isSuperInterest,
+      // Renter profile snapshot — shown to host in chat
+      renterSnapshot: {
+        budgetRange,
+        moveInDate: moveIn,
+        lifestyleTags: tags,
+        compatibilityScore: compatibility,
+        note,
+      },
+      messages: [{
+        id: `msg-${Date.now()}`,
+        senderId: 'system',
+        text: systemMessageText,
+        content: systemMessageText,
+        timestamp: new Date(),
+        read: true,
+      }],
+      createdAt: new Date().toISOString(),
+    };
+    await StorageService.addOrUpdateConversation(conversation);
+
+    // 3. Notify host
+    await StorageService.addNotification({
+      id: `notif_interest_${Date.now()}`,
+      userId: selectedProperty.hostId,
+      type: isSuperInterest ? 'super_interest_received' : 'interest_received',
+      title: isSuperInterest ? '⭐ Super Interest!' : 'New Interest!',
+      body: `${user.name} is interested in ${selectedProperty.title}`,
+      isRead: false,
+      createdAt: new Date(),
+      data: {
+        interestId,
+        propertyId: selectedProperty.id,
+        fromUserId: user.id,
+        fromUserName: user.name,
+        fromUserPhoto: user.profilePicture,
+      },
+    });
+
+    await refreshUnreadCount();
+    setShowUnifiedInterestSheet(false);
+    setConfirmationWasSuper(isSuperInterest);
+    setShowInterestConfirmation(true);
+    await loadInterestCards();
+
+  } catch (err) {
+    Alert.alert('Error', 'Failed to send. Please try again.');
+  } finally {
+    setSendingInterest(false);
+    setIsSuperInterest(false);
+  }
+};
+```
+
+---
+
+## STEP 3 — Replace the two buttons with one "I'm Interested" button in the listing detail view
+
+**File:** `screens/renter/ExploreScreen.tsx`
+
+Find the property detail view buttons section (around line 1579). Replace the existing "I'm Interested" and "Inquire" buttons with a single button:
+
+```tsx
+{/* Single unified interest button */}
+{(() => {
+  const alreadySent = interestMap.has(selectedProperty?.id || '');
+  if (alreadySent) {
+    return (
+      <View style={[styles.interestButton, { backgroundColor: 'rgba(255,255,255,0.08)' }]}>
+        <Feather name="check" size={18} color="rgba(255,255,255,0.4)" />
+        <ThemedText style={{ color: 'rgba(255,255,255,0.4)', fontWeight: '700', marginLeft: 8, fontSize: 15 }}>
+          Interest Sent
+        </ThemedText>
+      </View>
+    );
+  }
+  return (
+    <Pressable
+      style={[styles.interestButton, { backgroundColor: isSuperInterest ? '#FFD700' : '#ff6b5b' }]}
+      onPress={handleInterestPress}
+    >
+      <Feather name={isSuperInterest ? 'star' : 'heart'} size={18} color={isSuperInterest ? '#000' : '#fff'} />
+      <ThemedText style={{ color: isSuperInterest ? '#000' : '#fff', fontWeight: '700', marginLeft: 8, fontSize: 15 }}>
+        {isSuperInterest ? 'Super Interest' : "I'm Interested"}
+      </ThemedText>
+      {/* Super Interest toggle — only show if user has super interests available */}
+      {canSendSuperInterest().canSend ? (
+        <Pressable
+          onPress={(e) => {
+            e.stopPropagation();
+            setIsSuperInterest(!isSuperInterest);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          }}
+          style={[
+            styles.superInterestToggle,
+            isSuperInterest
+              ? { backgroundColor: 'rgba(0,0,0,0.2)' }
+              : { backgroundColor: 'rgba(255,255,255,0.2)' }
+          ]}
+        >
+          <Feather name="star" size={14} color={isSuperInterest ? '#000' : '#fff'} />
+        </Pressable>
+      ) : null}
+    </Pressable>
+  );
+})()}
+```
+
+---
+
+## STEP 4 — Build the new Unified Interest Bottom Sheet inline in ExploreScreen
+
+Replace the old `InterestCardSheet` component render with this new inline sheet inside a Modal:
+
+```tsx
+<Modal
+  visible={showUnifiedInterestSheet}
+  animationType="slide"
+  transparent
+  onRequestClose={() => { setShowUnifiedInterestSheet(false); setIsSuperInterest(false); }}
+>
+  <Pressable
+    style={styles.inquireModalOverlay}
+    onPress={() => { setShowUnifiedInterestSheet(false); setIsSuperInterest(false); }}
+  >
+    <Pressable style={styles.inquireSheet} onPress={() => {}}>
+      <View style={styles.inquireSheetHandle} />
+
+      {/* Super Interest badge */}
+      {isSuperInterest && (
+        <View style={styles.superInterestSheetBadge}>
+          <Text style={styles.superInterestSheetBadgeText}>⭐ Super Interest</Text>
+        </View>
+      )}
+
+      <Text style={styles.inquireSheetTitle}>
+        {isSuperInterest ? 'Send Super Interest' : "I'm Interested"}
+      </Text>
+      <Text style={styles.inquireSheetDesc}>
+        Your profile info will be shared with the host
+      </Text>
+
+      {/* Renter profile snapshot */}
+      {selectedProperty && (
+        <View style={styles.renterSnapshotCard}>
+          <View style={styles.renterSnapshotRow}>
+            <View style={styles.renterSnapshotItem}>
+              <Feather name="dollar-sign" size={13} color="rgba(255,255,255,0.4)" />
+              <Text style={styles.renterSnapshotLabel}>Budget</Text>
+              <Text style={styles.renterSnapshotValue}>
+                {user?.profileData?.budget ? `$${user.profileData.budget}/mo` : 'Not set'}
+              </Text>
+            </View>
+            <View style={styles.renterSnapshotDivider} />
+            <View style={styles.renterSnapshotItem}>
+              <Feather name="calendar" size={13} color="rgba(255,255,255,0.4)" />
+              <Text style={styles.renterSnapshotLabel}>Move-in</Text>
+              <Text style={styles.renterSnapshotValue}>
+                {user?.profileData?.preferences?.moveInDate || 'Flexible'}
+              </Text>
+            </View>
+            <View style={styles.renterSnapshotDivider} />
+            <View style={styles.renterSnapshotItem}>
+              <Feather name="percent" size={13} color="rgba(255,255,255,0.4)" />
+              <Text style={styles.renterSnapshotLabel}>Match</Text>
+              <Text style={styles.renterSnapshotValue}>
+                {getPropertyCompatibility(selectedProperty)}%
+              </Text>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Optional note */}
+      <TextInput
+        style={styles.inquireNoteInput}
+        placeholder="Add a note to the host... (optional)"
+        placeholderTextColor="rgba(255,255,255,0.3)"
+        value={interestNote}
+        onChangeText={(t) => setInterestNote(t.slice(0, 150))}
+        multiline
+        maxLength={150}
+      />
+      <Text style={styles.charCount}>{interestNote?.length || 0}/150</Text>
+
+      {/* Send button */}
+      <Pressable
+        style={[
+          styles.inquireSendBtn,
+          { opacity: sendingInterest ? 0.6 : 1 },
+          isSuperInterest ? { backgroundColor: '#FFD700' } : null,
+        ]}
+        onPress={() => handleSendUnifiedInterest(interestNote || '')}
+        disabled={sendingInterest}
+      >
+        <LinearGradient
+          colors={isSuperInterest ? ['#FFD700', '#FFA500'] : [ACCENT, '#e83a2a']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.inquireSendBtnGrad}
+        >
+          <Text style={[styles.inquireSendBtnText, isSuperInterest ? { color: '#000' } : null]}>
+            {sendingInterest ? 'Sending...' : isSuperInterest ? '⭐ Send Super Interest' : 'Send Interest'}
+          </Text>
+        </LinearGradient>
+      </Pressable>
+
+      <Pressable
+        style={styles.inquireCancelBtn}
+        onPress={() => { setShowUnifiedInterestSheet(false); setIsSuperInterest(false); }}
+      >
+        <Text style={styles.inquireCancelText}>Cancel</Text>
+      </Pressable>
+    </Pressable>
+  </Pressable>
+</Modal>
+```
+
+Add a new state variable for the note:
+```tsx
+const [interestNote, setInterestNote] = useState('');
+```
+
+Add styles:
+```tsx
+renterSnapshotCard: {
+  backgroundColor: 'rgba(255,255,255,0.05)',
+  borderRadius: 12,
+  padding: 14,
+  marginBottom: 14,
+},
+renterSnapshotRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+},
+renterSnapshotItem: {
+  flex: 1,
+  alignItems: 'center',
+  gap: 3,
+},
+renterSnapshotDivider: {
+  width: 1,
+  height: 30,
+  backgroundColor: 'rgba(255,255,255,0.08)',
+},
+renterSnapshotLabel: {
+  color: 'rgba(255,255,255,0.4)',
+  fontSize: 11,
+},
+renterSnapshotValue: {
+  color: '#fff',
+  fontWeight: '600',
+  fontSize: 13,
+},
+superInterestSheetBadge: {
+  alignSelf: 'flex-start',
+  backgroundColor: 'rgba(255,215,0,0.15)',
+  borderRadius: 20,
+  paddingHorizontal: 10,
+  paddingVertical: 4,
+  marginBottom: 8,
+},
+superInterestSheetBadgeText: {
+  color: '#FFD700',
+  fontSize: 12,
+  fontWeight: '700',
+},
+inquireNoteInput: {
+  backgroundColor: 'rgba(255,255,255,0.06)',
+  borderRadius: 10,
+  padding: 12,
+  color: '#fff',
+  fontSize: 14,
+  minHeight: 70,
+  textAlignVertical: 'top',
+  marginBottom: 4,
+},
+charCount: {
+  color: 'rgba(255,255,255,0.3)',
+  fontSize: 11,
+  textAlign: 'right',
+  marginBottom: 14,
+},
+```
+
+---
+
+## STEP 5 — Delete the InterestCardSheet component file
+
+Delete the file `components/InterestCardSheet.tsx` — it is no longer used anywhere in the app.
+
+---
+
+## STEP 6 — Update HostInquiriesScreen to show renter profile snapshot from the unified interest
+
+**File:** `screens/host/HostInquiriesScreen.tsx`
+
+The interest card now includes a `renterSnapshot` with budget, move-in, lifestyle tags, and note. Make sure the `renderCard` function displays these fields. They were already being passed in the old InterestCard — this is just ensuring the new unified record's snapshot fields are displayed correctly on the host side.
+
+If the card already shows `budgetRange`, `moveInDate`, `lifestyleTags`, and `personalNote` — no changes needed here. Just verify they render.
+
+---
+
+## SUMMARY OF CHANGES
+
+| File | Change |
+|---|---|
+| `screens/renter/ExploreScreen.tsx` | Remove separate Inquire button, remove old InterestCardSheet, add unified interest sheet + new handleSendUnifiedInterest |
+| `components/InterestCardSheet.tsx` | **Delete this file** |
+| `screens/shared/MessagesScreen.tsx` | Inquiry threads now appear for all sent interests (from previous prompt) |
+
+---
+
+## DO NOT CHANGE
+
+- Do not modify `InterestConfirmationModal` — it still fires after send
+- Do not modify Super Interest purchase/upsell flow — only the send action is changing
+- Do not change `canSendInterest` or `canSendSuperInterest` in AuthContext
+- Do not modify host-side inquiry accept/decline logic
+- Do not touch renter subscription pricing screens
+- Do not modify `isDev` guards or mock data

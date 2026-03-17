@@ -462,15 +462,15 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     >
       {isInquiryChat ? (
         <>
-          <View style={[styles.header, { backgroundColor: 'rgba(255,107,91,0.06)', paddingTop: insets.top + Spacing.lg }]}>
+          <View style={[styles.header, { backgroundColor: inquiryGroup?.isSuperInterest ? 'rgba(255,215,0,0.06)' : 'rgba(255,107,91,0.06)', paddingTop: insets.top + Spacing.lg }]}>
             <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
               <Feather name="arrow-left" size={24} color={theme.text} />
             </Pressable>
             <View style={[styles.headerCenter, { flex: 1 }]}>
-              <Feather name="home" size={18} color="#ff6b5b" />
+              <Feather name={inquiryGroup?.isSuperInterest ? 'star' : 'home'} size={18} color={inquiryGroup?.isSuperInterest ? '#FFD700' : '#ff6b5b'} />
               <View style={{ flex: 1, marginLeft: 10 }}>
-                <ThemedText style={{ fontSize: 11, color: '#ff6b5b', fontWeight: '600' }}>
-                  Listing Inquiry
+                <ThemedText style={{ fontSize: 11, color: inquiryGroup?.isSuperInterest ? '#FFD700' : '#ff6b5b', fontWeight: '600' }}>
+                  {inquiryGroup?.isSuperInterest ? 'Super Interest' : 'Listing Inquiry'}
                 </ThemedText>
                 <ThemedText style={[Typography.h3]} numberOfLines={1}>
                   {addressRevealed

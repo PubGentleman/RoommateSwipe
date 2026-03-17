@@ -180,7 +180,11 @@ export const MessagesScreen = () => {
         )
       );
 
-      userConversations.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+      userConversations.sort((a, b) => {
+        if (a.isInquiryThread && a.isSuperInterest && !(b.isInquiryThread && b.isSuperInterest)) return -1;
+        if (b.isInquiryThread && b.isSuperInterest && !(a.isInquiryThread && a.isSuperInterest)) return 1;
+        return b.timestamp.getTime() - a.timestamp.getTime();
+      });
       await StorageService.setConversations(existingConversations);
       setConversations(userConversations);
       try {
@@ -339,6 +343,7 @@ export const MessagesScreen = () => {
         listingPrice: conv.listingPrice,
         inquiryStatus: conv.inquiryStatus,
         isInquiryThread: true,
+        isSuperInterest: conv.isSuperInterest || false,
         isArchived: false,
         type: 'listing_inquiry',
       },
@@ -346,6 +351,10 @@ export const MessagesScreen = () => {
   };
 
   const renderInquiryConversation = (item: Conversation) => {
+    if (item.isSuperInterest) {
+      return renderSuperInterestConversation(item);
+    }
+
     const statusColor =
       item.inquiryStatus === 'accepted' ? '#2ecc71' :
       item.inquiryStatus === 'declined' ? '#ff4757' :
@@ -385,6 +394,55 @@ export const MessagesScreen = () => {
           <ThemedText style={styles.inquiryConvLastMsg} numberOfLines={1}>
             {item.lastMessage}
           </ThemedText>
+        </View>
+      </Pressable>
+    );
+  };
+
+  const renderSuperInterestConversation = (item: Conversation) => {
+    const statusColor =
+      item.inquiryStatus === 'accepted' ? '#2ecc71' :
+      item.inquiryStatus === 'declined' ? '#ff4757' :
+      '#FFD700';
+    const statusLabel =
+      item.inquiryStatus === 'accepted' ? 'Accepted' :
+      item.inquiryStatus === 'declined' ? 'Not Available' :
+      'Awaiting Response';
+
+    return (
+      <Pressable
+        key={item.id}
+        style={[styles.inquiryConvRow, styles.superInterestRow]}
+        onPress={() => navigateToInquiryConv(item)}
+      >
+        <View style={styles.superInterestAccent} />
+        {item.listingPhoto ? (
+          <Image source={{ uri: item.listingPhoto }} style={styles.inquiryConvThumb} />
+        ) : (
+          <View style={[styles.inquiryConvThumb, { backgroundColor: 'rgba(255,215,0,0.08)', alignItems: 'center', justifyContent: 'center' }]}>
+            <Feather name="home" size={20} color="rgba(255,215,0,0.4)" />
+          </View>
+        )}
+        <View style={styles.inquiryConvInfo}>
+          <View style={styles.inquiryConvTop}>
+            <ThemedText style={styles.inquiryConvTitle} numberOfLines={1}>
+              {item.listingTitle || 'Super Interest'}
+            </ThemedText>
+            <View style={styles.superInterestConvBadge}>
+              <Feather name="star" size={10} color="#FFD700" />
+              <ThemedText style={styles.superInterestConvBadgeText}>Super Interest</ThemedText>
+            </View>
+          </View>
+          <ThemedText style={styles.inquiryConvPrice}>
+            {item.listingPrice ? `$${item.listingPrice.toLocaleString()}/mo` : ''}
+            {item.hostName ? `  ·  ${item.hostName}` : ''}
+          </ThemedText>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+            <View style={[styles.inquiryStatusBadge, { backgroundColor: statusColor + '22', borderColor: statusColor + '55' }]}>
+              <View style={[styles.inquiryStatusDot, { backgroundColor: statusColor }]} />
+              <ThemedText style={[styles.inquiryStatusLabel, { color: statusColor }]}>{statusLabel}</ThemedText>
+            </View>
+          </View>
         </View>
       </Pressable>
     );
@@ -1154,5 +1212,30 @@ const styles = StyleSheet.create({
   inquiryConvLastMsg: {
     color: 'rgba(255,255,255,0.5)',
     fontSize: 12,
+  },
+  superInterestRow: {
+    backgroundColor: 'rgba(255,215,0,0.04)',
+    borderBottomColor: 'rgba(255,215,0,0.1)',
+  },
+  superInterestAccent: {
+    width: 3,
+    height: '80%' as any,
+    backgroundColor: '#FFD700',
+    borderRadius: 2,
+    marginRight: 4,
+  },
+  superInterestConvBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,215,0,0.15)',
+    borderRadius: 20,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    gap: 3,
+  },
+  superInterestConvBadgeText: {
+    color: '#FFD700',
+    fontSize: 10,
+    fontWeight: '700',
   },
 });

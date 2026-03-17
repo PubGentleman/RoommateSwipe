@@ -11,7 +11,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { StorageService } from '../../utils/storage';
-import { RoommateProfile, Match, InterestCard, Group } from '../../types/models';
+import { RoommateProfile, Match, InterestCard, Group, Conversation } from '../../types/models';
 import { isBoostExpired, getBoostDuration, getBoostTimeRemaining } from '../../utils/boostUtils';
 import { dispatchInsightTrigger } from '../../utils/insightRefresh';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -667,6 +667,59 @@ export const RoommatesScreen = () => {
     });
     await StorageService.addLike(user.id, currentProfile.id, true);
     await StorageService.addSuperLike(currentProfile.id, user.id, user.name, user.profilePicture);
+
+    const interestCardId = `si-${Date.now()}`;
+    const superInterestCard: InterestCard = {
+      id: interestCardId,
+      renterId: user.id,
+      renterName: user.name || 'Renter',
+      renterPhoto: user.profilePicture || '',
+      propertyId: '',
+      propertyTitle: currentProfile.name,
+      hostId: currentProfile.id,
+      compatibility: currentProfile.compatibility || 50,
+      moveInDate: '',
+      budgetRange: '',
+      lifestyleTags: [],
+      personalNote: '',
+      status: 'pending',
+      isSuperInterest: true,
+      createdAt: new Date().toISOString(),
+    };
+    await StorageService.addInterestCard(superInterestCard);
+
+    const superConvId = `super-conv-${interestCardId}`;
+    const siSystemMessage = {
+      id: `msg-${Date.now()}`,
+      senderId: 'system',
+      text: 'You sent a Super Interest. The host will see this at the top of their inquiries.',
+      content: 'You sent a Super Interest. The host will see this at the top of their inquiries.',
+      timestamp: new Date(),
+      read: true,
+    };
+    const superInterestConversation: Conversation = {
+      id: superConvId,
+      participant: {
+        id: currentProfile.id,
+        name: currentProfile.name,
+        photo: currentProfile.photos?.[0] || '',
+        online: false,
+      },
+      lastMessage: 'Super Interest sent — awaiting response',
+      timestamp: new Date(),
+      unread: 0,
+      messages: [siSystemMessage],
+      isInquiryThread: true,
+      isSuperInterest: true,
+      inquiryStatus: 'pending',
+      inquiryId: interestCardId,
+      listingTitle: currentProfile.name,
+      listingPhoto: currentProfile.photos?.[0] || '',
+      hostName: currentProfile.name,
+      hostId: currentProfile.id,
+    };
+    await StorageService.addOrUpdateConversation(superInterestConversation);
+
     const isReciprocalMatch = await StorageService.checkReciprocalLike(user.id, currentProfile.id);
     if (isReciprocalMatch) {
       const match: Match = {

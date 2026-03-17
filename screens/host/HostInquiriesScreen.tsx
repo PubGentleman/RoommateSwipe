@@ -74,10 +74,16 @@ export const HostInquiriesScreen = () => {
     }, [loadInterestCards])
   );
 
-  const filtered = interestCards.filter(card => {
-    if (filter === 'all') return true;
-    return card.status === filter;
-  });
+  const filtered = interestCards
+    .filter(card => {
+      if (filter === 'all') return true;
+      return card.status === filter;
+    })
+    .sort((a, b) => {
+      if (a.isSuperInterest && !b.isSuperInterest) return -1;
+      if (!a.isSuperInterest && b.isSuperInterest) return 1;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
 
   const handleAcceptInterest = async (card: InterestCard) => {
     if (!user) return;
@@ -145,6 +151,14 @@ export const HostInquiriesScreen = () => {
       await StorageService.updateConversation(inquiryConvId, {
         inquiryStatus: 'accepted',
         lastMessage: 'Inquiry accepted! The host wants to connect.',
+      });
+    }
+
+    if (card.isSuperInterest) {
+      const superConvId = `super-conv-${card.id}`;
+      await StorageService.updateConversation(superConvId, {
+        inquiryStatus: 'accepted',
+        lastMessage: 'Host accepted your Super Interest! Say hello.',
       });
     }
 
@@ -231,6 +245,14 @@ export const HostInquiriesScreen = () => {
       });
     }
 
+    if (card.isSuperInterest) {
+      const superConvId = `super-conv-${card.id}`;
+      await StorageService.updateConversation(superConvId, {
+        inquiryStatus: 'declined',
+        lastMessage: 'This listing is no longer available.',
+      });
+    }
+
     await StorageService.addNotification({
       id: `notif-${Date.now()}-pass`,
       userId: card.renterId,
@@ -288,10 +310,10 @@ export const HostInquiriesScreen = () => {
       ]}
     >
       {card.isSuperInterest ? (
-        <View style={styles.superBadge}>
-          <Feather name="star" size={12} color="#FFD700" />
-          <ThemedText style={[Typography.small, { color: '#FFD700', fontWeight: '700', marginLeft: 4 }]}>
-            Super Interest
+        <View style={styles.superInterestBanner}>
+          <Feather name="star" size={14} color="#FFD700" />
+          <ThemedText style={styles.superInterestBannerText}>
+            Super Interest — This renter is highly motivated
           </ThemedText>
         </View>
       ) : null}
@@ -508,6 +530,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: Spacing.sm,
+  },
+  superInterestBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,215,0,0.12)',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+    marginBottom: 12,
+    gap: 7,
+  },
+  superInterestBannerText: {
+    color: '#FFD700',
+    fontSize: 12,
+    fontWeight: '600',
+    flex: 1,
   },
   header: {
     flexDirection: 'row',
