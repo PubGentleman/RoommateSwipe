@@ -507,6 +507,13 @@ export const MessagesScreen = () => {
                 {item.participant.name}
               </ThemedText>
               <PlanBadge plan={participantPlan} size={13} />
+              {convMatchType === 'cold' ? (
+                <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 6, backgroundColor: theme.primary + '33' }}>
+                  <ThemedText style={{ fontSize: 10, fontWeight: '600', color: theme.primary }}>
+                    Unmatched
+                  </ThemedText>
+                </View>
+              ) : null}
               {isVerified ? (
                 <Feather name="check-circle" size={14} color="#5b8cff" style={{ marginLeft: 4 }} />
               ) : null}

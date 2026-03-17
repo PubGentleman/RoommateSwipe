@@ -1,0 +1,230 @@
+# Replit Prompt — Allow Limited Messaging Without a Match (Open Cold Messaging)
+
+## Overview
+Currently non-Elite users see a "Match Required" paywall when trying to message someone they haven't mutually matched with. This change removes that hard wall and gives all users a daily cold message allowance instead. Matched conversations remain unlimited for all plans.
+
+## New Cold Message Rules (Renter Plans)
+
+| Plan | Cold messages per day (non-matched) | Matched messages |
+|------|-------------------------------------|-----------------|
+| Basic | 3 per day | Unlimited |
+| Plus | 10 per day | Unlimited |
+| Elite | Unlimited | Unlimited |
+
+Cold message count resets at midnight. If the user hits their daily limit, show a friendly Alert — not a paywall modal.
+
+---
+
+## Changes Required
+
+### 1. `utils/messagingUtils.ts` — Add cold message daily limit helpers
+
+Add the following constants and functions:
+
+```ts
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+export const COLD_MESSAGE_LIMITS: Record<string, number> = {
+  basic: 3,
+  plus: 10,
+  elite: Infinity,
+};
+
+export function getDailyColdMessageLimit(plan: string): number {
+  return COLD_MESSAGE_LIMITS[plan] ?? 3;
+}
+
+export async function getDailyColdMessageCount(userId: string): Promise<number> {
+  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  const key = `cold_msg_count_${userId}_${today}`;
+  const stored = await AsyncStorage.getItem(key);
+  return stored ? parseInt(stored, 10) : 0;
+}
+
+export async function incrementDailyColdMessageCount(userId: string): Promise<void> {
+  const today = new Date().toISOString().split('T')[0];
+  const key = `cold_msg_count_${userId}_${today}`;
+  const current = await getDailyColdMessageCount(userId);
+  await AsyncStorage.setItem(key, String(current + 1));
+}
+```
+
+---
+
+### 2. `contexts/AuthContext.tsx` — Update `canSendColdMessage()`
+
+Find the existing `canSendColdMessage` function and replace it so all plans can cold message, just with different daily limits:
+
+```ts
+const canSendColdMessage = async (): Promise<{ canSend: boolean; reason?: string; remaining: number }> => {
+  if (!user) return { canSend: false, reason: 'Not logged in', remaining: 0 };
+
+  const plan = user.subscription?.plan || 'basic';
+  const limit = getDailyColdMessageLimit(plan);
+
+  if (limit === Infinity) return { canSend: true, remaining: Infinity };
+
+  const count = await getDailyColdMessageCount(user.id);
+  const remaining = Math.max(0, limit - count);
+
+  if (remaining <= 0) {
+    return {
+      canSend: false,
+      reason: `You've used all ${limit} free messages for today. Resets at midnight.`,
+      remaining: 0,
+    };
+  }
+
+  return { canSend: true, remaining };
+};
+```
+
+Make sure `getDailyColdMessageLimit` and `getDailyColdMessageCount` are imported from `../utils/messagingUtils`.
+
+---
+
+### 3. `screens/renter/RoommatesScreen.tsx` — Replace "Match Required" modal with daily limit flow
+
+#### 3a. Update `handleMessageClick`
+
+Replace the current logic that blocks non-Elite users with a "Match Required" modal:
+
+```ts
+const handleMessageClick = async () => {
+  if (!currentProfile || !user) return;
+
+  const matches = await StorageService.getMatches();
+  const hasMatch = matches.some(m =>
+    (m.userId1 === user.id && m.userId2 === currentProfile.id) ||
+    (m.userId2 === user.id && m.userId1 === currentProfile.id)
+  );
+
+  if (hasMatch) {
+    // Matched — open chat directly, no cold message limit applies
+    handleSendDirectMessage(false);
+  } else {
+    // Not matched — check daily cold message limit
+    const coldCheck = await canSendColdMessage();
+    if (!coldCheck.canSend) {
+      Alert.alert(
+        'Daily Limit Reached',
+        coldCheck.reason || `You've used all your messages for today. Resets at midnight.`,
+        [
+          {
+            text: 'Upgrade for More',
+            onPress: () => (navigation as any).getParent()?.navigate('Profile', { screen: 'Plans' }),
+          },
+          { text: 'OK', style: 'cancel' },
+        ]
+      );
+      return;
+    }
+    // Still has cold messages remaining — open chat
+    handleSendDirectMessage(true);
+  }
+};
+```
+
+#### 3b. Remove the "Match Required" modal
+
+Delete the entire `<Modal visible={showMessageModal} ...>` block — the modal that shows "Match Required" with "Upgrade to Elite". It is no longer needed.
+
+Also remove:
+- `const [showMessageModal, setShowMessageModal] = useState(false);`
+- The `handlePurchaseMessageCredit` function (if only used by that modal)
+- The `handleUpgradeForMessaging` function (if only used by that modal)
+- Any remaining calls to `setShowMessageModal(true)` or `setShowMessageModal(false)`
+
+---
+
+### 4. `screens/shared/ChatScreen.tsx` — Track cold message usage and show counter
+
+#### 4a. Increment cold message count after a cold message is sent successfully
+
+In the `sendMessage` function, find where `useColdMessage()` or `incrementActiveChatCount` is called after a cold message send, and add:
+
+```ts
+if (isColdMessage && !coldMessageResponded && isFirstMessageFromUser) {
+  await incrementDailyColdMessageCount(user.id);
+}
+```
+
+Import `incrementDailyColdMessageCount` from `../../utils/messagingUtils`.
+
+#### 4b. Show remaining cold messages in chat header/input area
+
+Add a state variable:
+```tsx
+const [coldMessagesRemaining, setColdMessagesRemaining] = useState<number>(3);
+```
+
+In `loadMessages`, after loading completes, add:
+```tsx
+if (isColdMessage) {
+  const coldCheck = await canSendColdMessage();
+  setColdMessagesRemaining(coldCheck.remaining === Infinity ? 999 : coldCheck.remaining);
+}
+```
+
+In the input area, find where the daily message limit counter is displayed (around line 758) and add a cold message counter alongside it:
+
+```tsx
+{isColdMessage && !coldMessageResponded && coldMessagesRemaining < 999 && (
+  <ThemedText style={[styles.limitText, { color: theme.textSecondary, textAlign: 'center', paddingBottom: 4 }]}>
+    Not matched yet · {coldMessagesRemaining} message{coldMessagesRemaining !== 1 ? 's' : ''} left today
+  </ThemedText>
+)}
+```
+
+---
+
+### 5. `screens/shared/MessagesScreen.tsx` — Add "Unmatched" badge on cold threads
+
+In the conversation list item renderer, add a small badge for cold message threads so the recipient can tell the difference:
+
+```tsx
+{item.matchType === 'cold' && (
+  <View style={[styles.coldBadge, { backgroundColor: theme.primary + '22' }]}>
+    <ThemedText style={[styles.coldBadgeText, { color: theme.primary }]}>
+      Unmatched
+    </ThemedText>
+  </View>
+)}
+```
+
+Add to StyleSheet:
+```tsx
+coldBadge: {
+  paddingHorizontal: 6,
+  paddingVertical: 2,
+  borderRadius: 4,
+  marginLeft: 6,
+  alignSelf: 'center',
+},
+coldBadgeText: {
+  fontSize: 10,
+  fontWeight: '600',
+},
+```
+
+---
+
+## What Does NOT Change
+
+- Matched conversations are unlimited for all plans — no cold message limit applies
+- Elite users keep unlimited cold messages as a premium perk
+- The regular daily message limit (for matched chats) is unchanged
+- Super Interest, interest cards, and the Explore/listing inquiry flow are unchanged
+- Host subscription plans (Free, Starter, Pro, Business) are unchanged — this only affects renter plans (Basic, Plus, Elite)
+
+---
+
+## Summary of Changes
+
+| File | Change |
+|------|--------|
+| `utils/messagingUtils.ts` | Add `COLD_MESSAGE_LIMITS`, `getDailyColdMessageLimit`, `getDailyColdMessageCount`, `incrementDailyColdMessageCount` |
+| `contexts/AuthContext.tsx` | Update `canSendColdMessage()` — all plans can cold message with daily limits |
+| `screens/renter/RoommatesScreen.tsx` | Replace "Match Required" modal with daily limit Alert; remove `showMessageModal` state and modal |
+| `screens/shared/ChatScreen.tsx` | Track cold message usage; show remaining counter in chat input area |
+| `screens/shared/MessagesScreen.tsx` | Show "Unmatched" badge on cold message conversation threads |

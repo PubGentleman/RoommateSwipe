@@ -31,7 +31,7 @@ Roomdr utilizes a points-based compatibility algorithm (0-100+ score) factoring 
 Built with React Native and Expo using TypeScript, the application employs React Navigation for role-based access (Renter, Host, Agent/Landlord) and supports light/dark modes.
 
 **Key Features:**
-- **Renter:** Swipe-based matching, 1-on-1 messaging, group management (Roommate Groups, Listing Inquiry Groups), property exploration with advanced filters and map/list views, saved properties, AI Match Assistant, animated match celebration, report/block system, and a notification feed. Elite users have access to cold messaging.
+- **Renter:** Swipe-based matching, 1-on-1 messaging, group management (Roommate Groups, Listing Inquiry Groups), property exploration with advanced filters and map/list views, saved properties, AI Match Assistant, animated match celebration, report/block system, and a notification feed. All plans can send cold messages with daily limits (Basic: 3, Starter/Plus: 5, Pro: 10, Elite: unlimited). Resets at midnight.
 - **Host:** A full host dashboard with statistics, listing management (create, edit, delete, pause, mark rented, boost), an Inquiries screen, inquiry analytics, and host subscription management.
 
 **User Experience Enhancements:**

@@ -51,7 +51,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [otherUserPlan, setOtherUserPlan] = useState<string | undefined>();
   const [isColdMessage, setIsColdMessage] = useState(false);
   const [coldMessageResponded, setColdMessageResponded] = useState(false);
-  const [showColdMessageBlockSheet, setShowColdMessageBlockSheet] = useState(false);
+  const [coldMessagesRemaining, setColdMessagesRemaining] = useState<number>(3);
   const [showDailyLimitModal, setShowDailyLimitModal] = useState(false);
   const [showChatLimitModal, setShowChatLimitModal] = useState(false);
 
@@ -256,6 +256,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         setIsColdMessage(true);
         const otherResponded = loadedMessages.some(m => m.senderId === conversation.participant.id);
         setColdMessageResponded(otherResponded);
+        const coldCheck = canSendColdMessage();
+        setColdMessagesRemaining(coldCheck.remaining === Infinity ? 999 : coldCheck.remaining);
       }
     }
   };
@@ -266,11 +268,14 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     if (isColdMessage && !coldMessageResponded) {
       const coldCheck = canSendColdMessage();
       if (!coldCheck.canSend) {
-        if (isEliteUser()) {
-          Alert.alert('Limit Reached', coldCheck.reason || 'No cold messages remaining.');
-        } else {
-          setShowColdMessageBlockSheet(true);
-        }
+        Alert.alert(
+          'Daily Limit Reached',
+          coldCheck.reason || "You've used all your messages for today. Resets at midnight.",
+          [
+            { text: 'Upgrade for More', onPress: () => navigation.getParent()?.navigate('Profile', { screen: 'Plans' }) },
+            { text: 'OK', style: 'cancel' },
+          ]
+        );
         return;
       }
     }
@@ -369,6 +374,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         await useColdMessage();
         conversations[conversationIndex].matchType = 'cold';
         await StorageService.setConversations(conversations);
+        const updatedColdCheck = canSendColdMessage();
+        setColdMessagesRemaining(updatedColdCheck.remaining === Infinity ? 999 : updatedColdCheck.remaining);
       }
     }
 
@@ -723,6 +730,13 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       </View>
 
       <AdBanner placement="chat_bottom" userPlan={userPlan} />
+      {isColdMessage && !coldMessageResponded ? (
+        <View style={{ paddingHorizontal: Spacing.lg, paddingVertical: Spacing.xs, backgroundColor: theme.backgroundRoot }}>
+          <ThemedText style={[Typography.caption, { color: theme.textSecondary, textAlign: 'center' }]}>
+            Not matched yet — {coldMessagesRemaining >= 999 ? 'unlimited' : coldMessagesRemaining} cold message{coldMessagesRemaining !== 1 ? 's' : ''} left today
+          </ThemedText>
+        </View>
+      ) : null}
       <View style={[styles.inputContainer, { backgroundColor: theme.backgroundRoot, paddingBottom: TAB_BAR_HEIGHT }]}>
         <TextInput
           style={[
@@ -814,42 +828,6 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         />
       ) : null}
 
-      <Modal
-        visible={showColdMessageBlockSheet}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowColdMessageBlockSheet(false)}
-      >
-        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <View style={{ backgroundColor: theme.backgroundSecondary, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: insets.bottom + 24 }}>
-            <View style={{ alignItems: 'center', marginBottom: 16 }}>
-              <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: theme.border, marginBottom: 16 }} />
-              <Feather name="lock" size={32} color={theme.primary} />
-            </View>
-            <ThemedText style={[Typography.h2, { textAlign: 'center', marginBottom: 8 }]}>
-              Match Required
-            </ThemedText>
-            <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary, marginBottom: 24 }]}>
-              Messaging requires a mutual match. Upgrade to Elite to send direct messages.
-            </ThemedText>
-            <Pressable
-              style={{ backgroundColor: theme.primary, paddingVertical: 14, borderRadius: 12, alignItems: 'center', marginBottom: 12 }}
-              onPress={() => {
-                setShowColdMessageBlockSheet(false);
-                (navigation as any).navigate('Profile', { screen: 'Subscription' });
-              }}
-            >
-              <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>Upgrade to Elite</ThemedText>
-            </Pressable>
-            <Pressable
-              style={{ paddingVertical: 14, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: theme.border }}
-              onPress={() => setShowColdMessageBlockSheet(false)}
-            >
-              <ThemedText style={[Typography.h3, { color: theme.textSecondary }]}>Maybe Later</ThemedText>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
       <Modal visible={showDailyLimitModal} transparent animationType="fade" onRequestClose={() => setShowDailyLimitModal(false)}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
           <View style={{ backgroundColor: theme.backgroundSecondary, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: insets.bottom + 24 }}>

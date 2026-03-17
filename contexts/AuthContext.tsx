@@ -1683,17 +1683,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const canSendColdMessage = (): { canSend: boolean; remaining: number; reason?: string } => {
     if (!user) return { canSend: false, remaining: 0, reason: 'Not logged in' };
     const plan = user.subscription?.plan || 'basic';
-    if (plan !== 'elite') {
-      return { canSend: false, remaining: 0, reason: 'Messaging requires a mutual match. Upgrade to Elite to send direct messages.' };
-    }
+    const coldLimits: Record<string, number> = { basic: 3, starter: 5, plus: 5, pro: 10, elite: Infinity };
+    const limit = coldLimits[plan] ?? 3;
+    if (limit === Infinity) return { canSend: true, remaining: Infinity };
     const now = new Date();
     let used = user.coldMessagesUsedThisMonth || 0;
     const resetDate = user.coldMessagesResetDate ? new Date(user.coldMessagesResetDate) : null;
-    if (!resetDate || resetDate.getMonth() !== now.getMonth() || resetDate.getFullYear() !== now.getFullYear()) {
+    const today = new Date().toISOString().split('T')[0];
+    const resetDay = resetDate ? resetDate.toISOString().split('T')[0] : null;
+    if (!resetDay || resetDay !== today) {
       used = 0;
     }
-    const remaining = Math.max(0, 3 - used);
-    if (remaining <= 0) return { canSend: false, remaining: 0, reason: 'You\'ve used all 3 direct messages this month.' };
+    const remaining = Math.max(0, limit - used);
+    if (remaining <= 0) return { canSend: false, remaining: 0, reason: `You've used all ${limit} messages for today. Resets at midnight.` };
     return { canSend: true, remaining };
   };
 
@@ -1702,7 +1704,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const now = new Date();
     let used = user.coldMessagesUsedThisMonth || 0;
     const resetDate = user.coldMessagesResetDate ? new Date(user.coldMessagesResetDate) : null;
-    if (!resetDate || resetDate.getMonth() !== now.getMonth() || resetDate.getFullYear() !== now.getFullYear()) {
+    const today = now.toISOString().split('T')[0];
+    const resetDay = resetDate ? resetDate.toISOString().split('T')[0] : null;
+    if (!resetDay || resetDay !== today) {
       used = 0;
     }
     const updated = {

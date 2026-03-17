@@ -66,8 +66,6 @@ export const RoommatesScreen = () => {
   const [processingUndoPass, setProcessingUndoPass] = useState(false);
   const [showProfileDetail, setShowProfileDetail] = useState(false);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
-  const [showMessageModal, setShowMessageModal] = useState(false);
-  const [processingMessagePurchase, setProcessingMessagePurchase] = useState(false);
   const [showSuperLikeUpgradeModal, setShowSuperLikeUpgradeModal] = useState(false);
   const [showSuperInterestUpsell, setShowSuperInterestUpsell] = useState(false);
   const [showSuperInterestConfirm, setShowSuperInterestConfirm] = useState(false);
@@ -1035,19 +1033,19 @@ export const RoommatesScreen = () => {
     if (hasMatch) {
       handleSendDirectMessage(false);
     } else {
-      const userPlan = user.subscription?.plan || 'basic';
-      const userStatus = user.subscription?.status || 'active';
-      const isEliteMember = userPlan === 'elite' && userStatus === 'active';
-      if (isEliteMember) {
-        const coldCheck = canSendColdMessage();
-        if (!coldCheck.canSend) {
-          Alert.alert('Limit Reached', coldCheck.reason || 'No direct messages remaining this month.');
-          return;
-        }
-        handleSendDirectMessage(true);
-      } else {
-        setShowMessageModal(true);
+      const coldCheck = canSendColdMessage();
+      if (!coldCheck.canSend) {
+        Alert.alert(
+          'Daily Limit Reached',
+          coldCheck.reason || "You've used all your messages for today. Resets at midnight.",
+          [
+            { text: 'Upgrade for More', onPress: () => (navigation as any).getParent()?.navigate('Profile', { screen: 'Plans' }) },
+            { text: 'OK', style: 'cancel' },
+          ]
+        );
+        return;
       }
+      handleSendDirectMessage(true);
     }
   };
 
@@ -1147,39 +1145,6 @@ export const RoommatesScreen = () => {
     }
   };
 
-  const handlePurchaseMessageCredit = async () => {
-    setProcessingMessagePurchase(true);
-    
-    // NOTE: This is a simulated payment flow for demonstration purposes.
-    // In a production app, you would need to:
-    // 1. Set up a backend API server (Express, etc.)
-    // 2. Create a Stripe payment intent for $0.99
-    // 3. Handle the payment confirmation
-    // 4. Grant the message credit upon successful payment
-    // 5. Track message credits in user data
-    
-    // Simulated payment processing (1 second delay)
-    setTimeout(async () => {
-      // In production, this would only execute after successful payment
-      const users = await StorageService.getUsers();
-      const currentUser = users.find(u => u.id === user?.id);
-      if (currentUser) {
-        // In production: increment message credits
-        // currentUser.messageCredits = (currentUser.messageCredits || 0) + 1;
-        // await StorageService.updateUser(currentUser);
-      }
-      
-      setProcessingMessagePurchase(false);
-      setShowMessageModal(false);
-      await handleSendDirectMessage(false);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }, 1000);
-  };
-
-  const handleUpgradeForMessaging = () => {
-    setShowMessageModal(false);
-    (navigation as any).navigate('Profile', { screen: 'Payment' });
-  };
 
   const photosArray = Array.isArray(currentProfile.photos) ? currentProfile.photos : currentProfile.photos ? [currentProfile.photos] : [];
 
@@ -1813,72 +1778,6 @@ export const RoommatesScreen = () => {
         </View>
       </Modal>
 
-      <Modal
-        visible={showMessageModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowMessageModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.vipModalContainer, { backgroundColor: theme.backgroundSecondary }]}>
-            <View style={[styles.vipModalHeader, { backgroundColor: theme.primary }]}>
-              <Feather name="message-circle" size={32} color="#FFFFFF" />
-            </View>
-            
-            <View style={styles.vipModalContent}>
-              <ThemedText style={[Typography.h2, { textAlign: 'center', marginBottom: Spacing.sm }]}>
-                Match Required
-              </ThemedText>
-              <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary, marginBottom: Spacing.xl }]}>
-                Messaging requires a mutual match. Upgrade to Elite to send direct messages to anyone — 3 per month included.
-              </ThemedText>
-              
-              <View style={styles.vipFeaturesList}>
-                <View style={styles.vipFeatureItem}>
-                  <Feather name="send" size={20} color="#9370DB" />
-                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
-                    3 direct messages per month
-                  </ThemedText>
-                </View>
-                <View style={styles.vipFeatureItem}>
-                  <Feather name="zap" size={20} color="#FFD700" />
-                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
-                    Unlimited Super Interests
-                  </ThemedText>
-                </View>
-                <View style={styles.vipFeatureItem}>
-                  <Feather name="eye" size={20} color={theme.info} />
-                  <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
-                    Read receipts and more
-                  </ThemedText>
-                </View>
-              </View>
-            </View>
-            
-            <View style={styles.vipModalActions}>
-              <Pressable
-                style={[styles.vipModalButton, { backgroundColor: theme.primary }]}
-                onPress={() => {
-                  setShowMessageModal(false);
-                  (navigation as any).navigate('Profile', { screen: 'Subscription' });
-                }}
-              >
-                <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
-                  Upgrade to Elite
-                </ThemedText>
-              </Pressable>
-              <Pressable
-                style={[styles.vipModalButtonSecondary, { borderColor: theme.border }]}
-                onPress={() => setShowMessageModal(false)}
-              >
-                <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
-                  Maybe Later
-                </ThemedText>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       <Modal
         visible={showSuperLikeUpgradeModal}
@@ -2318,23 +2217,24 @@ export const RoommatesScreen = () => {
                       (m.userId1 === user.id && m.userId2 === currentProfile.id) ||
                       (m.userId2 === user.id && m.userId1 === currentProfile.id)
                     );
-                    setShowProfileDetail(false);
                     if (hasMatch) {
+                      setShowProfileDetail(false);
                       setTimeout(() => handleSendDirectMessage(false), 200);
                     } else {
-                      const userPlan = user.subscription?.plan || 'basic';
-                      const userStatus = user.subscription?.status || 'active';
-                      const isEliteMember = userPlan === 'elite' && userStatus === 'active';
-                      if (isEliteMember) {
-                        const coldCheck = canSendColdMessage();
-                        if (!coldCheck.canSend) {
-                          Alert.alert('Limit Reached', coldCheck.reason || 'No direct messages remaining this month.');
-                          return;
-                        }
-                        setTimeout(() => handleSendDirectMessage(true), 200);
-                      } else {
-                        setTimeout(() => setShowMessageModal(true), 200);
+                      const coldCheck = canSendColdMessage();
+                      if (!coldCheck.canSend) {
+                        Alert.alert(
+                          'Daily Limit Reached',
+                          coldCheck.reason || "You've used all your messages for today. Resets at midnight.",
+                          [
+                            { text: 'Upgrade for More', onPress: () => (navigation as any).getParent()?.navigate('Profile', { screen: 'Plans' }) },
+                            { text: 'OK', style: 'cancel' },
+                          ]
+                        );
+                        return;
                       }
+                      setShowProfileDetail(false);
+                      setTimeout(() => handleSendDirectMessage(true), 200);
                     }
                   }}
                 >
