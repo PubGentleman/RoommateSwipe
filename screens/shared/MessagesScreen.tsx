@@ -463,7 +463,7 @@ export const MessagesScreen = () => {
   };
 
   const renderConversation = ({ item, index }: { item: Conversation; index: number }) => {
-    if (item.isInquiryThread) {
+    if (item.isInquiryThread && item.matchType !== 'cold' && item.matchType !== 'mutual') {
       return renderInquiryConversation(item);
     }
 

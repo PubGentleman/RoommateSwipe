@@ -1101,10 +1101,6 @@ export const RoommatesScreen = () => {
         unread: 0,
         messages: [systemMessage],
         matchType: isCold ? 'cold' : 'mutual',
-        isInquiryThread: true,
-        inquiryStatus: isCold ? 'pending' : 'accepted',
-        hostName: currentProfile.name,
-        hostPhoto: currentProfile.photos?.[0] || currentProfile.profilePicture || '',
         compatibilityScore: compatibility,
         createdAt: new Date().toISOString(),
       };
@@ -1455,10 +1451,6 @@ export const RoommatesScreen = () => {
                 unread: 0,
                 messages: [systemMessage],
                 matchType: (thisMatch?.matchType || 'mutual') as 'mutual' | 'super_interest' | 'cold',
-                isInquiryThread: true,
-                inquiryStatus: 'accepted' as const,
-                hostName: profile.name,
-                hostPhoto: profile.photos?.[0] || '',
                 compatibilityScore: compatibility,
                 createdAt: new Date().toISOString(),
               };
