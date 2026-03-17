@@ -1,0 +1,299 @@
+# Replit Prompt — Fix Chat: Messages Disappear After Sending
+
+## Problem
+When a user sends a message in the chat, only that single message appears. All previous messages are gone. This happens because of two bugs working together:
+
+**Bug 1 (Primary — MessagesScreen.tsx):**
+Every time the Messages screen loads or regains focus, `loadConversations()` saves conversations back to `StorageService` with `messages: []`. This wipes the entire message history from AsyncStorage. The culprit is in `loadConversationsFromSupabase()` which explicitly sets `messages: []` for every conversation it maps, and then those empty-message conversations are saved back to StorageService.
+
+**Bug 2 (Secondary — ChatScreen.tsx):**
+In `loadMessages()`, if Supabase returns any messages at all (`supaMessages.length > 0`), the function sets `loadedFromSupabase = true` and never loads StorageService messages. So dev/locally-stored messages are permanently ignored once a single real Supabase message exists.
+
+**The compounding effect:**
+1. User sends a message → saved to StorageService
+2. `subscribeToAllMessages` fires in MessagesScreen (still mounted in background) → `loadConversations()` runs → StorageService messages wiped
+3. User navigates away and back to the same chat → `loadMessages()` loads from StorageService → finds empty messages → only the most recently sent message shows
+
+---
+
+## Fix — File 1: `screens/shared/MessagesScreen.tsx`
+
+### Change 1: Load local conversations FIRST and preserve messages throughout
+
+Replace the entire `loadConversations` function with this corrected version:
+
+```tsx
+const loadConversations = async () => {
+  if (!user) return;
+
+  try {
+    setIsLoading(true);
+
+    // IMPORTANT: Load local conversations FIRST so we can preserve messages
+    const localConversations = await StorageService.getConversations();
+    const localConvMap = new Map(localConversations.map(c => [c.id, c]));
+
+    let existingConversations: Conversation[] = [];
+    try {
+      const supaConversations = await loadConversationsFromSupabase();
+      // When merging Supabase convs, restore messages from local storage
+      existingConversations = supaConversations.map(supaConv => {
+        const localConv = localConvMap.get(supaConv.id);
+        return { ...supaConv, messages: localConv?.messages || [] };
+      });
+    } catch (supaError) {
+      console.warn('Supabase getConversations failed, falling back to StorageService:', supaError);
+      existingConversations = [...localConversations];
+    }
+
+    // Merge ALL local conversations (not just inquiry ones) — preserve everything local
+    for (const localConv of localConversations) {
+      if (!existingConversations.some(c => c.id === localConv.id)) {
+        existingConversations.push(localConv);
+      }
+    }
+
+    const matches = await StorageService.getMatches();
+    const profiles = await StorageService.getRoommateProfiles();
+    const allUsers = await StorageService.getUsers();
+    const pMap = new Map(profiles.map(p => [p.id, p]));
+    const uMap = new Map(allUsers.map(u => [u.id, u]));
+    setProfilesMap(pMap);
+    setUsersMap(uMap);
+
+    const recentMatchProfiles: { profile: RoommateProfile; match: Match; compatibility: number }[] = [];
+
+    const mMap = new Map<string, Match>();
+    for (const match of matches) {
+      if (match.userId1 !== user.id && match.userId2 !== user.id) continue;
+
+      const otherUserId = match.userId1 === user.id ? match.userId2 : match.userId1;
+      mMap.set(otherUserId, match);
+      const conversationExists = existingConversations.some(
+        c => c.participant.id === otherUserId
+      );
+
+      if (!conversationExists) {
+        const otherProfile = profiles.find(p => p.id === otherUserId);
+        if (otherProfile) {
+          // Preserve messages from local storage when creating conversation from match
+          const localConv = localConvMap.get(`conv_${match.id}`);
+          const newConversation: Conversation = {
+            id: `conv_${match.id}`,
+            participant: {
+              id: otherProfile.id,
+              name: otherProfile.name,
+              photo: otherProfile.photos?.[0],
+              online: Math.random() > 0.5,
+            },
+            lastMessage: localConv?.lastMessage || 'You matched!',
+            timestamp: localConv?.timestamp || match.matchedAt,
+            unread: localConv?.unread || 0,
+            messages: localConv?.messages || [],  // PRESERVE messages
+            matchType: match.matchType || 'mutual',
+          };
+          existingConversations.push(newConversation);
+        }
+      } else {
+        const existingConv = existingConversations.find(c => c.participant.id === otherUserId);
+        if (existingConv && !existingConv.matchType) {
+          existingConv.matchType = match.matchType || 'mutual';
+        }
+      }
+
+      const otherProfile = pMap.get(otherUserId);
+      if (otherProfile) {
+        const compatibility = user ? calculateCompatibility(user, otherProfile) : 50;
+        recentMatchProfiles.push({ profile: otherProfile, match, compatibility });
+      }
+    }
+    setMatchesMap(mMap);
+
+    recentMatchProfiles.sort((a, b) => b.match.matchedAt.getTime() - a.match.matchedAt.getTime());
+    setNewMatches(recentMatchProfiles.slice(0, 10));
+
+    const blockedIds = user.blockedUsers || [];
+    const userConversations = existingConversations.filter(
+      c => !blockedIds.includes(c.participant.id) && (
+        c.isInquiryThread ||
+        c.id.startsWith('conv-interest-') ||
+        c.matchType === 'cold' ||
+        matches.some(match =>
+          (match.userId1 === user.id && match.userId2 === c.participant.id) ||
+          (match.userId2 === user.id && match.userId1 === c.participant.id)
+        )
+      )
+    );
+
+    userConversations.sort((a, b) => {
+      if (a.isInquiryThread && a.isSuperInterest && !(b.isInquiryThread && b.isSuperInterest)) return -1;
+      if (b.isInquiryThread && b.isSuperInterest && !(a.isInquiryThread && a.isSuperInterest)) return 1;
+      return b.timestamp.getTime() - a.timestamp.getTime();
+    });
+
+    // SAFE SAVE: merge back to StorageService preserving messages
+    // For any conversation already in localConvMap with messages, ensure we don't overwrite them
+    const safeToSave = existingConversations.map(c => {
+      const local = localConvMap.get(c.id);
+      if (local && local.messages && local.messages.length > 0 && (!c.messages || c.messages.length === 0)) {
+        return { ...c, messages: local.messages };
+      }
+      return c;
+    });
+    await StorageService.setConversations(safeToSave);
+
+    setConversations(userConversations);
+    try {
+      const groups = await getMyInquiryGroups();
+      const mapped = groups.map((g: any) => ({
+        ...g,
+        listingAddress: g.listing_address || g.listingAddress,
+        listingId: g.listing_id || g.listingId,
+        hostId: g.host_id || g.hostId,
+        isArchived: g.is_archived || g.isArchived || false,
+        hostName: g.host?.full_name || g.hostName || 'Host',
+        memberCount: g.members?.[0]?.count || g.memberCount || 0,
+        listingPhoto: g.listing?.photos?.[0] || g.listingPhoto,
+        inquiryStatus: g.inquiry_status || g.inquiryStatus || 'pending',
+        addressRevealed: g.address_revealed || g.addressRevealed || false,
+      }));
+      setInquiryGroups(mapped.filter((g: any) => !g.isArchived));
+    } catch (e) {
+      console.warn('Failed to load inquiry groups:', e);
+    }
+  } catch (error) {
+    console.error('Error loading conversations:', error);
+  } finally {
+    setIsLoading(false);
+  }
+};
+```
+
+**Key changes in this function:**
+- `localConversations` is loaded BEFORE the Supabase call
+- A `localConvMap` is built so we can quickly look up local conversations by ID
+- When mapping Supabase conversations, we restore `messages` from local storage: `messages: localConv?.messages || []`
+- The loop that previously only merged inquiry conversations now merges ALL local conversations
+- When creating new conversations from match data, local messages are preserved
+- The final `StorageService.setConversations` call does a safe merge that never overwrites existing messages with empty arrays
+
+---
+
+## Fix — File 2: `screens/shared/ChatScreen.tsx`
+
+### Change: Merge Supabase and StorageService messages in `loadMessages`
+
+Find the `loadMessages` function (around line 181) and replace its message-loading logic.
+
+**Find this block (approximately lines 181–217):**
+```tsx
+const loadMessages = async () => {
+  let loadedMessages: Message[] = [];
+  let loadedFromSupabase = false;
+
+  try {
+    const supaMessages = await getSupabaseMessages(matchIdFromConversation);
+    if (supaMessages && supaMessages.length > 0) {
+      loadedMessages = supaMessages.map((msg: any) => ({
+        id: msg.id,
+        senderId: msg.sender_id,
+        text: msg.content,
+        content: msg.content,
+        timestamp: new Date(msg.created_at),
+        read: msg.read || false,
+        readAt: msg.read_at ? new Date(msg.read_at) : undefined,
+      }));
+      loadedFromSupabase = true;
+      try { markSupabaseMessagesAsRead(matchIdFromConversation); } catch (_e) {}
+    }
+  } catch (supaError) {
+    console.warn('Supabase getMessages failed, falling back to StorageService:', supaError);
+  }
+
+  if (!loadedFromSupabase) {
+    const conversations = await StorageService.getConversations();
+    const conversation = conversations.find(c => c.id === conversationId);
+    if (conversation) {
+      loadedMessages = (conversation.messages || []).map((msg: Message) => {
+        if (msg.senderId === user?.id && !msg.readAt && msg.read !== false) {
+          return { ...msg, readAt: new Date(new Date(msg.timestamp).getTime() + 60000) };
+        }
+        return msg;
+      });
+    }
+  }
+
+  setMessages(loadedMessages);
+```
+
+**Replace with this merged version:**
+```tsx
+const loadMessages = async () => {
+  let supabaseMessages: Message[] = [];
+  let loadedFromSupabase = false;
+
+  try {
+    const supaMessages = await getSupabaseMessages(matchIdFromConversation);
+    if (supaMessages && supaMessages.length > 0) {
+      supabaseMessages = supaMessages.map((msg: any) => ({
+        id: msg.id,
+        senderId: msg.sender_id,
+        text: msg.content,
+        content: msg.content,
+        timestamp: new Date(msg.created_at),
+        read: msg.read || false,
+        readAt: msg.read_at ? new Date(msg.read_at) : undefined,
+      }));
+      loadedFromSupabase = true;
+      try { markSupabaseMessagesAsRead(matchIdFromConversation); } catch (_e) {}
+    }
+  } catch (supaError) {
+    console.warn('Supabase getMessages failed, falling back to StorageService:', supaError);
+  }
+
+  // Always load local messages — needed to merge or fall back
+  const conversations = await StorageService.getConversations();
+  const conversation = conversations.find(c => c.id === conversationId);
+  const localMessages: Message[] = (conversation?.messages || []).map((msg: Message) => {
+    if (msg.senderId === user?.id && !msg.readAt && msg.read !== false) {
+      return { ...msg, readAt: new Date(new Date(msg.timestamp).getTime() + 60000) };
+    }
+    return msg;
+  });
+
+  let loadedMessages: Message[];
+
+  if (loadedFromSupabase) {
+    // Merge: include local messages not already in Supabase results (avoids losing dev/mock messages)
+    const supabaseIds = new Set(supabaseMessages.map(m => m.id));
+    const localOnly = localMessages.filter(m => !supabaseIds.has(m.id));
+    loadedMessages = [...localOnly, ...supabaseMessages].sort(
+      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
+  } else {
+    // No Supabase messages — use local only
+    loadedMessages = localMessages;
+  }
+
+  setMessages(loadedMessages);
+```
+
+**Key changes:**
+- `supabaseMessages` is always mapped separately from the final `loadedMessages`
+- Local (StorageService) messages are ALWAYS loaded, regardless of whether Supabase has data
+- If Supabase has messages, they are MERGED with local messages (using a deduplication Set on IDs)
+- The merged result is sorted by timestamp so messages appear in order
+- If Supabase has nothing, local-only messages are used as before
+
+---
+
+## Summary of Root Causes Found
+
+| Bug | File | Line | Description |
+|-----|------|------|-------------|
+| PRIMARY | `MessagesScreen.tsx` | ~188 | `StorageService.setConversations(existingConversations)` saves conversations with `messages: []`, wiping all message history every time the Messages tab is opened |
+| PRIMARY | `MessagesScreen.tsx` | ~99–111 | Only inquiry conversations are merged from local storage — all other local conversations with messages are ignored |
+| PRIMARY | `MessagesScreen.tsx` | ~133–150 | New conversations created from match data always use `messages: []` even when local data has messages |
+| SECONDARY | `ChatScreen.tsx` | ~204 | When Supabase returns any messages, `loadedFromSupabase = true` and StorageService is never checked — locally stored messages permanently lost |
+
+Both files must be fixed together for chats to work correctly.
