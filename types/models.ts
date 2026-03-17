@@ -187,6 +187,17 @@ export interface Conversation {
   unread: number;
   messages: Message[];
   matchType?: 'mutual' | 'super_interest' | 'cold';
+  isInquiryThread?: boolean;
+  inquiryStatus?: 'pending' | 'accepted' | 'declined';
+  inquiryId?: string;
+  listingTitle?: string;
+  listingPhoto?: string;
+  listingPrice?: number;
+  hostName?: string;
+  hostId?: string;
+  propertyId?: string;
+  groupId?: string;
+  isSoloInquiry?: boolean;
 }
 
 export interface Application {

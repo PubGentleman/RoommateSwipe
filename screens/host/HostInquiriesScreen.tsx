@@ -140,6 +140,14 @@ export const HostInquiriesScreen = () => {
     };
     await StorageService.addOrUpdateConversation(conversation);
 
+    if (card.groupId) {
+      const inquiryConvId = `inquiry-conv-${card.groupId}`;
+      await StorageService.updateConversation(inquiryConvId, {
+        inquiryStatus: 'accepted',
+        lastMessage: 'Inquiry accepted! The host wants to connect.',
+      });
+    }
+
     await StorageService.addNotification({
       id: `notif-${Date.now()}-accept-renter`,
       userId: card.renterId,
@@ -205,6 +213,21 @@ export const HostInquiriesScreen = () => {
       await StorageService.updateInterestCard(card.id, {
         status: 'passed',
         respondedAt: now.toISOString(),
+      });
+    }
+
+    if (card.groupId) {
+      try {
+        await updateGroup(card.groupId, {
+          inquiry_status: 'declined',
+        });
+      } catch {
+        console.warn('[HostInquiriesScreen] Failed to update group decline status');
+      }
+      const inquiryConvId = `inquiry-conv-${card.groupId}`;
+      await StorageService.updateConversation(inquiryConvId, {
+        inquiryStatus: 'declined',
+        lastMessage: 'The host passed on this inquiry.',
       });
     }
 

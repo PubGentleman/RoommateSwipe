@@ -17,7 +17,7 @@ import { CityPickerModal, CityPillButton } from '../../components/CityPickerModa
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { StorageService } from '../../utils/storage';
 import { getListings } from '../../services/listingService';
-import { Property, PropertyFilter, User, RoommateProfile, InterestCard } from '../../types/models';
+import { Property, PropertyFilter, User, RoommateProfile, InterestCard, Conversation } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { formatMoveInDate, calculateCompatibility, getMatchQualityColor, getGenderSymbol, formatLocation } from '../../utils/matchingAlgorithm';
@@ -603,22 +603,55 @@ export const ExploreScreen = () => {
       setShowInquireModal(false);
       setSelectedGroupId(null);
       const listingPhoto = inquireProperty.photos?.[0] || inquireProperty.imageUrl || undefined;
-      (navigation as any).navigate('Messages', {
-        screen: 'Chat',
-        params: {
-          conversationId: `inquiry_${newGroup.id}`,
-          inquiryGroup: {
-            ...newGroup,
-            name: groupName,
-            listingAddress: address,
-            listingId: inquireProperty.id,
-            hostId: inquireProperty.hostProfileId,
-            listingPhoto,
-            isArchived: false,
-            type: 'listing_inquiry',
-          },
+      const hostUser = inquireProperty.hostProfileId ? hostProfiles.get(inquireProperty.hostProfileId) : null;
+      const hostName = (inquireProperty as any).hostName || hostUser?.name || 'Host';
+
+      const inquiryConvId = `inquiry-conv-${newGroup.id}`;
+      const systemMessage = {
+        id: `msg-${Date.now()}`,
+        senderId: 'system',
+        text: 'You inquired about this listing. Waiting for the host to respond.',
+        content: 'You inquired about this listing. Waiting for the host to respond.',
+        timestamp: new Date(),
+        read: true,
+      };
+      const inquiryConversation: Conversation = {
+        id: inquiryConvId,
+        participant: {
+          id: inquireProperty.hostProfileId || '',
+          name: hostName,
+          photo: hostUser?.profilePicture || '',
+          online: false,
         },
-      });
+        lastMessage: 'Inquiry sent — awaiting response',
+        timestamp: new Date(),
+        unread: 0,
+        messages: [systemMessage],
+        isInquiryThread: true,
+        inquiryStatus: 'pending',
+        inquiryId: newGroup.id,
+        listingTitle: inquireProperty.title,
+        listingPhoto: listingPhoto || '',
+        listingPrice: inquireProperty.price,
+        hostName,
+        hostId: inquireProperty.hostProfileId,
+        propertyId: inquireProperty.id,
+        groupId: isSoloInquiry ? undefined : selectedGroupId || undefined,
+        isSoloInquiry,
+      };
+      await StorageService.addOrUpdateConversation(inquiryConversation);
+
+      Alert.alert(
+        'Inquiry Sent!',
+        'Track your inquiry in the Messages tab.',
+        [
+          {
+            text: 'View in Messages',
+            onPress: () => (navigation as any).navigate('Messages'),
+          },
+          { text: 'OK' },
+        ]
+      );
     } catch (err) {
       console.error('Failed to create inquiry group:', err);
       Alert.alert('Error', 'Failed to send inquiry. Please try again.');

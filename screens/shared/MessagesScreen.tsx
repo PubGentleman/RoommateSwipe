@@ -4,7 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
 import { Spacing, BorderRadius, Typography } from '../../constants/theme';
-import { Conversation, Match, RoommateProfile } from '../../types/models';
+import { Conversation, Match, RoommateProfile, Message } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StorageService } from '../../utils/storage';
 import { useAuth } from '../../contexts/AuthContext';
@@ -102,6 +102,14 @@ export const MessagesScreen = () => {
         existingConversations = await StorageService.getConversations();
       }
 
+      const localConversations = await StorageService.getConversations();
+      const localInquiryConvs = localConversations.filter(c => c.isInquiryThread);
+      for (const inquiry of localInquiryConvs) {
+        if (!existingConversations.some(c => c.id === inquiry.id)) {
+          existingConversations.push(inquiry);
+        }
+      }
+
       const matches = await StorageService.getMatches();
       const profiles = await StorageService.getRoommateProfiles();
       const allUsers = await StorageService.getUsers();
@@ -162,6 +170,7 @@ export const MessagesScreen = () => {
       const blockedIds = user.blockedUsers || [];
       const userConversations = existingConversations.filter(
         c => !blockedIds.includes(c.participant.id) && (
+          c.isInquiryThread ||
           c.id.startsWith('conv-interest-') ||
           c.matchType === 'cold' ||
           matches.some(match => 
@@ -316,7 +325,76 @@ export const MessagesScreen = () => {
     );
   };
 
+  const navigateToInquiryConv = (conv: Conversation) => {
+    navigation.navigate('Chat', {
+      conversationId: conv.id,
+      inquiryGroup: {
+        id: conv.inquiryId || conv.id,
+        name: conv.listingTitle || 'Listing Inquiry',
+        listingAddress: conv.listingTitle || '',
+        listingId: conv.propertyId,
+        hostId: conv.hostId,
+        listingPhoto: conv.listingPhoto,
+        listingTitle: conv.listingTitle,
+        listingPrice: conv.listingPrice,
+        inquiryStatus: conv.inquiryStatus,
+        isInquiryThread: true,
+        isArchived: false,
+        type: 'listing_inquiry',
+      },
+    });
+  };
+
+  const renderInquiryConversation = (item: Conversation) => {
+    const statusColor =
+      item.inquiryStatus === 'accepted' ? '#2ecc71' :
+      item.inquiryStatus === 'declined' ? '#ff4757' :
+      '#ffd700';
+    const statusLabel =
+      item.inquiryStatus === 'accepted' ? 'Accepted' :
+      item.inquiryStatus === 'declined' ? 'Not Available' :
+      'Pending';
+
+    return (
+      <Pressable
+        key={item.id}
+        style={styles.inquiryConvRow}
+        onPress={() => navigateToInquiryConv(item)}
+      >
+        {item.listingPhoto ? (
+          <Image source={{ uri: item.listingPhoto }} style={styles.inquiryConvThumb} />
+        ) : (
+          <View style={[styles.inquiryConvThumb, { backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center' }]}>
+            <Feather name="home" size={20} color="rgba(255,255,255,0.3)" />
+          </View>
+        )}
+        <View style={styles.inquiryConvInfo}>
+          <View style={styles.inquiryConvTop}>
+            <ThemedText style={styles.inquiryConvTitle} numberOfLines={1}>
+              {item.listingTitle || 'Listing Inquiry'}
+            </ThemedText>
+            <View style={[styles.inquiryStatusBadge, { backgroundColor: statusColor + '22', borderColor: statusColor + '55' }]}>
+              <View style={[styles.inquiryStatusDot, { backgroundColor: statusColor }]} />
+              <ThemedText style={[styles.inquiryStatusLabel, { color: statusColor }]}>{statusLabel}</ThemedText>
+            </View>
+          </View>
+          <ThemedText style={styles.inquiryConvPrice}>
+            {item.listingPrice ? `$${item.listingPrice.toLocaleString()}/mo` : ''}
+            {item.hostName ? `  ·  ${item.hostName}` : ''}
+          </ThemedText>
+          <ThemedText style={styles.inquiryConvLastMsg} numberOfLines={1}>
+            {item.lastMessage}
+          </ThemedText>
+        </View>
+      </Pressable>
+    );
+  };
+
   const renderConversation = ({ item, index }: { item: Conversation; index: number }) => {
+    if (item.isInquiryThread) {
+      return renderInquiryConversation(item);
+    }
+
     const hasUnread = item.unread > 0;
     const isNew = isNewMatch(item);
     const compatibility = getCompatibilityForConversation(item.participant.id);
@@ -1020,5 +1098,61 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 10,
     backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  inquiryConvRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+    gap: 12,
+  },
+  inquiryConvThumb: {
+    width: 52,
+    height: 52,
+    borderRadius: 10,
+  },
+  inquiryConvInfo: {
+    flex: 1,
+    gap: 3,
+  },
+  inquiryConvTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  inquiryConvTitle: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
+    flex: 1,
+  },
+  inquiryStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 20,
+    borderWidth: 1,
+    gap: 4,
+  },
+  inquiryStatusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  inquiryStatusLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  inquiryConvPrice: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 12,
+  },
+  inquiryConvLastMsg: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 12,
   },
 });

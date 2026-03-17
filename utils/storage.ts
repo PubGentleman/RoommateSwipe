@@ -589,6 +589,19 @@ export const StorageService = {
     }
   },
 
+  async updateConversation(conversationId: string, updates: Partial<Conversation>): Promise<void> {
+    try {
+      const conversations = await this.getConversations();
+      const index = conversations.findIndex(c => c.id === conversationId);
+      if (index >= 0) {
+        conversations[index] = { ...conversations[index], ...updates };
+        await AsyncStorage.setItem(STORAGE_KEYS.CONVERSATIONS, JSON.stringify(conversations));
+      }
+    } catch (error) {
+      console.error('Error updating conversation:', error);
+    }
+  },
+
   async getMatches(): Promise<Match[]> {
     try {
       const data = await AsyncStorage.getItem(STORAGE_KEYS.MATCHES);

@@ -122,58 +122,80 @@ export async function createListingInquiryGroup(
   sourceGroupId: string | null,
   groupName: string
 ) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
 
-  let renterIds: string[] = [];
+    let renterIds: string[] = [];
 
-  if (sourceGroupId) {
-    const { data: sourceMembers } = await supabase
-      .from('group_members')
-      .select('user_id')
-      .eq('group_id', sourceGroupId)
-      .eq('status', 'active');
+    if (sourceGroupId) {
+      const { data: sourceMembers } = await supabase
+        .from('group_members')
+        .select('user_id')
+        .eq('group_id', sourceGroupId)
+        .eq('status', 'active');
 
-    renterIds = (sourceMembers || []).map(m => m.user_id);
-  } else {
-    renterIds = [user.id];
-  }
+      renterIds = (sourceMembers || []).map(m => m.user_id);
+    } else {
+      renterIds = [user.id];
+    }
 
-  const { data: group, error } = await supabase
-    .from('groups')
-    .insert({
+    const { data: group, error } = await supabase
+      .from('groups')
+      .insert({
+        name: groupName,
+        type: 'listing_inquiry',
+        listing_id: listingId,
+        host_id: hostId,
+        listing_address: listingAddress,
+        created_by: user.id,
+        is_archived: false,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    const memberInserts = renterIds.map(uid => ({
+      group_id: group.id,
+      user_id: uid,
+      role: 'member',
+      is_host: false,
+      status: 'active',
+    }));
+
+    memberInserts.push({
+      group_id: group.id,
+      user_id: hostId,
+      role: 'member',
+      is_host: true,
+      status: 'active',
+    });
+
+    await supabase.from('group_members').insert(memberInserts);
+
+    return group;
+  } catch (supaError) {
+    console.warn('[groupService] Supabase createListingInquiryGroup failed, using local fallback:', supaError);
+    const localGroup = {
+      id: `local-inquiry-${Date.now()}`,
       name: groupName,
-      type: 'listing_inquiry',
+      type: 'listing_inquiry' as const,
       listing_id: listingId,
       host_id: hostId,
       listing_address: listingAddress,
-      created_by: user.id,
+      created_by: 'local',
       is_archived: false,
-    })
-    .select()
-    .single();
-
-  if (error) throw error;
-
-  const memberInserts = renterIds.map(uid => ({
-    group_id: group.id,
-    user_id: uid,
-    role: 'member',
-    is_host: false,
-    status: 'active',
-  }));
-
-  memberInserts.push({
-    group_id: group.id,
-    user_id: hostId,
-    role: 'member',
-    is_host: true,
-    status: 'active',
-  });
-
-  await supabase.from('group_members').insert(memberInserts);
-
-  return group;
+      created_at: new Date().toISOString(),
+      members: [],
+      inquiry_status: 'pending',
+    };
+    const { StorageService } = await import('../utils/storage');
+    const existingGroups = await StorageService.getGroups();
+    existingGroups.push(localGroup as any);
+    await StorageService.setGroups(existingGroups);
+    return localGroup;
+  }
 }
 
 export async function addMemberToGroup(groupId: string, userId: string, userRole: 'renter' | 'host' = 'renter') {
