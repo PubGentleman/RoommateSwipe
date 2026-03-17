@@ -1,0 +1,305 @@
+# Replit Prompt — Fix "Send Message" Button Does Nothing (Profile Detail + Match Modal)
+
+## Root Cause
+
+The "Send Message" button in the profile detail sheet and the match celebration modal **silently fails** because of a navigation hierarchy mismatch.
+
+`RoommatesScreen` lives inside `RoommatesStackNavigator` (which only has `RoommatesList` and `AIAssistant`). When `handleSendDirectMessage` calls:
+
+```tsx
+(navigation as any).navigate('Messages', { screen: 'Chat', params: {...} });
+```
+
+It tries to find `'Messages'` inside `RoommatesStack` — but it doesn't exist there. React Navigation silently does nothing. The fix requires calling `navigation.getParent()` to reach the tab navigator first, then navigating to the Messages tab.
+
+---
+
+## Fix — File: `screens/renter/RoommatesScreen.tsx`
+
+### Change 1: Fix `handleSendDirectMessage` — use `getParent()` to reach the tab navigator
+
+Find and replace the entire `handleSendDirectMessage` function:
+
+**Current (broken) code ~line 1054:**
+```tsx
+const handleSendDirectMessage = async (isCold: boolean) => {
+  if (!currentProfile || !user) return;
+
+  const conversations = await StorageService.getConversations();
+  const existingConversation = conversations.find(c =>
+    c.participant.id === currentProfile.id
+  );
+
+  if (existingConversation) {
+    (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: existingConversation.id } });
+  } else {
+    const newConversation: any = {
+      id: `conv-${currentProfile.id}-${Date.now()}`,
+      participant: {
+        id: currentProfile.id,
+        name: currentProfile.name,
+        photo: currentProfile.photos?.[0],
+        online: false,
+      },
+      lastMessage: '',
+      timestamp: new Date(),
+      unread: 0,
+      messages: [],
+      matchType: isCold ? 'cold' : 'mutual',
+    };
+    await StorageService.addOrUpdateConversation(newConversation);
+    (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: newConversation.id } });
+  }
+
+  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+};
+```
+
+**Replace with (fixed):**
+```tsx
+const handleSendDirectMessage = async (isCold: boolean) => {
+  if (!currentProfile || !user) return;
+
+  const conversations = await StorageService.getConversations();
+  let existingConversation = conversations.find(c =>
+    c.participant.id === currentProfile.id
+  );
+
+  let conversationId: string;
+
+  if (existingConversation) {
+    conversationId = existingConversation.id;
+  } else {
+    // Use match-based ID so conversation aligns with what MessagesScreen creates
+    const storedMatches = await StorageService.getMatches();
+    const thisMatch = storedMatches.find(m =>
+      (m.userId1 === user.id && m.userId2 === currentProfile.id) ||
+      (m.userId2 === user.id && m.userId1 === currentProfile.id)
+    );
+    conversationId = thisMatch
+      ? `conv_${thisMatch.id}`
+      : `conv-cold-${currentProfile.id}`;
+
+    const newConversation: any = {
+      id: conversationId,
+      participant: {
+        id: currentProfile.id,
+        name: currentProfile.name,
+        photo: currentProfile.photos?.[0] || currentProfile.profilePicture || '',
+        online: false,
+      },
+      lastMessage: '',
+      timestamp: new Date(),
+      unread: 0,
+      messages: [],
+      matchType: isCold ? 'cold' : 'mutual',
+    };
+    await StorageService.addOrUpdateConversation(newConversation);
+  }
+
+  const profileForChat = currentProfile;
+  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+  // CRITICAL FIX: RoommatesScreen is inside RoommatesStackNavigator, so we must
+  // use getParent() to reach the tab navigator, then navigate to Messages tab.
+  // Without getParent(), navigation.navigate('Messages') silently does nothing.
+  const tabNavigation = (navigation as any).getParent();
+  if (tabNavigation) {
+    // Two-step: go to MessagesList first, then push Chat
+    tabNavigation.navigate('Messages', { screen: 'MessagesList' });
+    setTimeout(() => {
+      tabNavigation.navigate('Messages', {
+        screen: 'Chat',
+        params: {
+          conversationId,
+          otherUser: profileForChat,
+        },
+      });
+    }, 50);
+  }
+};
+```
+
+### Change 2: Fix Match Celebration Modal `onSendMessage`
+
+Find the `onSendMessage` callback inside `<MatchCelebrationModal>` (~line 1378) and replace it:
+
+**Current (broken):**
+```tsx
+onSendMessage={async () => {
+  setShowMatch(false);
+  setMatchedProfileData(null);
+  if (matchedProfileData?.profile) {
+    const conversations = await StorageService.getConversations();
+    const existingConversation = conversations.find(c =>
+      c.participant.id === matchedProfileData.profile.id
+    );
+    if (existingConversation) {
+      (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: existingConversation.id } });
+    } else {
+      const storedMatches = await StorageService.getMatches();
+      const thisMatch = storedMatches.find(m =>
+        (m.userId1 === user?.id && m.userId2 === matchedProfileData.profile.id) ||
+        (m.userId2 === user?.id && m.userId1 === matchedProfileData.profile.id)
+      );
+      const newConversation = {
+        id: `conv-${matchedProfileData.profile.id}-${Date.now()}`,
+        participant: {
+          id: matchedProfileData.profile.id,
+          name: matchedProfileData.profile.name,
+          photo: matchedProfileData.profile.photos?.[0],
+          online: false,
+        },
+        lastMessage: '',
+        timestamp: new Date(),
+        unread: 0,
+        messages: [],
+        matchType: (thisMatch?.matchType || 'mutual') as 'mutual' | 'super_interest' | 'cold',
+      };
+      await StorageService.addOrUpdateConversation(newConversation);
+      (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: newConversation.id } });
+    }
+  }
+}}
+```
+
+**Replace with (fixed):**
+```tsx
+onSendMessage={async () => {
+  const profile = matchedProfileData?.profile;
+  setShowMatch(false);
+  setMatchedProfileData(null);
+
+  if (profile) {
+    const conversations = await StorageService.getConversations();
+    let existingConversation = conversations.find(c =>
+      c.participant.id === profile.id
+    );
+
+    let conversationId: string;
+
+    if (existingConversation) {
+      conversationId = existingConversation.id;
+    } else {
+      const storedMatches = await StorageService.getMatches();
+      const thisMatch = storedMatches.find(m =>
+        (m.userId1 === user?.id && m.userId2 === profile.id) ||
+        (m.userId2 === user?.id && m.userId1 === profile.id)
+      );
+      conversationId = thisMatch
+        ? `conv_${thisMatch.id}`
+        : `conv-match-${profile.id}`;
+
+      const newConversation = {
+        id: conversationId,
+        participant: {
+          id: profile.id,
+          name: profile.name,
+          photo: profile.photos?.[0] || '',
+          online: false,
+        },
+        lastMessage: '',
+        timestamp: new Date(),
+        unread: 0,
+        messages: [],
+        matchType: (thisMatch?.matchType || 'mutual') as 'mutual' | 'super_interest' | 'cold',
+      };
+      await StorageService.addOrUpdateConversation(newConversation);
+    }
+
+    // CRITICAL FIX: Use getParent() to reach tab navigator from within RoommatesStack
+    const tabNavigation = (navigation as any).getParent();
+    if (tabNavigation) {
+      tabNavigation.navigate('Messages', { screen: 'MessagesList' });
+      setTimeout(() => {
+        tabNavigation.navigate('Messages', {
+          screen: 'Chat',
+          params: {
+            conversationId,
+            otherUser: profile,
+          },
+        });
+      }, 50);
+    }
+  }
+}}
+```
+
+### Change 3: Fix profile detail "Send Message" button — add delay before calling handleMessageClick
+
+The profile detail closes the modal AND immediately calls handleMessageClick. Add a short delay so the modal animation doesn't interfere with the subsequent navigation.
+
+**Find (~line 2191):**
+```tsx
+onPress={() => {
+  setShowProfileDetail(false);
+  handleMessageClick();
+}}
+```
+
+**Replace with:**
+```tsx
+onPress={() => {
+  setShowProfileDetail(false);
+  // Small delay to allow the modal close animation to settle
+  // before triggering navigation or showing another modal
+  setTimeout(() => {
+    handleMessageClick();
+  }, 200);
+}}
+```
+
+---
+
+## Fix — File: `navigation/RenterTabNavigator.tsx`
+
+### Reset Messages stack when Messages tab is pressed
+
+This ensures tapping the Messages tab always shows the conversation list, not a Chat screen.
+
+**Find the `onPress` handler (~line 52):**
+```tsx
+const onPress = () => {
+  const event = navigation.emit({
+    type: 'tabPress',
+    target: route.key,
+    canPreventDefault: true,
+  });
+  if (!isFocused && !event.defaultPrevented) {
+    navigation.navigate(route.name);
+  }
+};
+```
+
+**Replace with:**
+```tsx
+const onPress = () => {
+  const event = navigation.emit({
+    type: 'tabPress',
+    target: route.key,
+    canPreventDefault: true,
+  });
+  if (!event.defaultPrevented) {
+    if (route.name === 'Messages') {
+      // Always reset to conversation list when pressing Messages tab
+      navigation.navigate('Messages' as any, { screen: 'MessagesList' } as any);
+    } else if (!isFocused) {
+      navigation.navigate(route.name);
+    }
+  }
+};
+```
+
+---
+
+## Summary
+
+| Bug | File | Root Cause | Fix |
+|-----|------|-----------|-----|
+| Send Message does nothing | `RoommatesScreen.tsx` | `navigation.navigate('Messages')` targets wrong navigator — RoommatesScreen is inside RoommatesStack, not the tab directly | Use `navigation.getParent().navigate('Messages', ...)` |
+| Match modal Send Message does nothing | `RoommatesScreen.tsx` | Same wrong navigator reference | Same fix with `getParent()` |
+| Modal interference | `RoommatesScreen.tsx` | `setShowProfileDetail(false)` + `handleMessageClick()` called synchronously — modal animation conflicts | Add 200ms delay before calling `handleMessageClick()` |
+| Inconsistent conversation IDs | `RoommatesScreen.tsx` | New conversations created with `conv-${id}-${timestamp}` don't match `conv_${matchId}` format from MessagesScreen | Use `conv_${match.id}` when a match exists |
+| Messages tab shows Chat not list | `RenterTabNavigator.tsx` | Tab press doesn't reset stack | Reset stack to MessagesList on Messages tab press |
+
+> **Important:** Apply `roomdr-chat-message-history-fix-prompt.md` alongside this prompt. Without that fix, messages sent in chat will still disappear due to the StorageService wipe bug in MessagesScreen.

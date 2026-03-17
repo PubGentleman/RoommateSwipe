@@ -1091,19 +1091,22 @@ export const RoommatesScreen = () => {
       await StorageService.addOrUpdateConversation(newConversation);
     }
 
-    const otherUserProfile = currentProfile;
+    const profileForChat = currentProfile;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-    (navigation as any).navigate('Messages', { screen: 'MessagesList' });
-    setTimeout(() => {
-      (navigation as any).navigate('Messages', {
-        screen: 'Chat',
-        params: {
-          conversationId,
-          otherUser: otherUserProfile,
-        },
-      });
-    }, 50);
+    const tabNavigation = (navigation as any).getParent();
+    if (tabNavigation) {
+      tabNavigation.navigate('Messages', { screen: 'MessagesList' });
+      setTimeout(() => {
+        tabNavigation.navigate('Messages', {
+          screen: 'Chat',
+          params: {
+            conversationId,
+            otherUser: profileForChat,
+          },
+        });
+      }, 50);
+    }
   };
 
   const handlePurchaseMessageCredit = async () => {
@@ -1399,10 +1402,11 @@ export const RoommatesScreen = () => {
         matchedUserPlan={matchedProfileData?.profile ? profileUsers.get(matchedProfileData.profile.id)?.subscription?.plan : undefined}
         compatibility={matchedProfileData?.compatibility}
         onSendMessage={async () => {
+          const profile = matchedProfileData?.profile;
           setShowMatch(false);
           setMatchedProfileData(null);
-          if (matchedProfileData?.profile) {
-            const profile = matchedProfileData.profile;
+
+          if (profile) {
             const conversations = await StorageService.getConversations();
             let existingConversation = conversations.find(c =>
               c.participant.id === profile.id
@@ -1439,16 +1443,19 @@ export const RoommatesScreen = () => {
               await StorageService.addOrUpdateConversation(newConversation);
             }
 
-            (navigation as any).navigate('Messages', { screen: 'MessagesList' });
-            setTimeout(() => {
-              (navigation as any).navigate('Messages', {
-                screen: 'Chat',
-                params: {
-                  conversationId,
-                  otherUser: profile,
-                },
-              });
-            }, 50);
+            const tabNavigation = (navigation as any).getParent();
+            if (tabNavigation) {
+              tabNavigation.navigate('Messages', { screen: 'MessagesList' });
+              setTimeout(() => {
+                tabNavigation.navigate('Messages', {
+                  screen: 'Chat',
+                  params: {
+                    conversationId,
+                    otherUser: profile,
+                  },
+                });
+              }, 50);
+            }
           }
         }}
         onKeepSwiping={() => {
@@ -2238,9 +2245,9 @@ export const RoommatesScreen = () => {
                       (m.userId1 === user.id && m.userId2 === currentProfile.id) ||
                       (m.userId2 === user.id && m.userId1 === currentProfile.id)
                     );
+                    setShowProfileDetail(false);
                     if (hasMatch) {
-                      setShowProfileDetail(false);
-                      handleSendDirectMessage(false);
+                      setTimeout(() => handleSendDirectMessage(false), 200);
                     } else {
                       const userPlan = user.subscription?.plan || 'basic';
                       const userStatus = user.subscription?.status || 'active';
@@ -2251,11 +2258,9 @@ export const RoommatesScreen = () => {
                           Alert.alert('Limit Reached', coldCheck.reason || 'No direct messages remaining this month.');
                           return;
                         }
-                        setShowProfileDetail(false);
-                        handleSendDirectMessage(true);
+                        setTimeout(() => handleSendDirectMessage(true), 200);
                       } else {
-                        setShowProfileDetail(false);
-                        setShowMessageModal(true);
+                        setTimeout(() => setShowMessageModal(true), 200);
                       }
                     }
                   }}
