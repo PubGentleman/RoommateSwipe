@@ -146,6 +146,11 @@ export const HostInquiriesScreen = () => {
     };
     await StorageService.addOrUpdateConversation(conversation);
 
+    await StorageService.updateConversation(conversationId, {
+      inquiryStatus: 'accepted',
+      lastMessage: 'Interest accepted! Start chatting.',
+    });
+
     if (card.groupId) {
       const inquiryConvId = `inquiry-conv-${card.groupId}`;
       await StorageService.updateConversation(inquiryConvId, {
@@ -244,6 +249,12 @@ export const HostInquiriesScreen = () => {
         lastMessage: 'The host passed on this inquiry.',
       });
     }
+
+    const mainConvId = `conv-interest-${card.id}`;
+    await StorageService.updateConversation(mainConvId, {
+      inquiryStatus: 'declined',
+      lastMessage: 'The host passed on this inquiry.',
+    });
 
     if (card.isSuperInterest) {
       const superConvId = `super-conv-${card.id}`;
