@@ -1055,22 +1055,31 @@ export const RoommatesScreen = () => {
     if (!currentProfile || !user) return;
     
     const conversations = await StorageService.getConversations();
-    const existingConversation = conversations.find(c =>
+    let existingConversation = conversations.find(c =>
       c.participant.id === currentProfile.id
     );
+
+    let conversationId: string;
     
     if (existingConversation) {
-      (navigation as any).navigate('Messages', { screen: 'MessagesList' });
-      setTimeout(() => {
-        (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: existingConversation.id } });
-      }, 50);
+      conversationId = existingConversation.id;
     } else {
+      const storedMatches = await StorageService.getMatches();
+      const thisMatch = storedMatches.find(m =>
+        (m.userId1 === user.id && m.userId2 === currentProfile.id) ||
+        (m.userId2 === user.id && m.userId1 === currentProfile.id)
+      );
+
+      conversationId = thisMatch
+        ? `conv_${thisMatch.id}`
+        : `conv-cold-${currentProfile.id}`;
+
       const newConversation: any = {
-        id: `conv-${currentProfile.id}-${Date.now()}`,
+        id: conversationId,
         participant: {
           id: currentProfile.id,
           name: currentProfile.name,
-          photo: currentProfile.photos?.[0],
+          photo: currentProfile.photos?.[0] || currentProfile.profilePicture || '',
           online: false,
         },
         lastMessage: '',
@@ -1080,13 +1089,21 @@ export const RoommatesScreen = () => {
         matchType: isCold ? 'cold' : 'mutual',
       };
       await StorageService.addOrUpdateConversation(newConversation);
-      (navigation as any).navigate('Messages', { screen: 'MessagesList' });
-      setTimeout(() => {
-        (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: newConversation.id } });
-      }, 50);
     }
-    
+
+    const otherUserProfile = currentProfile;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    (navigation as any).navigate('Messages', { screen: 'MessagesList' });
+    setTimeout(() => {
+      (navigation as any).navigate('Messages', {
+        screen: 'Chat',
+        params: {
+          conversationId,
+          otherUser: otherUserProfile,
+        },
+      });
+    }, 50);
   };
 
   const handlePurchaseMessageCredit = async () => {
@@ -1385,27 +1402,32 @@ export const RoommatesScreen = () => {
           setShowMatch(false);
           setMatchedProfileData(null);
           if (matchedProfileData?.profile) {
+            const profile = matchedProfileData.profile;
             const conversations = await StorageService.getConversations();
-            const existingConversation = conversations.find(c =>
-              c.participant.id === matchedProfileData.profile.id
+            let existingConversation = conversations.find(c =>
+              c.participant.id === profile.id
             );
+
+            let conversationId: string;
+
             if (existingConversation) {
-              (navigation as any).navigate('Messages', { screen: 'MessagesList' });
-              setTimeout(() => {
-                (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: existingConversation.id } });
-              }, 50);
+              conversationId = existingConversation.id;
             } else {
               const storedMatches = await StorageService.getMatches();
               const thisMatch = storedMatches.find(m =>
-                (m.userId1 === user?.id && m.userId2 === matchedProfileData.profile.id) ||
-                (m.userId2 === user?.id && m.userId1 === matchedProfileData.profile.id)
+                (m.userId1 === user?.id && m.userId2 === profile.id) ||
+                (m.userId2 === user?.id && m.userId1 === profile.id)
               );
+              conversationId = thisMatch
+                ? `conv_${thisMatch.id}`
+                : `conv-match-${profile.id}`;
+
               const newConversation = {
-                id: `conv-${matchedProfileData.profile.id}-${Date.now()}`,
+                id: conversationId,
                 participant: {
-                  id: matchedProfileData.profile.id,
-                  name: matchedProfileData.profile.name,
-                  photo: matchedProfileData.profile.photos?.[0],
+                  id: profile.id,
+                  name: profile.name,
+                  photo: profile.photos?.[0] || '',
                   online: false,
                 },
                 lastMessage: '',
@@ -1415,11 +1437,18 @@ export const RoommatesScreen = () => {
                 matchType: (thisMatch?.matchType || 'mutual') as 'mutual' | 'super_interest' | 'cold',
               };
               await StorageService.addOrUpdateConversation(newConversation);
-              (navigation as any).navigate('Messages', { screen: 'MessagesList' });
-              setTimeout(() => {
-                (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: newConversation.id } });
-              }, 50);
             }
+
+            (navigation as any).navigate('Messages', { screen: 'MessagesList' });
+            setTimeout(() => {
+              (navigation as any).navigate('Messages', {
+                screen: 'Chat',
+                params: {
+                  conversationId,
+                  otherUser: profile,
+                },
+              });
+            }, 50);
           }
         }}
         onKeepSwiping={() => {
