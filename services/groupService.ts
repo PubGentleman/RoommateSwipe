@@ -119,19 +119,25 @@ export async function createListingInquiryGroup(
   listingId: string,
   hostId: string,
   listingAddress: string,
-  sourceGroupId: string,
+  sourceGroupId: string | null,
   groupName: string
 ) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
-  const { data: sourceMembers } = await supabase
-    .from('group_members')
-    .select('user_id')
-    .eq('group_id', sourceGroupId)
-    .eq('status', 'active');
+  let renterIds: string[] = [];
 
-  const renterIds = (sourceMembers || []).map(m => m.user_id);
+  if (sourceGroupId) {
+    const { data: sourceMembers } = await supabase
+      .from('group_members')
+      .select('user_id')
+      .eq('group_id', sourceGroupId)
+      .eq('status', 'active');
+
+    renterIds = (sourceMembers || []).map(m => m.user_id);
+  } else {
+    renterIds = [user.id];
+  }
 
   const { data: group, error } = await supabase
     .from('groups')

@@ -581,21 +581,27 @@ export const ExploreScreen = () => {
   };
 
   const handleSendInquiry = async () => {
-    if (!selectedGroupId || !inquireProperty) return;
+    if (!inquireProperty || !user) return;
+    const isSoloInquiry = roommateGroups.length === 0 && !selectedGroupId;
+    if (!isSoloInquiry && !selectedGroupId) return;
+
     setCreatingInquiry(true);
     try {
       const address = inquireProperty.location || inquireProperty.title || 'Listing';
-      const selectedGroup = roommateGroups.find(g => g.id === selectedGroupId);
-      const groupName = `${selectedGroup?.name || 'Group'} — ${address}`;
+      const selectedGroup = selectedGroupId ? roommateGroups.find(g => g.id === selectedGroupId) : null;
+      const groupName = isSoloInquiry
+        ? `${user.name || 'Renter'} — ${address}`
+        : `${selectedGroup?.name || 'Group'} — ${address}`;
       const newGroup = await createListingInquiryGroup(
         inquireProperty.id,
         inquireProperty.hostProfileId || '',
         address,
-        selectedGroupId,
+        isSoloInquiry ? null : selectedGroupId,
         groupName
       );
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setShowInquireModal(false);
+      setSelectedGroupId(null);
       const listingPhoto = inquireProperty.photos?.[0] || inquireProperty.imageUrl || undefined;
       (navigation as any).navigate('Messages', {
         screen: 'Chat',
@@ -1158,9 +1164,13 @@ export const ExploreScreen = () => {
         >
           <Pressable style={styles.inquireSheet} onPress={() => {}}>
             <View style={styles.inquireSheetHandle} />
-            <Text style={styles.inquireSheetTitle}>Start a Group Inquiry</Text>
+            <Text style={styles.inquireSheetTitle}>
+              {roommateGroups.length === 0 ? 'Inquire on This Listing' : 'Send a Group Inquiry'}
+            </Text>
             <Text style={styles.inquireSheetDesc}>
-              Invite your roommate group to discuss this listing with the host
+              {roommateGroups.length === 0
+                ? 'Send your details to the host to express interest'
+                : 'Select which group to represent in this inquiry'}
             </Text>
             {inquireProperty ? (
               <View style={styles.inquireListingPreview}>
@@ -1172,18 +1182,52 @@ export const ExploreScreen = () => {
               </View>
             ) : null}
             {roommateGroups.length === 0 ? (
-              <View style={{ alignItems: 'center', paddingVertical: 20 }}>
-                <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, textAlign: 'center' }}>
-                  You need a roommate group first
-                </Text>
+              <View style={{ paddingVertical: 12 }}>
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: 'rgba(255,107,91,0.1)',
+                  borderRadius: 12,
+                  padding: 14,
+                  marginBottom: 16,
+                  gap: 10,
+                }}>
+                  <Feather name="user" size={18} color={ACCENT} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>
+                      Inquiring as an Individual
+                    </Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 2 }}>
+                      You can add roommates to a group later
+                    </Text>
+                  </View>
+                </View>
+                <Pressable
+                  style={[styles.inquireSendBtn]}
+                  onPress={handleSendInquiry}
+                  disabled={creatingInquiry}
+                >
+                  <LinearGradient
+                    colors={[ACCENT, '#e83a2a']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.inquireSendBtnGrad}
+                  >
+                    <Text style={styles.inquireSendBtnText}>
+                      {creatingInquiry ? 'Sending...' : 'Send Inquiry'}
+                    </Text>
+                  </LinearGradient>
+                </Pressable>
                 <Pressable
                   onPress={() => {
                     setShowInquireModal(false);
                     (navigation as any).navigate('Groups');
                   }}
-                  style={{ marginTop: 10 }}
+                  style={{ marginTop: 12, alignItems: 'center' }}
                 >
-                  <Text style={{ color: ACCENT, fontSize: 14, fontWeight: '600' }}>Create Group →</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>
+                    Or <Text style={{ color: ACCENT, fontWeight: '600' }}>create a group first</Text>
+                  </Text>
                 </Pressable>
               </View>
             ) : (
