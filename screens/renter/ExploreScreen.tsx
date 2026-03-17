@@ -7,7 +7,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ThemedText } from '../../components/ThemedText';
 import { ThemedView } from '../../components/ThemedView';
 import { WalkScoreBadge } from '../../components/WalkScoreBadge';
-import InterestCardSheet from '../../components/InterestCardSheet';
 import { InterestConfirmationModal } from '../../components/InterestConfirmationModal';
 import { PaywallSheet } from '../../components/PaywallSheet';
 import { useTheme } from '../../hooks/useTheme';
@@ -25,8 +24,6 @@ import { getZodiacSymbol } from '../../utils/zodiacUtils';
 import { PropertyMapView } from '../../components/PropertyMapView';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
 import { useNotificationContext } from '../../contexts/NotificationContext';
-import { getMyRoommateGroups, createListingInquiryGroup } from '../../services/groupService';
-import { Group } from '../../types/models';
 
 const COMMON_AMENITIES = [
   'Parking', 'Gym', 'Pool', 'Laundry', 'Pet Friendly',
@@ -91,7 +88,7 @@ export const ExploreScreen = () => {
   const { activeCity, recentCities, setActiveCity } = useCityContext();
   const [hostProfiles, setHostProfiles] = useState<Map<string, User>>(new Map());
   const [interestMap, setInterestMap] = useState<Map<string, InterestCard>>(new Map());
-  const [showInterestSheet, setShowInterestSheet] = useState(false);
+  const [showUnifiedInterestSheet, setShowUnifiedInterestSheet] = useState(false);
   const [showInterestConfirmation, setShowInterestConfirmation] = useState(false);
   const [sendingInterest, setSendingInterest] = useState(false);
   const [isSuperInterest, setIsSuperInterest] = useState(false);
@@ -101,11 +98,7 @@ export const ExploreScreen = () => {
   const [paywallPlan, setPaywallPlan] = useState<'plus' | 'elite'>('plus');
   const [activeQuickFilters, setActiveQuickFilters] = useState<Set<string>>(new Set(['bestMatch']));
   const [showAISheet, setShowAISheet] = useState(false);
-  const [showInquireModal, setShowInquireModal] = useState(false);
-  const [inquireProperty, setInquireProperty] = useState<Property | null>(null);
-  const [roommateGroups, setRoommateGroups] = useState<any[]>([]);
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
-  const [creatingInquiry, setCreatingInquiry] = useState(false);
+  const [interestNote, setInterestNote] = useState('');
 
   useEffect(() => {
     loadProperties();
@@ -240,40 +233,46 @@ export const ExploreScreen = () => {
     return calculateCompatibility(user, hostProfile);
   };
 
-  const handleInterestPress = async () => {
-    if (!user || !selectedProperty) return;
+  const handleInterestPress = async (property?: Property) => {
+    const target = property || selectedProperty;
+    if (!user || !target) return;
+    if (property) setSelectedProperty(property);
     const result = await canSendInterest();
     if (!result.canSend) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      setPaywallFeature('Unlimited Interest Cards');
+      setPaywallFeature('Unlimited Interests');
       setPaywallPlan('plus');
       setShowPaywall(true);
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setShowInterestSheet(true);
+    setInterestNote('');
+    setShowUnifiedInterestSheet(true);
   };
 
-  const handleSendInterest = async (note: string) => {
+  const handleSendUnifiedInterest = async (note: string) => {
     if (!user || !selectedProperty) return;
     setSendingInterest(true);
     try {
-      const compatibility = getPropertyCompatibility(selectedProperty);
+      const interestId = `interest_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const conversationId = `conv-interest-${interestId}`;
       const budgetMin = user.profileData?.budget || 0;
       const budgetRange = budgetMin > 0 ? `$${budgetMin}/mo` : 'Not set';
       const moveIn = user.profileData?.preferences?.moveInDate || 'Flexible';
+      const compatibility = getPropertyCompatibility(selectedProperty);
       const tags: string[] = [];
       if (user.profileData?.preferences?.cleanliness === 'very_tidy') tags.push('Clean');
       if (user.profileData?.preferences?.smoking === 'no') tags.push('Non-Smoker');
       if (user.profileData?.preferences?.pets === 'have_pets' || user.profileData?.preferences?.pets === 'open_to_pets') tags.push('Pet Friendly');
       if (user.profileData?.preferences?.sleepSchedule === 'early_sleeper') tags.push('Early Bird');
       if (user.profileData?.preferences?.sleepSchedule === 'late_sleeper') tags.push('Night Owl');
+      if (user.profileData?.preferences?.workLocation === 'wfh_fulltime') tags.push('Remote Worker');
 
-      const card: InterestCard = {
-        id: `interest_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      const interestRecord: InterestCard = {
+        id: interestId,
         renterId: user.id,
         renterName: user.name,
-        renterPhoto: user.profilePicture,
+        renterPhoto: user.profilePicture || '',
         hostId: selectedProperty.hostId,
         propertyId: selectedProperty.id,
         propertyTitle: selectedProperty.title,
@@ -286,18 +285,54 @@ export const ExploreScreen = () => {
         isSuperInterest,
         createdAt: new Date().toISOString(),
       };
+      await StorageService.addInterestCard(interestRecord);
 
-      await StorageService.addInterestCard(card);
+      const systemMessageText = isSuperInterest
+        ? 'You sent a Super Interest. The host will see this at the top of their list.'
+        : 'You expressed interest in this listing. Waiting for the host to respond.';
+      const conversation: Conversation = {
+        id: conversationId,
+        participant: {
+          id: selectedProperty.hostId,
+          name: selectedProperty.hostName || 'Host',
+          photo: selectedProperty.hostProfilePhoto || '',
+          online: false,
+        },
+        lastMessage: isSuperInterest ? 'Super Interest sent' : 'Interest sent — awaiting response',
+        timestamp: new Date(),
+        unread: 0,
+        messages: [{
+          id: `msg-${Date.now()}`,
+          senderId: 'system',
+          text: systemMessageText,
+          content: systemMessageText,
+          timestamp: new Date(),
+          read: true,
+        }],
+        isInquiryThread: true,
+        isSuperInterest,
+        inquiryStatus: 'pending',
+        inquiryId: interestId,
+        listingTitle: selectedProperty.title,
+        listingPhoto: selectedProperty.photos?.[0] || '',
+        listingPrice: selectedProperty.price,
+        hostName: selectedProperty.hostName || 'Host',
+        hostId: selectedProperty.hostId,
+        propertyId: selectedProperty.id,
+        isSoloInquiry: true,
+      };
+      await StorageService.addOrUpdateConversation(conversation);
+
       await StorageService.addNotification({
         id: `notif_interest_${Date.now()}`,
         userId: selectedProperty.hostId,
         type: 'interest_received',
-        title: isSuperInterest ? 'Super Interest Received!' : 'New Interest!',
+        title: isSuperInterest ? 'Super Interest!' : 'New Interest!',
         body: `${user.name} is interested in ${selectedProperty.title}`,
         isRead: false,
         createdAt: new Date(),
         data: {
-          interestCardId: card.id,
+          interestCardId: interestId,
           propertyId: selectedProperty.id,
           fromUserId: user.id,
           fromUserName: user.name,
@@ -306,13 +341,12 @@ export const ExploreScreen = () => {
       });
 
       await refreshUnreadCount();
-      setShowInterestSheet(false);
+      setShowUnifiedInterestSheet(false);
       setConfirmationWasSuper(isSuperInterest);
       setShowInterestConfirmation(true);
       await loadInterestCards();
     } catch (err) {
-      console.error('Error sending interest:', err);
-      Alert.alert('Error', 'Failed to send interest. Please try again.');
+      Alert.alert('Error', 'Failed to send. Please try again.');
     } finally {
       setSendingInterest(false);
       setIsSuperInterest(false);
@@ -563,102 +597,6 @@ export const ExploreScreen = () => {
 
   const isBasic = (user?.subscription?.plan || 'basic') === 'basic';
 
-  const handleInquireTogether = async (property: Property) => {
-    try {
-      const groups = await getMyRoommateGroups();
-      setRoommateGroups(groups || []);
-      setInquireProperty(property);
-      setSelectedGroupId(null);
-      setShowInquireModal(true);
-    } catch (err) {
-      const localGroups = await StorageService.getGroups();
-      const myGrps = localGroups.filter(g => g.members.includes(user?.id || ''));
-      setRoommateGroups(myGrps);
-      setInquireProperty(property);
-      setSelectedGroupId(null);
-      setShowInquireModal(true);
-    }
-  };
-
-  const handleSendInquiry = async () => {
-    if (!inquireProperty || !user) return;
-    const isSoloInquiry = roommateGroups.length === 0 && !selectedGroupId;
-    if (!isSoloInquiry && !selectedGroupId) return;
-
-    setCreatingInquiry(true);
-    try {
-      const address = inquireProperty.location || inquireProperty.title || 'Listing';
-      const selectedGroup = selectedGroupId ? roommateGroups.find(g => g.id === selectedGroupId) : null;
-      const groupName = isSoloInquiry
-        ? `${user.name || 'Renter'} — ${address}`
-        : `${selectedGroup?.name || 'Group'} — ${address}`;
-      const newGroup = await createListingInquiryGroup(
-        inquireProperty.id,
-        inquireProperty.hostProfileId || '',
-        address,
-        isSoloInquiry ? null : selectedGroupId,
-        groupName
-      );
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setShowInquireModal(false);
-      setSelectedGroupId(null);
-      const listingPhoto = inquireProperty.photos?.[0] || inquireProperty.imageUrl || undefined;
-      const hostUser = inquireProperty.hostProfileId ? hostProfiles.get(inquireProperty.hostProfileId) : null;
-      const hostName = (inquireProperty as any).hostName || hostUser?.name || 'Host';
-
-      const inquiryConvId = `inquiry-conv-${newGroup.id}`;
-      const systemMessage = {
-        id: `msg-${Date.now()}`,
-        senderId: 'system',
-        text: 'You inquired about this listing. Waiting for the host to respond.',
-        content: 'You inquired about this listing. Waiting for the host to respond.',
-        timestamp: new Date(),
-        read: true,
-      };
-      const inquiryConversation: Conversation = {
-        id: inquiryConvId,
-        participant: {
-          id: inquireProperty.hostProfileId || '',
-          name: hostName,
-          photo: hostUser?.profilePicture || '',
-          online: false,
-        },
-        lastMessage: 'Inquiry sent — awaiting response',
-        timestamp: new Date(),
-        unread: 0,
-        messages: [systemMessage],
-        isInquiryThread: true,
-        inquiryStatus: 'pending',
-        inquiryId: newGroup.id,
-        listingTitle: inquireProperty.title,
-        listingPhoto: listingPhoto || '',
-        listingPrice: inquireProperty.price,
-        hostName,
-        hostId: inquireProperty.hostProfileId,
-        propertyId: inquireProperty.id,
-        groupId: isSoloInquiry ? undefined : selectedGroupId || undefined,
-        isSoloInquiry,
-      };
-      await StorageService.addOrUpdateConversation(inquiryConversation);
-
-      Alert.alert(
-        'Inquiry Sent!',
-        'Track your inquiry in the Messages tab.',
-        [
-          {
-            text: 'View in Messages',
-            onPress: () => (navigation as any).navigate('Messages'),
-          },
-          { text: 'OK' },
-        ]
-      );
-    } catch (err) {
-      console.error('Failed to create inquiry group:', err);
-      Alert.alert('Error', 'Failed to send inquiry. Please try again.');
-    } finally {
-      setCreatingInquiry(false);
-    }
-  };
 
   const renderProperty = ({ item }: { item: Property }) => {
     const hostUser = item.hostProfileId ? hostProfiles.get(item.hostProfileId) : null;
@@ -800,11 +738,11 @@ export const ExploreScreen = () => {
               style={styles.inquireTogetherBtn}
               onPress={(e) => {
                 e.stopPropagation?.();
-                handleInquireTogether(item);
+                handleInterestPress(item);
               }}
             >
-              <Feather name="users" size={14} color={ACCENT} />
-              <Text style={styles.inquireTogetherText}>Inquire Together</Text>
+              <Feather name="heart" size={14} color={ACCENT} />
+              <Text style={styles.inquireTogetherText}>I'm Interested</Text>
             </Pressable>
           ) : (
             <View style={styles.premiumRow}>
@@ -1186,127 +1124,91 @@ export const ExploreScreen = () => {
       />
 
       <Modal
-        visible={showInquireModal}
+        visible={showUnifiedInterestSheet}
         animationType="slide"
         transparent
-        onRequestClose={() => setShowInquireModal(false)}
+        onRequestClose={() => { setShowUnifiedInterestSheet(false); setIsSuperInterest(false); }}
       >
         <Pressable
           style={styles.inquireModalOverlay}
-          onPress={() => setShowInquireModal(false)}
+          onPress={() => { setShowUnifiedInterestSheet(false); setIsSuperInterest(false); }}
         >
           <Pressable style={styles.inquireSheet} onPress={() => {}}>
             <View style={styles.inquireSheetHandle} />
-            <Text style={styles.inquireSheetTitle}>
-              {roommateGroups.length === 0 ? 'Inquire on This Listing' : 'Send a Group Inquiry'}
-            </Text>
-            <Text style={styles.inquireSheetDesc}>
-              {roommateGroups.length === 0
-                ? 'Send your details to the host to express interest'
-                : 'Select which group to represent in this inquiry'}
-            </Text>
-            {inquireProperty ? (
-              <View style={styles.inquireListingPreview}>
-                <Image source={{ uri: inquireProperty.photos?.[0] }} style={styles.inquireListingThumb} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.inquireListingTitle} numberOfLines={1}>{inquireProperty.title}</Text>
-                  <Text style={styles.inquireListingPrice}>${inquireProperty.price?.toLocaleString()}/mo</Text>
-                </View>
+            {isSuperInterest ? (
+              <View style={styles.superInterestSheetBadge}>
+                <Text style={styles.superInterestSheetBadgeText}>Super Interest</Text>
               </View>
             ) : null}
-            {roommateGroups.length === 0 ? (
-              <View style={{ paddingVertical: 12 }}>
-                <View style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  backgroundColor: 'rgba(255,107,91,0.1)',
-                  borderRadius: 12,
-                  padding: 14,
-                  marginBottom: 16,
-                  gap: 10,
-                }}>
-                  <Feather name="user" size={18} color={ACCENT} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>
-                      Inquiring as an Individual
+            <Text style={styles.inquireSheetTitle}>
+              {isSuperInterest ? 'Send Super Interest' : "I'm Interested"}
+            </Text>
+            <Text style={styles.inquireSheetDesc}>
+              Your profile info will be shared with the host
+            </Text>
+            {selectedProperty ? (
+              <View style={styles.renterSnapshotCard}>
+                <View style={styles.renterSnapshotRow}>
+                  <View style={styles.renterSnapshotItem}>
+                    <Feather name="dollar-sign" size={13} color="rgba(255,255,255,0.4)" />
+                    <Text style={styles.renterSnapshotLabel}>Budget</Text>
+                    <Text style={styles.renterSnapshotValue}>
+                      {user?.profileData?.budget ? `$${user.profileData.budget}/mo` : 'Not set'}
                     </Text>
-                    <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 2 }}>
-                      You can add roommates to a group later
+                  </View>
+                  <View style={styles.renterSnapshotDivider} />
+                  <View style={styles.renterSnapshotItem}>
+                    <Feather name="calendar" size={13} color="rgba(255,255,255,0.4)" />
+                    <Text style={styles.renterSnapshotLabel}>Move-in</Text>
+                    <Text style={styles.renterSnapshotValue}>
+                      {user?.profileData?.preferences?.moveInDate || 'Flexible'}
+                    </Text>
+                  </View>
+                  <View style={styles.renterSnapshotDivider} />
+                  <View style={styles.renterSnapshotItem}>
+                    <Feather name="percent" size={13} color="rgba(255,255,255,0.4)" />
+                    <Text style={styles.renterSnapshotLabel}>Match</Text>
+                    <Text style={styles.renterSnapshotValue}>
+                      {getPropertyCompatibility(selectedProperty)}%
                     </Text>
                   </View>
                 </View>
-                <Pressable
-                  style={[styles.inquireSendBtn]}
-                  onPress={handleSendInquiry}
-                  disabled={creatingInquiry}
-                >
-                  <LinearGradient
-                    colors={[ACCENT, '#e83a2a']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.inquireSendBtnGrad}
-                  >
-                    <Text style={styles.inquireSendBtnText}>
-                      {creatingInquiry ? 'Sending...' : 'Send Inquiry'}
-                    </Text>
-                  </LinearGradient>
-                </Pressable>
-                <Pressable
-                  onPress={() => {
-                    setShowInquireModal(false);
-                    (navigation as any).navigate('Groups');
-                  }}
-                  style={{ marginTop: 12, alignItems: 'center' }}
-                >
-                  <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>
-                    Or <Text style={{ color: ACCENT, fontWeight: '600' }}>create a group first</Text>
-                  </Text>
-                </Pressable>
               </View>
-            ) : (
-              <>
-                <ScrollView style={{ maxHeight: 200, marginVertical: 12 }}>
-                  {roommateGroups.map((group: any) => (
-                    <Pressable
-                      key={group.id}
-                      style={[
-                        styles.inquireGroupRow,
-                        selectedGroupId === group.id && styles.inquireGroupRowSelected,
-                      ]}
-                      onPress={() => setSelectedGroupId(group.id)}
-                    >
-                      <Feather name="users" size={18} color={selectedGroupId === group.id ? ACCENT : 'rgba(255,255,255,0.4)'} />
-                      <View style={{ flex: 1, marginLeft: 12 }}>
-                        <Text style={styles.inquireGroupName}>{group.name}</Text>
-                        <Text style={styles.inquireGroupCount}>
-                          {group.members?.[0]?.count || group.members?.length || 0} members
-                        </Text>
-                      </View>
-                      {selectedGroupId === group.id ? (
-                        <Feather name="check-circle" size={20} color={ACCENT} />
-                      ) : null}
-                    </Pressable>
-                  ))}
-                </ScrollView>
-                <Pressable
-                  style={[styles.inquireSendBtn, { opacity: selectedGroupId && !creatingInquiry ? 1 : 0.5 }]}
-                  onPress={handleSendInquiry}
-                  disabled={!selectedGroupId || creatingInquiry}
-                >
-                  <LinearGradient
-                    colors={[ACCENT, '#e83a2a']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.inquireSendBtnGrad}
-                  >
-                    <Text style={styles.inquireSendBtnText}>
-                      {creatingInquiry ? 'Sending...' : 'Send Inquiry'}
-                    </Text>
-                  </LinearGradient>
-                </Pressable>
-              </>
-            )}
-            <Pressable style={styles.inquireCancelBtn} onPress={() => setShowInquireModal(false)}>
+            ) : null}
+            <TextInput
+              style={styles.inquireNoteInput}
+              placeholder="Add a note to the host... (optional)"
+              placeholderTextColor="rgba(255,255,255,0.3)"
+              value={interestNote}
+              onChangeText={(t) => setInterestNote(t.slice(0, 150))}
+              multiline
+              maxLength={150}
+            />
+            <Text style={styles.charCount}>{interestNote?.length || 0}/150</Text>
+            <Pressable
+              style={[
+                styles.inquireSendBtn,
+                { opacity: sendingInterest ? 0.6 : 1 },
+                isSuperInterest ? { backgroundColor: '#FFD700' } : null,
+              ]}
+              onPress={() => handleSendUnifiedInterest(interestNote || '')}
+              disabled={sendingInterest}
+            >
+              <LinearGradient
+                colors={isSuperInterest ? ['#FFD700', '#FFA500'] : [ACCENT, '#e83a2a']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.inquireSendBtnGrad}
+              >
+                <Text style={[styles.inquireSendBtnText, isSuperInterest ? { color: '#000' } : null]}>
+                  {sendingInterest ? 'Sending...' : isSuperInterest ? 'Send Super Interest' : 'Send Interest'}
+                </Text>
+              </LinearGradient>
+            </Pressable>
+            <Pressable
+              style={styles.inquireCancelBtn}
+              onPress={() => { setShowUnifiedInterestSheet(false); setIsSuperInterest(false); }}
+            >
               <Text style={styles.inquireCancelText}>Cancel</Text>
             </Pressable>
           </Pressable>
@@ -1652,12 +1554,12 @@ export const ExploreScreen = () => {
                       return (
                         <View>
                           <Pressable
-                            style={[styles.interestButton, { backgroundColor: '#ff6b5b' }]}
+                            style={[styles.interestButton, { backgroundColor: isSuperInterest ? '#FFD700' : '#ff6b5b' }]}
                             onPress={handleInterestPress}
                           >
-                            <Feather name="heart" size={18} color="#fff" />
-                            <ThemedText style={{ color: '#fff', fontWeight: '700', marginLeft: Spacing.sm, fontSize: 15 }}>
-                              I'm Interested
+                            <Feather name={isSuperInterest ? 'star' : 'heart'} size={18} color={isSuperInterest ? '#000' : '#fff'} />
+                            <ThemedText style={{ color: isSuperInterest ? '#000' : '#fff', fontWeight: '700', marginLeft: Spacing.sm, fontSize: 15 }}>
+                              {isSuperInterest ? 'Super Interest' : "I'm Interested"}
                             </ThemedText>
                             {canSendSuperInterest().canSend ? (
                               <Pressable
@@ -1666,7 +1568,7 @@ export const ExploreScreen = () => {
                                   setIsSuperInterest(!isSuperInterest);
                                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                                 }}
-                                style={[styles.superInterestToggle, isSuperInterest ? { backgroundColor: '#FFD700' } : { backgroundColor: 'rgba(255,255,255,0.2)' }]}
+                                style={[styles.superInterestToggle, isSuperInterest ? { backgroundColor: 'rgba(0,0,0,0.2)' } : { backgroundColor: 'rgba(255,255,255,0.2)' }]}
                               >
                                 <Feather name="star" size={14} color={isSuperInterest ? '#000' : '#fff'} />
                               </Pressable>
@@ -1695,17 +1597,6 @@ export const ExploreScreen = () => {
         onCitySelect={(city) => { setActiveCity(city); setShowCityPicker(false); }}
         onClose={() => setShowCityPicker(false)}
       />
-      {selectedProperty ? (
-        <InterestCardSheet
-          visible={showInterestSheet}
-          onClose={() => { setShowInterestSheet(false); setIsSuperInterest(false); }}
-          onSend={handleSendInterest}
-          property={selectedProperty}
-          compatibilityScore={getPropertyCompatibility(selectedProperty)}
-          isSuperInterest={isSuperInterest}
-          sending={sendingInterest}
-        />
-      ) : null}
       <InterestConfirmationModal
         visible={showInterestConfirmation}
         onClose={() => setShowInterestConfirmation(false)}
@@ -2502,56 +2393,63 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     marginBottom: 16,
   },
-  inquireListingPreview: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: 12,
-    padding: 12,
-    backgroundColor: 'rgba(255,255,255,0.04)',
+  renterSnapshotCard: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
-    marginBottom: 12,
-  },
-  inquireListingThumb: {
-    width: 56,
-    height: 56,
-    borderRadius: 10,
-  },
-  inquireListingTitle: {
-    fontSize: 14,
-    fontWeight: '600' as const,
-    color: '#fff',
-  },
-  inquireListingPrice: {
-    fontSize: 13,
-    color: '#ff6b5b',
-    fontWeight: '700' as const,
-    marginTop: 2,
-  },
-  inquireGroupRow: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
     padding: 14,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: 'transparent',
+    marginBottom: 14,
   },
-  inquireGroupRowSelected: {
-    borderColor: '#ff6b5b',
-    backgroundColor: 'rgba(255,107,91,0.08)',
+  renterSnapshotRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
   },
-  inquireGroupName: {
-    fontSize: 14,
-    fontWeight: '600' as const,
-    color: '#fff',
+  renterSnapshotItem: {
+    flex: 1,
+    alignItems: 'center' as const,
+    gap: 3,
   },
-  inquireGroupCount: {
-    fontSize: 12,
+  renterSnapshotDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  renterSnapshotLabel: {
     color: 'rgba(255,255,255,0.4)',
-    marginTop: 2,
+    fontSize: 11,
+  },
+  renterSnapshotValue: {
+    color: '#fff',
+    fontWeight: '600' as const,
+    fontSize: 13,
+  },
+  superInterestSheetBadge: {
+    alignSelf: 'flex-start' as const,
+    backgroundColor: 'rgba(255,215,0,0.15)',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginBottom: 8,
+  },
+  superInterestSheetBadgeText: {
+    color: '#FFD700',
+    fontSize: 12,
+    fontWeight: '700' as const,
+  },
+  inquireNoteInput: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 10,
+    padding: 12,
+    color: '#fff',
+    fontSize: 14,
+    minHeight: 70,
+    textAlignVertical: 'top' as const,
+    marginBottom: 4,
+  },
+  charCount: {
+    color: 'rgba(255,255,255,0.3)',
+    fontSize: 11,
+    textAlign: 'right' as const,
+    marginBottom: 14,
   },
   inquireSendBtn: {
     borderRadius: 14,
