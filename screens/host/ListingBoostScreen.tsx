@@ -93,7 +93,12 @@ export const ListingBoostScreen = () => {
             Upgrade to a paid plan to boost your listings and get more visibility.
           </Text>
           <Pressable
-            onPress={() => navigation.navigate('HostSubscription')}
+            onPress={() => {
+              const parent = navigation.getParent();
+              if (parent) {
+                parent.navigate('Dashboard', { screen: 'HostSubscription' });
+              }
+            }}
             style={{ marginTop: 20, backgroundColor: 'rgba(168,85,247,0.2)', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 }}
           >
             <Text style={{ fontSize: 15, fontWeight: '700', color: PURPLE }}>See Plans</Text>

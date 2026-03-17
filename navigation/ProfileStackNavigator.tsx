@@ -19,6 +19,7 @@ import { NotificationPreferencesScreen } from '../screens/shared/NotificationPre
 import { VerificationScreen } from '../screens/shared/VerificationScreen';
 import { MyInterestsScreen } from '../screens/shared/MyInterestsScreen';
 import { HostPricingScreen } from '../screens/host/HostPricingScreen';
+import { HostSubscriptionScreen } from '../screens/host/HostSubscriptionScreen';
 import { ManageSubscriptionScreen } from '../screens/shared/ManageSubscriptionScreen';
 import { DiagnosticScreen } from '../screens/shared/DiagnosticScreen';
 
@@ -27,6 +28,7 @@ export type ProfileStackParamList = {
   Payment: undefined;
   Plans: undefined;
   HostPricing: undefined;
+  HostSubscription: undefined;
   ManageSubscription: undefined;
   Diagnostic: undefined;
   EditProfile: undefined;
@@ -86,6 +88,11 @@ export const ProfileStackNavigator = () => {
       <Stack.Screen 
         name="HostPricing" 
         component={HostPricingScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="HostSubscription" 
+        component={HostSubscriptionScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen 

@@ -170,7 +170,17 @@ export const CreateEditListingScreen = () => {
       if (!capResult.allowed) {
         Alert.alert('Listing Limit Reached', capResult.message, [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Upgrade Plan', onPress: () => navigation.goBack() },
+          {
+            text: 'Upgrade Plan',
+            onPress: () => {
+              const parent = navigation.getParent();
+              if (parent) {
+                parent.navigate('Dashboard', { screen: 'HostSubscription' });
+              } else {
+                navigation.navigate('HostSubscription' as any);
+              }
+            },
+          },
         ]);
         return;
       }

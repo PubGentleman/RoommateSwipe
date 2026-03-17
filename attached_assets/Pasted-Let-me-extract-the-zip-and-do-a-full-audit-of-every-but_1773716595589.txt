@@ -1,0 +1,27 @@
+Let me extract the zip and do a full audit of every button in the codebase.Now I have everything I need. Let me compile the full audit findings.Done. I read every screen in your actual codebase. Here's what I found:
+
+[View Replit Fix Prompt (Based on Real Code)](computer:///Users/errolbrown/Library/Application%20Support/Claude/local-agent-mode-sessions/a45591bf-620d-444b-ac05-56a061f731b1/a67eae4a-4f04-4a0f-b229-6e59256baf8c/local_caecd24f-7429-4a6c-98c6-14fb9059dabc/outputs/roomdr-button-fix-prompt-v2.md)
+
+---
+
+Here's what the audit found — 6 real bugs, not guesses:
+
+**🔴 Bug #1 — App CRASH** (`ListingBoostScreen`)
+When a host opens Boost from the Listings tab, "See Plans" crashes the app. `HostSubscription` screen doesn't exist in the ListingsStack — only in DashboardStack. Fix: use `getParent().navigate('Dashboard', { screen: 'HostSubscription' })`.
+
+**🟠 Bug #2 — Wrong Action** (`MyListingsScreen`)
+"Boost to get noticed" text calls `toggleFeatured()` instead of navigating to the Boost screen. It's accidentally toggling the Featured flag instead of opening the boost purchase flow.
+
+**🟠 Bug #3 — Wrong Destination** (`HostDashboardScreen`)
+The 🔔 bell icon navigates to Inquiries, not Notifications. Users tapping the bell expect notifications.
+
+**🟠 Bug #4 — Wrong Action** (`CreateEditListingScreen`)
+When a host hits their listing cap and taps "Upgrade Plan" in the alert, it calls `navigation.goBack()` — sends them backwards instead of to the upgrade screen.
+
+**🟡 Bug #5 — Wrong Screen** (`ProfileScreen`)
+The "Upgrade" button inside the subscription card always goes to the renter Plans screen, even for hosts.
+
+**🟡 Bug #6 — Outdated Screen** (`ProfileScreen` + `ProfileStackNavigator`)
+Host users tapping their subscription from the Profile tab land on the old `HostPricingScreen` instead of the new 4-tier `HostSubscriptionScreen`. Fix requires adding `HostSubscription` to ProfileStack.
+
+**✅ All `onPress={() => {}}` patterns** are intentional — they're stop-propagation guards on modal sheets. Don't touch them.

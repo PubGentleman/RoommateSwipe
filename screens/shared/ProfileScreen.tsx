@@ -378,7 +378,7 @@ export const ProfileScreen = () => {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Subscription</Text>
           </View>
-          <Pressable style={styles.subCard} onPress={() => navigation.navigate(user?.role === 'host' ? 'HostPricing' : 'Plans')}>
+          <Pressable style={styles.subCard} onPress={() => navigation.navigate(user?.role === 'host' ? 'HostSubscription' : 'Plans')}>
             <View style={styles.subLeft}>
               <Text style={styles.subLabel}>Current Plan</Text>
               <Text style={styles.subPlan}>
@@ -395,7 +395,7 @@ export const ProfileScreen = () => {
               </Text>
             </View>
             {(user?.role === 'host' ? (!user?.hostPlan || user?.hostPlan === 'starter') : user?.subscription?.plan === 'basic') ? (
-              <Pressable onPress={() => navigation.navigate(user?.role === 'host' ? 'HostPricing' : 'Plans')}>
+              <Pressable onPress={() => navigation.navigate(user?.role === 'host' ? 'HostSubscription' : 'Plans')}>
                 <LinearGradient colors={['#ff6b5b', '#e83a2a']} style={styles.upgradeBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
                   <Text style={styles.upgradeBtnText}>Upgrade</Text>
                 </LinearGradient>
@@ -438,7 +438,7 @@ export const ProfileScreen = () => {
                   <Text style={styles.superInterestTrackerText}>
                     Super Interests: {getSuperInterestCount()} remaining
                   </Text>
-                  <Pressable onPress={() => navigation.navigate('Plans')}>
+                  <Pressable onPress={() => navigation.navigate(user?.role === 'host' ? 'HostSubscription' : 'Plans')}>
                     <Text style={{ color: '#4A90E2', fontWeight: '600', fontSize: 13 }}>Buy more</Text>
                   </Pressable>
                 </View>

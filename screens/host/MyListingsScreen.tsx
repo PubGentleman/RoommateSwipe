@@ -380,7 +380,7 @@ export const MyListingsScreen = () => {
           ) : (
             <Pressable
               style={styles.inquiryRowEmpty}
-              onPress={() => toggleFeatured(listing.id)}
+              onPress={() => navigation.navigate('ListingBoost', { listingId: listing.id })}
             >
               <View style={styles.inquiryRowLeft}>
                 <Feather name="message-square" size={16} color="rgba(255,255,255,0.2)" />

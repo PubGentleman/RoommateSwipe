@@ -339,7 +339,10 @@ export const HostDashboardScreen = () => {
               <Feather name="cpu" size={18} color="#FFFFFF" />
             </LinearGradient>
           </Pressable>
-          <Pressable style={styles.iconBtn} onPress={() => navigation.navigate('Inquiries')}>
+          <Pressable style={styles.iconBtn} onPress={() => {
+            const parent = navigation.getParent();
+            if (parent) parent.navigate('Profile', { screen: 'Notifications' });
+          }}>
             <Feather name="bell" size={16} color="rgba(255,255,255,0.6)" />
             {pendingInquiries > 0 ? <View style={styles.notifDot} /> : null}
           </Pressable>
