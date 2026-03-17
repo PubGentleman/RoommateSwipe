@@ -49,7 +49,7 @@ const CARD_WIDTH = Math.min(SCREEN_WIDTH - Spacing.xxl, MAX_CARD_WIDTH);
 
 export const RoommatesScreen = () => {
   const { theme } = useTheme();
-  const { user, canSendInterest, purchaseUndoPass, canRewind, useRewind, canSuperLike, useSuperLike, blockUser, reportUser, canSendSuperInterest, useSuperInterestCredit, getSuperInterestCount, purchaseSuperInterest, canSendColdMessage, activateBoost, canBoost, purchaseBoost, checkAndUpdateBoostStatus } = useAuth();
+  const { user, purchaseUndoPass, canRewind, useRewind, canSuperLike, useSuperLike, blockUser, reportUser, canSendSuperInterest, useSuperInterestCredit, getSuperInterestCount, purchaseSuperInterest, canSendColdMessage, activateBoost, canBoost, purchaseBoost, checkAndUpdateBoostStatus } = useAuth();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { refreshUnreadCount } = useNotificationContext();
@@ -1006,37 +1006,6 @@ export const RoommatesScreen = () => {
     (navigation as any).navigate('Profile', { screen: 'Payment' });
   };
 
-  const handleSendInterest = async (profile: RoommateProfile, isSuper: boolean = false) => {
-    if (!user || !profile) return;
-    const check = await canSendInterest();
-    if (!check.canSend) {
-      Alert.alert('Limit Reached', check.reason || 'You have reached your daily interest card limit. Upgrade your plan for more.');
-      return;
-    }
-    const card: InterestCard = {
-      id: `interest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      renterId: user.id,
-      renterName: user.name || 'Anonymous',
-      renterPhoto: user.photos?.[0],
-      hostId: profile.id,
-      propertyId: '',
-      propertyTitle: '',
-      compatibilityScore: profile.compatibility || 0,
-      budgetRange: user.profileData?.budget ? `$${user.profileData.budget}/mo` : 'Not set',
-      moveInDate: user.profileData?.preferences?.moveInDate || 'Flexible',
-      lifestyleTags: user.profileData?.preferences?.lifestyle || [],
-      personalNote: '',
-      status: 'pending',
-      isSuperInterest: isSuper,
-      createdAt: new Date().toISOString(),
-    };
-    await StorageService.addInterestCard(card);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert(
-      isSuper ? 'Super Interest Sent!' : 'Interest Sent!',
-      `Your interest card has been sent to ${profile.name}. They'll see your compatibility and preferences.`
-    );
-  };
 
   
 
@@ -2219,19 +2188,6 @@ export const RoommatesScreen = () => {
               ) : null}
 
               <View style={[styles.detailSection, { paddingBottom: Spacing.xxl, gap: Spacing.md }]}>
-                <Pressable
-                  style={[styles.detailActionButton, { backgroundColor: '#ff6b5b' }]}
-                  onPress={() => {
-                    if (currentProfile) {
-                      handleSendInterest(currentProfile);
-                    }
-                  }}
-                >
-                  <Feather name="heart" size={20} color="#FFFFFF" />
-                  <ThemedText style={[Typography.h3, { color: '#FFFFFF', marginLeft: Spacing.md }]}>
-                    Send Interest Card
-                  </ThemedText>
-                </Pressable>
                 <Pressable
                   style={[styles.detailActionButton, { backgroundColor: theme.primary }]}
                   onPress={() => {
