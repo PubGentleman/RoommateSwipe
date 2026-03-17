@@ -11,7 +11,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { StorageService } from '../../utils/storage';
-import { RoommateProfile, Match, InterestCard } from '../../types/models';
+import { RoommateProfile, Match, InterestCard, Group } from '../../types/models';
 import { isBoostExpired, getBoostDuration, getBoostTimeRemaining } from '../../utils/boostUtils';
 import { dispatchInsightTrigger } from '../../utils/insightRefresh';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -38,6 +38,7 @@ import { trackSwipe, startSession, shouldShowRefinementQuestion, getQuestionsAsk
 import { getNextRefinementQuestion, REFINEMENT_QUESTIONS } from '../../utils/refinementQuestions';
 import type { RefinementQuestion } from '../../utils/refinementQuestions';
 import { getSwipeDeck, sendLike, sendPass, undoLastAction } from '../../services/discoverService';
+import { getMyGroups as getMyGroupsFromSupabase } from '../../services/groupService';
 import { recordSwipe, getAIMemory } from '../../utils/aiMemory';
 import { getNextMicroQuestion } from '../../utils/aiMicroQuestions';
 
@@ -92,6 +93,7 @@ export const RoommatesScreen = () => {
   const [showBoostModal, setShowBoostModal] = useState(false);
   const [processingBoost, setProcessingBoost] = useState(false);
   const [boostTimeLabel, setBoostTimeLabel] = useState('');
+  const [userOpenGroup, setUserOpenGroup] = useState<Group | null>(null);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const rotation = useSharedValue(0);
@@ -209,6 +211,36 @@ export const RoommatesScreen = () => {
     React.useCallback(() => {
       console.log('[RoommatesScreen] Screen focused, reloading profiles to get latest photos');
       loadProfiles();
+      if (user) {
+        (async () => {
+          try {
+            const supabaseGroups = await getMyGroupsFromSupabase('roommate');
+            if (supabaseGroups && supabaseGroups.length > 0) {
+              const mapped = supabaseGroups.map((g: any) => ({
+                id: g.id,
+                name: g.name,
+                members: (g.group_members || []).map((m: any) => m.user_id),
+                maxMembers: g.max_members || 10,
+                createdBy: g.created_by,
+              }));
+              const openGroup = mapped.find((g: any) =>
+                g.createdBy === user.id && g.members.length < g.maxMembers
+              );
+              setUserOpenGroup(openGroup || null);
+              return;
+            }
+          } catch {}
+          try {
+            const groups = await StorageService.getGroups();
+            const openGroup = groups.find(g =>
+              g.createdBy === user.id &&
+              g.members.includes(user.id) &&
+              g.members.length < g.maxMembers
+            );
+            setUserOpenGroup(openGroup || null);
+          } catch {}
+        })();
+      }
       return () => {
         dispatchInsightTrigger('swipe_session_end');
       };
@@ -367,6 +399,29 @@ export const RoommatesScreen = () => {
     requestAnimationFrame(() => {
       cardOpacity.value = withTiming(1, { duration: 150 });
     });
+  };
+
+  const handleInviteToGroup = async () => {
+    if (!userOpenGroup || !user || !matchedProfileData?.profile) return;
+    try {
+      await StorageService.sendGroupInvite({
+        groupId: userOpenGroup.id,
+        groupName: userOpenGroup.name,
+        invitedUserId: matchedProfileData.profile.id,
+        invitedByUserId: user.id,
+        invitedByName: user.name || 'Someone',
+        createdAt: new Date().toISOString(),
+      });
+      setShowMatch(false);
+      setMatchedProfileData(null);
+      Alert.alert(
+        'Invite Sent!',
+        `${matchedProfileData.profile.name} has been invited to join your group.`,
+        [{ text: 'OK' }]
+      );
+    } catch {
+      Alert.alert('Error', 'Could not send invite. Try again.');
+    }
   };
 
   const handleSwipeAction = async (action: 'like' | 'nope' | 'superlike') => {
@@ -1337,6 +1392,8 @@ export const RoommatesScreen = () => {
           setShowMatch(false);
           setMatchedProfileData(null);
         }}
+        showInviteToGroup={!!userOpenGroup}
+        onInviteToGroup={handleInviteToGroup}
       />
 
       <PaywallSheet

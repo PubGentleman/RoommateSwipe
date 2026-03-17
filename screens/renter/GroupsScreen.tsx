@@ -56,6 +56,7 @@ export const GroupsScreen = () => {
   const [profileCache, setProfileCache] = useState<RoommateProfile[]>([]);
   const [inquiryGroups, setInquiryGroups] = useState<any[]>([]);
   const [showPastInquiries, setShowPastInquiries] = useState(false);
+  const [pendingInvites, setPendingInvites] = useState<any[]>([]);
 
   const [groupName, setGroupName] = useState('');
   const [groupDescription, setGroupDescription] = useState('');
@@ -72,6 +73,9 @@ export const GroupsScreen = () => {
   useFocusEffect(
     React.useCallback(() => {
       loadGroups();
+      if (user) {
+        StorageService.getPendingGroupInvites(user.id).then(setPendingInvites);
+      }
     }, [user, activeCity])
   );
 
@@ -529,6 +533,29 @@ export const GroupsScreen = () => {
     };
   });
 
+  const handleAcceptInvite = async (invite: any) => {
+    try {
+      const result = await StorageService.respondToGroupInvite(invite.id, true);
+      if (result) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Alert.alert('Joined!', `You have joined "${invite.groupName}".`);
+        setPendingInvites(prev => prev.filter(i => i.id !== invite.id));
+        await loadGroups();
+      }
+    } catch {
+      Alert.alert('Error', 'Could not accept invite. Try again.');
+    }
+  };
+
+  const handleDeclineInvite = async (invite: any) => {
+    try {
+      await StorageService.respondToGroupInvite(invite.id, false);
+      setPendingInvites(prev => prev.filter(i => i.id !== invite.id));
+    } catch {
+      Alert.alert('Error', 'Could not decline invite. Try again.');
+    }
+  };
+
   const handleCreateGroup = async () => {
     if (!user) return;
 
@@ -579,8 +606,8 @@ export const GroupsScreen = () => {
     }
 
     const maxMembers = parseInt(groupMaxMembers);
-    if (isNaN(maxMembers) || maxMembers < 2 || maxMembers > 10) {
-      Alert.alert('Error', 'Maximum members must be between 2 and 10');
+    if (isNaN(maxMembers) || maxMembers < 1 || maxMembers > 10) {
+      Alert.alert('Error', 'Maximum members must be between 1 and 10');
       return;
     }
 
@@ -853,6 +880,18 @@ export const GroupsScreen = () => {
           ) : null}
         </View>
 
+        {group.members.length <= 1 ? (
+          <View style={styles.soloGroupBanner}>
+            <Feather name="user-plus" size={20} color="#ff6b5b" />
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <ThemedText style={styles.soloGroupTitle}>Looking for Roommates</ThemedText>
+              <ThemedText style={styles.soloGroupDesc}>
+                Your group is visible to other renters. Share your group code to invite people directly.
+              </ThemedText>
+            </View>
+          </View>
+        ) : null}
+
         {memberProfiles.length > 0 ? (
           <View style={styles.membersSection}>
             <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.sm }]}>
@@ -934,6 +973,40 @@ export const GroupsScreen = () => {
           contentContainerStyle={styles.myGroupsList}
           showsVerticalScrollIndicator={false}
         >
+          {pendingInvites.length > 0 ? (
+            <View style={styles.invitesSection}>
+              <View style={styles.sectionHeader}>
+                <Feather name="mail" size={16} color="#ff6b5b" />
+                <ThemedText style={[Typography.h3, { marginLeft: 8 }]}>Group Invites</ThemedText>
+              </View>
+              {pendingInvites.map(invite => (
+                <View key={invite.id} style={styles.inviteCard}>
+                  <View style={styles.inviteInfo}>
+                    <Feather name="users" size={16} color="#ff6b5b" />
+                    <View style={{ marginLeft: 10, flex: 1 }}>
+                      <ThemedText style={styles.inviteGroupName}>{invite.groupName}</ThemedText>
+                      <ThemedText style={styles.inviteFrom}>Invited by {invite.invitedByName}</ThemedText>
+                    </View>
+                  </View>
+                  <View style={styles.inviteActions}>
+                    <Pressable
+                      style={styles.inviteAccept}
+                      onPress={() => handleAcceptInvite(invite)}
+                    >
+                      <Text style={styles.inviteAcceptText}>Join</Text>
+                    </Pressable>
+                    <Pressable
+                      style={styles.inviteDecline}
+                      onPress={() => handleDeclineInvite(invite)}
+                    >
+                      <Text style={styles.inviteDeclineText}>Decline</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
           <View style={styles.sectionHeader}>
             <Feather name="users" size={16} color="#ff6b5b" />
             <ThemedText style={[Typography.h3, { marginLeft: 8 }]}>My Roommate Groups</ThemedText>
@@ -1192,8 +1265,11 @@ export const GroupsScreen = () => {
         contentContainerStyle={styles.createForm}
         showsVerticalScrollIndicator={false}
       >
-        <ThemedText style={[Typography.h3, { marginBottom: Spacing.lg }]}>
+        <ThemedText style={[Typography.h3, { marginBottom: Spacing.xs }]}>
           Create a New Group
+        </ThemedText>
+        <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.lg, lineHeight: 18 }]}>
+          Start solo and invite roommates later, or create a group with people you already know.
         </ThemedText>
 
         <View style={styles.inputGroup}>
@@ -1332,7 +1408,7 @@ export const GroupsScreen = () => {
 
         <View style={styles.inputGroup}>
           <ThemedText style={[Typography.body, { marginBottom: Spacing.xs }]}>
-            Maximum Members (2-10) {groupBedrooms.trim() ? '(Auto-set from bedrooms)' : '*'}
+            Maximum Members (1-10) {groupBedrooms.trim() ? '(Auto-set from bedrooms)' : ''}
           </ThemedText>
           <TextInput
             style={[styles.input, { 
@@ -2423,5 +2499,75 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
+  },
+  soloGroupBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(255,107,91,0.1)',
+    borderRadius: 12,
+    padding: 14,
+    marginTop: Spacing.md,
+    marginBottom: 16,
+  },
+  soloGroupTitle: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  soloGroupDesc: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 12,
+    marginTop: 3,
+    lineHeight: 17,
+  },
+  invitesSection: {
+    marginBottom: 20,
+  },
+  inviteCard: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+  },
+  inviteInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  inviteGroupName: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  inviteFrom: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  inviteActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  inviteAccept: {
+    backgroundColor: '#ff6b5b',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  inviteAcceptText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  inviteDecline: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  inviteDeclineText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontWeight: '600',
+    fontSize: 13,
   },
 });

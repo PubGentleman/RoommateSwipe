@@ -31,6 +31,8 @@ interface MatchCelebrationModalProps {
   compatibility?: number;
   onSendMessage: () => void;
   onKeepSwiping: () => void;
+  showInviteToGroup?: boolean;
+  onInviteToGroup?: () => void;
 }
 
 const Particle = ({ index, visible }: { index: number; visible: boolean }) => {
@@ -110,6 +112,8 @@ export const MatchCelebrationModal = ({
   compatibility,
   onSendMessage,
   onKeepSwiping,
+  showInviteToGroup,
+  onInviteToGroup,
 }: MatchCelebrationModalProps) => {
   const { theme } = useTheme();
 
@@ -295,6 +299,17 @@ export const MatchCelebrationModal = ({
               Send Message
             </ThemedText>
           </Pressable>
+          {showInviteToGroup && onInviteToGroup ? (
+            <Pressable
+              style={styles.inviteToGroupButton}
+              onPress={onInviteToGroup}
+            >
+              <Feather name="user-plus" size={16} color="#fff" />
+              <ThemedText style={styles.inviteToGroupText}>
+                Invite to My Group
+              </ThemedText>
+            </Pressable>
+          ) : null}
           <Pressable
             style={styles.keepSwipingButton}
             onPress={onKeepSwiping}
@@ -468,5 +483,21 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  inviteToGroupButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  inviteToGroupText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
+    marginLeft: Spacing.sm,
   },
 });

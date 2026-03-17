@@ -1,0 +1,260 @@
+# Replit Prompt: Allow Renters to Create a Group Solo and Look for Roommates to Join
+
+---
+
+## OVERVIEW
+
+Renters should be able to create a group with just themselves in it. They can then browse listings, send inquiries, and look for other renters to join their group — all without needing to have roommates lined up first. This is a key use case for renters who are actively apartment hunting while also searching for roommates at the same time.
+
+---
+
+## CHANGES NEEDED
+
+---
+
+### 1. `screens/renter/GroupsScreen.tsx` — Update group creation UI language
+
+In the Create Group bottom sheet/modal, update the UI copy to make it clear that starting solo is perfectly fine.
+
+**Find the group name input label or header text** (around the group creation form) and update the descriptive text:
+
+```tsx
+// Find something like:
+<Text>Tell others about your group...</Text>
+
+// Update the section header/description to:
+<Text style={styles.createGroupSubtitle}>
+  Start solo and invite roommates later, or create a group with people you already know.
+</Text>
+```
+
+**Find the member count / size field label:**
+```tsx
+// Find label like "Max Group Size" or similar
+// Update placeholder or helper text to:
+helperText="How many roommates are you looking for total (including yourself)?"
+```
+
+**Find the Create Group submit button** and remove any validation that requires more than 1 member. A group of size 1 (just the creator) should be allowed.
+
+```tsx
+// Remove or update any check like:
+if (members.length < 2) return; // DELETE THIS
+
+// The only required fields before creating should be:
+// - group name
+// - budget min/max
+// - move-in date
+// Everything else is optional
+```
+
+---
+
+### 2. `screens/renter/GroupsScreen.tsx` — Update empty group state messaging
+
+When a renter has a group with only themselves in it, the group detail view should show a clear "Looking for Roommates" section instead of showing an empty members list awkwardly.
+
+**Find the group detail member list section** and add this case:
+
+```tsx
+{group.members.length <= 1 ? (
+  <View style={styles.soloGroupBanner}>
+    <Feather name="user-plus" size={20} color={ACCENT} />
+    <View style={{ flex: 1, marginLeft: 12 }}>
+      <Text style={styles.soloGroupTitle}>Looking for Roommates</Text>
+      <Text style={styles.soloGroupDesc}>
+        Your group is visible to other renters. Share your group code to invite people directly.
+      </Text>
+    </View>
+  </View>
+) : null}
+```
+
+Add these styles:
+```tsx
+soloGroupBanner: {
+  flexDirection: 'row',
+  alignItems: 'flex-start',
+  backgroundColor: 'rgba(255,107,91,0.1)',
+  borderRadius: 12,
+  padding: 14,
+  marginBottom: 16,
+},
+soloGroupTitle: {
+  color: '#fff',
+  fontWeight: '600',
+  fontSize: 14,
+},
+soloGroupDesc: {
+  color: 'rgba(255,255,255,0.5)',
+  fontSize: 12,
+  marginTop: 3,
+  lineHeight: 17,
+},
+```
+
+---
+
+### 3. `screens/host/BrowseRenterGroupsScreen.tsx` — Fix "1 people looking together" grammar
+
+When a group has only 1 member, the member count badge currently shows "1 people looking together" which is grammatically wrong and confusing.
+
+**Find the member badge text (around line 153):**
+```tsx
+<Text style={styles.memberText}>{item.memberCount} people looking together</Text>
+```
+
+**Replace with:**
+```tsx
+<Text style={styles.memberText}>
+  {item.memberCount === 1
+    ? '1 person looking — open to roommates'
+    : `${item.memberCount} people looking together`}
+</Text>
+```
+
+---
+
+### 4. `screens/renter/RoommatesScreen.tsx` — Allow solo group members to show up in swipe deck
+
+Renters in a solo group should appear on the Roommates/Match swipe screen so other renters can find them and request to join their group.
+
+**Find the filter or data fetch logic** that loads renter profiles into the swipe deck. Make sure profiles belonging to solo groups (groups with 1 member) are included in the deck and are not filtered out.
+
+If there is a filter like:
+```tsx
+.filter(profile => profile.groupSize > 1)
+// or
+.filter(profile => profile.hasGroup === false)
+```
+
+Remove or update it so solo-group renters are included:
+```tsx
+// Solo group renters should appear in the swipe deck
+// They are looking for roommates just like ungrouped renters
+.filter(profile => profile.isVisible !== false)
+```
+
+---
+
+### 5. `screens/renter/GroupsScreen.tsx` — Add "Invite to My Group" flow from swipe / match
+
+When a renter matches with or likes another renter on the Roommates tab, they should be able to invite that person to join their existing group (if they have one).
+
+In the match celebration modal or message flow, add an option:
+
+**Find `MatchCelebrationModal` usage or the post-match action sheet** and add a new option:
+
+```tsx
+// After a match, show option to invite to group if renter has a solo/open group:
+{userHasOpenGroup && (
+  <Pressable
+    style={styles.inviteToGroupBtn}
+    onPress={() => handleInviteToGroup(matchedProfile)}
+  >
+    <Feather name="user-plus" size={16} color="#fff" />
+    <Text style={styles.inviteToGroupText}>Invite to My Group</Text>
+  </Pressable>
+)}
+```
+
+The `handleInviteToGroup` function should:
+1. Send a group join request notification to the matched renter
+2. Show a confirmation: "Invite sent to [Name] to join your group!"
+3. The invited renter sees the request in their Groups tab under "Pending Invites"
+
+```tsx
+const handleInviteToGroup = async (profile: RoommateProfile) => {
+  if (!userGroup || !user) return;
+  try {
+    await StorageService.sendGroupInvite({
+      groupId: userGroup.id,
+      groupName: userGroup.name,
+      invitedUserId: profile.id,
+      invitedByUserId: user.id,
+      invitedByName: user.name || 'Someone',
+      createdAt: new Date().toISOString(),
+    });
+    Alert.alert(
+      'Invite Sent!',
+      `${profile.name} has been invited to join your group.`,
+      [{ text: 'OK' }]
+    );
+  } catch {
+    Alert.alert('Error', 'Could not send invite. Try again.');
+  }
+};
+```
+
+---
+
+### 6. `screens/renter/GroupsScreen.tsx` — Show pending group invites
+
+In the Groups tab, if a renter has received a group invite, show a "Pending Invites" section at the top of the screen.
+
+```tsx
+{pendingInvites.length > 0 && (
+  <View style={styles.invitesSection}>
+    <Text style={styles.invitesSectionTitle}>Group Invites</Text>
+    {pendingInvites.map(invite => (
+      <View key={invite.id} style={styles.inviteCard}>
+        <View style={styles.inviteInfo}>
+          <Feather name="users" size={16} color={ACCENT} />
+          <View style={{ marginLeft: 10 }}>
+            <Text style={styles.inviteGroupName}>{invite.groupName}</Text>
+            <Text style={styles.inviteFrom}>Invited by {invite.invitedByName}</Text>
+          </View>
+        </View>
+        <View style={styles.inviteActions}>
+          <Pressable
+            style={styles.inviteAccept}
+            onPress={() => handleAcceptInvite(invite)}
+          >
+            <Text style={styles.inviteAcceptText}>Join</Text>
+          </Pressable>
+          <Pressable
+            style={styles.inviteDecline}
+            onPress={() => handleDeclineInvite(invite)}
+          >
+            <Text style={styles.inviteDeclineText}>Decline</Text>
+          </Pressable>
+        </View>
+      </View>
+    ))}
+  </View>
+)}
+```
+
+Load pending invites on screen focus:
+```tsx
+useFocusEffect(
+  useCallback(() => {
+    if (user) {
+      StorageService.getPendingGroupInvites(user.id).then(setPendingInvites);
+    }
+  }, [user])
+);
+```
+
+---
+
+## SUMMARY OF FULL FLOW
+
+1. Renter opens Groups tab → taps "Create Group"
+2. Fills in name, budget, move-in date (no roommates required)
+3. Group is created with just them — shows "Looking for Roommates" banner
+4. They can browse listings and inquire immediately as a 1-person group
+5. Other renters find them on the Match/Roommates swipe screen
+6. After matching, either renter can tap "Invite to My Group"
+7. Invited renter sees the invite in their Groups tab and accepts/declines
+8. Group grows organically — host sees updated member count on the inquiry
+
+---
+
+## DO NOT CHANGE
+
+- Do not require a minimum group size anywhere in the codebase
+- Do not modify host-side inquiry handling
+- Do not change `isDev` mock data guards
+- Do not modify the Supabase schema — use `StorageService` for all new data operations
+- Keep existing multi-member group flows exactly as they are

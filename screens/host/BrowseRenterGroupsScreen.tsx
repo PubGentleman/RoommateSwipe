@@ -153,7 +153,11 @@ export const BrowseRenterGroupsScreen = () => {
         <View style={styles.cardHeader}>
           <View style={styles.memberBadge}>
             <Feather name="users" size={14} color={PURPLE} />
-            <Text style={styles.memberText}>{item.memberCount} people looking together</Text>
+            <Text style={styles.memberText}>
+                {item.memberCount === 1
+                  ? '1 person looking — open to roommates'
+                  : `${item.memberCount} people looking together`}
+              </Text>
           </View>
           <Text style={styles.moveIn}>Move-in: {item.moveInDate}</Text>
         </View>

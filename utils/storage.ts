@@ -20,6 +20,7 @@ const STORAGE_KEYS = {
   ONBOARDING_COMPLETED: '@roomdr/onboarding_completed',
   INTEREST_CARDS: '@roomdr/interestCards',
   HOST_SUBSCRIPTIONS: '@roomdr/host_subscriptions',
+  GROUP_INVITES: '@roomdr/group_invites',
 };
 
 let notificationIdCounter = 0;
@@ -464,6 +465,83 @@ export const StorageService = {
       }
     } catch (error) {
       console.error('Error removing member from group:', error);
+    }
+  },
+
+  async sendGroupInvite(invite: {
+    groupId: string;
+    groupName: string;
+    invitedUserId: string;
+    invitedByUserId: string;
+    invitedByName: string;
+    createdAt: string;
+  }): Promise<void> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.GROUP_INVITES);
+      const invites = data ? JSON.parse(data) : [];
+      const existing = invites.find((i: any) =>
+        i.groupId === invite.groupId && i.invitedUserId === invite.invitedUserId && i.status === 'pending'
+      );
+      if (existing) return;
+      invites.push({ ...invite, id: `ginv-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, status: 'pending' });
+      await AsyncStorage.setItem(STORAGE_KEYS.GROUP_INVITES, JSON.stringify(invites));
+
+      await this.addNotification({
+        id: generateNotificationId(),
+        userId: invite.invitedUserId,
+        type: 'group_invite',
+        title: 'Group Invite',
+        body: `${invite.invitedByName} invited you to join "${invite.groupName}"`,
+        isRead: false,
+        createdAt: new Date(),
+        data: { groupId: invite.groupId, fromUserId: invite.invitedByUserId, fromUserName: invite.invitedByName },
+      });
+    } catch (error) {
+      console.error('Error sending group invite:', error);
+    }
+  },
+
+  async getPendingGroupInvites(userId: string): Promise<any[]> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.GROUP_INVITES);
+      if (!data) return [];
+      const invites = JSON.parse(data);
+      return invites.filter((i: any) => i.invitedUserId === userId && i.status === 'pending');
+    } catch (error) {
+      console.error('Error getting pending group invites:', error);
+      return [];
+    }
+  },
+
+  async respondToGroupInvite(inviteId: string, accept: boolean): Promise<{ groupId: string } | null> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.GROUP_INVITES);
+      if (!data) return null;
+      const invites = JSON.parse(data);
+      const invite = invites.find((i: any) => i.id === inviteId);
+      if (!invite) return null;
+      invite.status = accept ? 'accepted' : 'declined';
+      await AsyncStorage.setItem(STORAGE_KEYS.GROUP_INVITES, JSON.stringify(invites));
+
+      if (accept) {
+        const groups = await this.getGroups();
+        const group = groups.find((g: Group) => g.id === invite.groupId);
+        if (group) {
+          if (group.members.length >= group.maxMembers) {
+            invite.status = 'pending';
+            await AsyncStorage.setItem(STORAGE_KEYS.GROUP_INVITES, JSON.stringify(invites));
+            return null;
+          }
+          if (!group.members.includes(invite.invitedUserId)) {
+            group.members.push(invite.invitedUserId);
+            await this.setGroups(groups);
+          }
+        }
+      }
+      return { groupId: invite.groupId };
+    } catch (error) {
+      console.error('Error responding to group invite:', error);
+      return null;
     }
   },
 
