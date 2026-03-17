@@ -281,9 +281,9 @@ export interface User {
     plan: 'free' | 'starter' | 'pro' | 'business';
     status: 'active' | 'cancelled' | 'cancelling' | 'expired';
     expiresAt?: Date;
-    scheduledPlan?: 'starter' | 'pro' | 'business';
+    scheduledPlan?: 'free' | 'starter' | 'pro' | 'business';
     scheduledChangeDate?: Date;
-    billingCycle?: 'monthly' | '3month' | 'annual';
+    billingCycle?: 'monthly' | 'annual';
     stripeSubscriptionId?: string;
     stripePriceId?: string;
     inquiryResponsesUsed?: number;

@@ -51,20 +51,25 @@ const RENTER_TIERS = {
 };
 
 const HOST_TIERS = {
-  starter: {
-    name: 'Starter',
+  free: {
+    name: 'Host Free',
     price: 'Free',
-    features: ['1 active listing', '5 inquiry responses/mo', 'Basic analytics (views only)'],
+    features: ['1 active listing', 'Basic inquiry management', 'Standard placement in search'],
+  },
+  starter: {
+    name: 'Host Starter',
+    price: '$19.99/mo',
+    features: ['1 active listing', 'Renter group browsing', 'AI assistant', '1 free 24-hr boost/mo', 'Verified host badge'],
   },
   pro: {
-    name: 'Pro',
-    price: '$29.99/mo',
-    features: ['Up to 5 active listings', 'Unlimited inquiry responses', 'Boosted visibility', 'Full analytics dashboard', 'Verified host badge'],
+    name: 'Host Pro',
+    price: '$49.99/mo',
+    features: ['Up to 5 active listings', 'Priority placement', '2 free 72-hr boosts/mo', 'Advanced analytics', '3 simultaneous boosts'],
   },
   business: {
-    name: 'Business',
-    price: '$79.99/mo',
-    features: ['Unlimited listings', 'Priority placement in search', 'Featured listing on Explore', 'Advanced analytics', 'Dedicated host support'],
+    name: 'Host Business',
+    price: '$99/mo',
+    features: ['Up to 15 listings (+$5 overage)', '2 free 7-day boosts/mo', '10 simultaneous boosts', 'Full analytics suite', 'Priority support'],
   },
 };
 
@@ -99,10 +104,11 @@ export function PaywallSheet({ visible, featureName, requiredPlan, onUpgrade, on
 
   const tiers = role === 'renter'
     ? [RENTER_TIERS.basic, RENTER_TIERS.plus, RENTER_TIERS.elite]
-    : [HOST_TIERS.starter, HOST_TIERS.pro, HOST_TIERS.business];
+    : [HOST_TIERS.free, HOST_TIERS.starter, HOST_TIERS.pro, HOST_TIERS.business];
 
   const isRequiredTier = (tier: { name: string }) => {
-    return tier.name.toLowerCase() === requiredPlan.toLowerCase();
+    const tierKey = tier.name.replace('Host ', '').toLowerCase();
+    return tierKey === requiredPlan.toLowerCase();
   };
 
   return (

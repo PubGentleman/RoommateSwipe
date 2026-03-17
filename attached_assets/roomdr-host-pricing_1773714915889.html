@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Roomdr — Host Pricing</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0F0F0F;
+      color: #FFFFFF;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      padding: 0 0 80px;
+    }
+
+    /* ── TOP NAV ── */
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 32px;
+      border-bottom: 1px solid #1E1E1E;
+    }
+    .nav-logo { font-size: 22px; font-weight: 800; color: #A78BFA; letter-spacing: -0.5px; }
+    .nav-tabs { display: flex; gap: 8px; background: #1A1A1A; border-radius: 10px; padding: 4px; }
+    .nav-tab {
+      padding: 7px 18px; border-radius: 8px; font-size: 14px; font-weight: 500;
+      cursor: pointer; color: #888; border: none; background: transparent;
+    }
+    .nav-tab.active { background: #7B5EA7; color: #fff; }
+
+    /* ── HERO ── */
+    .hero { text-align: center; padding: 52px 20px 36px; }
+    .hero-eyebrow {
+      display: inline-block; background: rgba(123,94,167,0.18);
+      color: #A78BFA; font-size: 12px; font-weight: 700;
+      letter-spacing: 1.5px; text-transform: uppercase;
+      padding: 5px 14px; border-radius: 20px; margin-bottom: 18px;
+    }
+    .hero h1 { font-size: 38px; font-weight: 800; line-height: 1.15; letter-spacing: -1px; }
+    .hero h1 span { color: #A78BFA; }
+    .hero p { color: #888; font-size: 16px; margin-top: 12px; max-width: 480px; margin-left: auto; margin-right: auto; }
+
+    /* ── TOGGLE ── */
+    .toggle-wrap { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 28px 0 0; }
+    .toggle-label { font-size: 14px; color: #888; }
+    .toggle-label.active { color: #fff; font-weight: 600; }
+    .toggle {
+      width: 44px; height: 24px; background: #7B5EA7; border-radius: 12px;
+      position: relative; cursor: pointer;
+    }
+    .toggle::after {
+      content: ''; position: absolute; top: 3px; left: 3px;
+      width: 18px; height: 18px; background: #fff; border-radius: 50%;
+      transition: transform 0.2s;
+    }
+    .save-badge {
+      background: #16A34A; color: #fff; font-size: 11px; font-weight: 700;
+      padding: 3px 8px; border-radius: 20px;
+    }
+
+    /* ── HOST TYPE SECTION ── */
+    .section-label {
+      text-align: center; font-size: 11px; font-weight: 700;
+      letter-spacing: 2px; text-transform: uppercase;
+      color: #555; margin: 48px 0 20px;
+    }
+
+    /* ── PLAN GRID ── */
+    .plans-wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+
+    /* Renter banner */
+    .renter-banner {
+      background: linear-gradient(135deg, #1A1A2E 0%, #16213E 100%);
+      border: 1px solid #2A2A4A;
+      border-radius: 16px;
+      padding: 22px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      margin-bottom: 36px;
+    }
+    .renter-banner-left { display: flex; align-items: center; gap: 16px; }
+    .renter-icon {
+      width: 48px; height: 48px; background: rgba(99,102,241,0.2);
+      border-radius: 12px; display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+    }
+    .renter-banner h3 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+    .renter-banner p { font-size: 13px; color: #888; }
+    .renter-badge {
+      background: rgba(99,102,241,0.15); color: #818CF8;
+      border: 1px solid rgba(99,102,241,0.3);
+      padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .plans-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+
+    .plan-card {
+      background: #161616;
+      border: 1px solid #242424;
+      border-radius: 20px;
+      padding: 28px 24px;
+      position: relative;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .plan-card:hover { border-color: #7B5EA7; transform: translateY(-2px); }
+    .plan-card.popular {
+      border-color: #7B5EA7;
+      background: linear-gradient(160deg, #1A1128 0%, #161616 60%);
+    }
+
+    .popular-badge {
+      position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+      background: #7B5EA7; color: #fff; font-size: 11px; font-weight: 700;
+      padding: 4px 14px; border-radius: 20px; letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+
+    .plan-type-badge {
+      display: inline-block; font-size: 10px; font-weight: 700;
+      letter-spacing: 1.5px; text-transform: uppercase;
+      padding: 3px 10px; border-radius: 6px; margin-bottom: 14px;
+    }
+    .badge-free { background: rgba(100,100,100,0.2); color: #888888; }
+    .badge-starter { background: rgba(59,130,246,0.15); color: #60A5FA; }
+    .badge-pro { background: rgba(123,94,167,0.2); color: #A78BFA; }
+    .badge-business { background: rgba(217,119,6,0.15); color: #FBBF24; }
+
+    .plan-name { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
+    .plan-subtitle { font-size: 13px; color: #666; margin-bottom: 20px; }
+
+    .plan-price { margin-bottom: 6px; }
+    .plan-price .amount { font-size: 42px; font-weight: 800; letter-spacing: -2px; }
+    .plan-price .period { font-size: 15px; color: #666; font-weight: 400; }
+
+    .overage-note {
+      font-size: 12px; color: #FBBF24; margin-bottom: 20px;
+      display: flex; align-items: center; gap: 5px;
+    }
+
+    .plan-cta {
+      width: 100%; padding: 13px; border-radius: 12px;
+      font-size: 15px; font-weight: 700; cursor: pointer;
+      border: none; margin-bottom: 24px;
+      transition: opacity 0.2s;
+    }
+    .plan-cta:hover { opacity: 0.85; }
+    .cta-outline { background: transparent; border: 1.5px solid #333; color: #fff; }
+    .cta-primary { background: #7B5EA7; color: #fff; }
+    .cta-gold { background: linear-gradient(135deg, #D97706, #B45309); color: #fff; }
+
+    .divider { height: 1px; background: #222; margin-bottom: 20px; }
+
+    .features-label { font-size: 11px; font-weight: 700; color: #555; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 12px; }
+
+    .feature-item {
+      display: flex; align-items: flex-start; gap: 10px;
+      font-size: 13.5px; color: #CCC; margin-bottom: 10px; line-height: 1.4;
+    }
+    .feature-check { color: #7B5EA7; font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+    .feature-check.gold { color: #FBBF24; }
+    .feature-highlight { color: #fff; font-weight: 600; }
+
+    .listing-cap {
+      display: flex; align-items: center; gap: 10px;
+      background: #1E1E1E; border-radius: 10px;
+      padding: 12px 14px; margin-bottom: 20px;
+    }
+    .listing-cap-icon { font-size: 18px; }
+    .listing-cap-text { font-size: 13px; }
+    .listing-cap-text strong { display: block; font-size: 15px; margin-bottom: 1px; }
+    .listing-cap-text span { color: #888; }
+
+    /* ── BOOST SECTION ── */
+    .boost-section { max-width: 1080px; margin: 60px auto 0; padding: 0 20px; }
+    .boost-header { text-align: center; margin-bottom: 32px; }
+    .boost-header h2 { font-size: 26px; font-weight: 800; margin-bottom: 8px; }
+    .boost-header p { color: #888; font-size: 15px; }
+
+    .boost-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 24px; }
+
+    .boost-card {
+      background: #161616; border: 1px solid #242424;
+      border-radius: 16px; padding: 22px 20px;
+      transition: border-color 0.2s;
+    }
+    .boost-card:hover { border-color: #7B5EA7; }
+    .boost-card.featured { border-color: #7B5EA7; background: linear-gradient(160deg, #1A1128 0%, #161616 60%); }
+
+    .boost-duration { font-size: 13px; font-weight: 700; color: #A78BFA; margin-bottom: 6px; letter-spacing: 0.5px; }
+    .boost-name { font-size: 18px; font-weight: 800; margin-bottom: 4px; }
+    .boost-desc { font-size: 13px; color: #666; margin-bottom: 18px; }
+    .boost-price { font-size: 30px; font-weight: 800; letter-spacing: -1px; }
+    .boost-price span { font-size: 14px; font-weight: 400; color: #666; }
+
+    .best-value-badge {
+      display: inline-block; background: #7B5EA7; color: #fff;
+      font-size: 10px; font-weight: 700; padding: 3px 8px;
+      border-radius: 6px; margin-left: 8px; letter-spacing: 0.5px;
+    }
+
+    /* ── SIMULTANEOUS BOOSTS TABLE ── */
+    .boost-limits {
+      background: #161616; border: 1px solid #242424;
+      border-radius: 16px; padding: 24px; margin-top: 16px;
+    }
+    .boost-limits h3 { font-size: 15px; font-weight: 700; margin-bottom: 16px; }
+    .boost-limits-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 0;
+    }
+    .bl-header {
+      font-size: 11px; font-weight: 700; color: #555;
+      text-transform: uppercase; letter-spacing: 1px;
+      padding: 8px 12px; border-bottom: 1px solid #242424;
+    }
+    .bl-cell {
+      padding: 12px 12px; font-size: 14px;
+      border-bottom: 1px solid #1A1A1A;
+    }
+    .bl-cell.plan-col { font-weight: 600; }
+    .bl-cell.center { text-align: center; }
+    .bl-cell .dot { color: #555; }
+    .bl-cell .boost-count { color: #A78BFA; font-weight: 700; }
+    .bl-cell .boost-count.gold { color: #FBBF24; }
+
+    /* ── BULK BOOST ── */
+    .bulk-boost-banner {
+      background: linear-gradient(135deg, #1A1030 0%, #0F0820 100%);
+      border: 1px solid #7B5EA7;
+      border-radius: 16px; padding: 22px 28px;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 20px; margin-top: 16px;
+    }
+    .bulk-boost-left h3 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+    .bulk-boost-left p { font-size: 13px; color: #888; }
+    .bulk-price {
+      display: flex; align-items: baseline; gap: 10px; flex-shrink: 0;
+    }
+    .bulk-price .new-price { font-size: 28px; font-weight: 800; color: #A78BFA; }
+    .bulk-price .old-price { font-size: 16px; color: #555; text-decoration: line-through; }
+    .bulk-badge { background: rgba(123,94,167,0.2); color: #A78BFA; border: 1px solid rgba(123,94,167,0.4); font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px; }
+
+    /* ── AGENT VERIFICATION ── */
+    .agent-section { max-width: 1080px; margin: 48px auto 0; padding: 0 20px; }
+    .agent-card {
+      background: linear-gradient(135deg, #1A1A0A 0%, #161600 100%);
+      border: 1px solid #3D3500;
+      border-radius: 16px; padding: 24px 28px;
+      display: flex; align-items: center; justify-content: space-between; gap: 20px;
+    }
+    .agent-left { display: flex; align-items: center; gap: 16px; }
+    .agent-icon { font-size: 28px; }
+    .agent-left h3 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+    .agent-left p { font-size: 13px; color: #888; max-width: 420px; }
+    .agent-right { display: flex; align-items: center; gap: 16px; flex-shrink: 0; }
+    .agent-price { font-size: 24px; font-weight: 800; color: #FBBF24; }
+    .agent-price span { font-size: 13px; font-weight: 400; color: #888; }
+    .agent-cta {
+      padding: 10px 20px; background: rgba(217,119,6,0.15);
+      border: 1px solid rgba(217,119,6,0.4); color: #FBBF24;
+      border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer;
+    }
+
+    /* ── FAQ ── */
+    .faq { max-width: 680px; margin: 56px auto 0; padding: 0 20px; }
+    .faq h2 { font-size: 22px; font-weight: 800; text-align: center; margin-bottom: 24px; }
+    .faq-item { border-bottom: 1px solid #1E1E1E; padding: 18px 0; }
+    .faq-q { font-size: 15px; font-weight: 600; margin-bottom: 8px; cursor: pointer; display: flex; justify-content: space-between; }
+    .faq-a { font-size: 14px; color: #888; line-height: 1.6; }
+
+    /* ── BOOST CARD BUTTON ── */
+    .boost-card { cursor: pointer; }
+    .boost-select-btn {
+      width: 100%; margin-top: 16px; padding: 10px;
+      border-radius: 10px; font-size: 14px; font-weight: 700;
+      cursor: pointer; border: 1.5px solid #333; background: transparent;
+      color: #fff; transition: all 0.2s;
+    }
+    .boost-select-btn:hover { background: #7B5EA7; border-color: #7B5EA7; }
+    .boost-card.featured .boost-select-btn { border-color: #7B5EA7; color: #A78BFA; }
+    .boost-card.featured .boost-select-btn:hover { background: #7B5EA7; color: #fff; }
+
+    /* ── FAQ TOGGLE ── */
+    .faq-a { display: none; }
+    .faq-item.open .faq-a { display: block; }
+    .faq-item.open .faq-q span { transform: rotate(45deg); display: inline-block; }
+
+    @media (max-width: 1100px) {
+      .plans-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 768px) {
+      .plans-grid { grid-template-columns: 1fr; }
+      .boost-grid { grid-template-columns: 1fr; }
+      .boost-limits-grid { grid-template-columns: repeat(2, 1fr); }
+      .renter-banner { flex-direction: column; align-items: flex-start; }
+      .bulk-boost-banner { flex-direction: column; }
+      .agent-card { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav class="nav">
+    <div class="nav-logo">roomdr</div>
+    <div class="nav-tabs">
+      <button class="nav-tab">Renters</button>
+      <button class="nav-tab active">Hosts</button>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-eyebrow">Host Plans</div>
+    <h1>Find great tenants.<br/><span>Pay for outcomes, not exposure.</span></h1>
+    <p>From filling one spare room to managing a full portfolio — a plan built for how you actually operate.</p>
+    <div class="toggle-wrap">
+      <span class="toggle-label">Monthly</span>
+      <div class="toggle"></div>
+      <span class="toggle-label active">Annual</span>
+      <span class="save-badge">Save 20%</span>
+    </div>
+  </div>
+
+  <div class="plans-wrap">
+
+    <!-- RENTER SPARE ROOM BANNER -->
+    <div class="section-label">Just need to fill your spare room?</div>
+    <div class="renter-banner">
+      <div class="renter-banner-left">
+        <div class="renter-icon">🛋️</div>
+        <div>
+          <h3>Renter with a spare room</h3>
+          <p>Already have a lease? Post your room and find a compatible roommate — included in your renter subscription at no extra cost.</p>
+        </div>
+      </div>
+      <div class="renter-badge">Included in Renter Plus / Elite</div>
+    </div>
+
+    <!-- HOST PLANS -->
+    <div class="section-label">Own the property?</div>
+    <div class="plans-grid">
+
+      <!-- FREE -->
+      <div class="plan-card">
+        <div class="plan-type-badge badge-free">Free</div>
+        <div class="plan-name">Host Free</div>
+        <div class="plan-subtitle">Just getting started</div>
+        <div class="plan-price">
+          <span class="amount">$0</span><span class="period">/mo</span>
+        </div>
+        <div style="margin-bottom: 20px; font-size: 13px; color: #555;">No credit card required</div>
+
+        <div class="listing-cap">
+          <span class="listing-cap-icon">🏠</span>
+          <div class="listing-cap-text">
+            <strong>1 Active Listing</strong>
+            <span>Post and receive inquiries</span>
+          </div>
+        </div>
+
+        <button class="plan-cta cta-outline">Get Started Free</button>
+        <div class="divider"></div>
+        <div class="features-label">What's included</div>
+
+        <div class="feature-item"><span class="feature-check" style="color:#555">✓</span><span>1 active listing</span></div>
+        <div class="feature-item"><span class="feature-check" style="color:#555">✓</span><span>Basic inquiry management</span></div>
+        <div class="feature-item"><span class="feature-check" style="color:#555">✓</span><span>Standard placement in search</span></div>
+        <div class="feature-item" style="opacity:0.4"><span style="color:#555; flex-shrink:0; margin-top:1px; font-size:15px">✕</span><span>Renter group browsing</span></div>
+        <div class="feature-item" style="opacity:0.4"><span style="color:#555; flex-shrink:0; margin-top:1px; font-size:15px">✕</span><span>AI assistant</span></div>
+        <div class="feature-item" style="opacity:0.4"><span style="color:#555; flex-shrink:0; margin-top:1px; font-size:15px">✕</span><span>Listing boosts</span></div>
+        <div class="feature-item" style="opacity:0.4"><span style="color:#555; flex-shrink:0; margin-top:1px; font-size:15px">✕</span><span>Compatibility scores</span></div>
+        <div class="feature-item" style="opacity:0.4"><span style="color:#555; flex-shrink:0; margin-top:1px; font-size:15px">✕</span><span>Verified host badge</span></div>
+
+        <div style="margin-top: 16px; background: rgba(123,94,167,0.08); border: 1px solid rgba(123,94,167,0.2); border-radius: 10px; padding: 10px 12px; font-size: 12px; color: #A78BFA; line-height: 1.5;">
+          💡 Hosts on Starter fill rooms <strong>2.4x faster</strong> with renter group access
+        </div>
+      </div>
+
+      <!-- STARTER -->
+      <div class="plan-card">
+        <div class="plan-type-badge badge-starter">Individual</div>
+        <div class="plan-name">Host Starter</div>
+        <div class="plan-subtitle">Homeowner with 1 room to fill</div>
+        <div class="plan-price">
+          <span class="amount">$19</span><span class="period">.99/mo</span>
+        </div>
+        <div style="margin-bottom: 20px; font-size: 13px; color: #555;">No overage fees</div>
+
+        <div class="listing-cap">
+          <span class="listing-cap-icon">🏠</span>
+          <div class="listing-cap-text">
+            <strong>1 Active Listing</strong>
+            <span>Hard cap — upgrade to add more</span>
+          </div>
+        </div>
+
+        <button class="plan-cta cta-outline">Get Started</button>
+        <div class="divider"></div>
+        <div class="features-label">What's included</div>
+
+        <div class="feature-item"><span class="feature-check">✓</span><span>1 active listing</span></div>
+        <div class="feature-item"><span class="feature-check">✓</span><span>Renter group browsing</span></div>
+        <div class="feature-item"><span class="feature-check">✓</span><span>AI assistant (host modes)</span></div>
+        <div class="feature-item"><span class="feature-check">✓</span><span><span class="feature-highlight">1 free 24-hr boost</span> per month</span></div>
+        <div class="feature-item"><span class="feature-check">✓</span><span>Verified host badge</span></div>
+        <div class="feature-item"><span class="feature-check">✓</span><span>Inquiry management</span></div>
+        <div class="feature-item"><span class="feature-check">✓</span><span>1 simultaneous boost</span></div>
+      </div>
+
+      <!-- PRO (POPULAR) -->
+      <div class="plan-card popular">
+        <div class="popular-badge">⭐ Most Popular</div>
+        <div class="plan-type-badge badge-pro">Small Landlord</div>
+        <div class="plan-name">Host Pro</div>
+        <div class="plan-subtitle">Own 2–5 units or rooms</div>
+        <div class="plan-price">
+          <span class="amount">$49</span><span class="period">.99/mo</span>
+        </div>
+        <div style="margin-bottom: 20px; font-size: 13px; color: #555;">No overage fees</div>
+
+        <div class="listing-cap">
+          <span class="listing-cap-icon">🏘️</span>
+          <div class="listing-cap-text">
+            <strong>Up to 5 Active Listings</strong>
+            <span>Hard cap — upgrade for more</span>
+          </div>
+        </div>
+
+        <button class="plan-cta cta-primary">Get Started</button>
+        <div class="divider"></div>
+        <div class="features-label">Everything in Starter, plus</div>
+
+        <div class="feature-item"><span class="feature-check">✓</span><span>Up to <span class="feature-highlight">5 active listings</span></span></div>
+        <div class="feature-item"><span class="feature-check">✓</span><span>Priority placement in search</span></div>
+        <div class="feature-item"><span class="feature-check">✓</span><span><span class="feature-highlight">2 free 72-hr boosts</span> per month</span></div>
+        <div class="feature-item"><span class="feature-check">✓</span><span>Advanced analytics dashboard</span></div>
+        <div class="feature-item"><span class="feature-check">✓</span><span>Up to <span class="feature-highlight">3 simultaneous boosts</span></span></div>
+        <div class="feature-item"><span class="feature-check">✓</span><span>Renter group messaging</span></div>
+        <div class="feature-item"><span class="feature-check">✓</span><span>Response rate tracking</span></div>
+      </div>
+
+      <!-- BUSINESS -->
+      <div class="plan-card">
+        <div class="plan-type-badge badge-business">Professional</div>
+        <div class="plan-name">Host Business</div>
+        <div class="plan-subtitle">Landlord or property manager</div>
+        <div class="plan-price">
+          <span class="amount">$99</span><span class="period">/mo</span>
+        </div>
+        <div class="overage-note">
+          ⚡ +$5/listing/mo after 15
+        </div>
+
+        <div class="listing-cap">
+          <span class="listing-cap-icon">🏢</span>
+          <div class="listing-cap-text">
+            <strong>Up to 15 Listings</strong>
+            <span>+$5/mo per listing beyond 15</span>
+          </div>
+        </div>
+
+        <button class="plan-cta cta-gold">Get Started</button>
+        <div class="divider"></div>
+        <div class="features-label">Everything in Pro, plus</div>
+
+        <div class="feature-item"><span class="feature-check gold">✓</span><span>Up to <span class="feature-highlight">15 active listings</span></span></div>
+        <div class="feature-item"><span class="feature-check gold">✓</span><span><span class="feature-highlight">2 free 7-day boosts</span> per month</span></div>
+        <div class="feature-item"><span class="feature-check gold">✓</span><span>Up to <span class="feature-highlight">10 simultaneous boosts</span></span></div>
+        <div class="feature-item"><span class="feature-check gold">✓</span><span>Bulk boost across listings</span></div>
+        <div class="feature-item"><span class="feature-check gold">✓</span><span>Full analytics suite</span></div>
+        <div class="feature-item"><span class="feature-check gold">✓</span><span>Bulk messaging tools</span></div>
+        <div class="feature-item"><span class="feature-check gold">✓</span><span>Agent verification badge (add-on)</span></div>
+        <div class="feature-item"><span class="feature-check gold">✓</span><span>Priority support</span></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- BOOST SECTION -->
+  <div class="boost-section">
+    <div class="boost-header">
+      <h2>⚡ Listing Boosts</h2>
+      <p>Push any listing to the top of search. Pay only when you need it.</p>
+    </div>
+
+    <div class="boost-grid">
+      <div class="boost-card">
+        <div class="boost-duration">24 HOURS</div>
+        <div class="boost-name">Quick Boost</div>
+        <div class="boost-desc">Top placement in search for one day · No badge</div>
+        <div class="boost-price">$4<span>.99</span></div>
+        <button class="boost-select-btn">Select</button>
+      </div>
+
+      <div class="boost-card featured">
+        <div class="boost-duration">72 HOURS <span class="best-value-badge">BEST VALUE</span></div>
+        <div class="boost-name">Featured Boost</div>
+        <div class="boost-desc">Top placement + Featured badge on listing card for 3 days</div>
+        <div class="boost-price">$9<span>.99</span></div>
+        <button class="boost-select-btn">Select</button>
+      </div>
+
+      <div class="boost-card">
+        <div class="boost-duration">7 DAYS</div>
+        <div class="boost-name">Extended Featured</div>
+        <div class="boost-desc">Top placement + Featured badge sustained for a full week</div>
+        <div class="boost-price">$19<span>.99</span></div>
+        <button class="boost-select-btn">Select</button>
+      </div>
+    </div>
+
+    <!-- SIMULTANEOUS BOOSTS TABLE -->
+    <div class="boost-limits">
+      <h3>Simultaneous boosts per plan</h3>
+      <div class="boost-limits-grid">
+        <div class="bl-header">Plan</div>
+        <div class="bl-header" style="text-align:center">Simultaneous Boosts</div>
+        <div class="bl-header" style="text-align:center">Free Boosts/mo</div>
+        <div class="bl-header" style="text-align:center">Free Tier</div>
+
+        <div class="bl-cell plan-col">Host Starter</div>
+        <div class="bl-cell center"><span class="boost-count">1</span> at a time</div>
+        <div class="bl-cell center"><span class="boost-count">1</span></div>
+        <div class="bl-cell center">24-hr</div>
+
+        <div class="bl-cell plan-col" style="color:#A78BFA">Host Pro</div>
+        <div class="bl-cell center"><span class="boost-count">3</span> at a time</div>
+        <div class="bl-cell center"><span class="boost-count">2</span></div>
+        <div class="bl-cell center">72-hr</div>
+
+        <div class="bl-cell plan-col" style="color:#FBBF24">Host Business</div>
+        <div class="bl-cell center"><span class="boost-count gold">10</span> at a time</div>
+        <div class="bl-cell center"><span class="boost-count gold">2</span></div>
+        <div class="bl-cell center">7-day</div>
+      </div>
+    </div>
+
+    <!-- BULK BOOST -->
+    <div class="bulk-boost-banner">
+      <div class="bulk-boost-left">
+        <h3>📦 Bulk Boost — Business Plan Exclusive</h3>
+        <p>Select 3 or more listings and apply the same boost in one transaction at a discounted rate.</p>
+      </div>
+      <div style="display:flex; align-items:center; gap:14px; flex-shrink:0;">
+        <div class="bulk-price">
+          <span class="old-price">$29.97</span>
+          <span class="new-price">$24.99</span>
+        </div>
+        <span class="bulk-badge">3 LISTINGS · 72HR</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- AGENT VERIFICATION -->
+  <div class="agent-section">
+    <div class="section-label">Property Agents</div>
+    <div class="agent-card">
+      <div class="agent-left">
+        <div class="agent-icon">🛡️</div>
+        <div>
+          <h3>Agent Verification Badge</h3>
+          <p>Required to list properties on behalf of other owners. Upload your real estate license and get a verified agent badge displayed on all your listings — building trust with renters instantly.</p>
+        </div>
+      </div>
+      <div class="agent-right">
+        <div class="agent-price">$9.99 <span>one-time</span></div>
+        <button class="agent-cta">Get Verified</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FAQ -->
+  <div class="faq">
+    <h2>Common questions</h2>
+
+    <div class="faq-item">
+      <div class="faq-q">What happens if I go over my listing limit? <span>+</span></div>
+      <div class="faq-a">On Starter and Pro plans, you'll be prompted to upgrade before publishing a new listing. On Business, each additional listing beyond 15 adds $5/mo to your bill automatically — you'll see a confirmation before it's applied.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Can I use my free monthly boosts on any listing? <span>+</span></div>
+      <div class="faq-a">Yes — free boosts apply to any active listing. They reset on your billing date each month. Unused free boosts don't roll over.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">I just have a spare room in my apartment — do I need a host plan? <span>+</span></div>
+      <div class="faq-a">No. If you're renting and just need a roommate for your current place, your Renter Plus or Elite subscription already includes the ability to post a room. No host plan needed.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Do I need the Agent Verification badge to use the Business plan? <span>+</span></div>
+      <div class="faq-a">No — the badge is only required if you're listing properties that you don't personally own (i.e., on behalf of a client). Individual landlords on Business don't need it.</div>
+    </div>
+  </div>
+
+  <script>
+    // ── MONTHLY / ANNUAL TOGGLE ──
+    const prices = {
+      monthly:  { free: '$0',   starter: '$19.99', starterPer: '.99/mo', pro: '$49.99', proPer: '.99/mo', business: '$99',  businessPer: '/mo' },
+      annual:   { free: '$0',   starter: '$15.99', starterPer: '.99/mo', pro: '$39.99', proPer: '.99/mo', business: '$79',  businessPer: '/mo' },
+    };
+
+    let isAnnual = true;
+
+    const toggle = document.querySelector('.toggle');
+    const toggleLabels = document.querySelectorAll('.toggle-label');
+    const planAmounts = document.querySelectorAll('.plan-price .amount');
+    const planPeriods = document.querySelectorAll('.plan-price .period');
+
+    function updatePrices() {
+      const p = isAnnual ? prices.annual : prices.monthly;
+      const vals = [p.free, p.starter, p.pro, p.business];
+      const pers = ['/mo', p.starterPer, p.proPer, p.businessPer];
+      planAmounts.forEach((el, i) => { if (vals[i]) el.textContent = vals[i]; });
+      planPeriods.forEach((el, i) => { if (pers[i]) el.textContent = pers[i]; });
+      toggleLabels[0].classList.toggle('active', !isAnnual);
+      toggleLabels[1].classList.toggle('active', isAnnual);
+      toggle.style.background = '#7B5EA7';
+      toggle.querySelector ? null : null;
+    }
+
+    toggle.addEventListener('click', () => {
+      isAnnual = !isAnnual;
+      toggle.style.justifyContent = isAnnual ? 'flex-end' : 'flex-start';
+      updatePrices();
+    });
+
+    // ── NAV TABS (Renters / Hosts) ──
+    const navTabs = document.querySelectorAll('.nav-tab');
+    navTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        navTabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        if (tab.textContent.trim() === 'Renters') {
+          alert('Renter pricing coming soon — redirecting to renter plans.');
+        }
+      });
+    });
+
+    // ── PLAN CTA BUTTONS ──
+    const planLabels = ['free', 'starter', 'pro', 'business'];
+    document.querySelectorAll('.plan-cta').forEach((btn, i) => {
+      btn.addEventListener('click', () => {
+        const plan = planLabels[i] || 'starter';
+        if (plan === 'free') {
+          alert('Starting your free host account — no credit card required.');
+        } else {
+          const billing = isAnnual ? 'annual' : 'monthly';
+          const price = prices[billing][plan];
+          alert(`Starting ${plan.charAt(0).toUpperCase() + plan.slice(1)} plan at ${price}/mo (billed ${billing}). Redirecting to checkout...`);
+        }
+      });
+    });
+
+    // ── BOOST SELECT BUTTONS ──
+    const boostNames = ['Quick Boost — $4.99', 'Featured Boost — $9.99', 'Extended Featured — $19.99'];
+    document.querySelectorAll('.boost-select-btn').forEach((btn, i) => {
+      btn.addEventListener('click', () => {
+        alert(`Selected: ${boostNames[i]}. You'll be prompted to choose a listing after signup.`);
+      });
+    });
+
+    // ── AGENT VERIFICATION BUTTON ──
+    document.querySelector('.agent-cta').addEventListener('click', () => {
+      alert('Agent Verification — $9.99 one-time fee. You\'ll upload your real estate license after signup.');
+    });
+
+    // ── FAQ ACCORDION ──
+    document.querySelectorAll('.faq-q').forEach(q => {
+      q.addEventListener('click', () => {
+        const item = q.closest('.faq-item');
+        const isOpen = item.classList.contains('open');
+        document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
+        if (!isOpen) item.classList.add('open');
+        const span = q.querySelector('span');
+        span.textContent = item.classList.contains('open') ? '−' : '+';
+      });
+    });
+
+    // Init: open first FAQ item
+    document.querySelector('.faq-item').classList.add('open');
+    document.querySelector('.faq-q span').textContent = '−';
+  </script>
+
+</body>
+</html>

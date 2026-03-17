@@ -1,6 +1,6 @@
 # Overview
 
-Roomdr is a React Native mobile application designed to be the "Airbnb for roommates," connecting renters and hosts to streamline the housing and roommate search process. It offers role-based navigation, swipe-based roommate matching, property listings, group formation, and secure messaging. The platform aims to capture a significant share of the roommate search market by providing a comprehensive and intuitive solution for finding compatible roommates and suitable properties.
+Roomdr is a React Native mobile application aiming to be the "Airbnb for roommates," connecting renters and hosts to simplify the housing and roommate search. It features role-based navigation, swipe-based matching, property listings, group functionalities, and secure messaging. The platform seeks to offer a comprehensive and intuitive solution for finding compatible roommates and suitable properties.
 
 # User Preferences
 
@@ -24,74 +24,64 @@ Preferred communication style: Simple, everyday language.
 
 ## Core Functionality
 
-Roomdr implements a points-based compatibility algorithm (0-100+ score) using 16 weighted factors, including age (8 pts - primary factor), location (16 pts), budget (12 pts), sleep schedule (12 pts), cleanliness (12 pts), smoking (10 pts), move-in timeline (4 pts), work location (6 pts), guest policy (6 pts), noise tolerance (4 pts), pets (4 pts), roommate relationship (2 pts), shared expenses (2 pts), interest tag overlap (2 pts), zodiac sign (2 pts), and personality compatibility (~15 pts, 15% weighting via 5-question quiz). A sophisticated interest tag system allows users to select 3-10 tags from predefined categories, which are used in the matching algorithm and displayed on user profiles.
+Roomdr utilizes a points-based compatibility algorithm (0-100+ score) factoring in 16 weighted criteria, including age, location, budget, sleep schedule, cleanliness, smoking, move-in timeline, work location, guest policy, noise tolerance, pets, roommate relationship, shared expenses, interest tag overlap, zodiac sign, and personality compatibility (derived from a 5-question quiz). A sophisticated interest tag system allows users to select 3-10 tags for matching and profile display.
 
 ## Frontend Architecture
 
-The application is built with React Native and Expo using TypeScript, featuring React Navigation for role-based access (Renter, Host, Agent/Landlord) and a theme system supporting light/dark modes.
+Built with React Native and Expo using TypeScript, the application employs React Navigation for role-based access (Renter, Host, Agent/Landlord) and supports light/dark modes.
 
 **Key Features:**
-- **Renter:** Swipe-based matching, 1-on-1 messaging, group management (Roommate Groups + Listing Inquiry Groups), property exploration with advanced filters and map/list views, saved properties, profile view tracking, AI Match Assistant, animated match celebration, report/block system, notification feed, profile completion indicator, mutual interest flow, cold messaging (Elite), and "Inquire Together" group listing inquiries.
-- **Host:** Full host dashboard with statistics and plan badge, listing management (create, edit, delete, pause, mark rented, boost), dedicated Inquiries screen, inquiry-based analytics, listing inquiry group chat participation, host subscription management (HostSubscriptionScreen), per-listing boosts (ListingBoostScreen), listing cap enforcement with overage for Business plan, and role switching.
+- **Renter:** Swipe-based matching, 1-on-1 messaging, group management (Roommate Groups, Listing Inquiry Groups), property exploration with advanced filters and map/list views, saved properties, AI Match Assistant, animated match celebration, report/block system, and a notification feed. Elite users have access to cold messaging.
+- **Host:** A full host dashboard with statistics, listing management (create, edit, delete, pause, mark rented, boost), an Inquiries screen, inquiry analytics, and host subscription management.
 
 **User Experience Enhancements:**
-- **Match Celebration:** Animated full-screen modal for mutual likes.
-- **Profile Questionnaire:** A 14-step questionnaire with progress tracking and per-step validation. During initial signup onboarding, only the first 5 steps are shown (Photos, Basic Info, Gender, Location & Work, Bio); remaining steps are completed later via Edit Profile. Occupation uses `OccupationBarSelector` (tap-to-open bottom sheet with categorized occupation tags). Interests use `InterestCategoryBars` (category bars with per-category modals, required/optional badges, Done button). Required categories: Lifestyle, Habits, Hobbies. Optional: Social, Diet. Validation via `validateInterestTags` in `profileReminderUtils.ts`.
-- **Roomdr AI Assistant:** A floating, context-aware AI button providing dynamic greetings, content cards, and insights based on the current screen and live data. Includes a `profile_reminder` mode that shows profile completion gaps with personalized messages and "Fix" buttons navigating to the correct questionnaire step. Insight cards are tappable with deep navigation links (profile completion → questionnaire step, match rate → swipe stats, pool impact → edit profile, response rate → unanswered messages). Uses trigger-based refresh (`utils/insightRefresh.ts`) — insights only recalculate on real events (profile_change, swipe_session_end, filter_change, message_activity, daily), with AsyncStorage caching for instant loading. Feedback system (`utils/aiInsightFeedback.ts`) tracks thumbs up/down with persistent hiding after 3 dismissals. Cards show urgency border colors (red/green/grey) and animated slide-out on dismiss with toast notifications.
-- **AI Profile Completion Reminders:** Centralized escalating reminder system via `ProfileReminderContext`. Three stages: (1) first reminder after 5 minutes of app usage, (2) second reminder 30 minutes after dismissing the first, (3) third/final reminder next day in-app + email via Supabase edge function `send-profile-reminder-email`. After the third dismissal, no more automatic reminders. Reminders auto-cancel if profile reaches 100% completion. Manual trigger via ProfileCompletionCard on Profile screen still available. State persisted in AsyncStorage with keys: `profileReminder_${userId}_stage`, `profileReminder_${userId}_firstDismissedAt`, `profileReminder_${userId}_nextDayDate`.
-- **Roommate Interaction System:** Three types: Swipe Right (free), Super Interest (notifies recipient), and Cold Messaging (Elite only).
-- **Profile Boost System:** Tier-based boosts (12-48 hours) increase profile visibility.
-- **Listing Boost System:** Three tiers clearly separated — Quick Boost ($4.99/24h, placement only, no badge), Featured Boost ($9.99/72h, placement + Featured badge), Extended Featured ($19.99/7d, placement + Featured badge). `BOOST_OPTIONS` in `utils/hostPricing.ts` has `includesFeaturedBadge` and `badgeLabel` fields. `createBoostRecord()` generates `ListingBoost` records. Renter-facing ExploreScreen shows purple Featured badge on boost-featured listings. MyListingsScreen shows context-aware pills ("Boosted" vs "Featured"). Sort order: Featured boosted > Plain boosted > Normal listings.
-- **AI Memory Layer:** Persistent swipe analytics via `utils/aiMemory.ts` — tracks total/right/left swipes, average match scores, cold conversations, response rates, and refinement question history. `recordSwipe()` called after every swipe in RoommatesScreen, `recordMessageActivity()` after every sent message in ChatScreen. Micro-question triggers fire every 25 right swipes (with 3-hour cooldown) using questions from `utils/aiMicroQuestions.ts`.
-- **Identity Verification:** Options for phone (real Supabase OTP in production, dev shortcut in dev mode), government ID, social media, and optional background/income checks for Elite users. Dev shortcuts available via `isDev` flag.
-- **References System:** ProfileScreen shows references section with author name, relationship type, star rating, review text, and verified badge. Users can request references via email. Reference count badge shown on swipe cards.
-- **Background Check:** One-time $9.99 purchase on ProfileScreen. Status tracked (none/pending/clear/flagged). Green shield badge on swipe cards for cleared users. Dev shortcut to mark as cleared.
-- **Personality Quiz:** 5-question personality questionnaire step (conflict resolution, energy level, space preference, schedule style, social preference). Results feed into `calculatePersonalityScore()` in matching algorithm with 15% weighting.
-- **Onboarding Tutorial:** Swipeable tutorial for new users.
-- **App Diagnostics:** Hidden screen for health checks.
-- **Read Receipts:** For Elite users.
-- **Who Liked You:** For Plus/Elite users.
+- **AI Profile Completion Reminders:** A centralized, escalating reminder system guides users through profile completion, with progress tracking and direct navigation to relevant questionnaire steps.
+- **Roomdr AI Assistant:** A floating, context-aware AI button provides dynamic greetings, content cards, and insights based on the current screen and data, including profile completion gaps and personalized suggestions.
+- **Profile Questionnaire:** A 14-step questionnaire with progress tracking and per-step validation, designed for comprehensive user profiling.
+- **Listing Boost System:** Tier-based boosting options for hosts to increase listing visibility.
+- **AI Memory Layer:** Tracks user swipe analytics, message activity, and triggers micro-questions to refine AI suggestions.
+- **Identity Verification:** Supports phone, government ID, social media verification, and optional background/income checks for Elite users.
+- **References System:** Users can request and display references on their profiles.
+- **Personality Quiz:** A 5-question quiz contributing to the matching algorithm.
 
-Animations are handled by React Native Reanimated, gestures by React Native Gesture Handler, and state management utilizes React Context API and AsyncStorage.
+Animations are managed by React Native Reanimated, gestures by React Native Gesture Handler, and state management uses React Context API and AsyncStorage.
 
 ## Backend (Supabase)
 
-Supabase serves as the comprehensive backend, providing:
+Supabase provides the entire backend infrastructure:
 - **Auth**: Email/password authentication.
-- **Database**: PostgreSQL with Row Level Security (RLS) enabled across all tables for users, profiles, listings, matches, messages, subscriptions, and more.
+- **Database**: PostgreSQL with Row Level Security (RLS) across all tables.
 - **Realtime**: Subscriptions for messages and notifications.
-- **Storage**: Buckets for profile and listing photos.
-- **Supabase Edge Functions**: For Stripe webhook handling.
-
-All screens prioritize Supabase data access, with AsyncStorage as a fallback cache. Coordinate data is standardized and normalized.
+- **Storage**: For profile and listing photos.
+- **Supabase Edge Functions**: For webhook handling.
 
 ## Authentication & Authorization
 
-Supabase Auth manages user authentication, with an `AuthContext` handling session management and role-based access for `renter` and `host` roles. A mandatory 2-step onboarding flow (Profile Creation, Plan Selection) gates access for new users post-signup.
+Supabase Auth handles user authentication, with an `AuthContext` managing sessions and role-based access for `renter` and `host`. A mandatory 2-step onboarding flow (Profile Creation, Plan Selection) is required post-signup.
 
 ## Subscription & Paywall System
 
-The application features tiered subscription plans for both renters (Basic, Plus, Elite) and hosts (Starter $0/Pro $29.99/Business $79.99), including one-time purchases. A `PaywallSheet` component prompts users for upgrades when limits are reached. Billing cycles include monthly, 3-month (10% off), and annual (17% off). Dedicated screens for Renter Subscription, Host Subscription (`HostSubscriptionScreen` with plan selector pills, billing cycle toggle, 3 plan cards with MOST POPULAR badge on Pro, agent verification add-on), Listing Boost (`ListingBoostScreen` with Quick Boost $4.99/24h placement-only, Featured Boost $9.99/72h placement+badge, Extended Featured $19.99/7d placement+badge + explainer box + free boost banner), and Manage Subscription provide detailed plan information, upgrade/downgrade options, and billing history. Host plan limits: Starter=1 listing, Pro=5, Business=15 (+$5/listing overage). Starter plan is the default for new hosts — no payment required. Starter plan hosts cannot access: boosted listing visibility, verified host badge, or full analytics dashboard. `utils/hostPricing.ts` centralizes plan constants and helpers with `isFreePlan()` utility. `HostPlanBadge` component shows plan tier in dashboard header (gray for Starter). Listing cap checks enforced in MyListingsScreen, CreateEditListingScreen, and HostDashboardScreen quick actions. Starter plan hosts see a dismissible upgrade banner (24hr cooldown) on the dashboard. ListingBoostScreen shows a locked state for starter plan hosts. RoomdrAISheet shows locked AI state for starter plan host contexts.
+The application features tiered subscription plans for renters (Basic, Plus, Elite) and hosts (Free, Starter, Pro, Business), alongside one-time purchases. A `PaywallSheet` prompts users for upgrades. Dedicated screens provide plan details, upgrade/downgrade options, and billing history. Host plans enforce listing caps and offer various features like boosts and analytics.
 
 ## Data Layer
 
-The data layer uses Supabase PostgreSQL, supported by local AsyncStorage for caching. TypeScript interfaces define core models like `User`, `RoommateProfile`, `Property`, `Group`, `GroupMember`, `Conversation`, `Message`, `Match`, and `InterestCard`. Service files abstract database operations.
+The data layer uses Supabase PostgreSQL, complemented by local AsyncStorage for caching. TypeScript interfaces define core models such as `User`, `RoommateProfile`, `Property`, `Group`, `Conversation`, `Message`, `Match`, and `InterestCard`.
 
-**Group System:** Two group types — `roommate` (renter-only swipe/join groups) and `listing_inquiry` (renter group + host in one chat, created via "Inquire Together" on listing cards). `GroupMember` tracks `role` (admin/member), `isHost`, and `status` (active/pending/left/removed). Inquiry groups can be archived (read-only). `groupService.ts` provides all group CRUD, membership, archive, accept/decline operations.
+**Group System:** Supports `roommate` groups (renter-only) and `listing_inquiry` groups (renter group + host in a chat). `GroupMember` tracks role, host status, and member status.
 
-**Address Reveal System:** Full property addresses are hidden until the host accepts an inquiry. Before acceptance, renters see neighborhood + city only with a lock icon. After acceptance: full address revealed with coral flash animation, "Get Directions" link opens Maps, and system message confirms the reveal. Host sees Accept/Decline action bar at top of inquiry chat. Declined inquiries show status and offer archive. `formatLocation()` in `matchingAlgorithm.ts` accepts `revealed` param. ExploreScreen listing cards always pass `revealed: false`. DB fields: `groups.inquiry_status` (pending/accepted/declined), `groups.address_revealed` (boolean). Migration: `008_inquiry_status.sql`.
+**Address Reveal System:** Full property addresses are hidden until the host accepts an inquiry, after which the address is revealed with navigational links.
 
 ## UI/UX and Branding
 
-A consistent dark theme with specific color palettes is used throughout the application. The `RoomdrLogo` component renders the brand logo using `react-native-svg` and `expo-linear-gradient`, featuring coral-red gradients and white.
+A consistent dark theme with a specific color palette is used, featuring a `RoomdrLogo` rendered with `react-native-svg` and `expo-linear-gradient`.
 
 ## Location System
 
-The application supports over 10 US cities with a centralized location data system and a `LocationPicker` component. A `CityContext` synchronizes city selections across tabs, persisting data via AsyncStorage. Comprehensive match filters (Budget, Move-in Date, Room Type, Lifestyle, Search Radius, Minimum Compatibility) are persistently stored and displayed as dismissible chips.
+The application supports over 10 US cities with a centralized location data system and a `LocationPicker` component. A `CityContext` synchronizes city selections, persisting data via AsyncStorage. Match filters (Budget, Move-in Date, Room Type, Search Radius, Minimum Compatibility) are persistently stored and displayed.
 
 ## Technical Decisions
 
-Key technical decisions include Babel module resolver for simplified imports, platform-specific UI adaptations, performance optimizations via React Native's New Architecture, React Compiler, and Reanimated, and robust error handling through an error boundary component.
+Technical decisions include Babel module resolver for simplified imports, platform-specific UI adaptations, performance optimizations via React Native's New Architecture, React Compiler, and Reanimated, and robust error handling through an error boundary component.
 
 # External Dependencies
 

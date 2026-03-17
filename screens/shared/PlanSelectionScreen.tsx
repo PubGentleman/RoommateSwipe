@@ -78,50 +78,66 @@ const RENTER_PLANS: PlanOption[] = [
 
 const HOST_PLANS: PlanOption[] = [
   {
-    id: 'starter',
-    name: 'Starter',
+    id: 'free',
+    name: 'Host Free',
     monthlyPrice: 0,
     threeMonthPrice: 0,
     annualPrice: 0,
     isFree: true,
     features: [
       { text: '1 active listing', included: true },
-      { text: 'Up to 5 inquiry responses/mo', included: true },
-      { text: 'Basic analytics', included: true },
-      { text: 'Boosted visibility', included: false },
+      { text: 'Basic inquiry management', included: true },
+      { text: 'Standard placement in search', included: true },
+      { text: 'Renter group browsing', included: false },
+      { text: 'AI assistant', included: false },
+      { text: 'Listing boosts', included: false },
       { text: 'Verified host badge', included: false },
     ],
   },
   {
-    id: 'pro',
-    name: 'Pro',
-    monthlyPrice: 29.99,
-    threeMonthPrice: 80.97,
-    annualPrice: 298.70,
-    badge: 'MOST POPULAR',
-    badgeColor: ACCENT,
+    id: 'starter',
+    name: 'Host Starter',
+    monthlyPrice: 19.99,
+    threeMonthPrice: 53.97,
+    annualPrice: 191.88,
     features: [
-      { text: 'Up to 5 active listings', included: true },
-      { text: 'Unlimited inquiry responses', included: true },
-      { text: 'Boosted listing visibility', included: true },
-      { text: 'Full analytics dashboard', included: true },
+      { text: '1 active listing', included: true },
+      { text: 'Renter group browsing', included: true },
+      { text: 'AI assistant (host modes)', included: true },
+      { text: '1 free 24-hr boost/mo', included: true },
       { text: 'Verified host badge', included: true },
     ],
   },
   {
+    id: 'pro',
+    name: 'Host Pro',
+    monthlyPrice: 49.99,
+    threeMonthPrice: 134.97,
+    annualPrice: 479.88,
+    badge: 'MOST POPULAR',
+    badgeColor: ACCENT,
+    features: [
+      { text: 'Up to 5 active listings', included: true },
+      { text: 'Priority placement in search', included: true },
+      { text: '2 free 72-hr boosts/mo', included: true },
+      { text: 'Advanced analytics dashboard', included: true },
+      { text: '3 simultaneous boosts', included: true },
+    ],
+  },
+  {
     id: 'business',
-    name: 'Business',
-    monthlyPrice: 79.99,
-    threeMonthPrice: 215.97,
-    annualPrice: 796.70,
+    name: 'Host Business',
+    monthlyPrice: 99,
+    threeMonthPrice: 267.30,
+    annualPrice: 948.00,
     badge: 'BEST VALUE',
     badgeColor: GOLD,
     features: [
-      { text: 'Everything in Pro', included: true },
-      { text: 'Unlimited active listings', included: true },
-      { text: 'Priority search placement', included: true },
-      { text: 'Featured slot on Explore', included: true },
-      { text: 'Dedicated host support', included: true },
+      { text: 'Up to 15 listings (+$5 overage)', included: true },
+      { text: '2 free 7-day boosts/mo', included: true },
+      { text: '10 simultaneous boosts', included: true },
+      { text: 'Full analytics suite', included: true },
+      { text: 'Priority support', included: true },
     ],
   },
 ];
@@ -170,7 +186,8 @@ export const PlanSelectionScreen = () => {
 
     try {
       if (isHost) {
-        if (planId === 'pro') await upgradeHostPlan('pro', billingCycle);
+        if (planId === 'starter') await upgradeHostPlan('starter', billingCycle);
+        else if (planId === 'pro') await upgradeHostPlan('pro', billingCycle);
         else if (planId === 'business') await upgradeHostPlan('business', billingCycle);
       } else {
         if (planId === 'plus') await upgradeToPlus(billingCycle);
@@ -199,10 +216,12 @@ export const PlanSelectionScreen = () => {
       </View>
 
       <View style={s.cycleRow}>
-        {(['monthly', '3month', 'annual'] as BillingCycle[]).map(cycle => {
+        {(isHost ? ['monthly', 'annual'] as BillingCycle[] : ['monthly', '3month', 'annual'] as BillingCycle[]).map(cycle => {
           const active = billingCycle === cycle;
           const label = cycle === 'monthly' ? 'Monthly' : cycle === '3month' ? '3 Months' : 'Annual';
-          const save = cycle === '3month' ? 'Save 10%' : cycle === 'annual' ? 'Save 17%' : null;
+          const save = isHost
+            ? (cycle === 'annual' ? 'Save 20%' : null)
+            : (cycle === '3month' ? 'Save 10%' : cycle === 'annual' ? 'Save 17%' : null);
           return (
             <Pressable
               key={cycle}

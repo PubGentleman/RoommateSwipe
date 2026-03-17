@@ -12,7 +12,7 @@ const CARD_BG = '#1a1a1a';
 const ACCENT = '#ff6b5b';
 const GOLD = '#ffd700';
 
-type HostPlan = 'starter' | 'pro' | 'business';
+type HostPlan = 'free' | 'none' | 'starter' | 'pro' | 'business';
 type BillingCycle = 'monthly' | '3month' | 'annual';
 
 interface PlanFeature {
@@ -42,53 +42,74 @@ const HOST_STRIPE_PRICES: Record<string, string> = {
 
 const HOST_PLANS: PlanTier[] = [
   {
-    id: 'starter',
-    name: 'Starter',
+    id: 'free',
+    name: 'Host Free',
     monthlyPrice: 0,
     threeMonthPrice: 0,
     annualPrice: 0,
     monthlyNote: 'No credit card required',
     features: [
       { label: '1 active listing', included: true },
-      { label: 'Up to 5 inquiry responses/mo', included: true },
-      { label: 'Basic analytics (views only)', included: true },
-      { label: 'Boosted listing visibility', included: false },
+      { label: 'Basic inquiry management', included: true },
+      { label: 'Standard placement in search', included: true },
+      { label: 'Renter group browsing', included: false },
+      { label: 'AI assistant', included: false },
+      { label: 'Listing boosts', included: false },
+      { label: 'Compatibility scores', included: false },
       { label: 'Verified host badge', included: false },
-      { label: 'Full analytics dashboard', included: false },
+    ],
+  },
+  {
+    id: 'starter',
+    name: 'Host Starter',
+    monthlyPrice: 19.99,
+    threeMonthPrice: 53.97,
+    annualPrice: 191.88,
+    monthlyNote: 'Renter groups, AI assistant & verified badge',
+    features: [
+      { label: '1 active listing', included: true },
+      { label: 'Renter group browsing', included: true },
+      { label: 'AI assistant (host modes)', included: true },
+      { label: '1 free 24-hr boost per month', included: true },
+      { label: 'Verified host badge', included: true },
+      { label: 'Inquiry management', included: true },
+      { label: '1 simultaneous boost', included: true },
     ],
   },
   {
     id: 'pro',
-    name: 'Pro',
-    monthlyPrice: 29.99,
-    threeMonthPrice: 80.97,
-    annualPrice: 298.70,
+    name: 'Host Pro',
+    monthlyPrice: 49.99,
+    threeMonthPrice: 134.97,
+    annualPrice: 479.88,
     recommended: true,
-    monthlyNote: 'Unlimited inquiries, full analytics & verified badge',
+    monthlyNote: 'Up to 5 listings, priority placement & advanced analytics',
     features: [
       { label: 'Up to 5 active listings', included: true },
-      { label: 'Unlimited inquiry responses', included: true },
-      { label: 'Boosted listing visibility', included: true },
-      { label: 'Full analytics dashboard', included: true },
-      { label: 'Verified host badge', included: true },
-      { label: 'Priority search placement', included: false },
-      { label: 'Featured slot on Explore page', included: false },
+      { label: 'Priority placement in search', included: true },
+      { label: '2 free 72-hr boosts per month', included: true },
+      { label: 'Up to 3 simultaneous boosts', included: true },
+      { label: 'Advanced analytics dashboard', included: true },
+      { label: 'Renter group messaging', included: true },
+      { label: 'Response rate tracking', included: true },
     ],
   },
   {
     id: 'business',
-    name: 'Business',
-    monthlyPrice: 79.99,
-    threeMonthPrice: 215.97,
-    annualPrice: 796.70,
-    monthlyNote: 'Unlimited listings, priority placement & dedicated support',
+    name: 'Host Business',
+    monthlyPrice: 99,
+    threeMonthPrice: 267.30,
+    annualPrice: 948.00,
+    monthlyNote: 'Up to 15 listings, bulk tools & priority support',
     features: [
-      { label: 'Everything in Pro', included: true },
-      { label: 'Unlimited active listings', included: true },
-      { label: 'Priority placement in search results', included: true },
-      { label: 'Featured listing slot on Explore page', included: true },
-      { label: 'Advanced analytics & conversion rate', included: true },
-      { label: 'Dedicated host support', included: true },
+      { label: 'Up to 15 active listings', included: true },
+      { label: '2 free 7-day boosts per month', included: true },
+      { label: 'Up to 10 simultaneous boosts', included: true },
+      { label: 'Bulk boost across listings', included: true },
+      { label: 'Full analytics suite', included: true },
+      { label: 'Bulk messaging tools', included: true },
+      { label: 'Agent verification badge (add-on)', included: true },
+      { label: 'Priority support', included: true },
     ],
   },
 ];
@@ -126,7 +147,7 @@ const ONE_TIME_PURCHASES = [
   },
 ];
 
-const planOrder: Record<HostPlan, number> = { starter: 0, pro: 1, business: 2 };
+const planOrder: Record<HostPlan, number> = { free: 0, none: 0, starter: 1, pro: 2, business: 3 };
 
 export const HostPricingScreen = () => {
   const navigation = useNavigation<any>();
@@ -138,7 +159,6 @@ export const HostPricingScreen = () => {
 
   const getMonthlyRate = (plan: PlanTier) => {
     if (plan.monthlyPrice === 0) return 0;
-    if (billingCycle === '3month') return plan.threeMonthPrice / 3;
     if (billingCycle === 'annual') return plan.annualPrice / 12;
     return plan.monthlyPrice;
   };
@@ -159,7 +179,6 @@ export const HostPricingScreen = () => {
   };
 
   const getBillingCtaSuffix = () => {
-    if (billingCycle === '3month') return 'Billed Every 3 Months';
     if (billingCycle === 'annual') return 'Billed Annually';
     return 'Billed Monthly';
   };
@@ -170,15 +189,15 @@ export const HostPricingScreen = () => {
       Alert.alert('Current Plan', `You are already on the ${plan.name} plan.`);
       return;
     }
-    if (plan.id === 'starter' && currentPlan !== 'starter') {
+    if (plan.id === 'free' && currentPlan !== 'free') {
       Alert.alert(
-        'Downgrade to Starter',
+        'Downgrade to Free',
         'Your current plan benefits will continue until the end of your billing period.',
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Downgrade', style: 'destructive', onPress: async () => {
-            await downgradeHostPlan('starter');
-            Alert.alert('Scheduled', 'You will be moved to Starter at the end of your billing period.');
+            await downgradeHostPlan('free');
+            Alert.alert('Scheduled', 'You will be moved to the Free plan at the end of your billing period.');
           }},
         ]
       );
@@ -186,8 +205,7 @@ export const HostPricingScreen = () => {
     }
     const isUpgrade = planOrder[plan.id] > planOrder[currentPlan];
     let price: string;
-    if (billingCycle === '3month') price = `$${plan.threeMonthPrice.toFixed(2)} every 3 months`;
-    else if (billingCycle === 'annual') price = `$${plan.annualPrice.toFixed(2)}/year`;
+    if (billingCycle === 'annual') price = `$${plan.annualPrice.toFixed(2)}/year`;
     else price = `$${plan.monthlyPrice.toFixed(2)}/month`;
     const title = isUpgrade ? `Upgrade to ${plan.name}` : `Switch to ${plan.name}`;
     const actionText = isUpgrade ? 'Subscribe' : 'Switch';
@@ -195,9 +213,9 @@ export const HostPricingScreen = () => {
       { text: 'Cancel', style: 'cancel' },
       { text: actionText, onPress: async () => {
         if (isUpgrade) {
-          await upgradeHostPlan(plan.id as 'pro' | 'business', billingCycle);
+          await upgradeHostPlan(plan.id as 'starter' | 'pro' | 'business', billingCycle);
         } else {
-          await downgradeHostPlan(plan.id as 'starter' | 'pro');
+          await downgradeHostPlan(plan.id as 'free' | 'starter' | 'pro');
         }
         Alert.alert('Success', `You are now on the ${plan.name} plan!`);
       }},
@@ -272,7 +290,7 @@ export const HostPricingScreen = () => {
           {HOST_PLANS.map(plan => {
             const active = selectedTier === plan.id;
             const showSaveBadge = plan.monthlyPrice > 0 && billingCycle !== 'monthly';
-            const saveBadgeLabel = billingCycle === '3month' ? 'SAVE 10%' : 'ANNUAL';
+            const saveBadgeLabel = 'SAVE 20%';
             return (
               <Pressable
                 key={plan.id}
@@ -292,8 +310,7 @@ export const HostPricingScreen = () => {
         <View style={s.billingToggle}>
           {([
             { cycle: 'monthly' as BillingCycle, label: 'Monthly', badge: undefined },
-            { cycle: '3month' as BillingCycle, label: '3 Months', badge: 'SAVE 10%' },
-            { cycle: 'annual' as BillingCycle, label: 'Annual', badge: 'SAVE 17%' },
+            { cycle: 'annual' as BillingCycle, label: 'Annual', badge: 'SAVE 20%' },
           ]).map(opt => {
             const active = billingCycle === opt.cycle;
             return (
@@ -317,12 +334,8 @@ export const HostPricingScreen = () => {
         {HOST_PLANS.map(plan => {
           const isRec = plan.recommended;
           let priceNote = plan.monthlyNote;
-          if (plan.monthlyPrice > 0) {
-            if (billingCycle === '3month') {
-              priceNote = `Billed $${plan.threeMonthPrice.toFixed(2)} every 3 months · Save 10%`;
-            } else if (billingCycle === 'annual') {
-              priceNote = `Billed $${plan.annualPrice.toFixed(2)}/yr · Save 17%`;
-            }
+          if (plan.monthlyPrice > 0 && billingCycle === 'annual') {
+            priceNote = `Billed $${plan.annualPrice.toFixed(2)}/yr · Save 20%`;
           }
           const ctaStyle = getCTAStyle(plan);
 

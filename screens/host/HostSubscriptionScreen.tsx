@@ -16,44 +16,73 @@ const CARD_BG = '#1a1a1a';
 const ACCENT = '#ff6b5b';
 const GOLD = '#ffd700';
 const PURPLE = '#a855f7';
+const ROOMDR_PURPLE = '#7B5EA7';
 
-type BillingCycle = 'monthly' | '3month' | 'annual';
-type DisplayPlan = 'starter' | 'pro' | 'business';
+type BillingCycle = 'monthly' | 'annual';
 
-const BILLING_CYCLES: { key: BillingCycle; label: string; savings?: string }[] = [
-  { key: 'monthly', label: 'Monthly' },
-  { key: '3month', label: '3 Months', savings: 'SAVE 10%' },
-  { key: 'annual', label: 'Annual', savings: 'SAVE 17%' },
+interface PlanDisplayInfo {
+  id: HostPlanType;
+  subtitle: string;
+  badge: string;
+  badgeColor: string;
+  ctaLabel: string;
+  isPopular: boolean;
+  ctaStyle: 'outline' | 'primary' | 'gold';
+  icon: 'user' | 'home' | 'trending-up' | 'briefcase';
+  featuresLabel: string;
+}
+
+const PLAN_DISPLAY: PlanDisplayInfo[] = [
+  {
+    id: 'free',
+    subtitle: 'Just getting started',
+    badge: 'Free',
+    badgeColor: '#888888',
+    ctaLabel: 'Get Started Free',
+    isPopular: false,
+    ctaStyle: 'outline',
+    icon: 'user',
+    featuresLabel: "What's included",
+  },
+  {
+    id: 'starter',
+    subtitle: 'Homeowner with 1 room to fill',
+    badge: 'Individual',
+    badgeColor: '#60A5FA',
+    ctaLabel: 'Get Started',
+    isPopular: false,
+    ctaStyle: 'outline',
+    icon: 'home',
+    featuresLabel: "What's included",
+  },
+  {
+    id: 'pro',
+    subtitle: 'Own 2-5 units or rooms',
+    badge: 'Small Landlord',
+    badgeColor: '#A78BFA',
+    ctaLabel: 'Get Started',
+    isPopular: true,
+    ctaStyle: 'primary',
+    icon: 'trending-up',
+    featuresLabel: 'Everything in Starter, plus',
+  },
+  {
+    id: 'business',
+    subtitle: 'Landlord or property manager',
+    badge: 'Professional',
+    badgeColor: '#FBBF24',
+    ctaLabel: 'Get Started',
+    isPopular: false,
+    ctaStyle: 'gold',
+    icon: 'briefcase',
+    featuresLabel: 'Everything in Pro, plus',
+  },
 ];
-
-const PLAN_PILLS: { plan: DisplayPlan; label: string; priceLabel: string }[] = [
-  { plan: 'starter', label: 'STARTER', priceLabel: '$0' },
-  { plan: 'pro', label: 'PRO', priceLabel: '$29.99' },
-  { plan: 'business', label: 'BUSINESS', priceLabel: '$79.99' },
-];
-
-const PLAN_SUBTITLES: Record<DisplayPlan, string> = {
-  starter: 'No credit card required',
-  pro: 'Unlimited inquiries, full analytics & verified badge',
-  business: 'Everything in Pro, plus priority placement & bulk tools',
-};
 
 function billingPrice(base: number, cycle: BillingCycle): number {
   if (base === 0) return 0;
-  if (cycle === '3month') return +(base * 0.9).toFixed(2);
-  if (cycle === 'annual') return +(base * 0.83).toFixed(2);
+  if (cycle === 'annual') return +(base * 0.8).toFixed(2);
   return base;
-}
-
-function billingPeriod(price: number, cycle: BillingCycle): string {
-  if (price === 0) return 'forever';
-  return '/mo';
-}
-
-function resolveCurrentDisplayPlan(plan: HostPlanType): DisplayPlan {
-  if (isFreePlan(plan) || plan === 'starter') return 'starter';
-  if (plan === 'pro') return 'pro';
-  return 'business';
 }
 
 export const HostSubscriptionScreen = () => {
@@ -62,43 +91,39 @@ export const HostSubscriptionScreen = () => {
   const { user, updateUser } = useAuth();
   const [hostSub, setHostSub] = useState<HostSubscriptionData | null>(null);
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
-  const [selectedPill, setSelectedPill] = useState<DisplayPlan>('pro');
 
   useEffect(() => {
     if (!user) return;
     StorageService.getHostSubscription(user.id).then(sub => {
       setHostSub(sub);
-      const current = resolveCurrentDisplayPlan(sub.plan);
-      setSelectedPill(current === 'starter' ? 'pro' : current);
     });
   }, [user]);
 
-  const handleSelectPlan = async (plan: DisplayPlan) => {
+  const handleSelectPlan = async (plan: HostPlanType) => {
     if (!user || !hostSub) return;
-    const targetPlan: HostPlanType = plan === 'starter' ? 'free' : plan;
-    const currentDisplay = resolveCurrentDisplayPlan(hostSub.plan);
-    if (plan === currentDisplay) return;
+    if (plan === hostSub.plan) return;
+    if (isFreePlan(plan) && isFreePlan(hostSub.plan)) return;
 
-    const planData = HOST_PLANS[targetPlan];
+    const planData = HOST_PLANS[plan];
     const price = billingPrice(planData.price, billingCycle);
 
     const applyPlan = async () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      const newSub = subscriptionFromPlan(targetPlan, hostSub);
+      const newSub = subscriptionFromPlan(plan, hostSub);
       await StorageService.updateHostSubscription(user.id, newSub);
       setHostSub(newSub);
       await updateUser({
         hostSubscription: {
           ...user.hostSubscription,
-          plan: isFreePlan(targetPlan) ? 'free' as const : targetPlan as 'starter' | 'pro' | 'business',
+          plan: isFreePlan(plan) ? 'free' as const : plan as 'starter' | 'pro' | 'business',
           status: 'active' as const,
-          billingCycle: billingCycle === '3month' ? 'quarterly' as any : billingCycle === 'annual' ? 'annual' as any : 'monthly' as const,
+          billingCycle: billingCycle === 'annual' ? 'annual' as any : 'monthly' as const,
         },
       });
       Alert.alert(
-        plan === 'starter' ? 'Switched to Starter' : 'Plan Updated',
-        plan === 'starter'
-          ? 'Your host plan has been switched to Starter (Free).'
+        isFreePlan(plan) ? 'Downgraded to Free' : 'Plan Updated',
+        isFreePlan(plan)
+          ? 'Your host plan has been downgraded to Free.'
           : `You're now on the ${planData.label} plan at $${price}/mo!`,
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
@@ -107,9 +132,9 @@ export const HostSubscriptionScreen = () => {
     if (isDev) {
       Alert.alert(
         'Dev Mode',
-        plan === 'starter'
-          ? 'Switch to Starter (Free) plan.'
-          : `Payment would process via Stripe: $${price}/mo for ${planData.label}.`,
+        isFreePlan(plan)
+          ? 'Downgrade to Free plan (no charge).'
+          : `Payment would process via Stripe: $${price}/mo for ${planData.label} (billed ${billingCycle}).`,
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Confirm (Mock)', onPress: applyPlan },
@@ -120,61 +145,151 @@ export const HostSubscriptionScreen = () => {
     }
   };
 
+  const handleAgentVerification = async () => {
+    if (!user || !hostSub) return;
+    if (isDev) {
+      Alert.alert(
+        'Agent Verification',
+        `One-time fee of $${AGENT_VERIFICATION_FEE}. Required to list properties on behalf of other owners.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Verify (Mock)',
+            onPress: async () => {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              const newSub = { ...hostSub, agentVerificationPaid: true, isVerifiedAgent: true };
+              await StorageService.updateHostSubscription(user.id, newSub);
+              setHostSub(newSub);
+              Alert.alert('Verified', 'You are now a verified agent.');
+            },
+          },
+        ]
+      );
+    }
+  };
+
   if (!hostSub) return null;
 
-  const currentDisplay = resolveCurrentDisplayPlan(hostSub.plan);
+  const currentPlanIsFree = isFreePlan(hostSub.plan);
 
-  const renderPlanCard = (plan: DisplayPlan) => {
-    const planKey: HostPlanType = plan === 'starter' ? 'free' : plan;
-    const planData = HOST_PLANS[planKey];
-    const price = billingPrice(planData.price, billingCycle);
-    const isCurrentPlan = plan === currentDisplay;
-    const isPopular = plan === 'pro';
-    const borderColor = isCurrentPlan ? ACCENT : isPopular ? ACCENT : 'rgba(255,255,255,0.06)';
+  const renderPlanCard = (display: PlanDisplayInfo) => {
+    const planKey = display.id;
+    const plan = HOST_PLANS[planKey];
+    const isCurrentPlan = hostSub.plan === planKey || (isFreePlan(hostSub.plan) && isFreePlan(planKey));
+    const price = billingPrice(plan.price, billingCycle);
 
     const ctaText = isCurrentPlan
       ? 'Current Plan'
-      : plan === 'starter'
-        ? 'Switch to Starter'
-        : `Switch to ${planData.label}`;
+      : (isFreePlan(planKey) && !currentPlanIsFree)
+        ? 'Downgrade'
+        : display.ctaLabel;
 
     return (
       <View
-        key={plan}
+        key={planKey}
         style={[
           styles.planCard,
-          { borderColor, borderWidth: isCurrentPlan || isPopular ? 1.5 : 1 },
+          isCurrentPlan ? { borderColor: ROOMDR_PURPLE, borderWidth: 2 } : null,
+          display.isPopular ? { borderColor: ROOMDR_PURPLE, borderWidth: 1.5 } : null,
         ]}
       >
-        <View style={styles.cardTop}>
-          <Text style={[styles.planName, plan === 'pro' ? { color: ACCENT } : null]}>
-            {planData.label}
-          </Text>
-          {isPopular ? (
-            <View style={styles.popularBadge}>
-              <Feather name="star" size={10} color="#fff" />
-              <Text style={styles.popularBadgeText}>MOST POPULAR</Text>
+        {display.isPopular ? (
+          <View style={styles.popularBadge}>
+            <Feather name="star" size={10} color="#fff" />
+            <Text style={styles.popularBadgeText}>Most Popular</Text>
+          </View>
+        ) : null}
+
+        <View style={styles.badgeRow}>
+          <View style={[styles.tierBadge, { backgroundColor: `${display.badgeColor}20` }]}>
+            <Text style={[styles.tierBadgeText, { color: display.badgeColor }]}>{display.badge}</Text>
+          </View>
+          {isCurrentPlan ? (
+            <View style={styles.currentLabel}>
+              <Feather name="check-circle" size={12} color={ACCENT} />
+              <Text style={styles.currentLabelText}>Your plan</Text>
             </View>
           ) : null}
         </View>
 
+        <Text style={styles.planName}>{plan.label}</Text>
+        <Text style={styles.planSubtitle}>{display.subtitle}</Text>
+
         <View style={styles.priceRow}>
-          <Text style={styles.planPrice}>${price === 0 ? '0' : price.toFixed(2)}</Text>
-          <Text style={styles.pricePeriod}>/ {billingPeriod(price, billingCycle)}</Text>
+          <Text style={styles.planPrice}>
+            {price === 0 ? '$0' : `$${price}`}
+          </Text>
+          <Text style={styles.pricePeriod}>/mo</Text>
         </View>
 
-        <Text style={styles.planSubtitle}>{PLAN_SUBTITLES[plan]}</Text>
+        {isFreePlan(planKey) ? (
+          <Text style={styles.noCreditCard}>No credit card required</Text>
+        ) : (
+          <Text style={styles.noCreditCard}>No overage fees{planKey === 'business' ? '' : ''}</Text>
+        )}
+
+        {planKey === 'business' ? (
+          <View style={styles.overageNote}>
+            <Feather name="zap" size={12} color={GOLD} />
+            <Text style={styles.overageNoteText}>+$5/listing/mo after 15</Text>
+          </View>
+        ) : null}
+
+        <View style={styles.listingCap}>
+          <Feather name="layers" size={16} color={display.badgeColor} />
+          <View>
+            <Text style={styles.listingCapStrong}>
+              {plan.listingsIncluded === 1 ? '1 Active Listing' : `Up to ${plan.listingsIncluded} Active Listings`}
+            </Text>
+            <Text style={styles.listingCapSub}>
+              {isFreePlan(planKey) ? 'Post and receive inquiries' :
+               planKey === 'starter' ? 'Hard cap - upgrade to add more' :
+               planKey === 'pro' ? 'Hard cap - upgrade for more' :
+               '+$5/mo per listing beyond 15'}
+            </Text>
+          </View>
+        </View>
+
+        {isCurrentPlan ? (
+          <View style={styles.ctaBtnDisabled}>
+            <Text style={styles.ctaBtnDisabledText}>{ctaText}</Text>
+          </View>
+        ) : display.ctaStyle === 'primary' ? (
+          <Pressable onPress={() => handleSelectPlan(planKey)}>
+            <View style={[styles.ctaBtnPrimary]}>
+              <Text style={styles.ctaBtnText}>{ctaText}</Text>
+            </View>
+          </Pressable>
+        ) : display.ctaStyle === 'gold' ? (
+          <Pressable onPress={() => handleSelectPlan(planKey)}>
+            <LinearGradient colors={['#D97706', '#B45309']} style={styles.ctaBtnGold}>
+              <Text style={styles.ctaBtnText}>{ctaText}</Text>
+            </LinearGradient>
+          </Pressable>
+        ) : (
+          <Pressable onPress={() => handleSelectPlan(planKey)}>
+            <View style={styles.ctaBtnOutlined}>
+              <Text style={styles.ctaBtnOutlinedText}>{ctaText}</Text>
+            </View>
+          </Pressable>
+        )}
 
         <View style={styles.divider} />
 
+        <Text style={styles.featuresLabel}>{display.featuresLabel}</Text>
+
         <View style={styles.featureList}>
-          {planData.features.included.map((f, i) => (
+          {plan.features.included.map((f, i) => (
             <View key={i} style={styles.featureRow}>
-              <Feather name="check" size={14} color={ACCENT} />
-              <Text style={styles.featureText}>{f}</Text>
+              <Feather
+                name="check"
+                size={14}
+                color={isFreePlan(planKey) ? '#555' : planKey === 'business' ? GOLD : ROOMDR_PURPLE}
+              />
+              <Text style={[styles.featureText, isFreePlan(planKey) ? { color: 'rgba(255,255,255,0.5)' } : null]}>{f}</Text>
             </View>
           ))}
-          {planData.features.locked.map((f, i) => (
+          {plan.features.locked.map((f, i) => (
             <View key={`locked-${i}`} style={styles.featureRow}>
               <Feather name="x" size={14} color="rgba(255,255,255,0.15)" />
               <Text style={styles.lockedFeatureText}>{f}</Text>
@@ -182,24 +297,14 @@ export const HostSubscriptionScreen = () => {
           ))}
         </View>
 
-        {plan === 'business' ? (
-          <View style={styles.overageNote}>
-            <Feather name="alert-circle" size={12} color={GOLD} />
-            <Text style={styles.overageNoteText}>+$5/listing/mo after 15 included</Text>
+        {isFreePlan(planKey) && currentPlanIsFree ? (
+          <View style={styles.upgradeNudge}>
+            <Feather name="info" size={14} color={ROOMDR_PURPLE} />
+            <Text style={styles.upgradeNudgeText}>
+              Hosts on Starter fill rooms 2.4x faster with renter group access
+            </Text>
           </View>
         ) : null}
-
-        {isCurrentPlan ? (
-          <View style={styles.ctaBtnDisabled}>
-            <Text style={styles.ctaBtnDisabledText}>{ctaText}</Text>
-          </View>
-        ) : (
-          <Pressable onPress={() => handleSelectPlan(plan)}>
-            <View style={styles.ctaBtnOutlined}>
-              <Text style={styles.ctaBtnOutlinedText}>{ctaText}</Text>
-            </View>
-          </Pressable>
-        )}
       </View>
     );
   };
@@ -210,124 +315,76 @@ export const HostSubscriptionScreen = () => {
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Feather name="arrow-left" size={22} color="#fff" />
         </Pressable>
-        <Text style={styles.headerTitle}>Subscription</Text>
-        <View style={styles.hostModeBadge}>
-          <Text style={styles.hostModeText}>HOST MODE</Text>
-        </View>
+        <Text style={styles.headerTitle}>Host Plans</Text>
+        <View style={{ width: 38 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.heroSection}>
+          <View style={styles.heroEyebrow}>
+            <Text style={styles.heroEyebrowText}>HOST PLANS</Text>
+          </View>
           <Text style={styles.heroTitle}>
-            Grow Your <Text style={{ color: ACCENT }}>Listings</Text>
+            Find great tenants.{'\n'}
+            <Text style={{ color: ROOMDR_PURPLE }}>Pay for outcomes.</Text>
           </Text>
-          <Text style={styles.heroSubtitle}>Reach more renters and fill vacancies faster</Text>
-        </View>
-
-        <View style={styles.pillRow}>
-          {PLAN_PILLS.map(p => {
-            const isActive = selectedPill === p.plan;
-            const isCurrent = p.plan === currentDisplay;
-            return (
-              <Pressable
-                key={p.plan}
-                onPress={() => setSelectedPill(p.plan)}
-                style={[
-                  styles.pill,
-                  isActive ? styles.pillActive : null,
-                  isCurrent && !isActive ? styles.pillCurrent : null,
-                ]}
-              >
-                <Text style={[styles.pillLabel, isActive ? styles.pillLabelActive : null]}>
-                  {p.label}
-                </Text>
-                {p.plan === 'pro' && isActive ? (
-                  <View style={styles.pillDot} />
-                ) : null}
-                <Text style={[styles.pillPrice, isActive ? styles.pillPriceActive : null]}>
-                  {p.priceLabel}
-                </Text>
-                <Text style={[styles.pillPeriod, isActive ? styles.pillPeriodActive : null]}>
-                  {p.plan === 'starter' ? 'forever' : '/mo'}
-                </Text>
-              </Pressable>
-            );
-          })}
+          <Text style={styles.heroSubtitle}>
+            From filling one spare room to managing a full portfolio - a plan built for how you operate.
+          </Text>
         </View>
 
         <View style={styles.billingRow}>
-          {BILLING_CYCLES.map(bc => {
-            const isActive = billingCycle === bc.key;
-            return (
-              <Pressable
-                key={bc.key}
-                onPress={() => setBillingCycle(bc.key)}
-                style={[styles.billingChip, isActive ? styles.billingChipActive : null]}
-              >
-                <Text style={[styles.billingChipText, isActive ? styles.billingChipTextActive : null]}>
-                  {bc.label}
-                </Text>
-                {bc.savings ? (
-                  <Text style={[styles.billingChipSavings, isActive ? styles.billingChipSavingsActive : null]}>
-                    {bc.savings}
-                  </Text>
-                ) : null}
-              </Pressable>
-            );
-          })}
+          <Pressable
+            onPress={() => setBillingCycle('monthly')}
+            style={[styles.billingChip, billingCycle === 'monthly' ? styles.billingChipActive : null]}
+          >
+            <Text style={[styles.billingChipText, billingCycle === 'monthly' ? styles.billingChipTextActive : null]}>
+              Monthly
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setBillingCycle('annual')}
+            style={[styles.billingChip, billingCycle === 'annual' ? styles.billingChipActive : null]}
+          >
+            <Text style={[styles.billingChipText, billingCycle === 'annual' ? styles.billingChipTextActive : null]}>
+              Annual
+            </Text>
+          </Pressable>
+          <View style={styles.saveBadge}>
+            <Text style={styles.saveBadgeText}>Save 20%</Text>
+          </View>
         </View>
 
-        {(['starter', 'pro', 'business'] as DisplayPlan[]).map(renderPlanCard)}
+        {PLAN_DISPLAY.map(renderPlanCard)}
 
         {hostSub.plan === 'business' && !hostSub.agentVerificationPaid ? (
-          <Pressable
-            style={styles.agentCard}
-            onPress={() => {
-              if (isDev) {
-                Alert.alert(
-                  'Agent Verification',
-                  `One-time fee of $${AGENT_VERIFICATION_FEE}. Required to list properties on behalf of other owners.`,
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    {
-                      text: 'Verify (Mock)',
-                      onPress: async () => {
-                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                        const newSub = { ...hostSub, agentVerificationPaid: true, isVerifiedAgent: true };
-                        await StorageService.updateHostSubscription(user!.id, newSub);
-                        setHostSub(newSub);
-                        Alert.alert('Verified', 'You are now a verified agent.');
-                      },
-                    },
-                  ]
-                );
-              }
-            }}
-          >
+          <Pressable style={styles.agentCard} onPress={handleAgentVerification}>
             <View style={styles.agentHeader}>
               <View style={styles.agentIcon}>
                 <Feather name="shield" size={20} color={GOLD} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.agentTitle}>Agent Verification</Text>
-                <Text style={styles.agentPrice}>${AGENT_VERIFICATION_FEE} one-time</Text>
+                <Text style={styles.agentTitle}>Agent Verification Badge</Text>
+                <Text style={styles.agentDesc}>
+                  Required to list properties on behalf of other owners. Includes verified agent badge.
+                </Text>
               </View>
-              <Feather name="chevron-right" size={20} color="rgba(255,255,255,0.3)" />
             </View>
-            <Text style={styles.agentDesc}>
-              Required to list properties on behalf of other owners. Includes verified agent badge.
-            </Text>
+            <View style={styles.agentBottom}>
+              <Text style={styles.agentPrice}>${AGENT_VERIFICATION_FEE} <Text style={styles.agentPriceSub}>one-time</Text></Text>
+              <View style={styles.agentCta}>
+                <Text style={styles.agentCtaText}>Get Verified</Text>
+              </View>
+            </View>
           </Pressable>
         ) : null}
 
-        {!isFreePlan(hostSub.plan) && hostSub.plan !== 'starter' ? (
+        {!isFreePlan(hostSub.plan) ? (
           <View style={styles.costSummary}>
             <Text style={styles.costTitle}>Monthly Cost Summary</Text>
             <View style={styles.costRow}>
               <Text style={styles.costLabel}>Plan base</Text>
-              <Text style={styles.costValue}>
-                ${billingPrice(HOST_PLANS[hostSub.plan].price, billingCycle).toFixed(2)}
-              </Text>
+              <Text style={styles.costValue}>${billingPrice(HOST_PLANS[hostSub.plan].price, billingCycle).toFixed(2)}</Text>
             </View>
             {hostSub.plan === 'business' && hostSub.activeListingCount > hostSub.listingsIncluded ? (
               <View style={styles.costRow}>
@@ -369,174 +426,222 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   headerTitle: { fontSize: 18, fontWeight: '700', color: '#fff' },
-  hostModeBadge: {
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  hostModeText: { fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.5)', letterSpacing: 0.5 },
-  scroll: { paddingHorizontal: 16 },
+  scroll: { paddingHorizontal: 16, paddingBottom: 40 },
 
-  heroSection: { marginBottom: 20, marginTop: 4 },
-  heroTitle: { fontSize: 26, fontWeight: '800', color: '#fff', marginBottom: 4 },
-  heroSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.45)' },
-
-  pillRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 14,
+  heroSection: { alignItems: 'center', marginBottom: 24, marginTop: 8 },
+  heroEyebrow: {
+    backgroundColor: 'rgba(123,94,167,0.18)',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    marginBottom: 16,
   },
-  pill: {
-    flex: 1,
-    backgroundColor: CARD_BG,
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 6,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+  heroEyebrowText: {
+    fontSize: 11, fontWeight: '700', color: ROOMDR_PURPLE,
+    letterSpacing: 1.5,
   },
-  pillActive: {
-    borderColor: ACCENT,
-    backgroundColor: 'rgba(255,107,91,0.08)',
+  heroTitle: {
+    fontSize: 26, fontWeight: '800', color: '#fff',
+    textAlign: 'center', lineHeight: 32, marginBottom: 8,
   },
-  pillCurrent: {
-    borderColor: 'rgba(255,255,255,0.15)',
+  heroSubtitle: {
+    fontSize: 14, color: 'rgba(255,255,255,0.45)',
+    textAlign: 'center', lineHeight: 20, paddingHorizontal: 10,
   },
-  pillLabel: { fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.4)', letterSpacing: 0.5 },
-  pillLabelActive: { color: 'rgba(255,255,255,0.7)' },
-  pillDot: {
-    width: 5, height: 5, borderRadius: 3,
-    backgroundColor: ACCENT,
-    position: 'absolute',
-    top: 6,
-    right: 6,
-  },
-  pillPrice: { fontSize: 18, fontWeight: '800', color: '#fff', marginTop: 2 },
-  pillPriceActive: { color: '#fff' },
-  pillPeriod: { fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 0 },
-  pillPeriodActive: { color: 'rgba(255,255,255,0.5)' },
 
   billingRow: {
     flexDirection: 'row',
-    gap: 0,
-    marginBottom: 18,
-    backgroundColor: CARD_BG,
-    borderRadius: 12,
-    padding: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginBottom: 24,
   },
   billingChip: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 18,
     borderRadius: 10,
+    backgroundColor: CARD_BG,
   },
   billingChipActive: {
-    backgroundColor: ACCENT,
+    backgroundColor: ROOMDR_PURPLE,
   },
-  billingChipText: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.5)' },
-  billingChipTextActive: { color: '#fff' },
-  billingChipSavings: { fontSize: 9, fontWeight: '700', color: ACCENT, marginTop: 1 },
-  billingChipSavingsActive: { color: 'rgba(255,255,255,0.8)' },
+  billingChipText: { fontSize: 14, fontWeight: '500', color: 'rgba(255,255,255,0.5)' },
+  billingChipTextActive: { color: '#fff', fontWeight: '600' },
+  saveBadge: {
+    backgroundColor: '#16A34A',
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  saveBadgeText: { fontSize: 11, fontWeight: '700', color: '#fff' },
 
   planCard: {
-    backgroundColor: CARD_BG,
-    borderRadius: 16,
-    padding: 18,
+    backgroundColor: '#161616',
+    borderRadius: 20,
+    padding: 24,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: '#242424',
   },
-  cardTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  planName: { fontSize: 20, fontWeight: '800', color: '#fff' },
   popularBadge: {
+    position: 'absolute',
+    top: -12,
+    alignSelf: 'center',
+    left: '30%',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: ACCENT,
-    borderRadius: 6,
-    paddingHorizontal: 8,
+    backgroundColor: ROOMDR_PURPLE,
+    borderRadius: 20,
+    paddingHorizontal: 14,
     paddingVertical: 4,
   },
-  popularBadgeText: { fontSize: 9, fontWeight: '800', color: '#fff', letterSpacing: 0.3 },
+  popularBadgeText: { fontSize: 11, fontWeight: '700', color: '#fff', letterSpacing: 0.5 },
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  tierBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  tierBadgeText: { fontSize: 10, fontWeight: '700', letterSpacing: 1.5 },
+  currentLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  currentLabelText: { fontSize: 11, fontWeight: '600', color: ACCENT },
+  planName: { fontSize: 20, fontWeight: '800', color: '#fff', marginBottom: 4 },
+  planSubtitle: { fontSize: 13, color: '#666', marginBottom: 16 },
   priceRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: 2,
     marginBottom: 4,
   },
-  planPrice: { fontSize: 32, fontWeight: '800', color: '#fff' },
-  pricePeriod: { fontSize: 14, color: 'rgba(255,255,255,0.35)', fontWeight: '500' },
-  planSubtitle: { fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 14, lineHeight: 18 },
-  divider: {
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    marginBottom: 14,
-  },
-  featureList: { gap: 10, marginBottom: 16 },
-  featureRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 2 },
-  featureText: { fontSize: 14, color: 'rgba(255,255,255,0.8)', flex: 1 },
-  lockedFeatureText: { fontSize: 14, color: 'rgba(255,255,255,0.25)', flex: 1 },
+  planPrice: { fontSize: 36, fontWeight: '800', color: '#fff', letterSpacing: -2 },
+  pricePeriod: { fontSize: 15, color: '#666', fontWeight: '400' },
+  noCreditCard: { fontSize: 13, color: '#555', marginBottom: 16 },
   overageNote: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(251,191,36,0.08)',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(251,191,36,0.15)',
+    gap: 5,
+    marginBottom: 16,
   },
   overageNoteText: { fontSize: 12, color: '#FBBF24', fontWeight: '600' },
+  listingCap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#1E1E1E',
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 16,
+  },
+  listingCapStrong: { fontSize: 15, fontWeight: '700', color: '#fff', marginBottom: 1 },
+  listingCapSub: { fontSize: 13, color: '#888' },
+  ctaBtnPrimary: {
+    height: 48,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: ROOMDR_PURPLE,
+    marginBottom: 20,
+  },
+  ctaBtnGold: {
+    height: 48,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  ctaBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
   ctaBtnOutlined: {
     height: 48,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1.5,
+    borderColor: '#333',
+    marginBottom: 20,
   },
-  ctaBtnOutlinedText: { fontSize: 15, fontWeight: '700', color: 'rgba(255,255,255,0.6)' },
+  ctaBtnOutlinedText: { fontSize: 15, fontWeight: '700', color: '#fff' },
   ctaBtnDisabled: {
     height: 48,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.05)',
+    marginBottom: 20,
   },
   ctaBtnDisabledText: { fontSize: 15, fontWeight: '700', color: 'rgba(255,255,255,0.25)' },
+  divider: {
+    height: 1,
+    backgroundColor: '#222',
+    marginBottom: 16,
+  },
+  featuresLabel: {
+    fontSize: 11, fontWeight: '700', color: '#555',
+    letterSpacing: 1, marginBottom: 12,
+  },
+  featureList: { gap: 10 },
+  featureRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 2 },
+  featureText: { fontSize: 13.5, color: '#ccc', flex: 1, lineHeight: 19 },
+  lockedFeatureText: { fontSize: 13.5, color: 'rgba(255,255,255,0.2)', flex: 1 },
+  upgradeNudge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(123,94,167,0.08)',
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(123,94,167,0.2)',
+  },
+  upgradeNudgeText: { fontSize: 12, color: ROOMDR_PURPLE, flex: 1, lineHeight: 17 },
 
   agentCard: {
-    backgroundColor: CARD_BG,
+    backgroundColor: '#161616',
     borderRadius: 16,
-    padding: 18,
+    padding: 22,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,215,0,0.2)',
+    borderColor: 'rgba(61,53,0,1)',
   },
   agentHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 8,
+    alignItems: 'flex-start',
+    gap: 14,
+    marginBottom: 14,
   },
   agentIcon: {
-    width: 40, height: 40, borderRadius: 12,
+    width: 44, height: 44, borderRadius: 12,
     backgroundColor: 'rgba(255,215,0,0.12)',
     alignItems: 'center', justifyContent: 'center',
   },
-  agentTitle: { fontSize: 15, fontWeight: '700', color: GOLD },
-  agentPrice: { fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 1 },
-  agentDesc: { fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: 18 },
+  agentTitle: { fontSize: 16, fontWeight: '700', color: '#fff', marginBottom: 4 },
+  agentDesc: { fontSize: 13, color: '#888', lineHeight: 18 },
+  agentBottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  agentPrice: { fontSize: 22, fontWeight: '800', color: GOLD },
+  agentPriceSub: { fontSize: 13, fontWeight: '400', color: '#888' },
+  agentCta: {
+    backgroundColor: 'rgba(217,119,6,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(217,119,6,0.4)',
+    borderRadius: 10,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+  },
+  agentCtaText: { fontSize: 14, fontWeight: '700', color: GOLD },
 
   costSummary: {
     backgroundColor: CARD_BG,
