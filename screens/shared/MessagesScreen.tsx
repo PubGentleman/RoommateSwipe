@@ -94,19 +94,24 @@ export const MessagesScreen = () => {
     try {
       setIsLoading(true);
 
+      const localConversations = await StorageService.getConversations();
+      const localConvMap = new Map(localConversations.map(c => [c.id, c]));
+
       let existingConversations: Conversation[] = [];
       try {
-        existingConversations = await loadConversationsFromSupabase();
+        const supaConversations = await loadConversationsFromSupabase();
+        existingConversations = supaConversations.map(supaConv => {
+          const localConv = localConvMap.get(supaConv.id);
+          return { ...supaConv, messages: localConv?.messages || [] };
+        });
       } catch (supaError) {
         console.warn('Supabase getConversations failed, falling back to StorageService:', supaError);
-        existingConversations = await StorageService.getConversations();
+        existingConversations = [...localConversations];
       }
 
-      const localConversations = await StorageService.getConversations();
-      const localInquiryConvs = localConversations.filter(c => c.isInquiryThread);
-      for (const inquiry of localInquiryConvs) {
-        if (!existingConversations.some(c => c.id === inquiry.id)) {
-          existingConversations.push(inquiry);
+      for (const localConv of localConversations) {
+        if (!existingConversations.some(c => c.id === localConv.id)) {
+          existingConversations.push(localConv);
         }
       }
 
@@ -133,6 +138,7 @@ export const MessagesScreen = () => {
         if (!conversationExists) {
           const otherProfile = profiles.find(p => p.id === otherUserId);
           if (otherProfile) {
+            const localConv = localConvMap.get(`conv_${match.id}`);
             const newConversation: Conversation = {
               id: `conv_${match.id}`,
               participant: {
@@ -141,10 +147,10 @@ export const MessagesScreen = () => {
                 photo: otherProfile.photos?.[0],
                 online: Math.random() > 0.5,
               },
-              lastMessage: 'You matched!',
-              timestamp: match.matchedAt,
-              unread: 0,
-              messages: [],
+              lastMessage: localConv?.lastMessage || 'You matched!',
+              timestamp: localConv?.timestamp || match.matchedAt,
+              unread: localConv?.unread || 0,
+              messages: localConv?.messages || [],
               matchType: match.matchType || 'mutual',
             };
             existingConversations.push(newConversation);
@@ -173,7 +179,7 @@ export const MessagesScreen = () => {
           c.isInquiryThread ||
           c.id.startsWith('conv-interest-') ||
           c.matchType === 'cold' ||
-          matches.some(match => 
+          matches.some(match =>
             (match.userId1 === user.id && match.userId2 === c.participant.id) ||
             (match.userId2 === user.id && match.userId1 === c.participant.id)
           )
@@ -185,7 +191,15 @@ export const MessagesScreen = () => {
         if (b.isInquiryThread && b.isSuperInterest && !(a.isInquiryThread && a.isSuperInterest)) return 1;
         return b.timestamp.getTime() - a.timestamp.getTime();
       });
-      await StorageService.setConversations(existingConversations);
+
+      const safeToSave = existingConversations.map(c => {
+        const local = localConvMap.get(c.id);
+        if (local && local.messages && local.messages.length > 0 && (!c.messages || c.messages.length === 0)) {
+          return { ...c, messages: local.messages };
+        }
+        return c;
+      });
+      await StorageService.setConversations(safeToSave);
       setConversations(userConversations);
       try {
         const groups = await getMyInquiryGroups();

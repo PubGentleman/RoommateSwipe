@@ -1,0 +1,291 @@
+# Replit Prompt — Fix "Send Message" Button in Match Section
+
+## Problems Found
+
+There are three bugs causing the "Send Message" button in the match/roommates section to not work correctly:
+
+**Bug 1 — Inconsistent conversation ID:**
+In `RoommatesScreen.tsx`, `handleSendDirectMessage` creates a new conversation with an ID like `conv-${profileId}-${timestamp}`. But `MessagesScreen.tsx` creates conversations from match data using `conv_${match.id}`. These are different IDs for the same conversation, so the conversation can't be found/merged properly and messages don't show up in the Messages list.
+
+**Bug 2 — Deep-link navigation bypasses MessagesList:**
+Both `handleSendDirectMessage` and the match celebration modal's `onSendMessage` use:
+```tsx
+(navigation as any).navigate('Messages', { screen: 'Chat', params: {...} })
+```
+This deep-links directly into Chat, skipping MessagesList. React Navigation preserves this state, so when the user returns to the Messages tab, they see Chat instead of the conversation list. The fix requires a two-step navigation: go to MessagesList first, then Chat.
+
+**Bug 3 — New chat doesn't appear in Messages list:**
+Because the conversation ID from Bug 1 doesn't match the ID format expected by MessagesScreen, the conversation either doesn't appear in the Messages list or appears as a separate duplicate entry with no messages.
+
+---
+
+## Fix — File: `screens/renter/RoommatesScreen.tsx`
+
+### Change 1: Fix `handleSendDirectMessage` — use consistent conversation ID and two-step navigation
+
+Find and replace the entire `handleSendDirectMessage` function:
+
+**Find (current code ~line 1054):**
+```tsx
+const handleSendDirectMessage = async (isCold: boolean) => {
+  if (!currentProfile || !user) return;
+
+  const conversations = await StorageService.getConversations();
+  const existingConversation = conversations.find(c =>
+    c.participant.id === currentProfile.id
+  );
+
+  if (existingConversation) {
+    (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: existingConversation.id } });
+  } else {
+    const newConversation: any = {
+      id: `conv-${currentProfile.id}-${Date.now()}`,
+      participant: {
+        id: currentProfile.id,
+        name: currentProfile.name,
+        photo: currentProfile.photos?.[0],
+        online: false,
+      },
+      lastMessage: '',
+      timestamp: new Date(),
+      unread: 0,
+      messages: [],
+      matchType: isCold ? 'cold' : 'mutual',
+    };
+    await StorageService.addOrUpdateConversation(newConversation);
+    (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: newConversation.id } });
+  }
+
+  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+};
+```
+
+**Replace with:**
+```tsx
+const handleSendDirectMessage = async (isCold: boolean) => {
+  if (!currentProfile || !user) return;
+
+  const conversations = await StorageService.getConversations();
+
+  // Try to find existing conversation by participant ID
+  let existingConversation = conversations.find(c =>
+    c.participant.id === currentProfile.id
+  );
+
+  let conversationId: string;
+
+  if (existingConversation) {
+    conversationId = existingConversation.id;
+  } else {
+    // Use the match-based ID format (conv_matchId) so it matches what MessagesScreen creates
+    // This ensures the conversation appears in the Messages list
+    const storedMatches = await StorageService.getMatches();
+    const thisMatch = storedMatches.find(m =>
+      (m.userId1 === user.id && m.userId2 === currentProfile.id) ||
+      (m.userId2 === user.id && m.userId1 === currentProfile.id)
+    );
+
+    // Use conv_matchId if there's a real match, otherwise conv-cold-profileId for cold messages
+    conversationId = thisMatch
+      ? `conv_${thisMatch.id}`
+      : `conv-cold-${currentProfile.id}`;
+
+    const newConversation: any = {
+      id: conversationId,
+      participant: {
+        id: currentProfile.id,
+        name: currentProfile.name,
+        photo: currentProfile.photos?.[0] || currentProfile.profilePicture || '',
+        online: false,
+      },
+      lastMessage: '',
+      timestamp: new Date(),
+      unread: 0,
+      messages: [],
+      matchType: isCold ? 'cold' : 'mutual',
+    };
+    await StorageService.addOrUpdateConversation(newConversation);
+  }
+
+  const otherUserProfile = currentProfile;
+  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+  // Two-step navigation: go to MessagesList first, then Chat
+  // This ensures the Messages tab shows the list when user presses back
+  (navigation as any).navigate('Messages', { screen: 'MessagesList' });
+  setTimeout(() => {
+    (navigation as any).navigate('Messages', {
+      screen: 'Chat',
+      params: {
+        conversationId,
+        otherUser: otherUserProfile,
+      },
+    });
+  }, 50);
+};
+```
+
+### Change 2: Fix Match Celebration Modal `onSendMessage` — use consistent ID and two-step navigation
+
+Find the `onSendMessage` callback inside the `<MatchCelebrationModal>` (approximately around line 1378):
+
+**Find (current code ~line 1378):**
+```tsx
+onSendMessage={async () => {
+  setShowMatch(false);
+  setMatchedProfileData(null);
+  if (matchedProfileData?.profile) {
+    const conversations = await StorageService.getConversations();
+    const existingConversation = conversations.find(c =>
+      c.participant.id === matchedProfileData.profile.id
+    );
+    if (existingConversation) {
+      (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: existingConversation.id } });
+    } else {
+      const storedMatches = await StorageService.getMatches();
+      const thisMatch = storedMatches.find(m =>
+        (m.userId1 === user?.id && m.userId2 === matchedProfileData.profile.id) ||
+        (m.userId2 === user?.id && m.userId1 === matchedProfileData.profile.id)
+      );
+      const newConversation = {
+        id: `conv-${matchedProfileData.profile.id}-${Date.now()}`,
+        participant: {
+          id: matchedProfileData.profile.id,
+          name: matchedProfileData.profile.name,
+          photo: matchedProfileData.profile.photos?.[0],
+          online: false,
+        },
+        lastMessage: '',
+        timestamp: new Date(),
+        unread: 0,
+        messages: [],
+        matchType: (thisMatch?.matchType || 'mutual') as 'mutual' | 'super_interest' | 'cold',
+      };
+      await StorageService.addOrUpdateConversation(newConversation);
+      (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: newConversation.id } });
+    }
+  }
+}}
+```
+
+**Replace with:**
+```tsx
+onSendMessage={async () => {
+  setShowMatch(false);
+  setMatchedProfileData(null);
+  if (matchedProfileData?.profile) {
+    const profile = matchedProfileData.profile;
+    const conversations = await StorageService.getConversations();
+    let existingConversation = conversations.find(c =>
+      c.participant.id === profile.id
+    );
+
+    let conversationId: string;
+
+    if (existingConversation) {
+      conversationId = existingConversation.id;
+    } else {
+      const storedMatches = await StorageService.getMatches();
+      const thisMatch = storedMatches.find(m =>
+        (m.userId1 === user?.id && m.userId2 === profile.id) ||
+        (m.userId2 === user?.id && m.userId1 === profile.id)
+      );
+      // Use conv_matchId format so it aligns with MessagesScreen's conversation IDs
+      conversationId = thisMatch
+        ? `conv_${thisMatch.id}`
+        : `conv-match-${profile.id}`;
+
+      const newConversation = {
+        id: conversationId,
+        participant: {
+          id: profile.id,
+          name: profile.name,
+          photo: profile.photos?.[0] || '',
+          online: false,
+        },
+        lastMessage: '',
+        timestamp: new Date(),
+        unread: 0,
+        messages: [],
+        matchType: (thisMatch?.matchType || 'mutual') as 'mutual' | 'super_interest' | 'cold',
+      };
+      await StorageService.addOrUpdateConversation(newConversation);
+    }
+
+    // Two-step navigation: MessagesList first, then Chat
+    (navigation as any).navigate('Messages', { screen: 'MessagesList' });
+    setTimeout(() => {
+      (navigation as any).navigate('Messages', {
+        screen: 'Chat',
+        params: {
+          conversationId,
+          otherUser: profile,
+        },
+      });
+    }, 50);
+  }
+}}
+```
+
+---
+
+## Fix — File: `navigation/RenterTabNavigator.tsx`
+
+### Change: Reset Messages stack to MessagesList when Messages tab is pressed
+
+This ensures pressing the Messages tab always shows the conversation list, not a Chat screen.
+
+**Find the `onPress` handler in the custom tab bar (approximately line 52):**
+```tsx
+const onPress = () => {
+  const event = navigation.emit({
+    type: 'tabPress',
+    target: route.key,
+    canPreventDefault: true,
+  });
+  if (!isFocused && !event.defaultPrevented) {
+    navigation.navigate(route.name);
+  }
+};
+```
+
+**Replace with:**
+```tsx
+const onPress = () => {
+  const event = navigation.emit({
+    type: 'tabPress',
+    target: route.key,
+    canPreventDefault: true,
+  });
+  if (!event.defaultPrevented) {
+    if (route.name === 'Messages') {
+      // Always reset Messages stack to show the list, not a specific chat
+      navigation.navigate('Messages' as any, { screen: 'MessagesList' } as any);
+    } else if (!isFocused) {
+      navigation.navigate(route.name);
+    }
+  }
+};
+```
+
+---
+
+## Fix — File: `navigation/HostTabNavigator.tsx`
+
+Apply the same `onPress` fix if HostTabNavigator also has a Messages tab with a custom tab bar. Find the same `onPress` block and apply the same change.
+
+---
+
+## What These Fixes Do
+
+After applying all three fixes:
+
+1. **Consistent conversation IDs** — conversations created from the Roommates screen now use `conv_${match.id}` format, which matches what MessagesScreen creates from match data. Messages are stored under one ID and can be found reliably.
+
+2. **Two-step navigation** — navigating to Chat from Roommates or match celebration now goes through MessagesList first. When the user presses back from Chat, they see the conversation list.
+
+3. **Chats appear in Messages list** — because conversation IDs are now consistent, the chat started from the match section will appear in the Messages tab alongside all other conversations.
+
+4. **Messages persist in chat** — combined with the `roomdr-chat-message-history-fix-prompt.md` fix, messages sent from the match section chat will continue to appear correctly on revisit.
+
+> **Note:** Apply `roomdr-chat-message-history-fix-prompt.md` alongside this prompt for the complete fix. These two prompts work together.

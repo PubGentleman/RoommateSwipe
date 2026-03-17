@@ -179,13 +179,13 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   }, [matchIdFromConversation, user?.id]);
 
   const loadMessages = async () => {
-    let loadedMessages: Message[] = [];
+    let supabaseMessages: Message[] = [];
     let loadedFromSupabase = false;
 
     try {
       const supaMessages = await getSupabaseMessages(matchIdFromConversation);
       if (supaMessages && supaMessages.length > 0) {
-        loadedMessages = supaMessages.map((msg: any) => ({
+        supabaseMessages = supaMessages.map((msg: any) => ({
           id: msg.id,
           senderId: msg.sender_id,
           text: msg.content,
@@ -201,23 +201,28 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       console.warn('Supabase getMessages failed, falling back to StorageService:', supaError);
     }
 
-    if (!loadedFromSupabase) {
-      const conversations = await StorageService.getConversations();
-      const conversation = conversations.find(c => c.id === conversationId);
-      if (conversation) {
-        loadedMessages = (conversation.messages || []).map((msg: Message) => {
-          if (msg.senderId === user?.id && !msg.readAt && msg.read !== false) {
-            return { ...msg, readAt: new Date(new Date(msg.timestamp).getTime() + 60000) };
-          }
-          return msg;
-        });
+    const conversations = await StorageService.getConversations();
+    const conversation = conversations.find(c => c.id === conversationId);
+    const localMessages: Message[] = (conversation?.messages || []).map((msg: Message) => {
+      if (msg.senderId === user?.id && !msg.readAt && msg.read !== false) {
+        return { ...msg, readAt: new Date(new Date(msg.timestamp).getTime() + 60000) };
       }
+      return msg;
+    });
+
+    let loadedMessages: Message[];
+
+    if (loadedFromSupabase) {
+      const supabaseIds = new Set(supabaseMessages.map(m => m.id));
+      const localOnly = localMessages.filter(m => !supabaseIds.has(m.id));
+      loadedMessages = [...localOnly, ...supabaseMessages].sort(
+        (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      );
+    } else {
+      loadedMessages = localMessages;
     }
 
     setMessages(loadedMessages);
-
-    const conversations = await StorageService.getConversations();
-    const conversation = conversations.find(c => c.id === conversationId);
 
     if (!otherUser && conversation?.participant) {
       const roommateProfiles = await StorageService.getRoommateProfiles();
