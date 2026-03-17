@@ -2231,9 +2231,33 @@ export const RoommatesScreen = () => {
               <View style={[styles.detailSection, { paddingBottom: Spacing.xxl, gap: Spacing.md }]}>
                 <Pressable
                   style={[styles.detailActionButton, { backgroundColor: theme.primary }]}
-                  onPress={() => {
-                    setShowProfileDetail(false);
-                    handleMessageClick();
+                  onPress={async () => {
+                    if (!currentProfile || !user) return;
+                    const matches = await StorageService.getMatches();
+                    const hasMatch = matches.some(m =>
+                      (m.userId1 === user.id && m.userId2 === currentProfile.id) ||
+                      (m.userId2 === user.id && m.userId1 === currentProfile.id)
+                    );
+                    if (hasMatch) {
+                      setShowProfileDetail(false);
+                      handleSendDirectMessage(false);
+                    } else {
+                      const userPlan = user.subscription?.plan || 'basic';
+                      const userStatus = user.subscription?.status || 'active';
+                      const isEliteMember = userPlan === 'elite' && userStatus === 'active';
+                      if (isEliteMember) {
+                        const coldCheck = canSendColdMessage();
+                        if (!coldCheck.canSend) {
+                          Alert.alert('Limit Reached', coldCheck.reason || 'No direct messages remaining this month.');
+                          return;
+                        }
+                        setShowProfileDetail(false);
+                        handleSendDirectMessage(true);
+                      } else {
+                        setShowProfileDetail(false);
+                        setShowMessageModal(true);
+                      }
+                    }
                   }}
                 >
                   <Feather name="message-circle" size={20} color="#FFFFFF" />
