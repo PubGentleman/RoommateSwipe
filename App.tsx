@@ -1,13 +1,13 @@
-import React, { useEffect, useCallback } from "react";
-import { StyleSheet, View, ActivityIndicator } from "react-native";
+import React, { useEffect, useCallback, useState } from "react";
+import { StyleSheet, View, ActivityIndicator, Platform } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { useFonts } from "expo-font";
+import * as Font from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
-import { Feather, MaterialIcons, Ionicons } from "@expo/vector-icons";
+import Feather from "@expo/vector-icons/Feather";
 
 import { RootNavigator } from "./navigation/RootNavigator";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -22,12 +22,23 @@ import { checkDailyTrigger } from "./utils/insightRefresh";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
+const featherFont = Feather.font as Record<string, any>;
+
 export default function App() {
-  const [fontsLoaded] = useFonts({
-    ...Feather.font,
-    ...MaterialIcons.font,
-    ...Ionicons.font,
-  });
+  const [fontsLoaded, setFontsLoaded] = useState(false);
+
+  useEffect(() => {
+    async function loadFonts() {
+      try {
+        await Font.loadAsync(featherFont);
+      } catch (e) {
+        console.warn('Font loading error:', e);
+      } finally {
+        setFontsLoaded(true);
+      }
+    }
+    loadFonts();
+  }, []);
 
   const onLayoutRootView = useCallback(async () => {
     if (fontsLoaded) {
