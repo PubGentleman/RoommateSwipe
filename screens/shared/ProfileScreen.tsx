@@ -166,9 +166,33 @@ export const ProfileScreen = () => {
   };
 
   const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : 'U';
-  const matchCount = 12;
-  const profileViewCount = 84;
-  const likesCount = 7;
+  const [matchCount, setMatchCount] = useState(0);
+  const [profileViewCount, setProfileViewCount] = useState(0);
+  const [likesCount, setLikesCount] = useState(0);
+
+  useEffect(() => {
+    const loadStats = async () => {
+      if (!user) return;
+      try {
+        const matches = await StorageService.getMatches();
+        const userMatches = matches.filter(m =>
+          m.userId1 === user.id || m.userId2 === user.id
+        );
+        setMatchCount(userMatches.length);
+
+        const views = await StorageService.getProfileViews(user.id);
+        setProfileViewCount(views.length);
+
+        const allUsers = await StorageService.getUsers();
+        const currentUser = allUsers.find(u => u.id === user.id);
+        const receivedLikes = currentUser?.receivedLikes || [];
+        setLikesCount(receivedLikes.length);
+      } catch (e) {
+        console.warn('Failed to load profile stats:', e);
+      }
+    };
+    loadStats();
+  }, [user?.id]);
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -217,18 +241,27 @@ export const ProfileScreen = () => {
           <Text style={styles.profileEmail}>{user?.email || ''}</Text>
 
           <View style={styles.statsRow}>
-            <View style={styles.statBox}>
+            <Pressable
+              style={styles.statBox}
+              onPress={() => navigation.navigate('MatchesList')}
+            >
               <Text style={[styles.statValue, styles.statCoral]}>{matchCount}</Text>
               <Text style={styles.statLabel}>Matches</Text>
-            </View>
-            <View style={styles.statBox}>
+            </Pressable>
+            <Pressable
+              style={styles.statBox}
+              onPress={() => navigation.navigate('ProfileViews')}
+            >
               <Text style={styles.statValue}>{profileViewCount}</Text>
               <Text style={styles.statLabel}>Profile Views</Text>
-            </View>
-            <View style={styles.statBox}>
+            </Pressable>
+            <Pressable
+              style={styles.statBox}
+              onPress={() => navigation.navigate('WhoLikedMe')}
+            >
               <Text style={[styles.statValue, styles.statCoral]}>{likesCount}</Text>
               <Text style={styles.statLabel}>Likes</Text>
-            </View>
+            </Pressable>
           </View>
 
           {user?.role === 'renter' ? (

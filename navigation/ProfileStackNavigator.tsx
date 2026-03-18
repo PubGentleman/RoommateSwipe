@@ -18,6 +18,8 @@ import { BlockedUsersScreen } from '../screens/shared/BlockedUsersScreen';
 import { NotificationPreferencesScreen } from '../screens/shared/NotificationPreferencesScreen';
 import { VerificationScreen } from '../screens/shared/VerificationScreen';
 import { MyInterestsScreen } from '../screens/shared/MyInterestsScreen';
+import { MatchesListScreen } from '../screens/shared/MatchesListScreen';
+import { WhoLikedMeScreen } from '../screens/shared/WhoLikedMeScreen';
 import { HostPricingScreen } from '../screens/host/HostPricingScreen';
 import { HostSubscriptionScreen } from '../screens/host/HostSubscriptionScreen';
 import { ManageSubscriptionScreen } from '../screens/shared/ManageSubscriptionScreen';
@@ -44,6 +46,8 @@ export type ProfileStackParamList = {
   NotificationPreferences: undefined;
   Verification: { fromHostPurchase?: boolean } | undefined;
   MyInterests: undefined;
+  MatchesList: undefined;
+  WhoLikedMe: undefined;
 };
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
@@ -248,6 +252,20 @@ export const ProfileStackNavigator = () => {
       <Stack.Screen 
         name="MyInterests" 
         component={MyInterestsScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen 
+        name="MatchesList" 
+        component={MatchesListScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen 
+        name="WhoLikedMe" 
+        component={WhoLikedMeScreen}
         options={{
           headerShown: false,
         }}
