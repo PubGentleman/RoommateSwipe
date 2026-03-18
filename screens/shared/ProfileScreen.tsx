@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Pressable, Image, Alert, Modal, ScrollView, Text, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, Pressable, Image, Alert, Modal, ScrollView, Text, TouchableOpacity, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -268,12 +268,19 @@ export const ProfileScreen = () => {
                   style={styles.bgCheckBtn}
                   onPress={() => {
                     if (isDev) {
-                      Alert.alert('Dev Mode', 'Background check marked as cleared', [
-                        { text: 'Cancel', style: 'cancel' },
-                        { text: 'Mark Cleared', onPress: () => {
-                          if (user) updateUser({ ...user, background_check_status: 'clear', background_check_completed_at: new Date().toISOString() });
-                        }},
-                      ]);
+                      if (Platform.OS === 'web') {
+                        const confirmed = window.confirm('Dev Mode: Mark background check as cleared?');
+                        if (confirmed && user) {
+                          updateUser({ ...user, background_check_status: 'clear', background_check_completed_at: new Date().toISOString() });
+                        }
+                      } else {
+                        Alert.alert('Dev Mode', 'Background check marked as cleared', [
+                          { text: 'Cancel', style: 'cancel' },
+                          { text: 'Mark Cleared', onPress: () => {
+                            if (user) updateUser({ ...user, background_check_status: 'clear', background_check_completed_at: new Date().toISOString() });
+                          }},
+                        ]);
+                      }
                     } else {
                       navigation.navigate('Payment', { type: 'background_check', amount: 999 } as any);
                     }
