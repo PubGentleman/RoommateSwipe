@@ -5,7 +5,6 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 
 import { RootNavigator } from "./navigation/RootNavigator";
@@ -22,15 +21,9 @@ import { checkDailyTrigger } from "./utils/insightRefresh";
 SplashScreen.preventAutoHideAsync();
 
 export default function App() {
-  const [fontsLoaded, fontError] = useFonts({
-    'feather': require('./assets/fonts/Feather.ttf'),
-  });
-
   useEffect(() => {
-    if (fontsLoaded || fontError) {
-      SplashScreen.hideAsync();
-    }
-  }, [fontsLoaded, fontError]);
+    SplashScreen.hideAsync();
+  }, []);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -51,10 +44,6 @@ export default function App() {
     }
     checkDailyTrigger();
   }, []);
-
-  if (!fontsLoaded && !fontError) {
-    return null;
-  }
 
   return (
     <ErrorBoundary>
