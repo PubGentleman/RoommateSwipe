@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Pressable, TextInput, Alert } from 'react-native';
+import { View, StyleSheet, Pressable, TextInput, Alert, Modal, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { WebView } from 'react-native-webview';
 import { ScreenKeyboardAwareScrollView } from '../../components/ScreenKeyboardAwareScrollView';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
@@ -9,6 +10,7 @@ import { Typography, Spacing } from '../../constants/theme';
 import { getVerificationLevel, getVerificationLabel } from '../../components/VerificationBadge';
 import { isDev } from '../../utils/envUtils';
 import { supabase } from '../../lib/supabase';
+import { createVerificationSession } from '../../services/paymentService';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { ProfileStackParamList } from '../../navigation/ProfileStackNavigator';
 
@@ -31,6 +33,8 @@ export function VerificationScreen({ navigation, route }: Props) {
   const [backgroundChecking, setBackgroundChecking] = useState(false);
   const [incomeVerifying, setIncomeVerifying] = useState(false);
   const [hostIdUploading, setHostIdUploading] = useState(false);
+  const [stripeVerificationUrl, setStripeVerificationUrl] = useState<string | null>(null);
+  const [showStripeWebView, setShowStripeWebView] = useState(false);
 
   const syncVerificationToSupabase = async (verificationData: any) => {
     await updateUser({ verification: verificationData });
@@ -123,19 +127,51 @@ export function VerificationScreen({ navigation, route }: Props) {
   };
 
   const handleVerifyId = async () => {
+    if (!user) return;
     setIdUploading(true);
-    setTimeout(async () => {
-      const newVerification = {
-        ...verification,
-        government_id: { verified: true, verifiedAt: new Date() },
-      };
-      await updateUser({
-        verification: newVerification,
-      });
-      await syncVerificationToSupabase(newVerification);
+
+    if (isDev) {
+      setTimeout(async () => {
+        const newVerification = {
+          ...verification,
+          government_id: { verified: true, verifiedAt: new Date(), provider: 'stripe_identity' },
+        };
+        await updateUser({ verification: newVerification });
+        await syncVerificationToSupabase(newVerification);
+        setIdUploading(false);
+        Alert.alert('ID Verified', 'Your government ID has been verified successfully via Stripe Identity.');
+      }, 1500);
+      return;
+    }
+
+    try {
+      const sessionData = await createVerificationSession(user.id);
+      if (sessionData?.url) {
+        setStripeVerificationUrl(sessionData.url);
+        setShowStripeWebView(true);
+      } else if (sessionData?.clientSecret) {
+        setStripeVerificationUrl(`https://verify.stripe.com/start#${sessionData.clientSecret}`);
+        setShowStripeWebView(true);
+      } else {
+        Alert.alert('Error', 'Could not start identity verification. Please try again.');
+      }
+    } catch (err: any) {
+      Alert.alert('Verification Error', err?.message || 'Failed to start identity verification. Please try again later.');
+    } finally {
       setIdUploading(false);
-      Alert.alert('ID Verified', 'Your government ID has been verified successfully.');
-    }, 1500);
+    }
+  };
+
+  const handleStripeVerificationComplete = async () => {
+    setShowStripeWebView(false);
+    setStripeVerificationUrl(null);
+    const newVerification = {
+      ...verification,
+      government_id: { verified: true, verifiedAt: new Date(), provider: 'stripe_identity' },
+    };
+    await updateUser({ verification: newVerification });
+    await syncVerificationToSupabase(newVerification);
+    Alert.alert('ID Verified', 'Your government ID has been verified successfully via Stripe Identity.');
   };
 
   const handleVerifySocial = async (platform: 'instagram' | 'linkedin' | 'facebook') => {
@@ -216,6 +252,7 @@ export function VerificationScreen({ navigation, route }: Props) {
   const progressColor = level >= 3 ? '#2563EB' : level >= 2 ? '#2563EB' : level >= 1 ? '#F59E0B' : theme.textSecondary;
 
   return (
+    <>
     <ScreenKeyboardAwareScrollView style={{ backgroundColor: '#111111' }} contentContainerStyle={{ backgroundColor: '#111111' }}>
       <View style={styles.container}>
         <View style={styles.header}>
@@ -351,7 +388,7 @@ export function VerificationScreen({ navigation, route }: Props) {
             <View style={{ flex: 1, marginLeft: Spacing.md }}>
               <ThemedText style={[Typography.body, { fontWeight: '600' }]}>Government ID</ThemedText>
               <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
-                Upload a government-issued photo ID for review
+                Securely verified via Stripe Identity
               </ThemedText>
             </View>
             {verification?.government_id?.verified ? (
@@ -364,15 +401,22 @@ export function VerificationScreen({ navigation, route }: Props) {
           {!verification?.government_id?.verified ? (
             <View style={styles.verificationAction}>
               <Pressable
-                style={[styles.actionButton, { backgroundColor: theme.primary, opacity: idUploading ? 0.6 : 1 }]}
+                style={[styles.actionButton, { backgroundColor: '#635BFF', opacity: idUploading ? 0.6 : 1 }]}
                 onPress={handleVerifyId}
                 disabled={idUploading}
               >
-                <Feather name="upload" size={16} color="#FFFFFF" style={{ marginRight: Spacing.xs }} />
+                {idUploading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: Spacing.xs }} />
+                ) : (
+                  <Feather name="shield" size={16} color="#FFFFFF" style={{ marginRight: Spacing.xs }} />
+                )}
                 <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>
-                  {idUploading ? 'Verifying...' : 'Upload ID'}
+                  {idUploading ? 'Starting Verification...' : 'Verify with Stripe Identity'}
                 </ThemedText>
               </Pressable>
+              <ThemedText style={[Typography.small, { color: theme.textSecondary, marginTop: Spacing.sm, textAlign: 'center' }]}>
+                Accepts driver's license, passport, or national ID card. Includes selfie matching.
+              </ThemedText>
             </View>
           ) : null}
         </View>
@@ -604,6 +648,73 @@ export function VerificationScreen({ navigation, route }: Props) {
         </View>
       </View>
     </ScreenKeyboardAwareScrollView>
+
+      <Modal
+        visible={showStripeWebView}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => {
+          setShowStripeWebView(false);
+          setStripeVerificationUrl(null);
+        }}
+      >
+        <View style={{ flex: 1, backgroundColor: '#111111' }}>
+          <View style={styles.stripeWebViewHeader}>
+            <ThemedText style={[Typography.h3, { flex: 1 }]}>Identity Verification</ThemedText>
+            <Pressable
+              onPress={() => {
+                Alert.alert(
+                  'Cancel Verification?',
+                  'Your verification progress will be lost if you close now.',
+                  [
+                    { text: 'Continue', style: 'cancel' },
+                    {
+                      text: 'Cancel',
+                      style: 'destructive',
+                      onPress: () => {
+                        setShowStripeWebView(false);
+                        setStripeVerificationUrl(null);
+                      },
+                    },
+                  ]
+                );
+              }}
+              hitSlop={12}
+            >
+              <Feather name="x" size={24} color="#FFFFFF" />
+            </Pressable>
+          </View>
+          {stripeVerificationUrl ? (
+            <WebView
+              source={{ uri: stripeVerificationUrl }}
+              style={{ flex: 1, backgroundColor: '#111111' }}
+              onNavigationStateChange={(navState) => {
+                if (navState.url.includes('verification_session_result=complete') ||
+                    navState.url.includes('return_url') ||
+                    navState.url.includes('success')) {
+                  handleStripeVerificationComplete();
+                }
+              }}
+              startInLoadingState
+              renderLoading={() => (
+                <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: '#111111' }}>
+                  <ActivityIndicator size="large" color="#635BFF" />
+                  <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.md }]}>
+                    Loading Stripe Identity...
+                  </ThemedText>
+                </View>
+              )}
+            />
+          ) : null}
+          <View style={styles.stripeWebViewFooter}>
+            <Feather name="lock" size={12} color="rgba(255,255,255,0.4)" />
+            <ThemedText style={[Typography.small, { color: 'rgba(255,255,255,0.4)', marginLeft: 6 }]}>
+              Powered by Stripe Identity. Your data is encrypted and secure.
+            </ThemedText>
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 }
 
@@ -723,5 +834,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 10,
+  },
+  stripeWebViewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingTop: 56,
+    paddingBottom: Spacing.md,
+    backgroundColor: '#1a1a1a',
+    borderBottomWidth: 1,
+    borderBottomColor: '#333333',
+  },
+  stripeWebViewFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.md,
+    paddingBottom: 34,
+    backgroundColor: '#1a1a1a',
+    borderTopWidth: 1,
+    borderTopColor: '#333333',
   },
 });

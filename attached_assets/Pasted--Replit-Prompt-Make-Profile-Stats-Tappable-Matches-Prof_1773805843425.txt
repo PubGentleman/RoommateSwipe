@@ -1,0 +1,469 @@
+# Replit Prompt — Make Profile Stats Tappable (Matches, Profile Views, Likes)
+
+## Current Problem
+
+In `screens/shared/ProfileScreen.tsx`, the three stat boxes (Matches, Profile Views, Likes) are:
+1. **Not tappable** — plain `View` components with no `onPress`
+2. **Hardcoded numbers** — `matchCount = 12`, `profileViewCount = 84`, `likesCount = 7` are static values, not loaded from real data
+
+A `ProfileViewsScreen` already exists and is registered in `ProfileStackNavigator`. No screen exists yet for Likes — that needs to be created.
+
+---
+
+## Visibility Rules
+
+| Stat | Free (Basic) | Plus | Elite |
+|------|-------------|------|-------|
+| Matches | ✅ Full list — names + photos | ✅ Full list | ✅ Full list |
+| Profile Views | 🔒 Blurred — count only | ✅ Full list | ✅ Full list |
+| Likes | 🔒 Blurred — count only | ✅ Full list | ✅ Full list |
+
+---
+
+## Fix 1 — `screens/shared/ProfileScreen.tsx`
+
+### 1a. Load real counts from StorageService
+
+Remove the hardcoded values and replace with real data loaded in a `useEffect`:
+
+```tsx
+// Remove these hardcoded lines:
+// const matchCount = 12;
+// const profileViewCount = 84;
+// const likesCount = 7;
+
+// Add state:
+const [matchCount, setMatchCount] = useState(0);
+const [profileViewCount, setProfileViewCount] = useState(0);
+const [likesCount, setLikesCount] = useState(0);
+
+// Add useEffect to load real counts:
+useEffect(() => {
+  const loadStats = async () => {
+    if (!user) return;
+    try {
+      // Matches count
+      const matches = await StorageService.getMatches();
+      const userMatches = matches.filter(m =>
+        m.userId1 === user.id || m.userId2 === user.id
+      );
+      setMatchCount(userMatches.length);
+
+      // Profile views count
+      const views = await StorageService.getProfileViews(user.id);
+      setProfileViewCount(views.length);
+
+      // Likes count — people who liked the current user
+      const likes = await StorageService.getLikes();
+      const receivedLikes = likes.filter(l => l.likedUserId === user.id && !l.isSuperLike);
+      setLikesCount(receivedLikes.length);
+    } catch (e) {
+      console.warn('Failed to load profile stats:', e);
+    }
+  };
+  loadStats();
+}, [user?.id]);
+```
+
+### 1b. Make the stat boxes tappable with `Pressable`
+
+Find the `statsRow` section (around line 220) and replace all three `View` stat boxes with `Pressable`:
+
+```tsx
+<View style={styles.statsRow}>
+  <Pressable
+    style={styles.statBox}
+    onPress={() => navigation.navigate('MatchesList')}
+  >
+    <Text style={[styles.statValue, styles.statCoral]}>{matchCount}</Text>
+    <Text style={styles.statLabel}>Matches</Text>
+  </Pressable>
+
+  <Pressable
+    style={styles.statBox}
+    onPress={() => navigation.navigate('ProfileViews')}
+  >
+    <Text style={styles.statValue}>{profileViewCount}</Text>
+    <Text style={styles.statLabel}>Profile Views</Text>
+  </Pressable>
+
+  <Pressable
+    style={styles.statBox}
+    onPress={() => navigation.navigate('WhoLikedMe')}
+  >
+    <Text style={[styles.statValue, styles.statCoral]}>{likesCount}</Text>
+    <Text style={styles.statLabel}>Likes</Text>
+  </Pressable>
+</View>
+```
+
+---
+
+## Fix 2 — `navigation/ProfileStackNavigator.tsx`
+
+### Register two new screens: `MatchesList` and `WhoLikedMe`
+
+Add to the `ProfileStackParamList` type:
+```tsx
+MatchesList: undefined;
+WhoLikedMe: undefined;
+```
+
+Add imports at the top:
+```tsx
+import { MatchesListScreen } from '../screens/shared/MatchesListScreen';
+import { WhoLikedMeScreen } from '../screens/shared/WhoLikedMeScreen';
+```
+
+Add the screens inside `<Stack.Navigator>`:
+```tsx
+<Stack.Screen name="MatchesList" component={MatchesListScreen} />
+<Stack.Screen name="WhoLikedMe" component={WhoLikedMeScreen} />
+```
+
+---
+
+## Fix 3 — Create `screens/shared/MatchesListScreen.tsx`
+
+This screen shows all mutual matches. All plans can see full names and photos — matches are mutual so no paywall needed.
+
+```tsx
+import React, { useState, useEffect } from 'react';
+import { View, FlatList, Pressable, StyleSheet, Image } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../hooks/useTheme';
+import { ThemedText } from '../../components/ThemedText';
+import { StorageService } from '../../utils/storage';
+import { Feather } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Typography, Spacing } from '../../constants/theme';
+
+export const MatchesListScreen = () => {
+  const { user } = useAuth();
+  const { theme } = useTheme();
+  const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
+  const [matches, setMatches] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    loadMatches();
+  }, []);
+
+  const loadMatches = async () => {
+    if (!user) return;
+    try {
+      setIsLoading(true);
+      const allMatches = await StorageService.getMatches();
+      const profiles = await StorageService.getRoommateProfiles();
+      const profileMap = new Map(profiles.map(p => [p.id, p]));
+
+      const userMatches = allMatches
+        .filter(m => m.userId1 === user.id || m.userId2 === user.id)
+        .map(m => {
+          const otherId = m.userId1 === user.id ? m.userId2 : m.userId1;
+          const profile = profileMap.get(otherId);
+          return {
+            matchId: m.id,
+            conversationId: `conv_${m.id}`,
+            profile,
+            matchedAt: m.matchedAt,
+            matchType: m.matchType,
+          };
+        })
+        .filter(m => m.profile)
+        .sort((a, b) => new Date(b.matchedAt).getTime() - new Date(a.matchedAt).getTime());
+
+      setMatches(userMatches);
+    } catch (e) {
+      console.error('Failed to load matches:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleOpenChat = (item: any) => {
+    // Navigate to Messages tab and open chat with this match
+    const tabNav = (navigation as any).getParent()?.getParent?.() || (navigation as any).getParent();
+    if (tabNav) {
+      tabNav.navigate('Messages', { screen: 'MessagesList' });
+      setTimeout(() => {
+        tabNav.navigate('Messages', {
+          screen: 'Chat',
+          params: {
+            conversationId: item.conversationId,
+            otherUser: item.profile,
+          },
+        });
+      }, 50);
+    }
+  };
+
+  const formatDate = (date: any) => {
+    const d = new Date(date);
+    const diff = Math.floor((Date.now() - d.getTime()) / 86400000);
+    if (diff === 0) return 'Today';
+    if (diff === 1) return 'Yesterday';
+    if (diff < 7) return `${diff} days ago`;
+    return d.toLocaleDateString();
+  };
+
+  return (
+    <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top }]}>
+      <View style={styles.header}>
+        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Feather name="arrow-left" size={22} color={theme.text} />
+        </Pressable>
+        <ThemedText style={[Typography.h2, { flex: 1, textAlign: 'center' }]}>
+          Matches
+        </ThemedText>
+        <View style={{ width: 40 }} />
+      </View>
+
+      {isLoading ? (
+        <View style={styles.center}>
+          <ThemedText style={{ color: theme.textSecondary }}>Loading...</ThemedText>
+        </View>
+      ) : matches.length === 0 ? (
+        <View style={styles.center}>
+          <Feather name="users" size={48} color={theme.textSecondary} style={{ marginBottom: Spacing.md }} />
+          <ThemedText style={[Typography.h3, { textAlign: 'center', marginBottom: Spacing.sm }]}>No Matches Yet</ThemedText>
+          <ThemedText style={[Typography.body, { color: theme.textSecondary, textAlign: 'center' }]}>
+            Keep swiping to find your perfect roommate match.
+          </ThemedText>
+        </View>
+      ) : (
+        <FlatList
+          data={matches}
+          keyExtractor={item => item.matchId}
+          contentContainerStyle={{ padding: Spacing.md }}
+          renderItem={({ item }) => (
+            <Pressable
+              style={[styles.matchItem, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}
+              onPress={() => handleOpenChat(item)}
+            >
+              {item.profile?.photos?.[0] ? (
+                <Image source={{ uri: item.profile.photos[0] }} style={styles.avatar} />
+              ) : (
+                <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: theme.backgroundSecondary }]}>
+                  <ThemedText style={{ fontSize: 22, fontWeight: '700' }}>
+                    {item.profile?.name?.charAt(0) || '?'}
+                  </ThemedText>
+                </View>
+              )}
+              <View style={{ flex: 1 }}>
+                <ThemedText style={[Typography.h3, { marginBottom: 2 }]}>
+                  {item.profile?.name || 'Unknown'}
+                </ThemedText>
+                <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+                  Matched {formatDate(item.matchedAt)}
+                </ThemedText>
+              </View>
+              <View style={[styles.msgBtn, { backgroundColor: theme.primary + '22' }]}>
+                <Feather name="message-circle" size={18} color={theme.primary} />
+              </View>
+            </Pressable>
+          )}
+        />
+      )}
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
+  backBtn: { width: 40, height: 40, justifyContent: 'center' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
+  matchItem: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 14, borderWidth: 1, marginBottom: 10, gap: 12 },
+  avatar: { width: 52, height: 52, borderRadius: 26 },
+  avatarPlaceholder: { justifyContent: 'center', alignItems: 'center' },
+  msgBtn: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
+});
+```
+
+---
+
+## Fix 4 — Create `screens/shared/WhoLikedMeScreen.tsx`
+
+This screen shows who liked the current user. Basic users see blurred profiles. Plus/Elite see full details.
+
+```tsx
+import React, { useState, useEffect } from 'react';
+import { View, FlatList, Pressable, StyleSheet, Image, Alert } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../hooks/useTheme';
+import { ThemedText } from '../../components/ThemedText';
+import { StorageService } from '../../utils/storage';
+import { Feather } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Typography, Spacing } from '../../constants/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+
+export const WhoLikedMeScreen = () => {
+  const { user } = useAuth();
+  const { theme } = useTheme();
+  const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
+  const [likers, setLikers] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const plan = user?.subscription?.plan || 'basic';
+  const canReveal = plan === 'plus' || plan === 'elite';
+
+  useEffect(() => {
+    loadLikers();
+  }, []);
+
+  const loadLikers = async () => {
+    if (!user) return;
+    try {
+      setIsLoading(true);
+      const likes = await StorageService.getLikes();
+      const profiles = await StorageService.getRoommateProfiles();
+      const profileMap = new Map(profiles.map(p => [p.id, p]));
+
+      const received = likes
+        .filter(l => l.likedUserId === user.id && !l.isSuperLike)
+        .map(l => ({
+          likerId: l.userId,
+          profile: profileMap.get(l.userId),
+          likedAt: l.likedAt,
+        }))
+        .filter(l => l.profile)
+        .sort((a, b) => new Date(b.likedAt).getTime() - new Date(a.likedAt).getTime());
+
+      setLikers(received);
+    } catch (e) {
+      console.error('Failed to load likers:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUpgrade = () => {
+    navigation.navigate('Plans' as never);
+  };
+
+  return (
+    <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top }]}>
+      <View style={styles.header}>
+        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Feather name="arrow-left" size={22} color={theme.text} />
+        </Pressable>
+        <ThemedText style={[Typography.h2, { flex: 1, textAlign: 'center' }]}>
+          {likers.length} {likers.length === 1 ? 'Like' : 'Likes'}
+        </ThemedText>
+        <View style={{ width: 40 }} />
+      </View>
+
+      {/* Upgrade banner for Basic users */}
+      {!canReveal && likers.length > 0 && (
+        <Pressable onPress={handleUpgrade} style={styles.upgradeBanner}>
+          <LinearGradient
+            colors={['#ff6b5b', '#ff8e7f']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={styles.upgradeBannerInner}
+          >
+            <Feather name="lock" size={16} color="#fff" />
+            <ThemedText style={styles.upgradeBannerText}>
+              Upgrade to Plus to see who liked you
+            </ThemedText>
+            <Feather name="chevron-right" size={16} color="#fff" />
+          </LinearGradient>
+        </Pressable>
+      )}
+
+      {isLoading ? (
+        <View style={styles.center}>
+          <ThemedText style={{ color: theme.textSecondary }}>Loading...</ThemedText>
+        </View>
+      ) : likers.length === 0 ? (
+        <View style={styles.center}>
+          <Feather name="heart" size={48} color={theme.textSecondary} style={{ marginBottom: Spacing.md }} />
+          <ThemedText style={[Typography.h3, { textAlign: 'center', marginBottom: Spacing.sm }]}>No Likes Yet</ThemedText>
+          <ThemedText style={[Typography.body, { color: theme.textSecondary, textAlign: 'center' }]}>
+            Complete your profile and boost it to get more likes.
+          </ThemedText>
+        </View>
+      ) : (
+        <FlatList
+          data={likers}
+          keyExtractor={item => item.likerId}
+          contentContainerStyle={{ padding: Spacing.md }}
+          numColumns={2}
+          columnWrapperStyle={{ gap: 10 }}
+          renderItem={({ item }) => (
+            <View style={[styles.likerCard, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
+              <View style={styles.avatarWrap}>
+                {item.profile?.photos?.[0] ? (
+                  <Image
+                    source={{ uri: item.profile.photos[0] }}
+                    style={[styles.avatar, !canReveal && styles.blurred]}
+                    blurRadius={canReveal ? 0 : 20}
+                  />
+                ) : (
+                  <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: theme.border }]}>
+                    <Feather name="user" size={32} color={theme.textSecondary} />
+                  </View>
+                )}
+                {!canReveal && (
+                  <View style={styles.lockOverlay}>
+                    <Feather name="lock" size={20} color="#fff" />
+                  </View>
+                )}
+              </View>
+              <ThemedText style={[Typography.bodyBold, { textAlign: 'center', marginTop: 8 }]} numberOfLines={1}>
+                {canReveal ? (item.profile?.name || 'Unknown') : '••••••'}
+              </ThemedText>
+              {canReveal && item.profile?.budget ? (
+                <ThemedText style={[Typography.small, { color: theme.textSecondary, textAlign: 'center' }]}>
+                  ${item.profile.budget}/mo
+                </ThemedText>
+              ) : null}
+            </View>
+          )}
+        />
+      )}
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
+  backBtn: { width: 40, height: 40, justifyContent: 'center' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
+  upgradeBanner: { marginHorizontal: 16, marginBottom: 8, borderRadius: 12, overflow: 'hidden' },
+  upgradeBannerInner: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14 },
+  upgradeBannerText: { flex: 1, color: '#fff', fontWeight: '600', fontSize: 14 },
+  likerCard: { flex: 1, borderRadius: 14, borderWidth: 1, padding: 12, alignItems: 'center' },
+  avatarWrap: { position: 'relative', width: 80, height: 80 },
+  avatar: { width: 80, height: 80, borderRadius: 40 },
+  avatarPlaceholder: { justifyContent: 'center', alignItems: 'center' },
+  blurred: { opacity: 0.4 },
+  lockOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', borderRadius: 40, backgroundColor: 'rgba(0,0,0,0.4)' },
+});
+```
+
+---
+
+## Fix 5 — Update existing `ProfileViewsScreen.tsx`
+
+The screen already exists and has the paywall logic (`canSeeProfileViews = plus || elite`). Make sure the blurred view for Basic users matches the same pattern as `WhoLikedMeScreen`. If it already blurs correctly, no changes needed here.
+
+The main thing to verify: Basic users see blurred photos + a locked name, and the upgrade banner at the top links to `navigation.navigate('Plans')`.
+
+---
+
+## Summary
+
+| What | Before | After |
+|------|--------|-------|
+| Stat numbers | Hardcoded (12, 84, 7) | Real data from StorageService |
+| Tapping Matches | Nothing | Opens `MatchesListScreen` — full list for all plans |
+| Tapping Profile Views | Nothing | Opens existing `ProfileViewsScreen` — blurred for Basic, full for Plus/Elite |
+| Tapping Likes | Nothing | Opens new `WhoLikedMeScreen` — blurred for Basic, full for Plus/Elite |
+| Chat from Matches | N/A | Tap match row → opens chat directly |
