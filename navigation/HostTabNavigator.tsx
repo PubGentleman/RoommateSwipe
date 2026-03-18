@@ -15,7 +15,7 @@ import { HostPricingScreen } from '../screens/host/HostPricingScreen';
 import { HostSubscriptionScreen } from '../screens/host/HostSubscriptionScreen';
 import { ListingBoostScreen } from '../screens/host/ListingBoostScreen';
 import { BrowseRenterGroupsScreen } from '../screens/host/BrowseRenterGroupsScreen';
-import { MessagesStackNavigator } from './MessagesStackNavigator';
+import { HostMessagesStackNavigator } from './HostMessagesStackNavigator';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
 import { useTheme } from '../hooks/useTheme';
 import { useNotificationContext } from '../contexts/NotificationContext';
@@ -194,7 +194,7 @@ export const HostTabNavigator = () => {
       <Tab.Screen name="Listings" component={ListingsStackNavigator} />
       <Tab.Screen name="Roommates" component={RoommatesScreen} />
       <Tab.Screen name="Groups" component={BrowseRenterGroupsScreen} />
-      <Tab.Screen name="Messages" component={MessagesStackNavigator} />
+      <Tab.Screen name="Messages" component={HostMessagesStackNavigator} />
       <Tab.Screen name="Profile" component={ProfileStackNavigator} />
     </Tab.Navigator>
   );

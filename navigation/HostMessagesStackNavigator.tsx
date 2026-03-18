@@ -5,8 +5,8 @@ import { ChatScreen } from '../screens/shared/ChatScreen';
 import { CreateGroupScreen } from '../screens/shared/CreateGroupScreen';
 import { RoommateProfile } from '../types/models';
 
-export type MessagesStackParamList = {
-  MessagesList: { role?: 'host' | 'renter' };
+export type HostMessagesStackParamList = {
+  MessagesList: { role: 'host' };
   Chat: {
     conversationId: string;
     otherUser?: RoommateProfile;
@@ -18,12 +18,16 @@ export type MessagesStackParamList = {
   };
 };
 
-const Stack = createNativeStackNavigator<MessagesStackParamList>();
+const Stack = createNativeStackNavigator<HostMessagesStackParamList>();
 
-export const MessagesStackNavigator = () => {
+export const HostMessagesStackNavigator = () => {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="MessagesList" component={MessagesScreen} />
+      <Stack.Screen
+        name="MessagesList"
+        component={MessagesScreen}
+        initialParams={{ role: 'host' }}
+      />
       <Stack.Screen name="Chat" component={ChatScreen} />
       <Stack.Screen name="CreateGroup" component={CreateGroupScreen} />
     </Stack.Navigator>

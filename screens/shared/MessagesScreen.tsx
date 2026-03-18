@@ -8,7 +8,7 @@ import { Conversation, Match, RoommateProfile, Message } from '../../types/model
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StorageService } from '../../utils/storage';
 import { useAuth } from '../../contexts/AuthContext';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MessagesStackParamList } from '../../navigation/MessagesStackNavigator';
 import { Image } from 'expo-image';
@@ -42,6 +42,9 @@ const ICE_BREAKERS = [
 
 export const MessagesScreen = () => {
   const navigation = useNavigation<MessagesScreenNavigationProp>();
+  const route = useRoute<any>();
+  const role: 'host' | 'renter' = route.params?.role || 'renter';
+  const isHostMode = role === 'host';
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
@@ -115,9 +118,9 @@ export const MessagesScreen = () => {
         }
       }
 
-      const matches = await StorageService.getMatches();
-      const profiles = await StorageService.getRoommateProfiles();
-      const allUsers = await StorageService.getUsers();
+      const matches = isHostMode ? [] : await StorageService.getMatches();
+      const profiles = isHostMode ? [] : await StorageService.getRoommateProfiles();
+      const allUsers = isHostMode ? [] : await StorageService.getUsers();
       const pMap = new Map(profiles.map(p => [p.id, p]));
       const uMap = new Map(allUsers.map(u => [u.id, u]));
       setProfilesMap(pMap);
@@ -189,17 +192,26 @@ export const MessagesScreen = () => {
       setNewMatches(recentMatchProfiles.slice(0, 10));
 
       const blockedIds = user.blockedUsers || [];
-      const userConversations = existingConversations.filter(
-        c => !blockedIds.includes(c.participant.id) && (
-          c.isInquiryThread ||
-          c.id.startsWith('conv-interest-') ||
-          c.matchType === 'cold' ||
-          matches.some(match =>
-            (match.userId1 === user.id && match.userId2 === c.participant.id) ||
-            (match.userId2 === user.id && match.userId1 === c.participant.id)
-          )
-        )
-      );
+      const userConversations = existingConversations.filter(c => {
+        if (blockedIds.includes(c.participant.id)) return false;
+
+        if (isHostMode) {
+          return (
+            c.id.startsWith('conv-interest-') ||
+            (c.isInquiryThread && c.hostId === user.id)
+          );
+        } else {
+          return (
+            (c.isInquiryThread && c.hostId !== user.id) ||
+            (c.id.startsWith('conv-interest-') && c.participant.id !== user.id) ||
+            c.matchType === 'cold' ||
+            matches.some(match =>
+              (match.userId1 === user.id && match.userId2 === c.participant.id) ||
+              (match.userId2 === user.id && match.userId1 === c.participant.id)
+            )
+          );
+        }
+      });
 
       userConversations.sort((a, b) => {
         if (a.isInquiryThread && a.isSuperInterest && !(b.isInquiryThread && b.isSuperInterest)) return -1;
@@ -216,23 +228,27 @@ export const MessagesScreen = () => {
       });
       await StorageService.setConversations(safeToSave);
       setConversations(userConversations);
-      try {
-        const groups = await getMyInquiryGroups();
-        const mapped = groups.map((g: any) => ({
-          ...g,
-          listingAddress: g.listing_address || g.listingAddress,
-          listingId: g.listing_id || g.listingId,
-          hostId: g.host_id || g.hostId,
-          isArchived: g.is_archived || g.isArchived || false,
-          hostName: g.host?.full_name || g.hostName || 'Host',
-          memberCount: g.members?.[0]?.count || g.memberCount || 0,
-          listingPhoto: g.listing?.photos?.[0] || g.listingPhoto,
-          inquiryStatus: g.inquiry_status || g.inquiryStatus || 'pending',
-          addressRevealed: g.address_revealed || g.addressRevealed || false,
-        }));
-        setInquiryGroups(mapped.filter((g: any) => !g.isArchived));
-      } catch (e) {
-        console.warn('Failed to load inquiry groups:', e);
+      if (!isHostMode) {
+        try {
+          const groups = await getMyInquiryGroups();
+          const mapped = groups.map((g: any) => ({
+            ...g,
+            listingAddress: g.listing_address || g.listingAddress,
+            listingId: g.listing_id || g.listingId,
+            hostId: g.host_id || g.hostId,
+            isArchived: g.is_archived || g.isArchived || false,
+            hostName: g.host?.full_name || g.hostName || 'Host',
+            memberCount: g.members?.[0]?.count || g.memberCount || 0,
+            listingPhoto: g.listing?.photos?.[0] || g.listingPhoto,
+            inquiryStatus: g.inquiry_status || g.inquiryStatus || 'pending',
+            addressRevealed: g.address_revealed || g.addressRevealed || false,
+          }));
+          setInquiryGroups(mapped.filter((g: any) => !g.isArchived));
+        } catch (e) {
+          console.warn('Failed to load inquiry groups:', e);
+        }
+      } else {
+        setInquiryGroups([]);
       }
     } catch (error) {
       console.error('Error loading conversations:', error);
@@ -673,7 +689,7 @@ export const MessagesScreen = () => {
           <View style={styles.divider} />
         </>
       ) : null}
-      {newMatches.length > 0 ? (
+      {!isHostMode && newMatches.length > 0 ? (
         <>
           <ThemedText style={styles.sectionLabel}>New Matches</ThemedText>
           <ScrollView
@@ -718,7 +734,9 @@ export const MessagesScreen = () => {
       </View>
       <ThemedText style={styles.emptyTitle}>No Messages Yet</ThemedText>
       <ThemedText style={styles.emptySubtitle}>
-        Match with roommates on the{'\n'}Match tab to start chatting
+        {isHostMode
+          ? `Accept renters' inquiries to\nstart a conversation`
+          : `Match with roommates on the\nMatch tab to start chatting`}
       </ThemedText>
     </View>
   );
@@ -752,14 +770,18 @@ export const MessagesScreen = () => {
             <Feather name="cpu" size={18} color="#FFFFFF" />
           </View>
         </Pressable>
-        <ThemedText style={styles.topNavTitle}>Messages</ThemedText>
+        <ThemedText style={styles.topNavTitle}>
+          {isHostMode ? 'Renter Chats' : 'Messages'}
+        </ThemedText>
         <View style={styles.navActions}>
           <Pressable style={styles.iconBtn} onPress={handleSearchToggle}>
             <Feather name={isSearchVisible ? 'x' : 'search'} size={16} color="rgba(255,255,255,0.7)" />
           </Pressable>
-          <Pressable style={styles.iconBtn} onPress={handleCompose}>
-            <Feather name="edit" size={16} color="rgba(255,255,255,0.7)" />
-          </Pressable>
+          {!isHostMode ? (
+            <Pressable style={styles.iconBtn} onPress={handleCompose}>
+              <Feather name="edit" size={16} color="rgba(255,255,255,0.7)" />
+            </Pressable>
+          ) : null}
         </View>
       </View>
 
