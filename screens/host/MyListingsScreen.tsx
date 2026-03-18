@@ -500,20 +500,35 @@ export const MyListingsScreen = () => {
             const result = canAddListingCheck(updatedSub);
             if (!result.allowed) {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-              Alert.alert('Listing Limit Reached', result.message, [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Upgrade Plan', onPress: () => {
+              if (Platform.OS === 'web') {
+                const upgrade = window.confirm(`${result.message}\n\nWould you like to upgrade your plan?`);
+                if (upgrade) {
                   const parent = navigation.getParent();
                   if (parent) parent.navigate('Dashboard', { screen: 'HostSubscription' });
-                }},
-              ]);
+                  else navigation.navigate('HostSubscription' as any);
+                }
+              } else {
+                Alert.alert('Listing Limit Reached', result.message, [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Upgrade Plan', onPress: () => {
+                    const parent = navigation.getParent();
+                    if (parent) parent.navigate('Dashboard', { screen: 'HostSubscription' });
+                    else navigation.navigate('HostSubscription' as any);
+                  }},
+                ]);
+              }
               return;
             }
             if (result.message) {
-              Alert.alert('Overage Notice', result.message, [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Continue', onPress: () => navigation.navigate('CreateEditListing') },
-              ]);
+              if (Platform.OS === 'web') {
+                const proceed = window.confirm(result.message);
+                if (proceed) navigation.navigate('CreateEditListing');
+              } else {
+                Alert.alert('Overage Notice', result.message, [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Continue', onPress: () => navigation.navigate('CreateEditListing') },
+                ]);
+              }
               return;
             }
           }
