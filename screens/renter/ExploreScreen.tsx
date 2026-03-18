@@ -866,17 +866,19 @@ export const ExploreScreen = () => {
         </Pressable>
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={styles.chipScrollContent}>
-        {QUICK_FILTERS.map(f => {
-          const active = activeQuickFilters.has(f.key);
-          return (
-            <Pressable key={f.key} style={active ? styles.chipSelected : styles.chipUnselected} onPress={() => toggleQuickFilter(f.key)}>
-              {f.icon ? <Feather name={f.icon} size={10} color={active ? '#ff8070' : 'rgba(255,255,255,0.4)'} /> : null}
-              <Text style={active ? styles.chipSelectedText : styles.chipUnselectedText}>{f.label}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+      <View style={styles.chipScrollWrapper}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipScrollContent}>
+          {QUICK_FILTERS.map(f => {
+            const active = activeQuickFilters.has(f.key);
+            return (
+              <Pressable key={f.key} style={active ? styles.chipSelected : styles.chipUnselected} onPress={() => toggleQuickFilter(f.key)}>
+                {f.icon ? <Feather name={f.icon} size={10} color={active ? '#ff8070' : 'rgba(255,255,255,0.4)'} /> : null}
+                <Text style={active ? styles.chipSelectedText : styles.chipUnselectedText}>{f.label}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
       {displayMode === 'map' ? (
         <PropertyMapView
           properties={filteredProperties}
@@ -1748,9 +1750,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  chipScroll: {
-    minHeight: 38,
+  chipScrollWrapper: {
+    height: 38,
     marginBottom: 8,
+    overflow: 'visible',
   },
   chipScrollContent: {
     paddingHorizontal: 16,
