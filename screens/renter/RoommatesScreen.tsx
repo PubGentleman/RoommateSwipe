@@ -1331,22 +1331,24 @@ export const RoommatesScreen = () => {
           <Feather name="flag" size={14} color="rgba(255,255,255,0.7)" />
         </Pressable>
 
-        <View style={styles.adBanner}>
-          <View style={styles.adLeft}>
-            <View style={styles.adLogo}>
-              <Feather name="home" size={16} color="#FFFFFF" />
+        {subscriptionPlan === 'basic' ? (
+          <View style={styles.adBanner}>
+            <View style={styles.adLeft}>
+              <View style={styles.adLogo}>
+                <Feather name="home" size={16} color="#FFFFFF" />
+              </View>
+              <View>
+                <ThemedText style={styles.adSponsoredLabel}>SPONSORED</ThemedText>
+                <ThemedText style={styles.adTitle}>Renters Insurance from $5/mo</ThemedText>
+                <ThemedText style={styles.adSubtitle}>Protect your belongings</ThemedText>
+              </View>
             </View>
-            <View>
-              <ThemedText style={styles.adSponsoredLabel}>SPONSORED</ThemedText>
-              <ThemedText style={styles.adTitle}>Renters Insurance from $5/mo</ThemedText>
-              <ThemedText style={styles.adSubtitle}>Protect your belongings</ThemedText>
+            <View style={styles.adCta}>
+              <ThemedText style={styles.adCtaText}>View</ThemedText>
+              <Feather name="arrow-right" size={10} color="#FFFFFF" />
             </View>
           </View>
-          <View style={styles.adCta}>
-            <ThemedText style={styles.adCtaText}>View</ThemedText>
-            <Feather name="arrow-right" size={10} color="#FFFFFF" />
-          </View>
-        </View>
+        ) : null}
       </View>
 
       <View style={styles.actionRow}>
