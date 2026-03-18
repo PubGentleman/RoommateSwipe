@@ -231,7 +231,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       },
       messageCount: 0,
       photos: profile?.photos || [],
-      verification: supabaseUser.verification || undefined,
+      verification: (() => {
+        const existing = supabaseUser.verification || {};
+        return {
+          ...existing,
+          government_id: supabaseUser.identity_verified
+            ? { verified: true, verifiedAt: supabaseUser.identity_verified_at, provider: 'stripe_identity' }
+            : existing?.government_id || { verified: false },
+          background_check: supabaseUser.background_check_status
+            ? {
+                verified: supabaseUser.background_check_status === 'clear',
+                status: supabaseUser.background_check_status,
+                initiatedAt: supabaseUser.background_check_initiated_at,
+              }
+            : existing?.background_check,
+        };
+      })(),
       privacySettings: supabaseUser.privacy_settings || undefined,
     };
   };

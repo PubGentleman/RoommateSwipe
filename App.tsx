@@ -12,6 +12,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import { CityProvider } from "./contexts/CityContext";
 import { ProfileReminderProvider } from "./contexts/ProfileReminderContext";
+import { StripeWrapper } from "./components/StripeWrapper";
 import { StorageService } from "./utils/storage";
 import { isDev } from "./utils/dataUtils";
 import { checkDailyTrigger } from "./utils/insightRefresh";
@@ -39,24 +40,26 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <SafeAreaProvider>
-        <GestureHandlerRootView style={styles.root}>
-          <KeyboardProvider>
-            <AuthProvider>
-              <CityProvider>
-                <ProfileReminderProvider>
-                  <NotificationProvider>
-                    <NavigationContainer>
-                      <RootNavigator />
-                    </NavigationContainer>
-                    <StatusBar style="auto" />
-                  </NotificationProvider>
-                </ProfileReminderProvider>
-              </CityProvider>
-            </AuthProvider>
-          </KeyboardProvider>
-        </GestureHandlerRootView>
-      </SafeAreaProvider>
+      <StripeWrapper>
+        <SafeAreaProvider>
+          <GestureHandlerRootView style={styles.root}>
+            <KeyboardProvider>
+              <AuthProvider>
+                <CityProvider>
+                  <ProfileReminderProvider>
+                    <NotificationProvider>
+                      <NavigationContainer>
+                        <RootNavigator />
+                      </NavigationContainer>
+                      <StatusBar style="auto" />
+                    </NotificationProvider>
+                  </ProfileReminderProvider>
+                </CityProvider>
+              </AuthProvider>
+            </KeyboardProvider>
+          </GestureHandlerRootView>
+        </SafeAreaProvider>
+      </StripeWrapper>
     </ErrorBoundary>
   );
 }

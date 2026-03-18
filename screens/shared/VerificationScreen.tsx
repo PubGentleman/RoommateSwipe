@@ -126,6 +126,53 @@ export function VerificationScreen({ navigation, route }: Props) {
     }
   };
 
+  const pollForVerificationStatus = async () => {
+    if (!user) return;
+    let attempts = 0;
+    const maxAttempts = 10;
+    const interval = 2000;
+
+    const check = async (): Promise<void> => {
+      attempts++;
+      try {
+        const { data } = await supabase
+          .from('users')
+          .select('identity_verified, identity_verified_at')
+          .eq('id', user.id)
+          .single();
+
+        if (data?.identity_verified) {
+          const newVerification = {
+            ...verification,
+            government_id: {
+              verified: true,
+              verifiedAt: data.identity_verified_at
+                ? new Date(data.identity_verified_at)
+                : new Date(),
+              provider: 'stripe_identity',
+            },
+          };
+          await updateUser({ verification: newVerification });
+          await syncVerificationToSupabase(newVerification);
+          Alert.alert('ID Verified', 'Your government ID has been verified successfully by Stripe Identity.');
+          return;
+        }
+      } catch (_e) {}
+
+      if (attempts < maxAttempts) {
+        await new Promise(res => setTimeout(res, interval));
+        return check();
+      } else {
+        Alert.alert(
+          'Verification Pending',
+          'Your ID is being reviewed. This usually takes a few minutes. We\'ll notify you when it\'s complete.'
+        );
+      }
+    };
+
+    await check();
+  };
+
   const handleVerifyId = async () => {
     if (!user) return;
     setIdUploading(true);
@@ -139,25 +186,28 @@ export function VerificationScreen({ navigation, route }: Props) {
         await updateUser({ verification: newVerification });
         await syncVerificationToSupabase(newVerification);
         setIdUploading(false);
-        Alert.alert('ID Verified', 'Your government ID has been verified successfully via Stripe Identity.');
+        Alert.alert('ID Verified (Dev)', 'Simulated verification complete.');
       }, 1500);
       return;
     }
 
     try {
       const sessionData = await createVerificationSession(user.id);
+
       if (sessionData?.url) {
         setStripeVerificationUrl(sessionData.url);
         setShowStripeWebView(true);
+        setIdUploading(false);
       } else if (sessionData?.clientSecret) {
         setStripeVerificationUrl(`https://verify.stripe.com/start#${sessionData.clientSecret}`);
         setShowStripeWebView(true);
+        setIdUploading(false);
       } else {
         Alert.alert('Error', 'Could not start identity verification. Please try again.');
+        setIdUploading(false);
       }
     } catch (err: any) {
       Alert.alert('Verification Error', err?.message || 'Failed to start identity verification. Please try again later.');
-    } finally {
       setIdUploading(false);
     }
   };
@@ -165,13 +215,7 @@ export function VerificationScreen({ navigation, route }: Props) {
   const handleStripeVerificationComplete = async () => {
     setShowStripeWebView(false);
     setStripeVerificationUrl(null);
-    const newVerification = {
-      ...verification,
-      government_id: { verified: true, verifiedAt: new Date(), provider: 'stripe_identity' },
-    };
-    await updateUser({ verification: newVerification });
-    await syncVerificationToSupabase(newVerification);
-    Alert.alert('ID Verified', 'Your government ID has been verified successfully via Stripe Identity.');
+    await pollForVerificationStatus();
   };
 
   const handleVerifySocial = async (platform: 'instagram' | 'linkedin' | 'facebook') => {
@@ -191,28 +235,57 @@ export function VerificationScreen({ navigation, route }: Props) {
   };
 
   const handleVerifyBackground = () => {
-    if (!isElite) return;
+    if (!isElite || !user) return;
     Alert.alert(
       'Background Check',
-      'This will initiate a background verification check. Your information will be securely processed. Do you want to proceed?',
+      'This initiates a background check via Checkr. Results are typically ready within 24-48 hours. A link will be sent to your email to complete the process.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Start Verification',
+          text: 'Start Check',
           onPress: async () => {
             setBackgroundChecking(true);
-            setTimeout(async () => {
+            try {
+              if (isDev) {
+                setTimeout(async () => {
+                  const newVerification = {
+                    ...verification,
+                    background_check: { status: 'pending', initiatedAt: new Date() },
+                  };
+                  await updateUser({ verification: newVerification });
+                  await syncVerificationToSupabase(newVerification);
+                  setBackgroundChecking(false);
+                  Alert.alert('Check Initiated (Dev)', 'Background check simulated as pending.');
+                }, 1500);
+                return;
+              }
+
+              const { data, error } = await supabase.functions.invoke('initiate-background-check', {
+                body: { userId: user.id, email: user.email },
+              });
+
+              if (error) throw error;
+
               const newVerification = {
                 ...verification,
-                background_check: { verified: true, verifiedAt: new Date() },
+                background_check: {
+                  status: 'pending',
+                  initiatedAt: new Date(),
+                  checkrInvitationUrl: data?.invitationUrl,
+                },
               };
-              await updateUser({
-                verification: newVerification,
-              });
+              await updateUser({ verification: newVerification });
               await syncVerificationToSupabase(newVerification);
+
+              Alert.alert(
+                'Check Initiated',
+                'A link has been sent to your email to complete the background check. Results are typically ready in 24-48 hours.'
+              );
+            } catch (e: any) {
+              Alert.alert('Error', e.message || 'Failed to initiate background check. Please try again.');
+            } finally {
               setBackgroundChecking(false);
-              Alert.alert('Background Verified', 'Your background check has been completed successfully.');
-            }, 2000);
+            }
           },
         },
       ]

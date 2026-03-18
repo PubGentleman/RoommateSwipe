@@ -40,7 +40,7 @@ Built with React Native and Expo using TypeScript, the application employs React
 - **Profile Questionnaire:** A 14-step questionnaire with progress tracking and per-step validation, designed for comprehensive user profiling.
 - **Listing Boost System:** Tier-based boosting options for hosts to increase listing visibility.
 - **AI Memory Layer:** Tracks user swipe analytics, message activity, and triggers micro-questions to refine AI suggestions.
-- **Identity Verification:** Supports phone, government ID (via Stripe Identity with document scanning and selfie matching), social media verification, and optional background/income checks for Elite users.
+- **Identity Verification:** Supports phone, government ID (via Stripe Identity SDK on native / WebView fallback on web, with document scanning and selfie matching), social media verification, and optional background checks (via Checkr) and income checks for Elite users. Platform-specific Stripe wrapper files (`StripeWrapper.native.tsx` / `StripeWrapper.web.tsx`) handle native-only SDK imports. Verification status is synced from Supabase (`identity_verified`, `background_check_status`) on app load via `mapSupabaseToUser` in AuthContext.
 - **References System:** Users can request and display references on their profiles.
 - **Personality Quiz:** A 5-question quiz contributing to the matching algorithm.
 
@@ -53,7 +53,7 @@ Supabase provides the entire backend infrastructure:
 - **Database**: PostgreSQL with Row Level Security (RLS) across all tables.
 - **Realtime**: Subscriptions for messages and notifications.
 - **Storage**: For profile and listing photos.
-- **Supabase Edge Functions**: For webhook handling.
+- **Supabase Edge Functions**: For webhook handling (`stripe-webhook`, `checkr-webhook`), verification sessions (`create-verification-session`), background checks (`initiate-background-check`), payments (`create-payment-intent`, `create-subscription`), and references (`send-reference-request`).
 
 ## Authentication & Authorization
 
@@ -103,6 +103,9 @@ Technical decisions include Babel module resolver for simplified imports, platfo
 - `react-native-gesture-handler`
 - `react-native-worklets`
 - `expo-haptics`
+
+**Payments:**
+- `@stripe/stripe-react-native` (native only, platform-specific via `StripeWrapper`)
 
 **Storage & State:**
 - `@react-native-async-storage/async-storage`

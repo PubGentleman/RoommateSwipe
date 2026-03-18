@@ -1,0 +1,445 @@
+# Replit Prompt — Implement Stripe Identity Verification + Checkr Background Checks
+
+## Overview
+
+The backend infrastructure for Stripe Identity is already built:
+- ✅ `supabase/functions/create-verification-session/index.ts` — creates Stripe Identity session
+- ✅ `supabase/functions/stripe-webhook/index.ts` — handles `identity.verification_session.verified` and updates `identity_verified` in Supabase
+- ✅ `services/paymentService.ts` — has `createVerificationSession()` and `initiateBackgroundCheck()`
+
+**What's missing:**
+- ❌ The app calls a fake `setTimeout` instead of real Stripe Identity SDK
+- ❌ No Stripe SDK initialization for Identity
+- ❌ No status sync between Supabase `identity_verified` and local user state
+- ❌ Background check has no real provider — just sets `pending` status
+
+**Background checks:** Stripe Identity only verifies WHO someone is (ID + selfie). It **cannot** do background checks. Use **Checkr** for criminal history, eviction records, and employment verification.
+
+---
+
+## Step 1 — Install Stripe React Native SDK
+
+Run in the project root:
+```bash
+npx expo install @stripe/stripe-react-native
+```
+
+For bare React Native (if needed):
+```bash
+cd ios && pod install
+```
+
+---
+
+## Step 2 — Initialize Stripe in `app.tsx` or root layout
+
+Find the root App component (likely `App.tsx` or `app/_layout.tsx`) and wrap the app with `StripeProvider`:
+
+```tsx
+import { StripeProvider } from '@stripe/stripe-react-native';
+
+// Add your Stripe publishable key to .env:
+// EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_xxx  (or pk_test_xxx for dev)
+
+export default function App() {
+  return (
+    <StripeProvider
+      publishableKey={process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY!}
+    >
+      {/* existing app content */}
+    </StripeProvider>
+  );
+}
+```
+
+---
+
+## Step 3 — Fix `screens/shared/VerificationScreen.tsx`
+
+### 3a. Replace fake `handleVerifyId` with real Stripe Identity
+
+Add the import at the top of the file:
+```tsx
+import { useStripeIdentity } from '@stripe/stripe-react-native';
+import { createVerificationSession } from '../../services/paymentService';
+```
+
+Remove the old `handleVerifyId` function and replace with:
+
+```tsx
+const { present: presentIdentity, status: identityStatus } = useStripeIdentity(
+  async () => {
+    if (!user) return { clientSecret: '', ephemeralKeySecret: '' };
+    try {
+      const { clientSecret } = await createVerificationSession(user.id);
+      return { clientSecret };
+    } catch (e) {
+      Alert.alert('Error', 'Failed to start verification. Please try again.');
+      return { clientSecret: '', ephemeralKeySecret: '' };
+    }
+  }
+);
+
+const handleVerifyId = async () => {
+  if (!user) return;
+
+  // In dev mode, simulate verification
+  if (isDev) {
+    setIdUploading(true);
+    setTimeout(async () => {
+      const newVerification = {
+        ...verification,
+        government_id: { verified: true, verifiedAt: new Date() },
+      };
+      await updateUser({ verification: newVerification });
+      await syncVerificationToSupabase(newVerification);
+      setIdUploading(false);
+      Alert.alert('ID Verified (Dev)', 'Simulated verification complete.');
+    }, 1500);
+    return;
+  }
+
+  // Production: launch Stripe Identity sheet
+  setIdUploading(true);
+  try {
+    await presentIdentity();
+    // After the sheet closes, check status
+    if (identityStatus === 'FlowCompleted') {
+      // Poll Supabase for the verified status (webhook updates it asynchronously)
+      await pollForVerificationStatus();
+    } else if (identityStatus === 'FlowCanceled') {
+      Alert.alert('Cancelled', 'ID verification was cancelled.');
+    } else if (identityStatus === 'FlowFailed') {
+      Alert.alert('Failed', 'ID verification failed. Please try again with a clear photo.');
+    }
+  } catch (e: any) {
+    Alert.alert('Error', e.message || 'Something went wrong. Please try again.');
+  } finally {
+    setIdUploading(false);
+  }
+};
+
+const pollForVerificationStatus = async () => {
+  if (!user) return;
+  // Poll Supabase up to 10 times, every 2 seconds, for identity_verified = true
+  // (Stripe webhook updates this async)
+  let attempts = 0;
+  const maxAttempts = 10;
+  const interval = 2000;
+
+  const check = async (): Promise<void> => {
+    attempts++;
+    try {
+      const { data } = await supabase
+        .from('users')
+        .select('identity_verified, identity_verified_at')
+        .eq('id', user.id)
+        .single();
+
+      if (data?.identity_verified) {
+        // Stripe confirmed — update local user state
+        const newVerification = {
+          ...verification,
+          government_id: {
+            verified: true,
+            verifiedAt: data.identity_verified_at
+              ? new Date(data.identity_verified_at)
+              : new Date(),
+          },
+        };
+        await updateUser({ verification: newVerification });
+        await syncVerificationToSupabase(newVerification);
+        Alert.alert(
+          '✅ ID Verified',
+          'Your government ID has been verified successfully by Stripe Identity.'
+        );
+        return;
+      }
+    } catch (_e) {}
+
+    if (attempts < maxAttempts) {
+      await new Promise(res => setTimeout(res, interval));
+      return check();
+    } else {
+      // Timeout — show pending message
+      Alert.alert(
+        'Verification Pending',
+        'Your ID is being reviewed. This usually takes a few minutes. We\'ll notify you when it\'s complete.'
+      );
+    }
+  };
+
+  await check();
+};
+```
+
+Make sure `supabase` is imported from `../../lib/supabase` in VerificationScreen.
+
+### 3b. Fix `handleVerifyBackground` — connect to Checkr
+
+Replace the fake background check with a real Checkr initiation call:
+
+```tsx
+const handleVerifyBackground = async () => {
+  if (!isElite || !user) return;
+
+  Alert.alert(
+    'Background Check',
+    'This initiates a background check via Checkr. Results are typically ready within 24–48 hours. A link will be sent to your email to complete the process.',
+    [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Start Check',
+        onPress: async () => {
+          setBackgroundChecking(true);
+          try {
+            if (isDev) {
+              // Dev simulation
+              setTimeout(async () => {
+                const newVerification = {
+                  ...verification,
+                  background_check: { status: 'pending', initiatedAt: new Date() },
+                };
+                await updateUser({ verification: newVerification });
+                await syncVerificationToSupabase(newVerification);
+                setBackgroundChecking(false);
+                Alert.alert('Check Initiated (Dev)', 'Background check simulated as pending.');
+              }, 1500);
+              return;
+            }
+
+            // Production: call Supabase edge function which calls Checkr API
+            const { data, error } = await supabase.functions.invoke('initiate-background-check', {
+              body: { userId: user.id, email: user.email },
+            });
+
+            if (error) throw error;
+
+            const newVerification = {
+              ...verification,
+              background_check: {
+                status: 'pending',
+                initiatedAt: new Date(),
+                checkrInvitationUrl: data?.invitationUrl,
+              },
+            };
+            await updateUser({ verification: newVerification });
+            await syncVerificationToSupabase(newVerification);
+
+            Alert.alert(
+              'Check Initiated',
+              'A link has been sent to your email to complete the background check. Results are typically ready in 24–48 hours.'
+            );
+          } catch (e: any) {
+            Alert.alert('Error', e.message || 'Failed to initiate background check. Please try again.');
+          } finally {
+            setBackgroundChecking(false);
+          }
+        },
+      },
+    ]
+  );
+};
+```
+
+---
+
+## Step 4 — Update `supabase/functions/initiate-background-check/index.ts`
+
+Replace the placeholder with a real Checkr API integration:
+
+```ts
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const supabase = createClient(
+  Deno.env.get('SUPABASE_URL')!,
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+);
+
+const CHECKR_API_KEY = Deno.env.get('CHECKR_API_KEY')!;
+const CHECKR_PACKAGE = 'checkr_package_roommate_basic'; // your Checkr package slug
+
+Deno.serve(async (req) => {
+  const { userId, email } = await req.json();
+
+  try {
+    // Step 1: Create a Checkr candidate
+    const candidateRes = await fetch('https://api.checkr.com/v1/candidates', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${btoa(CHECKR_API_KEY + ':')}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email }),
+    });
+    const candidate = await candidateRes.json();
+    if (!candidateRes.ok) throw new Error(candidate.message || 'Failed to create candidate');
+
+    // Step 2: Create an invitation (sends email to candidate with Checkr link)
+    const invitationRes = await fetch('https://api.checkr.com/v1/invitations', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${btoa(CHECKR_API_KEY + ':')}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        candidate_id: candidate.id,
+        package: CHECKR_PACKAGE,
+      }),
+    });
+    const invitation = await invitationRes.json();
+    if (!invitationRes.ok) throw new Error(invitation.message || 'Failed to create invitation');
+
+    // Step 3: Store Checkr IDs in Supabase
+    await supabase
+      .from('users')
+      .update({
+        background_check_status: 'pending',
+        checkr_candidate_id: candidate.id,
+        background_check_initiated_at: new Date().toISOString(),
+      })
+      .eq('id', userId);
+
+    return new Response(
+      JSON.stringify({
+        status: 'pending',
+        invitationUrl: invitation.invitation_url,
+        message: 'Background check initiated. A link has been sent to your email.',
+      }),
+      { headers: { 'Content-Type': 'application/json' } }
+    );
+  } catch (error: any) {
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+});
+```
+
+---
+
+## Step 5 — Handle Checkr webhook in `supabase/functions/stripe-webhook/index.ts`
+
+Create a **separate** Supabase edge function for Checkr webhooks:
+`supabase/functions/checkr-webhook/index.ts`
+
+```ts
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const supabase = createClient(
+  Deno.env.get('SUPABASE_URL')!,
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+);
+
+Deno.serve(async (req) => {
+  const body = await req.json();
+  const { type, data } = body;
+
+  // Checkr sends 'report.completed' when background check is done
+  if (type === 'report.completed') {
+    const report = data.object;
+    const candidateId = report.candidate_id;
+    const status = report.adjudication === 'clear' ? 'clear' : 'consider';
+
+    await supabase
+      .from('users')
+      .update({
+        background_check_status: status,
+        background_check_completed_at: new Date().toISOString(),
+      })
+      .eq('checkr_candidate_id', candidateId);
+
+    // Send in-app notification if status is clear
+    if (status === 'clear') {
+      const { data: userData } = await supabase
+        .from('users')
+        .select('id')
+        .eq('checkr_candidate_id', candidateId)
+        .single();
+
+      if (userData) {
+        await supabase.from('notifications').insert({
+          user_id: userData.id,
+          type: 'background_check_complete',
+          title: '✅ Background Check Complete',
+          body: 'Your background check came back clear. Your profile now shows a verified badge.',
+          is_read: false,
+          created_at: new Date().toISOString(),
+        });
+      }
+    }
+  }
+
+  return new Response(JSON.stringify({ received: true }), { status: 200 });
+});
+```
+
+Register this endpoint in Checkr's dashboard as your webhook URL:
+`https://<your-project>.supabase.co/functions/v1/checkr-webhook`
+
+---
+
+## Step 6 — Add required environment variables
+
+Add these to your Supabase project's Edge Function secrets (Settings → Edge Functions → Secrets):
+
+```
+STRIPE_SECRET_KEY=sk_live_xxx         # already exists for payments
+STRIPE_WEBHOOK_SECRET=whsec_xxx       # already exists
+CHECKR_API_KEY=your_checkr_api_key    # NEW — from Checkr dashboard
+```
+
+Add to `.env` (mobile app):
+```
+EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_xxx   # already used for payments
+```
+
+---
+
+## Step 7 — Sync verification status on app load
+
+In `contexts/AuthContext.tsx`, when loading the user profile from Supabase, map the `identity_verified` and `background_check_status` fields to the local user object:
+
+Find where user data is loaded/mapped from Supabase and add:
+
+```tsx
+// When mapping Supabase user data to local User object:
+verification: {
+  ...existingVerification,
+  government_id: data.identity_verified
+    ? { verified: true, verifiedAt: data.identity_verified_at }
+    : existingVerification?.government_id || { verified: false },
+  background_check: data.background_check_status
+    ? {
+        verified: data.background_check_status === 'clear',
+        status: data.background_check_status,
+        initiatedAt: data.background_check_initiated_at,
+      }
+    : existingVerification?.background_check,
+},
+```
+
+---
+
+## Required Checkr Setup
+
+1. Sign up at **checkr.com** and create an account
+2. Create a background check **package** in their dashboard (select: criminal search + sex offender + global watchlist — basic rental package)
+3. Note your **API key** from Checkr settings
+4. Register your webhook URL in Checkr: `https://<project>.supabase.co/functions/v1/checkr-webhook`
+5. Add `CHECKR_API_KEY` to Supabase secrets
+
+---
+
+## Summary
+
+| Feature | Before | After |
+|---------|--------|-------|
+| ID Verification | Fake setTimeout | Real Stripe Identity SDK (document + selfie) |
+| Verified status | Marked locally after 1.5s | Confirmed by Stripe webhook → Supabase → app |
+| Background Check | Sets `pending` locally only | Checkr invitation sent to user email, webhook updates status |
+| Background Check result | Always says "complete" | Real `clear` / `consider` result from Checkr |
+| Dev mode | Works as before (simulated) | Simulated in dev, real in production |
+
+> **Note:** Background checks are NOT done by Stripe. Stripe Identity = ID document + selfie verification only. Checkr handles criminal history, eviction records, and employment verification.
