@@ -1749,8 +1749,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   chipScroll: {
-    maxHeight: 38,
-    marginBottom: 6,
+    minHeight: 38,
+    marginBottom: 8,
   },
   chipScrollContent: {
     paddingHorizontal: 16,
