@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, Pressable, Alert } from 'react-native';
+import { View, Text, FlatList, StyleSheet, Pressable, Modal, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
 import { StorageService } from '../../utils/storage';
 import { isFreePlan } from '../../utils/hostPricing';
@@ -36,6 +37,9 @@ export const BrowseRenterGroupsScreen = () => {
   const [loading, setLoading] = useState(true);
   const [sentRequests, setSentRequests] = useState<string[]>([]);
   const [hostSub, setHostSub] = useState<HostSubscriptionData | null>(null);
+  const [showMessageModal, setShowMessageModal] = useState(false);
+  const [pendingMessageGroupId, setPendingMessageGroupId] = useState<string | null>(null);
+  const [messageSending, setMessageSending] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -106,41 +110,59 @@ export const BrowseRenterGroupsScreen = () => {
   };
 
   const handleMessage = (groupId: string) => {
-    Alert.alert(
-      'Message This Group',
-      'Your listing details will be sent to this group. They can accept or decline your inquiry.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Send',
-          onPress: () => {
-            setSentRequests(prev => [...prev, groupId]);
-            Alert.alert('Sent!', 'Your listing was shared with this group.');
-          },
-        },
-      ]
-    );
+    if (sentRequests.includes(groupId)) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setPendingMessageGroupId(groupId);
+    setShowMessageModal(true);
+  };
+
+  const confirmSendMessage = () => {
+    if (!pendingMessageGroupId) return;
+    setMessageSending(true);
+    setTimeout(() => {
+      setSentRequests(prev => [...prev, pendingMessageGroupId]);
+      setMessageSending(false);
+      setShowMessageModal(false);
+      setPendingMessageGroupId(null);
+    }, 800);
   };
 
   if (hostSub && isFreePlan(hostSub.plan)) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
-          <Text style={styles.title}>Renter Groups</Text>
-          <Text style={styles.subtitle}>Groups actively looking for a place together</Text>
+          <View>
+            <Text style={styles.title}>Renter Groups</Text>
+            <Text style={styles.subtitle}>Groups actively looking for a place together</Text>
+          </View>
         </View>
         <View style={styles.lockedContainer}>
-          <Feather name="lock" size={40} color={PURPLE} />
-          <Text style={styles.lockedTitle}>Available on Starter+</Text>
-          <Text style={styles.lockedDesc}>
-            Upgrade your host plan to browse renter groups and connect with renters looking for a place together.
-          </Text>
-          <Pressable
-            onPress={() => navigation.navigate('Dashboard', { screen: 'HostSubscription' })}
-            style={styles.upgradeCta}
+          <LinearGradient
+            colors={['rgba(123,94,167,0.15)', 'transparent']}
+            style={styles.lockedGradient}
           >
-            <Text style={styles.upgradeCtaText}>See Plans</Text>
-          </Pressable>
+            <View style={styles.lockedIconWrap}>
+              <Feather name="lock" size={32} color={PURPLE} />
+            </View>
+            <Text style={styles.lockedTitle}>Browse Renter Groups</Text>
+            <Text style={styles.lockedDesc}>
+              Upgrade your host plan to see groups of renters actively looking for a place together — and message them directly with your listing.
+            </Text>
+            <Pressable
+              onPress={() => navigation.navigate('Dashboard', { screen: 'HostSubscription' })}
+              style={styles.upgradeCta}
+            >
+              <LinearGradient
+                colors={[ROOMDR_PURPLE, '#6a4d96']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.upgradeCtaGradient}
+              >
+                <Feather name="zap" size={14} color="#fff" />
+                <Text style={styles.upgradeCtaText}>See Plans</Text>
+              </LinearGradient>
+            </Pressable>
+          </LinearGradient>
         </View>
       </View>
     );
@@ -148,63 +170,98 @@ export const BrowseRenterGroupsScreen = () => {
 
   const renderGroup = ({ item }: { item: RenterGroupCard }) => {
     const alreadySent = sentRequests.includes(item.groupId);
+
+    const memberColors = ['#7B5EA7', '#4A90E2', '#22c55e', '#ff6b5b', '#f59e0b'];
+    const memberLabels = Array.from({ length: item.memberCount }, (_, i) => ({
+      color: memberColors[i % memberColors.length],
+      label: String.fromCharCode(65 + i),
+    }));
+
     return (
       <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <View style={styles.memberBadge}>
-            <Feather name="users" size={14} color={PURPLE} />
-            <Text style={styles.memberText}>
-                {item.memberCount === 1
-                  ? '1 person looking — open to roommates'
-                  : `${item.memberCount} people looking together`}
-              </Text>
+        <View style={styles.avatarRow}>
+          {memberLabels.map((m, i) => (
+            <View
+              key={i}
+              style={[
+                styles.memberAvatar,
+                { backgroundColor: m.color, marginLeft: i > 0 ? -10 : 0, zIndex: memberLabels.length - i },
+              ]}
+            >
+              <Text style={styles.memberAvatarText}>{m.label}</Text>
+            </View>
+          ))}
+          <View style={styles.memberCountPill}>
+            <Feather name="users" size={11} color={PURPLE} />
+            <Text style={styles.memberCountText}>
+              {item.memberCount === 1 ? '1 person' : `${item.memberCount} people`}
+            </Text>
           </View>
-          <Text style={styles.moveIn}>Move-in: {item.moveInDate}</Text>
         </View>
 
-        <Text style={styles.budget}>
-          ${item.budgetMin.toLocaleString()} - ${item.budgetMax.toLocaleString()}/mo
-        </Text>
-
-        <View style={styles.tagsRow}>
-          {item.neighborhoods.slice(0, 3).map(n => (
-            <View key={n} style={styles.neighborhoodChip}>
-              <Feather name="map-pin" size={10} color="rgba(255,255,255,0.5)" />
-              <Text style={styles.neighborhoodText}>{n}</Text>
-            </View>
-          ))}
+        <View style={styles.budgetRow}>
+          <Text style={styles.budget}>
+            ${item.budgetMin.toLocaleString()} – ${item.budgetMax.toLocaleString()}
+            <Text style={styles.budgetSuffix}>/mo</Text>
+          </Text>
+          <View style={styles.moveInPill}>
+            <Feather name="calendar" size={11} color="rgba(255,255,255,0.4)" />
+            <Text style={styles.moveInText}>{item.moveInDate}</Text>
+          </View>
         </View>
 
-        <View style={styles.tagsRow}>
-          {item.lifestyleTags.slice(0, 4).map(t => (
-            <View key={t} style={styles.lifestyleChip}>
-              <Text style={styles.lifestyleText}>{t}</Text>
-            </View>
-          ))}
-        </View>
+        {item.neighborhoods.length > 0 ? (
+          <View style={styles.chipsRow}>
+            {item.neighborhoods.slice(0, 3).map(n => (
+              <View key={n} style={styles.neighborhoodChip}>
+                <Feather name="map-pin" size={10} color="rgba(255,255,255,0.45)" />
+                <Text style={styles.neighborhoodText}>{n}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
 
-        <View style={styles.occupationRow}>
-          {item.occupationTypes.map(o => (
-            <View key={o} style={styles.occupationChip}>
-              <Feather name="briefcase" size={10} color="rgba(255,255,255,0.4)" />
-              <Text style={styles.occupationText}>{o}</Text>
-            </View>
-          ))}
-        </View>
+        {item.lifestyleTags.length > 0 ? (
+          <View style={styles.chipsRow}>
+            {item.lifestyleTags.slice(0, 4).map(t => (
+              <View key={t} style={styles.lifestyleChip}>
+                <Text style={styles.lifestyleText}>{t}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        {item.occupationTypes.length > 0 ? (
+          <View style={styles.occupationRow}>
+            {item.occupationTypes.map(o => (
+              <View key={o} style={styles.occupationChip}>
+                <Feather name="briefcase" size={10} color="rgba(255,255,255,0.35)" />
+                <Text style={styles.occupationText}>{o}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        <View style={styles.cardDivider} />
 
         <Pressable
           style={[styles.ctaButton, alreadySent ? styles.ctaButtonSent : null]}
-          onPress={() => !alreadySent ? handleMessage(item.groupId) : null}
+          onPress={() => handleMessage(item.groupId)}
           disabled={alreadySent}
         >
           {alreadySent ? (
             <View style={styles.ctaInner}>
-              <Feather name="check" size={14} color="rgba(255,255,255,0.4)" />
-              <Text style={[styles.ctaText, { color: 'rgba(255,255,255,0.4)' }]}>Request Sent</Text>
+              <Feather name="check-circle" size={15} color="#22c55e" />
+              <Text style={[styles.ctaText, { color: '#22c55e' }]}>Request Sent</Text>
             </View>
           ) : (
-            <LinearGradient colors={[ROOMDR_PURPLE, '#6a4d96']} style={styles.ctaGradient}>
-              <Feather name="send" size={14} color="#fff" />
+            <LinearGradient
+              colors={[ROOMDR_PURPLE, '#6a4d96']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.ctaGradient}
+            >
+              <Feather name="send" size={15} color="#fff" />
               <Text style={styles.ctaText}>Message This Group</Text>
             </LinearGradient>
           )}
@@ -216,12 +273,21 @@ export const BrowseRenterGroupsScreen = () => {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <Text style={styles.title}>Renter Groups</Text>
-        <Text style={styles.subtitle}>Groups actively looking for a place together</Text>
+        <View>
+          <Text style={styles.title}>Renter Groups</Text>
+          <Text style={styles.subtitle}>
+            {groups.length > 0 ? `${groups.length} groups looking for a place` : 'Groups actively looking for a place together'}
+          </Text>
+        </View>
+        <View style={styles.headerBadge}>
+          <Feather name="users" size={14} color={PURPLE} />
+          <Text style={styles.headerBadgeText}>{groups.length}</Text>
+        </View>
       </View>
       {loading ? (
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading groups...</Text>
+          <ActivityIndicator size="large" color={PURPLE} />
+          <Text style={styles.loadingText}>Finding renter groups...</Text>
         </View>
       ) : (
         <FlatList
@@ -239,73 +305,176 @@ export const BrowseRenterGroupsScreen = () => {
           }
         />
       )}
+
+      <Modal
+        visible={showMessageModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowMessageModal(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setShowMessageModal(false)}>
+          <Pressable style={styles.modalSheet} onPress={() => {}}>
+            <View style={styles.modalIconWrap}>
+              <Feather name="send" size={26} color={PURPLE} />
+            </View>
+            <Text style={styles.modalTitle}>Message This Group</Text>
+            <Text style={styles.modalDesc}>
+              Your listing details will be shared with this group. They can review your property and respond to your inquiry.
+            </Text>
+            <Pressable
+              style={[styles.modalConfirmBtn, { opacity: messageSending ? 0.7 : 1 }]}
+              onPress={confirmSendMessage}
+              disabled={messageSending}
+            >
+              <LinearGradient
+                colors={[ROOMDR_PURPLE, '#6a4d96']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.modalConfirmGradient}
+              >
+                {messageSending ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Feather name="send" size={15} color="#fff" />
+                    <Text style={styles.modalConfirmText}>Send My Listing</Text>
+                  </>
+                )}
+              </LinearGradient>
+            </Pressable>
+            <Pressable style={styles.modalCancelBtn} onPress={() => setShowMessageModal(false)}>
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
+
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 18,
     paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.06)',
   },
-  title: { fontSize: 22, fontWeight: '800', color: '#fff', marginBottom: 4 },
+  title: { fontSize: 22, fontWeight: '800', color: '#fff', marginBottom: 3, letterSpacing: -0.3 },
   subtitle: { fontSize: 13, color: 'rgba(255,255,255,0.4)' },
-  list: { padding: 16, gap: 12 },
-  card: {
-    backgroundColor: CARD_BG,
-    borderRadius: 16,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
-    marginBottom: 12,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  memberBadge: {
+  headerBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    backgroundColor: 'rgba(123,94,167,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(123,94,167,0.3)',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
-  memberText: { color: PURPLE, fontSize: 13, fontWeight: '600' },
-  moveIn: { fontSize: 12, color: 'rgba(255,255,255,0.35)' },
-  budget: { fontSize: 22, fontWeight: '800', color: '#fff', marginBottom: 14 },
-  tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
+  headerBadgeText: { fontSize: 13, fontWeight: '700', color: PURPLE },
+
+  list: { padding: 16, paddingBottom: 100 },
+
+  card: {
+    backgroundColor: CARD_BG,
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+    marginBottom: 14,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+
+  avatarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  memberAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: CARD_BG,
+  },
+  memberAvatarText: { fontSize: 13, fontWeight: '800', color: '#fff' },
+  memberCountPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(123,94,167,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(123,94,167,0.25)',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    marginLeft: 14,
+  },
+  memberCountText: { fontSize: 12, fontWeight: '600', color: PURPLE },
+
+  budgetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  budget: { fontSize: 24, fontWeight: '800', color: '#fff' },
+  budgetSuffix: { fontSize: 15, fontWeight: '500', color: 'rgba(255,255,255,0.5)' },
+  moveInPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  moveInText: { fontSize: 12, color: 'rgba(255,255,255,0.45)' },
+
+  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
   neighborhoodChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    borderRadius: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
   },
-  neighborhoodText: { fontSize: 12, color: 'rgba(255,255,255,0.6)' },
+  neighborhoodText: { fontSize: 12, color: 'rgba(255,255,255,0.55)' },
   lifestyleChip: {
-    backgroundColor: 'rgba(123,94,167,0.15)',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    backgroundColor: 'rgba(123,94,167,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(123,94,167,0.25)',
+    borderRadius: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
   },
-  lifestyleText: { fontSize: 12, color: PURPLE },
-  occupationRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },
-  occupationChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  occupationText: { fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: '600' },
-  ctaButton: { borderRadius: 12, overflow: 'hidden' },
+  lifestyleText: { fontSize: 12, fontWeight: '500', color: PURPLE },
+  occupationRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 4 },
+  occupationChip: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  occupationText: { fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: '500' },
+
+  cardDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.06)', marginVertical: 14 },
+
+  ctaButton: { borderRadius: 14, overflow: 'hidden' },
   ctaButtonSent: {
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderRadius: 12,
+    backgroundColor: 'rgba(34,197,94,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(34,197,94,0.2)',
+    borderRadius: 14,
   },
   ctaGradient: {
     flexDirection: 'row',
@@ -313,6 +482,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 14,
+    shadowColor: ROOMDR_PURPLE,
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
   ctaInner: {
     flexDirection: 'row',
@@ -322,31 +494,76 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   ctaText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  lockedContainer: {
-    flex: 1,
-    justifyContent: 'center',
+
+  lockedContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 28 },
+  lockedGradient: { width: '100%', borderRadius: 24, padding: 32, alignItems: 'center' },
+  lockedIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 24,
+    backgroundColor: 'rgba(123,94,167,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(123,94,167,0.3)',
     alignItems: 'center',
-    paddingHorizontal: 32,
+    justifyContent: 'center',
+    marginBottom: 20,
   },
-  lockedTitle: { fontSize: 18, fontWeight: '700', color: '#fff', marginTop: 16, textAlign: 'center' },
-  lockedDesc: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.5)',
-    marginTop: 8,
-    textAlign: 'center',
-    lineHeight: 20,
+  lockedTitle: { fontSize: 20, fontWeight: '800', color: '#fff', marginBottom: 10, textAlign: 'center' },
+  lockedDesc: { fontSize: 14, color: 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: 21, marginBottom: 24 },
+  upgradeCta: { borderRadius: 14, overflow: 'hidden', width: '100%' },
+  upgradeCtaGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 50,
   },
-  upgradeCta: {
-    marginTop: 20,
-    backgroundColor: 'rgba(168,85,247,0.2)',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  upgradeCtaText: { fontSize: 15, fontWeight: '700', color: PURPLE },
-  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  upgradeCtaText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+
+  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14 },
   loadingText: { fontSize: 14, color: 'rgba(255,255,255,0.4)' },
-  emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40, gap: 8 },
-  emptyText: { color: 'rgba(255,255,255,0.5)', fontSize: 15, fontWeight: '600' },
-  emptySubtext: { color: 'rgba(255,255,255,0.3)', fontSize: 13, textAlign: 'center' },
+  emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40, gap: 10 },
+  emptyText: { color: 'rgba(255,255,255,0.5)', fontSize: 16, fontWeight: '700' },
+  emptySubtext: { color: 'rgba(255,255,255,0.3)', fontSize: 13, textAlign: 'center', lineHeight: 19 },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+  },
+  modalSheet: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 24,
+    padding: 28,
+    width: '100%',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
+  },
+  modalIconWrap: {
+    width: 68,
+    height: 68,
+    borderRadius: 22,
+    backgroundColor: 'rgba(123,94,167,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(123,94,167,0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 18,
+  },
+  modalTitle: { fontSize: 20, fontWeight: '800', color: '#fff', marginBottom: 10, textAlign: 'center' },
+  modalDesc: { fontSize: 14, color: 'rgba(255,255,255,0.55)', textAlign: 'center', lineHeight: 21, marginBottom: 22 },
+  modalConfirmBtn: { borderRadius: 14, overflow: 'hidden', width: '100%', marginBottom: 10 },
+  modalConfirmGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 52,
+  },
+  modalConfirmText: { fontSize: 16, fontWeight: '700', color: '#fff' },
+  modalCancelBtn: { height: 44, alignItems: 'center', justifyContent: 'center' },
+  modalCancelText: { fontSize: 14, color: 'rgba(255,255,255,0.35)' },
 });
