@@ -180,13 +180,13 @@ export const ProfileScreen = () => {
         );
         setMatchCount(userMatches.length);
 
-        const views = await StorageService.getProfileViews(user.id);
-        setProfileViewCount(views.length);
-
         const allUsers = await StorageService.getUsers();
         const currentUser = allUsers.find(u => u.id === user.id);
         const receivedLikes = currentUser?.receivedLikes || [];
-        setLikesCount(receivedLikes.length);
+        const regularLikes = receivedLikes.filter((l: any) => !l.isSuperLike);
+        const superLikes = receivedLikes.filter((l: any) => l.isSuperLike);
+        setProfileViewCount(regularLikes.length);
+        setLikesCount(superLikes.length);
       } catch (e) {
         console.warn('Failed to load profile stats:', e);
       }
@@ -253,14 +253,14 @@ export const ProfileScreen = () => {
               onPress={() => navigation.navigate('ProfileViews')}
             >
               <Text style={styles.statValue}>{profileViewCount}</Text>
-              <Text style={styles.statLabel}>Profile Views</Text>
+              <Text style={styles.statLabel}>Likes</Text>
             </Pressable>
             <Pressable
               style={styles.statBox}
               onPress={() => navigation.navigate('WhoLikedMe')}
             >
               <Text style={[styles.statValue, styles.statCoral]}>{likesCount}</Text>
-              <Text style={styles.statLabel}>Likes</Text>
+              <Text style={styles.statLabel}>Super Likes</Text>
             </Pressable>
           </View>
 

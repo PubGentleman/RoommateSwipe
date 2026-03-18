@@ -32,10 +32,11 @@ export const WhoLikedMeScreen = () => {
       const allUsers = await StorageService.getUsers();
       const currentUser = allUsers.find(u => u.id === user.id);
       const receivedLikes = currentUser?.receivedLikes || [];
+      const superLikesOnly = receivedLikes.filter((l: any) => l.isSuperLike);
       const profiles = await StorageService.getRoommateProfiles();
       const profileMap = new Map(profiles.map(p => [p.id, p]));
 
-      const received = receivedLikes
+      const received = superLikesOnly
         .map((l: any) => ({
           likerId: l.likerId,
           profile: profileMap.get(l.likerId),
@@ -63,7 +64,7 @@ export const WhoLikedMeScreen = () => {
           <Feather name="arrow-left" size={22} color={theme.text} />
         </Pressable>
         <ThemedText style={[Typography.h2, { flex: 1, textAlign: 'center' }]}>
-          {likers.length} {likers.length === 1 ? 'Like' : 'Likes'}
+          {likers.length} Super {likers.length === 1 ? 'Like' : 'Likes'}
         </ThemedText>
         <View style={{ width: 40 }} />
       </View>
@@ -77,7 +78,7 @@ export const WhoLikedMeScreen = () => {
           >
             <Feather name="lock" size={16} color="#fff" />
             <ThemedText style={styles.upgradeBannerText}>
-              Upgrade to Plus to see who liked you
+              Upgrade to Plus to see who super liked you
             </ThemedText>
             <Feather name="chevron-right" size={16} color="#fff" />
           </LinearGradient>
@@ -90,10 +91,10 @@ export const WhoLikedMeScreen = () => {
         </View>
       ) : likers.length === 0 ? (
         <View style={styles.center}>
-          <Feather name="heart" size={48} color={theme.textSecondary} style={{ marginBottom: Spacing.md }} />
-          <ThemedText style={[Typography.h3, { textAlign: 'center', marginBottom: Spacing.sm }]}>No Likes Yet</ThemedText>
+          <Feather name="star" size={48} color="#FFD700" style={{ marginBottom: Spacing.md }} />
+          <ThemedText style={[Typography.h3, { textAlign: 'center', marginBottom: Spacing.sm }]}>No Super Likes Yet</ThemedText>
           <ThemedText style={[Typography.body, { color: theme.textSecondary, textAlign: 'center' }]}>
-            Complete your profile and boost it to get more likes.
+            When someone super likes your profile, they'll appear here.
           </ThemedText>
         </View>
       ) : (

@@ -8,51 +8,49 @@ import { StorageService } from '@/utils/storage';
 import { Typography, Spacing } from '@/constants/theme';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { getProfileViews as supabaseGetProfileViews } from '@/services/profileService';
 
-interface ProfileView {
-  viewerId: string;
-  viewerName: string;
-  viewerPhoto?: string;
-  viewedAt: Date;
+interface LikeItem {
+  likerId: string;
+  likerName: string;
+  likerPhoto?: string;
+  likedAt: Date;
+  isSuperLike: boolean;
 }
 
 export const ProfileViewsScreen = () => {
   const { theme } = useTheme();
   const { user } = useAuth();
   const navigation = useNavigation();
-  const [profileViews, setProfileViews] = useState<ProfileView[]>([]);
+  const [likes, setLikes] = useState<LikeItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   const userPlan = user?.subscription?.plan || 'basic';
-  const canSeeProfileViews = userPlan === 'plus' || userPlan === 'elite';
+  const canSeeLikes = userPlan === 'plus' || userPlan === 'elite';
 
   useEffect(() => {
-    loadProfileViews();
+    loadLikes();
   }, []);
 
-  const loadProfileViews = async () => {
+  const loadLikes = async () => {
     if (!user) return;
-
     try {
       setIsLoading(true);
-      const supabaseViews = await supabaseGetProfileViews();
-      const mapped: ProfileView[] = (supabaseViews || []).map((v: any) => ({
-        viewerId: v.viewer?.id || v.viewer_id,
-        viewerName: v.viewer?.full_name || 'Unknown User',
-        viewerPhoto: v.viewer?.avatar_url,
-        viewedAt: new Date(v.created_at),
+      const allUsers = await StorageService.getUsers();
+      const currentUser = allUsers.find(u => u.id === user.id);
+      const receivedLikes = currentUser?.receivedLikes || [];
+
+      const mapped: LikeItem[] = receivedLikes.map((l: any) => ({
+        likerId: l.likerId,
+        likerName: l.likerName || 'Unknown',
+        likerPhoto: l.likerPhoto,
+        likedAt: new Date(l.likedAt),
+        isSuperLike: l.isSuperLike || false,
       }));
-      setProfileViews(mapped);
-    } catch (supabaseError) {
-      console.warn('[ProfileViewsScreen] Supabase fetch failed, falling back to StorageService:', supabaseError);
-      try {
-        const views = await StorageService.getProfileViews(user.id);
-        setProfileViews(views);
-      } catch (error) {
-        console.error('[ProfileViewsScreen] Error loading profile views:', error);
-      }
+
+      mapped.sort((a, b) => b.likedAt.getTime() - a.likedAt.getTime());
+      setLikes(mapped);
+    } catch (error) {
+      console.error('[ProfileViewsScreen] Error loading likes:', error);
     } finally {
       setIsLoading(false);
     }
@@ -75,72 +73,86 @@ export const ProfileViewsScreen = () => {
     return `${mm}/${dd}/${yyyy}`;
   };
 
-  const renderViewItem = ({ item }: { item: ProfileView }) => (
-    <Pressable
-      style={[styles.viewItem, { backgroundColor: '#1a1a1a', borderColor: '#333333' }]}
-      onPress={() => {
-        (navigation as any).navigate('Roommates');
-      }}
+  const renderLikeItem = ({ item }: { item: LikeItem }) => (
+    <View
+      style={[styles.viewItem, { backgroundColor: '#1a1a1a', borderColor: item.isSuperLike ? '#FFD700' : '#333333' }]}
     >
-      {item.viewerPhoto ? (
-        <Image
-          source={{ uri: item.viewerPhoto }}
-          style={styles.avatar}
-        />
+      {canSeeLikes && item.likerPhoto ? (
+        <Image source={{ uri: item.likerPhoto }} style={styles.avatar} />
+      ) : canSeeLikes ? (
+        <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: '#222222' }]}>
+          <ThemedText style={{ fontSize: 22, fontWeight: '700' }}>
+            {item.likerName.charAt(0).toUpperCase()}
+          </ThemedText>
+        </View>
       ) : (
         <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: '#222222' }]}>
-          <Feather name="user" size={32} color={theme.textSecondary} />
+          <Feather name="lock" size={24} color={theme.textSecondary} />
         </View>
       )}
       <View style={styles.viewInfo}>
-        <ThemedText style={[Typography.h3, { marginBottom: Spacing.xs }]}>
-          {item.viewerName}
-        </ThemedText>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <ThemedText style={[Typography.h3, { marginBottom: Spacing.xs }]}>
+            {canSeeLikes ? item.likerName : '??????'}
+          </ThemedText>
+          {item.isSuperLike ? (
+            <View style={styles.superLikeBadge}>
+              <Feather name="star" size={10} color="#FFD700" />
+              <ThemedText style={styles.superLikeText}>Super</ThemedText>
+            </View>
+          ) : null}
+        </View>
         <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
-          {formatTimeAgo(item.viewedAt)}
+          {item.isSuperLike ? 'Super liked you' : 'Liked you'} {formatTimeAgo(item.likedAt)}
         </ThemedText>
       </View>
-      <Feather name="chevron-right" size={24} color={theme.textSecondary} />
-    </Pressable>
+      {item.isSuperLike ? (
+        <Feather name="star" size={20} color="#FFD700" />
+      ) : (
+        <Feather name="heart" size={20} color="#ff6b5b" />
+      )}
+    </View>
   );
 
   const renderUpgradePrompt = () => (
     <View style={[styles.upgradeContainer, { backgroundColor: '#1a1a1a' }]}>
-      <View style={[styles.upgradeIcon, { backgroundColor: theme.primary }]}>
-        <Feather name="eye" size={32} color="#FFFFFF" />
+      <View style={[styles.upgradeIcon, { backgroundColor: '#ff6b5b' }]}>
+        <Feather name="heart" size={32} color="#FFFFFF" />
       </View>
       <ThemedText style={[Typography.h2, { textAlign: 'center', marginBottom: Spacing.sm }]}>
-        See Who Viewed You
+        See Who Likes You
       </ThemedText>
       <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary, marginBottom: Spacing.xl }]}>
-        Upgrade to Plus to see who's checking out your profile and make better connections.
+        Upgrade to Plus to see who liked and super liked your profile.
       </ThemedText>
       <View style={styles.featuresList}>
         <View style={styles.featureItem}>
-          <Feather name="check-circle" size={20} color={theme.success} />
+          <Feather name="check-circle" size={20} color="#22c55e" />
           <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
-            See everyone who viewed your profile
+            See everyone who liked your profile
           </ThemedText>
         </View>
         <View style={styles.featureItem}>
-          <Feather name="check-circle" size={20} color={theme.success} />
+          <Feather name="check-circle" size={20} color="#22c55e" />
           <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
-            Get notified of new profile views
+            Spot super likes instantly
           </ThemedText>
         </View>
         <View style={styles.featureItem}>
-          <Feather name="check-circle" size={20} color={theme.success} />
+          <Feather name="check-circle" size={20} color="#22c55e" />
           <ThemedText style={[Typography.body, { marginLeft: Spacing.md, flex: 1 }]}>
-            View profiles anytime, no limits
+            Match faster with people interested in you
           </ThemedText>
         </View>
       </View>
+      {likes.length > 0 ? (
+        <ThemedText style={[Typography.body, { color: '#ff6b5b', fontWeight: '700', marginBottom: Spacing.md }]}>
+          {likes.length} {likes.length === 1 ? 'person has' : 'people have'} liked you!
+        </ThemedText>
+      ) : null}
       <Pressable
-        style={[styles.upgradeButton, { backgroundColor: theme.primary }]}
-        onPress={() => {
-          setShowUpgradeModal(false);
-          navigation.navigate('Settings' as never);
-        }}
+        style={[styles.upgradeButton, { backgroundColor: '#ff6b5b' }]}
+        onPress={() => navigation.navigate('Plans' as never)}
       >
         <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
           Upgrade to Plus
@@ -151,17 +163,17 @@ export const ProfileViewsScreen = () => {
 
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
-      <Feather name="eye-off" size={64} color={theme.textSecondary} style={{ marginBottom: Spacing.lg }} />
+      <Feather name="heart" size={64} color={theme.textSecondary} style={{ marginBottom: Spacing.lg }} />
       <ThemedText style={[Typography.h2, { textAlign: 'center', marginBottom: Spacing.sm }]}>
-        No Profile Views Yet
+        No Likes Yet
       </ThemedText>
       <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary }]}>
-        When other users view your profile, they'll appear here.
+        When other users like or super like your profile, they'll appear here.
       </ThemedText>
     </View>
   );
 
-  if (!canSeeProfileViews) {
+  if (!canSeeLikes) {
     return (
       <ScreenScrollView style={{ backgroundColor: '#111111' }} contentContainerStyle={{ backgroundColor: '#111111' }}>
         {renderUpgradePrompt()}
@@ -172,9 +184,9 @@ export const ProfileViewsScreen = () => {
   return (
     <View style={[styles.container, { backgroundColor: '#111111' }]}>
       <FlatList
-        data={profileViews}
-        renderItem={renderViewItem}
-        keyExtractor={(item) => item.viewerId}
+        data={likes}
+        renderItem={renderLikeItem}
+        keyExtractor={(item) => item.likerId}
         contentContainerStyle={styles.listContainer}
         ListEmptyComponent={isLoading ? null : renderEmptyState}
         showsVerticalScrollIndicator={false}
@@ -211,6 +223,21 @@ const styles = StyleSheet.create({
   },
   viewInfo: {
     flex: 1,
+  },
+  superLikeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFD70020',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    gap: 3,
+    marginBottom: 4,
+  },
+  superLikeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFD700',
   },
   emptyContainer: {
     flex: 1,

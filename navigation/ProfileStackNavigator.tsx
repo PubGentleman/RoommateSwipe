@@ -151,7 +151,7 @@ export const ProfileStackNavigator = () => {
         options={({ navigation }) => ({
           headerShown: true,
           ...darkHeaderOptions,
-          headerTitle: 'Profile Views',
+          headerTitle: 'Who Likes You',
           headerBackVisible: false,
           headerLeft: () => (
             <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
