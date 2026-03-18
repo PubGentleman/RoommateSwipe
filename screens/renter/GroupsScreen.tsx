@@ -135,6 +135,7 @@ export const GroupsScreen = () => {
         userGroups = groups.filter(g => g.members.includes(user.id));
         const filterCity = activeCity;
         otherGroups = groups.filter(g => {
+          if (!g.members || g.members.length === 0) return false;
           if (g.members.includes(user.id) || g.pendingMembers.includes(user.id)) return false;
           if (filterCity && g.preferredLocation) {
             const groupCity = getCityFromNeighborhood(g.preferredLocation);
