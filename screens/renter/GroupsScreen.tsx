@@ -1661,9 +1661,17 @@ export const GroupsScreen = () => {
                     <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Members</ThemedText>
                     {currentGroup.members.map((memberId) => {
                       const profile = profileCache.find(p => p.id === memberId);
+                      const memberPhoto = profile?.photos?.[0] || profile?.profilePicture;
                       return profile ? (
                         <View key={memberId} style={styles.memberRow}>
                           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            {memberPhoto ? (
+                              <Image source={{ uri: memberPhoto }} style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10 }} />
+                            ) : (
+                              <View style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10, backgroundColor: '#333', alignItems: 'center', justifyContent: 'center' }}>
+                                <ThemedText style={{ fontSize: 14, fontWeight: '600' }}>{profile.name.charAt(0).toUpperCase()}</ThemedText>
+                              </View>
+                            )}
                             <ThemedText style={Typography.body}>
                               {profile.name}{profile.age ? `, ${profile.age}` : ''}{profile.zodiacSign ? ` ${getZodiacSymbol(profile.zodiacSign)}` : ''} {getGenderSymbol(profile.gender)}
                             </ThemedText>
