@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Pressable, Image, Alert, Modal, ScrollView, Text, TextInput, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, Pressable, Image, Alert, Modal, ScrollView, Text, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -15,7 +15,6 @@ import { StorageService } from '../../utils/storage';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
 import { getBoostTimeRemaining, getBoostDuration, isBoostExpired } from '../../utils/boostUtils';
 import { isDev } from '../../utils/envUtils';
-import { Reference } from '../../types/models';
 
 type ProfileScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'ProfileMain'>;
 
@@ -31,79 +30,6 @@ export const ProfileScreen = () => {
   const [aiSheetContext, setAiSheetContext] = useState<'profile' | 'profile_reminder'>('profile');
   const [devTapCount, setDevTapCount] = useState(0);
   const [devTapTimer, setDevTapTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
-  const [showRefSheet, setShowRefSheet] = useState(false);
-  const [refEmail, setRefEmail] = useState('');
-  const [refRelationship, setRefRelationship] = useState<'past_roommate' | 'landlord' | 'colleague' | 'friend'>('past_roommate');
-
-  const mockReferences: Reference[] = user?.references || [
-    { id: 'ref1', recipientId: user?.id || '', authorName: 'Alex Thompson', authorEmail: 'alex@email.com', authorRelationship: 'past_roommate', rating: 5, review: 'Excellent roommate! Very clean and respectful of shared spaces. Always paid rent on time.', isVerified: true, createdAt: '2025-06-15' },
-    { id: 'ref2', recipientId: user?.id || '', authorName: 'Maria Lopez', authorEmail: 'maria@email.com', authorRelationship: 'landlord', rating: 4, review: 'Great tenant. Kept the apartment in excellent condition. Would rent to again.', isVerified: true, createdAt: '2025-03-20' },
-    { id: 'ref3', recipientId: user?.id || '', authorName: 'Jordan Kim', authorEmail: 'jordan@email.com', authorRelationship: 'colleague', rating: 5, review: 'Wonderful person to be around. Very considerate and easy-going.', isVerified: false, createdAt: '2025-01-10' },
-  ];
-
-  const avgRating = mockReferences.length > 0 ? (mockReferences.reduce((sum, r) => sum + r.rating, 0) / mockReferences.length).toFixed(1) : '0';
-
-  const relationshipColors: Record<string, string> = {
-    past_roommate: '#2563EB',
-    landlord: '#22c55e',
-    colleague: '#8b8b8b',
-    friend: '#a855f7',
-  };
-
-  const relationshipLabels: Record<string, string> = {
-    past_roommate: 'Past Roommate',
-    landlord: 'Landlord',
-    colleague: 'Colleague',
-    friend: 'Friend',
-  };
-
-  const handleRequestReference = () => {
-    if (!refEmail.trim()) {
-      Alert.alert('Required', 'Please enter an email address');
-      return;
-    }
-    Alert.alert('Request Sent', `Reference request sent to ${refEmail}`);
-    setRefEmail('');
-    setShowRefSheet(false);
-  };
-
-  const handleRefTap = async (ref: Reference) => {
-    try {
-      const conversations = await StorageService.getConversations();
-      const refConvId = `ref-conv-${ref.id}`;
-      let existing = conversations.find(c => c.id === refConvId);
-      if (!existing) {
-        const newConv = {
-          id: refConvId,
-          participant: {
-            id: `ref-user-${ref.id}`,
-            name: ref.authorName,
-            photo: undefined,
-            online: false,
-          },
-          lastMessage: ref.review || 'Reference conversation',
-          timestamp: new Date(ref.createdAt),
-          unread: 0,
-          messages: ref.review ? [{
-            id: `ref-msg-${ref.id}`,
-            senderId: `ref-user-${ref.id}`,
-            text: ref.review,
-            content: ref.review,
-            timestamp: new Date(ref.createdAt),
-            read: true,
-          }] : [],
-        };
-        await StorageService.addOrUpdateConversation(newConv as any);
-        existing = newConv as any;
-      }
-      (navigation as any).navigate('Messages', {
-        screen: 'Chat',
-        params: { conversationId: refConvId },
-      });
-    } catch (error) {
-      console.error('Error navigating to reference chat:', error);
-    }
-  };
 
   const handleDevTap = () => {
     const newCount = devTapCount + 1;
@@ -295,63 +221,7 @@ export const ProfileScreen = () => {
           </View>
         ) : null}
 
-        {user?.role === 'renter' ? (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>References</Text>
-              <Pressable onPress={() => setShowRefSheet(true)}>
-                <Text style={styles.sectionAction}>Request</Text>
-              </Pressable>
-            </View>
-            <View style={styles.refSummary}>
-              <View style={styles.refSummaryLeft}>
-                <Feather name="star" size={16} color="#FFD700" />
-                <Text style={styles.refAvgRating}>{avgRating}</Text>
-                <Text style={styles.refCount}>{mockReferences.length} references</Text>
-              </View>
-              {mockReferences.filter(r => r.isVerified).length > 0 ? (
-                <View style={styles.refVerifiedBadge}>
-                  <Feather name="check-circle" size={12} color="#22c55e" />
-                  <Text style={styles.refVerifiedText}>{mockReferences.filter(r => r.isVerified).length} verified</Text>
-                </View>
-              ) : null}
-            </View>
-            {mockReferences.slice(0, 3).map((ref) => (
-              <Pressable
-                key={ref.id}
-                style={({ pressed }) => [styles.refCard, pressed && { opacity: 0.7 }]}
-                onPress={() => handleRefTap(ref)}
-              >
-                <View style={styles.refCardHeader}>
-                  <View style={styles.refAuthorRow}>
-                    <View style={[styles.refAvatar, { backgroundColor: relationshipColors[ref.authorRelationship] || '#666' }]}>
-                      <Text style={styles.refAvatarText}>{ref.authorName.charAt(0)}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={styles.refAuthorName}>{ref.authorName}</Text>
-                        {ref.isVerified ? <Feather name="check-circle" size={12} color="#22c55e" /> : null}
-                      </View>
-                      <View style={[styles.refRelTag, { backgroundColor: `${relationshipColors[ref.authorRelationship] || '#666'}22` }]}>
-                        <Text style={[styles.refRelTagText, { color: relationshipColors[ref.authorRelationship] || '#666' }]}>{relationshipLabels[ref.authorRelationship]}</Text>
-                      </View>
-                    </View>
-                  </View>
-                  <View style={styles.refStars}>
-                    {[1,2,3,4,5].map(s => (
-                      <Feather key={s} name="star" size={12} color={s <= ref.rating ? '#FFD700' : 'rgba(255,255,255,0.15)'} />
-                    ))}
-                  </View>
-                </View>
-                {ref.review ? <Text style={styles.refReview}>"{ref.review}"</Text> : null}
-                <View style={styles.refTapHint}>
-                  <Feather name="message-circle" size={12} color="rgba(255,255,255,0.4)" />
-                  <Text style={styles.refTapHintText}>Tap to message</Text>
-                </View>
-              </Pressable>
-            ))}
-          </View>
-        ) : null}
+        {/* TODO: References section — build invite-based reference system post-launch */}
 
         {user?.role === 'renter' ? (
           <View style={styles.section}>
@@ -743,46 +613,6 @@ export const ProfileScreen = () => {
         </Pressable>
       </Modal>
 
-      <Modal visible={showRefSheet} animationType="slide" transparent onRequestClose={() => setShowRefSheet(false)}>
-        <Pressable style={styles.refSheetOverlay} onPress={() => setShowRefSheet(false)}>
-          <Pressable style={styles.refSheetContent} onPress={() => {}}>
-            <View style={styles.refSheetHandle} />
-            <Text style={styles.refSheetTitle}>Request a Reference</Text>
-            <Text style={styles.refSheetDesc}>Enter the email of someone who can vouch for you as a roommate.</Text>
-            <TextInput
-              style={styles.refSheetInput}
-              placeholder="Email address"
-              placeholderTextColor="rgba(255,255,255,0.3)"
-              value={refEmail}
-              onChangeText={setRefEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-            <Text style={styles.refSheetLabel}>Relationship</Text>
-            <View style={styles.refSheetRelRow}>
-              {(['past_roommate', 'landlord', 'colleague', 'friend'] as const).map(rel => (
-                <Pressable
-                  key={rel}
-                  style={[styles.refSheetRelBtn, refRelationship === rel ? styles.refSheetRelBtnActive : null]}
-                  onPress={() => setRefRelationship(rel)}
-                >
-                  <Text style={[styles.refSheetRelBtnText, refRelationship === rel ? styles.refSheetRelBtnTextActive : null]}>
-                    {relationshipLabels[rel]}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-            <Pressable style={styles.refSheetSendBtn} onPress={handleRequestReference}>
-              <LinearGradient colors={['#ff6b5b', '#e83a2a']} style={styles.refSheetSendGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-                <Text style={styles.refSheetSendText}>Send Request</Text>
-              </LinearGradient>
-            </Pressable>
-            <Pressable style={styles.refSheetDismiss} onPress={() => setShowRefSheet(false)}>
-              <Text style={styles.refSheetDismissText}>Cancel</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
 
       <RoomdrAISheet
         visible={showAISheet}
@@ -1339,112 +1169,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: 'rgba(255,255,255,0.4)',
   },
-  refSummary: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 12,
-  },
-  refSummaryLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  refAvgRating: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#fff',
-  },
-  refCount: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.5)',
-  },
-  refVerifiedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(34,197,94,0.12)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-  },
-  refVerifiedText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#22c55e',
-  },
-  refCard: {
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
-  },
-  refCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  refAuthorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
-  },
-  refAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  refAvatarText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  refAuthorName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  refRelTag: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-    alignSelf: 'flex-start',
-    marginTop: 3,
-  },
-  refRelTagText: {
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  refStars: {
-    flexDirection: 'row',
-    gap: 2,
-  },
-  refReview: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.6)',
-    lineHeight: 18,
-    marginTop: 10,
-    fontStyle: 'italic',
-  },
-  refTapHint: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: 4,
-    marginTop: 8,
-    alignSelf: 'flex-end' as const,
-  },
-  refTapHintText: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.4)',
-  },
   bgCheckCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1509,109 +1233,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 12,
-  },
-  refSheetOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'flex-end',
-  },
-  refSheetContent: {
-    backgroundColor: '#1a1a1a',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-    paddingTop: 12,
-  },
-  refSheetHandle: {
-    width: 36,
-    height: 4,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: 18,
-  },
-  refSheetTitle: {
-    fontSize: 19,
-    fontWeight: '800',
-    color: '#fff',
-    textAlign: 'center',
-    marginBottom: 6,
-  },
-  refSheetDesc: {
-    fontSize: 13.5,
-    color: 'rgba(255,255,255,0.5)',
-    textAlign: 'center',
-    lineHeight: 19,
-    marginBottom: 20,
-  },
-  refSheetInput: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 15,
-    color: '#fff',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    marginBottom: 16,
-  },
-  refSheetLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.6)',
-    marginBottom: 8,
-  },
-  refSheetRelRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 20,
-  },
-  refSheetRelBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-  refSheetRelBtnActive: {
-    backgroundColor: 'rgba(255,107,91,0.15)',
-    borderColor: '#ff6b5b',
-  },
-  refSheetRelBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.5)',
-  },
-  refSheetRelBtnTextActive: {
-    color: '#ff6b5b',
-  },
-  refSheetSendBtn: {
-    borderRadius: 14,
-    overflow: 'hidden',
-    marginBottom: 10,
-  },
-  refSheetSendGrad: {
-    height: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 14,
-  },
-  refSheetSendText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  refSheetDismiss: {
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  refSheetDismissText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.4)',
   },
 });
