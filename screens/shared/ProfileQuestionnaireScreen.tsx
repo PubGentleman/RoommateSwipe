@@ -11,6 +11,7 @@ import {
   Platform,
   ActivityIndicator,
   KeyboardAvoidingView,
+  Text,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -125,6 +126,24 @@ const STEP_SUBTITLES: Record<StepId, string> = {
   interests: 'Pick at least 3 tags that match your lifestyle. This helps us find your perfect roommate.',
   expenses: 'How would you like to split shared costs?',
   personality: '5 quick questions to find your best matches',
+};
+
+const STEP_ICONS: Record<StepId, keyof typeof Feather.glyphMap> = {
+  photos: 'camera',
+  basicInfo: 'user',
+  gender: 'credit-card',
+  locationOccupation: 'map-pin',
+  bio: 'edit-3',
+  sleepSchedule: 'moon',
+  cleanliness: 'trash-2',
+  smoking: 'wind',
+  social: 'users',
+  noiseTolerance: 'volume-2',
+  workPets: 'briefcase',
+  housing: 'home',
+  interests: 'star',
+  expenses: 'dollar-sign',
+  personality: 'cpu',
 };
 
 export const ProfileQuestionnaireScreen = () => {
@@ -426,6 +445,13 @@ export const ProfileQuestionnaireScreen = () => {
 
   const isLastStep = currentFilteredIndex === stepsToShow.length - 1;
 
+  const renderSubSectionHeader = (label: string) => (
+    <View style={styles.subSectionHeader}>
+      <View style={styles.subSectionBar} />
+      <ThemedText style={styles.subSectionTitle}>{label}</ThemedText>
+    </View>
+  );
+
   const renderStepContent = () => {
     const stepId = STEP_ORDER[currentStep];
 
@@ -435,15 +461,15 @@ export const ProfileQuestionnaireScreen = () => {
           <View style={styles.stepInner}>
             <View style={styles.photoGrid}>
               {photos.map((photo, index) => (
-                <View key={`photo-${index}`} style={[styles.photoSlot, { borderColor: theme.border }]}>
+                <View key={`photo-${index}`} style={styles.photoSlot}>
                   <Image source={{ uri: photo }} style={styles.photoImage} />
                   {index === 0 ? (
-                    <View style={[styles.mainBadge, { backgroundColor: theme.primary }]}>
-                      <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '600' }]}>Main</ThemedText>
+                    <View style={styles.mainBadge}>
+                      <ThemedText style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 11 }}>Main</ThemedText>
                     </View>
                   ) : null}
                   <Pressable
-                    style={[styles.removeBtn, { backgroundColor: theme.error }]}
+                    style={styles.removeBtn}
                     onPress={() => setPhotos(photos.filter((_, i) => i !== index))}
                   >
                     <Feather name="x" size={14} color="#FFFFFF" />
@@ -452,14 +478,17 @@ export const ProfileQuestionnaireScreen = () => {
               ))}
               {photos.length < 6 ? (
                 <Pressable
-                  style={[styles.photoSlot, styles.addPhotoSlot, { borderColor: theme.border, backgroundColor: theme.backgroundSecondary }]}
+                  style={[styles.photoSlot, styles.addPhotoSlot]}
                   onPress={pickImage}
                 >
-                  <Feather name="plus" size={28} color={theme.textSecondary} />
-                  <ThemedText style={[Typography.small, { color: theme.textSecondary, marginTop: Spacing.xs }]}>Add</ThemedText>
+                  <View style={styles.addPhotoIcon}>
+                    <Feather name="camera" size={22} color="rgba(255,255,255,0.4)" />
+                  </View>
+                  <ThemedText style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: 6 }}>Add Photo</ThemedText>
                 </Pressable>
               ) : null}
             </View>
+            <ThemedText style={styles.photoHint}>First photo is your main profile picture</ThemedText>
           </View>
         );
 
@@ -467,39 +496,41 @@ export const ProfileQuestionnaireScreen = () => {
         return (
           <View style={styles.stepInner}>
             <View style={styles.inputGroup}>
-              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>Name *</ThemedText>
+              <ThemedText style={styles.inputLabel}>Name *</ThemedText>
               <TextInput
-                style={[styles.textInput, { backgroundColor: theme.backgroundDefault, borderColor: theme.border, color: theme.text }]}
+                style={styles.textInput}
                 value={name}
                 onChangeText={setName}
                 placeholder="Your full name"
-                placeholderTextColor={theme.textSecondary}
+                placeholderTextColor="rgba(255,255,255,0.25)"
               />
             </View>
             <View style={styles.inputGroup}>
-              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>Email *</ThemedText>
+              <ThemedText style={styles.inputLabel}>Email *</ThemedText>
               <TextInput
-                style={[styles.textInput, { backgroundColor: theme.backgroundDefault, borderColor: theme.border, color: theme.text }]}
+                style={styles.textInput}
                 value={email}
                 onChangeText={setEmail}
                 placeholder="your@email.com"
-                placeholderTextColor={theme.textSecondary}
+                placeholderTextColor="rgba(255,255,255,0.25)"
                 keyboardType="email-address"
                 autoCapitalize="none"
               />
             </View>
             <View style={styles.inputGroup}>
-              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>Date of Birth *</ThemedText>
+              <ThemedText style={styles.inputLabel}>Date of Birth *</ThemedText>
               <Pressable
-                style={[styles.textInput, { backgroundColor: theme.backgroundDefault, borderColor: birthdayError ? theme.error : theme.border, justifyContent: 'center' }]}
+                style={[styles.dateTrigger, { borderColor: birthdayError ? theme.error : '#2a2a2a' }]}
                 onPress={() => setShowBirthdayPicker(true)}
               >
-                <ThemedText style={{ color: birthday ? theme.text : theme.textSecondary }}>
+                <Feather name="calendar" size={18} color="rgba(255,255,255,0.35)" style={{ marginRight: 12 }} />
+                <ThemedText style={{ color: birthday ? '#fff' : 'rgba(255,255,255,0.3)', fontSize: 16, flex: 1 }}>
                   {birthday ? formatDate(birthday) : 'Select your birthday'}
                 </ThemedText>
+                <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.2)" />
               </Pressable>
               {birthdayError ? (
-                <ThemedText style={[Typography.small, { color: theme.error, marginTop: Spacing.xs }]}>{birthdayError}</ThemedText>
+                <ThemedText style={{ color: theme.error, fontSize: 12, marginTop: 4 }}>{birthdayError}</ThemedText>
               ) : null}
               <DatePickerModal
                 visible={showBirthdayPicker}
@@ -534,8 +565,8 @@ export const ProfileQuestionnaireScreen = () => {
               onNeighborhoodChange={setSelectedNeighborhood}
             />
             <View style={[styles.inputGroup, { marginTop: Spacing.lg }]}>
-              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>Occupation</ThemedText>
-              <ThemedText style={{ fontSize: 13, color: theme.textSecondary, marginBottom: Spacing.sm }}>Select the option that best describes what you do</ThemedText>
+              <ThemedText style={styles.inputLabel}>Occupation</ThemedText>
+              <ThemedText style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: Spacing.sm }}>Select the option that best describes what you do</ThemedText>
               <OccupationBarSelector
                 selectedOccupation={occupation}
                 onChange={setOccupation}
@@ -548,16 +579,16 @@ export const ProfileQuestionnaireScreen = () => {
         return (
           <View style={styles.stepInner}>
             <TextInput
-              style={[styles.textInput, styles.bioInput, { backgroundColor: theme.backgroundDefault, borderColor: theme.border, color: theme.text }]}
+              style={styles.bioInput}
               value={bio}
               onChangeText={setBio}
               placeholder="Tell potential roommates about yourself, your hobbies, and what you're looking for..."
-              placeholderTextColor={theme.textSecondary}
+              placeholderTextColor="rgba(255,255,255,0.25)"
               multiline
               textAlignVertical="top"
               maxLength={500}
             />
-            <ThemedText style={[Typography.small, { color: theme.textSecondary, textAlign: 'right', marginTop: Spacing.xs }]}>
+            <ThemedText style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', textAlign: 'right', marginTop: 6 }}>
               {bio.length}/500
             </ThemedText>
           </View>
@@ -594,15 +625,15 @@ export const ProfileQuestionnaireScreen = () => {
       case 'social':
         return (
           <View style={styles.stepInner}>
-            <ThemedText style={[Typography.h3, { marginBottom: Spacing.md, color: theme.text }]}>Guest Policy</ThemedText>
+            {renderSubSectionHeader('Guest Policy')}
             <SelectionCard icon="user-x" title="Rarely" isSelected={guestPolicy === 'rarely'} onPress={() => setGuestPolicy('rarely')} index={0} />
             <SelectionCard icon="user-check" title="Occasionally" isSelected={guestPolicy === 'occasionally'} onPress={() => setGuestPolicy('occasionally')} index={1} />
             <SelectionCard icon="users" title="Frequently" isSelected={guestPolicy === 'frequently'} onPress={() => setGuestPolicy('frequently')} index={2} />
             <SelectionCard icon="x" title="Prefer No Guests" isSelected={guestPolicy === 'prefer_no_guests'} onPress={() => setGuestPolicy('prefer_no_guests')} index={3} />
 
-            <View style={{ height: Spacing.xl }} />
+            <View style={{ height: 24 }} />
 
-            <ThemedText style={[Typography.h3, { marginBottom: Spacing.md, color: theme.text }]}>Roommate Relationship</ThemedText>
+            {renderSubSectionHeader('Roommate Relationship')}
             <SelectionCard icon="shield" title="Respectful Co-living" subtitle="Keep things friendly but independent" isSelected={roommateRelationship === 'respectful_coliving'} onPress={() => setRoommateRelationship('respectful_coliving')} index={0} />
             <SelectionCard icon="coffee" title="Occasional Hangouts" subtitle="Grab a meal or watch a show together sometimes" isSelected={roommateRelationship === 'occasional_hangouts'} onPress={() => setRoommateRelationship('occasional_hangouts')} index={1} />
             <SelectionCard icon="heart" title="Prefer Friends" subtitle="Looking for a roommate who becomes a friend" isSelected={roommateRelationship === 'prefer_friends'} onPress={() => setRoommateRelationship('prefer_friends')} index={2} />
@@ -622,15 +653,15 @@ export const ProfileQuestionnaireScreen = () => {
       case 'workPets':
         return (
           <View style={styles.stepInner}>
-            <ThemedText style={[Typography.h3, { marginBottom: Spacing.md, color: theme.text }]}>Work Location</ThemedText>
+            {renderSubSectionHeader('Work Location')}
             <SelectionCard icon="home" title="Work From Home" subtitle="Full-time remote" isSelected={workLocation === 'wfh_fulltime'} onPress={() => setWorkLocation('wfh_fulltime')} index={0} />
             <SelectionCard icon="repeat" title="Hybrid" subtitle="Mix of home and office" isSelected={workLocation === 'hybrid'} onPress={() => setWorkLocation('hybrid')} index={1} />
             <SelectionCard icon="briefcase" title="Office Full-time" subtitle="Out of the house all day" isSelected={workLocation === 'office_fulltime'} onPress={() => setWorkLocation('office_fulltime')} index={2} />
             <SelectionCard icon="shuffle" title="Irregular Schedule" isSelected={workLocation === 'irregular'} onPress={() => setWorkLocation('irregular')} index={3} />
 
-            <View style={{ height: Spacing.xl }} />
+            <View style={{ height: 24 }} />
 
-            <ThemedText style={[Typography.h3, { marginBottom: Spacing.md, color: theme.text }]}>Pets</ThemedText>
+            {renderSubSectionHeader('Pets')}
             <SelectionCard icon="heart" title="I Have Pets" isSelected={pets === 'have_pets'} onPress={() => setPets('have_pets')} index={0} />
             <SelectionCard icon="smile" title="Open to Pets" isSelected={pets === 'open_to_pets'} onPress={() => setPets('open_to_pets')} index={1} />
             <SelectionCard icon="x-circle" title="Prefer No Pets" subtitle="Allergies or personal preference" isSelected={pets === 'no_pets'} onPress={() => setPets('no_pets')} index={2} />
@@ -641,30 +672,35 @@ export const ProfileQuestionnaireScreen = () => {
         return (
           <View style={styles.stepInner}>
             <View style={styles.inputGroup}>
-              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>Monthly Budget ($)</ThemedText>
-              <TextInput
-                style={[styles.textInput, { backgroundColor: theme.backgroundDefault, borderColor: theme.border, color: theme.text }]}
-                value={budget}
-                onChangeText={setBudget}
-                placeholder="1500"
-                placeholderTextColor={theme.textSecondary}
-                keyboardType="number-pad"
-              />
+              <ThemedText style={styles.inputLabel}>Monthly Budget</ThemedText>
+              <View style={styles.budgetInputRow}>
+                <ThemedText style={styles.budgetPrefix}>$</ThemedText>
+                <TextInput
+                  style={styles.budgetInput}
+                  value={budget}
+                  onChangeText={setBudget}
+                  placeholder="1500"
+                  placeholderTextColor="rgba(255,255,255,0.25)"
+                  keyboardType="number-pad"
+                />
+              </View>
             </View>
 
-            <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.sm, marginTop: Spacing.md }]}>Looking For</ThemedText>
+            <ThemedText style={[styles.inputLabel, { marginBottom: 10, marginTop: 4 }]}>Looking For</ThemedText>
             <SelectionCard icon="grid" title="A Room" subtitle="Shared apartment" isSelected={lookingFor === 'room'} onPress={() => setLookingFor('room')} index={0} />
             <SelectionCard icon="home" title="Entire Apartment" subtitle="Full place for you and roommates" isSelected={lookingFor === 'entire_apartment'} onPress={() => setLookingFor('entire_apartment')} index={1} />
 
             <View style={styles.inputGroup}>
-              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.xs, marginTop: Spacing.md }]}>Move-in Date</ThemedText>
+              <ThemedText style={[styles.inputLabel, { marginTop: 12 }]}>Move-in Date</ThemedText>
               <Pressable
-                style={[styles.textInput, { backgroundColor: theme.backgroundDefault, borderColor: theme.border, justifyContent: 'center' }]}
+                style={styles.dateTrigger}
                 onPress={() => setShowMoveInPicker(true)}
               >
-                <ThemedText style={{ color: moveInDate ? theme.text : theme.textSecondary }}>
+                <Feather name="calendar" size={18} color="rgba(255,255,255,0.35)" style={{ marginRight: 12 }} />
+                <ThemedText style={{ color: moveInDate ? '#fff' : 'rgba(255,255,255,0.3)', fontSize: 16, flex: 1 }}>
                   {moveInDate ? formatDate(moveInDate) : 'Select move-in date'}
                 </ThemedText>
+                <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.2)" />
               </Pressable>
               <DatePickerModal
                 visible={showMoveInPicker}
@@ -678,29 +714,29 @@ export const ProfileQuestionnaireScreen = () => {
               />
             </View>
             <View style={styles.inputGroup}>
-              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>Bedrooms</ThemedText>
+              <ThemedText style={styles.inputLabel}>Bedrooms</ThemedText>
               <TextInput
-                style={[styles.textInput, { backgroundColor: theme.backgroundDefault, borderColor: theme.border, color: theme.text }]}
+                style={styles.textInput}
                 value={bedrooms}
                 onChangeText={setBedrooms}
                 placeholder="2"
-                placeholderTextColor={theme.textSecondary}
+                placeholderTextColor="rgba(255,255,255,0.25)"
                 keyboardType="number-pad"
               />
             </View>
             <View style={styles.inputGroup}>
-              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>Bathrooms</ThemedText>
+              <ThemedText style={styles.inputLabel}>Bathrooms</ThemedText>
               <TextInput
-                style={[styles.textInput, { backgroundColor: theme.backgroundDefault, borderColor: theme.border, color: theme.text }]}
+                style={styles.textInput}
                 value={bathrooms}
                 onChangeText={setBathrooms}
                 placeholder="1"
-                placeholderTextColor={theme.textSecondary}
+                placeholderTextColor="rgba(255,255,255,0.25)"
                 keyboardType="number-pad"
               />
             </View>
 
-            <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.sm, marginTop: Spacing.md }]}>Private Bathroom</ThemedText>
+            <ThemedText style={[styles.inputLabel, { marginBottom: 10, marginTop: 4 }]}>Private Bathroom</ThemedText>
             <SelectionCard icon="check-circle" title="Yes, I need a private bathroom" isSelected={privateBathroom === true} onPress={() => setPrivateBathroom(true)} index={0} />
             <SelectionCard icon="users" title="Shared bathroom is fine" isSelected={privateBathroom === false} onPress={() => setPrivateBathroom(false)} index={1} />
           </View>
@@ -720,25 +756,25 @@ export const ProfileQuestionnaireScreen = () => {
       case 'expenses':
         return (
           <View style={styles.stepInner}>
-            <ThemedText style={[Typography.h3, { marginBottom: Spacing.sm, color: theme.text }]}>Utilities</ThemedText>
+            {renderSubSectionHeader('Utilities')}
             <SelectionCard icon="zap" title="Split Equally" isSelected={expenseUtilities === 'split_equally'} onPress={() => setExpenseUtilities('split_equally')} index={0} />
             <SelectionCard icon="bar-chart" title="Based on Usage" isSelected={expenseUtilities === 'usage_based'} onPress={() => setExpenseUtilities('usage_based')} index={1} />
             <SelectionCard icon="home" title="Included in Rent" isSelected={expenseUtilities === 'included_in_rent'} onPress={() => setExpenseUtilities('included_in_rent')} index={2} />
 
-            <View style={{ height: Spacing.lg }} />
-            <ThemedText style={[Typography.h3, { marginBottom: Spacing.sm, color: theme.text }]}>Groceries</ThemedText>
+            <View style={{ height: 20 }} />
+            {renderSubSectionHeader('Groceries')}
             <SelectionCard icon="shopping-cart" title="Split Equally" isSelected={expenseGroceries === 'split_equally'} onPress={() => setExpenseGroceries('split_equally')} index={0} />
             <SelectionCard icon="shopping-bag" title="Everyone Buys Their Own" isSelected={expenseGroceries === 'buy_own'} onPress={() => setExpenseGroceries('buy_own')} index={1} />
             <SelectionCard icon="share-2" title="Share Basics" isSelected={expenseGroceries === 'shared_basics'} onPress={() => setExpenseGroceries('shared_basics')} index={2} />
 
-            <View style={{ height: Spacing.lg }} />
-            <ThemedText style={[Typography.h3, { marginBottom: Spacing.sm, color: theme.text }]}>Internet / WiFi</ThemedText>
+            <View style={{ height: 20 }} />
+            {renderSubSectionHeader('Internet / WiFi')}
             <SelectionCard icon="wifi" title="Split Equally" isSelected={expenseInternet === 'split_equally'} onPress={() => setExpenseInternet('split_equally')} index={0} />
             <SelectionCard icon="user" title="One Person Pays" isSelected={expenseInternet === 'one_pays'} onPress={() => setExpenseInternet('one_pays')} index={1} />
             <SelectionCard icon="home" title="Included in Rent" isSelected={expenseInternet === 'included_in_rent'} onPress={() => setExpenseInternet('included_in_rent')} index={2} />
 
-            <View style={{ height: Spacing.lg }} />
-            <ThemedText style={[Typography.h3, { marginBottom: Spacing.sm, color: theme.text }]}>Cleaning Supplies</ThemedText>
+            <View style={{ height: 20 }} />
+            {renderSubSectionHeader('Cleaning Supplies')}
             <SelectionCard icon="droplet" title="Split Equally" isSelected={expenseCleaning === 'split_equally'} onPress={() => setExpenseCleaning('split_equally')} index={0} />
             <SelectionCard icon="refresh-cw" title="Take Turns Buying" isSelected={expenseCleaning === 'take_turns'} onPress={() => setExpenseCleaning('take_turns')} index={1} />
             <SelectionCard icon="award" title="Hire a Cleaner" isSelected={expenseCleaning === 'hire_cleaner'} onPress={() => setExpenseCleaning('hire_cleaner')} index={2} />
@@ -802,30 +838,19 @@ export const ProfileQuestionnaireScreen = () => {
         return (
           <View style={styles.stepInner}>
             {PERSONALITY_QUESTIONS.map((q) => (
-              <View key={q.id} style={{ marginBottom: 20 }}>
-                <ThemedText style={[Typography.body, { fontWeight: '600', marginBottom: 10, color: theme.text }]}>{q.question}</ThemedText>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              <View key={q.id} style={{ marginBottom: 24 }}>
+                <ThemedText style={styles.questionText}>{q.question}</ThemedText>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
                   {q.options.map((opt) => {
                     const isSelected = personalityAnswers[q.id] === opt.value;
                     return (
                       <Pressable
                         key={opt.value}
                         onPress={() => setPersonalityAnswers(prev => ({ ...prev, [q.id]: opt.value }))}
-                        style={{
-                          flex: 1,
-                          minWidth: '45%',
-                          backgroundColor: isSelected ? 'rgba(255,107,91,0.1)' : '#1e1e1e',
-                          borderWidth: 1,
-                          borderColor: isSelected ? '#ff6b5b' : 'rgba(255,255,255,0.08)',
-                          borderRadius: 12,
-                          padding: 12,
-                          alignItems: 'center',
-                        }}
+                        style={[styles.personalityOption, isSelected && styles.personalityOptionSelected]}
                       >
-                        <Text style={{ fontSize: 24, marginBottom: 4 }}>{opt.emoji}</Text>
-                        <Text style={{ color: isSelected ? '#ff6b5b' : 'rgba(255,255,255,0.7)', fontSize: 12, textAlign: 'center', fontWeight: isSelected ? '600' : '400' }}>
-                          {opt.label}
-                        </Text>
+                        <Text style={styles.personalityEmoji}>{opt.emoji}</Text>
+                        <ThemedText style={styles.personalityLabel}>{opt.label}</ThemedText>
                       </Pressable>
                     );
                   })}
@@ -845,16 +870,16 @@ export const ProfileQuestionnaireScreen = () => {
 
   return (
     <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
+      style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={0}
     >
       <View style={{ paddingTop: insets.top }}>
         <View style={styles.navHeader}>
           <TouchableOpacity onPress={goBack} style={styles.navButton} activeOpacity={0.6} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-            <Feather name="arrow-left" size={24} color={theme.text} />
+            <Feather name="arrow-left" size={24} color="#fff" />
           </TouchableOpacity>
-          <ThemedText style={[Typography.h3, { flex: 1, textAlign: 'center' }]}>
+          <ThemedText style={{ flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '700', color: '#fff' }}>
             {isMissingMode ? `${currentFilteredIndex + 1} of ${stepsToShow.length}` : (currentFilteredIndex === 0 ? (isOnboarding ? 'Create Profile' : 'Edit Profile') : '')}
           </ThemedText>
           {isMissingMode ? (
@@ -865,7 +890,9 @@ export const ProfileQuestionnaireScreen = () => {
             <View style={styles.navButton} />
           )}
         </View>
-        <ProgressBar currentStep={currentFilteredIndex} totalSteps={stepsToShow.length} />
+        <View style={styles.progressWrap}>
+          <ProgressBar currentStep={currentFilteredIndex} totalSteps={stepsToShow.length} />
+        </View>
       </View>
 
       <ScrollView
@@ -879,20 +906,24 @@ export const ProfileQuestionnaireScreen = () => {
           key={currentStepId}
           entering={direction === 'forward' ? SlideInRight.duration(250) : SlideInLeft.duration(250)}
         >
-          <ThemedText style={[Typography.h2, { marginBottom: Spacing.xs }]}>
-            {STEP_TITLES[currentStepId]}
-          </ThemedText>
-          <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.xl }]}>
-            {STEP_SUBTITLES[currentStepId]}
-          </ThemedText>
+          <View style={styles.stepHeader}>
+            <View style={styles.stepIconWrap}>
+              <Feather name={STEP_ICONS[currentStepId]} size={28} color="#ff6b5b" />
+            </View>
+            <View style={styles.stepBadge}>
+              <Text style={styles.stepBadgeText}>{currentFilteredIndex + 1} of {stepsToShow.length}</Text>
+            </View>
+            <ThemedText style={styles.stepTitle}>{STEP_TITLES[currentStepId]}</ThemedText>
+            <ThemedText style={styles.stepSubtitle}>{STEP_SUBTITLES[currentStepId]}</ThemedText>
+          </View>
           {renderStepContent()}
         </Animated.View>
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, Spacing.lg) + 80 }]}>
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) + 80 }]}>
         {isLastStep ? (
           <Pressable
-            style={[styles.primaryButton, { backgroundColor: theme.primary, opacity: isSaving ? 0.7 : 1 }]}
+            style={[styles.nextButton, { opacity: isSaving ? 0.7 : 1 }]}
             onPress={handleSave}
             disabled={isSaving}
           >
@@ -900,14 +931,14 @@ export const ProfileQuestionnaireScreen = () => {
               <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
               <>
-                <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>{isMissingMode ? 'Save' : 'Save Profile'}</ThemedText>
                 <Feather name="check" size={20} color="#FFFFFF" />
+                <ThemedText style={styles.nextButtonText}>{isMissingMode ? 'Save' : 'Save Profile'}</ThemedText>
               </>
             )}
           </Pressable>
         ) : (
-          <Pressable style={[styles.primaryButton, { backgroundColor: theme.primary }]} onPress={goNext}>
-            <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>Next</ThemedText>
+          <Pressable style={styles.nextButton} onPress={goNext}>
+            <ThemedText style={styles.nextButtonText}>Next</ThemedText>
             <Feather name="arrow-right" size={20} color="#FFFFFF" />
           </Pressable>
         )}
@@ -919,12 +950,13 @@ export const ProfileQuestionnaireScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#111',
   },
   navHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   navButton: {
     width: 44,
@@ -933,48 +965,156 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 10,
   },
+  progressWrap: {
+    paddingHorizontal: 24,
+    paddingTop: 6,
+    paddingBottom: 2,
+  },
   scrollContent: {
     flex: 1,
   },
   scrollContentContainer: {
-    paddingHorizontal: Spacing.xl,
-    paddingBottom: Spacing.xxl,
+    paddingBottom: 32,
+  },
+  stepHeader: {
+    alignItems: 'center',
+    paddingTop: 8,
+    paddingBottom: 24,
+    paddingHorizontal: 24,
+  },
+  stepIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,107,91,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  stepBadge: {
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    marginBottom: 10,
+  },
+  stepBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.5)',
+  },
+  stepTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#fff',
+    textAlign: 'center',
+    letterSpacing: -0.5,
+    marginBottom: 8,
+  },
+  stepSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.5)',
+    textAlign: 'center',
+    lineHeight: 20,
   },
   stepInner: {
-    paddingBottom: Spacing.lg,
+    paddingHorizontal: 24,
+    paddingBottom: 32,
   },
   inputGroup: {
-    marginBottom: Spacing.lg,
+    marginBottom: 18,
+  },
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.6)',
+    marginBottom: 8,
   },
   textInput: {
-    height: Spacing.inputHeight,
-    borderWidth: 1,
-    borderRadius: BorderRadius.medium,
-    paddingHorizontal: Spacing.lg,
-    ...Typography.body,
+    height: 52,
+    backgroundColor: '#1c1c1c',
+    borderWidth: 1.5,
+    borderColor: '#2a2a2a',
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    fontSize: 16,
+    color: '#fff',
   },
   bioInput: {
-    height: 150,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.md,
+    height: 140,
+    backgroundColor: '#1c1c1c',
+    borderWidth: 1.5,
+    borderColor: '#2a2a2a',
+    borderRadius: 14,
+    paddingTop: 16,
+    paddingBottom: 16,
+    paddingHorizontal: 18,
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#fff',
+    textAlignVertical: 'top',
+  },
+  dateTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1c1c1c',
+    borderWidth: 1.5,
+    borderColor: '#2a2a2a',
+    borderRadius: 14,
+    height: 52,
+    paddingHorizontal: 18,
+  },
+  budgetInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1c1c1c',
+    borderWidth: 1.5,
+    borderColor: '#2a2a2a',
+    borderRadius: 14,
+    height: 52,
+    paddingHorizontal: 18,
+  },
+  budgetPrefix: {
+    fontSize: 18,
+    color: 'rgba(255,255,255,0.4)',
+    marginRight: 8,
+  },
+  budgetInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#fff',
   },
   photoGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: Spacing.sm,
+    gap: 10,
+    justifyContent: 'center',
+    paddingTop: 8,
   },
   photoSlot: {
-    width: '31%',
-    aspectRatio: 0.8,
-    borderRadius: BorderRadius.medium,
-    borderWidth: 1,
+    width: 105,
+    height: 130,
+    borderRadius: 16,
     overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: '#2a2a2a',
   },
   addPhotoSlot: {
-    borderStyle: 'dashed',
-    borderWidth: 2,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1c1c1c',
+  },
+  addPhotoIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   photoImage: {
     width: '100%',
@@ -982,32 +1122,100 @@ const styles = StyleSheet.create({
   },
   mainBadge: {
     position: 'absolute',
-    bottom: 6,
-    left: 6,
+    bottom: 8,
+    left: 8,
+    borderRadius: 8,
     paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
+    paddingVertical: 3,
+    backgroundColor: '#ff6b5b',
   },
   removeBtn: {
     position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
+    top: 8,
+    right: 8,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,59,48,0.9)',
+  },
+  photoHint: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.35)',
+    textAlign: 'center',
+    marginTop: 14,
+  },
+  subSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+    marginTop: 8,
+  },
+  subSectionBar: {
+    width: 3,
+    height: 16,
+    borderRadius: 2,
+    backgroundColor: '#ff6b5b',
+  },
+  subSectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  questionText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 14,
+    marginTop: 4,
+  },
+  personalityOption: {
+    width: '48%',
+    borderRadius: 14,
+    padding: 16,
+    backgroundColor: '#1c1c1c',
+    borderWidth: 1.5,
+    borderColor: '#2a2a2a',
+    alignItems: 'center',
+    flexGrow: 1,
+  },
+  personalityOptionSelected: {
+    backgroundColor: 'rgba(255,107,91,0.1)',
+    borderColor: '#ff6b5b',
+  },
+  personalityEmoji: {
+    fontSize: 28,
+    marginBottom: 8,
+  },
+  personalityLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#fff',
+    textAlign: 'center',
+    lineHeight: 18,
   },
   footer: {
-    paddingHorizontal: Spacing.xl,
-    paddingTop: Spacing.md,
+    paddingHorizontal: 24,
+    paddingTop: 12,
   },
-  primaryButton: {
+  nextButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: Spacing.buttonHeight,
-    borderRadius: BorderRadius.large,
-    gap: Spacing.sm,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: '#ff6b5b',
+    gap: 8,
+    shadowColor: '#ff6b5b',
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  nextButtonText: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#fff',
   },
 });
