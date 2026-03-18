@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, TextInput, StyleSheet, Pressable, Alert, Image, ScrollView } from 'react-native';
+import { View, TextInput, StyleSheet, Pressable, Alert, Image, ScrollView, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { ScreenKeyboardAwareScrollView } from '../../components/ScreenKeyboardAwareScrollView';
@@ -294,7 +294,24 @@ export const CreateEditListingScreen = () => {
     }
   };
 
+  const executeDelete = async () => {
+    if (!propertyId) return;
+    try {
+      await deleteListingSupa(propertyId);
+    } catch {
+    }
+    await StorageService.deleteProperty(propertyId);
+    navigation.goBack();
+  };
+
   const handleDelete = () => {
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm('Are you sure you want to delete this listing? This cannot be undone.');
+      if (confirmed) {
+        executeDelete();
+      }
+      return;
+    }
     Alert.alert(
       'Delete Listing',
       'Are you sure you want to delete this listing? This cannot be undone.',
@@ -303,16 +320,7 @@ export const CreateEditListingScreen = () => {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: async () => {
-            if (propertyId) {
-              try {
-                await deleteListingSupa(propertyId);
-              } catch {
-                await StorageService.deleteProperty(propertyId);
-              }
-              navigation.goBack();
-            }
-          },
+          onPress: executeDelete,
         },
       ]
     );

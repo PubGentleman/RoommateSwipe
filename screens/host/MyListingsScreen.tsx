@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, StyleSheet, Pressable, Text, ScrollView, Image, Alert } from 'react-native';
+import { View, StyleSheet, Pressable, Text, ScrollView, Image, Alert, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -204,7 +204,24 @@ export const MyListingsScreen = () => {
     await loadData();
   };
 
+  const executeDeleteListing = async (propertyId: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    try {
+      await deleteListingSupa(propertyId);
+    } catch {
+    }
+    await StorageService.deleteProperty(propertyId);
+    await loadData();
+  };
+
   const deleteListingHandler = (propertyId: string) => {
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm('Are you sure you want to delete this listing? This action cannot be undone.');
+      if (confirmed) {
+        executeDeleteListing(propertyId);
+      }
+      return;
+    }
     Alert.alert(
       'Delete Listing',
       'Are you sure you want to delete this listing? This action cannot be undone.',
@@ -213,15 +230,7 @@ export const MyListingsScreen = () => {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: async () => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-            try {
-              await deleteListingSupa(propertyId);
-            } catch {
-              await StorageService.deleteProperty(propertyId);
-            }
-            await loadData();
-          },
+          onPress: () => executeDeleteListing(propertyId),
         },
       ]
     );

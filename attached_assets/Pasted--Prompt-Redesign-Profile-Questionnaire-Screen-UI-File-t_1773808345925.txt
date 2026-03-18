@@ -1,0 +1,308 @@
+# Prompt: Redesign Profile Questionnaire Screen UI
+
+## File to Edit
+`screens/shared/ProfileQuestionnaireScreen.tsx`
+
+Do **not** change any logic, state, validation, navigation, or save handlers. Only improve the visual design and layout. All existing functionality must work identically.
+
+---
+
+## 1. Upgrade the Step Header
+
+Each step currently shows a title and subtitle. Add a step number badge and an emoji/icon per step.
+
+Add a `STEP_EMOJIS` map above the component:
+```tsx
+const STEP_EMOJIS: Record<StepId, string> = {
+  photos: '📸',
+  basicInfo: '👤',
+  gender: '🪪',
+  locationOccupation: '📍',
+  bio: '✍️',
+  sleepSchedule: '🌙',
+  cleanliness: '🧹',
+  smoking: '🚬',
+  social: '🤝',
+  noiseTolerance: '🔊',
+  workPets: '💼',
+  housing: '🏠',
+  interests: '✨',
+  expenses: '💰',
+  personality: '🧠',
+};
+```
+
+Replace the existing step header render with:
+```tsx
+<View style={styles.stepHeader}>
+  <View style={styles.stepEmojiWrap}>
+    <Text style={styles.stepEmoji}>{STEP_EMOJIS[STEP_ORDER[currentStep]]}</Text>
+  </View>
+  <View style={styles.stepBadge}>
+    <Text style={styles.stepBadgeText}>{currentFilteredIndex + 1} of {stepsToShow.length}</Text>
+  </View>
+  <ThemedText style={styles.stepTitle}>{STEP_TITLES[STEP_ORDER[currentStep]]}</ThemedText>
+  <ThemedText style={styles.stepSubtitle}>{STEP_SUBTITLES[STEP_ORDER[currentStep]]}</ThemedText>
+</View>
+```
+
+New styles:
+```
+stepHeader: { alignItems: 'center', paddingTop: 8, paddingBottom: 24, paddingHorizontal: 24 }
+stepEmojiWrap: { width: 64, height: 64, borderRadius: 20, backgroundColor: 'rgba(255,107,91,0.12)', borderWidth: 1, borderColor: 'rgba(255,107,91,0.2)', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }
+stepEmoji: { fontSize: 30 }
+stepBadge: { backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4, marginBottom: 10 }
+stepBadgeText: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.5)' }
+stepTitle: { fontSize: 24, fontWeight: '800', color: '#fff', textAlign: 'center', letterSpacing: -0.5, marginBottom: 8 }
+stepSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: 20 }
+```
+
+---
+
+## 2. Improve the Progress Bar
+
+The existing `ProgressBar` component is rendered at the top. Wrap it in a container with more breathing room:
+
+```tsx
+<View style={styles.progressWrap}>
+  <ProgressBar current={currentFilteredIndex + 1} total={stepsToShow.length} />
+</View>
+```
+
+`progressWrap`: `paddingHorizontal: 24`, `paddingTop: 6`, `paddingBottom: 2`
+
+If `ProgressBar` accepts custom colors, pass `color="#ff6b5b"`.
+
+---
+
+## 3. Improve Text Inputs
+
+For ALL `TextInput` elements in `renderStepContent`, update to:
+- `backgroundColor: '#1c1c1c'`
+- `borderWidth: 1.5`, `borderColor: '#2a2a2a'`
+- `borderRadius: 14`
+- `height: 52` (single-line)
+- `fontSize: 16`
+- `color: '#fff'`
+- `paddingHorizontal: 18`
+
+For the `bio` textarea:
+- `height: 140`
+- `paddingTop: 16`, `paddingBottom: 16`
+- `paddingHorizontal: 18`
+- `borderRadius: 14`
+- `fontSize: 15`, `lineHeight: 22`
+
+For all input labels (`.inputGroup` > `ThemedText`):
+- `fontSize: 13`, `fontWeight: '600'`, `color: 'rgba(255,255,255,0.6)'`, `marginBottom: 8`
+
+---
+
+## 4. Improve Date Picker Trigger Buttons
+
+For birthday and move-in date `Pressable` triggers, replace the bare pressable with a styled row containing a calendar icon:
+
+```tsx
+<Pressable
+  style={[styles.dateTrigger, { borderColor: birthdayError ? theme.error : '#2a2a2a' }]}
+  onPress={() => setShowBirthdayPicker(true)}
+>
+  <Feather name="calendar" size={18} color="rgba(255,255,255,0.35)" style={{ marginRight: 12 }} />
+  <ThemedText style={{ color: birthday ? '#fff' : 'rgba(255,255,255,0.3)', fontSize: 16 }}>
+    {birthday ? formatDate(birthday) : 'Select your birthday'}
+  </ThemedText>
+  <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.2)" style={{ marginLeft: 'auto' }} />
+</Pressable>
+```
+
+Apply same treatment to the move-in date trigger in the `housing` step.
+
+`dateTrigger` style:
+- `flexDirection: 'row'`, `alignItems: 'center'`
+- `backgroundColor: '#1c1c1c'`
+- `borderWidth: 1.5`, `borderColor: '#2a2a2a'`
+- `borderRadius: 14`
+- `height: 52`
+- `paddingHorizontal: 18`
+
+---
+
+## 5. Improve the Photo Grid (photos step)
+
+`photoGrid`: `flexDirection: 'row'`, `flexWrap: 'wrap'`, `gap: 10`, `justifyContent: 'center'`, `paddingTop: 8`
+
+`photoSlot`: `width: 105`, `height: 130`, `borderRadius: 16`, `overflow: 'hidden'`, `borderWidth: 1.5`, `borderColor: '#2a2a2a'`
+
+`photoImage`: `width: '100%'`, `height: '100%'`
+
+`addPhotoSlot`: `alignItems: 'center'`, `justifyContent: 'center'`, `backgroundColor: '#1c1c1c'`
+
+In the add photo slot, replace the `Feather "plus"` with:
+```tsx
+<View style={styles.addPhotoIcon}>
+  <Feather name="camera" size={22} color="rgba(255,255,255,0.4)" />
+</View>
+<ThemedText style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: 6 }}>Add Photo</ThemedText>
+```
+`addPhotoIcon`: `width: 44`, `height: 44`, `borderRadius: 22`, `backgroundColor: 'rgba(255,255,255,0.06)'`, `alignItems: 'center'`, `justifyContent: 'center'`
+
+`mainBadge`: `position: 'absolute'`, `bottom: 8`, `left: 8`, `borderRadius: 8`, `paddingHorizontal: 8`, `paddingVertical: 3`
+
+`removeBtn`: `position: 'absolute'`, `top: 8`, `right: 8`, `width: 26`, `height: 26`, `borderRadius: 13`, `alignItems: 'center'`, `justifyContent: 'center'`
+
+Below the photo grid, add a hint:
+```tsx
+<ThemedText style={styles.photoHint}>First photo is your main profile picture</ThemedText>
+```
+`photoHint`: `fontSize: 12`, `color: 'rgba(255,255,255,0.35)'`, `textAlign: 'center'`, `marginTop: 14`
+
+---
+
+## 6. Improve SelectionCard Visual (in SelectionCard component)
+
+**File: `components/questionnaire/SelectionCard.tsx`**
+
+Update the card style for both selected and unselected states:
+
+Unselected card:
+- `backgroundColor: '#1c1c1c'`
+- `borderWidth: 1.5`, `borderColor: '#2a2a2a'`
+- `borderRadius: 14`
+- `paddingVertical: 16`, `paddingHorizontal: 18`
+- `marginBottom: 10`
+- `flexDirection: 'row'`, `alignItems: 'center'`, `gap: 14`
+
+Selected card:
+- `backgroundColor: 'rgba(255,107,91,0.1)'`
+- `borderColor: '#ff6b5b'`
+- Add `shadowColor: '#ff6b5b'`, `shadowOpacity: 0.2`, `shadowRadius: 8`, `elevation: 3`
+
+Icon wrap (if present):
+- `width: 40`, `height: 40`, `borderRadius: 12`
+- Unselected: `backgroundColor: 'rgba(255,255,255,0.06)'`
+- Selected: `backgroundColor: 'rgba(255,107,91,0.2)'`
+
+Card title: `fontSize: 15`, `fontWeight: '600'`, `color: '#fff'`
+Card subtitle: `fontSize: 13`, `color: 'rgba(255,255,255,0.45)'`, `marginTop: 2`
+
+Selected check indicator: render a `Feather "check-circle"` size 20, color `#ff6b5b` on the right side when selected.
+
+---
+
+## 7. Improve Sub-section Headers Inside Steps
+
+For step-internal headers like "Guest Policy", "Roommate Relationship", "Work Location", "Pets", "Utilities", etc., update:
+
+```tsx
+<View style={styles.subSectionHeader}>
+  <View style={styles.subSectionBar} />
+  <ThemedText style={styles.subSectionTitle}>{label}</ThemedText>
+</View>
+```
+
+`subSectionHeader`: `flexDirection: 'row'`, `alignItems: 'center'`, `gap: 8`, `marginBottom: 12`, `marginTop: 8`
+`subSectionBar`: `width: 3`, `height: 16`, `borderRadius: 2`, `backgroundColor: '#ff6b5b'`
+`subSectionTitle`: `fontSize: 16`, `fontWeight: '700'`, `color: '#fff'`
+
+Apply this to all `Typography.h3` section headers within the step content (social, workPets, expenses steps).
+
+---
+
+## 8. Improve the Personality Step (emoji grid)
+
+In the `personality` case, update each personality option card:
+
+```tsx
+<Pressable
+  style={[styles.personalityOption, personalityAnswers[q.id] === opt.value && styles.personalityOptionSelected]}
+  onPress={() => setPersonalityAnswers(prev => ({ ...prev, [q.id]: opt.value }))}
+>
+  <Text style={styles.personalityEmoji}>{opt.emoji}</Text>
+  <ThemedText style={styles.personalityLabel}>{opt.label}</ThemedText>
+</Pressable>
+```
+
+Layout: 2-column grid using `flexDirection: 'row'`, `flexWrap: 'wrap'`, `gap: 10`
+
+`personalityOption`:
+- `width: '48%'`, `borderRadius: 14`, `padding: 16`
+- `backgroundColor: '#1c1c1c'`, `borderWidth: 1.5`, `borderColor: '#2a2a2a'`
+- `alignItems: 'center'`
+
+`personalityOptionSelected`:
+- `backgroundColor: 'rgba(255,107,91,0.1)'`, `borderColor: '#ff6b5b'`
+
+`personalityEmoji`: `fontSize: 28`, `marginBottom: 8`
+`personalityLabel`: `fontSize: 13`, `fontWeight: '500'`, `color: '#fff'`, `textAlign: 'center'`, `lineHeight: 18`
+
+Each question should have a `questionText` styled as:
+- `fontSize: 16`, `fontWeight: '700'`, `color: '#fff'`, `marginBottom: 14`, `marginTop: 20`
+
+---
+
+## 9. Improve the Bottom Navigation (Next / Back / Save)
+
+The current bottom buttons should be styled as:
+
+**Next button:**
+- `height: 56`
+- `borderRadius: 16`
+- `backgroundColor: '#ff6b5b'`
+- `shadowColor: '#ff6b5b'`, `shadowOpacity: 0.4`, `shadowRadius: 12`, `elevation: 6`
+- Font: `fontSize: 17`, `fontWeight: '700'`, `color: '#fff'`
+- Full width minus `marginHorizontal: 24`
+
+**Back button:**
+- `height: 52`, `borderRadius: 16`
+- `backgroundColor: '#1c1c1c'`, `borderWidth: 1`, `borderColor: '#2a2a2a'`
+- Font: `fontSize: 16`, `fontWeight: '600'`, `color: 'rgba(255,255,255,0.6)'`
+- Full width minus `marginHorizontal: 24`, `marginTop: 10`
+
+**Save button (last step):**
+- Same as Next but label: "Save Profile"
+- Add a `Feather "check"` icon to the left of the text
+
+---
+
+## 10. Improve the `stepInner` Container
+
+`stepInner` style: `paddingHorizontal: 24`, `paddingBottom: 32`, `flex: 1`
+
+The outer `ScrollView` or `KeyboardAvoidingView` should have `backgroundColor: '#111'` to match the app theme.
+
+---
+
+## 11. Housing Step — Budget Input with $ Prefix
+
+In the `housing` case, replace the plain budget `TextInput` with a prefixed input row (same pattern as listing screen):
+
+```tsx
+<View style={styles.budgetInputRow}>
+  <ThemedText style={styles.budgetPrefix}>$</ThemedText>
+  <TextInput
+    style={styles.budgetInput}
+    value={budget}
+    onChangeText={setBudget}
+    placeholder="1500"
+    placeholderTextColor="rgba(255,255,255,0.25)"
+    keyboardType="number-pad"
+  />
+</View>
+```
+
+`budgetInputRow`: `flexDirection: 'row'`, `alignItems: 'center'`, `backgroundColor: '#1c1c1c'`, `borderWidth: 1.5`, `borderColor: '#2a2a2a'`, `borderRadius: 14`, `height: 52`, `paddingHorizontal: 18`
+`budgetPrefix`: `fontSize: 18`, `color: 'rgba(255,255,255,0.4)'`, `marginRight: 8`
+`budgetInput`: `flex: 1`, `fontSize: 16`, `color: '#fff'`
+
+---
+
+## What NOT to Change
+- All state variables and setters
+- `validateCurrentStep`, `goNext`, `goBack`, `handleSave`
+- `ImagePicker` logic in `pickImage`
+- `DatePickerModal` usage (don't remove or replace)
+- `LocationPicker`, `OccupationBarSelector`, `InterestCategoryBars` components
+- `ProgressBar` component (only wrap it)
+- `completeOnboardingStep` and `abandonSignup` flows
+- All `STEP_ORDER`, `STEP_TITLES`, `STEP_SUBTITLES` constants
+- Animated transitions (`SlideInRight`, `SlideOutLeft`, etc.)
