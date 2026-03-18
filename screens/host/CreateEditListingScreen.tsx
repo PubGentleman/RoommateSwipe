@@ -38,6 +38,15 @@ const POPULAR_CITIES = [
   'Austin', 'Seattle', 'Denver', 'Boston', 'Houston',
 ];
 
+const SECTION_ICONS: Record<string, string> = {
+  'Basic Info': 'file-text',
+  'Type': 'home',
+  'Location': 'map-pin',
+  'Amenities': 'star',
+  'House Rules': 'shield',
+  'Photos': 'camera',
+};
+
 export const CreateEditListingScreen = () => {
   const navigation = useNavigation();
   const route = useRoute<RouteProp<RouteParams, 'CreateEditListing'>>();
@@ -309,13 +318,24 @@ export const CreateEditListingScreen = () => {
     );
   };
 
-  const inputStyle = [
-    styles.input,
-    { backgroundColor: '#1a1a1a', color: theme.text, borderColor: '#333' },
+  const completionFields = [
+    title.trim(),
+    description.trim(),
+    price.trim(),
+    city.trim(),
+    address.trim(),
+    availableDate,
+    selectedAmenities.length > 0 ? 'yes' : '',
+    photos.length > 0 ? 'yes' : '',
   ];
+  const completionCount = completionFields.filter(Boolean).length;
+  const completionPct = completionCount / completionFields.length;
 
-  const renderSectionTitle = (title: string) => (
-    <ThemedText style={styles.sectionTitle}>{title}</ThemedText>
+  const renderSectionTitle = (sectionName: string) => (
+    <View style={styles.sectionTitleRow}>
+      <Feather name={(SECTION_ICONS[sectionName] || 'info') as any} size={16} color="#ff6b5b" style={{ marginRight: 8 }} />
+      <ThemedText style={styles.sectionTitle}>{sectionName}</ThemedText>
+    </View>
   );
 
   const renderNumberSelector = (
@@ -334,11 +354,11 @@ export const CreateEditListingScreen = () => {
               key={n}
               style={[
                 styles.chip,
-                { backgroundColor: selected ? '#ff6b5b' : '#1a1a1a', borderColor: selected ? '#ff6b5b' : '#333' },
+                selected ? styles.chipSelected : styles.chipUnselected,
               ]}
               onPress={() => onChange(n)}
             >
-              <ThemedText style={[styles.chipText, { color: selected ? '#fff' : theme.textSecondary }]}>
+              <ThemedText style={[styles.chipText, { color: selected ? '#fff' : '#aaa' }]}>
                 {n}
               </ThemedText>
             </Pressable>
@@ -365,11 +385,11 @@ export const CreateEditListingScreen = () => {
               key={opt.value}
               style={[
                 styles.toggleButton,
-                { backgroundColor: selected ? '#ff6b5b' : '#1a1a1a', borderColor: selected ? '#ff6b5b' : '#333' },
+                { backgroundColor: selected ? '#ff6b5b' : 'transparent' },
               ]}
               onPress={() => onChange(opt.value)}
             >
-              <ThemedText style={[styles.toggleText, { color: selected ? '#fff' : theme.textSecondary }]}>
+              <ThemedText style={[styles.toggleText, { color: selected ? '#fff' : '#666', fontWeight: selected ? '700' : '500' }]}>
                 {opt.label}
               </ThemedText>
             </Pressable>
@@ -389,109 +409,220 @@ export const CreateEditListingScreen = () => {
         <View style={{ width: 40 }} />
       </View>
 
-      {renderSectionTitle('Basic Info')}
-
-      <View style={styles.fieldContainer}>
-        <ThemedText style={styles.label}>Title</ThemedText>
-        <TextInput
-          style={inputStyle}
-          value={title}
-          onChangeText={setTitle}
-          placeholder="e.g. Sunny 2BR in Williamsburg"
-          placeholderTextColor="#666"
-        />
+      <View style={styles.progressContainer}>
+        <View style={styles.progressBar}>
+          <View style={[styles.progressFill, { width: `${completionPct * 100}%` }]} />
+        </View>
+        <ThemedText style={styles.progressLabel}>
+          {Math.round(completionPct * 100)}% complete
+        </ThemedText>
       </View>
 
-      <View style={styles.fieldContainer}>
-        <ThemedText style={styles.label}>Description</ThemedText>
-        <TextInput
-          style={[...inputStyle, styles.multilineInput]}
-          value={description}
-          onChangeText={setDescription}
-          placeholder="Describe your listing..."
-          placeholderTextColor="#666"
-          multiline
-          numberOfLines={4}
-          textAlignVertical="top"
-        />
-      </View>
+      <View style={styles.card}>
+        {renderSectionTitle('Basic Info')}
 
-      <View style={styles.row}>
-        <View style={[styles.fieldContainer, { flex: 1, marginRight: Spacing.sm }]}>
-          <ThemedText style={styles.label}>Price/month ($)</ThemedText>
+        <View style={styles.fieldContainer}>
+          <ThemedText style={styles.label}>Title</ThemedText>
           <TextInput
-            style={inputStyle}
-            value={price}
-            onChangeText={setPrice}
-            placeholder="2500"
+            style={styles.input}
+            value={title}
+            onChangeText={setTitle}
+            placeholder="e.g. Sunny 2BR in Williamsburg"
+            placeholderTextColor="#666"
+          />
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <ThemedText style={styles.label}>Description</ThemedText>
+          <TextInput
+            style={[styles.input, styles.multilineInput]}
+            value={description}
+            onChangeText={setDescription}
+            placeholder="Describe your listing..."
+            placeholderTextColor="#666"
+            multiline
+            numberOfLines={4}
+            textAlignVertical="top"
+            maxLength={500}
+          />
+          <ThemedText style={styles.charCount}>{description.length} / 500</ThemedText>
+        </View>
+
+        <View style={styles.row}>
+          <View style={[styles.fieldContainer, { flex: 1, marginRight: Spacing.sm }]}>
+            <ThemedText style={styles.label}>Price/month</ThemedText>
+            <View style={styles.inputWithPrefix}>
+              <ThemedText style={styles.inputPrefix}>$</ThemedText>
+              <TextInput
+                style={styles.inputInner}
+                value={price}
+                onChangeText={setPrice}
+                placeholder="2500"
+                placeholderTextColor="#666"
+                keyboardType="numeric"
+              />
+            </View>
+          </View>
+          <View style={[styles.fieldContainer, { flex: 1, marginLeft: Spacing.sm }]}>
+            <ThemedText style={styles.label}>Security Deposit</ThemedText>
+            <View style={styles.inputWithPrefix}>
+              <ThemedText style={styles.inputPrefix}>$</ThemedText>
+              <TextInput
+                style={styles.inputInner}
+                value={securityDeposit}
+                onChangeText={setSecurityDeposit}
+                placeholder="2500"
+                placeholderTextColor="#666"
+                keyboardType="numeric"
+              />
+            </View>
+          </View>
+        </View>
+
+        {renderNumberSelector('Bedrooms', BEDROOM_OPTIONS, bedrooms, setBedrooms)}
+        {renderNumberSelector('Bathrooms', BATHROOM_OPTIONS, bathrooms, setBathrooms)}
+
+        <View style={styles.fieldContainer}>
+          <ThemedText style={styles.label}>Square Feet</ThemedText>
+          <TextInput
+            style={styles.input}
+            value={sqft}
+            onChangeText={setSqft}
+            placeholder="800"
             placeholderTextColor="#666"
             keyboardType="numeric"
           />
         </View>
-        <View style={[styles.fieldContainer, { flex: 1, marginLeft: Spacing.sm }]}>
-          <ThemedText style={styles.label}>Security Deposit ($)</ThemedText>
+      </View>
+
+      <View style={styles.card}>
+        {renderSectionTitle('Type')}
+
+        {renderToggle(
+          'Property Type',
+          { label: 'Lease', value: 'lease' },
+          { label: 'Sublet', value: 'sublet' },
+          propertyType,
+          setPropertyType,
+        )}
+
+        {renderToggle(
+          'Room Type',
+          { label: 'Entire Place', value: 'entire' },
+          { label: 'Private Room', value: 'room' },
+          roomType,
+          setRoomType,
+        )}
+      </View>
+
+      <View style={styles.card}>
+        {renderSectionTitle('Location')}
+
+        <View style={styles.fieldContainer}>
+          <ThemedText style={styles.label}>City</ThemedText>
           <TextInput
-            style={inputStyle}
-            value={securityDeposit}
-            onChangeText={setSecurityDeposit}
-            placeholder="2500"
+            style={styles.input}
+            value={city}
+            onChangeText={setCity}
+            placeholder="Type a city..."
             placeholderTextColor="#666"
-            keyboardType="numeric"
+          />
+          <ThemedText style={[styles.label, { marginTop: 12 }]}>Popular Cities</ThemedText>
+          <View style={styles.chipRow}>
+            {POPULAR_CITIES.map(c => {
+              const selected = c === city;
+              return (
+                <Pressable
+                  key={c}
+                  style={[
+                    styles.cityChip,
+                    selected ? styles.cityChipSelected : styles.cityChipUnselected,
+                  ]}
+                  onPress={() => setCity(c)}
+                >
+                  <ThemedText style={[styles.cityChipText, { color: selected ? '#fff' : '#aaa' }]}>
+                    {c}
+                  </ThemedText>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <ThemedText style={styles.label}>State</ThemedText>
+          <TextInput
+            style={styles.input}
+            value={state}
+            onChangeText={setState}
+            placeholder="NY"
+            placeholderTextColor="#666"
+          />
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <ThemedText style={styles.label}>Neighborhood</ThemedText>
+          <TextInput
+            style={styles.input}
+            value={neighborhood}
+            onChangeText={setNeighborhood}
+            placeholder="e.g. Williamsburg"
+            placeholderTextColor="#666"
+          />
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <ThemedText style={styles.label}>Address</ThemedText>
+          <TextInput
+            style={styles.input}
+            value={address}
+            onChangeText={setAddress}
+            placeholder="123 Main St"
+            placeholderTextColor="#666"
+          />
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <ThemedText style={styles.label}>Available Date</ThemedText>
+          <Pressable style={styles.datePickerButton} onPress={() => setShowAvailableDatePicker(true)}>
+            <Feather name="calendar" size={18} color="#666" style={{ marginRight: 10 }} />
+            <ThemedText style={{ color: availableDate ? '#fff' : '#666', fontSize: 15, flex: 1 }}>
+              {availableDate ? formatDate(availableDate) : 'Select available date'}
+            </ThemedText>
+            <Feather name="chevron-right" size={16} color="#555" />
+          </Pressable>
+          <DatePickerModal
+            visible={showAvailableDatePicker}
+            onClose={() => setShowAvailableDatePicker(false)}
+            onConfirm={(date) => setAvailableDate(date)}
+            mode="availability"
+            title="Select Available Date"
+            showFlexible
+            initialDate={availableDate || undefined}
           />
         </View>
       </View>
 
-      {renderNumberSelector('Bedrooms', BEDROOM_OPTIONS, bedrooms, setBedrooms)}
-      {renderNumberSelector('Bathrooms', BATHROOM_OPTIONS, bathrooms, setBathrooms)}
+      <View style={styles.card}>
+        {renderSectionTitle('Amenities')}
 
-      <View style={styles.fieldContainer}>
-        <ThemedText style={styles.label}>Square Feet</ThemedText>
-        <TextInput
-          style={inputStyle}
-          value={sqft}
-          onChangeText={setSqft}
-          placeholder="800"
-          placeholderTextColor="#666"
-          keyboardType="numeric"
-        />
-      </View>
-
-      {renderSectionTitle('Type')}
-
-      {renderToggle(
-        'Property Type',
-        { label: 'Lease', value: 'lease' },
-        { label: 'Sublet', value: 'sublet' },
-        propertyType,
-        setPropertyType,
-      )}
-
-      {renderToggle(
-        'Room Type',
-        { label: 'Entire Place', value: 'entire' },
-        { label: 'Private Room', value: 'room' },
-        roomType,
-        setRoomType,
-      )}
-
-      {renderSectionTitle('Location')}
-
-      <View style={styles.fieldContainer}>
-        <ThemedText style={styles.label}>City</ThemedText>
         <View style={styles.chipRow}>
-          {POPULAR_CITIES.map(c => {
-            const selected = c === city;
+          {AMENITIES_LIST.map(amenity => {
+            const selected = selectedAmenities.includes(amenity);
             return (
               <Pressable
-                key={c}
+                key={amenity}
                 style={[
-                  styles.cityChip,
-                  { backgroundColor: selected ? '#ff6b5b' : '#1a1a1a', borderColor: selected ? '#ff6b5b' : '#333' },
+                  styles.amenityChip,
+                  selected ? styles.amenityChipSelected : styles.amenityChipUnselected,
                 ]}
-                onPress={() => setCity(c)}
+                onPress={() => toggleAmenity(amenity)}
               >
-                <ThemedText style={[styles.chipText, { color: selected ? '#fff' : theme.textSecondary }]}>
-                  {c}
+                {selected ? (
+                  <Feather name="check" size={14} color="#fff" style={{ marginRight: 4 }} />
+                ) : null}
+                <ThemedText style={[styles.amenityChipText, { color: selected ? '#fff' : '#aaa' }]}>
+                  {amenity}
                 </ThemedText>
               </Pressable>
             );
@@ -499,119 +630,46 @@ export const CreateEditListingScreen = () => {
         </View>
       </View>
 
-      <View style={styles.fieldContainer}>
-        <ThemedText style={styles.label}>State</ThemedText>
-        <TextInput
-          style={inputStyle}
-          value={state}
-          onChangeText={setState}
-          placeholder="NY"
-          placeholderTextColor="#666"
-        />
+      <View style={styles.card}>
+        {renderSectionTitle('House Rules')}
+
+        <View style={styles.fieldContainer}>
+          <ThemedText style={styles.hintText}>e.g. No smoking indoors, quiet hours after 10pm, guests allowed with notice</ThemedText>
+          <TextInput
+            style={[styles.input, styles.multilineInput]}
+            value={houseRules}
+            onChangeText={setHouseRules}
+            placeholder="e.g. No smoking, quiet hours after 10pm..."
+            placeholderTextColor="#666"
+            multiline
+            numberOfLines={3}
+            textAlignVertical="top"
+          />
+        </View>
       </View>
 
-      <View style={styles.fieldContainer}>
-        <ThemedText style={styles.label}>Neighborhood</ThemedText>
-        <TextInput
-          style={inputStyle}
-          value={neighborhood}
-          onChangeText={setNeighborhood}
-          placeholder="e.g. Williamsburg"
-          placeholderTextColor="#666"
-        />
+      <View style={styles.card}>
+        {renderSectionTitle('Photos')}
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photosRow}>
+          {(photos.length > 0 ? photos : PLACEHOLDER_PHOTOS).map((photo, index) => (
+            <View key={index} style={styles.photoContainer}>
+              <Image source={{ uri: photo }} style={styles.photoThumb} />
+            </View>
+          ))}
+          <Pressable
+            style={styles.addPhotoButton}
+            onPress={() => {
+              const newPhotos = [...photos, PLACEHOLDER_PHOTOS[photos.length % PLACEHOLDER_PHOTOS.length]];
+              setPhotos(newPhotos);
+            }}
+          >
+            <Feather name="camera" size={24} color="#555" />
+            <ThemedText style={styles.addPhotoText}>Add Photo</ThemedText>
+          </Pressable>
+        </ScrollView>
+        <ThemedText style={styles.photoHint}>Add up to 8 photos. First photo is your cover image.</ThemedText>
       </View>
-
-      <View style={styles.fieldContainer}>
-        <ThemedText style={styles.label}>Address</ThemedText>
-        <TextInput
-          style={inputStyle}
-          value={address}
-          onChangeText={setAddress}
-          placeholder="123 Main St"
-          placeholderTextColor="#666"
-        />
-      </View>
-
-      <View style={styles.fieldContainer}>
-        <ThemedText style={styles.label}>Available Date</ThemedText>
-        <Pressable
-          style={inputStyle}
-          onPress={() => setShowAvailableDatePicker(true)}
-        >
-          <ThemedText style={{ color: availableDate ? '#fff' : '#666' }}>
-            {availableDate ? formatDate(availableDate) : 'Select available date'}
-          </ThemedText>
-        </Pressable>
-        <DatePickerModal
-          visible={showAvailableDatePicker}
-          onClose={() => setShowAvailableDatePicker(false)}
-          onConfirm={(date) => setAvailableDate(date)}
-          mode="availability"
-          title="Select Available Date"
-          showFlexible
-          initialDate={availableDate || undefined}
-        />
-      </View>
-
-      {renderSectionTitle('Amenities')}
-
-      <View style={styles.chipRow}>
-        {AMENITIES_LIST.map(amenity => {
-          const selected = selectedAmenities.includes(amenity);
-          return (
-            <Pressable
-              key={amenity}
-              style={[
-                styles.amenityChip,
-                { backgroundColor: selected ? '#ff6b5b' : '#1a1a1a', borderColor: selected ? '#ff6b5b' : '#333' },
-              ]}
-              onPress={() => toggleAmenity(amenity)}
-            >
-              {selected ? (
-                <Feather name="check" size={14} color="#fff" style={{ marginRight: 4 }} />
-              ) : null}
-              <ThemedText style={[styles.chipText, { color: selected ? '#fff' : theme.textSecondary }]}>
-                {amenity}
-              </ThemedText>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      {renderSectionTitle('House Rules')}
-
-      <View style={styles.fieldContainer}>
-        <TextInput
-          style={[...inputStyle, styles.multilineInput]}
-          value={houseRules}
-          onChangeText={setHouseRules}
-          placeholder="e.g. No smoking, quiet hours after 10pm..."
-          placeholderTextColor="#666"
-          multiline
-          numberOfLines={3}
-          textAlignVertical="top"
-        />
-      </View>
-
-      {renderSectionTitle('Photos')}
-
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photosRow}>
-        {(photos.length > 0 ? photos : PLACEHOLDER_PHOTOS).map((photo, index) => (
-          <View key={index} style={styles.photoContainer}>
-            <Image source={{ uri: photo }} style={styles.photoThumb} />
-          </View>
-        ))}
-        <Pressable
-          style={[styles.addPhotoButton, { borderColor: '#333' }]}
-          onPress={() => {
-            const newPhotos = [...photos, PLACEHOLDER_PHOTOS[photos.length % PLACEHOLDER_PHOTOS.length]];
-            setPhotos(newPhotos);
-          }}
-        >
-          <Feather name="plus" size={24} color={theme.textSecondary} />
-          <ThemedText style={[styles.addPhotoText, { color: theme.textSecondary }]}>Add</ThemedText>
-        </Pressable>
-      </ScrollView>
 
       <Pressable
         style={[styles.saveButton, { opacity: saving ? 0.6 : 1 }]}
@@ -641,7 +699,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.md,
     paddingTop: Spacing.md,
   },
   backButton: {
@@ -650,12 +708,46 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  progressContainer: {
+    marginBottom: 20,
+  },
+  progressBar: {
+    height: 4,
+    backgroundColor: '#1c1c1c',
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginBottom: 6,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#ff6b5b',
+    borderRadius: 2,
+  },
+  progressLabel: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'right',
+  },
+  card: {
+    backgroundColor: '#111',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
+    padding: 20,
+    marginBottom: 16,
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#2a2a2a',
+    paddingBottom: 14,
+    marginBottom: 16,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#ff6b5b',
-    marginTop: Spacing.xl,
-    marginBottom: Spacing.md,
+    color: '#fff',
   },
   fieldContainer: {
     marginBottom: Spacing.lg,
@@ -663,19 +755,49 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '500',
+    color: '#aaa',
     marginBottom: Spacing.xs,
   },
   input: {
-    height: 48,
+    height: 50,
     borderWidth: 1,
-    borderRadius: BorderRadius.medium,
-    paddingHorizontal: Spacing.lg,
-    fontSize: 16,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    fontSize: 15,
+    backgroundColor: '#1c1c1c',
+    borderColor: '#333',
+    color: '#fff',
   },
   multilineInput: {
     height: 100,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.md,
+    paddingTop: 14,
+    paddingBottom: 14,
+  },
+  charCount: {
+    fontSize: 12,
+    color: '#555',
+    textAlign: 'right',
+    marginTop: 4,
+  },
+  inputWithPrefix: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1c1c1c',
+    borderWidth: 1,
+    borderColor: '#333',
+    borderRadius: 12,
+    height: 50,
+    paddingHorizontal: 16,
+  },
+  inputPrefix: {
+    fontSize: 16,
+    color: '#666',
+    marginRight: 6,
+  },
+  inputInner: {
+    flex: 1,
+    fontSize: 15,
+    color: '#fff',
   },
   row: {
     flexDirection: 'row',
@@ -686,99 +808,164 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   chip: {
-    width: 44,
-    height: 44,
-    borderRadius: BorderRadius.medium,
+    width: 48,
+    height: 48,
+    borderRadius: 12,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  chipSelected: {
+    backgroundColor: '#ff6b5b',
+    borderColor: '#ff6b5b',
+    shadowColor: '#ff6b5b',
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  chipUnselected: {
+    backgroundColor: '#1c1c1c',
+    borderColor: '#333',
+  },
   chipText: {
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 16,
+    fontWeight: '700',
   },
   cityChip: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.full,
-    borderWidth: 1,
-    marginBottom: Spacing.xs,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    marginBottom: 4,
+  },
+  cityChipSelected: {
+    backgroundColor: '#ff6b5b',
+    borderColor: '#ff6b5b',
+  },
+  cityChipUnselected: {
+    backgroundColor: '#1c1c1c',
+    borderColor: '#333',
+  },
+  cityChipText: {
+    fontSize: 13,
+    fontWeight: '500',
   },
   amenityChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.full,
-    borderWidth: 1,
-    marginBottom: Spacing.xs,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    marginBottom: 4,
+  },
+  amenityChipSelected: {
+    backgroundColor: '#ff6b5b',
+    borderColor: '#ff6b5b',
+  },
+  amenityChipUnselected: {
+    backgroundColor: '#1c1c1c',
+    borderColor: '#333',
+  },
+  amenityChipText: {
+    fontSize: 13,
+    fontWeight: '500',
   },
   toggleRow: {
     flexDirection: 'row',
-    gap: Spacing.sm,
+    backgroundColor: '#1c1c1c',
+    borderRadius: 12,
+    padding: 4,
   },
   toggleButton: {
     flex: 1,
     height: 44,
-    borderRadius: BorderRadius.medium,
-    borderWidth: 1,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
   toggleText: {
     fontSize: 14,
-    fontWeight: '600',
+  },
+  datePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1c1c1c',
+    borderWidth: 1,
+    borderColor: '#333',
+    borderRadius: 12,
+    height: 50,
+    paddingHorizontal: 16,
+  },
+  hintText: {
+    fontSize: 12,
+    color: '#555',
+    marginBottom: 8,
+    lineHeight: 18,
   },
   photosRow: {
-    marginBottom: Spacing.lg,
+    marginBottom: 8,
   },
   photoContainer: {
-    marginRight: Spacing.sm,
-    borderRadius: BorderRadius.medium,
+    marginRight: 10,
+    borderRadius: 12,
     overflow: 'hidden',
   },
   photoThumb: {
-    width: 100,
-    height: 100,
-    borderRadius: BorderRadius.medium,
+    width: 110,
+    height: 110,
+    borderRadius: 12,
   },
   addPhotoButton: {
-    width: 100,
-    height: 100,
-    borderRadius: BorderRadius.medium,
-    borderWidth: 1,
+    width: 110,
+    height: 110,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#333',
     borderStyle: 'dashed',
+    backgroundColor: '#1c1c1c',
     alignItems: 'center',
     justifyContent: 'center',
   },
   addPhotoText: {
     fontSize: 12,
-    marginTop: 4,
+    marginTop: 6,
+    color: '#555',
+  },
+  photoHint: {
+    fontSize: 12,
+    color: '#555',
+    marginTop: 8,
   },
   saveButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#ff6b5b',
-    height: 52,
-    borderRadius: BorderRadius.medium,
+    height: 56,
+    borderRadius: 14,
     marginTop: Spacing.xl,
     gap: Spacing.sm,
+    shadowColor: '#ff6b5b',
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 6,
   },
   saveButtonText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '700',
   },
   deleteButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     height: 52,
-    borderRadius: BorderRadius.medium,
+    borderRadius: 14,
     marginTop: Spacing.md,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#ff4757',
+    backgroundColor: 'transparent',
     gap: Spacing.sm,
   },
   deleteButtonText: {
