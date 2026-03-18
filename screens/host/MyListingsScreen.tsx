@@ -13,6 +13,7 @@ import { getMyListings, updateListing, deleteListing as deleteListingSupa } from
 import { getReceivedInterestCards } from '../../services/discoverService';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
 import { isListingBoosted, canAddListingCheck, isFreePlan } from '../../utils/hostPricing';
+import { ListingLimitModal, OverageModal } from '../../components/ListingLimitModal';
 
 const BG = '#111';
 const CARD_BG = '#1a1a1a';
@@ -75,6 +76,10 @@ export const MyListingsScreen = () => {
   const [showHostPaywall, setShowHostPaywall] = useState(false);
   const [showAISheet, setShowAISheet] = useState(false);
   const [hostSub, setHostSub] = useState<HostSubscriptionData | null>(null);
+  const [showLimitModal, setShowLimitModal] = useState(false);
+  const [showOverageModal, setShowOverageModal] = useState(false);
+  const [limitMessage, setLimitMessage] = useState('');
+  const [overageMessage, setOverageMessage] = useState('');
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -500,35 +505,13 @@ export const MyListingsScreen = () => {
             const result = canAddListingCheck(updatedSub);
             if (!result.allowed) {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-              if (Platform.OS === 'web') {
-                const upgrade = window.confirm(`${result.message}\n\nWould you like to upgrade your plan?`);
-                if (upgrade) {
-                  const parent = navigation.getParent();
-                  if (parent) parent.navigate('Dashboard', { screen: 'HostSubscription' });
-                  else navigation.navigate('HostSubscription' as any);
-                }
-              } else {
-                Alert.alert('Listing Limit Reached', result.message, [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Upgrade Plan', onPress: () => {
-                    const parent = navigation.getParent();
-                    if (parent) parent.navigate('Dashboard', { screen: 'HostSubscription' });
-                    else navigation.navigate('HostSubscription' as any);
-                  }},
-                ]);
-              }
+              setLimitMessage(result.message);
+              setShowLimitModal(true);
               return;
             }
             if (result.message) {
-              if (Platform.OS === 'web') {
-                const proceed = window.confirm(result.message);
-                if (proceed) navigation.navigate('CreateEditListing');
-              } else {
-                Alert.alert('Overage Notice', result.message, [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Continue', onPress: () => navigation.navigate('CreateEditListing') },
-                ]);
-              }
+              setOverageMessage(result.message);
+              setShowOverageModal(true);
               return;
             }
           }
@@ -615,6 +598,28 @@ export const MyListingsScreen = () => {
           }
         }}
         onDismiss={() => setShowHostPaywall(false)}
+      />
+
+      <ListingLimitModal
+        visible={showLimitModal}
+        message={limitMessage}
+        onCancel={() => setShowLimitModal(false)}
+        onUpgrade={() => {
+          setShowLimitModal(false);
+          const parent = navigation.getParent();
+          if (parent) parent.navigate('Dashboard', { screen: 'HostSubscription' });
+          else navigation.navigate('HostSubscription' as any);
+        }}
+      />
+
+      <OverageModal
+        visible={showOverageModal}
+        message={overageMessage}
+        onCancel={() => setShowOverageModal(false)}
+        onContinue={() => {
+          setShowOverageModal(false);
+          navigation.navigate('CreateEditListing');
+        }}
       />
     </View>
   );

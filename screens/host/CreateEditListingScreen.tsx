@@ -9,6 +9,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { StorageService } from '../../utils/storage';
 import { Property, HostSubscriptionData } from '../../types/models';
 import { canAddListingCheck } from '../../utils/hostPricing';
+import { ListingLimitModal, OverageModal } from '../../components/ListingLimitModal';
 import { US_STATES } from '../../utils/locationData';
 import { Spacing, BorderRadius } from '../../constants/theme';
 import { createListing as createListingSupa, updateListing as updateListingSupa, getListing, deleteListing as deleteListingSupa } from '../../services/listingService';
@@ -76,6 +77,11 @@ export const CreateEditListingScreen = () => {
   const [houseRules, setHouseRules] = useState('');
   const [photos, setPhotos] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [showLimitModal, setShowLimitModal] = useState(false);
+  const [showOverageModal, setShowOverageModal] = useState(false);
+  const [limitMessage, setLimitMessage] = useState('');
+  const [overageMessage, setOverageMessage] = useState('');
+  const [overageResolve, setOverageResolve] = useState<((v: boolean) => void) | null>(null);
 
   useEffect(() => {
     if (isEditing) {
@@ -177,29 +183,18 @@ export const CreateEditListingScreen = () => {
     if (!isEditing && hostSub) {
       const capResult = canAddListingCheck(hostSub);
       if (!capResult.allowed) {
-        Alert.alert('Listing Limit Reached', capResult.message, [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Upgrade Plan',
-            onPress: () => {
-              const parent = navigation.getParent();
-              if (parent) {
-                parent.navigate('Dashboard', { screen: 'HostSubscription' });
-              } else {
-                navigation.navigate('HostSubscription' as any);
-              }
-            },
-          },
-        ]);
+        setLimitMessage(capResult.message);
+        setShowLimitModal(true);
         return;
       }
       if (capResult.message) {
+        setOverageMessage(capResult.message);
+        setShowOverageModal(true);
         const confirmed = await new Promise<boolean>((resolve) => {
-          Alert.alert('Overage Notice', capResult.message, [
-            { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
-            { text: 'Continue', onPress: () => resolve(true) },
-          ]);
+          setOverageResolve(() => resolve);
         });
+        setShowOverageModal(false);
+        setOverageResolve(null);
         if (!confirmed) return;
       }
     }
@@ -698,6 +693,34 @@ export const CreateEditListingScreen = () => {
       ) : null}
 
       <View style={{ height: Spacing.xxl }} />
+
+      <ListingLimitModal
+        visible={showLimitModal}
+        message={limitMessage}
+        onCancel={() => setShowLimitModal(false)}
+        onUpgrade={() => {
+          setShowLimitModal(false);
+          const parent = navigation.getParent();
+          if (parent) {
+            parent.navigate('Dashboard', { screen: 'HostSubscription' });
+          } else {
+            navigation.navigate('HostSubscription' as any);
+          }
+        }}
+      />
+
+      <OverageModal
+        visible={showOverageModal}
+        message={overageMessage}
+        onCancel={() => {
+          setShowOverageModal(false);
+          if (overageResolve) overageResolve(false);
+        }}
+        onContinue={() => {
+          setShowOverageModal(false);
+          if (overageResolve) overageResolve(true);
+        }}
+      />
     </ScreenKeyboardAwareScrollView>
   );
 };
