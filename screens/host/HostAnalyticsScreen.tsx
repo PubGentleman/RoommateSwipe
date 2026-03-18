@@ -10,6 +10,8 @@ import { StorageService } from '../../utils/storage';
 import { Property, InterestCard } from '../../types/models';
 import { Spacing, BorderRadius } from '../../constants/theme';
 import { PaywallSheet } from '../../components/PaywallSheet';
+import { getMyListings } from '../../services/listingService';
+import { getReceivedInterestCards } from '../../services/discoverService';
 
 const ACCENT = '#ff6b5b';
 const CARD_BG = '#1a1a1a';
@@ -33,13 +35,68 @@ export const HostAnalyticsScreen = () => {
 
   const loadData = async () => {
     if (!user) return;
-    await StorageService.assignPropertiesToHost(user.id, user.name);
-    const allProperties = await StorageService.getProperties();
-    const hostProperties = allProperties.filter(p => p.hostId === user.id);
-    setProperties(hostProperties);
 
-    const hostInquiries = await StorageService.getInterestCardsForHost(user.id);
-    setInquiries(hostInquiries);
+    try {
+      const supaListings = await getMyListings();
+      if (supaListings && supaListings.length > 0) {
+        const mapped: Property[] = supaListings.map((l: any) => ({
+          id: l.id,
+          title: l.title || '',
+          description: l.description || '',
+          price: l.rent || 0,
+          bedrooms: l.bedrooms || 1,
+          bathrooms: l.bathrooms || 1,
+          sqft: l.sqft || 0,
+          propertyType: l.property_type || 'lease',
+          roomType: l.room_type || 'entire',
+          city: l.city || '',
+          state: l.state || '',
+          neighborhood: l.neighborhood,
+          address: l.address || '',
+          availableDate: l.available_date ? new Date(l.available_date) : undefined,
+          amenities: l.amenities || [],
+          photos: l.photos || [],
+          available: l.is_active && !l.is_paused,
+          hostId: l.host_id || user.id,
+          hostName: user.name,
+          featured: l.is_featured || false,
+          rentedDate: l.is_rented ? new Date() : undefined,
+        }));
+        setProperties(mapped);
+      } else {
+        setProperties([]);
+      }
+    } catch {
+      await StorageService.assignPropertiesToHost(user.id, user.name);
+      const allProperties = await StorageService.getProperties();
+      setProperties(allProperties.filter(p => p.hostId === user.id));
+    }
+
+    try {
+      const supaCards = await getReceivedInterestCards();
+      const mapped: InterestCard[] = (supaCards || []).map((c: any) => ({
+        id: c.id,
+        renterId: c.sender?.id || c.sender_id,
+        renterName: c.sender?.full_name || 'Unknown',
+        renterPhoto: c.sender?.avatar_url,
+        hostId: c.recipient_id || user.id,
+        propertyId: c.listing_id || '',
+        propertyTitle: c.listing_title || '',
+        status: c.status || 'pending',
+        isSuperInterest: c.action === 'super_interest',
+        compatibilityScore: c.compatibility_score || 0,
+        budgetRange: c.budget_range || '',
+        moveInDate: c.move_in_date || '',
+        lifestyleTags: c.lifestyle_tags || [],
+        personalNote: c.personal_note || '',
+        createdAt: c.created_at || new Date().toISOString(),
+        respondedAt: c.responded_at,
+      }));
+      setInquiries(mapped);
+    } catch {
+      const interestCards = await StorageService.getInterestCardsForHost(user.id);
+      setInquiries(interestCards);
+    }
   };
 
   const totalListings = properties.length;
@@ -55,6 +112,20 @@ export const HostAnalyticsScreen = () => {
 
   const estimatedViews = totalInquiries * 15;
   const estimatedSaves = totalInquiries * 8;
+
+  const now = Date.now();
+  const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+  const inquiriesLast30 = inquiries.filter(i => {
+    const created = new Date(i.createdAt).getTime();
+    return now - created < thirtyDays;
+  }).length;
+  const inquiriesPrior30 = inquiries.filter(i => {
+    const created = new Date(i.createdAt).getTime();
+    return now - created >= thirtyDays && now - created < thirtyDays * 2;
+  }).length;
+  const trendDelta = inquiriesLast30 - inquiriesPrior30;
+  const trendPositive = trendDelta > 0;
+  const trendNeutral = trendDelta === 0;
 
   const perListingInquiries = properties.map(p => {
     const count = inquiries.filter(i => i.propertyId === p.id).length;
@@ -97,8 +168,8 @@ export const HostAnalyticsScreen = () => {
           <ThemedText type="h2" style={styles.sectionTitle}>Conversion Funnel</ThemedText>
           <View style={[styles.card, { backgroundColor: CARD_BG, overflow: 'hidden' }]}>  
             <View style={{ opacity: 0.15 }}>
-              <FunnelRow label="Estimated Views" value={0} maxValue={1} color="#5B7FFF" />
-              <FunnelRow label="Estimated Saves" value={0} maxValue={1} color="#FFA500" />
+              <FunnelRow label="Est. Views *" value={0} maxValue={1} color="#5B7FFF" />
+              <FunnelRow label="Est. Saves *" value={0} maxValue={1} color="#FFA500" />
               <FunnelRow label="Inquiries" value={0} maxValue={1} color={ACCENT} />
               <FunnelRow label="Accepted" value={0} maxValue={1} color="#3ECF8E" />
             </View>
@@ -109,6 +180,9 @@ export const HostAnalyticsScreen = () => {
               </View>
             </View>
           </View>
+          <ThemedText style={{ color: 'rgba(255,255,255,0.2)', fontSize: 10, marginTop: 6, paddingHorizontal: 4 }}>
+            * Estimated based on inquiry volume. Actual view tracking coming soon.
+          </ThemedText>
 
           <ThemedText type="h2" style={styles.sectionTitle}>Per-Listing Breakdown</ThemedText>
           <View style={[styles.card, { backgroundColor: CARD_BG, overflow: 'hidden' }]}>  
@@ -136,11 +210,14 @@ export const HostAnalyticsScreen = () => {
         <>
           <ThemedText type="h2" style={styles.sectionTitle}>Conversion Funnel</ThemedText>
           <View style={[styles.card, { backgroundColor: CARD_BG }]}>
-            <FunnelRow label="Estimated Views" value={estimatedViews} maxValue={estimatedViews} color="#5B7FFF" />
-            <FunnelRow label="Estimated Saves" value={estimatedSaves} maxValue={estimatedViews} color="#FFA500" />
+            <FunnelRow label="Est. Views *" value={estimatedViews} maxValue={estimatedViews} color="#5B7FFF" />
+            <FunnelRow label="Est. Saves *" value={estimatedSaves} maxValue={estimatedViews} color="#FFA500" />
             <FunnelRow label="Inquiries" value={totalInquiries} maxValue={estimatedViews} color={ACCENT} />
             <FunnelRow label="Accepted" value={acceptedInquiries} maxValue={estimatedViews} color="#3ECF8E" />
           </View>
+          <ThemedText style={{ color: 'rgba(255,255,255,0.2)', fontSize: 10, marginTop: 6, paddingHorizontal: 4 }}>
+            * Estimated based on inquiry volume. Actual view tracking coming soon.
+          </ThemedText>
 
           <ThemedText type="h2" style={styles.sectionTitle}>Per-Listing Breakdown</ThemedText>
           {perListingInquiries.length === 0 ? (
@@ -183,15 +260,25 @@ export const HostAnalyticsScreen = () => {
       <ThemedText type="h2" style={styles.sectionTitle}>Monthly Trend</ThemedText>
       <View style={[styles.card, { backgroundColor: CARD_BG }]}>
         <View style={styles.trendRow}>
-          <Feather name="trending-up" size={24} color="#3ECF8E" />
+          <Feather
+            name={trendPositive ? 'trending-up' : trendNeutral ? 'minus' : 'trending-down'}
+            size={24}
+            color={trendPositive ? '#3ECF8E' : trendNeutral ? '#888' : '#FF4757'}
+          />
           <View style={{ marginLeft: Spacing.md, flex: 1 }}>
             <ThemedText type="h3">
-              {totalInquiries > 0 ? 'Trending Up' : 'Getting Started'}
+              {trendPositive
+                ? `+${trendDelta} more than last month`
+                : trendNeutral && inquiriesLast30 > 0
+                ? 'Same as last month'
+                : trendNeutral
+                ? 'Getting Started'
+                : `${Math.abs(trendDelta)} fewer than last month`}
             </ThemedText>
             <ThemedText style={{ color: '#888', marginTop: Spacing.xs }}>
-              {totalInquiries > 0
-                ? `You have ${totalInquiries} inquir${totalInquiries !== 1 ? 'ies' : 'y'} across ${totalListings} listing${totalListings !== 1 ? 's' : ''}. ${acceptRate}% accept rate.`
-                : 'Add listings to start receiving inquiries and tracking performance.'}
+              {inquiriesLast30 > 0
+                ? `${inquiriesLast30} inquir${inquiriesLast30 !== 1 ? 'ies' : 'y'} in the last 30 days${inquiriesPrior30 > 0 ? ` vs. ${inquiriesPrior30} prior` : ''}.`
+                : 'No inquiries in the last 30 days. Add listings to start tracking performance.'}
             </ThemedText>
           </View>
         </View>

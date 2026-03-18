@@ -1,0 +1,285 @@
+# Prompt: Separate Host and Renter Message Inboxes by Role
+
+## Problem
+
+Both `HostTabNavigator` and `RenterTabNavigator` use the identical `MessagesStackNavigator`, which renders the same `MessagesScreen` with no role-based filtering. When a user switches roles, both inboxes show the same conversations. Host conversations (accepted inquiry chats) bleed into the renter inbox and vice versa.
+
+## Root Cause
+
+Conversation IDs follow distinct patterns that already encode which role they belong to:
+- `conv_${matchId}` — renter-to-renter roommate match conversations → **renter only**
+- `conv-interest-${id}` — created when a host accepts a renter's interest card → **host only**
+- Inquiry threads (`isInquiryThread: true`) — belong to whoever is NOT the host if `hostId !== user.id` → **renter only**, or to the host if `hostId === user.id` → **host only**
+- Supabase conversations from `getSupabaseConversations()` — roommate matches → **renter only**
+
+---
+
+## Step 1 — Update `MessagesStackParamList` in `navigation/MessagesStackNavigator.tsx`
+
+Change the `MessagesList` route to accept an optional `role` param:
+
+```tsx
+export type MessagesStackParamList = {
+  MessagesList: { role?: 'host' | 'renter' };
+  Chat: {
+    conversationId: string;
+    otherUser?: RoommateProfile;
+    inquiryGroup?: any;
+  };
+  CreateGroup: {
+    matchedUserId: string;
+    matchedUserName: string;
+  };
+};
+```
+
+---
+
+## Step 2 — Create `navigation/HostMessagesStackNavigator.tsx`
+
+Create a new file alongside `MessagesStackNavigator.tsx`:
+
+```tsx
+import React from 'react';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { MessagesScreen } from '../screens/shared/MessagesScreen';
+import { ChatScreen } from '../screens/shared/ChatScreen';
+import { CreateGroupScreen } from '../screens/shared/CreateGroupScreen';
+import { RoommateProfile } from '../types/models';
+
+export type HostMessagesStackParamList = {
+  MessagesList: { role: 'host' };
+  Chat: {
+    conversationId: string;
+    otherUser?: RoommateProfile;
+    inquiryGroup?: any;
+  };
+  CreateGroup: {
+    matchedUserId: string;
+    matchedUserName: string;
+  };
+};
+
+const Stack = createNativeStackNavigator<HostMessagesStackParamList>();
+
+export const HostMessagesStackNavigator = () => {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen
+        name="MessagesList"
+        component={MessagesScreen}
+        initialParams={{ role: 'host' }}
+      />
+      <Stack.Screen name="Chat" component={ChatScreen} />
+      <Stack.Screen name="CreateGroup" component={CreateGroupScreen} />
+    </Stack.Navigator>
+  );
+};
+```
+
+---
+
+## Step 3 — Update `HostTabNavigator.tsx` to use `HostMessagesStackNavigator`
+
+In `navigation/HostTabNavigator.tsx`, replace the import and usage:
+
+**Replace:**
+```tsx
+import { MessagesStackNavigator } from './MessagesStackNavigator';
+```
+
+**With:**
+```tsx
+import { HostMessagesStackNavigator } from './HostMessagesStackNavigator';
+```
+
+**Then replace** the `Messages` tab screen registration:
+```tsx
+// OLD:
+<Tab.Screen name="Messages" component={MessagesStackNavigator} />
+
+// NEW:
+<Tab.Screen name="Messages" component={HostMessagesStackNavigator} />
+```
+
+---
+
+## Step 4 — Update `MessagesScreen.tsx` to read the role param and filter conversations
+
+### 4a. Import `useRoute` and add route param reading
+
+At the top of `MessagesScreen`, add:
+```tsx
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+```
+
+Inside the component, after the existing state declarations, add:
+```tsx
+const route = useRoute<any>();
+const role: 'host' | 'renter' = route.params?.role || 'renter';
+const isHostMode = role === 'host';
+```
+
+### 4b. Update the conversation filtering logic inside `loadConversations`
+
+Find this block (around line 171):
+```tsx
+const userConversations = existingConversations.filter(
+  c => !blockedIds.includes(c.participant.id) && (
+    c.isInquiryThread ||
+    c.id.startsWith('conv-interest-') ||
+    c.matchType === 'cold' ||
+    matches.some(match =>
+      (match.userId1 === user.id && match.userId2 === c.participant.id) ||
+      (match.userId2 === user.id && match.userId1 === c.participant.id)
+    )
+  )
+);
+```
+
+**Replace it with:**
+```tsx
+const userConversations = existingConversations.filter(c => {
+  if (blockedIds.includes(c.participant.id)) return false;
+
+  if (isHostMode) {
+    // Host inbox: accepted interest chats + inquiry threads where user is the host
+    return (
+      c.id.startsWith('conv-interest-') ||
+      (c.isInquiryThread && c.hostId === user.id)
+    );
+  } else {
+    // Renter inbox: roommate match convos + inquiry threads where user is the renter
+    return (
+      c.isInquiryThread && c.hostId !== user.id ||
+      c.matchType === 'cold' ||
+      matches.some(match =>
+        (match.userId1 === user.id && match.userId2 === c.participant.id) ||
+        (match.userId2 === user.id && match.userId1 === c.participant.id)
+      )
+    );
+  }
+});
+```
+
+### 4c. Skip loading roommate match data in host mode
+
+The `getMatches`, `getRoommateProfiles`, and `getUsers` calls exist to build the "New Matches" bubbles row. Hosts don't have this. Wrap that block to skip it in host mode:
+
+Find:
+```tsx
+const matches = await StorageService.getMatches();
+const profiles = await StorageService.getRoommateProfiles();
+const allUsers = await StorageService.getUsers();
+```
+
+**Replace with:**
+```tsx
+const matches = isHostMode ? [] : await StorageService.getMatches();
+const profiles = isHostMode ? [] : await StorageService.getRoommateProfiles();
+const allUsers = isHostMode ? [] : await StorageService.getUsers();
+```
+
+### 4d. Hide "New Matches" bubbles row in host mode
+
+In `renderHeader`, wrap the New Matches section:
+```tsx
+{!isHostMode && newMatches.length > 0 ? (
+  <>
+    <ThemedText style={styles.sectionLabel}>New Matches</ThemedText>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.matchesRow}
+    >
+      {newMatches.map((m, i) => renderMatchBubble(m, i))}
+    </ScrollView>
+    <View style={styles.divider} />
+  </>
+) : null}
+```
+
+### 4e. Update the empty state message for host mode
+
+Find `renderEmptyState` and update the subtitle:
+```tsx
+const renderEmptyState = () => (
+  <View style={styles.emptyState}>
+    <View style={styles.emptyIcon}>
+      <Feather name="message-square" size={26} color="#ff6b5b" />
+    </View>
+    <ThemedText style={styles.emptyTitle}>No Messages Yet</ThemedText>
+    <ThemedText style={styles.emptySubtitle}>
+      {isHostMode
+        ? `Accept renters' inquiries to\nstart a conversation`
+        : `Match with roommates on the\nMatch tab to start chatting`}
+    </ThemedText>
+  </View>
+);
+```
+
+### 4f. Update the header title for host mode
+
+Find the top nav title:
+```tsx
+<ThemedText style={styles.topNavTitle}>Messages</ThemedText>
+```
+
+Update to:
+```tsx
+<ThemedText style={styles.topNavTitle}>
+  {isHostMode ? 'Renter Chats' : 'Messages'}
+</ThemedText>
+```
+
+### 4g. Hide the compose button in host mode (hosts don't initiate chats)
+
+In `renderHeader` or the top nav actions, wrap the compose (edit) button:
+```tsx
+{!isHostMode ? (
+  <Pressable style={styles.iconBtn} onPress={handleCompose}>
+    <Feather name="edit" size={16} color="rgba(255,255,255,0.7)" />
+  </Pressable>
+) : null}
+```
+
+---
+
+## Step 5 — Update inquiry groups loading to be role-aware
+
+The `getMyInquiryGroups()` call at the end of `loadConversations` fetches groups where the user is a renter member. In host mode this should instead fetch groups where the user is the host.
+
+Keep the existing `getMyInquiryGroups()` call for renter mode, and skip it entirely in host mode (host inquiry chats come through the `conv-interest-*` conversations, not through group objects):
+
+```tsx
+if (!isHostMode) {
+  try {
+    const groups = await getMyInquiryGroups();
+    // ... existing mapping code ...
+    setInquiryGroups(mapped.filter((g: any) => !g.isArchived));
+  } catch (e) {
+    console.warn('Failed to load inquiry groups:', e);
+  }
+} else {
+  setInquiryGroups([]);
+}
+```
+
+---
+
+## What NOT to Change
+
+- `RenterTabNavigator.tsx` — no changes, it keeps using the original `MessagesStackNavigator` (role defaults to `'renter'`)
+- `ChatScreen.tsx` — no changes needed, it works for both roles
+- `MessagesStackNavigator.tsx` — only the minor type update to `MessagesList` params
+- All conversation storage/service logic — no changes
+- The `isHostMode` variable is derived purely from the route param, not from `useAuth`, so it always reflects which tab the user is actually in (even if they have dual roles)
+
+---
+
+## Expected Result
+
+- When user is in **Renter mode**: Messages tab shows roommate match conversations, listing inquiry threads they sent as a renter. No host chats visible.
+- When user is in **Host mode**: Messages tab (now labeled "Renter Chats") shows only conversations from accepted interest cards and inquiry group chats where user is the host. No renter match chats visible.
+- Switching roles no longer shows the other role's messages.
+- Each inbox keeps its own unread count independently.
