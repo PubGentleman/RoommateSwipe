@@ -137,18 +137,26 @@ export const ProfileScreen = () => {
       </View>
 
       <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}>
+        <LinearGradient
+          colors={['rgba(255,107,91,0.08)', 'transparent']}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={styles.profileHeroGradient}
+        >
         <View style={styles.profileHeader}>
-          <View style={styles.avatarWrap}>
-            {(user?.photos?.[0] || user?.profilePicture) ? (
-              <Image source={{ uri: user?.photos?.[0] || user?.profilePicture }} style={styles.avatarImage} />
-            ) : (
-              <LinearGradient colors={['#667eea', '#764ba2']} style={styles.avatarCircle} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-                <Text style={styles.avatarInitial}>{userInitial}</Text>
-              </LinearGradient>
-            )}
-            <Pressable style={styles.cameraBtn} onPress={() => navigation.navigate('ProfileQuestionnaire')}>
-              <Feather name="camera" size={13} color="#fff" />
-            </Pressable>
+          <View style={styles.avatarRing}>
+            <View style={styles.avatarWrap}>
+              {(user?.photos?.[0] || user?.profilePicture) ? (
+                <Image source={{ uri: user?.photos?.[0] || user?.profilePicture }} style={styles.avatarImage} />
+              ) : (
+                <LinearGradient colors={['#667eea', '#764ba2']} style={styles.avatarCircle} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                  <Text style={styles.avatarInitial}>{userInitial}</Text>
+                </LinearGradient>
+              )}
+              <Pressable style={styles.cameraBtn} onPress={() => navigation.navigate('ProfileQuestionnaire')}>
+                <Feather name="camera" size={13} color="#fff" />
+              </Pressable>
+            </View>
           </View>
 
           <View style={styles.roleBadge}>
@@ -174,6 +182,7 @@ export const ProfileScreen = () => {
               <Text style={[styles.statValue, styles.statCoral]}>{matchCount}</Text>
               <Text style={styles.statLabel}>Matches</Text>
             </Pressable>
+            <View style={styles.statDivider} />
             <Pressable
               style={styles.statBox}
               onPress={() => navigation.navigate('ProfileViews')}
@@ -181,6 +190,7 @@ export const ProfileScreen = () => {
               <Text style={styles.statValue}>{profileViewCount}</Text>
               <Text style={styles.statLabel}>Likes</Text>
             </Pressable>
+            <View style={styles.statDivider} />
             <Pressable
               style={styles.statBox}
               onPress={() => navigation.navigate('WhoLikedMe')}
@@ -206,11 +216,15 @@ export const ProfileScreen = () => {
             </TouchableOpacity>
           ) : null}
         </View>
+        </LinearGradient>
 
         {user?.role === 'renter' ? (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Profile Strength</Text>
+              <View style={styles.sectionTitleRow}>
+                <View style={styles.sectionTitleBar} />
+                <Text style={styles.sectionTitle}>Profile Strength</Text>
+              </View>
               <Pressable onPress={() => { setShowAISheet(true); setAiSheetContext('profile_reminder'); }}>
                 <Text style={styles.sectionAction}>View all</Text>
               </Pressable>
@@ -226,7 +240,10 @@ export const ProfileScreen = () => {
         {user?.role === 'renter' ? (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Background Check</Text>
+              <View style={styles.sectionTitleRow}>
+                <View style={styles.sectionTitleBar} />
+                <Text style={styles.sectionTitle}>Background Check</Text>
+              </View>
             </View>
             <View style={styles.bgCheckCard}>
               <View style={styles.bgCheckLeft}>
@@ -279,7 +296,10 @@ export const ProfileScreen = () => {
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Subscription</Text>
+            <View style={styles.sectionTitleRow}>
+              <View style={styles.sectionTitleBar} />
+              <Text style={styles.sectionTitle}>Subscription</Text>
+            </View>
           </View>
           <Pressable style={styles.subCard} onPress={() => navigation.navigate(user?.role === 'host' ? 'HostSubscription' : 'Plans')}>
             <View style={styles.subLeft}>
@@ -352,7 +372,10 @@ export const ProfileScreen = () => {
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Settings</Text>
+            <View style={styles.sectionTitleRow}>
+              <View style={styles.sectionTitleBar} />
+              <Text style={styles.sectionTitle}>Settings</Text>
+            </View>
           </View>
           <View style={styles.settingsCard}>
             <SettingsItem
@@ -435,7 +458,10 @@ export const ProfileScreen = () => {
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Support</Text>
+            <View style={styles.sectionTitleRow}>
+              <View style={styles.sectionTitleBar} />
+              <Text style={styles.sectionTitle}>Support</Text>
+            </View>
           </View>
           <View style={styles.settingsCard}>
             <SettingsItem
@@ -658,9 +684,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 22,
-    paddingTop: 12,
-    paddingBottom: 10,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 12,
   },
   profileAiBtn: {
     width: 42,
@@ -672,15 +698,18 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: '#ff4d4d',
+    backgroundColor: '#ff6b5b',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#ff6b5b',
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
   },
   topNavTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '800',
     color: '#fff',
-    letterSpacing: -0.4,
+    letterSpacing: -0.3,
   },
   iconBtn: {
     width: 38,
@@ -695,27 +724,41 @@ const styles = StyleSheet.create({
   scrollContent: {
     flex: 1,
   },
+  profileHeroGradient: {
+    paddingBottom: 24,
+    paddingTop: 12,
+  },
   profileHeader: {
     alignItems: 'center',
     paddingHorizontal: 22,
     paddingTop: 8,
     paddingBottom: 20,
   },
-  avatarWrap: {
-    position: 'relative',
+  avatarRing: {
+    width: 106,
+    height: 106,
+    borderRadius: 53,
+    padding: 3,
+    borderWidth: 2.5,
+    borderColor: '#ff6b5b',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 14,
   },
+  avatarWrap: {
+    position: 'relative',
+  },
   avatarCircle: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarImage: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
   },
   avatarInitial: {
     fontSize: 36,
@@ -775,110 +818,122 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '800',
     color: '#fff',
-    letterSpacing: -0.3,
+    letterSpacing: -0.5,
   },
   profileEmail: {
-    fontSize: 12.5,
-    color: 'rgba(255,255,255,0.35)',
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.4)',
     fontWeight: '400',
     marginBottom: 18,
   },
   statsRow: {
     flexDirection: 'row',
-    gap: 10,
+    alignItems: 'center',
     width: '100%',
+    gap: 8,
   },
   statBox: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: '#1a1a1a',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.07)',
+    borderColor: '#2a2a2a',
     borderRadius: 14,
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 10,
+    minWidth: 90,
     alignItems: 'center',
-    gap: 3,
+  },
+  statDivider: {
+    width: 1,
+    height: 36,
+    backgroundColor: '#2a2a2a',
+    alignSelf: 'center',
   },
   statValue: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '800',
     color: '#fff',
-    letterSpacing: -0.5,
   },
   statCoral: {
     color: '#ff6b5b',
   },
   statLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.3)',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontSize: 11,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.45)',
+    marginTop: 3,
     textAlign: 'center',
   },
   section: {
-    paddingHorizontal: 18,
-    paddingTop: 18,
+    marginHorizontal: 16,
+    marginBottom: 20,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 12,
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  sectionTitleBar: {
+    width: 3,
+    height: 16,
+    borderRadius: 2,
+    backgroundColor: '#ff6b5b',
   },
   sectionTitle: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '700',
-    color: 'rgba(255,255,255,0.5)',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    color: '#fff',
+    letterSpacing: -0.2,
   },
   sectionAction: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
     color: '#ff6b5b',
   },
   subCard: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#1a1a1a',
     borderWidth: 1,
-    borderColor: 'rgba(91,140,255,0.2)',
-    borderRadius: 20,
-    paddingVertical: 16,
-    paddingHorizontal: 18,
+    borderColor: '#2a2a2a',
+    borderRadius: 16,
+    padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 12,
-    overflow: 'hidden',
   },
   subLeft: {
     flex: 1,
   },
   subLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.3)',
+    fontSize: 11,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.4)',
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: 3,
+    letterSpacing: 0.5,
+    marginBottom: 4,
   },
   subPlan: {
     fontSize: 18,
     fontWeight: '800',
     color: '#fff',
-    marginBottom: 4,
   },
   subDesc: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.3)',
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.45)',
+    marginTop: 3,
   },
   upgradeBtn: {
-    borderRadius: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
+    borderRadius: 20,
+    paddingVertical: 9,
+    paddingHorizontal: 16,
   },
   upgradeBtnText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
     color: '#fff',
   },
@@ -953,26 +1008,25 @@ const styles = StyleSheet.create({
   },
   settingsCard: {
     backgroundColor: '#1a1a1a',
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.07)',
-    borderRadius: 20,
+    borderColor: '#2a2a2a',
     overflow: 'hidden',
   },
   settingsItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 13,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    padding: 16,
+    gap: 14,
   },
   settingsItemBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
+    borderBottomColor: '#222',
   },
   settingsIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -980,47 +1034,46 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   settingsTitle: {
-    fontSize: 13.5,
+    fontSize: 15,
     fontWeight: '600',
     color: '#fff',
   },
   settingsSubtitle: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.3)',
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.4)',
     marginTop: 1,
   },
   switchRoleBtn: {
-    marginTop: 14,
-    height: 48,
-    backgroundColor: 'rgba(255,107,91,0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,107,91,0.18)',
-    borderRadius: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+    backgroundColor: 'rgba(255,107,91,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.2)',
+    borderRadius: 14,
+    height: 48,
+    marginTop: 16,
   },
   switchRoleText: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '600',
     color: '#ff6b5b',
   },
   signoutBtn: {
-    marginTop: 14,
-    height: 48,
-    backgroundColor: 'rgba(255,77,77,0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,77,77,0.18)',
-    borderRadius: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+    height: 48,
+    borderRadius: 14,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,77,77,0.2)',
   },
   signoutText: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '600',
     color: '#ff4d4d',
   },
   navBadge: {
@@ -1045,15 +1098,20 @@ const styles = StyleSheet.create({
   },
   boostBtnWrap: {
     width: '100%',
-    marginTop: 14,
+    marginTop: 4,
   },
   boostBtn: {
+    height: 40,
+    borderRadius: 20,
+    paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    height: 44,
-    borderRadius: 22,
+    gap: 7,
+    shadowColor: '#ff6b5b',
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 5,
   },
   boostBtnText: {
     fontSize: 14,
@@ -1061,15 +1119,16 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   boostActiveBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    height: 44,
-    borderRadius: 22,
     backgroundColor: 'rgba(255,215,0,0.12)',
     borderWidth: 1,
     borderColor: 'rgba(255,215,0,0.3)',
+    borderRadius: 20,
+    height: 40,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
   },
   boostActiveBtnText: {
     fontSize: 13,
@@ -1170,49 +1229,50 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.4)',
   },
   bgCheckCard: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
+    padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    gap: 14,
   },
   bgCheckLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 14,
     flex: 1,
   },
   bgCheckIcon: {
     width: 44,
     height: 44,
-    borderRadius: 12,
+    borderRadius: 14,
     backgroundColor: 'rgba(34,197,94,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(34,197,94,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   bgCheckTitle: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
     color: '#fff',
-    marginBottom: 2,
   },
   bgCheckDesc: {
     fontSize: 12,
     color: 'rgba(255,255,255,0.45)',
-    lineHeight: 16,
+    marginTop: 3,
+    lineHeight: 17,
   },
   bgCheckBtn: {
-    backgroundColor: '#22c55e',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
-    marginLeft: 12,
+    backgroundColor: '#ff6b5b',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
   },
   bgCheckBtnText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
     color: '#fff',
   },
