@@ -1,0 +1,195 @@
+# Prompt: Fix HostAnalyticsScreen — Real Data from Supabase
+
+## Problem
+
+`HostAnalyticsScreen` currently uses only `StorageService` (local/mock data) to load listings and inquiries. This causes all values to show as 0 for real users because there is no real data in local storage. The `HostDashboardScreen` already solved this correctly by fetching from Supabase — analytics needs to match.
+
+Additionally, the "Monthly Trend" section shows a static text message with no real trend data. This prompt adds a simple 30-day vs. prior 30-day comparison using data already available.
+
+---
+
+## Step 1 — Update imports in `HostAnalyticsScreen.tsx`
+
+Add these two imports (already used in HostDashboardScreen, so they exist):
+
+```tsx
+import { getMyListings } from '../../services/listingService';
+import { getReceivedInterestCards } from '../../services/discoverService';
+```
+
+---
+
+## Step 2 — Replace `loadData` with a Supabase-first version
+
+Replace the current `loadData` function with:
+
+```tsx
+const loadData = async () => {
+  if (!user) return;
+
+  // --- Listings ---
+  try {
+    const supaListings = await getMyListings();
+    if (supaListings && supaListings.length > 0) {
+      const mapped: Property[] = supaListings.map((l: any) => ({
+        id: l.id,
+        title: l.title || '',
+        description: l.description || '',
+        price: l.rent || 0,
+        bedrooms: l.bedrooms || 1,
+        bathrooms: l.bathrooms || 1,
+        sqft: l.sqft || 0,
+        propertyType: l.property_type || 'lease',
+        roomType: l.room_type || 'entire',
+        city: l.city || '',
+        state: l.state || '',
+        neighborhood: l.neighborhood,
+        address: l.address || '',
+        availableDate: l.available_date ? new Date(l.available_date) : undefined,
+        amenities: l.amenities || [],
+        photos: l.photos || [],
+        available: l.is_active && !l.is_paused,
+        hostId: l.host_id || user.id,
+        hostName: user.name,
+        featured: l.is_featured || false,
+        rentedDate: l.is_rented ? new Date() : undefined,
+      }));
+      setProperties(mapped);
+    } else {
+      setProperties([]);
+    }
+  } catch {
+    // Fallback to StorageService
+    await StorageService.assignPropertiesToHost(user.id, user.name);
+    const allProperties = await StorageService.getProperties();
+    setProperties(allProperties.filter(p => p.hostId === user.id));
+  }
+
+  // --- Inquiries ---
+  try {
+    const supaCards = await getReceivedInterestCards();
+    const mapped: InterestCard[] = (supaCards || []).map((c: any) => ({
+      id: c.id,
+      renterId: c.sender?.id || c.sender_id,
+      renterName: c.sender?.full_name || 'Unknown',
+      renterPhoto: c.sender?.avatar_url,
+      hostId: c.recipient_id || user.id,
+      propertyId: c.listing_id || '',
+      propertyTitle: c.listing_title || '',
+      status: c.status || 'pending',
+      isSuperInterest: c.action === 'super_interest',
+      compatibilityScore: c.compatibility_score || 0,
+      budgetRange: c.budget_range || '',
+      moveInDate: c.move_in_date || '',
+      lifestyleTags: c.lifestyle_tags || [],
+      personalNote: c.personal_note || '',
+      createdAt: c.created_at || new Date().toISOString(),
+      respondedAt: c.responded_at,
+    }));
+    setInquiries(mapped);
+  } catch {
+    const interestCards = await StorageService.getInterestCardsForHost(user.id);
+    setInquiries(interestCards);
+  }
+};
+```
+
+---
+
+## Step 3 — Fix the "Monthly Trend" section
+
+The current Monthly Trend shows a static message. Replace it with a real 30-day vs. prior 30-day comparison.
+
+### 3a. Add this computed value near the other derived stats (after `acceptRate`):
+
+```tsx
+const now = Date.now();
+const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+const inquiriesLast30 = inquiries.filter(i => {
+  const created = new Date(i.createdAt).getTime();
+  return now - created < thirtyDays;
+}).length;
+const inquiriesPrior30 = inquiries.filter(i => {
+  const created = new Date(i.createdAt).getTime();
+  return now - created >= thirtyDays && now - created < thirtyDays * 2;
+}).length;
+const trendDelta = inquiriesLast30 - inquiriesPrior30;
+const trendPositive = trendDelta > 0;
+const trendNeutral = trendDelta === 0;
+```
+
+### 3b. Replace the Monthly Trend card JSX with:
+
+```tsx
+<ThemedText type="h2" style={styles.sectionTitle}>Monthly Trend</ThemedText>
+<View style={[styles.card, { backgroundColor: CARD_BG }]}>
+  <View style={styles.trendRow}>
+    <Feather
+      name={trendPositive ? 'trending-up' : trendNeutral ? 'minus' : 'trending-down'}
+      size={24}
+      color={trendPositive ? '#3ECF8E' : trendNeutral ? '#888' : '#FF4757'}
+    />
+    <View style={{ marginLeft: Spacing.md, flex: 1 }}>
+      <ThemedText type="h3">
+        {trendPositive
+          ? `+${trendDelta} more than last month`
+          : trendNeutral && inquiriesLast30 > 0
+          ? 'Same as last month'
+          : trendNeutral
+          ? 'Getting Started'
+          : `${Math.abs(trendDelta)} fewer than last month`}
+      </ThemedText>
+      <ThemedText style={{ color: '#888', marginTop: Spacing.xs }}>
+        {inquiriesLast30 > 0
+          ? `${inquiriesLast30} inquir${inquiriesLast30 !== 1 ? 'ies' : 'y'} in the last 30 days${inquiriesPrior30 > 0 ? ` vs. ${inquiriesPrior30} prior` : ''}.`
+          : 'No inquiries in the last 30 days. Add listings to start tracking performance.'}
+      </ThemedText>
+    </View>
+  </View>
+</View>
+```
+
+---
+
+## Step 4 — Add a note label to "Estimated Views" and "Estimated Saves"
+
+These are genuinely estimates (no view tracking exists yet). Add a small asterisk label so hosts know:
+
+In the `FunnelRow` component call for Estimated Views, change the label to:
+```tsx
+label="Est. Views *"
+```
+
+And for Estimated Saves:
+```tsx
+label="Est. Saves *"
+```
+
+Then add a small footnote below the Conversion Funnel card (both the unlocked version and the locked preview):
+
+```tsx
+<ThemedText style={{ color: 'rgba(255,255,255,0.2)', fontSize: 10, marginTop: 6, paddingHorizontal: 4 }}>
+  * Estimated based on inquiry volume. Actual view tracking coming soon.
+</ThemedText>
+```
+
+---
+
+## What NOT to Change
+
+- The paywall lock for Starter plan — keep that exactly as-is
+- The `OverviewCard`, `StatusPill`, `FunnelRow` sub-components — no changes needed
+- Per-listing breakdown logic — just benefits from the fixed data source
+- Navigation or auth logic
+- `useFocusEffect` / `useCallback` pattern — keep it
+
+---
+
+## Expected Result
+
+- All stat boxes (Total Listings, Active, Inquiries, Accept Rate) now show real numbers from Supabase
+- Status pills (Pending, Accepted, Passed, Rented, Paused) show real counts
+- Conversion Funnel (for Pro hosts) shows real inquiry numbers vs. estimated views
+- Per-Listing Breakdown shows actual inquiry counts per listing
+- Monthly Trend shows a meaningful +/- comparison between last 30 days and prior 30 days
+- Estimated views/saves are clearly labeled as estimates

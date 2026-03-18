@@ -150,6 +150,7 @@ export async function createListingInquiryGroup(
         listing_id: listingId,
         host_id: hostId,
         listing_address: listingAddress,
+        source_group_id: sourceGroupId,
         created_by: user.id,
         is_archived: false,
       })
@@ -186,6 +187,7 @@ export async function createListingInquiryGroup(
       listing_id: listingId,
       host_id: hostId,
       listing_address: listingAddress,
+      source_group_id: sourceGroupId,
       created_by: 'local',
       is_archived: false,
       created_at: new Date().toISOString(),
@@ -244,11 +246,65 @@ export async function joinGroup(groupId: string) {
 
   const { data, error } = await supabase
     .from('group_members')
-    .insert({ group_id: groupId, user_id: user.id, role: 'member' })
+    .insert({ group_id: groupId, user_id: user.id, role: 'member', status: 'active' })
     .select()
     .single();
 
   if (error) throw error;
+
+  try {
+    const { data: inquiryGroups } = await supabase
+      .from('groups')
+      .select('id, inquiry_status, name')
+      .eq('source_group_id', groupId)
+      .eq('type', 'listing_inquiry')
+      .eq('is_archived', false);
+
+    if (inquiryGroups && inquiryGroups.length > 0) {
+      const { data: profile } = await supabase
+        .from('users')
+        .select('full_name')
+        .eq('id', user.id)
+        .single();
+
+      const memberName = profile?.full_name || 'A new member';
+
+      for (const inquiryGroup of inquiryGroups) {
+        await supabase
+          .from('group_members')
+          .insert({
+            group_id: inquiryGroup.id,
+            user_id: user.id,
+            role: 'member',
+            is_host: false,
+            status: 'active',
+            joined_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+
+        const systemMessage =
+          inquiryGroup.inquiry_status === 'accepted'
+            ? `${memberName} joined after this inquiry was accepted.`
+            : inquiryGroup.inquiry_status === 'declined'
+            ? `${memberName} joined after this inquiry was declined.`
+            : `${memberName} joined the group.`;
+
+        await supabase
+          .from('messages')
+          .insert({
+            group_id: inquiryGroup.id,
+            sender_id: null,
+            content: systemMessage,
+            is_system_message: true,
+            created_at: new Date().toISOString(),
+          });
+      }
+    }
+  } catch (syncError) {
+    console.warn('[joinGroup] Failed to sync new member to inquiry groups:', syncError);
+  }
+
   return data;
 }
 

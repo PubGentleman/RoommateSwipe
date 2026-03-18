@@ -160,10 +160,10 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   useEffect(() => {
     if (!matchIdFromConversation) return;
     const unsubscribe = subscribeToMessages(matchIdFromConversation, (newMsg: any) => {
-      if (newMsg.sender_id !== user?.id) {
+      if (newMsg.sender_id !== user?.id || newMsg.sender_id === null || newMsg.is_system_message) {
         const mapped: Message = {
           id: newMsg.id,
-          senderId: newMsg.sender_id,
+          senderId: newMsg.is_system_message ? 'system' : newMsg.sender_id,
           text: newMsg.content,
           content: newMsg.content,
           timestamp: new Date(newMsg.created_at),
@@ -187,7 +187,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       if (supaMessages && supaMessages.length > 0) {
         supabaseMessages = supaMessages.map((msg: any) => ({
           id: msg.id,
-          senderId: msg.sender_id,
+          senderId: msg.is_system_message ? 'system' : msg.sender_id,
           text: msg.content,
           content: msg.content,
           timestamp: new Date(msg.created_at),
@@ -445,7 +445,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   };
 
   const renderMessage = ({ item }: { item: Message }) => {
-    if (item.senderId === 'system') {
+    if (item.senderId === 'system' || item.senderId === null || (item as any).is_system_message) {
       return (
         <View style={styles.systemMessageContainer}>
           <View style={styles.systemMessageBubble}>

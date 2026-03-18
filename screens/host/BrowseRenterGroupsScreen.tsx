@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, Pressable, Modal, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, StyleSheet, Pressable, Modal, ActivityIndicator, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,6 +9,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { StorageService } from '../../utils/storage';
 import { isFreePlan } from '../../utils/hostPricing';
 import { HostSubscriptionData } from '../../types/models';
+import { createListingInquiryGroup } from '../../services/groupService';
 
 const isDev = __DEV__;
 const BG = '#111';
@@ -132,15 +133,59 @@ export const BrowseRenterGroupsScreen = () => {
     setShowMessageModal(true);
   };
 
-  const confirmSendMessage = () => {
-    if (!pendingMessageGroupId) return;
+  const confirmSendMessage = async () => {
+    if (!pendingMessageGroupId || !user) return;
     setMessageSending(true);
-    setTimeout(() => {
+
+    try {
+      const properties = await StorageService.getProperties();
+      const activeListings = properties.filter(p => p.hostId === user.id && p.available);
+      const listing = activeListings[0];
+
+      if (!listing) {
+        Alert.alert(
+          'No Active Listing',
+          'You need an active listing to message a group. Go to the Listings tab to create one.',
+          [{ text: 'OK' }]
+        );
+        setMessageSending(false);
+        setShowMessageModal(false);
+        return;
+      }
+
+      const group = groups.find(g => g.groupId === pendingMessageGroupId);
+      const groupName = group ? `Inquiry — ${group.location || group.neighborhoods[0] || 'Your Listing'}` : 'Listing Inquiry';
+
+      const inquiryGroup = await createListingInquiryGroup(
+        listing.id,
+        user.id,
+        listing.address || listing.city || 'Your listing',
+        pendingMessageGroupId,
+        groupName,
+      );
+
       setSentRequests(prev => [...prev, pendingMessageGroupId]);
       setMessageSending(false);
       setShowMessageModal(false);
       setPendingMessageGroupId(null);
-    }, 800);
+
+      const parent = navigation.getParent();
+      if (parent) {
+        parent.navigate('Messages', {
+          screen: 'Chat',
+          params: { conversationId: inquiryGroup.id, isGroupChat: true },
+        });
+      } else {
+        navigation.navigate('Messages', {
+          screen: 'Chat',
+          params: { conversationId: inquiryGroup.id, isGroupChat: true },
+        });
+      }
+    } catch (error) {
+      console.error('[BrowseRenterGroups] Failed to create inquiry group:', error);
+      setMessageSending(false);
+      Alert.alert('Error', 'Failed to send message. Please try again.');
+    }
   };
 
   if (hostSub && isFreePlan(hostSub.plan)) {
@@ -348,7 +393,7 @@ export const BrowseRenterGroupsScreen = () => {
             </View>
             <Text style={styles.modalTitle}>Message This Group</Text>
             <Text style={styles.modalDesc}>
-              Your listing details will be shared with this group. They can review your property and respond to your inquiry.
+              A group chat will be created with all members of this group. Everyone will see your listing and can respond together.
             </Text>
             <Pressable
               style={[styles.modalConfirmBtn, { opacity: messageSending ? 0.7 : 1 }]}
