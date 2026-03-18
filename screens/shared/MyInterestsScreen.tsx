@@ -163,9 +163,26 @@ export const MyInterestsScreen = () => {
     const conversations = await StorageService.getConversations();
     const existing = conversations.find(c => c.id === conversationId);
     if (existing) {
-      (navigation as any).navigate('Messages', { screen: 'MessagesList' });
+      if (card.status === 'accepted' && existing.inquiryStatus === 'pending') {
+        await StorageService.updateConversation(conversationId, {
+          inquiryStatus: 'accepted',
+          lastMessage: 'Interest accepted! You can now message each other.',
+        });
+      }
+
+      const tabNav = (navigation as any).getParent?.() || navigation;
+      tabNav.navigate('Messages', { screen: 'MessagesList' });
       setTimeout(() => {
-        (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: existing.id } });
+        tabNav.navigate('Messages', {
+          screen: 'Chat',
+          params: {
+            conversationId: existing.id,
+            otherUser: {
+              id: card.hostId,
+              name: card.hostName || 'Host',
+            },
+          },
+        });
       }, 50);
     }
   };

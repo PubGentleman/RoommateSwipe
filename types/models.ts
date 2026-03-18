@@ -199,6 +199,7 @@ export interface Conversation {
   groupId?: string;
   isSoloInquiry?: boolean;
   isSuperInterest?: boolean;
+  matchId?: string;
 }
 
 export interface Application {

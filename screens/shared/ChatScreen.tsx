@@ -224,6 +224,34 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
 
     setMessages(loadedMessages);
 
+    if (conversationId.startsWith('conv-interest-') && conversation?.inquiryId) {
+      try {
+        const cards = await StorageService.getInterestCards();
+        const card = cards.find(c => c.id === conversation.inquiryId);
+        if (card?.status === 'accepted' && conversation.inquiryStatus === 'pending') {
+          await StorageService.updateConversation(conversationId, {
+            inquiryStatus: 'accepted',
+            lastMessage: 'Interest accepted! You can now message each other.',
+          });
+          setInquiryStatus('accepted');
+          const hasAcceptedMsg = loadedMessages.some(m =>
+            m.senderId === 'system' && m.text?.includes('accepted')
+          );
+          if (!hasAcceptedMsg) {
+            const acceptMsg: Message = {
+              id: `msg-sync-accept-${Date.now()}`,
+              senderId: 'system',
+              text: 'Interest accepted! You can now message each other.',
+              content: 'Interest accepted! You can now message each other.',
+              timestamp: new Date(),
+              read: true,
+            };
+            setMessages(prev => [...prev, acceptMsg]);
+          }
+        }
+      } catch (_e) {}
+    }
+
     if (!otherUser && conversation?.participant) {
       const roommateProfiles = await StorageService.getRoommateProfiles();
       const profile = roommateProfiles.find(p => p.id === conversation.participant.id);

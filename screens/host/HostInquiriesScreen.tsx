@@ -102,8 +102,10 @@ export const HostInquiriesScreen = () => {
 
     const now = new Date();
 
+    let supabaseMatchId: string | undefined;
     try {
-      await acceptInterestCard(card.id, card.renterId);
+      const result = await acceptInterestCard(card.id, card.renterId);
+      supabaseMatchId = result?.match?.id;
     } catch {
       await StorageService.updateInterestCard(card.id, {
         status: 'accepted',
@@ -123,14 +125,19 @@ export const HostInquiriesScreen = () => {
     }
 
     const conversationId = `conv-interest-${card.id}`;
-    const initialMessage: Message = {
-      id: `msg-${Date.now()}`,
+    const acceptedMessage: Message = {
+      id: `msg-accept-${Date.now()}`,
       senderId: 'system',
-      text: 'Interest accepted! Start chatting.',
-      content: 'Interest accepted! Start chatting.',
+      text: `${user.name} accepted your interest! You can now message each other.`,
+      content: `${user.name} accepted your interest! You can now message each other.`,
       timestamp: now,
       read: false,
     };
+
+    const existingConvs = await StorageService.getConversations();
+    const existingConv = existingConvs.find(c => c.id === conversationId);
+    const priorMessages = existingConv?.messages || [];
+
     const conversation: Conversation = {
       id: conversationId,
       participant: {
@@ -139,17 +146,21 @@ export const HostInquiriesScreen = () => {
         photo: card.renterPhoto,
         online: false,
       },
-      lastMessage: initialMessage.text || '',
+      lastMessage: acceptedMessage.text || '',
       timestamp: now,
       unread: 0,
-      messages: [initialMessage],
+      messages: [...priorMessages, acceptedMessage],
+      isInquiryThread: true,
+      isSuperInterest: card.isSuperInterest || false,
+      inquiryStatus: 'accepted',
+      inquiryId: card.id,
+      listingTitle: card.propertyTitle,
+      hostId: user.id,
+      hostName: user.name,
+      propertyId: card.propertyId,
+      matchId: supabaseMatchId,
     };
     await StorageService.addOrUpdateConversation(conversation);
-
-    await StorageService.updateConversation(conversationId, {
-      inquiryStatus: 'accepted',
-      lastMessage: 'Interest accepted! Start chatting.',
-    });
 
     if (card.groupId) {
       const inquiryConvId = `inquiry-conv-${card.groupId}`;

@@ -138,22 +138,37 @@ export const MessagesScreen = () => {
         if (!conversationExists) {
           const otherProfile = profiles.find(p => p.id === otherUserId);
           if (otherProfile) {
-            const localConv = localConvMap.get(`conv_${match.id}`);
-            const newConversation: Conversation = {
-              id: `conv_${match.id}`,
-              participant: {
-                id: otherProfile.id,
-                name: otherProfile.name,
-                photo: otherProfile.photos?.[0],
-                online: Math.random() > 0.5,
-              },
-              lastMessage: localConv?.lastMessage || 'You matched!',
-              timestamp: localConv?.timestamp || match.matchedAt,
-              unread: localConv?.unread || 0,
-              messages: localConv?.messages || [],
-              matchType: match.matchType || 'mutual',
-            };
-            existingConversations.push(newConversation);
+            const existingInquiryThread = existingConversations.find(
+              c => c.participant?.id === otherUserId && c.isInquiryThread
+            );
+
+            if (existingInquiryThread) {
+              if (!existingInquiryThread.matchId) {
+                existingInquiryThread.matchId = match.id;
+                existingInquiryThread.matchType = match.matchType || 'mutual';
+                if (existingInquiryThread.inquiryStatus === 'pending') {
+                  existingInquiryThread.inquiryStatus = 'accepted';
+                  existingInquiryThread.lastMessage = 'Interest accepted! You can now message each other.';
+                }
+              }
+            } else {
+              const localConv = localConvMap.get(`conv_${match.id}`);
+              const newConversation: Conversation = {
+                id: `conv_${match.id}`,
+                participant: {
+                  id: otherProfile.id,
+                  name: otherProfile.name,
+                  photo: otherProfile.photos?.[0],
+                  online: Math.random() > 0.5,
+                },
+                lastMessage: localConv?.lastMessage || 'You matched!',
+                timestamp: localConv?.timestamp || match.matchedAt,
+                unread: localConv?.unread || 0,
+                messages: localConv?.messages || [],
+                matchType: match.matchType || 'mutual',
+              };
+              existingConversations.push(newConversation);
+            }
           }
         } else {
           const existingConv = existingConversations.find(c => c.participant.id === otherUserId);

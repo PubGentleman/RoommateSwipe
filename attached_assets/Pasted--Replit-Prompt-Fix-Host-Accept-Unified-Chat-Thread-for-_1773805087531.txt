@@ -1,0 +1,306 @@
+# Replit Prompt — Fix Host Accept → Unified Chat Thread for Both Sides
+
+## Problems to Fix
+
+When a host accepts a renter's interest, four things go wrong:
+
+1. **Renter gets a duplicate conversation.** They already have `conv-interest-${interestId}` (the inquiry thread with history). After the host accepts, Supabase creates a match record, and MessagesScreen creates a second blank conversation `conv_${match.id}`. The renter now has two threads with the same host — one with history, one blank.
+
+2. **Renter's inquiry thread never updates to "accepted."** The host's `StorageService.updateConversation()` call runs only on the host's device. The renter's conversation stays in `inquiryStatus: 'pending'` forever, showing "Waiting for host to respond."
+
+3. **Host's conversation is missing the `isInquiryThread` flag.** The conversation created by `handleAcceptInterest` doesn't set `isInquiryThread: true`, so listing details, the inquiry banner, and accept/decline UI won't render correctly inside the host's chat view.
+
+4. **No bridge between the match record and the inquiry thread.** The Supabase match (`conv_${match.id}`) and the inquiry thread (`conv-interest-${interestId}`) are unconnected, so MessagesScreen treats them as separate conversations.
+
+---
+
+## The Fix Strategy
+
+When the host accepts:
+- Update the **existing** `conv-interest-${card.id}` conversation (same ID the renter has) with accepted status, `isInquiryThread: true`, and a system message
+- Store the `matchId` from Supabase on the conversation so MessagesScreen can link them
+- When MessagesScreen builds its conversation list, **skip creating a new `conv_${match.id}`** if a `conv-interest-` conversation already exists for that participant
+
+---
+
+## Fix 1 — `screens/host/HostInquiriesScreen.tsx`
+
+### Update `handleAcceptInterest` — use `addOrUpdateConversation` with full flags
+
+Find the block in `handleAcceptInterest` that creates the `conversation` object and calls `StorageService.addOrUpdateConversation` (around line 130). Replace the entire conversation creation block with:
+
+```tsx
+const conversationId = `conv-interest-${card.id}`;
+
+// Get the Supabase match ID if the accept succeeded
+let supabaseMatchId: string | undefined;
+try {
+  const result = await acceptInterestCard(card.id, card.renterId);
+  supabaseMatchId = result?.match?.id;
+} catch {
+  await StorageService.updateInterestCard(card.id, {
+    status: 'accepted',
+    respondedAt: now.toISOString(),
+  });
+}
+
+const acceptedMessage: Message = {
+  id: `msg-accept-${Date.now()}`,
+  senderId: 'system',
+  text: `${user.name} accepted your interest! You can now message each other.`,
+  content: `${user.name} accepted your interest! You can now message each other.`,
+  timestamp: now,
+  read: false,
+};
+
+// Load existing conversation to preserve any prior messages
+const existingConvs = await StorageService.getConversations();
+const existingConv = existingConvs.find(c => c.id === conversationId);
+const priorMessages = existingConv?.messages || [];
+
+const conversation: Conversation = {
+  id: conversationId,
+  participant: {
+    id: card.renterId,
+    name: card.renterName,
+    photo: card.renterPhoto,
+    online: false,
+  },
+  lastMessage: acceptedMessage.text || '',
+  timestamp: now,
+  unread: 0,
+  messages: [...priorMessages, acceptedMessage],
+  // CRITICAL: set isInquiryThread so chat renders correctly for host
+  isInquiryThread: true,
+  isSuperInterest: card.isSuperInterest || false,
+  inquiryStatus: 'accepted',
+  inquiryId: card.id,
+  listingTitle: card.propertyTitle,
+  hostId: user.id,
+  hostName: user.name,
+  propertyId: card.propertyId,
+  // Store matchId so MessagesScreen can deduplicate
+  matchId: supabaseMatchId,
+};
+await StorageService.addOrUpdateConversation(conversation);
+```
+
+Also remove the **duplicate** `acceptInterestCard` call that appears earlier in the function (the one inside the `try { await acceptInterestCard(...) } catch { ... }` block at the top of `handleAcceptInterest`) since we've now moved it into the conversation block above. Keep only one call to `acceptInterestCard`.
+
+---
+
+## Fix 2 — `screens/renter/ExploreScreen.tsx`
+
+### Store `inquiryId` on the conversation when interest is sent
+
+When the renter creates the inquiry conversation, ensure `inquiryId` is set (it should already be, but verify):
+
+Find the `conversation` object created inside `handleSendUnifiedInterest` and confirm it includes:
+```tsx
+inquiryId: interestId,
+```
+
+If it's missing, add it. This is needed so we can look up the conversation later by inquiry ID.
+
+---
+
+## Fix 3 — `screens/shared/MessagesScreen.tsx`
+
+### Prevent duplicate conversations — skip creating `conv_${match.id}` if inquiry thread exists
+
+This is the most important fix. In `loadConversations`, after `existingConversations` is built, find the loop that creates new conversations from matches (the `for (const match of matches)` loop, around line 124).
+
+Inside the `if (!conversationExists)` block where a new conversation would be created from a match, add a check to see if there's already an inquiry thread for that participant:
+
+**Find this block:**
+```tsx
+if (!conversationExists) {
+  const otherProfile = profiles.find(p => p.id === otherUserId);
+  if (otherProfile) {
+    const localConv = localConvMap.get(`conv_${match.id}`);
+    const newConversation: Conversation = {
+      id: `conv_${match.id}`,
+      ...
+      messages: localConv?.messages || [],
+    };
+    existingConversations.push(newConversation);
+  }
+}
+```
+
+**Replace with:**
+```tsx
+if (!conversationExists) {
+  const otherProfile = profiles.find(p => p.id === otherUserId);
+  if (otherProfile) {
+    // Check if an inquiry/interest thread already exists for this participant
+    // If so, update it with the match ID instead of creating a duplicate blank conversation
+    const existingInquiryThread = existingConversations.find(
+      c => c.participant?.id === otherUserId && c.isInquiryThread
+    );
+
+    if (existingInquiryThread) {
+      // Link the match to the existing inquiry thread — no duplicate needed
+      if (!existingInquiryThread.matchId) {
+        existingInquiryThread.matchId = match.id;
+        existingInquiryThread.matchType = match.matchType || 'mutual';
+        // Update status to accepted if still showing pending
+        if (existingInquiryThread.inquiryStatus === 'pending') {
+          existingInquiryThread.inquiryStatus = 'accepted';
+          existingInquiryThread.lastMessage = 'Interest accepted! You can now message each other.';
+        }
+      }
+    } else {
+      // No inquiry thread exists — create a standard match conversation
+      const localConv = localConvMap.get(`conv_${match.id}`);
+      const newConversation: Conversation = {
+        id: `conv_${match.id}`,
+        participant: {
+          id: otherProfile.id,
+          name: otherProfile.name,
+          photo: otherProfile.photos?.[0],
+          online: Math.random() > 0.5,
+        },
+        lastMessage: localConv?.lastMessage || 'You matched!',
+        timestamp: localConv?.timestamp || match.matchedAt,
+        unread: localConv?.unread || 0,
+        messages: localConv?.messages || [],
+        matchType: match.matchType || 'mutual',
+      };
+      existingConversations.push(newConversation);
+    }
+  }
+}
+```
+
+### Also update the conversation filter to show accepted inquiry threads
+
+The existing filter at line ~171 already includes `c.isInquiryThread` — that's correct. But also make sure `conv-interest-` threads aren't filtered out when they have `inquiryStatus === 'accepted'` and are now full chats:
+
+```tsx
+const userConversations = existingConversations.filter(
+  c => !blockedIds.includes(c.participant?.id || '') && (
+    c.isInquiryThread ||
+    c.id.startsWith('conv-interest-') ||
+    c.matchType === 'cold' ||
+    matches.some(match =>
+      (match.userId1 === user.id && match.userId2 === c.participant?.id) ||
+      (match.userId2 === user.id && match.userId1 === c.participant?.id)
+    )
+  )
+);
+```
+
+---
+
+## Fix 4 — `screens/renter/MyInterestsScreen.tsx`
+
+### Update `handleMessage` to also update conversation status on tap
+
+When the renter taps "Message" on an accepted interest card, update their local conversation status before navigating:
+
+**Find `handleMessage` (around line 161):**
+```tsx
+const handleMessage = async (card: InterestCard) => {
+  const conversationId = `conv-interest-${card.id}`;
+  const conversations = await StorageService.getConversations();
+  const existing = conversations.find(c => c.id === conversationId);
+  if (existing) {
+    (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: existing.id } });
+  }
+};
+```
+
+**Replace with:**
+```tsx
+const handleMessage = async (card: InterestCard) => {
+  const conversationId = `conv-interest-${card.id}`;
+  const conversations = await StorageService.getConversations();
+  let existing = conversations.find(c => c.id === conversationId);
+
+  if (existing) {
+    // If card is accepted but conversation still shows pending, update it
+    if (card.status === 'accepted' && existing.inquiryStatus === 'pending') {
+      await StorageService.updateConversation(conversationId, {
+        inquiryStatus: 'accepted',
+        lastMessage: 'Interest accepted! You can now message each other.',
+      });
+    }
+
+    // Two-step navigation so Messages tab shows list first
+    const tabNav = (navigation as any).getParent?.() || navigation;
+    tabNav.navigate('Messages', { screen: 'MessagesList' });
+    setTimeout(() => {
+      tabNav.navigate('Messages', {
+        screen: 'Chat',
+        params: {
+          conversationId: existing!.id,
+          otherUser: {
+            id: card.hostId,
+            name: card.hostName || 'Host',
+          },
+        },
+      });
+    }, 50);
+  }
+};
+```
+
+---
+
+## Fix 5 — `screens/shared/ChatScreen.tsx`
+
+### Show "Interest Accepted" banner when inquiryStatus changes to accepted
+
+In `loadMessages`, after loading the conversation from StorageService, check if the interest card status has been updated in Supabase and sync it locally:
+
+After `setMessages(loadedMessages)` is called, add:
+```tsx
+// Sync inquiry status from StorageService
+if (isInquiryChat && conversation?.inquiryId) {
+  try {
+    const cards = await StorageService.getInterestCards();
+    const card = cards.find(c => c.id === conversation.inquiryId);
+    if (card?.status === 'accepted' && conversation.inquiryStatus === 'pending') {
+      await StorageService.updateConversation(conversationId, {
+        inquiryStatus: 'accepted',
+        lastMessage: 'Interest accepted! You can now message each other.',
+      });
+      // Show a system message if one doesn't already exist
+      const hasAcceptedMsg = loadedMessages.some(m =>
+        m.senderId === 'system' && m.text?.includes('accepted')
+      );
+      if (!hasAcceptedMsg) {
+        const acceptMsg: Message = {
+          id: `msg-sync-accept-${Date.now()}`,
+          senderId: 'system',
+          text: 'Interest accepted! You can now message each other.',
+          content: 'Interest accepted! You can now message each other.',
+          timestamp: new Date(),
+          read: true,
+        };
+        setMessages(prev => [...prev, acceptMsg]);
+      }
+    }
+  } catch (_e) {}
+}
+```
+
+---
+
+## Summary of What Changes
+
+| File | Change |
+|------|--------|
+| `HostInquiriesScreen.tsx` | On accept: use `addOrUpdateConversation` with `isInquiryThread: true`, `inquiryStatus: 'accepted'`, preserve prior messages, store `matchId` |
+| `MessagesScreen.tsx` | When building conversation list from matches, skip creating `conv_${match.id}` if an inquiry thread already exists for that participant — link the match to the existing thread instead |
+| `MyInterestsScreen.tsx` | On renter tapping "Message" on an accepted card, update local conversation status before navigating; fix navigation to use two-step |
+| `ChatScreen.tsx` | Sync inquiry status from local interest cards — if accepted but conversation shows pending, add system message and update status |
+
+## Result After Fix
+
+- Renter sends interest → sees `conv-interest-${id}` thread in Messages with "Pending" status ✓
+- Host accepts → host's conversation updates to "Accepted" with system message ✓
+- Renter's thread automatically upgrades to "Accepted" status (no duplicate blank conversation) ✓
+- Both host and renter chat in the **same `conv-interest-${id}` thread** — history preserved ✓
+- No orphan `conv_${match.id}` blank conversation created ✓
