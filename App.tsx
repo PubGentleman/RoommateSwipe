@@ -1,13 +1,13 @@
-import React, { useEffect, useCallback, useState } from "react";
-import { StyleSheet, View, ActivityIndicator, Platform } from "react-native";
+import React, { useEffect } from "react";
+import { StyleSheet } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import * as Font from "expo-font";
+import { useFonts } from "expo-font";
+import { Feather } from "@expo/vector-icons";
 import * as SplashScreen from "expo-splash-screen";
-import Feather from "@expo/vector-icons/Feather";
 
 import { RootNavigator } from "./navigation/RootNavigator";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -20,31 +20,18 @@ import { StorageService } from "./utils/storage";
 import { isDev } from "./utils/dataUtils";
 import { checkDailyTrigger } from "./utils/insightRefresh";
 
-SplashScreen.preventAutoHideAsync().catch(() => {});
-
-const featherFont = Feather.font as Record<string, any>;
+SplashScreen.preventAutoHideAsync();
 
 export default function App() {
-  const [fontsLoaded, setFontsLoaded] = useState(false);
+  const [fontsLoaded, fontError] = useFonts({
+    ...Feather.font,
+  });
 
   useEffect(() => {
-    async function loadFonts() {
-      try {
-        await Font.loadAsync(featherFont);
-      } catch (e) {
-        console.warn('Font loading error:', e);
-      } finally {
-        setFontsLoaded(true);
-      }
+    if (fontsLoaded || fontError) {
+      SplashScreen.hideAsync();
     }
-    loadFonts();
-  }, []);
-
-  const onLayoutRootView = useCallback(async () => {
-    if (fontsLoaded) {
-      await SplashScreen.hideAsync();
-    }
-  }, [fontsLoaded]);
+  }, [fontsLoaded, fontError]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -66,19 +53,15 @@ export default function App() {
     checkDailyTrigger();
   }, []);
 
-  if (!fontsLoaded) {
-    return (
-      <View style={styles.loading}>
-        <ActivityIndicator size="large" color="#ff6b5b" />
-      </View>
-    );
+  if (!fontsLoaded && !fontError) {
+    return null;
   }
 
   return (
     <ErrorBoundary>
       <StripeWrapper>
         <SafeAreaProvider>
-          <GestureHandlerRootView style={styles.root} onLayout={onLayoutRootView}>
+          <GestureHandlerRootView style={styles.root}>
             <KeyboardProvider>
               <AuthProvider>
                 <CityProvider>
@@ -103,11 +86,5 @@ export default function App() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-  },
-  loading: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#111',
   },
 });
