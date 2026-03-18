@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, Modal, Pressable, Alert } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather } from './VectorIcons';
 import { ThemedText } from './ThemedText';
 import { useTheme } from '../hooks/useTheme';
 import { Spacing, BorderRadius, Typography } from '../constants/theme';

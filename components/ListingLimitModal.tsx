@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Modal, Pressable, StyleSheet } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather } from './VectorIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 
 interface ListingLimitModalProps {

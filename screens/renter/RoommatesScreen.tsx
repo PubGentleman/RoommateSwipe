@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { View, StyleSheet, Image, Pressable, Dimensions, Modal, ScrollView, Alert, Text, Animated as RNAnimated } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, withSequence, runOnJS, interpolate } from 'react-native-reanimated';
-import { Feather } from '@expo/vector-icons';
+import { Feather } from '../../components/VectorIcons';
 import * as Haptics from 'expo-haptics';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { ThemedText } from '../../components/ThemedText';

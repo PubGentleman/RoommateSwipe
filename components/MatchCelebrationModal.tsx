@@ -10,7 +10,7 @@ import Animated, {
   interpolate,
   Easing,
 } from 'react-native-reanimated';
-import { Feather } from '@expo/vector-icons';
+import { Feather } from './VectorIcons';
 import { ThemedText } from './ThemedText';
 import { useTheme } from '../hooks/useTheme';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';

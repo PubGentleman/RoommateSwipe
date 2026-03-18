@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { View, StyleSheet, Pressable, FlatList, Alert } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather } from '../../components/VectorIcons';
 import { useFocusEffect } from '@react-navigation/native';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';

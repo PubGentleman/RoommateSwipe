@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, Pressable, Image, Alert, Modal, ScrollView, Text, TouchableOpacity, Platform } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather } from '../../components/VectorIcons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

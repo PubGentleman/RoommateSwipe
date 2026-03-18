@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, Pressable, TextInput, Alert, Modal, ActivityIndicator } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather } from '../../components/VectorIcons';
 import { WebView } from 'react-native-webview';
 import { ScreenKeyboardAwareScrollView } from '../../components/ScreenKeyboardAwareScrollView';
 import { ThemedText } from '../../components/ThemedText';

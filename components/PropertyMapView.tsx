@@ -4,7 +4,7 @@ import { ThemedText } from './ThemedText';
 import { useTheme } from '../hooks/useTheme';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
 import { Property, User, RoommateProfile } from '../types/models';
-import { Feather } from '@expo/vector-icons';
+import { Feather } from './VectorIcons';
 import { formatLocation, getMatchQualityColor, calculateCompatibility } from '../utils/matchingAlgorithm';
 
 interface PropertyMapViewProps {

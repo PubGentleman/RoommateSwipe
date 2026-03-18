@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, Pressable, Modal, TextInput, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather } from './VectorIcons';
 import { ThemedText } from './ThemedText';
 import { BorderRadius, Spacing } from '../constants/theme';
 import { getAllCities } from '../utils/locationData';

@@ -6,7 +6,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ScreenScrollView } from '@/components/ScreenScrollView';
 import { StorageService } from '@/utils/storage';
 import { Typography, Spacing } from '@/constants/theme';
-import { Feather } from '@expo/vector-icons';
+import { Feather } from '../../components/VectorIcons';
 import { useNavigation } from '@react-navigation/native';
 
 interface LikeItem {

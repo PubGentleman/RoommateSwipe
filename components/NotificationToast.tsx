@@ -7,7 +7,7 @@ import Animated, {
   withTiming,
   runOnJS,
 } from 'react-native-reanimated';
-import { Feather } from '@expo/vector-icons';
+import { Feather } from './VectorIcons';
 import { ThemedText } from './ThemedText';
 import { useTheme } from '../hooks/useTheme';
 import { Spacing, BorderRadius, Typography } from '../constants/theme';

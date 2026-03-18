@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { View, StyleSheet, Pressable, Alert, Platform } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather } from './VectorIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   useSharedValue,

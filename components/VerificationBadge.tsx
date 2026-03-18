@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather } from './VectorIcons';
 import { ThemedText } from './ThemedText';
 import { Typography, Spacing } from '../constants/theme';
 import type { VerificationStatus } from '../types/models';

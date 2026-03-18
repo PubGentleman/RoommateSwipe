@@ -5,7 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../hooks/useTheme';
 import { ThemedText } from '../../components/ThemedText';
 import { StorageService } from '../../utils/storage';
-import { Feather } from '@expo/vector-icons';
+import { Feather } from '../../components/VectorIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Typography, Spacing } from '../../constants/theme';
 import { LinearGradient } from 'expo-linear-gradient';

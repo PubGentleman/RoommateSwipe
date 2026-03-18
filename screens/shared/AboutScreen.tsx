@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, Text, Pressable, Linking } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather } from '../../components/VectorIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ScreenScrollView } from '../../components/ScreenScrollView';
 import { Spacing } from '../../constants/theme';

@@ -3,7 +3,7 @@ import { View, Text, TextInput, StyleSheet, Pressable, Alert } from 'react-nativ
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenKeyboardAwareScrollView } from '../../components/ScreenKeyboardAwareScrollView';
 import { useAuth, UserRole } from '../../contexts/AuthContext';
-import { Feather } from '@expo/vector-icons';
+import { Feather } from '../../components/VectorIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RoomdrLogo } from '../../components/RoomdrLogo';
 

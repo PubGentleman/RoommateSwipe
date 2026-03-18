@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
+import { Feather } from './VectorIcons';
 import * as Haptics from 'expo-haptics';
 
 interface AIFloatingButtonProps {

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { View, StyleSheet, Pressable, ScrollView, TextInput } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather } from './VectorIcons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { ThemedText } from './ThemedText';
 import { useTheme } from '../hooks/useTheme';

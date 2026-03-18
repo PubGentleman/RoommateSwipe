@@ -14,7 +14,7 @@ import Animated, {
   FadeIn,
   FadeInDown,
 } from 'react-native-reanimated';
-import { Feather } from '@expo/vector-icons';
+import { Feather } from '../../components/VectorIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RoomdrLogo } from '../../components/RoomdrLogo';
 

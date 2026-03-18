@@ -6,7 +6,6 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useFonts } from "expo-font";
-import { Feather } from "@expo/vector-icons";
 import * as SplashScreen from "expo-splash-screen";
 
 import { RootNavigator } from "./navigation/RootNavigator";
@@ -24,7 +23,7 @@ SplashScreen.preventAutoHideAsync();
 
 export default function App() {
   const [fontsLoaded, fontError] = useFonts({
-    ...Feather.font,
+    'feather': require('./assets/fonts/Feather.ttf'),
   });
 
   useEffect(() => {

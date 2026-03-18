@@ -40,6 +40,12 @@
           }
         }
       ],
+      [
+        "expo-font",
+        {
+          "fonts": ["./assets/fonts/Feather.ttf"]
+        }
+      ],
       "expo-web-browser"
     ],
     "experiments": {

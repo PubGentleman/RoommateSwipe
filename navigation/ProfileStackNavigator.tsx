@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { Feather } from '@expo/vector-icons';
+import { Feather } from '../components/VectorIcons';
 import { ProfileScreen } from '../screens/shared/ProfileScreen';
 import { PaymentScreen } from '../screens/shared/PaymentScreen';
 import { PlansScreen } from '../screens/shared/PlansScreen';

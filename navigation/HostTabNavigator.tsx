@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Pressable, StyleSheet, Platform, Text } from 'react-native';
 import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { Feather } from '@expo/vector-icons';
+import { Feather } from '../components/VectorIcons';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HostDashboardScreen } from '../screens/host/HostDashboardScreen';

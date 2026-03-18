@@ -8,7 +8,7 @@ import {
   Text,
   Modal,
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { Feather } from './VectorIcons';
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, Pressable, Modal, Dimensions, ScrollView } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather } from './VectorIcons';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,

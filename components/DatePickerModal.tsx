@@ -7,7 +7,7 @@ import Animated, {
   useSharedValue, useAnimatedStyle, withSpring, withTiming,
   FadeIn, FadeOut, SlideInUp, SlideOutUp,
 } from 'react-native-reanimated';
-import { Feather } from '@expo/vector-icons';
+import { Feather } from './VectorIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { isAtLeast18 } from '../utils/dateUtils';
