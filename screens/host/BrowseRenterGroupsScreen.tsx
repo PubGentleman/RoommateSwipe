@@ -19,10 +19,14 @@ const ROOMDR_PURPLE = '#7B5EA7';
 
 interface RenterGroupCard {
   groupId: string;
+  name: string;
+  description: string;
   memberCount: number;
+  maxMembers: number;
   budgetMin: number;
   budgetMax: number;
   moveInDate: string;
+  location: string;
   neighborhoods: string[];
   lifestyleTags: string[];
   occupationTypes: string[];
@@ -75,10 +79,14 @@ export const BrowseRenterGroupsScreen = () => {
     setGroups([
       {
         groupId: 'group_mock_1',
+        name: 'Creative Roommates',
+        description: 'Artists, designers, and creative professionals seeking a collaborative living space',
         memberCount: 3,
+        maxMembers: 4,
         budgetMin: 2000,
         budgetMax: 2800,
         moveInDate: 'April 2026',
+        location: 'Williamsburg',
         neighborhoods: ['Brooklyn', 'Bushwick', 'Bed-Stuy'],
         lifestyleTags: ['Pet-friendly', 'Non-smoker', 'Remote work'],
         occupationTypes: ['Professional', 'Creative'],
@@ -86,10 +94,14 @@ export const BrowseRenterGroupsScreen = () => {
       },
       {
         groupId: 'group_mock_2',
+        name: 'Young Professionals',
+        description: 'Working professionals looking for a clean, quiet apartment near transit',
         memberCount: 2,
+        maxMembers: 3,
         budgetMin: 1500,
         budgetMax: 2200,
         moveInDate: 'May 2026',
+        location: 'Astoria',
         neighborhoods: ['Astoria', 'Long Island City'],
         lifestyleTags: ['Early riser', 'Clean', 'Social'],
         occupationTypes: ['Student', 'Professional'],
@@ -97,10 +109,14 @@ export const BrowseRenterGroupsScreen = () => {
       },
       {
         groupId: 'group_mock_3',
+        name: 'Manhattan Movers',
+        description: 'Finance and tech professionals seeking upscale shared living in Manhattan',
         memberCount: 4,
+        maxMembers: 4,
         budgetMin: 3000,
         budgetMax: 4000,
         moveInDate: 'March 2026',
+        location: 'Upper West Side',
         neighborhoods: ['Manhattan', 'Upper West Side', 'Harlem'],
         lifestyleTags: ['Quiet hours', 'Non-smoker', 'Professional'],
         occupationTypes: ['Professional', 'Finance'],
@@ -170,56 +186,75 @@ export const BrowseRenterGroupsScreen = () => {
 
   const renderGroup = ({ item }: { item: RenterGroupCard }) => {
     const alreadySent = sentRequests.includes(item.groupId);
+    const spotsLeft = item.maxMembers - item.memberCount;
 
     const memberColors = ['#7B5EA7', '#4A90E2', '#22c55e', '#ff6b5b', '#f59e0b'];
+    const gradients: [string, string][] = [['#667eea', '#764ba2'], ['#f093fb', '#f5576c'], ['#11998e', '#38ef7d'], ['#f6d365', '#fda085']];
     const memberLabels = Array.from({ length: item.memberCount }, (_, i) => ({
-      color: memberColors[i % memberColors.length],
+      gradient: gradients[i % gradients.length],
       label: String.fromCharCode(65 + i),
     }));
 
     return (
       <View style={styles.card}>
-        <View style={styles.avatarRow}>
-          {memberLabels.map((m, i) => (
+        <View style={styles.avatarCluster}>
+          {memberLabels.slice(0, 3).map((m, i) => (
             <View
               key={i}
-              style={[
-                styles.memberAvatar,
-                { backgroundColor: m.color, marginLeft: i > 0 ? -10 : 0, zIndex: memberLabels.length - i },
-              ]}
+              style={[styles.avatarWrap, i > 0 && { marginLeft: -18 }, { zIndex: memberLabels.length - i }]}
             >
-              <Text style={styles.memberAvatarText}>{m.label}</Text>
+              <LinearGradient colors={m.gradient} style={styles.avatarCircle}>
+                <Text style={styles.avatarLetter}>{m.label}</Text>
+              </LinearGradient>
             </View>
           ))}
-          <View style={styles.memberCountPill}>
-            <Feather name="users" size={11} color={PURPLE} />
-            <Text style={styles.memberCountText}>
-              {item.memberCount === 1 ? '1 person' : `${item.memberCount} people`}
-            </Text>
-          </View>
+          {spotsLeft > 0 ? (
+            <View style={[styles.avatarWrap, styles.avatarEmpty, { marginLeft: -18, zIndex: 0 }]}>
+              <Text style={styles.avatarPlus}>+</Text>
+            </View>
+          ) : null}
         </View>
 
-        <View style={styles.budgetRow}>
-          <Text style={styles.budget}>
-            ${item.budgetMin.toLocaleString()} – ${item.budgetMax.toLocaleString()}
-            <Text style={styles.budgetSuffix}>/mo</Text>
+        <View style={styles.memberCountRow}>
+          <Feather name="users" size={13} color="rgba(255,255,255,0.4)" />
+          <Text style={styles.memberCountText}>
+            {item.memberCount} of {item.maxMembers} members filled
           </Text>
-          <View style={styles.moveInPill}>
-            <Feather name="calendar" size={11} color="rgba(255,255,255,0.4)" />
-            <Text style={styles.moveInText}>{item.moveInDate}</Text>
+          {spotsLeft > 0 ? (
+            <View style={styles.spotPill}>
+              <Text style={styles.spotPillText}>{spotsLeft} left</Text>
+            </View>
+          ) : null}
+        </View>
+
+        <Text style={styles.groupName}>{item.name}</Text>
+
+        {item.description ? (
+          <Text style={styles.groupDesc} numberOfLines={2}>{item.description}</Text>
+        ) : null}
+
+        <View style={styles.statsRow}>
+          <View style={styles.statCard}>
+            <View style={[styles.statIcon, { backgroundColor: 'rgba(255,107,91,0.12)' }]}>
+              <Feather name="dollar-sign" size={16} color={ACCENT} />
+            </View>
+            <View>
+              <Text style={styles.statLabel}>BUDGET</Text>
+              <Text style={styles.statValue}>${item.budgetMin.toLocaleString()}/mo</Text>
+            </View>
+          </View>
+          <View style={styles.statCard}>
+            <View style={[styles.statIcon, { backgroundColor: 'rgba(255,107,91,0.12)' }]}>
+              <Feather name="map-pin" size={16} color={ACCENT} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.statLabel}>LOCATION</Text>
+              <Text style={styles.statValue} numberOfLines={1}>{item.location || item.neighborhoods[0] || 'Flexible'}</Text>
+            </View>
           </View>
         </View>
 
-        {item.neighborhoods.length > 0 ? (
-          <View style={styles.chipsRow}>
-            {item.neighborhoods.slice(0, 3).map(n => (
-              <View key={n} style={styles.neighborhoodChip}>
-                <Feather name="map-pin" size={10} color="rgba(255,255,255,0.45)" />
-                <Text style={styles.neighborhoodText}>{n}</Text>
-              </View>
-            ))}
-          </View>
-        ) : null}
+        <View style={styles.cardDivider} />
 
         {item.lifestyleTags.length > 0 ? (
           <View style={styles.chipsRow}>
@@ -231,18 +266,12 @@ export const BrowseRenterGroupsScreen = () => {
           </View>
         ) : null}
 
-        {item.occupationTypes.length > 0 ? (
-          <View style={styles.occupationRow}>
-            {item.occupationTypes.map(o => (
-              <View key={o} style={styles.occupationChip}>
-                <Feather name="briefcase" size={10} color="rgba(255,255,255,0.35)" />
-                <Text style={styles.occupationText}>{o}</Text>
-              </View>
-            ))}
+        {item.moveInDate ? (
+          <View style={styles.moveInRow}>
+            <Feather name="calendar" size={12} color="rgba(255,255,255,0.35)" />
+            <Text style={styles.moveInText}>Move-in: {item.moveInDate}</Text>
           </View>
         ) : null}
-
-        <View style={styles.cardDivider} />
 
         <Pressable
           style={[styles.ctaButton, alreadySent ? styles.ctaButtonSent : null]}
@@ -385,75 +414,103 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: CARD_BG,
     borderRadius: 20,
-    padding: 18,
+    padding: 20,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.07)',
-    marginBottom: 14,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 3,
+    marginBottom: 16,
   },
 
-  avatarRow: {
+  avatarCluster: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  memberAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: CARD_BG,
-  },
-  memberAvatarText: { fontSize: 13, fontWeight: '800', color: '#fff' },
-  memberCountPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(123,94,167,0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(123,94,167,0.25)',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    marginLeft: 14,
-  },
-  memberCountText: { fontSize: 12, fontWeight: '600', color: PURPLE },
-
-  budgetRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     marginBottom: 14,
   },
-  budget: { fontSize: 24, fontWeight: '800', color: '#fff' },
-  budgetSuffix: { fontSize: 15, fontWeight: '500', color: 'rgba(255,255,255,0.5)' },
-  moveInPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+  avatarWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 3,
+    borderColor: CARD_BG,
   },
-  moveInText: { fontSize: 12, color: 'rgba(255,255,255,0.45)' },
+  avatarCircle: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarLetter: { fontSize: 22, fontWeight: '800', color: '#fff' },
+  avatarEmpty: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderStyle: 'dashed',
+    borderColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarPlus: { fontSize: 22, fontWeight: '600', color: 'rgba(255,255,255,0.3)' },
 
-  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
-  neighborhoodChip: {
+  memberCountRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 8,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
+    justifyContent: 'center',
+    gap: 6,
+    marginBottom: 10,
   },
-  neighborhoodText: { fontSize: 12, color: 'rgba(255,255,255,0.55)' },
+  memberCountText: { fontSize: 13, color: 'rgba(255,255,255,0.45)' },
+  spotPill: {
+    backgroundColor: 'rgba(34,197,94,0.12)',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  spotPillText: { fontSize: 11, fontWeight: '700', color: '#22c55e' },
+
+  groupName: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  groupDesc: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.5)',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 16,
+    paddingHorizontal: 8,
+  },
+
+  statsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 14,
+  },
+  statCard: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  statIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statLabel: { fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.35)', letterSpacing: 0.5 },
+  statValue: { fontSize: 14, fontWeight: '700', color: '#fff', marginTop: 1 },
+
+  cardDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.06)', marginBottom: 14 },
+
+  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
   lifestyleChip: {
     backgroundColor: 'rgba(123,94,167,0.12)',
     borderWidth: 1,
@@ -463,11 +520,14 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   lifestyleText: { fontSize: 12, fontWeight: '500', color: PURPLE },
-  occupationRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 4 },
-  occupationChip: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  occupationText: { fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: '500' },
 
-  cardDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.06)', marginVertical: 14 },
+  moveInRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 14,
+  },
+  moveInText: { fontSize: 12, color: 'rgba(255,255,255,0.4)' },
 
   ctaButton: { borderRadius: 14, overflow: 'hidden' },
   ctaButtonSent: {

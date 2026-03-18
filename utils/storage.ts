@@ -275,10 +275,14 @@ export const StorageService = {
         .filter(g => !g.isArchived)
         .map(g => ({
           groupId: g.id,
+          name: g.name || 'Roommate Group',
+          description: g.description || '',
           memberCount: g.members?.length || 2,
+          maxMembers: g.maxMembers || 4,
           budgetMin: (g as any).budgetMin ?? (g as any).budget_min ?? 1500,
           budgetMax: (g as any).budgetMax ?? (g as any).budget_max ?? 2500,
           moveInDate: (g as any).moveInDate ?? (g as any).move_in_date ?? 'Flexible',
+          location: g.preferredLocation || g.city || '',
           neighborhoods: (g as any).neighborhoods ?? [],
           lifestyleTags: (g as any).lifestyleTags ?? (g as any).lifestyle_tags ?? [],
           occupationTypes: (g as any).occupationTypes ?? (g as any).occupation_types ?? [],

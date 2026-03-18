@@ -1,0 +1,138 @@
+# Prompt: Group Host Visibility — Auto-Visible with Disclosure
+
+## Context
+All `roommate` type groups should be automatically visible to hosts. No opt-in toggle is needed — renters creating a group are actively looking for a place to live, so being discoverable by hosts serves their own goal. The separation between group types already handles privacy correctly:
+- `roommate` groups → always visible to hosts
+- `listing_inquiry` groups → always private (between a renter group and a specific host)
+
+This prompt does three things:
+1. Ensures `is_visible_to_hosts: true` is always set when a `roommate` group is created
+2. Ensures the host browse query correctly filters for `is_visible_to_hosts = true`
+3. Adds a short disclosure line in the group creation UI so renters know hosts can find them
+
+---
+
+## Step 1 — Update `types/models.ts`
+
+Find the `Group` interface/type and add:
+```ts
+is_visible_to_hosts?: boolean;
+```
+
+---
+
+## Step 2 — Update `services/groupService.ts`
+
+### 2a. Add `is_visible_to_hosts` to the `GroupData` interface
+```ts
+is_visible_to_hosts?: boolean;
+```
+
+### 2b. In `createGroup()`, always set `is_visible_to_hosts: true` for roommate groups
+
+In the `.insert()` call, add the field explicitly:
+```ts
+const { data, error } = await supabase
+  .from('groups')
+  .insert({
+    created_by: user.id,
+    type: group.type || 'roommate',
+    is_visible_to_hosts: group.type === 'listing_inquiry' ? false : true,
+    ...group,
+  })
+```
+
+This ensures:
+- `roommate` groups → always `is_visible_to_hosts: true`
+- `listing_inquiry` groups → always `is_visible_to_hosts: false`
+
+### 2c. Update the host browse query
+
+Find the Supabase query used to fetch groups for hosts (in `getGroups` or a similar function). Add:
+```ts
+.eq('is_visible_to_hosts', true)
+.eq('type', 'roommate')
+```
+
+Both filters should be present to guarantee hosts only see roommate groups that are explicitly marked visible.
+
+---
+
+## Step 3 — Update `StorageService.getVisibleRenterGroups()` in `utils/storage.ts`
+
+Find this method and update its filter:
+```ts
+return groups.filter(g =>
+  g.type === 'roommate' &&
+  g.is_visible_to_hosts !== false  // treat undefined as true for backward compat
+);
+```
+
+---
+
+## Step 4 — Add disclosure text in `screens/shared/CreateGroupScreen.tsx`
+
+No toggle is needed. Just add a single informational line below the Max Members field, inside `<View style={styles.form}>`:
+
+```tsx
+<View style={styles.disclosureRow}>
+  <Feather name="eye" size={13} color="rgba(255,255,255,0.3)" />
+  <ThemedText style={styles.disclosureText}>
+    Your group will be discoverable by hosts with listings in your area.
+  </ThemedText>
+</View>
+```
+
+Add styles:
+```tsx
+disclosureRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 8,
+  backgroundColor: 'rgba(255,255,255,0.04)',
+  borderRadius: 10,
+  paddingHorizontal: 12,
+  paddingVertical: 10,
+},
+disclosureText: {
+  fontSize: 12,
+  color: 'rgba(255,255,255,0.35)',
+  flex: 1,
+  lineHeight: 17,
+},
+```
+
+---
+
+## Step 5 — Add the same disclosure in `screens/renter/GroupsScreen.tsx` create tab
+
+Find the inline create form (inside the `'create'` tab render). After the last form field, add the same disclosure row:
+
+```tsx
+<View style={{
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 8,
+  backgroundColor: 'rgba(255,255,255,0.04)',
+  borderRadius: 10,
+  paddingHorizontal: 12,
+  paddingVertical: 10,
+  marginTop: 12,
+}}>
+  <Feather name="eye" size={13} color="rgba(255,255,255,0.3)" />
+  <ThemedText style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', flex: 1, lineHeight: 17 }}>
+    Your group will be discoverable by hosts with listings in your area.
+  </ThemedText>
+</View>
+```
+
+Also make sure the `createGroupSupabase` call in this screen does NOT pass `is_visible_to_hosts` — let the service layer handle it automatically based on type.
+
+---
+
+## What NOT to Change
+- No visibility toggle of any kind — hosts always see all roommate groups
+- `listing_inquiry` group creation — those remain private
+- Swipe, join, leave logic on the renter side
+- Any existing group data (treat missing flag as `true` for backward compat)
+- Navigation or auth logic in either screen
