@@ -1436,6 +1436,22 @@ export const GroupsScreen = () => {
           ) : null}
         </View>
 
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+          backgroundColor: 'rgba(255,255,255,0.04)',
+          borderRadius: 10,
+          paddingHorizontal: 12,
+          paddingVertical: 10,
+          marginTop: 12,
+        }}>
+          <Feather name="eye" size={13} color="rgba(255,255,255,0.3)" />
+          <ThemedText style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', flex: 1, lineHeight: 17 }}>
+            Your group will be discoverable by hosts with listings in your area.
+          </ThemedText>
+        </View>
+
         <Pressable
           style={[styles.createButton, { backgroundColor: theme.primary }]}
           onPress={handleCreateGroup}

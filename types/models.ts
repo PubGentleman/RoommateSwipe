@@ -156,6 +156,7 @@ export interface Group {
   hostId?: string;
   listingAddress?: string;
   isArchived: boolean;
+  is_visible_to_hosts?: boolean;
   hostName?: string;
   memberCount?: number;
   inquiryStatus?: 'pending' | 'accepted' | 'declined';

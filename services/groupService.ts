@@ -16,6 +16,7 @@ export interface GroupData {
   host_id?: string;
   listing_address?: string;
   is_archived?: boolean;
+  is_visible_to_hosts?: boolean;
   address_revealed?: boolean;
   inquiry_status?: 'pending' | 'accepted' | 'declined';
 }
@@ -101,6 +102,7 @@ export async function createGroup(group: GroupData) {
     .insert({
       created_by: user.id,
       type: group.type || 'roommate',
+      is_visible_to_hosts: group.type === 'listing_inquiry' ? false : true,
       ...group,
     })
     .select()

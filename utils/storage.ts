@@ -270,7 +270,10 @@ export const StorageService = {
   async getVisibleRenterGroups(): Promise<any[]> {
     try {
       const groups = await this.getGroups();
-      const roommateGroups = groups.filter(g => !g.type || g.type === 'roommate');
+      const roommateGroups = groups.filter(g =>
+        (g.type === 'roommate' || !g.type) &&
+        (g as any).is_visible_to_hosts !== false
+      );
       return roommateGroups
         .filter(g => !g.isArchived)
         .map(g => ({
