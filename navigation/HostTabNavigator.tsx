@@ -90,15 +90,15 @@ function HostCustomTabBar({ state, descriptors, navigation }: BottomTabBarProps)
   return (
     <View style={[hostTabStyles.wrapper, { paddingBottom: insets.bottom }]}>
       {Platform.OS === 'ios' ? (
-        <BlurView intensity={100} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
+        <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFill} />
       ) : (
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.backgroundRoot }]} />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: '#1A1A1A' }]} />
       )}
       <View style={hostTabStyles.container}>
         {state.routes.map((route, index) => {
           const isFocused = state.index === index;
           const config = HOST_TAB_CONFIG[route.name] || { icon: 'circle', label: route.name };
-          const color = isFocused ? theme.tabIconSelected : theme.tabIconDefault;
+          const color = isFocused ? '#ff6b5b' : '#A0A0A0';
           const showBadge = (route.name === 'Profile' || route.name === 'Messages') && unreadCount > 0;
 
           const onPress = () => {

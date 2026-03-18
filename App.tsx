@@ -1,10 +1,13 @@
-import React, { useEffect } from "react";
-import { StyleSheet } from "react-native";
+import React, { useEffect, useCallback } from "react";
+import { StyleSheet, View, ActivityIndicator } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
+import { useFonts } from "expo-font";
+import * as SplashScreen from "expo-splash-screen";
+import { Feather, MaterialIcons, Ionicons } from "@expo/vector-icons";
 
 import { RootNavigator } from "./navigation/RootNavigator";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -17,7 +20,21 @@ import { StorageService } from "./utils/storage";
 import { isDev } from "./utils/dataUtils";
 import { checkDailyTrigger } from "./utils/insightRefresh";
 
+SplashScreen.preventAutoHideAsync().catch(() => {});
+
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    ...Feather.font,
+    ...MaterialIcons.font,
+    ...Ionicons.font,
+  });
+
+  const onLayoutRootView = useCallback(async () => {
+    if (fontsLoaded) {
+      await SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded]);
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       if (isDev) {
@@ -38,11 +55,19 @@ export default function App() {
     checkDailyTrigger();
   }, []);
 
+  if (!fontsLoaded) {
+    return (
+      <View style={styles.loading}>
+        <ActivityIndicator size="large" color="#ff6b5b" />
+      </View>
+    );
+  }
+
   return (
     <ErrorBoundary>
       <StripeWrapper>
         <SafeAreaProvider>
-          <GestureHandlerRootView style={styles.root}>
+          <GestureHandlerRootView style={styles.root} onLayout={onLayoutRootView}>
             <KeyboardProvider>
               <AuthProvider>
                 <CityProvider>
@@ -51,7 +76,7 @@ export default function App() {
                       <NavigationContainer>
                         <RootNavigator />
                       </NavigationContainer>
-                      <StatusBar style="auto" />
+                      <StatusBar style="light" />
                     </NotificationProvider>
                   </ProfileReminderProvider>
                 </CityProvider>
@@ -67,5 +92,11 @@ export default function App() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+  },
+  loading: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#111',
   },
 });
