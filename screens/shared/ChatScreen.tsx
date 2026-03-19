@@ -711,6 +711,21 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
               <Feather name="cpu" size={16} color="#FFFFFF" />
             </View>
           </Pressable>
+          {conversationId.startsWith('group-') ? (
+            <Pressable
+              onPress={() => {
+                const groupId = conversationId.replace('group-', '');
+                navigation.navigate('GroupInvite', {
+                  groupId,
+                  groupName: otherUser?.name || 'Group',
+                  listingId: linkedListing?.id || null,
+                });
+              }}
+              style={styles.moreButton}
+            >
+              <Feather name="user-plus" size={22} color={theme.primary} />
+            </Pressable>
+          ) : null}
           <Pressable onPress={() => {
             Alert.alert(
               'Options',

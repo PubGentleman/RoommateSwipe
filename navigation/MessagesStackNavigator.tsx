@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { MessagesScreen } from '../screens/shared/MessagesScreen';
 import { ChatScreen } from '../screens/shared/ChatScreen';
 import { CreateGroupScreen } from '../screens/shared/CreateGroupScreen';
+import { GroupInviteScreen } from '../screens/shared/GroupInviteScreen';
 import { RoommateProfile } from '../types/models';
 
 export type MessagesStackParamList = {
@@ -17,6 +18,11 @@ export type MessagesStackParamList = {
     matchedUserName?: string;
     preselectedListingId?: string;
   };
+  GroupInvite: {
+    groupId: string;
+    groupName: string;
+    listingId?: string | null;
+  };
 };
 
 const Stack = createNativeStackNavigator<MessagesStackParamList>();
@@ -27,6 +33,7 @@ export const MessagesStackNavigator = () => {
       <Stack.Screen name="MessagesList" component={MessagesScreen} />
       <Stack.Screen name="Chat" component={ChatScreen} />
       <Stack.Screen name="CreateGroup" component={CreateGroupScreen} />
+      <Stack.Screen name="GroupInvite" component={GroupInviteScreen} />
     </Stack.Navigator>
   );
 };

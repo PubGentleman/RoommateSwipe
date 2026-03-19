@@ -9,7 +9,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { Group, RoommateProfile, GroupType } from '../../types/models';
 import { StorageService } from '../../utils/storage';
-import { getGroups as getGroupsFromSupabase, getMyGroups as getMyGroupsFromSupabase, getMyInquiryGroups as getMyInquiryGroupsFromSupabase, joinGroup as joinGroupSupabase, leaveGroup as leaveGroupSupabase, createGroup as createGroupSupabase, archiveGroup as archiveGroupSupabase, getGroupLimit, getMemberLimit } from '../../services/groupService';
+import { getGroups as getGroupsFromSupabase, getMyGroups as getMyGroupsFromSupabase, getMyInquiryGroups as getMyInquiryGroupsFromSupabase, joinGroup as joinGroupSupabase, leaveGroup as leaveGroupSupabase, createGroup as createGroupSupabase, archiveGroup as archiveGroupSupabase, getGroupLimit, getMemberLimit, getMyPendingInvites, respondToInvite, joinGroupByCode } from '../../services/groupService';
 import { getMyListings } from '../../services/listingService';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -59,6 +59,8 @@ export const GroupsScreen = () => {
   const [inquiryGroups, setInquiryGroups] = useState<any[]>([]);
   const [showPastInquiries, setShowPastInquiries] = useState(false);
   const [pendingInvites, setPendingInvites] = useState<any[]>([]);
+  const [codeInput, setCodeInput] = useState('');
+  const [joiningByCode, setJoiningByCode] = useState(false);
 
   const [groupName, setGroupName] = useState('');
   const [groupDescription, setGroupDescription] = useState('');
@@ -75,7 +77,11 @@ export const GroupsScreen = () => {
     React.useCallback(() => {
       loadGroups();
       if (user) {
-        StorageService.getPendingGroupInvites(user.id).then(setPendingInvites);
+        getMyPendingInvites()
+          .then(setPendingInvites)
+          .catch(() => {
+            StorageService.getPendingGroupInvites(user.id).then(setPendingInvites).catch(() => {});
+          });
       }
       if (user?.role === 'host') {
         getMyListings().then(setHostListings).catch(() => {});
@@ -570,13 +576,11 @@ export const GroupsScreen = () => {
 
   const handleAcceptInvite = async (invite: any) => {
     try {
-      const result = await StorageService.respondToGroupInvite(invite.id, true);
-      if (result) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        Alert.alert('Joined!', `You have joined "${invite.groupName}".`);
-        setPendingInvites(prev => prev.filter(i => i.id !== invite.id));
-        await loadGroups();
-      }
+      await respondToInvite(invite.id, 'accepted');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('Joined!', `You have joined "${invite.groupName}".`);
+      setPendingInvites(prev => prev.filter(i => i.id !== invite.id));
+      await loadGroups();
     } catch {
       Alert.alert('Error', 'Could not accept invite. Try again.');
     }
@@ -584,10 +588,30 @@ export const GroupsScreen = () => {
 
   const handleDeclineInvite = async (invite: any) => {
     try {
-      await StorageService.respondToGroupInvite(invite.id, false);
+      await respondToInvite(invite.id, 'declined');
       setPendingInvites(prev => prev.filter(i => i.id !== invite.id));
     } catch {
       Alert.alert('Error', 'Could not decline invite. Try again.');
+    }
+  };
+
+  const handleJoinByCode = async () => {
+    if (codeInput.trim().length < 6) {
+      Alert.alert('Invalid Code', 'Please enter a 6-character invite code.');
+      return;
+    }
+    setJoiningByCode(true);
+    try {
+      const { groupId, groupName: joinedName } = await joinGroupByCode(codeInput.trim());
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('Joined!', `You have joined "${joinedName}".`);
+      setCodeInput('');
+      await loadGroups();
+      setActiveTab('my-groups');
+    } catch (err: any) {
+      Alert.alert('Could Not Join', err.message);
+    } finally {
+      setJoiningByCode(false);
     }
   };
 
@@ -984,7 +1008,9 @@ export const GroupsScreen = () => {
                     <Feather name="users" size={16} color="#ff6b5b" />
                     <View style={{ marginLeft: 10, flex: 1 }}>
                       <ThemedText style={styles.inviteGroupName}>{invite.groupName}</ThemedText>
-                      <ThemedText style={styles.inviteFrom}>Invited by {invite.invitedByName}</ThemedText>
+                      <ThemedText style={styles.inviteFrom}>
+                        Invited by {invite.invitedByName}{invite.listingTitle ? ` · ${invite.listingTitle}` : ''}
+                      </ThemedText>
                     </View>
                   </View>
                   <View style={styles.inviteActions}>
@@ -1005,6 +1031,28 @@ export const GroupsScreen = () => {
               ))}
             </View>
           ) : null}
+
+          <View style={[styles.codeEntry, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <TextInput
+              style={[styles.codeEntryInput, { color: theme.text }]}
+              placeholder="Enter invite code..."
+              placeholderTextColor={theme.textSecondary}
+              value={codeInput}
+              onChangeText={text => setCodeInput(text.toUpperCase())}
+              maxLength={6}
+              autoCapitalize="characters"
+            />
+            <Pressable
+              style={[styles.codeEntryBtn, { backgroundColor: theme.primary, opacity: joiningByCode ? 0.6 : 1 }]}
+              onPress={handleJoinByCode}
+              disabled={joiningByCode}
+            >
+              {joiningByCode
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <ThemedText style={[Typography.small, { color: '#fff', fontWeight: '700' }]}>Join</ThemedText>
+              }
+            </Pressable>
+          </View>
 
           <View style={styles.sectionHeader}>
             <Feather name="users" size={16} color="#ff6b5b" />
@@ -2634,5 +2682,29 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.5)',
     fontWeight: '600',
     fontSize: 13,
+  },
+  codeEntry: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: Spacing.md,
+    marginBottom: Spacing.md,
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  codeEntryInput: {
+    flex: 1,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 12,
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: 2,
+  },
+  codeEntryBtn: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 60,
   },
 });

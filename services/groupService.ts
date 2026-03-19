@@ -539,6 +539,296 @@ export function getMemberLimit(plan: string): number {
   return limits[plan] || 3;
 }
 
+// ─── METHOD A: Invite from Matches ───────────────────────────────────────────
+
+export async function getInvitableMates(groupId: string): Promise<{
+  id: string;
+  name: string;
+  photo?: string;
+  alreadyInGroup: boolean;
+  alreadyInvited: boolean;
+}[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: conversations } = await supabase
+    .from('conversations')
+    .select('participant_ids')
+    .contains('participant_ids', [user.id]);
+
+  if (!conversations?.length) return [];
+
+  const userIds = [...new Set(
+    conversations.flatMap((c: any) => c.participant_ids)
+  )].filter(id => id !== user.id);
+
+  if (!userIds.length) return [];
+
+  const { data: profiles } = await supabase
+    .from('users')
+    .select('id, full_name, avatar_url')
+    .in('id', userIds);
+
+  const { data: members } = await supabase
+    .from('group_members')
+    .select('user_id')
+    .eq('group_id', groupId);
+
+  const { data: pendingInvites } = await supabase
+    .from('group_invites')
+    .select('invited_user_id')
+    .eq('group_id', groupId)
+    .eq('status', 'pending');
+
+  const memberIds = new Set((members || []).map((m: any) => m.user_id));
+  const invitedIds = new Set((pendingInvites || []).map((i: any) => i.invited_user_id));
+
+  return (profiles || []).map((p: any) => ({
+    id: p.id,
+    name: p.full_name || 'Unknown',
+    photo: p.avatar_url,
+    alreadyInGroup: memberIds.has(p.id),
+    alreadyInvited: invitedIds.has(p.id),
+  }));
+}
+
+export async function sendGroupInvite(groupId: string, invitedUserId: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { data: group } = await supabase
+    .from('groups')
+    .select('created_by')
+    .eq('id', groupId)
+    .single();
+
+  const { data: memberData } = await supabase
+    .from('group_members')
+    .select('user_id')
+    .eq('group_id', groupId);
+
+  const creatorPlan = await getUserPlan(group?.created_by);
+  const limit = getMemberLimit(creatorPlan);
+
+  if ((memberData?.length || 0) >= limit) {
+    throw new Error(`This group has reached its member limit of ${limit}.`);
+  }
+
+  const { error } = await supabase.from('group_invites').insert({
+    group_id: groupId,
+    invited_by: user.id,
+    invited_user_id: invitedUserId,
+    status: 'pending',
+  });
+  if (error && error.code !== '23505') throw error;
+}
+
+export async function respondToInvite(
+  inviteId: string,
+  response: 'accepted' | 'declined'
+): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { data: invite } = await supabase
+    .from('group_invites')
+    .update({ status: response })
+    .eq('id', inviteId)
+    .eq('invited_user_id', user.id)
+    .select()
+    .single();
+
+  if (response === 'accepted' && invite) {
+    const { data: group } = await supabase
+      .from('groups')
+      .select('created_by')
+      .eq('id', invite.group_id)
+      .single();
+
+    const { data: memberData } = await supabase
+      .from('group_members')
+      .select('user_id')
+      .eq('group_id', invite.group_id);
+
+    const creatorPlan = await getUserPlan(group?.created_by);
+    const limit = getMemberLimit(creatorPlan);
+
+    if ((memberData?.length || 0) >= limit) {
+      await supabase
+        .from('group_invites')
+        .update({ status: 'pending' })
+        .eq('id', inviteId);
+      throw new Error(`This group is full (${limit} member limit).`);
+    }
+
+    await supabase.from('group_members').insert({
+      group_id: invite.group_id,
+      user_id: user.id,
+      role: 'member',
+    });
+  }
+}
+
+export async function getMyPendingInvites(): Promise<{
+  id: string;
+  groupId: string;
+  groupName: string;
+  invitedByName: string;
+  listingTitle?: string;
+  createdAt: string;
+}[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from('group_invites')
+    .select(`
+      id, created_at, group_id,
+      groups ( name, listings ( title ) ),
+      inviter:users!invited_by ( full_name )
+    `)
+    .eq('invited_user_id', user.id)
+    .eq('status', 'pending');
+
+  if (error) throw error;
+
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    groupId: row.group_id,
+    groupName: row.groups?.name || 'Unknown Group',
+    invitedByName: row.inviter?.full_name || 'Someone',
+    listingTitle: row.groups?.listings?.title,
+    createdAt: row.created_at,
+  }));
+}
+
+// ─── METHOD C: Shareable Invite Code ─────────────────────────────────────────
+
+function generateInviteCode(): string {
+  return Math.random().toString(36).substring(2, 8).toUpperCase();
+}
+
+export async function getInviteCode(groupId: string): Promise<string> {
+  const { data: group } = await supabase
+    .from('groups')
+    .select('invite_code, invite_code_enabled')
+    .eq('id', groupId)
+    .single();
+
+  if (group?.invite_code && group.invite_code_enabled) {
+    return group.invite_code;
+  }
+
+  const code = generateInviteCode();
+  await supabase
+    .from('groups')
+    .update({ invite_code: code, invite_code_enabled: true })
+    .eq('id', groupId);
+
+  return code;
+}
+
+export async function regenerateInviteCode(groupId: string): Promise<string> {
+  const code = generateInviteCode();
+  await supabase
+    .from('groups')
+    .update({ invite_code: code, invite_code_enabled: true })
+    .eq('id', groupId);
+  return code;
+}
+
+export async function disableInviteCode(groupId: string): Promise<void> {
+  await supabase
+    .from('groups')
+    .update({ invite_code_enabled: false })
+    .eq('id', groupId);
+}
+
+export async function joinGroupByCode(code: string): Promise<{ groupId: string; groupName: string }> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { data: group } = await supabase
+    .from('groups')
+    .select('id, name, invite_code_enabled, created_by')
+    .eq('invite_code', code.toUpperCase())
+    .single();
+
+  if (!group) throw new Error('Invalid invite code. Please check and try again.');
+  if (!group.invite_code_enabled) throw new Error('This invite link has been disabled.');
+
+  const { data: existing } = await supabase
+    .from('group_members')
+    .select('id')
+    .eq('group_id', group.id)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (existing) throw new Error('You are already in this group.');
+
+  const { data: memberData } = await supabase
+    .from('group_members')
+    .select('user_id')
+    .eq('group_id', group.id);
+
+  const creatorPlan = await getUserPlan(group.created_by);
+  const limit = getMemberLimit(creatorPlan);
+
+  if ((memberData?.length || 0) >= limit) {
+    throw new Error(`This group is full (${limit} member limit).`);
+  }
+
+  const { error } = await supabase.from('group_members').insert({
+    group_id: group.id,
+    user_id: user.id,
+    role: 'member',
+  });
+  if (error) throw error;
+
+  return { groupId: group.id, groupName: group.name };
+}
+
+// ─── METHOD D: Host Invites from Listing Interest ────────────────────────────
+
+export async function getRentersInterestedInListing(listingId: string): Promise<{
+  id: string;
+  name: string;
+  photo?: string;
+  interestedAt: string;
+}[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from('interest_cards')
+    .select(`
+      created_at,
+      renter:users!renter_id ( id, full_name, avatar_url )
+    `)
+    .eq('listing_id', listingId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+
+  return (data || []).map((row: any) => ({
+    id: row.renter?.id,
+    name: row.renter?.full_name || 'Unknown',
+    photo: row.renter?.avatar_url,
+    interestedAt: row.created_at,
+  })).filter((r: any) => r.id);
+}
+
+// ─── HELPER ──────────────────────────────────────────────────────────────────
+
+async function getUserPlan(userId: string): Promise<string> {
+  const { data } = await supabase
+    .from('subscriptions')
+    .select('plan')
+    .eq('user_id', userId)
+    .maybeSingle();
+  return data?.plan || 'basic';
+}
+
 export async function getGroupWithListing(groupId: string) {
   const { data, error } = await supabase
     .from('groups')
