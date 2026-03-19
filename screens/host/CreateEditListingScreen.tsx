@@ -16,6 +16,7 @@ import { createListing as createListingSupa, updateListing as updateListingSupa,
 import { DatePickerModal } from '../../components/DatePickerModal';
 import { formatDate } from '../../utils/dateUtils';
 import { geocodeAddress, fetchNearbyTransit } from '../../utils/transitService';
+import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 
 type RouteParams = {
   CreateEditListing: { propertyId?: string };
@@ -78,6 +79,16 @@ export const CreateEditListingScreen = () => {
   const [houseRules, setHouseRules] = useState('');
   const [photos, setPhotos] = useState<string[]>([]);
   const [transitOverride, setTransitOverride] = useState('');
+  const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null);
+  const [addressFromAutocomplete, setAddressFromAutocomplete] = useState(false);
+
+  const handleManualAddressChange = useCallback((text: string) => {
+    setAddress(text);
+    if (addressFromAutocomplete) {
+      setCoordinates(null);
+      setAddressFromAutocomplete(false);
+    }
+  }, [addressFromAutocomplete]);
   const [saving, setSaving] = useState(false);
   const [showLimitModal, setShowLimitModal] = useState(false);
   const [showOverageModal, setShowOverageModal] = useState(false);
@@ -117,6 +128,7 @@ export const CreateEditListingScreen = () => {
           amenities: supaListing.amenities || [],
           photos: supaListing.photos || [],
           transitInfo: supaListing.transit_info || undefined,
+          coordinates: supaListing.coordinates || undefined,
         };
       }
     } catch {
@@ -145,6 +157,9 @@ export const CreateEditListingScreen = () => {
     setPhotos(prop.photos);
     if (prop.transitInfo?.manualOverride) {
       setTransitOverride(prop.transitInfo.manualOverride);
+    }
+    if (prop.coordinates) {
+      setCoordinates(prop.coordinates);
     }
 
     const descParts = prop.description.split('\n\nSecurity Deposit:');
@@ -216,12 +231,15 @@ export const CreateEditListingScreen = () => {
       }
 
       let transitInfo: any = undefined;
-      let coordinates: any = undefined;
+      let savedCoords: any = undefined;
       try {
         const override = transitOverride.trim() || undefined;
-        const coords = await geocodeAddress(address.trim(), city.trim(), state.trim());
+        let coords = coordinates;
+        if (!coords) {
+          coords = await geocodeAddress(address.trim(), city.trim(), state.trim());
+        }
         if (coords) {
-          coordinates = coords;
+          savedCoords = coords;
           const stops = await fetchNearbyTransit(coords.lat, coords.lng);
           transitInfo = {
             stops,
@@ -259,7 +277,7 @@ export const CreateEditListingScreen = () => {
         is_paused: false,
         is_rented: false,
       };
-      if (coordinates) supaData.coordinates = coordinates;
+      if (savedCoords) supaData.coordinates = savedCoords;
       if (transitInfo) supaData.transit_info = transitInfo;
 
       try {
@@ -290,7 +308,7 @@ export const CreateEditListingScreen = () => {
           hostId: user?.id || '',
           hostName: user?.name || '',
           hostProfileId: user?.id,
-          coordinates,
+          coordinates: savedCoords,
           transitInfo,
         };
         await StorageService.addOrUpdateProperty(property);
@@ -610,14 +628,85 @@ export const CreateEditListingScreen = () => {
           />
         </View>
 
-        <View style={styles.fieldContainer}>
+        <View style={[styles.fieldContainer, { zIndex: 1000 }]}>
           <ThemedText style={styles.label}>Address</ThemedText>
-          <TextInput
-            style={styles.input}
-            value={address}
-            onChangeText={setAddress}
-            placeholder="123 Main St"
-            placeholderTextColor="#666"
+          <GooglePlacesAutocomplete
+            placeholder="Start typing your address..."
+            fetchDetails={true}
+            onPress={(data: any, details: any = null) => {
+              if (!details) return;
+              const components = details.address_components;
+              const getComponent = (type: string) =>
+                components.find((c: any) => c.types.includes(type));
+              const streetNumber = getComponent('street_number')?.long_name || '';
+              const streetName = getComponent('route')?.long_name || '';
+              const cityName =
+                getComponent('locality')?.long_name ||
+                getComponent('sublocality')?.long_name ||
+                getComponent('administrative_area_level_2')?.long_name || '';
+              const stateName =
+                getComponent('administrative_area_level_1')?.short_name || '';
+              const neighborhoodName =
+                getComponent('neighborhood')?.long_name ||
+                getComponent('sublocality_level_1')?.long_name || '';
+              setAddress(`${streetNumber} ${streetName}`.trim());
+              setCity(cityName);
+              setState(stateName);
+              if (neighborhoodName) setNeighborhood(neighborhoodName);
+              const loc = details.geometry.location;
+              setCoordinates({ lat: loc.lat, lng: loc.lng });
+              setAddressFromAutocomplete(true);
+            }}
+            query={{
+              key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
+              language: 'en',
+              types: 'address',
+            }}
+            textInputProps={{
+              value: address,
+              onChangeText: handleManualAddressChange,
+              placeholderTextColor: '#666',
+            }}
+            styles={{
+              container: { flex: 0 },
+              textInput: {
+                height: 50,
+                backgroundColor: '#1c1c1c',
+                borderWidth: 1,
+                borderColor: '#333',
+                borderRadius: 12,
+                paddingHorizontal: 16,
+                fontSize: 15,
+                color: '#fff',
+              },
+              listView: {
+                backgroundColor: '#1a1a1a',
+                borderWidth: 1,
+                borderColor: '#333',
+                borderRadius: 12,
+                marginTop: 4,
+                zIndex: 1000,
+              },
+              row: {
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                backgroundColor: '#1a1a1a',
+              },
+              description: {
+                fontSize: 14,
+                color: '#ccc',
+              },
+              separator: {
+                height: 1,
+                backgroundColor: '#333',
+              },
+            }}
+            enablePoweredByContainer={false}
+            minLength={3}
+            debounce={300}
+            keyboardShouldPersistTaps="handled"
+            onFail={(error: any) => console.warn('Places autocomplete error:', error)}
+            onNotFound={() => {}}
           />
         </View>
 

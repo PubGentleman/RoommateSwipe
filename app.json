@@ -10,10 +10,18 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.roomdr.app"
+      "bundleIdentifier": "com.roomdr.app",
+      "config": {
+        "googleMapsApiKey": "${EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}"
+      }
     },
     "android": {
       "package": "com.roomdr.app",
+      "config": {
+        "googleMaps": {
+          "apiKey": "${EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}"
+        }
+      },
       "adaptiveIcon": {
         "backgroundColor": "#FF6B6B",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

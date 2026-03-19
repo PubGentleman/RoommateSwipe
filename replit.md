@@ -39,6 +39,7 @@ Built with React Native and Expo using TypeScript, the application employs React
 - **Roomdr AI Assistant:** A floating, context-aware AI button provides dynamic greetings, content cards, and insights based on the current screen and data, including profile completion gaps and personalized suggestions.
 - **Profile Questionnaire:** A 14-step questionnaire with progress tracking and per-step validation, designed for comprehensive user profiling.
 - **Listing Boost System:** Tier-based boosting options for hosts to increase listing visibility.
+- **Address Autocomplete:** The host listing form uses `react-native-google-places-autocomplete` for smart address entry. As the host types, a dropdown shows real address suggestions. Selecting one auto-fills address, city, state, neighborhood, and coordinates. Coordinates from autocomplete skip the separate Geocoding API call on save. Manual address edits clear stale coordinates so geocoding runs as fallback.
 - **Transit Auto-Fill:** Listings auto-detect nearby transit stops via Google Places API on save. Hosts can manually override transit info. Transit details display in listing detail views on the Explore screen. Service: `utils/transitService.ts`, API key: `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY`.
 - **AI Memory Layer:** Tracks user swipe analytics, message activity, and triggers micro-questions to refine AI suggestions.
 - **Identity Verification:** Supports phone, government ID (via Stripe Identity SDK on native / WebView fallback on web, with document scanning and selfie matching), social media verification, and optional background checks (via Checkr) and income checks for Elite users. Platform-specific Stripe wrapper files (`StripeWrapper.native.tsx` / `StripeWrapper.web.tsx`) handle native-only SDK imports. Verification status is synced from Supabase (`identity_verified`, `background_check_status`) on app load via `mapSupabaseToUser` in AuthContext.
@@ -113,6 +114,7 @@ Technical decisions include Babel module resolver for simplified imports, platfo
 
 **Maps:**
 - `react-native-maps`
+- `react-native-google-places-autocomplete`
 - `react-native-webview`
 
 **Utilities:**
