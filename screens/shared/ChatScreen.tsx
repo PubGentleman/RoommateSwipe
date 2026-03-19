@@ -15,7 +15,8 @@ import { RoomdrAISheet, ScreenContext } from '../../components/RoomdrAISheet';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { getMessages as getSupabaseMessages, sendMessage as sendSupabaseMessage, markMessagesAsRead as markSupabaseMessagesAsRead, subscribeToMessages } from '../../services/messageService';
 import { recordMessageActivity } from '../../utils/aiMemory';
-import { acceptInquiry, declineInquiry, getGroupWithListing } from '../../services/groupService';
+import { acceptInquiry, declineInquiry, getGroupWithListing, linkListingToGroup } from '../../services/groupService';
+import { GroupPropertySearchModal } from '../../components/GroupPropertySearchModal';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence } from 'react-native-reanimated';
 import { AdBanner } from '../../components/AdBanner';
 import { getDailyMessageCount, MESSAGING_LIMITS, getTimeUntilMidnight, incrementDailyColdMessageCount } from '../../utils/messagingUtils';
@@ -55,6 +56,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [showDailyLimitModal, setShowDailyLimitModal] = useState(false);
   const [showChatLimitModal, setShowChatLimitModal] = useState(false);
   const [linkedListing, setLinkedListing] = useState<any>(null);
+  const [showPropertySearch, setShowPropertySearch] = useState(false);
 
   const [inquiryStatus, setInquiryStatus] = useState<'pending' | 'accepted' | 'declined'>(
     inquiryGroup?.inquiryStatus || inquiryGroup?.inquiry_status || 'pending'
@@ -162,17 +164,24 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     setLinkedListing(null);
     const isGroupChat = conversationId.startsWith('group-');
     if (isGroupChat && !isInquiryChat) {
-      const groupId = conversationId.replace('group-', '');
-      getGroupWithListing(groupId)
-        .then(group => {
-          if (group?.listing_id && group?.listing) {
-            const listing = Array.isArray(group.listing) ? group.listing[0] : group.listing;
-            if (listing) setLinkedListing(listing);
-          }
-        })
-        .catch(() => {});
+      reloadGroupListing();
     }
   }, [conversationId, isInquiryChat]);
+
+  const reloadGroupListing = () => {
+    const isGroupChat = conversationId.startsWith('group-');
+    if (!isGroupChat || isInquiryChat) return;
+    const groupId = conversationId.replace('group-', '');
+    getGroupWithListing(groupId)
+      .then(group => {
+        if (group?.listing_id && group?.listing) {
+          const listing = Array.isArray(group.listing) ? group.listing[0] : group.listing;
+          if (listing) { setLinkedListing(listing); return; }
+        }
+        setLinkedListing(null);
+      })
+      .catch(() => {});
+  };
 
   useEffect(() => {
     if (!matchIdFromConversation) return;
@@ -770,6 +779,22 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         </Pressable>
       ) : null}
 
+      {conversationId.startsWith('group-') && !isInquiryChat ? (
+        <Pressable
+          style={[styles.addPropertyBtn, { borderColor: theme.border }]}
+          onPress={() => setShowPropertySearch(true)}
+        >
+          <Feather
+            name={linkedListing ? 'edit-2' : 'home'}
+            size={14}
+            color={theme.textSecondary}
+          />
+          <ThemedText style={[Typography.small, { color: theme.textSecondary, marginLeft: 6 }]}>
+            {linkedListing ? 'Change property' : 'Link a property'}
+          </ThemedText>
+        </Pressable>
+      ) : null}
+
       {linkedListing && !isInquiryChat ? (
         <Pressable
           style={[styles.pinnedListingCard, { borderColor: theme.border }]}
@@ -805,6 +830,22 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           <Feather name="chevron-right" size={18} color={theme.textSecondary} />
         </Pressable>
       ) : null}
+
+      <GroupPropertySearchModal
+        visible={showPropertySearch}
+        currentListingId={linkedListing?.id || null}
+        onSelect={async (listing) => {
+          setShowPropertySearch(false);
+          try {
+            const groupId = conversationId.replace('group-', '');
+            await linkListingToGroup(groupId, listing?.id || null);
+            reloadGroupListing();
+          } catch (err: any) {
+            Alert.alert('Error', err.message || 'Failed to update property.');
+          }
+        }}
+        onClose={() => setShowPropertySearch(false)}
+      />
 
       {isColdMessage && !coldMessageResponded ? (
         <View style={[styles.premiumBanner, { backgroundColor: 'rgba(147,112,219,0.15)', borderBottomWidth: 1, borderBottomColor: 'rgba(147,112,219,0.3)' }]}>
@@ -1136,6 +1177,11 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  addPropertyBtn: {
+    flexDirection: 'row', alignItems: 'center',
+    alignSelf: 'center', paddingVertical: 6, paddingHorizontal: 14,
+    borderRadius: 20, borderWidth: 1, marginVertical: 6,
   },
   pinnedListingCard: {
     flexDirection: 'row',

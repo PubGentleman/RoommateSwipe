@@ -1,18 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
-  View, StyleSheet, Pressable, TextInput, Alert, FlatList, ActivityIndicator,
+  View, StyleSheet, Pressable, TextInput, Alert, ActivityIndicator,
 } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
-import { Spacing, BorderRadius, Typography } from '../../constants/theme';
+import { Spacing, Typography } from '../../constants/theme';
 import { createGroup as createGroupSupabase, getGroupLimit } from '../../services/groupService';
-import { getMyListings } from '../../services/listingService';
 import { StorageService } from '../../utils/storage';
 import { supabase } from '../../lib/supabase';
 import { ScreenKeyboardAwareScrollView } from '../../components/ScreenKeyboardAwareScrollView';
 import { Image } from 'expo-image';
+import { GroupPropertySearchModal } from '../../components/GroupPropertySearchModal';
 
 export const CreateGroupScreen = ({ navigation, route }: any) => {
   const { theme } = useTheme();
@@ -22,18 +22,12 @@ export const CreateGroupScreen = ({ navigation, route }: any) => {
   const [selectedListingId, setSelectedListingId] = useState<string | null>(
     route.params?.preselectedListingId || null
   );
-  const [myListings, setMyListings] = useState<any[]>([]);
+  const [selectedListing, setSelectedListing] = useState<any | null>(null);
   const [creating, setCreating] = useState(false);
-  const isHost = user?.role === 'host';
+  const [showPropertySearch, setShowPropertySearch] = useState(false);
 
   const matchedUserId = route.params?.matchedUserId;
   const matchedUserName = route.params?.matchedUserName;
-
-  useEffect(() => {
-    if (isHost) {
-      getMyListings().then(setMyListings).catch(() => {});
-    }
-  }, [isHost]);
 
   const handleCreate = async () => {
     if (!user) return;
@@ -186,90 +180,60 @@ export const CreateGroupScreen = ({ navigation, route }: any) => {
         <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: 6 }]}>
           LINK TO A PROPERTY (OPTIONAL)
         </ThemedText>
-        <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: 12 }]}>
+        <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: 10 }]}>
           Attaching a listing pins the property details to the top of your group chat.
         </ThemedText>
 
-        <Pressable
-          style={[
-            styles.listingOption,
-            {
-              borderColor: !selectedListingId ? theme.primary : theme.border,
-              backgroundColor: !selectedListingId ? theme.primary + '15' : theme.background,
-            },
-          ]}
-          onPress={() => setSelectedListingId(null)}
-        >
-          <Feather name="slash" size={18} color={!selectedListingId ? theme.primary : theme.textSecondary} />
-          <ThemedText style={[Typography.body, {
-            marginLeft: Spacing.sm,
-            color: !selectedListingId ? theme.primary : theme.text,
-          }]}>
-            No property — standalone group
-          </ThemedText>
-          {!selectedListingId ? (
-            <Feather name="check" size={18} color={theme.primary} style={{ marginLeft: 'auto' }} />
-          ) : null}
-        </Pressable>
-
-        {isHost && myListings.length > 0 ? (
-          <FlatList
-            data={myListings}
-            keyExtractor={item => item.id}
-            scrollEnabled={false}
-            renderItem={({ item }) => (
-              <Pressable
-                style={[
-                  styles.listingOption,
-                  {
-                    borderColor: selectedListingId === item.id ? theme.primary : theme.border,
-                    backgroundColor: selectedListingId === item.id ? theme.primary + '15' : theme.background,
-                  },
-                ]}
-                onPress={() => setSelectedListingId(item.id)}
-              >
-                {item.photos?.[0] ? (
-                  <Image source={{ uri: item.photos[0] }} style={styles.listingThumb} />
-                ) : (
-                  <View style={[styles.listingThumb, { backgroundColor: theme.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }]}>
-                    <Feather name="home" size={18} color={theme.textSecondary} />
-                  </View>
-                )}
-                <View style={{ flex: 1, marginLeft: Spacing.sm }}>
-                  <ThemedText style={[Typography.body, { fontWeight: '600' }]} numberOfLines={1}>{item.title}</ThemedText>
-                  <ThemedText style={[Typography.small, { color: theme.textSecondary }]} numberOfLines={1}>
-                    {item.address}, {item.city}
-                  </ThemedText>
-                  <ThemedText style={[Typography.small, { color: theme.primary, fontWeight: '600' }]}>
-                    ${item.rent}/mo
-                  </ThemedText>
-                </View>
-                {selectedListingId === item.id ? (
-                  <Feather name="check" size={18} color={theme.primary} />
-                ) : null}
-              </Pressable>
-            )}
-          />
-        ) : null}
-
-        {!isHost ? (
+        {selectedListing ? (
           <Pressable
-            style={[styles.listingOption, { borderColor: theme.border }]}
-            onPress={() => {
-              Alert.alert(
-                'Link a Listing',
-                'Browse listings on the Explore tab, then use "Create Group" from a listing to link it automatically.',
-                [{ text: 'OK' }]
-              );
-            }}
+            style={[styles.selectedListing, { borderColor: theme.primary, backgroundColor: theme.primary + '10' }]}
+            onPress={() => setShowPropertySearch(true)}
           >
-            <Feather name="search" size={18} color={theme.textSecondary} />
-            <ThemedText style={[Typography.body, { marginLeft: Spacing.sm, color: theme.textSecondary }]}>
-              {selectedListingId ? 'Change selected listing...' : 'Search for a listing to link...'}
+            {selectedListing.photos?.[0] ? (
+              <Image source={{ uri: selectedListing.photos[0] }} style={styles.selectedListingThumb} />
+            ) : null}
+            <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+              <ThemedText style={[Typography.body, { fontWeight: '600' }]} numberOfLines={1}>
+                {selectedListing.title}
+              </ThemedText>
+              <ThemedText style={[Typography.small, { color: theme.textSecondary }]} numberOfLines={1}>
+                {selectedListing.address}, {selectedListing.city}
+              </ThemedText>
+              <ThemedText style={[Typography.small, { color: theme.primary, fontWeight: '600' }]}>
+                ${selectedListing.rent?.toLocaleString()}/mo · {selectedListing.bedrooms} BR
+              </ThemedText>
+            </View>
+            <Pressable
+              onPress={() => { setSelectedListing(null); setSelectedListingId(null); }}
+              hitSlop={8}
+              style={[styles.clearListingBtn, { backgroundColor: theme.border }]}
+            >
+              <Feather name="x" size={14} color={theme.textSecondary} />
+            </Pressable>
+          </Pressable>
+        ) : (
+          <Pressable
+            style={[styles.searchTrigger, { borderColor: theme.border }]}
+            onPress={() => setShowPropertySearch(true)}
+          >
+            <Feather name="search" size={17} color={theme.textSecondary} />
+            <ThemedText style={[Typography.body, { marginLeft: 10, color: theme.textSecondary }]}>
+              Search for a listing to link...
             </ThemedText>
           </Pressable>
-        ) : null}
+        )}
       </View>
+
+      <GroupPropertySearchModal
+        visible={showPropertySearch}
+        currentListingId={selectedListingId}
+        onSelect={(listing) => {
+          setSelectedListing(listing);
+          setSelectedListingId(listing?.id || null);
+          setShowPropertySearch(false);
+        }}
+        onClose={() => setShowPropertySearch(false)}
+      />
     </ScreenKeyboardAwareScrollView>
   );
 };
@@ -303,17 +267,17 @@ const styles = StyleSheet.create({
   input: {
     fontSize: 16,
   },
-  listingOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: Spacing.sm,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    marginBottom: Spacing.sm,
+  selectedListing: {
+    flexDirection: 'row', alignItems: 'center',
+    padding: Spacing.sm, borderRadius: 12, borderWidth: 1.5,
   },
-  listingThumb: {
-    width: 44,
-    height: 44,
-    borderRadius: 8,
+  selectedListingThumb: { width: 52, height: 52, borderRadius: 8 },
+  clearListingBtn: {
+    width: 26, height: 26, borderRadius: 13,
+    alignItems: 'center', justifyContent: 'center', marginLeft: 6,
+  },
+  searchTrigger: {
+    flexDirection: 'row', alignItems: 'center',
+    padding: Spacing.md, borderRadius: 12, borderWidth: 1.5, borderStyle: 'dashed',
   },
 });

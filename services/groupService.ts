@@ -843,3 +843,14 @@ export async function getGroupWithListing(groupId: string) {
   if (error) throw error;
   return data;
 }
+
+export async function linkListingToGroup(
+  groupId: string,
+  listingId: string | null
+): Promise<void> {
+  const { error } = await supabase
+    .from('groups')
+    .update({ listing_id: listingId, updated_at: new Date().toISOString() })
+    .eq('id', groupId);
+  if (error) throw error;
+}
