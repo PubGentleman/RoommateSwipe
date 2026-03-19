@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, FlatList, Modal, TextInput, ScrollView, Switch, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Image, Pressable, FlatList, Modal, TextInput, ScrollView, Switch, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -1107,6 +1107,10 @@ export const ExploreScreen = () => {
         transparent
         onRequestClose={() => { setShowUnifiedInterestSheet(false); setIsSuperInterest(false); }}
       >
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
         <Pressable
           style={styles.inquireModalOverlay}
           onPress={() => { setShowUnifiedInterestSheet(false); setIsSuperInterest(false); }}
@@ -1161,6 +1165,8 @@ export const ExploreScreen = () => {
               onChangeText={(t) => setInterestNote(t.slice(0, 150))}
               multiline
               maxLength={150}
+              blurOnSubmit
+              returnKeyType="done"
             />
             <Text style={styles.charCount}>{interestNote?.length || 0}/150</Text>
             <Pressable
@@ -1191,6 +1197,7 @@ export const ExploreScreen = () => {
             </Pressable>
           </Pressable>
         </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal
