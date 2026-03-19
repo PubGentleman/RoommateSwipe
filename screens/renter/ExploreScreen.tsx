@@ -578,7 +578,7 @@ export const ExploreScreen = () => {
     const hostUser = item.hostProfileId ? hostProfiles.get(item.hostProfileId) : null;
     const hostProfile = hostUser ? getUserAsRoommateProfile(hostUser) : null;
     const compatibility = hostProfile && user ? calculateCompatibility(user, hostProfile) : null;
-    const hostName = hostUser?.name || 'Host';
+    const hostName = hostUser?.name || item.hostName || 'Host';
     const hostInitials = getInitials(hostName);
     const avatarGradient = getAvatarGradient(item.hostProfileId || item.id);
     const isPetFriendly = item.amenities?.some(a => a.toLowerCase().includes('pet'));
@@ -695,7 +695,7 @@ export const ExploreScreen = () => {
             </LinearGradient>
             <View style={styles.hostInfo}>
               <View style={styles.hostNameRow}>
-                <Text style={styles.hostName}>{hostName.split(' ')[0]} {hostName.split(' ')[1]?.[0] ? hostName.split(' ')[1][0] + '.' : ''} · Host</Text>
+                <Text style={styles.hostName}>{hostName.split(' ')[0]}{hostName.split(' ')[1]?.[0] ? ` ${hostName.split(' ')[1][0]}.` : ''}</Text>
                 {hostUser?.purchases?.hostVerificationBadge === true ? (
                   <View style={styles.verifiedHostBadge}>
                     <Feather name="shield" size={10} color="#3ECF8E" />
