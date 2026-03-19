@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { Property } from '../types/models';
 
 export interface ListingData {
   title: string;
@@ -6,6 +7,8 @@ export interface ListingData {
   rent: number;
   bedrooms?: number;
   bathrooms?: number;
+  sqft?: number;
+  property_type?: string;
   address?: string;
   city?: string;
   state?: string;
@@ -17,8 +20,59 @@ export interface ListingData {
   is_active?: boolean;
   is_paused?: boolean;
   is_rented?: boolean;
+  is_featured?: boolean;
+  rented_date?: string;
   coordinates?: { lat: number; lng: number };
   transit_info?: any;
+  walk_score?: number;
+  walk_score_label?: string;
+  transit_score?: number;
+  transit_score_label?: string;
+  host_name?: string;
+  host_profile_id?: string;
+  existing_roommates?: any[];
+}
+
+export function mapListingToProperty(l: any, fallbackHostName?: string): Property {
+  const coords = l.coordinates
+    ? l.coordinates.lat !== undefined
+      ? { lat: l.coordinates.lat, lng: l.coordinates.lng }
+      : l.coordinates.latitude !== undefined
+        ? { lat: l.coordinates.latitude, lng: l.coordinates.longitude }
+        : undefined
+    : undefined;
+
+  return {
+    id: l.id,
+    title: l.title || '',
+    description: l.description || '',
+    price: l.rent || 0,
+    bedrooms: l.bedrooms || 1,
+    bathrooms: l.bathrooms || 1,
+    sqft: l.sqft || 0,
+    propertyType: l.property_type || 'lease',
+    roomType: l.room_type || 'entire',
+    city: l.city || '',
+    state: l.state || '',
+    neighborhood: l.neighborhood || '',
+    address: l.address || '',
+    availableDate: l.available_date ? new Date(l.available_date) : undefined,
+    rentedDate: l.rented_date ? new Date(l.rented_date) : undefined,
+    amenities: l.amenities || [],
+    photos: l.photos || [],
+    available: (l.is_active ?? true) && !(l.is_paused ?? false) && !(l.is_rented ?? false),
+    hostId: l.host_id || '',
+    hostName: l.host?.full_name || l.host_name || fallbackHostName || 'Host',
+    hostProfileId: l.host_profile_id || l.host_id || '',
+    featured: l.is_featured || l.featured || false,
+    existingRoommates: l.existing_roommates || [],
+    coordinates: coords,
+    transitInfo: l.transit_info || undefined,
+    walkScore: l.walk_score ?? undefined,
+    walkScoreLabel: l.walk_score_label ?? undefined,
+    transitScore: l.transit_score ?? undefined,
+    transitScoreLabel: l.transit_score_label ?? undefined,
+  };
 }
 
 export async function getListings(filters?: {

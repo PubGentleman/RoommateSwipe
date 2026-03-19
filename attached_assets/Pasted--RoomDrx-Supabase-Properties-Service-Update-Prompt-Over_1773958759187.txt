@@ -1,0 +1,422 @@
+# RoomDrx – Supabase Properties Service Update Prompt
+
+## Overview
+The app currently saves and reads all property/listing data using `StorageService` (AsyncStorage — local device storage only). This means listings only exist on the host's phone and renters can never see them.
+
+This prompt wires listings to Supabase so:
+- Hosts save listings to the cloud
+- Renters see all listings in the Explore screen
+- Transit info, Walk Score, coordinates, and all new fields are saved and retrieved properly
+
+---
+
+## Step 1 — Run Supabase Migration
+
+In your Supabase dashboard, go to **SQL Editor** and run:
+
+```sql
+-- Create properties table if it doesn't exist
+CREATE TABLE IF NOT EXISTS properties (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  description TEXT,
+  price NUMERIC NOT NULL,
+  bedrooms INTEGER DEFAULT 1,
+  bathrooms NUMERIC DEFAULT 1,
+  sqft NUMERIC DEFAULT 0,
+  property_type TEXT DEFAULT 'lease',
+  room_type TEXT DEFAULT 'entire',
+  city TEXT,
+  state TEXT,
+  neighborhood TEXT,
+  address TEXT,
+  available BOOLEAN DEFAULT true,
+  available_date TIMESTAMPTZ,
+  rented_date TIMESTAMPTZ,
+  amenities JSONB DEFAULT '[]',
+  photos JSONB DEFAULT '[]',
+  host_id TEXT NOT NULL,
+  host_name TEXT,
+  host_profile_id TEXT,
+  featured BOOLEAN DEFAULT false,
+  existing_roommates JSONB DEFAULT '[]',
+  -- New transport/location fields
+  coordinates JSONB,
+  transit_info JSONB,
+  walk_score INTEGER,
+  walk_score_label TEXT,
+  transit_score INTEGER,
+  transit_score_label TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- If table already exists, just add the new columns
+ALTER TABLE properties
+  ADD COLUMN IF NOT EXISTS coordinates JSONB,
+  ADD COLUMN IF NOT EXISTS transit_info JSONB,
+  ADD COLUMN IF NOT EXISTS walk_score INTEGER,
+  ADD COLUMN IF NOT EXISTS walk_score_label TEXT,
+  ADD COLUMN IF NOT EXISTS transit_score INTEGER,
+  ADD COLUMN IF NOT EXISTS transit_score_label TEXT;
+
+-- Enable Row Level Security
+ALTER TABLE properties ENABLE ROW LEVEL SECURITY;
+
+-- Policy: anyone can read available properties
+CREATE POLICY IF NOT EXISTS "Public can view available properties"
+  ON properties FOR SELECT
+  USING (available = true);
+
+-- Policy: hosts can insert/update/delete their own properties
+CREATE POLICY IF NOT EXISTS "Hosts can manage their own properties"
+  ON properties FOR ALL
+  USING (auth.uid()::text = host_id);
+```
+
+---
+
+## Step 2 — Create `utils/supabasePropertyService.ts`
+
+Create this new file. It replaces `StorageService` calls for property reads/writes:
+
+```ts
+// utils/supabasePropertyService.ts
+import { createClient } from '@supabase/supabase-js';
+import { Property } from '../types/models';
+
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// Convert Supabase snake_case row to our Property type
+function rowToProperty(row: any): Property {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    price: row.price,
+    bedrooms: row.bedrooms,
+    bathrooms: row.bathrooms,
+    sqft: row.sqft,
+    propertyType: row.property_type,
+    roomType: row.room_type,
+    city: row.city,
+    state: row.state,
+    neighborhood: row.neighborhood,
+    address: row.address,
+    available: row.available,
+    availableDate: row.available_date ? new Date(row.available_date) : undefined,
+    rentedDate: row.rented_date ? new Date(row.rented_date) : undefined,
+    amenities: row.amenities || [],
+    photos: row.photos || [],
+    hostId: row.host_id,
+    hostName: row.host_name,
+    hostProfileId: row.host_profile_id,
+    featured: row.featured,
+    existingRoommates: row.existing_roommates || [],
+    // New fields
+    coordinates: row.coordinates || undefined,
+    transitInfo: row.transit_info || undefined,
+    walkScore: row.walk_score ?? undefined,
+    walkScoreLabel: row.walk_score_label ?? undefined,
+    transitScore: row.transit_score ?? undefined,
+    transitScoreLabel: row.transit_score_label ?? undefined,
+  };
+}
+
+// Convert our Property type to Supabase snake_case row
+function propertyToRow(property: Property): any {
+  return {
+    id: property.id,
+    title: property.title,
+    description: property.description,
+    price: property.price,
+    bedrooms: property.bedrooms,
+    bathrooms: property.bathrooms,
+    sqft: property.sqft,
+    property_type: property.propertyType,
+    room_type: property.roomType,
+    city: property.city,
+    state: property.state,
+    neighborhood: property.neighborhood || null,
+    address: property.address,
+    available: property.available,
+    available_date: property.availableDate?.toISOString() || null,
+    rented_date: property.rentedDate?.toISOString() || null,
+    amenities: property.amenities || [],
+    photos: property.photos || [],
+    host_id: property.hostId,
+    host_name: property.hostName,
+    host_profile_id: property.hostProfileId || null,
+    featured: property.featured || false,
+    existing_roommates: property.existingRoommates || [],
+    // New fields
+    coordinates: property.coordinates || null,
+    transit_info: property.transitInfo || null,
+    walk_score: property.walkScore ?? null,
+    walk_score_label: property.walkScoreLabel ?? null,
+    transit_score: property.transitScore ?? null,
+    transit_score_label: property.transitScoreLabel ?? null,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+// ─── READ ───────────────────────────────────────────────────────────────────
+
+// Get all available properties (for Explore screen — renters see these)
+export async function getAllProperties(): Promise<Property[]> {
+  const { data, error } = await supabase
+    .from('properties')
+    .select('*')
+    .eq('available', true)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching properties:', error);
+    return [];
+  }
+  return (data || []).map(rowToProperty);
+}
+
+// Get properties for a specific host (for MyListings screen)
+export async function getMyListings(hostId: string): Promise<Property[]> {
+  const { data, error } = await supabase
+    .from('properties')
+    .select('*')
+    .eq('host_id', hostId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching host listings:', error);
+    return [];
+  }
+  return (data || []).map(rowToProperty);
+}
+
+// Get a single property by ID
+export async function getPropertyById(propertyId: string): Promise<Property | null> {
+  const { data, error } = await supabase
+    .from('properties')
+    .select('*')
+    .eq('id', propertyId)
+    .single();
+
+  if (error || !data) return null;
+  return rowToProperty(data);
+}
+
+// ─── WRITE ──────────────────────────────────────────────────────────────────
+
+// Save or update a property (used when host taps Save in CreateEditListingScreen)
+export async function saveProperty(property: Property): Promise<void> {
+  const row = propertyToRow(property);
+
+  const { error } = await supabase
+    .from('properties')
+    .upsert(row, { onConflict: 'id' });
+
+  if (error) {
+    console.error('Error saving property:', error);
+    throw new Error('Failed to save listing');
+  }
+}
+
+// Delete a property
+export async function deleteProperty(propertyId: string): Promise<void> {
+  const { error } = await supabase
+    .from('properties')
+    .delete()
+    .eq('id', propertyId);
+
+  if (error) {
+    console.error('Error deleting property:', error);
+    throw new Error('Failed to delete listing');
+  }
+}
+
+// Mark a property as rented
+export async function markPropertyAsRented(propertyId: string): Promise<void> {
+  const { error } = await supabase
+    .from('properties')
+    .update({
+      available: false,
+      rented_date: new Date().toISOString(),
+    })
+    .eq('id', propertyId);
+
+  if (error) {
+    console.error('Error marking property as rented:', error);
+    throw new Error('Failed to update listing');
+  }
+}
+```
+
+---
+
+## Step 3 — Update `screens/host/CreateEditListingScreen.tsx`
+
+#### A. Replace StorageService import with Supabase service
+
+Remove:
+```ts
+import { StorageService } from '../../utils/storage';
+```
+
+Add:
+```ts
+import { saveProperty, deleteProperty as deletePropertyFromSupabase } from '../../utils/supabasePropertyService';
+```
+
+#### B. Update `handleSave` — replace StorageService call
+
+Find:
+```ts
+await StorageService.addOrUpdateProperty(property);
+navigation.goBack();
+```
+
+Replace with:
+```ts
+await saveProperty(property);
+navigation.goBack();
+```
+
+#### C. Update delete handler — replace StorageService call
+
+Find:
+```ts
+await StorageService.deleteProperty(propertyId);
+```
+
+Replace with:
+```ts
+await deletePropertyFromSupabase(propertyId);
+```
+
+---
+
+## Step 4 — Update `screens/host/MyListingsScreen.tsx`
+
+#### Replace StorageService with Supabase service
+
+Add import:
+```ts
+import { getMyListings } from '../../utils/supabasePropertyService';
+```
+
+Find where listings are fetched (look for `StorageService.getProperties()`):
+```ts
+const allProperties = await StorageService.getProperties();
+const myListings = allProperties.filter(p => p.hostId === user?.id);
+```
+
+Replace with:
+```ts
+const myListings = await getMyListings(user?.id || '');
+```
+
+---
+
+## Step 5 — Update `screens/renter/ExploreScreen.tsx`
+
+#### Replace StorageService with Supabase service
+
+Add import:
+```ts
+import { getAllProperties } from '../../utils/supabasePropertyService';
+```
+
+Find where properties are fetched:
+```ts
+await StorageService.initializeWithMockData();
+const allProperties = await StorageService.getProperties();
+```
+
+Replace with:
+```ts
+const allProperties = await getAllProperties();
+```
+
+Remove the `StorageService.initializeWithMockData()` call entirely — real data from Supabase doesn't need mock initialization.
+
+---
+
+## Step 6 — Update `screens/host/HostDashboardScreen.tsx`
+
+Add import:
+```ts
+import { getMyListings } from '../../utils/supabasePropertyService';
+```
+
+Find:
+```ts
+await StorageService.initializeWithMockData();
+await StorageService.assignPropertiesToHost(user.id, user.name);
+const allProperties = await StorageService.getProperties();
+const myListings = allProperties.filter(p => p.hostId === user.id);
+```
+
+Replace with:
+```ts
+const myListings = await getMyListings(user.id);
+```
+
+---
+
+## Step 7 — Update `screens/host/HostAnalyticsScreen.tsx`
+
+Add import:
+```ts
+import { getMyListings } from '../../utils/supabasePropertyService';
+```
+
+Replace any `StorageService.getProperties()` calls with:
+```ts
+const myListings = await getMyListings(user?.id || '');
+```
+
+---
+
+## Step 8 — Verify `.env` has Supabase credentials
+
+Your `.env` file should have:
+```
+EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
+EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=your-google-key-here
+EXPO_PUBLIC_WALKSCORE_API_KEY=your-walkscore-key-here
+```
+
+Find your Supabase URL and anon key at:
+**Supabase Dashboard → Project Settings → API**
+
+---
+
+## How It All Connects
+
+```
+Host creates listing in CreateEditListingScreen
+        ↓
+Address autocomplete fills city, state, neighborhood, coordinates
+        ↓
+On Save:
+  - Transit stops fetched (Google Places API)
+  - Walk Score fetched (Walk Score API)
+  - All data saved to Supabase properties table
+        ↓
+Renter opens Explore screen
+        ↓
+getAllProperties() reads from Supabase
+        ↓
+Listing cards show with transit stops + Walk Score automatically
+```
+
+---
+
+## Notes
+
+- **StorageService is not deleted** — it's still used for other things like conversations, interest cards, notifications, and user data. Only property reads/writes are moved to Supabase in this prompt.
+- **Fallback**: If Supabase is unavailable, functions return empty arrays and log errors — the app won't crash.
+- **Existing mock data**: Once Supabase is connected, mock data from `StorageService.initializeWithMockData()` will no longer appear in the Explore screen. Only real listings saved to Supabase will show. This is the correct behavior for production.
+- **RLS policies**: The SQL migration sets up Row Level Security so renters can only read available listings, and hosts can only modify their own listings.

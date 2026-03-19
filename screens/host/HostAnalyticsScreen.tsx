@@ -10,7 +10,7 @@ import { StorageService } from '../../utils/storage';
 import { Property, InterestCard } from '../../types/models';
 import { Spacing, BorderRadius } from '../../constants/theme';
 import { PaywallSheet } from '../../components/PaywallSheet';
-import { getMyListings } from '../../services/listingService';
+import { getMyListings, mapListingToProperty } from '../../services/listingService';
 import { getReceivedInterestCards } from '../../services/discoverService';
 
 const ACCENT = '#ff6b5b';
@@ -39,29 +39,7 @@ export const HostAnalyticsScreen = () => {
     try {
       const supaListings = await getMyListings();
       if (supaListings && supaListings.length > 0) {
-        const mapped: Property[] = supaListings.map((l: any) => ({
-          id: l.id,
-          title: l.title || '',
-          description: l.description || '',
-          price: l.rent || 0,
-          bedrooms: l.bedrooms || 1,
-          bathrooms: l.bathrooms || 1,
-          sqft: l.sqft || 0,
-          propertyType: l.property_type || 'lease',
-          roomType: l.room_type || 'entire',
-          city: l.city || '',
-          state: l.state || '',
-          neighborhood: l.neighborhood,
-          address: l.address || '',
-          availableDate: l.available_date ? new Date(l.available_date) : undefined,
-          amenities: l.amenities || [],
-          photos: l.photos || [],
-          available: l.is_active && !l.is_paused,
-          hostId: l.host_id || user.id,
-          hostName: user.name,
-          featured: l.is_featured || false,
-          rentedDate: l.is_rented ? new Date() : undefined,
-        }));
+        const mapped: Property[] = supaListings.map((l: any) => mapListingToProperty(l, user.name));
         setProperties(mapped);
       } else {
         setProperties([]);

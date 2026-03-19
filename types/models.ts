@@ -98,6 +98,9 @@ export interface Property {
   }>;
   hostProfileId?: string;
   walkScore?: number;
+  walkScoreLabel?: string;
+  transitScore?: number;
+  transitScoreLabel?: string;
   listingBoost?: ListingBoost;
   transitInfo?: {
     stops: Array<{

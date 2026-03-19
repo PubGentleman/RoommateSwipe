@@ -69,6 +69,8 @@ The application features tiered subscription plans for renters (Basic, Plus, Eli
 
 The data layer uses Supabase PostgreSQL, complemented by local AsyncStorage for caching. TypeScript interfaces define core models such as `User`, `RoommateProfile`, `Property`, `Group`, `Conversation`, `Message`, `Match`, and `InterestCard`.
 
+**Listing Service (`services/listingService.ts`):** Centralized Supabase CRUD for the `listings` table. Exports `mapListingToProperty()` to convert Supabase rows (snake_case) to the `Property` TypeScript type (camelCase). All screens (ExploreScreen, HostDashboardScreen, MyListingsScreen, HostAnalyticsScreen, CreateEditListingScreen) use this centralized mapper instead of inline mapping. Supabase-first with StorageService (mock data) fallback for demo mode.
+
 **Group System:** Supports `roommate` groups (renter-only) and `listing_inquiry` groups (renter group + host in a chat). `GroupMember` tracks role, host status, and member status.
 
 **Address Reveal System:** Full property addresses are hidden until the host accepts an inquiry, after which the address is revealed with navigational links.

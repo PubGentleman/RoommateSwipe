@@ -12,7 +12,7 @@ import { canAddListingCheck } from '../../utils/hostPricing';
 import { ListingLimitModal, OverageModal } from '../../components/ListingLimitModal';
 import { US_STATES } from '../../utils/locationData';
 import { Spacing, BorderRadius } from '../../constants/theme';
-import { createListing as createListingSupa, updateListing as updateListingSupa, getListing, deleteListing as deleteListingSupa } from '../../services/listingService';
+import { createListing as createListingSupa, updateListing as updateListingSupa, getListing, deleteListing as deleteListingSupa, mapListingToProperty } from '../../services/listingService';
 import { DatePickerModal } from '../../components/DatePickerModal';
 import { formatDate } from '../../utils/dateUtils';
 import { geocodeAddress, fetchNearbyTransit } from '../../utils/transitService';
@@ -111,25 +111,7 @@ export const CreateEditListingScreen = () => {
     try {
       const supaListing = await getListing(propertyId);
       if (supaListing) {
-        prop = {
-          title: supaListing.title || '',
-          description: supaListing.description || '',
-          price: supaListing.rent || 0,
-          bedrooms: supaListing.bedrooms || 1,
-          bathrooms: supaListing.bathrooms || 1,
-          sqft: supaListing.sqft || 0,
-          propertyType: supaListing.property_type || 'lease',
-          roomType: supaListing.room_type || 'entire',
-          city: supaListing.city || '',
-          state: supaListing.state || '',
-          neighborhood: supaListing.neighborhood || '',
-          address: supaListing.address || '',
-          availableDate: supaListing.available_date ? new Date(supaListing.available_date) : undefined,
-          amenities: supaListing.amenities || [],
-          photos: supaListing.photos || [],
-          transitInfo: supaListing.transit_info || undefined,
-          coordinates: supaListing.coordinates || undefined,
-        };
+        prop = mapListingToProperty(supaListing, user?.name);
       }
     } catch {
       const properties = await StorageService.getProperties();
@@ -265,6 +247,8 @@ export const CreateEditListingScreen = () => {
         rent: Number(price),
         bedrooms,
         bathrooms,
+        sqft: Number(sqft) || 0,
+        property_type: propertyType,
         address: address.trim(),
         city: city.trim(),
         state: state.trim(),
@@ -276,6 +260,8 @@ export const CreateEditListingScreen = () => {
         is_active: true,
         is_paused: false,
         is_rented: false,
+        host_name: user?.name || '',
+        host_profile_id: user?.id || '',
       };
       if (savedCoords) supaData.coordinates = savedCoords;
       if (transitInfo) supaData.transit_info = transitInfo;

@@ -9,7 +9,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { PaywallSheet } from '../../components/PaywallSheet';
 import { StorageService } from '../../utils/storage';
 import { Property, InterestCard, HostSubscriptionData } from '../../types/models';
-import { getMyListings, updateListing, deleteListing as deleteListingSupa } from '../../services/listingService';
+import { getMyListings, mapListingToProperty, updateListing, deleteListing as deleteListingSupa } from '../../services/listingService';
 import { getReceivedInterestCards } from '../../services/discoverService';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
 import { isListingBoosted, canAddListingCheck, isFreePlan } from '../../utils/hostPricing';
@@ -86,29 +86,7 @@ export const MyListingsScreen = () => {
     try {
       const supaListings = await getMyListings();
       if (supaListings && supaListings.length > 0) {
-        const mapped: Property[] = supaListings.map((l: any) => ({
-          id: l.id,
-          title: l.title || '',
-          description: l.description || '',
-          price: l.rent || 0,
-          bedrooms: l.bedrooms || 1,
-          bathrooms: l.bathrooms || 1,
-          sqft: l.sqft || 0,
-          propertyType: l.property_type || 'lease',
-          roomType: l.room_type || 'entire',
-          city: l.city || '',
-          state: l.state || '',
-          neighborhood: l.neighborhood,
-          address: l.address || '',
-          availableDate: l.available_date ? new Date(l.available_date) : undefined,
-          amenities: l.amenities || [],
-          photos: l.photos || [],
-          available: (l.is_active ?? true) && !(l.is_paused ?? false),
-          hostId: l.host_id || user.id,
-          hostName: user.name,
-          featured: l.is_featured || false,
-          rentedDate: (l.is_rented ?? false) ? new Date() : undefined,
-        }));
+        const mapped: Property[] = supaListings.map((l: any) => mapListingToProperty(l, user.name));
         setListings(mapped);
       } else {
         await StorageService.initializeWithMockData();
@@ -257,7 +235,7 @@ export const MyListingsScreen = () => {
     if (!property || property.hostId !== user.id) return;
     const updated = { ...property, featured: !property.featured };
     try {
-      await updateListing(propertyId, { is_featured: !property.featured } as any);
+      await updateListing(propertyId, { is_featured: !property.featured });
     } catch {
       await StorageService.addOrUpdateProperty(updated);
     }
