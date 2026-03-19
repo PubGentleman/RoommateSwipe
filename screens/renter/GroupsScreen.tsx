@@ -9,7 +9,9 @@ import { useTheme } from '../../hooks/useTheme';
 import { Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { Group, RoommateProfile, GroupType } from '../../types/models';
 import { StorageService } from '../../utils/storage';
-import { getGroups as getGroupsFromSupabase, getMyGroups as getMyGroupsFromSupabase, getMyInquiryGroups as getMyInquiryGroupsFromSupabase, joinGroup as joinGroupSupabase, leaveGroup as leaveGroupSupabase, createGroup as createGroupSupabase, archiveGroup as archiveGroupSupabase } from '../../services/groupService';
+import { getGroups as getGroupsFromSupabase, getMyGroups as getMyGroupsFromSupabase, getMyInquiryGroups as getMyInquiryGroupsFromSupabase, joinGroup as joinGroupSupabase, leaveGroup as leaveGroupSupabase, createGroup as createGroupSupabase, archiveGroup as archiveGroupSupabase, getGroupLimit, getMemberLimit } from '../../services/groupService';
+import { getMyListings } from '../../services/listingService';
+import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -65,6 +67,10 @@ export const GroupsScreen = () => {
   const [groupBedrooms, setGroupBedrooms] = useState('');
   const [groupLocation, setGroupLocation] = useState('');
   const [groupMaxMembers, setGroupMaxMembers] = useState('4');
+  const [selectedListingId, setSelectedListingId] = useState<string | null>(null);
+  const [hostListings, setHostListings] = useState<any[]>([]);
+  const userPlan = user?.subscription?.plan || 'basic';
+  const planMemberLimit = getMemberLimit(userPlan);
 
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -75,6 +81,9 @@ export const GroupsScreen = () => {
       loadGroups();
       if (user) {
         StorageService.getPendingGroupInvites(user.id).then(setPendingInvites);
+      }
+      if (user?.role === 'host') {
+        getMyListings().then(setHostListings).catch(() => {});
       }
     }, [user, activeCity])
   );
@@ -590,35 +599,43 @@ export const GroupsScreen = () => {
   const handleCreateGroup = async () => {
     if (!user) return;
 
-    const isPremium = user.subscription?.plan === 'plus' || user.subscription?.plan === 'elite';
+    const userPlan = user.subscription?.plan || 'basic';
+    const groupLimit = getGroupLimit(userPlan);
+    const memberLimit = getMemberLimit(userPlan);
 
-    if (!isPremium) {
+    try {
+      let createdCount = 0;
       try {
-        const allExistingGroups = await StorageService.getGroups();
-        const userCreatedGroups = allExistingGroups.filter(g => g.createdBy === user.id);
-        
-        console.log('[GroupsScreen] User created groups:', userCreatedGroups.length);
-        
-        if (userCreatedGroups.length >= 1) {
-          console.log('[GroupsScreen] Group creation limit reached, showing alert');
-          Alert.alert(
-            'Upgrade Required',
-            'You can only create 1 group with the basic plan. Upgrade to Plus or Elite for unlimited group creation!',
-            [
-              { text: 'Maybe Later', style: 'cancel' },
-              {
-                text: 'View Plans',
-                onPress: () => navigation.navigate('Profile', { screen: 'Payment' }),
-              },
-            ]
-          );
-          return;
+        const { count, error: countError } = await supabase
+          .from('groups')
+          .select('id', { count: 'exact', head: true })
+          .eq('created_by', user.id);
+        if (countError || count === null) {
+          throw new Error(countError?.message || 'Count query returned null');
         }
-      } catch (error) {
-        console.error('[GroupsScreen] Error checking group limits:', error);
-        Alert.alert('Error', 'Failed to check group limits');
+        createdCount = count;
+      } catch {
+        const allExistingGroups = await StorageService.getGroups();
+        createdCount = allExistingGroups.filter(g => g.createdBy === user.id).length;
+      }
+
+      if (createdCount >= groupLimit) {
+        const planLabel = userPlan.charAt(0).toUpperCase() + userPlan.slice(1);
+        Alert.alert(
+          'Group Limit Reached',
+          `Your ${planLabel} plan allows up to ${groupLimit} group${groupLimit === 1 ? '' : 's'}. Upgrade to create more.`,
+          [
+            { text: 'Maybe Later', style: 'cancel' },
+            {
+              text: 'Upgrade',
+              onPress: () => navigation.navigate('Profile', { screen: 'Payment' }),
+            },
+          ]
+        );
         return;
       }
+    } catch (error) {
+      console.error('[GroupsScreen] Error checking group limits:', error);
     }
 
     if (!groupName.trim()) {
@@ -637,8 +654,8 @@ export const GroupsScreen = () => {
     }
 
     const maxMembers = parseInt(groupMaxMembers);
-    if (isNaN(maxMembers) || maxMembers < 1 || maxMembers > 10) {
-      Alert.alert('Error', 'Maximum members must be between 1 and 10');
+    if (isNaN(maxMembers) || maxMembers < 1 || maxMembers > memberLimit) {
+      Alert.alert('Error', `Maximum members must be between 1 and ${memberLimit} for your plan.`);
       return;
     }
 
@@ -659,6 +676,7 @@ export const GroupsScreen = () => {
 
     const newGroup: Group = {
       id: Math.random().toString(36).substr(2, 9),
+      type: selectedListingId ? 'listing_inquiry' : 'roommate',
       name: groupName.trim(),
       description: groupDescription.trim() || undefined,
       members: [user.id],
@@ -670,7 +688,10 @@ export const GroupsScreen = () => {
       maxMembers: maxMembers,
       createdAt: new Date(),
       createdBy: user.id,
+      listingId: selectedListingId || undefined,
     };
+
+    const groupType = selectedListingId ? 'listing_inquiry' : 'roommate';
 
     try {
       await createGroupSupabase({
@@ -680,6 +701,8 @@ export const GroupsScreen = () => {
         max_members: maxMembers,
         budget_min: parseInt(groupBudget),
         budget_max: apartmentPrice,
+        listing_id: selectedListingId || undefined,
+        type: groupType,
       });
     } catch (supabaseError) {
       console.warn('[GroupsScreen] Supabase createGroup failed, falling back to StorageService:', supabaseError);
@@ -693,6 +716,7 @@ export const GroupsScreen = () => {
     setGroupBedrooms('');
     setGroupLocation('');
     setGroupMaxMembers('4');
+    setSelectedListingId(null);
 
     await loadGroups();
     setActiveTab('my-groups');
@@ -1439,7 +1463,7 @@ export const GroupsScreen = () => {
 
         <View style={styles.inputGroup}>
           <ThemedText style={[Typography.body, { marginBottom: Spacing.xs }]}>
-            Maximum Members (1-10) {groupBedrooms.trim() ? '(Auto-set from bedrooms)' : ''}
+            Maximum Members (1-{planMemberLimit}) {groupBedrooms.trim() ? '(Auto-set from bedrooms)' : ''}
           </ThemedText>
           <TextInput
             style={[styles.input, { 
@@ -1458,6 +1482,92 @@ export const GroupsScreen = () => {
             <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
               Automatically set to match number of bedrooms
             </ThemedText>
+          ) : null}
+        </View>
+
+        <View style={styles.inputGroup}>
+          <ThemedText style={[Typography.body, { marginBottom: Spacing.xs }]}>
+            Link to a Listing (Optional)
+          </ThemedText>
+          <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.sm }]}>
+            {user?.role === 'host'
+              ? 'Link this group to one of your listings so members can view it in chat.'
+              : 'Link a listing to pin it in the group chat for all members to see.'}
+          </ThemedText>
+          {user?.role === 'host' && hostListings.length > 0 ? (
+            <View>
+              {hostListings.map((listing: any) => (
+                <Pressable
+                  key={listing.id}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    padding: 12,
+                    borderRadius: 10,
+                    backgroundColor: selectedListingId === listing.id
+                      ? `${theme.primary}22`
+                      : theme.backgroundDefault,
+                    borderWidth: 1,
+                    borderColor: selectedListingId === listing.id
+                      ? theme.primary
+                      : theme.border,
+                    marginBottom: 8,
+                  }}
+                  onPress={() =>
+                    setSelectedListingId(
+                      selectedListingId === listing.id ? null : listing.id
+                    )
+                  }
+                >
+                  <Feather
+                    name={selectedListingId === listing.id ? 'check-circle' : 'circle'}
+                    size={18}
+                    color={selectedListingId === listing.id ? theme.primary : theme.textSecondary}
+                  />
+                  <View style={{ marginLeft: 10, flex: 1 }}>
+                    <ThemedText style={[Typography.body, { fontWeight: '500' }]}>
+                      {listing.title || listing.address || 'Untitled Listing'}
+                    </ThemedText>
+                    {listing.city ? (
+                      <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
+                        {listing.city}{listing.state ? `, ${listing.state}` : ''}
+                      </ThemedText>
+                    ) : null}
+                  </View>
+                  {listing.price ? (
+                    <ThemedText style={[Typography.caption, { color: theme.primary, fontWeight: '600' }]}>
+                      ${listing.price}/mo
+                    </ThemedText>
+                  ) : null}
+                </Pressable>
+              ))}
+            </View>
+          ) : user?.role === 'host' ? (
+            <ThemedText style={[Typography.caption, { color: theme.textSecondary, fontStyle: 'italic' }]}>
+              No listings found. Create a listing first to link it here.
+            </ThemedText>
+          ) : (
+            <View style={{
+              backgroundColor: theme.backgroundDefault,
+              borderRadius: 10,
+              padding: 12,
+              borderWidth: 1,
+              borderColor: theme.border,
+            }}>
+              <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
+                After creating your group, you can browse listings and link them from Explore.
+              </ThemedText>
+            </View>
+          )}
+          {selectedListingId ? (
+            <Pressable
+              style={{ marginTop: 4 }}
+              onPress={() => setSelectedListingId(null)}
+            >
+              <ThemedText style={[Typography.caption, { color: theme.primary }]}>
+                Remove linked listing
+              </ThemedText>
+            </Pressable>
           ) : null}
         </View>
 
