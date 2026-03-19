@@ -437,3 +437,119 @@ export async function getGroupMembers(groupId: string): Promise<GroupMember[]> {
   if (error) throw error;
   return (data || []).map(mapGroupMember);
 }
+
+export interface GroupMessage {
+  id: string;
+  groupId: string;
+  senderId: string;
+  senderName: string;
+  senderPhoto?: string;
+  content: string;
+  createdAt: string;
+}
+
+export async function getGroupMessages(groupId: string): Promise<GroupMessage[]> {
+  const { data, error } = await supabase
+    .from('group_messages')
+    .select(`
+      id, group_id, sender_id, content, created_at,
+      users ( full_name, avatar_url )
+    `)
+    .eq('group_id', groupId)
+    .order('created_at', { ascending: true })
+    .limit(100);
+
+  if (error) throw error;
+
+  return (data || []).map((msg: any) => ({
+    id: msg.id,
+    groupId: msg.group_id,
+    senderId: msg.sender_id,
+    senderName: msg.users?.full_name || 'Unknown',
+    senderPhoto: msg.users?.avatar_url,
+    content: msg.content,
+    createdAt: msg.created_at,
+  }));
+}
+
+export async function sendGroupMessage(groupId: string, content: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { error } = await supabase.from('group_messages').insert({
+    group_id: groupId,
+    sender_id: user.id,
+    content,
+  });
+  if (error) throw error;
+}
+
+export function subscribeToGroupMessages(
+  groupId: string,
+  onMessage: (msg: GroupMessage) => void
+) {
+  return supabase
+    .channel(`group-messages-${groupId}`)
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'group_messages', filter: `group_id=eq.${groupId}` },
+      async (payload) => {
+        const msg = payload.new as any;
+        const { data: senderData } = await supabase
+          .from('users')
+          .select('full_name, avatar_url')
+          .eq('id', msg.sender_id)
+          .single();
+
+        onMessage({
+          id: msg.id,
+          groupId: msg.group_id,
+          senderId: msg.sender_id,
+          senderName: senderData?.full_name || 'Unknown',
+          senderPhoto: senderData?.avatar_url,
+          content: msg.content,
+          createdAt: msg.created_at,
+        });
+      }
+    )
+    .subscribe();
+}
+
+export function getGroupLimit(plan: string): number {
+  const limits: Record<string, number> = {
+    basic: 1,
+    plus: 3,
+    elite: 10,
+    starter: 1,
+    pro: 3,
+    business: 999,
+  };
+  return limits[plan] || 1;
+}
+
+export function getMemberLimit(plan: string): number {
+  const limits: Record<string, number> = {
+    basic: 4,
+    plus: 8,
+    elite: 15,
+    starter: 6,
+    pro: 12,
+    business: 25,
+  };
+  return limits[plan] || 4;
+}
+
+export async function getGroupWithListing(groupId: string) {
+  const { data, error } = await supabase
+    .from('groups')
+    .select(`
+      *,
+      members:group_members(count),
+      listing:listings(id, title, address, city, state, rent, photos)
+    `)
+    .eq('id', groupId)
+    .single();
+
+  if (error) throw error;
+  return data;
+}

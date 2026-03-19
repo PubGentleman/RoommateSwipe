@@ -13,8 +13,9 @@ export type MessagesStackParamList = {
     inquiryGroup?: any;
   };
   CreateGroup: {
-    matchedUserId: string;
-    matchedUserName: string;
+    matchedUserId?: string;
+    matchedUserName?: string;
+    preselectedListingId?: string;
   };
 };
 

@@ -1,0 +1,647 @@
+# RoomDrx — Groups Feature with Optional Property Linking
+
+## Overview
+Groups allow renters to coordinate with potential roommates and hosts to manage tenants. A group can optionally be linked to a specific listing — when linked, the listing card appears at the top of the group chat so all members can reference it.
+
+---
+
+## Plan Limits
+
+### Renter Plans
+| Plan | Groups Can Create | Members Per Group |
+|------|------------------|-------------------|
+| Basic | 1 | 4 |
+| Plus | 3 | 8 |
+| Elite | 10 | 15 |
+
+### Host Plans
+| Plan | Groups Can Create | Members Per Group |
+|------|------------------|-------------------|
+| Starter | 1 | 6 |
+| Pro | 3 | 12 |
+| Business | Unlimited | 25 |
+
+---
+
+## Step 1 — Database Migration
+
+Run this in Supabase SQL editor:
+
+```sql
+-- Groups table
+CREATE TABLE IF NOT EXISTS groups (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  description TEXT,
+  created_by UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  listing_id UUID REFERENCES listings(id) ON DELETE SET NULL, -- optional property link
+  cover_photo TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Group members table
+CREATE TABLE IF NOT EXISTS group_members (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id UUID REFERENCES groups(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  role TEXT DEFAULT 'member' CHECK (role IN ('admin', 'member')),
+  joined_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(group_id, user_id)
+);
+
+-- Group messages table
+CREATE TABLE IF NOT EXISTS group_messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id UUID REFERENCES groups(id) ON DELETE CASCADE,
+  sender_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  content TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- RLS Policies
+ALTER TABLE groups ENABLE ROW LEVEL SECURITY;
+ALTER TABLE group_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE group_messages ENABLE ROW LEVEL SECURITY;
+
+-- Anyone can read groups they're a member of
+CREATE POLICY "Members can view their groups"
+ON groups FOR SELECT
+USING (
+  id IN (SELECT group_id FROM group_members WHERE user_id = auth.uid())
+);
+
+-- Only authenticated users can create groups
+CREATE POLICY "Authenticated users can create groups"
+ON groups FOR INSERT
+WITH CHECK (auth.uid() = created_by);
+
+-- Creator can update/delete their group
+CREATE POLICY "Creator can manage their group"
+ON groups FOR ALL
+USING (auth.uid() = created_by);
+
+-- Members can see who else is in their groups
+CREATE POLICY "Members can view group members"
+ON group_members FOR SELECT
+USING (
+  group_id IN (SELECT group_id FROM group_members WHERE user_id = auth.uid())
+);
+
+-- Admins can add/remove members
+CREATE POLICY "Admins can manage members"
+ON group_members FOR ALL
+USING (
+  group_id IN (
+    SELECT group_id FROM group_members
+    WHERE user_id = auth.uid() AND role = 'admin'
+  )
+);
+
+-- Members can read messages in their groups
+CREATE POLICY "Members can read group messages"
+ON group_messages FOR SELECT
+USING (
+  group_id IN (SELECT group_id FROM group_members WHERE user_id = auth.uid())
+);
+
+-- Members can send messages
+CREATE POLICY "Members can send messages"
+ON group_messages FOR INSERT
+WITH CHECK (
+  auth.uid() = sender_id
+  AND group_id IN (SELECT group_id FROM group_members WHERE user_id = auth.uid())
+);
+
+-- Enable Realtime on group_messages
+ALTER PUBLICATION supabase_realtime ADD TABLE group_messages;
+```
+
+---
+
+## Step 2 — Create `services/groupService.ts`
+
+```ts
+import { supabase } from '../lib/supabase';
+
+export interface Group {
+  id: string;
+  name: string;
+  description?: string;
+  createdBy: string;
+  listingId?: string;       // null = standalone group
+  listing?: {              // populated when fetched with join
+    id: string;
+    title: string;
+    address: string;
+    city: string;
+    state: string;
+    rent: number;
+    photos: string[];
+  };
+  coverPhoto?: string;
+  memberCount: number;
+  createdAt: string;
+  myRole: 'admin' | 'member';
+}
+
+export interface GroupMessage {
+  id: string;
+  groupId: string;
+  senderId: string;
+  senderName: string;
+  senderPhoto?: string;
+  content: string;
+  createdAt: string;
+}
+
+// Get all groups the current user belongs to
+export async function getMyGroups(): Promise<Group[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from('group_members')
+    .select(`
+      role,
+      groups (
+        id, name, description, created_by, listing_id, cover_photo, created_at,
+        listings ( id, title, address, city, state, rent, photos ),
+        group_members ( count )
+      )
+    `)
+    .eq('user_id', user.id);
+
+  if (error) throw error;
+
+  return (data || []).map((row: any) => ({
+    id: row.groups.id,
+    name: row.groups.name,
+    description: row.groups.description,
+    createdBy: row.groups.created_by,
+    listingId: row.groups.listing_id,
+    listing: row.groups.listings || undefined,
+    coverPhoto: row.groups.cover_photo,
+    memberCount: row.groups.group_members?.[0]?.count || 0,
+    createdAt: row.groups.created_at,
+    myRole: row.role,
+  }));
+}
+
+// Create a new group — listingId is optional
+export async function createGroup(params: {
+  name: string;
+  description?: string;
+  listingId?: string;
+  coverPhoto?: string;
+}): Promise<Group> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { data: group, error } = await supabase
+    .from('groups')
+    .insert({
+      name: params.name,
+      description: params.description,
+      created_by: user.id,
+      listing_id: params.listingId || null,
+      cover_photo: params.coverPhoto || null,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  // Auto-add creator as admin
+  await supabase.from('group_members').insert({
+    group_id: group.id,
+    user_id: user.id,
+    role: 'admin',
+  });
+
+  return {
+    id: group.id,
+    name: group.name,
+    description: group.description,
+    createdBy: group.created_by,
+    listingId: group.listing_id,
+    memberCount: 1,
+    createdAt: group.created_at,
+    myRole: 'admin',
+  };
+}
+
+// Invite a user to a group by user ID
+export async function inviteMember(groupId: string, userId: string): Promise<void> {
+  const { error } = await supabase.from('group_members').insert({
+    group_id: groupId,
+    user_id: userId,
+    role: 'member',
+  });
+  if (error) throw error;
+}
+
+// Leave a group
+export async function leaveGroup(groupId: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase
+    .from('group_members')
+    .delete()
+    .eq('group_id', groupId)
+    .eq('user_id', user.id);
+}
+
+// Get messages for a group
+export async function getGroupMessages(groupId: string): Promise<GroupMessage[]> {
+  const { data, error } = await supabase
+    .from('group_messages')
+    .select(`
+      id, group_id, sender_id, content, created_at,
+      users ( name, photos )
+    `)
+    .eq('group_id', groupId)
+    .order('created_at', { ascending: true })
+    .limit(100);
+
+  if (error) throw error;
+
+  return (data || []).map((msg: any) => ({
+    id: msg.id,
+    groupId: msg.group_id,
+    senderId: msg.sender_id,
+    senderName: msg.users?.name || 'Unknown',
+    senderPhoto: msg.users?.photos?.[0],
+    content: msg.content,
+    createdAt: msg.created_at,
+  }));
+}
+
+// Send a message to a group
+export async function sendGroupMessage(groupId: string, content: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { error } = await supabase.from('group_messages').insert({
+    group_id: groupId,
+    sender_id: user.id,
+    content,
+  });
+  if (error) throw error;
+}
+
+// Subscribe to new messages in real time
+export function subscribeToGroupMessages(
+  groupId: string,
+  onMessage: (msg: GroupMessage) => void
+) {
+  return supabase
+    .channel(`group-messages-${groupId}`)
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'group_messages', filter: `group_id=eq.${groupId}` },
+      async (payload) => {
+        const msg = payload.new as any;
+        // Fetch sender details
+        const { data: senderData } = await supabase
+          .from('users')
+          .select('name, photos')
+          .eq('id', msg.sender_id)
+          .single();
+
+        onMessage({
+          id: msg.id,
+          groupId: msg.group_id,
+          senderId: msg.sender_id,
+          senderName: senderData?.name || 'Unknown',
+          senderPhoto: senderData?.photos?.[0],
+          content: msg.content,
+          createdAt: msg.created_at,
+        });
+      }
+    )
+    .subscribe();
+}
+
+// Check if user has hit their plan's group creation limit
+export function getGroupLimit(plan: string): number {
+  const limits: Record<string, number> = {
+    basic:    1,
+    plus:     3,
+    elite:    10,
+    starter:  1,   // host
+    pro:      3,   // host
+    business: 999, // unlimited
+  };
+  return limits[plan] || 1;
+}
+
+export function getMemberLimit(plan: string): number {
+  const limits: Record<string, number> = {
+    basic:    4,
+    plus:     8,
+    elite:    15,
+    starter:  6,
+    pro:      12,
+    business: 25,
+  };
+  return limits[plan] || 4;
+}
+```
+
+---
+
+## Step 3 — Create `CreateGroupScreen.tsx`
+
+Create `screens/shared/CreateGroupScreen.tsx`:
+
+```tsx
+import React, { useState, useEffect } from 'react';
+import {
+  View, StyleSheet, Pressable, TextInput, Alert, FlatList, ActivityIndicator,
+} from 'react-native';
+import { Feather } from '../../components/VectorIcons';
+import { ThemedText } from '../../components/ThemedText';
+import { useTheme } from '../../hooks/useTheme';
+import { useAuth } from '../../contexts/AuthContext';
+import { Typography, Spacing } from '../../constants/theme';
+import { createGroup, getGroupLimit } from '../../services/groupService';
+import { getMyListings } from '../../services/listingService';
+import { Image } from 'expo-image';
+
+export function CreateGroupScreen({ navigation, route }: any) {
+  const { theme } = useTheme();
+  const { user } = useAuth();
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [selectedListingId, setSelectedListingId] = useState<string | null>(
+    route.params?.preselectedListingId || null
+  );
+  const [myListings, setMyListings] = useState<any[]>([]);
+  const [creating, setCreating] = useState(false);
+  const isHost = user?.role === 'host';
+
+  useEffect(() => {
+    if (isHost) {
+      getMyListings().then(setMyListings).catch(() => {});
+    }
+  }, [isHost]);
+
+  const handleCreate = async () => {
+    if (!name.trim()) {
+      Alert.alert('Name Required', 'Please enter a name for your group.');
+      return;
+    }
+
+    setCreating(true);
+    try {
+      const group = await createGroup({
+        name: name.trim(),
+        description: description.trim() || undefined,
+        listingId: selectedListingId || undefined,
+      });
+      navigation.replace('GroupChat', { groupId: group.id, groupName: group.name });
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to create group.');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={styles.header}>
+        <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
+          <Feather name="x" size={24} color={theme.text} />
+        </Pressable>
+        <ThemedText style={[Typography.h3, { flex: 1, textAlign: 'center' }]}>New Group</ThemedText>
+        <Pressable onPress={handleCreate} disabled={creating || !name.trim()}>
+          {creating ? (
+            <ActivityIndicator size="small" color={theme.primary} />
+          ) : (
+            <ThemedText style={[Typography.body, { color: name.trim() ? theme.primary : theme.textSecondary, fontWeight: '600' }]}>
+              Create
+            </ThemedText>
+          )}
+        </Pressable>
+      </View>
+
+      {/* Group Name */}
+      <View style={[styles.field, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: 6 }]}>GROUP NAME *</ThemedText>
+        <TextInput
+          style={[styles.input, { color: theme.text }]}
+          placeholder="e.g. Looking for 2BR Downtown"
+          placeholderTextColor={theme.textSecondary}
+          value={name}
+          onChangeText={setName}
+          maxLength={60}
+        />
+      </View>
+
+      {/* Description */}
+      <View style={[styles.field, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: 6 }]}>DESCRIPTION (OPTIONAL)</ThemedText>
+        <TextInput
+          style={[styles.input, { color: theme.text, minHeight: 70 }]}
+          placeholder="What is this group for?"
+          placeholderTextColor={theme.textSecondary}
+          value={description}
+          onChangeText={setDescription}
+          multiline
+          maxLength={200}
+        />
+      </View>
+
+      {/* Link to Property (optional) */}
+      <View style={[styles.field, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: 6 }]}>
+          LINK TO A PROPERTY (OPTIONAL)
+        </ThemedText>
+        <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: 12 }]}>
+          Attaching a listing pins the property details to the top of your group chat.
+        </ThemedText>
+
+        {/* None option */}
+        <Pressable
+          style={[
+            styles.listingOption,
+            { borderColor: !selectedListingId ? theme.primary : theme.border,
+              backgroundColor: !selectedListingId ? theme.primary + '15' : theme.background }
+          ]}
+          onPress={() => setSelectedListingId(null)}
+        >
+          <Feather name="slash" size={18} color={!selectedListingId ? theme.primary : theme.textSecondary} />
+          <ThemedText style={[Typography.body, { marginLeft: Spacing.sm, color: !selectedListingId ? theme.primary : theme.text }]}>
+            No property — standalone group
+          </ThemedText>
+          {!selectedListingId && <Feather name="check" size={18} color={theme.primary} style={{ marginLeft: 'auto' }} />}
+        </Pressable>
+
+        {/* Host's own listings */}
+        {isHost && myListings.length > 0 && (
+          <FlatList
+            data={myListings}
+            keyExtractor={item => item.id}
+            scrollEnabled={false}
+            renderItem={({ item }) => (
+              <Pressable
+                style={[
+                  styles.listingOption,
+                  { borderColor: selectedListingId === item.id ? theme.primary : theme.border,
+                    backgroundColor: selectedListingId === item.id ? theme.primary + '15' : theme.background }
+                ]}
+                onPress={() => setSelectedListingId(item.id)}
+              >
+                {item.photos?.[0] && (
+                  <Image source={{ uri: item.photos[0] }} style={styles.listingThumb} />
+                )}
+                <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+                  <ThemedText style={[Typography.body, { fontWeight: '600' }]} numberOfLines={1}>{item.title}</ThemedText>
+                  <ThemedText style={[Typography.small, { color: theme.textSecondary }]} numberOfLines={1}>
+                    {item.address}, {item.city}
+                  </ThemedText>
+                  <ThemedText style={[Typography.small, { color: theme.primary, fontWeight: '600' }]}>
+                    ${item.rent}/mo
+                  </ThemedText>
+                </View>
+                {selectedListingId === item.id && (
+                  <Feather name="check" size={18} color={theme.primary} />
+                )}
+              </Pressable>
+            )}
+          />
+        )}
+
+        {/* Renters: show a search/pick listing option */}
+        {!isHost && (
+          <Pressable
+            style={[styles.listingOption, { borderColor: theme.border }]}
+            onPress={() => navigation.navigate('PickListingForGroup', { onSelect: (id: string) => setSelectedListingId(id) })}
+          >
+            <Feather name="search" size={18} color={theme.textSecondary} />
+            <ThemedText style={[Typography.body, { marginLeft: Spacing.sm, color: theme.textSecondary }]}>
+              {selectedListingId ? 'Change selected listing...' : 'Search for a listing to link...'}
+            </ThemedText>
+          </Pressable>
+        )}
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  header: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: Spacing.lg, paddingTop: 56, paddingBottom: Spacing.md,
+  },
+  field: {
+    marginHorizontal: Spacing.lg, marginBottom: Spacing.md,
+    padding: Spacing.md, borderRadius: 14, borderWidth: 1,
+  },
+  input: { fontSize: 16 },
+  listingOption: {
+    flexDirection: 'row', alignItems: 'center',
+    padding: Spacing.sm, borderRadius: 12, borderWidth: 1.5,
+    marginBottom: Spacing.sm,
+  },
+  listingThumb: { width: 44, height: 44, borderRadius: 8 },
+});
+```
+
+---
+
+## Step 4 — Add Property Card to Group Chat Header
+
+In your `GroupChatScreen` (or wherever group messages are displayed), add this pinned header when `group.listingId` is set:
+
+```tsx
+{group.listing && (
+  <Pressable
+    style={[styles.pinnedListing, { backgroundColor: theme.card, borderColor: theme.border }]}
+    onPress={() => navigation.navigate('ListingDetail', { listingId: group.listing.id })}
+  >
+    {group.listing.photos?.[0] && (
+      <Image source={{ uri: group.listing.photos[0] }} style={styles.pinnedPhoto} />
+    )}
+    <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+      <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>📍 Linked Property</ThemedText>
+      <ThemedText style={[Typography.body, { fontWeight: '600' }]} numberOfLines={1}>
+        {group.listing.title}
+      </ThemedText>
+      <ThemedText style={[Typography.small, { color: theme.textSecondary }]} numberOfLines={1}>
+        {group.listing.address}, {group.listing.city} · ${group.listing.rent}/mo
+      </ThemedText>
+    </View>
+    <Feather name="chevron-right" size={18} color={theme.textSecondary} />
+  </Pressable>
+)}
+```
+
+Styles:
+```ts
+pinnedListing: {
+  flexDirection: 'row', alignItems: 'center',
+  padding: Spacing.sm, marginHorizontal: Spacing.md,
+  marginBottom: Spacing.sm, borderRadius: 12, borderWidth: 1,
+},
+pinnedPhoto: { width: 52, height: 52, borderRadius: 8 },
+```
+
+---
+
+## Step 5 — Add Plan Limit Check Before Creating
+
+In `CreateGroupScreen.handleCreate`, add this check before calling `createGroup()`:
+
+```ts
+const userPlan = user?.subscription?.plan || 'basic';
+const groupLimit = getGroupLimit(userPlan);
+
+// Count how many groups user already created
+const { count } = await supabase
+  .from('groups')
+  .select('id', { count: 'exact', head: true })
+  .eq('created_by', user.id);
+
+if ((count || 0) >= groupLimit) {
+  Alert.alert(
+    'Group Limit Reached',
+    `Your ${userPlan.charAt(0).toUpperCase() + userPlan.slice(1)} plan allows up to ${groupLimit} group${groupLimit === 1 ? '' : 's'}. Upgrade to create more.`,
+    [
+      { text: 'Upgrade', onPress: () => navigation.navigate('PlanSelection') },
+      { text: 'Cancel', style: 'cancel' },
+    ]
+  );
+  return;
+}
+```
+
+---
+
+## Step 6 — Navigation Setup
+
+Add these routes to your navigator:
+
+```ts
+// In your shared stack or tab navigator:
+<Stack.Screen name="Groups" component={GroupsListScreen} />
+<Stack.Screen name="CreateGroup" component={CreateGroupScreen} />
+<Stack.Screen name="GroupChat" component={GroupChatScreen} />
+```
+
+Add a **Groups** tab or button in the MessagesScreen so users can toggle between direct messages and groups.
+
+---
+
+## Summary of Behavior
+
+| Scenario | What Happens |
+|----------|-------------|
+| Renter creates group with no listing | Standalone group — find roommates, coordinate together |
+| Renter creates group linked to listing | Listing card pinned at top — everyone sees rent, address, photos |
+| Host creates group linked to their property | Tenant coordination group — all members see listing details |
+| Host creates group with no listing | General group — useful for multi-property coordination |
+| User hits plan limit | Prompt to upgrade with plan limit message |
+| Member taps pinned listing card | Opens full listing detail screen |

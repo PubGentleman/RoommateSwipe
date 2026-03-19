@@ -71,7 +71,7 @@ The data layer uses Supabase PostgreSQL, complemented by local AsyncStorage for 
 
 **Listing Service (`services/listingService.ts`):** Centralized Supabase CRUD for the `listings` table. Exports `mapListingToProperty()` to convert Supabase rows (snake_case) to the `Property` TypeScript type (camelCase). All screens (ExploreScreen, HostDashboardScreen, MyListingsScreen, HostAnalyticsScreen, CreateEditListingScreen) use this centralized mapper instead of inline mapping. Supabase-first with StorageService (mock data) fallback for demo mode.
 
-**Group System:** Supports `roommate` groups (renter-only) and `listing_inquiry` groups (renter group + host in a chat). `GroupMember` tracks role, host status, and member status.
+**Group System:** Supports `roommate` groups (renter-only) and `listing_inquiry` groups (renter group + host in a chat). `GroupMember` tracks role, host status, and member status. Groups can optionally be linked to a listing (`listing_id`) — when linked, a pinned listing card appears at the top of the group chat. Plan-based group creation limits: Renter (Basic: 1, Plus: 3, Elite: 10), Host (Starter: 1, Pro: 3, Business: unlimited). Member limits per group also vary by plan. `CreateGroupScreen` supports standalone creation and optional property linking. Service: `services/groupService.ts` (includes `getGroupLimit`, `getMemberLimit`, `getGroupWithListing`, group message CRUD, and real-time subscription).
 
 **Address Reveal System:** Full property addresses are hidden until the host accepts an inquiry, after which the address is revealed with navigational links.
 

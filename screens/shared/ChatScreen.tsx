@@ -15,7 +15,7 @@ import { RoomdrAISheet, ScreenContext } from '../../components/RoomdrAISheet';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { getMessages as getSupabaseMessages, sendMessage as sendSupabaseMessage, markMessagesAsRead as markSupabaseMessagesAsRead, subscribeToMessages } from '../../services/messageService';
 import { recordMessageActivity } from '../../utils/aiMemory';
-import { acceptInquiry, declineInquiry } from '../../services/groupService';
+import { acceptInquiry, declineInquiry, getGroupWithListing } from '../../services/groupService';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence } from 'react-native-reanimated';
 import { AdBanner } from '../../components/AdBanner';
 import { getDailyMessageCount, MESSAGING_LIMITS, getTimeUntilMidnight, incrementDailyColdMessageCount } from '../../utils/messagingUtils';
@@ -54,6 +54,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [coldMessagesRemaining, setColdMessagesRemaining] = useState<number>(3);
   const [showDailyLimitModal, setShowDailyLimitModal] = useState(false);
   const [showChatLimitModal, setShowChatLimitModal] = useState(false);
+  const [linkedListing, setLinkedListing] = useState<any>(null);
 
   const [inquiryStatus, setInquiryStatus] = useState<'pending' | 'accepted' | 'declined'>(
     inquiryGroup?.inquiryStatus || inquiryGroup?.inquiry_status || 'pending'
@@ -156,6 +157,22 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   useEffect(() => {
     loadMessages();
   }, [conversationId]);
+
+  useEffect(() => {
+    setLinkedListing(null);
+    const isGroupChat = conversationId.startsWith('group-');
+    if (isGroupChat && !isInquiryChat) {
+      const groupId = conversationId.replace('group-', '');
+      getGroupWithListing(groupId)
+        .then(group => {
+          if (group?.listing_id && group?.listing) {
+            const listing = Array.isArray(group.listing) ? group.listing[0] : group.listing;
+            if (listing) setLinkedListing(listing);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [conversationId, isInquiryChat]);
 
   useEffect(() => {
     if (!matchIdFromConversation) return;
@@ -735,6 +752,42 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           <Pressable onPress={() => setShowGroupOption(false)} style={styles.dismissButton}>
             <Feather name="x" size={20} color="#FFFFFF" />
           </Pressable>
+        </Pressable>
+      ) : null}
+
+      {linkedListing && !isInquiryChat ? (
+        <Pressable
+          style={[styles.pinnedListingCard, { borderColor: theme.border }]}
+          onPress={() => {
+            const tabNav = navigation.getParent();
+            if (tabNav && linkedListing.id) {
+              try {
+                tabNav.navigate('Explore', { viewListingId: linkedListing.id });
+              } catch {
+                try {
+                  tabNav.navigate('Listings', { viewListingId: linkedListing.id });
+                } catch {}
+              }
+            }
+          }}
+        >
+          {linkedListing.photos?.[0] ? (
+            <Image source={{ uri: linkedListing.photos[0] }} style={styles.pinnedListingThumb} />
+          ) : (
+            <View style={[styles.pinnedListingThumbWrap, { backgroundColor: theme.backgroundSecondary }]}>
+              <Feather name="home" size={20} color="#ff6b5b" />
+            </View>
+          )}
+          <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+            <ThemedText style={{ fontSize: 11, color: theme.textSecondary, fontWeight: '600' }}>Linked Property</ThemedText>
+            <ThemedText style={{ fontSize: 13, fontWeight: '600', color: theme.text }} numberOfLines={1}>
+              {linkedListing.title}
+            </ThemedText>
+            <ThemedText style={{ fontSize: 12, color: theme.textSecondary }} numberOfLines={1}>
+              {linkedListing.address}, {linkedListing.city} · ${linkedListing.rent}/mo
+            </ThemedText>
+          </View>
+          <Feather name="chevron-right" size={18} color={theme.textSecondary} />
         </Pressable>
       ) : null}
 
