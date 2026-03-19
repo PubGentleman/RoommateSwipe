@@ -1642,9 +1642,65 @@ export const GroupsScreen = () => {
               {currentGroup ? (
                 <>
                   <View style={[styles.detailSection, { alignItems: 'center' }]}>
-                    <View style={[styles.groupIconLarge, { backgroundColor: theme.primary }]}>
-                      <Feather name="users" size={32} color="#FFFFFF" />
-                    </View>
+                    {(() => {
+                      const memberPhotos = currentGroup.members
+                        .map((mid: string) => {
+                          const p = profileCache.find(pr => pr.id === mid);
+                          return { photo: p?.photos?.[0] || p?.profilePicture, initial: p?.name?.charAt(0)?.toUpperCase() || '?' };
+                        })
+                        .slice(0, 4);
+                      if (memberPhotos.length === 0) {
+                        return (
+                          <View style={[styles.groupIconLarge, { backgroundColor: theme.primary }]}>
+                            <Feather name="users" size={32} color="#FFFFFF" />
+                          </View>
+                        );
+                      }
+                      const size = memberPhotos.length === 1 ? 64 : 44;
+                      const overlap = memberPhotos.length <= 2 ? 14 : 10;
+                      const totalWidth = size + (memberPhotos.length - 1) * (size - overlap);
+                      return (
+                        <View style={{ width: totalWidth, height: size, flexDirection: 'row', marginBottom: 4 }}>
+                          {memberPhotos.map((m: { photo?: string; initial: string }, i: number) => (
+                            m.photo ? (
+                              <Image
+                                key={i}
+                                source={{ uri: m.photo }}
+                                style={{
+                                  width: size,
+                                  height: size,
+                                  borderRadius: size / 2,
+                                  borderWidth: 2,
+                                  borderColor: '#1a1a1a',
+                                  position: 'absolute',
+                                  left: i * (size - overlap),
+                                  zIndex: memberPhotos.length - i,
+                                }}
+                              />
+                            ) : (
+                              <View
+                                key={i}
+                                style={{
+                                  width: size,
+                                  height: size,
+                                  borderRadius: size / 2,
+                                  borderWidth: 2,
+                                  borderColor: '#1a1a1a',
+                                  backgroundColor: '#444',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  position: 'absolute',
+                                  left: i * (size - overlap),
+                                  zIndex: memberPhotos.length - i,
+                                }}
+                              >
+                                <Text style={{ color: '#fff', fontWeight: '700', fontSize: size * 0.38 }}>{m.initial}</Text>
+                              </View>
+                            )
+                          ))}
+                        </View>
+                      );
+                    })()}
                     <ThemedText style={[Typography.h2, { marginTop: Spacing.md }]}>{currentGroup.name}</ThemedText>
                     <View style={styles.membersInfo}>
                       <Feather name="users" size={16} color={theme.textSecondary} />
