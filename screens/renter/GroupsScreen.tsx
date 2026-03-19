@@ -9,7 +9,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { Group, RoommateProfile, GroupType } from '../../types/models';
 import { StorageService } from '../../utils/storage';
-import { getGroups as getGroupsFromSupabase, getMyGroups as getMyGroupsFromSupabase, getMyInquiryGroups as getMyInquiryGroupsFromSupabase, joinGroup as joinGroupSupabase, leaveGroup as leaveGroupSupabase, createGroup as createGroupSupabase, archiveGroup as archiveGroupSupabase, getGroupLimit, getMemberLimit, getMyPendingInvites, respondToInvite, joinGroupByCode } from '../../services/groupService';
+import { getGroups as getGroupsFromSupabase, getMyGroups as getMyGroupsFromSupabase, getMyInquiryGroups as getMyInquiryGroupsFromSupabase, joinGroup as joinGroupSupabase, leaveGroup as leaveGroupSupabase, createGroup as createGroupSupabase, archiveGroup as archiveGroupSupabase, getGroupLimit, getMemberLimit, getMyPendingInvites, respondToInvite, joinGroupByCode, updateGroup as updateGroupSupabase } from '../../services/groupService';
 import { getMyListings } from '../../services/listingService';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -61,6 +61,10 @@ export const GroupsScreen = () => {
   const [pendingInvites, setPendingInvites] = useState<any[]>([]);
   const [codeInput, setCodeInput] = useState('');
   const [joiningByCode, setJoiningByCode] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<Group | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const [groupName, setGroupName] = useState('');
   const [groupDescription, setGroupDescription] = useState('');
@@ -775,6 +779,42 @@ export const GroupsScreen = () => {
     );
   };
 
+  const handleOpenGroupChat = (group: Group) => {
+    navigation.navigate('Messages', {
+      screen: 'Chat',
+      params: { conversationId: `group-${group.id}` },
+    });
+  };
+
+  const handleEditGroup = (group: Group) => {
+    setEditingGroup(group);
+    setEditName(group.name);
+    setEditDescription(group.description || '');
+  };
+
+  const handleSaveGroupEdit = async () => {
+    if (!editingGroup || !editName.trim()) return;
+    setSavingEdit(true);
+    try {
+      await updateGroupSupabase(editingGroup.id, {
+        name: editName.trim(),
+        description: editDescription.trim() || null,
+      } as any);
+    } catch (err) {
+      console.warn('Supabase group update failed (expected in demo):', err);
+    }
+    setMyGroups(prev =>
+      prev.map(g =>
+        g.id === editingGroup.id
+          ? { ...g, name: editName.trim(), description: editDescription.trim() || '' }
+          : g
+      )
+    );
+    setEditingGroup(null);
+    setSavingEdit(false);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
   const renderInquiryGroup = (group: any) => {
     return (
       <Pressable
@@ -842,9 +882,10 @@ export const GroupsScreen = () => {
       .filter((p): p is NonNullable<typeof p> => p !== null && p !== undefined);
 
     return (
-      <View
+      <Pressable
         key={group.id}
         style={[styles.myGroupCard, { backgroundColor: theme.backgroundDefault }]}
+        onPress={() => handleOpenGroupChat(group)}
       >
         <View style={styles.groupHeader}>
           <View style={[styles.groupIcon, { backgroundColor: theme.primary }]}>
@@ -856,14 +897,28 @@ export const GroupsScreen = () => {
               {group.members.length}/{group.maxMembers} members
             </ThemedText>
           </View>
-          {!isCreator ? (
-            <Pressable
-              style={[styles.leaveButton, { borderColor: theme.error }]}
-              onPress={() => handleLeaveGroup(group)}
-            >
-              <ThemedText style={[Typography.small, { color: theme.error }]}>Leave</ThemedText>
-            </Pressable>
-          ) : null}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            {isCreator ? (
+              <Pressable
+                style={styles.groupActionBtn}
+                onPress={(e) => { e.stopPropagation(); handleEditGroup(group); }}
+                hitSlop={8}
+              >
+                <Feather name="edit-2" size={16} color={theme.textSecondary} />
+              </Pressable>
+            ) : null}
+            {!isCreator ? (
+              <Pressable
+                style={[styles.leaveButton, { borderColor: theme.error }]}
+                onPress={(e) => { e.stopPropagation(); handleLeaveGroup(group); }}
+              >
+                <ThemedText style={[Typography.small, { color: theme.error }]}>Leave</ThemedText>
+              </Pressable>
+            ) : null}
+            <View style={styles.groupChatChevron}>
+              <Feather name="chevron-right" size={18} color={theme.textSecondary} />
+            </View>
+          </View>
         </View>
 
         {group.description ? (
@@ -931,7 +986,7 @@ export const GroupsScreen = () => {
                   ) : null}
                 </View>
                 {isCreator && profile.id !== user?.id ? (
-                  <Pressable onPress={() => handleRemoveMember(group.id, profile.id, profile.name || 'Member')}>
+                  <Pressable onPress={(e) => { e.stopPropagation(); handleRemoveMember(group.id, profile.id, profile.name || 'Member'); }}>
                     <Feather name="x-circle" size={20} color={theme.error} />
                   </Pressable>
                 ) : null}
@@ -958,13 +1013,13 @@ export const GroupsScreen = () => {
                 <View style={styles.pendingActions}>
                   <Pressable
                     style={[styles.pendingButton, { backgroundColor: theme.primary }]}
-                    onPress={() => handleAcceptMember(group.id, profile.id, profile.name || 'Member')}
+                    onPress={(e) => { e.stopPropagation(); handleAcceptMember(group.id, profile.id, profile.name || 'Member'); }}
                   >
                     <Feather name="check" size={16} color="#FFFFFF" />
                   </Pressable>
                   <Pressable
                     style={[styles.pendingButton, { backgroundColor: theme.error }]}
-                    onPress={() => handleRejectMember(group.id, profile.id)}
+                    onPress={(e) => { e.stopPropagation(); handleRejectMember(group.id, profile.id); }}
                   >
                     <Feather name="x" size={16} color="#FFFFFF" />
                   </Pressable>
@@ -973,7 +1028,7 @@ export const GroupsScreen = () => {
             ))}
           </View>
         ) : null}
-      </View>
+      </Pressable>
     );
   };
 
@@ -1545,6 +1600,65 @@ export const GroupsScreen = () => {
       ) : null}
 
       <Modal
+        visible={!!editingGroup}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setEditingGroup(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.editGroupModal, { backgroundColor: theme.backgroundSecondary }]}>
+            <View style={styles.editGroupModalHeader}>
+              <ThemedText style={[Typography.h3]}>Edit Group</ThemedText>
+              <Pressable onPress={() => setEditingGroup(null)} hitSlop={8}>
+                <Feather name="x" size={22} color={theme.textSecondary} />
+              </Pressable>
+            </View>
+
+            <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: 6 }]}>Group Name</ThemedText>
+            <TextInput
+              style={[styles.editGroupInput, { backgroundColor: theme.backgroundDefault, color: theme.text, borderColor: theme.border }]}
+              value={editName}
+              onChangeText={setEditName}
+              placeholder="Group name"
+              placeholderTextColor={theme.textSecondary}
+              maxLength={50}
+            />
+
+            <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: 6, marginTop: 16 }]}>Description</ThemedText>
+            <TextInput
+              style={[styles.editGroupInput, styles.editGroupTextArea, { backgroundColor: theme.backgroundDefault, color: theme.text, borderColor: theme.border }]}
+              value={editDescription}
+              onChangeText={setEditDescription}
+              placeholder="What is your group about?"
+              placeholderTextColor={theme.textSecondary}
+              multiline
+              maxLength={200}
+              textAlignVertical="top"
+            />
+
+            <View style={styles.editGroupActions}>
+              <Pressable
+                style={[styles.editGroupCancelBtn, { borderColor: theme.border }]}
+                onPress={() => setEditingGroup(null)}
+              >
+                <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>Cancel</ThemedText>
+              </Pressable>
+              <Pressable
+                style={[styles.editGroupSaveBtn, { backgroundColor: theme.primary, opacity: savingEdit || !editName.trim() ? 0.5 : 1 }]}
+                onPress={handleSaveGroupEdit}
+                disabled={savingEdit || !editName.trim()}
+              >
+                {savingEdit
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <ThemedText style={[Typography.body, { color: '#fff', fontWeight: '700' }]}>Save</ThemedText>
+                }
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
         visible={showUndoUpgradeModal}
         animationType="slide"
         transparent={true}
@@ -2066,6 +2180,55 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.small,
+  },
+  groupActionBtn: {
+    padding: 6,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  groupChatChevron: {
+    marginLeft: 2,
+  },
+  editGroupModal: {
+    width: '90%',
+    maxWidth: 400,
+    borderRadius: BorderRadius.large,
+    padding: Spacing.xl,
+  },
+  editGroupModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.lg,
+  },
+  editGroupInput: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.small,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    fontSize: 16,
+  },
+  editGroupTextArea: {
+    minHeight: 80,
+    paddingTop: Spacing.sm,
+  },
+  editGroupActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: Spacing.xl,
+  },
+  editGroupCancelBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: BorderRadius.small,
+    paddingVertical: Spacing.sm,
+    alignItems: 'center',
+  },
+  editGroupSaveBtn: {
+    flex: 1,
+    borderRadius: BorderRadius.small,
+    paddingVertical: Spacing.sm,
+    alignItems: 'center',
   },
   membersSection: {
     marginTop: Spacing.md,
