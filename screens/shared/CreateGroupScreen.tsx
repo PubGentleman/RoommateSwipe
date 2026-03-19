@@ -49,12 +49,12 @@ export const CreateGroupScreen = ({ navigation, route }: any) => {
       const groupLimit = getGroupLimit(userPlan);
 
       try {
-        const { count } = await supabase
+        const { count, error: countError } = await supabase
           .from('groups')
           .select('id', { count: 'exact', head: true })
           .eq('created_by', user.id);
 
-        if ((count || 0) >= groupLimit) {
+        if (!countError && count !== null && count >= groupLimit) {
           const planLabel = userPlan.charAt(0).toUpperCase() + userPlan.slice(1);
           Alert.alert(
             'Group Limit Reached',

@@ -62,11 +62,6 @@ export const GroupsScreen = () => {
 
   const [groupName, setGroupName] = useState('');
   const [groupDescription, setGroupDescription] = useState('');
-  const [groupBudget, setGroupBudget] = useState('');
-  const [groupApartmentPrice, setGroupApartmentPrice] = useState('');
-  const [groupBedrooms, setGroupBedrooms] = useState('');
-  const [groupLocation, setGroupLocation] = useState('');
-  const [groupMaxMembers, setGroupMaxMembers] = useState('4');
   const [selectedListingId, setSelectedListingId] = useState<string | null>(null);
   const [hostListings, setHostListings] = useState<any[]>([]);
   const userPlan = user?.subscription?.plan || 'basic';
@@ -599,9 +594,12 @@ export const GroupsScreen = () => {
   const handleCreateGroup = async () => {
     if (!user) return;
 
-    const userPlan = user.subscription?.plan || 'basic';
+    if (!groupName.trim()) {
+      Alert.alert('Name Required', 'Please enter a name for your group.');
+      return;
+    }
+
     const groupLimit = getGroupLimit(userPlan);
-    const memberLimit = getMemberLimit(userPlan);
 
     try {
       let createdCount = 0;
@@ -625,11 +623,8 @@ export const GroupsScreen = () => {
           'Group Limit Reached',
           `Your ${planLabel} plan allows up to ${groupLimit} group${groupLimit === 1 ? '' : 's'}. Upgrade to create more.`,
           [
-            { text: 'Maybe Later', style: 'cancel' },
-            {
-              text: 'Upgrade',
-              onPress: () => navigation.navigate('Profile', { screen: 'Payment' }),
-            },
+            { text: 'Upgrade', onPress: () => navigation.navigate('Profile', { screen: 'Payment' }) },
+            { text: 'Cancel', style: 'cancel' },
           ]
         );
         return;
@@ -638,84 +633,33 @@ export const GroupsScreen = () => {
       console.error('[GroupsScreen] Error checking group limits:', error);
     }
 
-    if (!groupName.trim()) {
-      Alert.alert('Error', 'Please enter a group name');
-      return;
-    }
-
-    if (!groupBudget.trim() || isNaN(parseInt(groupBudget))) {
-      Alert.alert('Error', 'Please enter a valid budget');
-      return;
-    }
-
-    if (!groupLocation.trim()) {
-      Alert.alert('Error', 'Please enter a location');
-      return;
-    }
-
-    const maxMembers = parseInt(groupMaxMembers);
-    if (isNaN(maxMembers) || maxMembers < 1 || maxMembers > memberLimit) {
-      Alert.alert('Error', `Maximum members must be between 1 and ${memberLimit} for your plan.`);
-      return;
-    }
-
-    const apartmentPrice = groupApartmentPrice.trim() ? parseInt(groupApartmentPrice) : undefined;
-    const bedrooms = groupBedrooms.trim() ? parseInt(groupBedrooms) : undefined;
-
-    // Validate apartment price is at least budget * bedrooms
-    if (apartmentPrice !== undefined && bedrooms !== undefined) {
-      const minPrice = parseInt(groupBudget) * bedrooms;
-      if (apartmentPrice < minPrice) {
-        Alert.alert(
-          'Invalid Apartment Price',
-          `The apartment price ($${apartmentPrice}) cannot be less than the minimum budget per person ($${groupBudget}) × bedrooms (${bedrooms}) = $${minPrice}`
-        );
-        return;
-      }
-    }
-
-    const newGroup: Group = {
-      id: Math.random().toString(36).substr(2, 9),
-      type: selectedListingId ? 'listing_inquiry' : 'roommate',
-      name: groupName.trim(),
-      description: groupDescription.trim() || undefined,
-      members: [user.id],
-      pendingMembers: [],
-      budget: parseInt(groupBudget),
-      apartmentPrice: apartmentPrice,
-      bedrooms: bedrooms,
-      preferredLocation: groupLocation.trim(),
-      maxMembers: maxMembers,
-      createdAt: new Date(),
-      createdBy: user.id,
-      listingId: selectedListingId || undefined,
-    };
-
-    const groupType = selectedListingId ? 'listing_inquiry' : 'roommate';
-
     try {
       await createGroupSupabase({
         name: groupName.trim(),
         description: groupDescription.trim() || undefined,
-        city: groupLocation.trim(),
-        max_members: maxMembers,
-        budget_min: parseInt(groupBudget),
-        budget_max: apartmentPrice,
         listing_id: selectedListingId || undefined,
-        type: groupType,
       });
     } catch (supabaseError) {
       console.warn('[GroupsScreen] Supabase createGroup failed, falling back to StorageService:', supabaseError);
+      const newGroup: Group = {
+        id: Math.random().toString(36).substr(2, 9),
+        type: 'roommate',
+        name: groupName.trim(),
+        description: groupDescription.trim() || undefined,
+        members: [user.id],
+        pendingMembers: [],
+        budget: 0,
+        preferredLocation: '',
+        maxMembers: planMemberLimit,
+        createdAt: new Date(),
+        createdBy: user.id,
+        listingId: selectedListingId || undefined,
+      };
       await StorageService.addOrUpdateGroup(newGroup);
     }
 
     setGroupName('');
     setGroupDescription('');
-    setGroupBudget('');
-    setGroupApartmentPrice('');
-    setGroupBedrooms('');
-    setGroupLocation('');
-    setGroupMaxMembers('4');
     setSelectedListingId(null);
 
     await loadGroups();
@@ -1335,165 +1279,67 @@ export const GroupsScreen = () => {
               color: theme.text,
               borderColor: theme.border
             }]}
-            placeholder="e.g., Young Professionals"
+            placeholder="e.g., Looking for 2BR Downtown"
             placeholderTextColor={theme.textSecondary}
             value={groupName}
             onChangeText={setGroupName}
+            maxLength={60}
           />
         </View>
 
         <View style={styles.inputGroup}>
-          <ThemedText style={[Typography.body, { marginBottom: Spacing.xs }]}>Description</ThemedText>
+          <ThemedText style={[Typography.body, { marginBottom: Spacing.xs }]}>Description (Optional)</ThemedText>
           <TextInput
             style={[styles.input, styles.textArea, { 
               backgroundColor: theme.backgroundDefault, 
               color: theme.text,
               borderColor: theme.border
             }]}
-            placeholder="Tell others about your group..."
+            placeholder="What is this group for?"
             placeholderTextColor={theme.textSecondary}
             value={groupDescription}
             onChangeText={setGroupDescription}
             multiline
-            numberOfLines={4}
+            numberOfLines={3}
             textAlignVertical="top"
+            maxLength={200}
           />
         </View>
 
         <View style={styles.inputGroup}>
           <ThemedText style={[Typography.body, { marginBottom: Spacing.xs }]}>
-            Minimum Monthly Budget (per person) {(groupApartmentPrice.trim() && groupBedrooms.trim()) ? '(Auto-calculated)' : '*'}
+            Link to a Property (Optional)
           </ThemedText>
-          <TextInput
-            style={[styles.input, { 
-              backgroundColor: (groupApartmentPrice.trim() && groupBedrooms.trim()) ? theme.backgroundSecondary : theme.backgroundDefault, 
-              color: theme.text,
-              borderColor: theme.border
-            }]}
-            placeholder="e.g., 800"
-            placeholderTextColor={theme.textSecondary}
-            value={groupBudget}
-            onChangeText={setGroupBudget}
-            keyboardType="numeric"
-            editable={!(groupApartmentPrice.trim() && groupBedrooms.trim())}
-          />
-          {(groupApartmentPrice.trim() && groupBedrooms.trim()) ? (
-            <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
-              Automatically calculated from apartment price ÷ bedrooms
-            </ThemedText>
-          ) : null}
-        </View>
+          <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.sm, lineHeight: 18 }]}>
+            Attaching a listing pins the property details to the top of your group chat.
+          </ThemedText>
 
-        <View style={styles.inputGroup}>
-          <ThemedText style={[Typography.body, { marginBottom: Spacing.xs }]}>Entire Apartment Price</ThemedText>
-          <TextInput
-            style={[styles.input, { 
-              backgroundColor: theme.backgroundDefault, 
-              color: theme.text,
-              borderColor: theme.border
-            }]}
-            placeholder="e.g., 2500"
-            placeholderTextColor={theme.textSecondary}
-            value={groupApartmentPrice}
-            onChangeText={(value) => {
-              setGroupApartmentPrice(value);
-              // Auto-calculate minimum budget per person
-              if (value.trim() && !isNaN(parseInt(value)) && groupBedrooms.trim() && !isNaN(parseInt(groupBedrooms))) {
-                const totalPrice = parseInt(value);
-                const rooms = parseInt(groupBedrooms);
-                const perPerson = Math.ceil(totalPrice / rooms);
-                setGroupBudget(perPerson.toString());
-              }
+          <Pressable
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              padding: 12,
+              borderRadius: 12,
+              borderWidth: 1.5,
+              borderColor: !selectedListingId ? theme.primary : theme.border,
+              backgroundColor: !selectedListingId ? `${theme.primary}15` : theme.backgroundDefault,
+              marginBottom: 8,
             }}
-            keyboardType="numeric"
-          />
-          {groupApartmentPrice.trim() && groupBedrooms.trim() ? (
-            <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
-              Minimum budget will be auto-calculated as ${groupApartmentPrice} ÷ {groupBedrooms} bedrooms
+            onPress={() => setSelectedListingId(null)}
+          >
+            <Feather name="slash" size={18} color={!selectedListingId ? theme.primary : theme.textSecondary} />
+            <ThemedText style={[Typography.body, {
+              marginLeft: Spacing.sm,
+              color: !selectedListingId ? theme.primary : theme.text,
+              flex: 1,
+            }]}>
+              No property — standalone group
             </ThemedText>
-          ) : null}
-        </View>
+            {!selectedListingId ? (
+              <Feather name="check" size={18} color={theme.primary} />
+            ) : null}
+          </Pressable>
 
-        <View style={styles.inputGroup}>
-          <ThemedText style={[Typography.body, { marginBottom: Spacing.xs }]}>Number of Bedrooms</ThemedText>
-          <TextInput
-            style={[styles.input, { 
-              backgroundColor: theme.backgroundDefault, 
-              color: theme.text,
-              borderColor: theme.border
-            }]}
-            placeholder="e.g., 3"
-            placeholderTextColor={theme.textSecondary}
-            value={groupBedrooms}
-            onChangeText={(value) => {
-              setGroupBedrooms(value);
-              // Auto-set max members to match bedrooms
-              if (value.trim() && !isNaN(parseInt(value))) {
-                setGroupMaxMembers(value);
-                // Auto-calculate minimum budget if apartment price is set
-                if (groupApartmentPrice.trim() && !isNaN(parseInt(groupApartmentPrice))) {
-                  const totalPrice = parseInt(groupApartmentPrice);
-                  const rooms = parseInt(value);
-                  const perPerson = Math.ceil(totalPrice / rooms);
-                  setGroupBudget(perPerson.toString());
-                }
-              }
-            }}
-            keyboardType="numeric"
-          />
-          <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
-            Maximum members will automatically match the number of bedrooms
-          </ThemedText>
-        </View>
-
-        <View style={styles.inputGroup}>
-          <ThemedText style={[Typography.body, { marginBottom: Spacing.xs }]}>Preferred Location *</ThemedText>
-          <TextInput
-            style={[styles.input, { 
-              backgroundColor: theme.backgroundDefault, 
-              color: theme.text,
-              borderColor: theme.border
-            }]}
-            placeholder="e.g., Downtown"
-            placeholderTextColor={theme.textSecondary}
-            value={groupLocation}
-            onChangeText={setGroupLocation}
-          />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <ThemedText style={[Typography.body, { marginBottom: Spacing.xs }]}>
-            Maximum Members (1-{planMemberLimit}) {groupBedrooms.trim() ? '(Auto-set from bedrooms)' : ''}
-          </ThemedText>
-          <TextInput
-            style={[styles.input, { 
-              backgroundColor: groupBedrooms.trim() ? theme.backgroundSecondary : theme.backgroundDefault, 
-              color: theme.text,
-              borderColor: theme.border
-            }]}
-            placeholder="4"
-            placeholderTextColor={theme.textSecondary}
-            value={groupMaxMembers}
-            onChangeText={setGroupMaxMembers}
-            keyboardType="numeric"
-            editable={!groupBedrooms.trim()}
-          />
-          {groupBedrooms.trim() ? (
-            <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
-              Automatically set to match number of bedrooms
-            </ThemedText>
-          ) : null}
-        </View>
-
-        <View style={styles.inputGroup}>
-          <ThemedText style={[Typography.body, { marginBottom: Spacing.xs }]}>
-            Link to a Listing (Optional)
-          </ThemedText>
-          <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.sm }]}>
-            {user?.role === 'host'
-              ? 'Link this group to one of your listings so members can view it in chat.'
-              : 'Link a listing to pin it in the group chat for all members to see.'}
-          </ThemedText>
           {user?.role === 'host' && hostListings.length > 0 ? (
             <View>
               {hostListings.map((listing: any) => (
@@ -1503,72 +1349,70 @@ export const GroupsScreen = () => {
                     flexDirection: 'row',
                     alignItems: 'center',
                     padding: 12,
-                    borderRadius: 10,
-                    backgroundColor: selectedListingId === listing.id
-                      ? `${theme.primary}22`
-                      : theme.backgroundDefault,
-                    borderWidth: 1,
-                    borderColor: selectedListingId === listing.id
-                      ? theme.primary
-                      : theme.border,
+                    borderRadius: 12,
+                    borderWidth: 1.5,
+                    borderColor: selectedListingId === listing.id ? theme.primary : theme.border,
+                    backgroundColor: selectedListingId === listing.id ? `${theme.primary}15` : theme.backgroundDefault,
                     marginBottom: 8,
                   }}
-                  onPress={() =>
-                    setSelectedListingId(
-                      selectedListingId === listing.id ? null : listing.id
-                    )
-                  }
+                  onPress={() => setSelectedListingId(listing.id)}
                 >
-                  <Feather
-                    name={selectedListingId === listing.id ? 'check-circle' : 'circle'}
-                    size={18}
-                    color={selectedListingId === listing.id ? theme.primary : theme.textSecondary}
-                  />
-                  <View style={{ marginLeft: 10, flex: 1 }}>
-                    <ThemedText style={[Typography.body, { fontWeight: '500' }]}>
+                  {listing.photos?.[0] ? (
+                    <Image source={{ uri: listing.photos[0] }} style={{ width: 44, height: 44, borderRadius: 8 }} />
+                  ) : (
+                    <View style={{ width: 44, height: 44, borderRadius: 8, backgroundColor: theme.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
+                      <Feather name="home" size={18} color={theme.textSecondary} />
+                    </View>
+                  )}
+                  <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+                    <ThemedText style={[Typography.body, { fontWeight: '600' }]} numberOfLines={1}>
                       {listing.title || listing.address || 'Untitled Listing'}
                     </ThemedText>
-                    {listing.city ? (
-                      <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
-                        {listing.city}{listing.state ? `, ${listing.state}` : ''}
+                    <ThemedText style={[Typography.caption, { color: theme.textSecondary }]} numberOfLines={1}>
+                      {listing.address}{listing.city ? `, ${listing.city}` : ''}
+                    </ThemedText>
+                    {listing.rent || listing.price ? (
+                      <ThemedText style={[Typography.caption, { color: theme.primary, fontWeight: '600' }]}>
+                        ${listing.rent || listing.price}/mo
                       </ThemedText>
                     ) : null}
                   </View>
-                  {listing.price ? (
-                    <ThemedText style={[Typography.caption, { color: theme.primary, fontWeight: '600' }]}>
-                      ${listing.price}/mo
-                    </ThemedText>
+                  {selectedListingId === listing.id ? (
+                    <Feather name="check" size={18} color={theme.primary} />
                   ) : null}
                 </Pressable>
               ))}
             </View>
           ) : user?.role === 'host' ? (
-            <ThemedText style={[Typography.caption, { color: theme.textSecondary, fontStyle: 'italic' }]}>
+            <ThemedText style={[Typography.caption, { color: theme.textSecondary, fontStyle: 'italic', marginTop: 4 }]}>
               No listings found. Create a listing first to link it here.
             </ThemedText>
           ) : (
-            <View style={{
-              backgroundColor: theme.backgroundDefault,
-              borderRadius: 10,
-              padding: 12,
-              borderWidth: 1,
-              borderColor: theme.border,
-            }}>
-              <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
-                After creating your group, you can browse listings and link them from Explore.
-              </ThemedText>
-            </View>
-          )}
-          {selectedListingId ? (
             <Pressable
-              style={{ marginTop: 4 }}
-              onPress={() => setSelectedListingId(null)}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                padding: 12,
+                borderRadius: 12,
+                borderWidth: 1.5,
+                borderColor: theme.border,
+                backgroundColor: theme.backgroundDefault,
+                marginBottom: 8,
+              }}
+              onPress={() => {
+                Alert.alert(
+                  'Link a Listing',
+                  'Browse listings on the Explore tab, then use "Create Group" from a listing to link it automatically.',
+                  [{ text: 'OK' }]
+                );
+              }}
             >
-              <ThemedText style={[Typography.caption, { color: theme.primary }]}>
-                Remove linked listing
+              <Feather name="search" size={18} color={theme.textSecondary} />
+              <ThemedText style={[Typography.body, { marginLeft: Spacing.sm, color: theme.textSecondary }]}>
+                Search for a listing to link...
               </ThemedText>
             </Pressable>
-          ) : null}
+          )}
         </View>
 
         <View style={{
@@ -1579,11 +1423,11 @@ export const GroupsScreen = () => {
           borderRadius: 10,
           paddingHorizontal: 12,
           paddingVertical: 10,
-          marginTop: 12,
+          marginTop: 4,
         }}>
-          <Feather name="eye" size={13} color="rgba(255,255,255,0.3)" />
+          <Feather name="info" size={13} color="rgba(255,255,255,0.3)" />
           <ThemedText style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', flex: 1, lineHeight: 17 }}>
-            Your group will be discoverable by hosts with listings in your area.
+            Your {userPlan.charAt(0).toUpperCase() + userPlan.slice(1)} plan allows up to {planMemberLimit} members per group.
           </ThemedText>
         </View>
 

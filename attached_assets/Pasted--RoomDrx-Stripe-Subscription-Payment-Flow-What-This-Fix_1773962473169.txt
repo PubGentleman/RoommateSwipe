@@ -1,0 +1,383 @@
+# RoomDrx — Stripe Subscription Payment Flow
+
+## What This Fixes
+Currently `upgradeToPlus()` and `upgradeToElite()` in `AuthContext.tsx` skip Stripe entirely — they just write the new plan directly to Supabase. This means any user can upgrade for free. This prompt wires the Stripe PaymentSheet into the upgrade flow so a real card is charged before the plan activates.
+
+---
+
+## Prerequisites
+
+### Environment Variables
+Add to your `.env` file:
+```
+EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...
+```
+Get this from: **Stripe Dashboard → Developers → API Keys → Publishable key**
+
+### Stripe Products & Price IDs
+In your Stripe dashboard, create Products for each plan and copy the Price IDs. You'll need them below.
+
+Go to **Stripe → Products → Add product** for each:
+
+| Plan | Billing | Monthly Price |
+|------|---------|--------------|
+| Renter Plus | Monthly | $9.99 |
+| Renter Plus | 3-Month | $26.97 |
+| Renter Plus | Annual | $99.99 |
+| Renter Elite | Monthly | $19.99 |
+| Renter Elite | 3-Month | $53.97 |
+| Renter Elite | Annual | $199.99 |
+| Host Starter | Monthly | $29.99 |
+| Host Pro | Monthly | $59.99 |
+| Host Business | Monthly | $99.99 |
+
+---
+
+## Step 1 — Update the `create-subscription` Edge Function
+
+Open `supabase/functions/create-subscription/index.ts` and make sure it looks like this:
+
+```ts
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import Stripe from 'https://esm.sh/stripe@14.21.0?target=deno';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!, { apiVersion: '2023-10-16' });
+const supabase = createClient(
+  Deno.env.get('SUPABASE_URL')!,
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+);
+
+serve(async (req) => {
+  const { userId, priceId, email } = await req.json();
+
+  // Get or create Stripe customer
+  let customerId: string;
+  const { data: sub } = await supabase
+    .from('subscriptions')
+    .select('stripe_customer_id')
+    .eq('user_id', userId)
+    .single();
+
+  if (sub?.stripe_customer_id) {
+    customerId = sub.stripe_customer_id;
+  } else {
+    const customer = await stripe.customers.create({ email, metadata: { supabase_user_id: userId } });
+    customerId = customer.id;
+    await supabase.from('subscriptions').update({ stripe_customer_id: customerId }).eq('user_id', userId);
+  }
+
+  // Create PaymentIntent with subscription setup
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount: 0, // will be set by subscription
+    currency: 'usd',
+    customer: customerId,
+    setup_future_usage: 'off_session',
+    metadata: { userId, priceId },
+  });
+
+  // Create subscription with payment_behavior = default_incomplete
+  const subscription = await stripe.subscriptions.create({
+    customer: customerId,
+    items: [{ price: priceId }],
+    payment_behavior: 'default_incomplete',
+    payment_settings: { save_default_payment_method: 'on_subscription' },
+    expand: ['latest_invoice.payment_intent'],
+  });
+
+  const invoice = subscription.latest_invoice as any;
+  const clientSecret = invoice?.payment_intent?.client_secret;
+
+  return new Response(JSON.stringify({ clientSecret, subscriptionId: subscription.id }), {
+    headers: { 'Content-Type': 'application/json' },
+  });
+});
+```
+
+Deploy this with:
+```bash
+supabase functions deploy create-subscription
+```
+
+---
+
+## Step 2 — Add Price IDs to the App
+
+Create a new file `constants/stripePrices.ts`:
+
+```ts
+// Replace these with your actual Stripe Price IDs from the dashboard
+export const STRIPE_PRICES: Record<string, string> = {
+  // Renter
+  'plus_monthly':  'price_XXXXXXXXXXXXXXXX',
+  'plus_3month':   'price_XXXXXXXXXXXXXXXX',
+  'plus_annual':   'price_XXXXXXXXXXXXXXXX',
+  'elite_monthly': 'price_XXXXXXXXXXXXXXXX',
+  'elite_3month':  'price_XXXXXXXXXXXXXXXX',
+  'elite_annual':  'price_XXXXXXXXXXXXXXXX',
+  // Host
+  'host_starter_monthly':  'price_XXXXXXXXXXXXXXXX',
+  'host_pro_monthly':      'price_XXXXXXXXXXXXXXXX',
+  'host_business_monthly': 'price_XXXXXXXXXXXXXXXX',
+  'host_starter_annual':   'price_XXXXXXXXXXXXXXXX',
+  'host_pro_annual':       'price_XXXXXXXXXXXXXXXX',
+  'host_business_annual':  'price_XXXXXXXXXXXXXXXX',
+};
+
+export function getPriceId(plan: string, billingCycle: string): string | null {
+  const key = `${plan}_${billingCycle}`;
+  return STRIPE_PRICES[key] || null;
+}
+```
+
+---
+
+## Step 3 — Update `AuthContext.tsx`
+
+### Add imports at the top
+```ts
+import { useStripe } from '@stripe/stripe-react-native';
+import { getPriceId } from '../constants/stripePrices';
+```
+
+### Replace `upgradeToPlus` with the Stripe-gated version
+
+Find `upgradeToPlus` and replace the entire function:
+
+```ts
+const upgradeToPlus = async (billingCycle: 'monthly' | '3month' | 'annual' = 'monthly') => {
+  if (!user) return;
+  await chargeAndUpgrade('plus', billingCycle);
+};
+```
+
+### Replace `upgradeToElite` with the Stripe-gated version
+
+```ts
+const upgradeToElite = async (billingCycle: 'monthly' | '3month' | 'annual' = 'monthly') => {
+  if (!user) return;
+  await chargeAndUpgrade('elite', billingCycle);
+};
+```
+
+### Replace `upgradeHostPlan` with the Stripe-gated version
+
+Find `upgradeHostPlan` and replace with:
+```ts
+const upgradeHostPlan = async (plan: 'starter' | 'pro' | 'business', billingCycle: 'monthly' | '3month' | 'annual' = 'monthly') => {
+  if (!user) return;
+  await chargeAndUpgrade(`host_${plan}`, billingCycle);
+};
+```
+
+### Add the shared `chargeAndUpgrade` helper
+
+Add this function inside the `AuthProvider` component, before `upgradeToPlus`:
+
+```ts
+const chargeAndUpgrade = async (plan: string, billingCycle: 'monthly' | '3month' | 'annual') => {
+  if (!user) return;
+
+  const priceId = getPriceId(plan, billingCycle);
+  if (!priceId) {
+    Alert.alert('Error', 'Could not find pricing for this plan. Please try again.');
+    return;
+  }
+
+  try {
+    // Call edge function to get client secret
+    const { data, error } = await supabase.functions.invoke('create-subscription', {
+      body: { userId: user.id, priceId, email: user.email },
+    });
+
+    if (error || !data?.clientSecret) {
+      throw new Error(error?.message || 'Failed to initialize payment');
+    }
+
+    // Present Stripe PaymentSheet
+    const { initPaymentSheet, presentPaymentSheet } = useStripe();
+
+    const { error: initError } = await initPaymentSheet({
+      paymentIntentClientSecret: data.clientSecret,
+      merchantDisplayName: 'RoomDrx',
+      allowsDelayedPaymentMethods: false,
+    });
+
+    if (initError) throw new Error(initError.message);
+
+    const { error: paymentError } = await presentPaymentSheet();
+
+    if (paymentError) {
+      if (paymentError.code !== 'Canceled') {
+        Alert.alert('Payment Failed', paymentError.message);
+      }
+      return; // User canceled or payment failed — don't upgrade
+    }
+
+    // Payment succeeded — now activate the plan in Supabase
+    const expiresAt = getExpiryForCycle(billingCycle);
+    const amount = getBillingAmount(plan as any, billingCycle);
+    const prevHistory = user.subscription?.billingHistory || [];
+
+    const planKey = plan.startsWith('host_') ? plan.replace('host_', '') : plan;
+
+    const updatedUser: User = {
+      ...user,
+      subscription: {
+        plan: planKey as any,
+        status: 'active',
+        expiresAt,
+        billingCycle,
+        billingHistory: [
+          { date: new Date().toISOString(), amount, description: `${planKey} - ${billingCycle}` },
+          ...prevHistory,
+        ].slice(0, 10),
+      },
+    };
+
+    await StorageService.setCurrentUser(updatedUser);
+    await StorageService.addOrUpdateUser(updatedUser);
+    await supabase
+      .from('subscriptions')
+      .update({
+        plan: planKey,
+        billing_cycle: billingCycle,
+        status: 'active',
+        current_period_end: expiresAt.toISOString(),
+        cancel_at_period_end: false,
+        stripe_subscription_id: data.subscriptionId,
+      })
+      .eq('user_id', user.id);
+
+    setUser(updatedUser);
+    Alert.alert('Success!', `You're now on the ${planKey.charAt(0).toUpperCase() + planKey.slice(1)} plan.`);
+
+  } catch (err: any) {
+    Alert.alert('Error', err.message || 'Something went wrong. Please try again.');
+  }
+};
+```
+
+> **Note:** `useStripe()` is a React hook and must be called inside a component, not inside a context function. See the alternative approach below if you hit a "hooks can't be called here" error.
+
+---
+
+## Alternative: Move Payment Logic to `PlanSelectionScreen`
+
+If you run into issues calling `useStripe()` inside `AuthContext`, keep the payment logic in the screen instead. In `PlanSelectionScreen.tsx`, update `handleConfirmPlan`:
+
+```ts
+import { useStripe } from '@stripe/stripe-react-native';
+import { getPriceId } from '../../constants/stripePrices';
+
+// Inside the component:
+const { initPaymentSheet, presentPaymentSheet } = useStripe();
+
+const handleConfirmPlan = async (planIdOverride?: string) => {
+  const planId = planIdOverride || selectedPlanId;
+  if (!planId || !user) return;
+
+  const plan = plans.find(p => p.id === planId);
+  if (plan?.isFree) {
+    // Free plan — no payment needed
+    await completeOnboardingStep('complete');
+    return;
+  }
+
+  setProcessing(true);
+
+  const priceId = getPriceId(planId, billingCycle);
+  if (!priceId) {
+    Alert.alert('Error', 'Pricing not found for this plan.');
+    setProcessing(false);
+    return;
+  }
+
+  try {
+    const { data, error } = await supabase.functions.invoke('create-subscription', {
+      body: { userId: user.id, priceId, email: user.email },
+    });
+
+    if (error || !data?.clientSecret) throw new Error('Failed to initialize payment');
+
+    const { error: initError } = await initPaymentSheet({
+      paymentIntentClientSecret: data.clientSecret,
+      merchantDisplayName: 'RoomDrx',
+      allowsDelayedPaymentMethods: false,
+    });
+    if (initError) throw new Error(initError.message);
+
+    const { error: paymentError } = await presentPaymentSheet();
+    if (paymentError) {
+      if (paymentError.code !== 'Canceled') Alert.alert('Payment Failed', paymentError.message);
+      setProcessing(false);
+      setShowConfirm(false);
+      return;
+    }
+
+    // Payment succeeded — activate plan
+    if (isHost) {
+      if (planId === 'starter') await upgradeHostPlan('starter', billingCycle);
+      else if (planId === 'pro') await upgradeHostPlan('pro', billingCycle);
+      else if (planId === 'business') await upgradeHostPlan('business', billingCycle);
+    } else {
+      if (planId === 'plus') await upgradeToPlus(billingCycle);
+      else if (planId === 'elite') await upgradeToElite(billingCycle);
+    }
+
+    await completeOnboardingStep('complete');
+    Alert.alert('Welcome!', `You're now on the ${planId.charAt(0).toUpperCase() + planId.slice(1)} plan.`);
+
+  } catch (err: any) {
+    Alert.alert('Error', err.message || 'Something went wrong.');
+  } finally {
+    setProcessing(false);
+    setShowConfirm(false);
+  }
+};
+```
+
+This approach is cleaner since hooks work naturally in components.
+
+---
+
+## Step 4 — Update `stripe-webhook` Edge Function
+
+The webhook handles subscription renewals and cancellations from Stripe. Open `supabase/functions/stripe-webhook/index.ts` and verify it handles `invoice.payment_succeeded` and `customer.subscription.deleted` events:
+
+```ts
+// On invoice.payment_succeeded → extend current_period_end in subscriptions table
+// On customer.subscription.deleted → set status = 'canceled' in subscriptions table
+```
+
+If missing, add these event handlers inside the webhook function. Deploy with:
+```bash
+supabase functions deploy stripe-webhook
+```
+
+Then register the webhook URL in **Stripe Dashboard → Developers → Webhooks → Add endpoint**:
+```
+https://<your-project>.supabase.co/functions/v1/stripe-webhook
+```
+Select events: `invoice.payment_succeeded`, `customer.subscription.deleted`, `customer.subscription.updated`
+
+---
+
+## Step 5 — Add `stripe_customer_id` and `stripe_subscription_id` columns
+
+Run this migration in Supabase SQL editor:
+
+```sql
+ALTER TABLE subscriptions
+  ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT,
+  ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT;
+```
+
+---
+
+## Result
+- Users must enter a real credit card before their plan activates
+- Stripe handles payment retry, card decline messaging, and 3D Secure
+- Subscription renewals are handled automatically via webhook
+- Failed payments downgrade the user back to Basic via the webhook handler
+- Free plan selection still works instantly with no payment prompt

@@ -529,14 +529,14 @@ export function getGroupLimit(plan: string): number {
 
 export function getMemberLimit(plan: string): number {
   const limits: Record<string, number> = {
-    basic: 4,
-    plus: 8,
-    elite: 15,
-    starter: 6,
-    pro: 12,
-    business: 25,
+    basic: 3,
+    plus: 5,
+    elite: 6,
+    starter: 4,
+    pro: 6,
+    business: 6,
   };
-  return limits[plan] || 4;
+  return limits[plan] || 3;
 }
 
 export async function getGroupWithListing(groupId: string) {
