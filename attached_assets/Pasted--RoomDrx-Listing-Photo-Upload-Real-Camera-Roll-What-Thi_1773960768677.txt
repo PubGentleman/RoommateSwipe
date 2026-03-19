@@ -1,0 +1,196 @@
+# RoomDrx — Listing Photo Upload (Real Camera Roll)
+
+## What This Fixes
+Currently `CreateEditListingScreen` uses hardcoded placeholder photo URLs instead of letting hosts pick real photos from their phone. This prompt wires up the already-installed `expo-image-picker` and the existing `uploadListingPhoto()` function in `listingService.ts`.
+
+---
+
+## Step 1 — Update `CreateEditListingScreen.tsx`
+
+### Remove the placeholder constants at the top of the file
+Find and delete this block:
+```ts
+const PLACEHOLDER_PHOTOS = [
+  'https://...',
+  // ... all placeholder URLs
+];
+```
+
+### Add the photo picker function
+Add this function inside the component, before the `return` statement:
+
+```ts
+const handleAddPhoto = async () => {
+  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (!permission.granted) {
+    Alert.alert(
+      'Permission Required',
+      'Please allow access to your photo library to upload listing photos.',
+      [{ text: 'OK' }]
+    );
+    return;
+  }
+
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    allowsEditing: true,
+    aspect: [4, 3],
+    quality: 0.8,
+  });
+
+  if (result.canceled || !result.assets?.length) return;
+
+  const asset = result.assets[0];
+
+  // Show uploading state
+  setUploadingPhoto(true);
+
+  try {
+    // Try Supabase storage upload
+    const { uploadListingPhoto } = await import('../../services/listingService');
+    const uploadedUrl = await uploadListingPhoto(asset.uri, asset.fileName || `photo_${Date.now()}.jpg`);
+    setPhotos(prev => [...prev, uploadedUrl]);
+  } catch (err) {
+    // Fallback: use local URI if upload fails (shows in-session but won't persist cross-device)
+    console.warn('Photo upload failed, using local URI:', err);
+    setPhotos(prev => [...prev, asset.uri]);
+  } finally {
+    setUploadingPhoto(false);
+  }
+};
+```
+
+### Add the uploading state variable
+At the top of the component, next to other state declarations, add:
+```ts
+const [uploadingPhoto, setUploadingPhoto] = useState(false);
+```
+
+### Update the "add photo" button in the UI
+Find the section where photos are rendered (around line 786). Replace the button that currently adds a placeholder photo with this:
+
+```tsx
+{/* Add Photo Button */}
+{photos.length < 8 && (
+  <Pressable
+    onPress={handleAddPhoto}
+    disabled={uploadingPhoto}
+    style={[
+      styles.addPhotoButton,
+      { backgroundColor: theme.card, borderColor: theme.border, opacity: uploadingPhoto ? 0.6 : 1 }
+    ]}
+  >
+    {uploadingPhoto ? (
+      <ActivityIndicator size="small" color={theme.primary} />
+    ) : (
+      <>
+        <Feather name="camera" size={24} color={theme.textSecondary} />
+        <ThemedText style={[Typography.small, { color: theme.textSecondary, marginTop: 4 }]}>
+          Add Photo
+        </ThemedText>
+      </>
+    )}
+  </Pressable>
+)}
+```
+
+Make sure `ActivityIndicator` is imported from `react-native` at the top of the file.
+
+### Update the save logic to use real photos only
+Find `handleSave` and replace references to `PLACEHOLDER_PHOTOS` with just `photos`:
+
+```ts
+// BEFORE (remove this):
+photos: photos.length > 0 ? photos : PLACEHOLDER_PHOTOS.slice(0, 1),
+
+// AFTER:
+photos: photos,
+```
+
+Do this for both places where `PLACEHOLDER_PHOTOS` is referenced in `handleSave`.
+
+---
+
+## Step 2 — Update `listingService.ts` (if not already done)
+
+Open `services/listingService.ts` and verify the `uploadListingPhoto` function looks like this. If it's missing or incomplete, add it:
+
+```ts
+export async function uploadListingPhoto(uri: string, fileName: string): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  // Read the file as a blob
+  const response = await fetch(uri);
+  const blob = await response.blob();
+
+  const filePath = `listings/${user.id}/${Date.now()}_${fileName}`;
+
+  const { error } = await supabase.storage
+    .from('listing-photos')
+    .upload(filePath, blob, {
+      contentType: blob.type || 'image/jpeg',
+      upsert: false,
+    });
+
+  if (error) throw error;
+
+  const { data } = supabase.storage
+    .from('listing-photos')
+    .getPublicUrl(filePath);
+
+  return data.publicUrl;
+}
+```
+
+---
+
+## Step 3 — Create Supabase Storage Bucket
+
+In the Supabase dashboard:
+1. Go to **Storage** → **New bucket**
+2. Name it: `listing-photos`
+3. Set to **Public** (so the photos load without auth headers)
+4. Click **Create bucket**
+
+Then add a storage policy. Go to **Storage → listing-photos → Policies** and add:
+
+**Policy for INSERT (hosts can upload):**
+```sql
+CREATE POLICY "Hosts can upload listing photos"
+ON storage.objects FOR INSERT
+WITH CHECK (
+  bucket_id = 'listing-photos'
+  AND auth.uid()::text = (storage.foldername(name))[2]
+);
+```
+
+**Policy for SELECT (anyone can view):**
+```sql
+CREATE POLICY "Anyone can view listing photos"
+ON storage.objects FOR SELECT
+USING (bucket_id = 'listing-photos');
+```
+
+---
+
+## Step 4 — Add `ImagePicker` import (if not present)
+
+At the top of `CreateEditListingScreen.tsx`, confirm this import exists:
+```ts
+import * as ImagePicker from 'expo-image-picker';
+```
+
+It should already be in `package.json` as `expo-image-picker ^17.0.8`. If not installed, run:
+```bash
+npx expo install expo-image-picker
+```
+
+---
+
+## Result
+- Hosts can tap the photo area to pick real photos from their camera roll
+- Photos are uploaded to Supabase Storage and stored as permanent public URLs
+- Up to 8 photos per listing
+- If upload fails, falls back to the local URI so the host can still save
+- Photos persist across devices and appear correctly on listing cards in ExploreScreen

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, TextInput, StyleSheet, Pressable, Alert, Image, ScrollView, Platform } from 'react-native';
+import { View, TextInput, StyleSheet, Pressable, Alert, Image, ScrollView, Platform, ActivityIndicator } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { ScreenKeyboardAwareScrollView } from '../../components/ScreenKeyboardAwareScrollView';
@@ -17,6 +17,7 @@ import { DatePickerModal } from '../../components/DatePickerModal';
 import { formatDate } from '../../utils/dateUtils';
 import { geocodeAddress, fetchNearbyTransit } from '../../utils/transitService';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
+import * as ImagePicker from 'expo-image-picker';
 
 type RouteParams = {
   CreateEditListing: { propertyId?: string };
@@ -29,12 +30,6 @@ const AMENITIES_LIST = [
 
 const BEDROOM_OPTIONS = [1, 2, 3, 4, 5, 6];
 const BATHROOM_OPTIONS = [1, 2, 3, 4];
-
-const PLACEHOLDER_PHOTOS = [
-  'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=400',
-  'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=400',
-  'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=400',
-];
 
 const POPULAR_CITIES = [
   'New York', 'Los Angeles', 'Chicago', 'Miami', 'San Francisco',
@@ -89,6 +84,7 @@ export const CreateEditListingScreen = () => {
       setAddressFromAutocomplete(false);
     }
   }, [addressFromAutocomplete]);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showLimitModal, setShowLimitModal] = useState(false);
   const [showOverageModal, setShowOverageModal] = useState(false);
@@ -167,6 +163,45 @@ export const CreateEditListingScreen = () => {
         ? prev.filter(a => a !== amenity)
         : [...prev, amenity]
     );
+  };
+
+  const handleAddPhoto = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert(
+        'Permission Required',
+        'Please allow access to your photo library to upload listing photos.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+
+    if (result.canceled || !result.assets?.length) return;
+
+    const asset = result.assets[0];
+    setUploadingPhoto(true);
+
+    try {
+      const { uploadListingPhoto } = await import('../../services/listingService');
+      const uploadedUrl = await uploadListingPhoto(asset.uri, asset.fileName || `photo_${Date.now()}.jpg`);
+      setPhotos(prev => [...prev, uploadedUrl]);
+    } catch (err) {
+      console.warn('Photo upload failed, using local URI:', err);
+      setPhotos(prev => [...prev, asset.uri]);
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const handleRemovePhoto = (index: number) => {
+    setPhotos(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSave = async () => {
@@ -255,7 +290,7 @@ export const CreateEditListingScreen = () => {
         neighborhood: neighborhood.trim() || undefined,
         room_type: roomType,
         amenities: selectedAmenities,
-        photos: photos.length > 0 ? photos : PLACEHOLDER_PHOTOS.slice(0, 1),
+        photos: photos,
         available_date: availableDate && availableDate !== 'flexible' ? new Date(availableDate).toISOString() : undefined,
         is_active: true,
         is_paused: false,
@@ -289,7 +324,7 @@ export const CreateEditListingScreen = () => {
           address: address.trim(),
           availableDate: availableDate ? new Date(availableDate) : undefined,
           amenities: selectedAmenities,
-          photos: photos.length > 0 ? photos : PLACEHOLDER_PHOTOS.slice(0, 1),
+          photos: photos,
           available: true,
           hostId: user?.id || '',
           hostName: user?.name || '',
@@ -783,21 +818,38 @@ export const CreateEditListingScreen = () => {
         {renderSectionTitle('Photos')}
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photosRow}>
-          {(photos.length > 0 ? photos : PLACEHOLDER_PHOTOS).map((photo, index) => (
+          {photos.map((photo, index) => (
             <View key={index} style={styles.photoContainer}>
               <Image source={{ uri: photo }} style={styles.photoThumb} />
+              <Pressable
+                style={styles.removePhotoBtn}
+                onPress={() => handleRemovePhoto(index)}
+              >
+                <Feather name="x" size={14} color="#fff" />
+              </Pressable>
+              {index === 0 ? (
+                <View style={styles.coverBadge}>
+                  <ThemedText style={styles.coverBadgeText}>Cover</ThemedText>
+                </View>
+              ) : null}
             </View>
           ))}
-          <Pressable
-            style={styles.addPhotoButton}
-            onPress={() => {
-              const newPhotos = [...photos, PLACEHOLDER_PHOTOS[photos.length % PLACEHOLDER_PHOTOS.length]];
-              setPhotos(newPhotos);
-            }}
-          >
-            <Feather name="camera" size={24} color="#555" />
-            <ThemedText style={styles.addPhotoText}>Add Photo</ThemedText>
-          </Pressable>
+          {photos.length < 8 ? (
+            <Pressable
+              style={[styles.addPhotoButton, { opacity: uploadingPhoto ? 0.6 : 1 }]}
+              onPress={handleAddPhoto}
+              disabled={uploadingPhoto}
+            >
+              {uploadingPhoto ? (
+                <ActivityIndicator size="small" color={theme.primary} />
+              ) : (
+                <>
+                  <Feather name="camera" size={24} color="#555" />
+                  <ThemedText style={styles.addPhotoText}>Add Photo</ThemedText>
+                </>
+              )}
+            </Pressable>
+          ) : null}
         </ScrollView>
         <ThemedText style={styles.photoHint}>Add up to 8 photos. First photo is your cover image.</ThemedText>
       </View>
@@ -1075,6 +1127,32 @@ const styles = StyleSheet.create({
     marginRight: 10,
     borderRadius: 12,
     overflow: 'hidden',
+    position: 'relative' as const,
+  },
+  removePhotoBtn: {
+    position: 'absolute' as const,
+    top: 6,
+    right: 6,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  coverBadge: {
+    position: 'absolute' as const,
+    bottom: 6,
+    left: 6,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  coverBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '600' as const,
   },
   photoThumb: {
     width: 110,
