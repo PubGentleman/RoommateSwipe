@@ -1,0 +1,403 @@
+# RoomDrx – Transportation Auto-Fill Feature Prompt
+
+## Overview
+When a host saves a listing, automatically fetch nearby transit stops using the Google Places API and save them to the listing. The listing card and detail view will then display transit info without any extra input from the host.
+
+This feature works globally — but coverage varies by city. To handle all cases gracefully, three layers are implemented:
+1. **Auto-fill** — Google Places API fetches stops automatically from the address (works in most major cities worldwide)
+2. **"No transit nearby" label** — if auto-fill finds nothing, display a clear indicator instead of hiding the section
+3. **Manual override** — host can always type in their own transit description if auto-fill is wrong or missing
+
+---
+
+## What to Build
+
+### 1. Update `types/models.ts` — Add transit fields to `Property`
+
+Add the following fields to the `Property` interface:
+
+```ts
+transitInfo?: {
+  stops: Array<{
+    name: string;
+    type: 'subway' | 'bus' | 'train' | 'tram' | 'ferry' | 'other';
+    distanceMiles: number;
+  }>;
+  noTransitNearby?: boolean;  // true when auto-fetch found nothing
+  manualOverride?: string;    // host-entered custom description
+  fetchedAt: string;          // ISO timestamp
+};
+coordinates?: {
+  lat: number;
+  lng: number;
+};
+walkScore?: number; // already exists — keep it
+```
+
+---
+
+### 2. Create `utils/transitService.ts` — New utility file
+
+This file handles geocoding the address and fetching nearby transit stops.
+
+```ts
+// utils/transitService.ts
+
+const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+
+export interface TransitStop {
+  name: string;
+  type: 'subway' | 'bus' | 'train' | 'tram' | 'ferry' | 'other';
+  distanceMiles: number;
+}
+
+// Step 1: Geocode address to lat/lng
+export async function geocodeAddress(address: string, city: string, state: string): Promise<{ lat: number; lng: number } | null> {
+  const fullAddress = encodeURIComponent(`${address}, ${city}, ${state}`);
+  const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${fullAddress}&key=${GOOGLE_API_KEY}`;
+
+  const res = await fetch(url);
+  const data = await res.json();
+
+  if (data.status === 'OK' && data.results.length > 0) {
+    const loc = data.results[0].geometry.location;
+    return { lat: loc.lat, lng: loc.lng };
+  }
+  return null;
+}
+
+// Step 2: Find nearby transit stops using Places Nearby Search
+export async function fetchNearbyTransit(lat: number, lng: number): Promise<TransitStop[]> {
+  const radius = 800; // 800 meters (~0.5 miles)
+  const types = ['subway_station', 'bus_station', 'train_station', 'transit_station'];
+  const stops: TransitStop[] = [];
+  const seen = new Set<string>();
+
+  for (const type of types) {
+    const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=${type}&key=${GOOGLE_API_KEY}`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (data.status === 'OK') {
+      for (const place of data.results.slice(0, 3)) {
+        if (seen.has(place.place_id)) continue;
+        seen.add(place.place_id);
+
+        const placeLat = place.geometry.location.lat;
+        const placeLng = place.geometry.location.lng;
+        const distanceMiles = haversineDistance(lat, lng, placeLat, placeLng);
+
+        stops.push({
+          name: place.name,
+          type: mapPlaceTypeToTransitType(type),
+          distanceMiles: Math.round(distanceMiles * 10) / 10,
+        });
+      }
+    }
+  }
+
+  // Sort by distance, return closest 5
+  return stops.sort((a, b) => a.distanceMiles - b.distanceMiles).slice(0, 5);
+}
+
+// Map Google place type to our internal type
+function mapPlaceTypeToTransitType(type: string): TransitStop['type'] {
+  switch (type) {
+    case 'subway_station': return 'subway';
+    case 'bus_station': return 'bus';
+    case 'train_station': return 'train';
+    case 'transit_station': return 'other';
+    default: return 'other';
+  }
+}
+
+// Haversine formula — distance in miles between two lat/lng points
+function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 3958.8; // Earth radius in miles
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+```
+
+---
+
+### 3. Update `screens/host/CreateEditListingScreen.tsx` — Transit fetch + manual override
+
+#### A. Add state variable for manual override
+
+At the top of the component with the other `useState` declarations, add:
+
+```ts
+const [transitOverride, setTransitOverride] = useState(
+  existingProperty?.transitInfo?.manualOverride || ''
+);
+```
+
+#### B. Add manual override input field in the form UI
+
+After the address input field (around line 410), add this section:
+
+```tsx
+{/* Transportation */}
+<ThemedText style={styles.label}>Transportation (optional)</ThemedText>
+<ThemedText style={styles.labelHint}>
+  We'll auto-detect nearby transit from your address. Override below if needed.
+</ThemedText>
+<TextInput
+  style={styles.input}
+  placeholder="e.g. Near Metro Line 2, Bus Route 40, 5 min walk to station"
+  value={transitOverride}
+  onChangeText={setTransitOverride}
+  multiline
+  numberOfLines={2}
+/>
+```
+
+Add to `styles`:
+```ts
+labelHint: {
+  fontSize: 12,
+  color: '#888',
+  marginBottom: 6,
+  marginTop: -4,
+},
+```
+
+#### C. Update `handleSave` to fetch transit and respect manual override
+
+In `handleSave`, after building the `property` object and before calling `StorageService.addOrUpdateProperty()`, add:
+
+```ts
+// --- TRANSPORTATION AUTO-FILL ---
+try {
+  // Always save the manual override if the host typed one
+  const override = transitOverride.trim() || undefined;
+
+  const coords = await geocodeAddress(address.trim(), city.trim(), state.trim());
+  if (coords) {
+    property.coordinates = coords;
+    const stops = await fetchNearbyTransit(coords.lat, coords.lng);
+
+    property.transitInfo = {
+      stops,
+      noTransitNearby: stops.length === 0,
+      manualOverride: override,
+      fetchedAt: new Date().toISOString(),
+    };
+  } else {
+    // Could not geocode — save override only
+    property.transitInfo = {
+      stops: [],
+      noTransitNearby: true,
+      manualOverride: override,
+      fetchedAt: new Date().toISOString(),
+    };
+  }
+} catch (transitError) {
+  // Non-blocking — listing still saves without transit info
+  console.warn('Transit fetch failed:', transitError);
+}
+// --- END TRANSPORTATION AUTO-FILL ---
+```
+
+Add imports at the top of `CreateEditListingScreen.tsx`:
+```ts
+import { geocodeAddress, fetchNearbyTransit } from '../../utils/transitService';
+```
+
+---
+
+### 4. Update `screens/renter/ExploreScreen.tsx` — Display transit on listing card and detail view
+
+#### A. Listing Card (swipe card) — Add transit section
+
+In the swipe card component, below the `walkScore` badge (around line 1214), add the following. This handles all three states: auto-filled stops, manual override, and no transit found.
+
+```tsx
+{selectedProperty.transitInfo && (
+  <View style={styles.transitRow}>
+    <Text style={styles.transitHeader}>🚇 Nearby Transit</Text>
+
+    {/* State 1: Manual override set by host — always shown first if present */}
+    {selectedProperty.transitInfo.manualOverride ? (
+      <Text style={styles.transitManual}>
+        {selectedProperty.transitInfo.manualOverride}
+      </Text>
+    ) : selectedProperty.transitInfo.stops.length > 0 ? (
+      /* State 2: Auto-detected stops */
+      selectedProperty.transitInfo.stops.slice(0, 3).map((stop, index) => (
+        <View key={index} style={styles.transitItem}>
+          <Text style={styles.transitIcon}>{getTransitIcon(stop.type)}</Text>
+          <Text style={styles.transitName} numberOfLines={1}>{stop.name}</Text>
+          <Text style={styles.transitDistance}>{stop.distanceMiles} mi</Text>
+        </View>
+      ))
+    ) : (
+      /* State 3: No transit nearby */
+      <View style={styles.transitItem}>
+        <Text style={styles.transitIcon}>🚫</Text>
+        <Text style={styles.transitNoTransit}>No public transit nearby</Text>
+      </View>
+    )}
+  </View>
+)}
+```
+
+#### B. Add helper function (above the component):
+
+```ts
+function getTransitIcon(type: string): string {
+  switch (type) {
+    case 'subway': return '🚇';
+    case 'bus': return '🚌';
+    case 'train': return '🚆';
+    case 'tram': return '🚊';
+    case 'ferry': return '⛴️';
+    default: return '🚏';
+  }
+}
+```
+
+#### C. Add styles:
+
+```ts
+transitRow: {
+  marginTop: 12,
+  paddingTop: 12,
+  borderTopWidth: 1,
+  borderTopColor: 'rgba(0,0,0,0.08)',
+},
+transitHeader: {
+  fontSize: 13,
+  fontWeight: '600',
+  color: '#444',
+  marginBottom: 6,
+},
+transitItem: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingVertical: 3,
+},
+transitIcon: {
+  fontSize: 14,
+  marginRight: 6,
+  width: 20,
+},
+transitName: {
+  flex: 1,
+  fontSize: 13,
+  color: '#333',
+},
+transitDistance: {
+  fontSize: 12,
+  color: '#888',
+  marginLeft: 8,
+},
+transitManual: {
+  fontSize: 13,
+  color: '#555',
+  fontStyle: 'italic',
+  lineHeight: 18,
+},
+transitNoTransit: {
+  fontSize: 13,
+  color: '#999',
+  fontStyle: 'italic',
+},
+```
+
+---
+
+### 5. Environment Setup — Add Google API Key
+
+In `.env` (create if it doesn't exist at project root):
+```
+EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
+```
+
+In `app.json`, under `expo.extra`:
+```json
+"extra": {
+  "googleMapsApiKey": "${EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}"
+}
+```
+
+**Google Cloud Console setup:**
+1. Go to https://console.cloud.google.com
+2. Enable these APIs:
+   - **Geocoding API**
+   - **Places API**
+3. Create an API key and restrict it to your app's bundle ID
+4. Add the key to your `.env` file
+
+---
+
+### 6. Update Supabase `properties` table schema
+
+Run this migration in Supabase SQL editor:
+
+```sql
+ALTER TABLE properties
+  ADD COLUMN IF NOT EXISTS coordinates JSONB,
+  ADD COLUMN IF NOT EXISTS transit_info JSONB;
+```
+
+Then update the Supabase service functions (`getMyListings`, `getReceivedInterestCards`, etc.) to include `coordinates` and `transit_info` in select queries and insert/update calls.
+
+---
+
+## How It Works End-to-End
+
+```
+Host enters address → taps Save
+         ↓
+geocodeAddress("123 Main St", "New York", "NY")
+         ↓
+Google Geocoding API → { lat: 40.748, lng: -73.985 }
+         ↓
+fetchNearbyTransit(40.748, -73.985)
+         ↓
+Google Places Nearby Search (800m radius)
+  → subway_station, bus_station, train_station
+         ↓
+property.transitInfo = {
+  stops: [
+    { name: "14th St–Union Sq", type: "subway", distanceMiles: 0.2 },
+    { name: "M14 Bus Stop",     type: "bus",    distanceMiles: 0.1 },
+    { name: "Penn Station",     type: "train",  distanceMiles: 0.5 },
+  ],
+  fetchedAt: "2025-01-15T10:30:00Z"
+}
+         ↓
+Saved to Supabase with listing
+         ↓
+Renter sees transit info on listing card automatically
+```
+
+---
+
+## Notes
+
+- **Non-blocking**: If the Google API call fails for any reason, the listing still saves. Transit info just won't appear until next save.
+- **Re-fetches on edit**: Every time the host saves, transit info is re-fetched. This keeps it accurate if the address changes.
+- **Cost**: Each listing save = 1 Geocoding call + up to 4 Places calls = ~$0.13. Very low cost.
+- **No host action needed**: Fully automatic from the address field — manual override is optional.
+- **Manual override wins**: If a host types anything in the override field, it displays instead of the auto-fetched stops. This lets hosts in areas with poor Google coverage still show accurate transit info.
+- **No transit label**: If auto-fetch returns zero results and no manual override is set, the listing card shows "No public transit nearby" — useful info for renters rather than a blank section.
+- **Works globally**: Auto-fill works in any city where Google Maps has transit data. For cities with partial or no coverage, the manual override ensures hosts can always provide accurate info.
+
+## Display Priority (on listing card)
+
+```
+1. Manual override (if set by host)         → shown as italic description
+        ↓ if empty
+2. Auto-detected stops (if found)           → shown as list with icons + distance
+        ↓ if none found
+3. "No public transit nearby"               → shown as greyed-out note
+```
