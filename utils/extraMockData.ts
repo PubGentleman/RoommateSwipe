@@ -199,6 +199,145 @@ export const extraConversations: Conversation[] = [
   },
 ];
 
+const transitDataByNeighborhood: Record<string, Array<{ name: string; type: 'subway' | 'bus' | 'train' | 'tram' | 'ferry' | 'other'; distanceMiles: number }>> = {
+  'Silver Lake': [
+    { name: 'Silver Lake / Sunset Junction Bus Hub', type: 'bus', distanceMiles: 0.3 },
+    { name: 'Metro Line 2 Bus', type: 'bus', distanceMiles: 0.2 },
+  ],
+  'Venice': [
+    { name: 'Venice / Abbott Kinney Bus Stop', type: 'bus', distanceMiles: 0.2 },
+    { name: 'Big Blue Bus Line 1', type: 'bus', distanceMiles: 0.3 },
+  ],
+  'Wicker Park': [
+    { name: 'Damen Station (Blue Line)', type: 'subway', distanceMiles: 0.2 },
+    { name: 'CTA Bus 56 Milwaukee', type: 'bus', distanceMiles: 0.1 },
+  ],
+  'Lincoln Park': [
+    { name: 'Fullerton Station (Red/Brown/Purple)', type: 'subway', distanceMiles: 0.3 },
+    { name: 'CTA Bus 22 Clark', type: 'bus', distanceMiles: 0.1 },
+  ],
+  'Brickell': [
+    { name: 'Brickell Station (Metrorail)', type: 'train', distanceMiles: 0.2 },
+    { name: 'Brickell Key Metromover', type: 'tram', distanceMiles: 0.3 },
+  ],
+  'Coconut Grove': [
+    { name: 'Coconut Grove Station (Metrorail)', type: 'train', distanceMiles: 0.3 },
+    { name: 'Miami Trolley Coconut Grove', type: 'tram', distanceMiles: 0.1 },
+  ],
+  'Mission District': [
+    { name: '24th St Mission Station (BART)', type: 'train', distanceMiles: 0.2 },
+    { name: 'Muni 14 Mission Bus', type: 'bus', distanceMiles: 0.1 },
+  ],
+  'Castro': [
+    { name: 'Castro Station (Muni Metro K/L/M)', type: 'tram', distanceMiles: 0.1 },
+    { name: 'Muni 24 Divisadero Bus', type: 'bus', distanceMiles: 0.2 },
+  ],
+  'East Austin': [
+    { name: 'CapMetro Route 4 Bus', type: 'bus', distanceMiles: 0.2 },
+    { name: 'Plaza Saltillo Station (MetroRail)', type: 'train', distanceMiles: 0.4 },
+  ],
+  'South Congress': [
+    { name: 'South Congress Transit Center', type: 'bus', distanceMiles: 0.3 },
+    { name: 'CapMetro Route 1 Bus', type: 'bus', distanceMiles: 0.1 },
+  ],
+  'Capitol Hill Seattle': [
+    { name: 'Capitol Hill Station (Link Light Rail)', type: 'train', distanceMiles: 0.2 },
+    { name: 'Metro Bus 10', type: 'bus', distanceMiles: 0.1 },
+  ],
+  'Ballard': [
+    { name: 'Rapid Ride D Line', type: 'bus', distanceMiles: 0.2 },
+    { name: 'Metro Bus 44', type: 'bus', distanceMiles: 0.3 },
+  ],
+  'RiNo': [
+    { name: '38th & Blake Station (A Line)', type: 'train', distanceMiles: 0.3 },
+    { name: 'RTD Bus 48', type: 'bus', distanceMiles: 0.2 },
+  ],
+  'Capitol Hill Denver': [
+    { name: 'RTD Bus 0 / 0L', type: 'bus', distanceMiles: 0.1 },
+    { name: '10th & Osage Station (D/H/E Line)', type: 'train', distanceMiles: 0.5 },
+  ],
+  'Back Bay': [
+    { name: 'Back Bay Station (Orange Line / Commuter Rail)', type: 'train', distanceMiles: 0.2 },
+    { name: 'Copley Station (Green Line)', type: 'subway', distanceMiles: 0.3 },
+  ],
+  'Cambridge': [
+    { name: 'Harvard Station (Red Line)', type: 'subway', distanceMiles: 0.2 },
+    { name: 'MBTA Bus 66', type: 'bus', distanceMiles: 0.1 },
+  ],
+  'Montrose': [
+    { name: 'Metro Bus 82 Westheimer', type: 'bus', distanceMiles: 0.1 },
+    { name: 'Wheeler Transit Center', type: 'train', distanceMiles: 0.5 },
+  ],
+  'The Heights Houston': [
+    { name: 'Metro Bus 36 Heights', type: 'bus', distanceMiles: 0.2 },
+    { name: 'Cavalcade METRORail Station', type: 'train', distanceMiles: 0.6 },
+  ],
+  'Midtown Atlanta': [
+    { name: 'Midtown Station (MARTA)', type: 'train', distanceMiles: 0.2 },
+    { name: 'MARTA Bus 110', type: 'bus', distanceMiles: 0.1 },
+  ],
+  'Inman Park': [
+    { name: 'Inman Park Station (MARTA)', type: 'train', distanceMiles: 0.3 },
+    { name: 'Atlanta Streetcar', type: 'tram', distanceMiles: 0.5 },
+  ],
+  'Downtown LA': [
+    { name: '7th St / Metro Center (A/B/D/E Line)', type: 'subway', distanceMiles: 0.2 },
+    { name: 'DASH Downtown Route A', type: 'bus', distanceMiles: 0.1 },
+  ],
+  'Logan Square': [
+    { name: 'Logan Square Station (Blue Line)', type: 'subway', distanceMiles: 0.2 },
+    { name: 'CTA Bus 56 Milwaukee', type: 'bus', distanceMiles: 0.1 },
+  ],
+  'Wynwood': [
+    { name: 'Miami Trolley Wynwood Route', type: 'tram', distanceMiles: 0.1 },
+    { name: 'Wynwood / NW 2nd Ave Bus Stop', type: 'bus', distanceMiles: 0.2 },
+  ],
+  'SOMA': [
+    { name: 'Caltrain 4th & King Station', type: 'train', distanceMiles: 0.3 },
+    { name: 'Muni T Third St', type: 'tram', distanceMiles: 0.1 },
+  ],
+  'Zilker': [
+    { name: 'CapMetro Route 30 Bus', type: 'bus', distanceMiles: 0.3 },
+    { name: 'Zilker Park / Barton Springs Bus Stop', type: 'bus', distanceMiles: 0.2 },
+  ],
+  'Queen Anne': [
+    { name: 'Metro Rapid Ride D Line', type: 'bus', distanceMiles: 0.2 },
+    { name: 'Seattle Center Monorail', type: 'tram', distanceMiles: 0.4 },
+  ],
+  'LoDo': [
+    { name: 'Union Station (A/B/C/E/G/W Line)', type: 'train', distanceMiles: 0.2 },
+    { name: 'Free MallRide', type: 'bus', distanceMiles: 0.1 },
+  ],
+  'South End': [
+    { name: 'Back Bay Station (Orange Line)', type: 'subway', distanceMiles: 0.3 },
+    { name: 'MBTA Silver Line', type: 'bus', distanceMiles: 0.2 },
+  ],
+  'Buckhead': [
+    { name: 'Buckhead Station (MARTA)', type: 'train', distanceMiles: 0.3 },
+    { name: 'MARTA Bus 5 Buckhead', type: 'bus', distanceMiles: 0.2 },
+  ],
+  'Rice Village': [
+    { name: 'Metro Bus 25 Richmond', type: 'bus', distanceMiles: 0.2 },
+    { name: 'Hermann Park METRORail Station', type: 'train', distanceMiles: 0.4 },
+  ],
+  'Arts District': [
+    { name: 'Little Tokyo / Arts District Station (A/E Line)', type: 'train', distanceMiles: 0.3 },
+    { name: 'DASH Downtown Route A', type: 'bus', distanceMiles: 0.1 },
+  ],
+  'Hollywood': [
+    { name: 'Hollywood / Vine Station (B Line)', type: 'subway', distanceMiles: 0.2 },
+    { name: 'Metro 217 Bus', type: 'bus', distanceMiles: 0.1 },
+  ],
+};
+
+function addTransitToProperty(p: Property): Property {
+  const stops = p.neighborhood ? transitDataByNeighborhood[p.neighborhood] : undefined;
+  if (stops) {
+    return { ...p, transitInfo: { stops, fetchedAt: new Date().toISOString() } };
+  }
+  return p;
+}
+
 export const extraProperties: Property[] = [
   {
     id: '21',
@@ -923,7 +1062,7 @@ export const extraProperties: Property[] = [
     roomType: 'entire',
     walkScore: 84,
   },
-];
+].map(addTransitToProperty);
 
 export const extraGroups: Group[] = [
   {

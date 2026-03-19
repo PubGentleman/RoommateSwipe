@@ -1,0 +1,304 @@
+# RoomDrx – Address Autocomplete for Host Listing Form
+
+## Overview
+Replace the plain text address field in `CreateEditListingScreen` with a smart autocomplete input. As the host types, a dropdown appears with real address suggestions. When they tap one, the full address, city, state, neighborhood, and coordinates are all filled in automatically — no manual typing required.
+
+This also eliminates the need for a separate Geocoding API call when saving, since the autocomplete result already includes coordinates.
+
+---
+
+## What to Build
+
+### 1. Install Required Package
+
+```bash
+npx expo install react-native-google-places-autocomplete
+```
+
+This is the standard Expo-compatible library for Google Places Autocomplete in React Native.
+
+---
+
+### 2. Update `screens/host/CreateEditListingScreen.tsx`
+
+#### A. Add import at the top
+
+```ts
+import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
+```
+
+#### B. Add coordinates state variable
+
+With the other `useState` declarations at the top of the component, add:
+
+```ts
+const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(
+  existingProperty?.coordinates || null
+);
+```
+
+#### C. Replace the Address `TextInput` with the Autocomplete component
+
+Find and **replace** this block (around line 406):
+
+```tsx
+<View style={styles.fieldContainer}>
+  <ThemedText style={styles.label}>Address</ThemedText>
+  <TextInput
+    style={inputStyle}
+    value={address}
+    onChangeText={setAddress}
+    placeholder="123 Main St"
+    placeholderTextColor="#666"
+  />
+</View>
+```
+
+**Replace with:**
+
+```tsx
+<View style={styles.fieldContainer}>
+  <ThemedText style={styles.label}>Address</ThemedText>
+  <GooglePlacesAutocomplete
+    placeholder="Start typing your address..."
+    fetchDetails={true}
+    onPress={(data, details = null) => {
+      if (!details) return;
+
+      // Extract address components
+      const components = details.address_components;
+      const getComponent = (type: string) =>
+        components.find((c) => c.types.includes(type));
+
+      const streetNumber = getComponent('street_number')?.long_name || '';
+      const streetName = getComponent('route')?.long_name || '';
+      const cityName =
+        getComponent('locality')?.long_name ||
+        getComponent('sublocality')?.long_name ||
+        getComponent('administrative_area_level_2')?.long_name || '';
+      const stateName =
+        getComponent('administrative_area_level_1')?.short_name || '';
+      const neighborhood =
+        getComponent('neighborhood')?.long_name ||
+        getComponent('sublocality_level_1')?.long_name || '';
+
+      // Set all fields automatically
+      setAddress(`${streetNumber} ${streetName}`.trim());
+      setCity(cityName);
+      setState(stateName);
+      if (neighborhood) setNeighborhood(neighborhood);
+
+      // Save coordinates — no separate geocoding call needed on Save
+      const loc = details.geometry.location;
+      setCoordinates({ lat: loc.lat, lng: loc.lng });
+    }}
+    query={{
+      key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
+      language: 'en',
+      types: 'address', // Only show full street addresses, not just cities
+    }}
+    textInputProps={{
+      value: address,
+      onChangeText: setAddress,
+      placeholderTextColor: '#666',
+    }}
+    styles={{
+      container: {
+        flex: 0,
+      },
+      textInput: {
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        fontSize: 15,
+        color: '#333',
+      },
+      listView: {
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderRadius: 8,
+        marginTop: 4,
+        elevation: 4,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        zIndex: 1000,
+      },
+      row: {
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+      },
+      description: {
+        fontSize: 14,
+        color: '#333',
+      },
+      poweredContainer: {
+        display: 'none', // Hide "Powered by Google" text (optional)
+      },
+    }}
+    enablePoweredByContainer={false}
+    minLength={3}
+    debounce={300}
+    keyboardShouldPersistTaps="handled"
+  />
+</View>
+```
+
+#### D. Update `handleSave` to use saved coordinates
+
+In `handleSave`, update the transportation auto-fill block. Since autocomplete already provides coordinates, skip the geocodeAddress call if coordinates are already set:
+
+```ts
+// --- TRANSPORTATION AUTO-FILL ---
+try {
+  const override = transitOverride.trim() || undefined;
+  const fullAddress = `${address.trim()}, ${city.trim()}, ${state.trim()}`;
+
+  // Use coordinates from autocomplete if available, otherwise geocode
+  let coords = coordinates;
+  if (!coords) {
+    coords = await geocodeAddress(address.trim(), city.trim(), state.trim());
+  }
+
+  if (coords) {
+    property.coordinates = coords;
+
+    // Fetch transit stops and Walk Score in parallel
+    const [stops, walkScoreResult] = await Promise.all([
+      fetchNearbyTransit(coords.lat, coords.lng),
+      fetchWalkScore(fullAddress, coords.lat, coords.lng),
+    ]);
+
+    property.transitInfo = {
+      stops,
+      noTransitNearby: stops.length === 0,
+      manualOverride: override,
+      fetchedAt: new Date().toISOString(),
+    };
+
+    if (walkScoreResult) {
+      property.walkScore = walkScoreResult.walkScore;
+      property.walkScoreLabel = walkScoreResult.walkScoreLabel;
+      property.transitScore = walkScoreResult.transitScore;
+      property.transitScoreLabel = walkScoreResult.transitScoreLabel;
+    }
+  } else {
+    property.transitInfo = {
+      stops: [],
+      noTransitNearby: true,
+      manualOverride: override,
+      fetchedAt: new Date().toISOString(),
+    };
+  }
+} catch (transitError) {
+  console.warn('Transit/Walk Score fetch failed:', transitError);
+}
+// --- END TRANSPORTATION AUTO-FILL ---
+```
+
+Also update the `property` object to include coordinates:
+```ts
+const property: Property = {
+  // ... existing fields ...
+  coordinates: coordinates || undefined,
+};
+```
+
+---
+
+### 3. Fix ScrollView conflict (important)
+
+`GooglePlacesAutocomplete` dropdowns can get blocked by `ScrollView`. Wrap the entire form's `ScrollView` with `keyboardShouldPersistTaps`:
+
+Find the `ScrollView` in `CreateEditListingScreen` and add:
+```tsx
+<ScrollView
+  keyboardShouldPersistTaps="handled"
+  // ... existing props
+>
+```
+
+---
+
+### 4. Update `app.json` — Add API key for native builds
+
+In `app.json`, add your Google Maps API key so it's available in native builds:
+
+```json
+{
+  "expo": {
+    "android": {
+      "config": {
+        "googleMaps": {
+          "apiKey": "${EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}"
+        }
+      }
+    },
+    "ios": {
+      "config": {
+        "googleMapsApiKey": "${EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}"
+      }
+    }
+  }
+}
+```
+
+---
+
+## How It Works
+
+```
+Host taps Address field
+        ↓
+Types "123 Mai..."
+        ↓
+GooglePlacesAutocomplete calls Places API after 300ms delay
+        ↓
+Dropdown shows suggestions:
+  → 123 Main St, New York, NY, USA
+  → 123 Main Ave, Los Angeles, CA, USA
+  → 123 Main Blvd, Chicago, IL, USA
+        ↓
+Host taps their address
+        ↓
+App auto-fills:
+  address     = "123 Main St"
+  city        = "New York"
+  state       = "NY"
+  neighborhood = "Lower East Side"
+  coordinates = { lat: 40.748, lng: -73.985 }
+        ↓
+Host taps Save
+        ↓
+Coordinates already known — skip Geocoding API call
+Transit stops + Walk Score fetched using saved coordinates
+```
+
+---
+
+## What Auto-Fills When Host Picks an Address
+
+| Field | Auto-filled? |
+|-------|-------------|
+| Address (street + number) | ✅ Yes |
+| City | ✅ Yes |
+| State | ✅ Yes |
+| Neighborhood | ✅ Yes (if available) |
+| Coordinates (lat/lng) | ✅ Yes — saves a Geocoding API call |
+| Zip code | Can be added if needed |
+
+---
+
+## Notes
+
+- **Debounce 300ms** — waits until the host pauses typing before calling the API. Prevents excessive API calls on every keystroke.
+- **minLength 3** — only starts searching after 3 characters are typed.
+- **types: 'address'** — restricts results to full street addresses only, not cities or regions.
+- **fetchDetails: true** — required to get address components and coordinates from the selected result.
+- **Host can still type manually** — if autocomplete doesn't find the address (rare), the host can still type the address manually and the form works as before. Coordinates will then be fetched at save time via Geocoding API as a fallback.
+- **Existing listings** — when editing an existing listing, the address field shows the saved address. The host can tap it to trigger autocomplete or leave it as-is.

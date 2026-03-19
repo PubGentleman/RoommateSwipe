@@ -4,7 +4,7 @@ import { additionalProfiles } from './additionalProfiles';
 import { extraProfiles } from './extraProfiles';
 import { extraConversations, extraProperties, extraGroups, extraApplications } from './extraMockData';
 
-export const MOCK_DATA_VERSION = '2.2.0';
+export const MOCK_DATA_VERSION = '2.3.0';
 
 export const mockProfileUsers: User[] = [
   {
@@ -1306,6 +1306,14 @@ export const mockProperties: Property[] = [
     propertyType: 'lease',
     roomType: 'entire',
     walkScore: 98,
+    transitInfo: {
+      stops: [
+        { name: 'Fulton St Station (2/3/4/5/A/C/J/Z)', type: 'subway' as const, distanceMiles: 0.1 },
+        { name: 'Wall St Station (4/5)', type: 'subway' as const, distanceMiles: 0.2 },
+        { name: 'Broad St Station (J/Z)', type: 'subway' as const, distanceMiles: 0.2 },
+      ],
+      fetchedAt: new Date().toISOString(),
+    },
   },
   {
     id: '2',
@@ -1333,6 +1341,14 @@ export const mockProperties: Property[] = [
     ],
     hostProfileId: '1',
     walkScore: 94,
+    transitInfo: {
+      stops: [
+        { name: 'Bedford Ave Station (L)', type: 'subway' as const, distanceMiles: 0.2 },
+        { name: 'Marcy Ave Station (J/M/Z)', type: 'subway' as const, distanceMiles: 0.4 },
+        { name: 'B62 Bus', type: 'bus' as const, distanceMiles: 0.1 },
+      ],
+      fetchedAt: new Date().toISOString(),
+    },
     listingBoost: {
       listingId: '2',
       duration: '24h',
@@ -1367,6 +1383,14 @@ export const mockProperties: Property[] = [
     propertyType: 'lease',
     roomType: 'entire',
     walkScore: 97,
+    transitInfo: {
+      stops: [
+        { name: 'Chambers St Station (1/2/3)', type: 'subway' as const, distanceMiles: 0.2 },
+        { name: 'Franklin St Station (1)', type: 'subway' as const, distanceMiles: 0.3 },
+        { name: 'Canal St Station (A/C/E)', type: 'subway' as const, distanceMiles: 0.4 },
+      ],
+      fetchedAt: new Date().toISOString(),
+    },
   },
   {
     id: '4',
@@ -1395,6 +1419,14 @@ export const mockProperties: Property[] = [
     ],
     hostProfileId: '2',
     walkScore: 88,
+    transitInfo: {
+      stops: [
+        { name: 'DeKalb Ave Station (L)', type: 'subway' as const, distanceMiles: 0.3 },
+        { name: 'Jefferson St Station (L)', type: 'subway' as const, distanceMiles: 0.4 },
+        { name: 'B38 Bus', type: 'bus' as const, distanceMiles: 0.1 },
+      ],
+      fetchedAt: new Date().toISOString(),
+    },
     listingBoost: {
       listingId: '4',
       duration: '72h',
@@ -1429,6 +1461,14 @@ export const mockProperties: Property[] = [
     propertyType: 'lease',
     roomType: 'entire',
     walkScore: 91,
+    transitInfo: {
+      stops: [
+        { name: '86th St Station (4/5/6)', type: 'subway' as const, distanceMiles: 0.2 },
+        { name: '77th St Station (6)', type: 'subway' as const, distanceMiles: 0.4 },
+        { name: 'M86 Crosstown Bus', type: 'bus' as const, distanceMiles: 0.1 },
+      ],
+      fetchedAt: new Date().toISOString(),
+    },
   },
   {
     id: '6',
@@ -1456,6 +1496,14 @@ export const mockProperties: Property[] = [
     ],
     hostProfileId: '3',
     walkScore: 93,
+    transitInfo: {
+      stops: [
+        { name: '7th Ave Station (F/G)', type: 'subway' as const, distanceMiles: 0.2 },
+        { name: 'Union St Station (R)', type: 'subway' as const, distanceMiles: 0.3 },
+        { name: 'B63 Bus', type: 'bus' as const, distanceMiles: 0.1 },
+      ],
+      fetchedAt: new Date().toISOString(),
+    },
     listingBoost: {
       listingId: '6',
       duration: '7d',
@@ -1490,6 +1538,14 @@ export const mockProperties: Property[] = [
     propertyType: 'lease',
     roomType: 'entire',
     walkScore: 96,
+    transitInfo: {
+      stops: [
+        { name: '23rd St Station (C/E)', type: 'subway' as const, distanceMiles: 0.1 },
+        { name: '23rd St Station (1)', type: 'subway' as const, distanceMiles: 0.2 },
+        { name: 'M23 Crosstown Bus', type: 'bus' as const, distanceMiles: 0.1 },
+      ],
+      fetchedAt: new Date().toISOString(),
+    },
   },
   {
     id: '8',
@@ -1518,6 +1574,14 @@ export const mockProperties: Property[] = [
     ],
     hostProfileId: '4',
     walkScore: 90,
+    transitInfo: {
+      stops: [
+        { name: 'Astoria Blvd Station (N/W)', type: 'subway' as const, distanceMiles: 0.2 },
+        { name: '30th Ave Station (N/W)', type: 'subway' as const, distanceMiles: 0.3 },
+        { name: 'Q19 Bus', type: 'bus' as const, distanceMiles: 0.1 },
+      ],
+      fetchedAt: new Date().toISOString(),
+    },
   },
   {
     id: '9',
@@ -1541,6 +1605,14 @@ export const mockProperties: Property[] = [
     propertyType: 'lease',
     roomType: 'entire',
     walkScore: 97,
+    transitInfo: {
+      stops: [
+        { name: 'Christopher St-Sheridan Sq (1)', type: 'subway' as const, distanceMiles: 0.2 },
+        { name: 'W 4th St-Washington Sq (A/B/C/D/E/F/M)', type: 'subway' as const, distanceMiles: 0.3 },
+        { name: 'M8 Bus', type: 'bus' as const, distanceMiles: 0.1 },
+      ],
+      fetchedAt: new Date().toISOString(),
+    },
   },
   {
     id: '10',
@@ -1568,6 +1640,14 @@ export const mockProperties: Property[] = [
     ],
     hostProfileId: '6',
     walkScore: 92,
+    transitInfo: {
+      stops: [
+        { name: 'Delancey St-Essex St (F/J/M/Z)', type: 'subway' as const, distanceMiles: 0.2 },
+        { name: '2nd Ave Station (F)', type: 'subway' as const, distanceMiles: 0.3 },
+        { name: 'M14A Bus', type: 'bus' as const, distanceMiles: 0.1 },
+      ],
+      fetchedAt: new Date().toISOString(),
+    },
   },
   {
     id: '11',
@@ -1591,6 +1671,14 @@ export const mockProperties: Property[] = [
     propertyType: 'lease',
     roomType: 'entire',
     walkScore: 93,
+    transitInfo: {
+      stops: [
+        { name: 'Greenpoint Ave Station (G)', type: 'subway' as const, distanceMiles: 0.3 },
+        { name: 'Nassau Ave Station (G)', type: 'subway' as const, distanceMiles: 0.4 },
+        { name: 'B43 Bus', type: 'bus' as const, distanceMiles: 0.1 },
+      ],
+      fetchedAt: new Date().toISOString(),
+    },
   },
   {
     id: '12',
@@ -1614,6 +1702,14 @@ export const mockProperties: Property[] = [
     propertyType: 'lease',
     roomType: 'entire',
     walkScore: 96,
+    transitInfo: {
+      stops: [
+        { name: 'Prince St Station (N/R/W)', type: 'subway' as const, distanceMiles: 0.1 },
+        { name: 'Spring St Station (6)', type: 'subway' as const, distanceMiles: 0.2 },
+        { name: 'Broadway-Lafayette St (B/D/F/M)', type: 'subway' as const, distanceMiles: 0.3 },
+      ],
+      fetchedAt: new Date().toISOString(),
+    },
   },
   {
     id: '13',
@@ -1643,6 +1739,14 @@ export const mockProperties: Property[] = [
     ],
     hostProfileId: '7',
     walkScore: 89,
+    transitInfo: {
+      stops: [
+        { name: '125th St Station (A/B/C/D)', type: 'subway' as const, distanceMiles: 0.3 },
+        { name: '116th St Station (2/3)', type: 'subway' as const, distanceMiles: 0.4 },
+        { name: 'M60 SBS Bus', type: 'bus' as const, distanceMiles: 0.2 },
+      ],
+      fetchedAt: new Date().toISOString(),
+    },
   },
   {
     id: '14',
@@ -1666,6 +1770,14 @@ export const mockProperties: Property[] = [
     propertyType: 'sublet',
     roomType: 'entire',
     walkScore: 95,
+    transitInfo: {
+      stops: [
+        { name: 'Astor Place Station (6)', type: 'subway' as const, distanceMiles: 0.2 },
+        { name: '1st Ave Station (L)', type: 'subway' as const, distanceMiles: 0.3 },
+        { name: 'M8 Bus', type: 'bus' as const, distanceMiles: 0.1 },
+      ],
+      fetchedAt: new Date().toISOString(),
+    },
   },
   {
     id: '15',
@@ -1689,6 +1801,14 @@ export const mockProperties: Property[] = [
     propertyType: 'lease',
     roomType: 'entire',
     walkScore: 87,
+    transitInfo: {
+      stops: [
+        { name: 'Rector St Station (1)', type: 'subway' as const, distanceMiles: 0.3 },
+        { name: 'Bowling Green Station (4/5)', type: 'subway' as const, distanceMiles: 0.4 },
+        { name: 'NY Waterway Ferry Terminal', type: 'ferry' as const, distanceMiles: 0.2 },
+      ],
+      fetchedAt: new Date().toISOString(),
+    },
   },
   {
     id: '16',
@@ -1717,6 +1837,14 @@ export const mockProperties: Property[] = [
     ],
     hostProfileId: '8',
     walkScore: 90,
+    transitInfo: {
+      stops: [
+        { name: 'Franklin Ave Station (2/3/4/5/S)', type: 'subway' as const, distanceMiles: 0.2 },
+        { name: 'Nostrand Ave Station (A/C)', type: 'subway' as const, distanceMiles: 0.3 },
+        { name: 'B44 SBS Bus', type: 'bus' as const, distanceMiles: 0.1 },
+      ],
+      fetchedAt: new Date().toISOString(),
+    },
   },
   {
     id: '17',
@@ -1740,6 +1868,14 @@ export const mockProperties: Property[] = [
     propertyType: 'lease',
     roomType: 'entire',
     walkScore: 88,
+    transitInfo: {
+      stops: [
+        { name: 'Grand Central-42nd St (4/5/6/7/S)', type: 'subway' as const, distanceMiles: 0.3 },
+        { name: '51st St Station (6)', type: 'subway' as const, distanceMiles: 0.3 },
+        { name: 'M42 Crosstown Bus', type: 'bus' as const, distanceMiles: 0.1 },
+      ],
+      fetchedAt: new Date().toISOString(),
+    },
   },
   {
     id: '18',
@@ -1769,6 +1905,14 @@ export const mockProperties: Property[] = [
     ],
     hostProfileId: '9',
     walkScore: 94,
+    transitInfo: {
+      stops: [
+        { name: 'Clark St Station (2/3)', type: 'subway' as const, distanceMiles: 0.2 },
+        { name: 'Borough Hall Station (4/5/R)', type: 'subway' as const, distanceMiles: 0.3 },
+        { name: 'B25 Bus', type: 'bus' as const, distanceMiles: 0.1 },
+      ],
+      fetchedAt: new Date().toISOString(),
+    },
   },
   {
     id: '19',
@@ -1792,6 +1936,14 @@ export const mockProperties: Property[] = [
     propertyType: 'lease',
     roomType: 'entire',
     walkScore: 89,
+    transitInfo: {
+      stops: [
+        { name: '33rd St Station (6)', type: 'subway' as const, distanceMiles: 0.2 },
+        { name: '28th St Station (6)', type: 'subway' as const, distanceMiles: 0.3 },
+        { name: 'M34 SBS Bus', type: 'bus' as const, distanceMiles: 0.2 },
+      ],
+      fetchedAt: new Date().toISOString(),
+    },
   },
   {
     id: '20',
@@ -1815,6 +1967,14 @@ export const mockProperties: Property[] = [
     propertyType: 'lease',
     roomType: 'entire',
     walkScore: 91,
+    transitInfo: {
+      stops: [
+        { name: 'Bergen St Station (2/3)', type: 'subway' as const, distanceMiles: 0.2 },
+        { name: 'Atlantic Ave-Barclays Ctr (B/D/N/Q/R/2/3/4/5)', type: 'subway' as const, distanceMiles: 0.3 },
+        { name: 'B65 Bus', type: 'bus' as const, distanceMiles: 0.1 },
+      ],
+      fetchedAt: new Date().toISOString(),
+    },
   },
   {
     id: '21',
@@ -1838,6 +1998,14 @@ export const mockProperties: Property[] = [
     propertyType: 'lease',
     roomType: 'entire',
     walkScore: 82,
+    transitInfo: {
+      stops: [
+        { name: 'Silver Lake / Sunset Junction Bus Hub', type: 'bus' as const, distanceMiles: 0.3 },
+        { name: 'Metro Line 2 Bus', type: 'bus' as const, distanceMiles: 0.2 },
+        { name: 'Sunset Blvd / Hyperion Ave Bus Stop', type: 'bus' as const, distanceMiles: 0.4 },
+      ],
+      fetchedAt: new Date().toISOString(),
+    },
   },
   {
     id: '22',
@@ -1864,6 +2032,14 @@ export const mockProperties: Property[] = [
       { gender: 'male', onApp: false },
     ],
     walkScore: 91,
+    transitInfo: {
+      stops: [
+        { name: 'Hollywood / Vine Station (B Line)', type: 'subway' as const, distanceMiles: 0.2 },
+        { name: 'Hollywood / Highland Station (B Line)', type: 'subway' as const, distanceMiles: 0.4 },
+        { name: 'Metro 217 Bus', type: 'bus' as const, distanceMiles: 0.1 },
+      ],
+      fetchedAt: new Date().toISOString(),
+    },
   },
   {
     id: '23',
@@ -1887,6 +2063,14 @@ export const mockProperties: Property[] = [
     propertyType: 'lease',
     roomType: 'entire',
     walkScore: 88,
+    transitInfo: {
+      stops: [
+        { name: 'Venice / Abbott Kinney Bus Stop', type: 'bus' as const, distanceMiles: 0.2 },
+        { name: 'Big Blue Bus Line 1', type: 'bus' as const, distanceMiles: 0.3 },
+        { name: 'Culver City Station (E Line)', type: 'train' as const, distanceMiles: 1.2 },
+      ],
+      fetchedAt: new Date().toISOString(),
+    },
   },
   {
     id: '24',
@@ -1910,6 +2094,14 @@ export const mockProperties: Property[] = [
     propertyType: 'lease',
     roomType: 'entire',
     walkScore: 95,
+    transitInfo: {
+      stops: [
+        { name: 'Damen Station (Blue Line)', type: 'subway' as const, distanceMiles: 0.2 },
+        { name: 'Division Station (Blue Line)', type: 'subway' as const, distanceMiles: 0.4 },
+        { name: 'CTA Bus 56 Milwaukee', type: 'bus' as const, distanceMiles: 0.1 },
+      ],
+      fetchedAt: new Date().toISOString(),
+    },
   },
   {
     id: '25',
@@ -1937,6 +2129,14 @@ export const mockProperties: Property[] = [
       { gender: 'female', onApp: false },
     ],
     walkScore: 93,
+    transitInfo: {
+      stops: [
+        { name: 'Fullerton Station (Red/Brown/Purple Line)', type: 'subway' as const, distanceMiles: 0.3 },
+        { name: 'Armitage Station (Brown/Purple Line)', type: 'subway' as const, distanceMiles: 0.4 },
+        { name: 'CTA Bus 22 Clark', type: 'bus' as const, distanceMiles: 0.1 },
+      ],
+      fetchedAt: new Date().toISOString(),
+    },
   },
   {
     id: '26',
@@ -1960,6 +2160,14 @@ export const mockProperties: Property[] = [
     propertyType: 'lease',
     roomType: 'entire',
     walkScore: 94,
+    transitInfo: {
+      stops: [
+        { name: 'Brickell Station (Metrorail)', type: 'train' as const, distanceMiles: 0.2 },
+        { name: 'Brickell Key Metromover', type: 'tram' as const, distanceMiles: 0.3 },
+        { name: 'Metro Bus Route 8', type: 'bus' as const, distanceMiles: 0.1 },
+      ],
+      fetchedAt: new Date().toISOString(),
+    },
   },
   {
     id: '27',
@@ -1983,6 +2191,14 @@ export const mockProperties: Property[] = [
     propertyType: 'lease',
     roomType: 'entire',
     walkScore: 86,
+    transitInfo: {
+      stops: [
+        { name: 'Wynwood / NW 2nd Ave Bus Stop', type: 'bus' as const, distanceMiles: 0.2 },
+        { name: 'Miami Trolley Wynwood Route', type: 'tram' as const, distanceMiles: 0.1 },
+        { name: 'Earlington Heights Station (Metrorail)', type: 'train' as const, distanceMiles: 0.8 },
+      ],
+      fetchedAt: new Date().toISOString(),
+    },
   },
   {
     id: '28',
@@ -2006,6 +2222,14 @@ export const mockProperties: Property[] = [
     propertyType: 'lease',
     roomType: 'entire',
     walkScore: 96,
+    transitInfo: {
+      stops: [
+        { name: '24th St Mission Station (BART)', type: 'train' as const, distanceMiles: 0.2 },
+        { name: '16th St Mission Station (BART)', type: 'train' as const, distanceMiles: 0.4 },
+        { name: 'Muni 14 Mission Bus', type: 'bus' as const, distanceMiles: 0.1 },
+      ],
+      fetchedAt: new Date().toISOString(),
+    },
   },
   {
     id: '29',
@@ -2032,6 +2256,14 @@ export const mockProperties: Property[] = [
       { gender: 'female', onApp: false },
     ],
     walkScore: 93,
+    transitInfo: {
+      stops: [
+        { name: 'Caltrain 4th & King Station', type: 'train' as const, distanceMiles: 0.3 },
+        { name: 'SOMA / Brannan St Muni Stop', type: 'tram' as const, distanceMiles: 0.1 },
+        { name: 'Muni 10 Townsend Bus', type: 'bus' as const, distanceMiles: 0.2 },
+      ],
+      fetchedAt: new Date().toISOString(),
+    },
   },
   {
     id: '30',
@@ -2055,6 +2287,14 @@ export const mockProperties: Property[] = [
     propertyType: 'lease',
     roomType: 'entire',
     walkScore: 85,
+    transitInfo: {
+      stops: [
+        { name: 'Little Tokyo / Arts District Station (A/E Line)', type: 'train' as const, distanceMiles: 0.3 },
+        { name: 'Metro 60 Bus', type: 'bus' as const, distanceMiles: 0.2 },
+        { name: 'DASH Downtown Route A', type: 'bus' as const, distanceMiles: 0.1 },
+      ],
+      fetchedAt: new Date().toISOString(),
+    },
   },
   ...extraProperties,
 ];
