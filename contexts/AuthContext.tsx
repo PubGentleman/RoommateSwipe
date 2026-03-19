@@ -17,8 +17,8 @@ interface AuthContextType {
   logout: () => Promise<void>;
   abandonSignup: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
-  upgradeToPlus: (billingCycle?: 'monthly' | '3month' | 'annual') => Promise<void>;
-  upgradeToElite: (billingCycle?: 'monthly' | '3month' | 'annual') => Promise<void>;
+  upgradeToPlus: (billingCycle?: 'monthly' | '3month' | 'annual', stripeSubscriptionId?: string) => Promise<void>;
+  upgradeToElite: (billingCycle?: 'monthly' | '3month' | 'annual', stripeSubscriptionId?: string) => Promise<void>;
   downgradeToPlan: (plan: 'basic' | 'plus') => Promise<void>;
   cancelSubscription: () => Promise<void>;
   cancelSubscriptionAtPeriodEnd: () => Promise<void>;
@@ -548,7 +548,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return prices[plan][cycle];
   };
 
-  const upgradeToPlus = async (billingCycle: 'monthly' | '3month' | 'annual' = 'monthly') => {
+  const upgradeToPlus = async (billingCycle: 'monthly' | '3month' | 'annual' = 'monthly', stripeSubscriptionId?: string) => {
     if (!user) return;
     const expiresAt = getExpiryForCycle(billingCycle);
     const amount = getBillingAmount('plus', billingCycle);
@@ -567,12 +567,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     await StorageService.setCurrentUser(updatedUser);
     await StorageService.addOrUpdateUser(updatedUser);
-    await supabase.from('subscriptions').update({ plan: 'plus', billing_cycle: billingCycle, status: 'active', current_period_end: expiresAt.toISOString(), cancel_at_period_end: false }).eq('user_id', user.id);
+    const updatePayload: any = { plan: 'plus', billing_cycle: billingCycle, status: 'active', current_period_end: expiresAt.toISOString(), cancel_at_period_end: false };
+    if (stripeSubscriptionId) updatePayload.stripe_subscription_id = stripeSubscriptionId;
+    await supabase.from('subscriptions').update(updatePayload).eq('user_id', user.id);
     setUser(updatedUser);
     console.log('[Auth] Upgraded to Plus:', updatedUser.subscription);
   };
 
-  const upgradeToElite = async (billingCycle: 'monthly' | '3month' | 'annual' = 'monthly') => {
+  const upgradeToElite = async (billingCycle: 'monthly' | '3month' | 'annual' = 'monthly', stripeSubscriptionId?: string) => {
     if (!user) return;
     const expiresAt = getExpiryForCycle(billingCycle);
     const amount = getBillingAmount('elite', billingCycle);
@@ -591,7 +593,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     await StorageService.setCurrentUser(updatedUser);
     await StorageService.addOrUpdateUser(updatedUser);
-    await supabase.from('subscriptions').update({ plan: 'elite', billing_cycle: billingCycle, status: 'active', current_period_end: expiresAt.toISOString(), cancel_at_period_end: false }).eq('user_id', user.id);
+    const updatePayload: any = { plan: 'elite', billing_cycle: billingCycle, status: 'active', current_period_end: expiresAt.toISOString(), cancel_at_period_end: false };
+    if (stripeSubscriptionId) updatePayload.stripe_subscription_id = stripeSubscriptionId;
+    await supabase.from('subscriptions').update(updatePayload).eq('user_id', user.id);
     setUser(updatedUser);
     console.log('[Auth] Upgraded to Elite:', updatedUser.subscription);
   };

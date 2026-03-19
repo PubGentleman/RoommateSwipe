@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../contexts/AuthContext';
 import * as Haptics from 'expo-haptics';
+import { useStripePayment } from '../../hooks/useStripePayment';
 
 type PlansScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'Plans'>;
 
@@ -67,6 +68,7 @@ const FEATURES: Record<Tier, { text: string; included: boolean }[]> = {
 export const PlansScreen = () => {
   const insets = useSafeAreaInsets();
   const { user, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscriptionAtPeriodEnd, reactivateSubscription, canSendInterest, canRewind, canSuperLike } = useAuth();
+  const { processPayment } = useStripePayment();
   const navigation = useNavigation<PlansScreenNavigationProp>();
 
   const [showUpgradeConfirm, setShowUpgradeConfirm] = useState(false);
@@ -123,20 +125,31 @@ export const PlansScreen = () => {
   };
 
   const confirmUpgrade = async () => {
-    if (!selectedPlan || selectedPlan === currentPlan) {
+    if (!selectedPlan || selectedPlan === currentPlan || !user) {
       setShowUpgradeConfirm(false);
       setSelectedPlan(null);
       return;
     }
     setShowUpgradeConfirm(false);
     setProcessing(true);
-    await new Promise(r => setTimeout(r, 1500));
-    if (selectedPlan === 'plus') await upgradeToPlus(billingCycle);
-    else await upgradeToElite(billingCycle);
-    const planName = selectedPlan === 'plus' ? 'Plus' : 'Elite';
-    Alert.alert('Success!', `Welcome to ${planName}! You now have access to all ${planName} features.`, [
-      { text: 'OK', onPress: () => navigation.goBack() },
-    ]);
+
+    try {
+      const { success, subscriptionId } = await processPayment(user.id, user.email || '', selectedPlan, billingCycle);
+      if (!success) {
+        setProcessing(false);
+        setSelectedPlan(null);
+        return;
+      }
+
+      if (selectedPlan === 'plus') await upgradeToPlus(billingCycle, subscriptionId);
+      else await upgradeToElite(billingCycle, subscriptionId);
+      const planName = selectedPlan === 'plus' ? 'Plus' : 'Elite';
+      Alert.alert('Success!', `Welcome to ${planName}! You now have access to all ${planName} features.`, [
+        { text: 'OK', onPress: () => navigation.goBack() },
+      ]);
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Something went wrong.');
+    }
     setProcessing(false);
     setSelectedPlan(null);
   };

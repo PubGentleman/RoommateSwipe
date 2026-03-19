@@ -1,0 +1,703 @@
+# RoomDrx — Group Property Search & Linking
+
+## Overview
+A reusable property search modal that can be opened from two places:
+1. **CreateGroupScreen** — when optionally linking a property during group creation
+2. **GroupChatScreen** — when a group admin wants to add or change the linked property after the group exists
+
+The modal shows a search bar with live results and filter chips to narrow listings down by city, price range, and bedroom count. Selecting a listing closes the modal and updates the group.
+
+> **Member limit note:** When a listing is linked, the group's member cap automatically becomes `bedrooms + 1`. The bedroom count is shown on each listing card in the modal so users can see the limit they're committing to before selecting.
+
+---
+
+## Step 1 — Add `linkListingToGroup` to `groupService.ts`
+
+Add this function to the existing `services/groupService.ts`:
+
+```ts
+// Link or change the property attached to a group
+// Pass null to remove the linked property
+export async function linkListingToGroup(
+  groupId: string,
+  listingId: string | null
+): Promise<void> {
+  const { error } = await supabase
+    .from('groups')
+    .update({ listing_id: listingId, updated_at: new Date().toISOString() })
+    .eq('id', groupId);
+  if (error) throw error;
+}
+```
+
+---
+
+## Step 2 — Create `GroupPropertySearchModal.tsx`
+
+Create `components/GroupPropertySearchModal.tsx`. This is a full-screen modal with:
+- A text search bar (searches title, address, city, neighborhood)
+- Filter chips: City, Price range, Bedrooms
+- Live results from Supabase as the user types
+- A "Remove property" option if a listing is already linked
+
+```tsx
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  View, StyleSheet, Modal, Pressable, TextInput, FlatList,
+  ActivityIndicator, ScrollView,
+} from 'react-native';
+import { Feather } from '../components/VectorIcons';
+import { ThemedText } from '../components/ThemedText';
+import { useTheme } from '../hooks/useTheme';
+import { Typography, Spacing } from '../constants/theme';
+import { Image } from 'expo-image';
+import { supabase } from '../lib/supabase';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface ListingResult {
+  id: string;
+  title: string;
+  address: string;
+  city: string;
+  state: string;
+  rent: number;
+  bedrooms: number;
+  photos: string[];
+  transitInfo?: string[];
+}
+
+interface Filters {
+  city: string;
+  minRent: number | null;
+  maxRent: number | null;
+  bedrooms: number | null;
+}
+
+const DEFAULT_FILTERS: Filters = {
+  city: '',
+  minRent: null,
+  maxRent: null,
+  bedrooms: null,
+};
+
+const PRICE_RANGES = [
+  { label: 'Any', min: null, max: null },
+  { label: 'Under $1k', min: null, max: 1000 },
+  { label: '$1k–$2k', min: 1000, max: 2000 },
+  { label: '$2k–$3k', min: 2000, max: 3000 },
+  { label: '$3k+', min: 3000, max: null },
+];
+
+const BEDROOM_OPTIONS = [
+  { label: 'Any', value: null },
+  { label: '1 BR', value: 1 },
+  { label: '2 BR', value: 2 },
+  { label: '3 BR', value: 3 },
+  { label: '4+ BR', value: 4 },
+];
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+interface Props {
+  visible: boolean;
+  currentListingId?: string | null;
+  onSelect: (listing: ListingResult | null) => void; // null = remove
+  onClose: () => void;
+}
+
+export function GroupPropertySearchModal({ visible, currentListingId, onSelect, onClose }: Props) {
+  const { theme } = useTheme();
+  const [query, setQuery] = useState('');
+  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
+  const [results, setResults] = useState<ListingResult[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [cities, setCities] = useState<string[]>([]);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Load distinct cities for filter chip suggestions on open
+  useEffect(() => {
+    if (visible) {
+      supabase
+        .from('listings')
+        .select('city')
+        .eq('status', 'available')
+        .then(({ data }) => {
+          const unique = [...new Set((data || []).map((r: any) => r.city))].sort();
+          setCities(unique.slice(0, 20));
+        });
+      searchListings('', DEFAULT_FILTERS);
+    } else {
+      // Reset on close
+      setQuery('');
+      setFilters(DEFAULT_FILTERS);
+      setShowFilters(false);
+    }
+  }, [visible]);
+
+  // Debounced search on query or filter change
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      searchListings(query, filters);
+    }, 300);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [query, filters]);
+
+  const searchListings = async (q: string, f: Filters) => {
+    setLoading(true);
+    try {
+      let req = supabase
+        .from('listings')
+        .select('id, title, address, city, state, rent, bedrooms, photos, transit_info')
+        .eq('status', 'available')
+        .order('created_at', { ascending: false })
+        .limit(30);
+
+      // Text search across title, address, city, neighborhood
+      if (q.trim()) {
+        req = req.or(
+          `title.ilike.%${q}%,address.ilike.%${q}%,city.ilike.%${q}%,neighborhood.ilike.%${q}%`
+        );
+      }
+
+      // City filter
+      if (f.city) req = req.ilike('city', `%${f.city}%`);
+
+      // Price range
+      if (f.minRent !== null) req = req.gte('rent', f.minRent);
+      if (f.maxRent !== null) req = req.lte('rent', f.maxRent);
+
+      // Bedrooms
+      if (f.bedrooms !== null) {
+        if (f.bedrooms >= 4) {
+          req = req.gte('bedrooms', 4);
+        } else {
+          req = req.eq('bedrooms', f.bedrooms);
+        }
+      }
+
+      const { data, error } = await req;
+      if (error) throw error;
+
+      setResults((data || []).map((r: any) => ({
+        id: r.id,
+        title: r.title,
+        address: r.address,
+        city: r.city,
+        state: r.state,
+        rent: r.rent,
+        bedrooms: r.bedrooms,
+        photos: r.photos || [],
+        transitInfo: r.transit_info || [],
+      })));
+    } catch {
+      setResults([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const activeFilterCount = [
+    filters.city,
+    filters.minRent !== null || filters.maxRent !== null,
+    filters.bedrooms !== null,
+  ].filter(Boolean).length;
+
+  const clearFilters = () => setFilters(DEFAULT_FILTERS);
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+
+        {/* ── Header ──────────────────────────────────────────────────────── */}
+        <View style={[styles.header, { borderBottomColor: theme.border }]}>
+          <Pressable onPress={onClose} hitSlop={8}>
+            <Feather name="x" size={24} color={theme.text} />
+          </Pressable>
+          <ThemedText style={[Typography.h3, { flex: 1, textAlign: 'center' }]}>
+            Find a Property
+          </ThemedText>
+          <View style={{ width: 24 }} />
+        </View>
+
+        {/* ── Search Bar ──────────────────────────────────────────────────── */}
+        <View style={styles.searchRow}>
+          <View style={[styles.searchBar, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <Feather name="search" size={17} color={theme.textSecondary} />
+            <TextInput
+              style={[styles.searchInput, { color: theme.text }]}
+              placeholder="Search by address, city, or name..."
+              placeholderTextColor={theme.textSecondary}
+              value={query}
+              onChangeText={setQuery}
+              autoFocus
+              returnKeyType="search"
+            />
+            {query.length > 0 && (
+              <Pressable onPress={() => setQuery('')} hitSlop={8}>
+                <Feather name="x-circle" size={16} color={theme.textSecondary} />
+              </Pressable>
+            )}
+          </View>
+
+          {/* Filter toggle button */}
+          <Pressable
+            style={[
+              styles.filterBtn,
+              { backgroundColor: activeFilterCount > 0 ? theme.primary : theme.card,
+                borderColor: activeFilterCount > 0 ? theme.primary : theme.border }
+            ]}
+            onPress={() => setShowFilters(v => !v)}
+          >
+            <Feather
+              name="sliders"
+              size={17}
+              color={activeFilterCount > 0 ? '#fff' : theme.textSecondary}
+            />
+            {activeFilterCount > 0 && (
+              <View style={styles.filterBadge}>
+                <ThemedText style={styles.filterBadgeText}>{activeFilterCount}</ThemedText>
+              </View>
+            )}
+          </Pressable>
+        </View>
+
+        {/* ── Filter Panel ────────────────────────────────────────────────── */}
+        {showFilters && (
+          <View style={[styles.filterPanel, { backgroundColor: theme.card, borderColor: theme.border }]}>
+
+            {/* City chips */}
+            <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: 8 }]}>
+              CITY
+            </ThemedText>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+              <Pressable
+                style={[styles.chip, { borderColor: !filters.city ? theme.primary : theme.border,
+                  backgroundColor: !filters.city ? theme.primary + '20' : 'transparent' }]}
+                onPress={() => setFilters(f => ({ ...f, city: '' }))}
+              >
+                <ThemedText style={[Typography.small, { color: !filters.city ? theme.primary : theme.text }]}>
+                  Any City
+                </ThemedText>
+              </Pressable>
+              {cities.map(city => (
+                <Pressable
+                  key={city}
+                  style={[styles.chip, { borderColor: filters.city === city ? theme.primary : theme.border,
+                    backgroundColor: filters.city === city ? theme.primary + '20' : 'transparent' }]}
+                  onPress={() => setFilters(f => ({ ...f, city: f.city === city ? '' : city }))}
+                >
+                  <ThemedText style={[Typography.small, { color: filters.city === city ? theme.primary : theme.text }]}>
+                    {city}
+                  </ThemedText>
+                </Pressable>
+              ))}
+            </ScrollView>
+
+            {/* Price range chips */}
+            <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: 8 }]}>
+              PRICE RANGE
+            </ThemedText>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+              {PRICE_RANGES.map(range => {
+                const active = filters.minRent === range.min && filters.maxRent === range.max;
+                return (
+                  <Pressable
+                    key={range.label}
+                    style={[styles.chip, { borderColor: active ? theme.primary : theme.border,
+                      backgroundColor: active ? theme.primary + '20' : 'transparent' }]}
+                    onPress={() => setFilters(f => ({ ...f, minRent: range.min, maxRent: range.max }))}
+                  >
+                    <ThemedText style={[Typography.small, { color: active ? theme.primary : theme.text }]}>
+                      {range.label}
+                    </ThemedText>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
+            {/* Bedroom chips */}
+            <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: 8 }]}>
+              BEDROOMS
+            </ThemedText>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }}>
+              {BEDROOM_OPTIONS.map(opt => {
+                const active = filters.bedrooms === opt.value;
+                return (
+                  <Pressable
+                    key={opt.label}
+                    style={[styles.chip, { borderColor: active ? theme.primary : theme.border,
+                      backgroundColor: active ? theme.primary + '20' : 'transparent' }]}
+                    onPress={() => setFilters(f => ({ ...f, bedrooms: opt.value }))}
+                  >
+                    <ThemedText style={[Typography.small, { color: active ? theme.primary : theme.text }]}>
+                      {opt.label}
+                    </ThemedText>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
+            {activeFilterCount > 0 && (
+              <Pressable onPress={clearFilters} style={styles.clearFilters}>
+                <ThemedText style={[Typography.small, { color: theme.primary }]}>
+                  Clear all filters
+                </ThemedText>
+              </Pressable>
+            )}
+          </View>
+        )}
+
+        {/* ── Remove Property Option ───────────────────────────────────────── */}
+        {currentListingId && (
+          <Pressable
+            style={[styles.removeOption, { borderColor: theme.border }]}
+            onPress={() => onSelect(null)}
+          >
+            <Feather name="slash" size={16} color={theme.textSecondary} style={{ marginRight: 8 }} />
+            <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
+              Remove linked property
+            </ThemedText>
+          </Pressable>
+        )}
+
+        {/* ── Results ─────────────────────────────────────────────────────── */}
+        {loading ? (
+          <ActivityIndicator size="large" color={theme.primary} style={{ marginTop: 40 }} />
+        ) : results.length === 0 ? (
+          <View style={styles.empty}>
+            <Feather name="home" size={40} color={theme.textSecondary} />
+            <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.md, textAlign: 'center' }]}>
+              No listings found.{'\n'}Try adjusting your search or filters.
+            </ThemedText>
+          </View>
+        ) : (
+          <FlatList
+            data={results}
+            keyExtractor={item => item.id}
+            contentContainerStyle={{ padding: Spacing.md, paddingBottom: 40 }}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item }) => (
+              <Pressable
+                style={[
+                  styles.listingCard,
+                  { backgroundColor: theme.card, borderColor: item.id === currentListingId ? theme.primary : theme.border,
+                    borderWidth: item.id === currentListingId ? 2 : 1 }
+                ]}
+                onPress={() => onSelect(item)}
+              >
+                {/* Photo */}
+                {item.photos[0] ? (
+                  <Image source={{ uri: item.photos[0] }} style={styles.listingPhoto} />
+                ) : (
+                  <View style={[styles.listingPhotoPlaceholder, { backgroundColor: theme.border }]}>
+                    <Feather name="home" size={24} color={theme.textSecondary} />
+                  </View>
+                )}
+
+                {/* Details */}
+                <View style={styles.listingInfo}>
+                  <ThemedText style={[Typography.body, { fontWeight: '700' }]} numberOfLines={1}>
+                    {item.title}
+                  </ThemedText>
+                  <ThemedText style={[Typography.small, { color: theme.textSecondary }]} numberOfLines={1}>
+                    {item.address}, {item.city}, {item.state}
+                  </ThemedText>
+                  <View style={styles.listingMeta}>
+                    <View style={[styles.metaChip, { backgroundColor: theme.primary + '15' }]}>
+                      <ThemedText style={[Typography.small, { color: theme.primary, fontWeight: '700' }]}>
+                        ${item.rent.toLocaleString()}/mo
+                      </ThemedText>
+                    </View>
+                    <View style={[styles.metaChip, { backgroundColor: theme.border }]}>
+                      <Feather name="home" size={11} color={theme.textSecondary} />
+                      <ThemedText style={[Typography.small, { color: theme.textSecondary, marginLeft: 3 }]}>
+                        {item.bedrooms} BR
+                      </ThemedText>
+                    </View>
+                    <View style={[styles.metaChip, { backgroundColor: theme.primary + '15' }]}>
+                      <Feather name="users" size={11} color={theme.primary} />
+                      <ThemedText style={[Typography.small, { color: theme.primary, marginLeft: 3 }]}>
+                        {item.bedrooms + 1} max members
+                      </ThemedText>
+                    </View>
+                    {item.transitInfo && item.transitInfo.length > 0 && (
+                      <View style={[styles.metaChip, { backgroundColor: theme.border }]}>
+                        <Feather name="navigation" size={11} color={theme.textSecondary} />
+                        <ThemedText style={[Typography.small, { color: theme.textSecondary, marginLeft: 3 }]}>
+                          Transit
+                        </ThemedText>
+                      </View>
+                    )}
+                  </View>
+                </View>
+
+                {/* Selected indicator */}
+                {item.id === currentListingId && (
+                  <Feather name="check-circle" size={22} color={theme.primary} style={{ marginLeft: 4 }} />
+                )}
+              </Pressable>
+            )}
+          />
+        )}
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  header: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: Spacing.lg, paddingTop: 20, paddingBottom: Spacing.md,
+    borderBottomWidth: 1,
+  },
+  searchRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, gap: 10,
+  },
+  searchBar: {
+    flex: 1, flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: Spacing.md, borderRadius: 12, borderWidth: 1, height: 46,
+  },
+  searchInput: { flex: 1, marginLeft: 8, fontSize: 15 },
+  filterBtn: {
+    width: 46, height: 46, borderRadius: 12, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  filterBadge: {
+    position: 'absolute', top: -4, right: -4,
+    backgroundColor: '#EF4444', borderRadius: 8,
+    width: 16, height: 16, alignItems: 'center', justifyContent: 'center',
+  },
+  filterBadgeText: { fontSize: 10, color: '#fff', fontWeight: '700' },
+  filterPanel: {
+    marginHorizontal: Spacing.md, marginBottom: Spacing.sm,
+    padding: Spacing.md, borderRadius: 14, borderWidth: 1,
+  },
+  chip: {
+    paddingHorizontal: 14, paddingVertical: 6,
+    borderRadius: 20, borderWidth: 1.5, marginRight: 8,
+  },
+  clearFilters: { alignSelf: 'flex-start', marginTop: 8 },
+  removeOption: {
+    flexDirection: 'row', alignItems: 'center',
+    marginHorizontal: Spacing.md, marginBottom: Spacing.sm,
+    paddingVertical: 10, paddingHorizontal: Spacing.md,
+    borderRadius: 12, borderWidth: 1,
+  },
+  empty: {
+    flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.xl,
+  },
+  listingCard: {
+    flexDirection: 'row', alignItems: 'center',
+    borderRadius: 14, marginBottom: Spacing.sm, overflow: 'hidden', padding: Spacing.sm,
+  },
+  listingPhoto: { width: 72, height: 72, borderRadius: 10 },
+  listingPhotoPlaceholder: {
+    width: 72, height: 72, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  listingInfo: { flex: 1, marginLeft: Spacing.sm, gap: 3 },
+  listingMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 },
+  metaChip: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8,
+  },
+});
+```
+
+---
+
+## Step 3 — Wire into `CreateGroupScreen`
+
+Replace the existing listing picker section in `CreateGroupScreen` with the modal:
+
+```tsx
+// Add to imports
+import { GroupPropertySearchModal } from '../../components/GroupPropertySearchModal';
+
+// Add state
+const [showPropertySearch, setShowPropertySearch] = useState(false);
+const [selectedListing, setSelectedListing] = useState<any | null>(null);
+
+// Replace the listing picker UI with this:
+<View style={[styles.field, { backgroundColor: theme.card, borderColor: theme.border }]}>
+  <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: 6 }]}>
+    LINK TO A PROPERTY (OPTIONAL)
+  </ThemedText>
+  <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: 10 }]}>
+    Attaching a listing pins the property details to the top of your group chat.
+  </ThemedText>
+
+  {selectedListing ? (
+    /* Selected listing preview */
+    <Pressable
+      style={[styles.selectedListing, { borderColor: theme.primary, backgroundColor: theme.primary + '10' }]}
+      onPress={() => setShowPropertySearch(true)}
+    >
+      {selectedListing.photos?.[0] && (
+        <Image source={{ uri: selectedListing.photos[0] }} style={styles.selectedListingThumb} />
+      )}
+      <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+        <ThemedText style={[Typography.body, { fontWeight: '600' }]} numberOfLines={1}>
+          {selectedListing.title}
+        </ThemedText>
+        <ThemedText style={[Typography.small, { color: theme.textSecondary }]} numberOfLines={1}>
+          {selectedListing.address}, {selectedListing.city}
+        </ThemedText>
+        <ThemedText style={[Typography.small, { color: theme.primary, fontWeight: '600' }]}>
+          ${selectedListing.rent?.toLocaleString()}/mo · {selectedListing.bedrooms} BR
+        </ThemedText>
+      </View>
+      <Pressable
+        onPress={() => setSelectedListing(null)}
+        hitSlop={8}
+        style={[styles.clearListingBtn, { backgroundColor: theme.border }]}
+      >
+        <Feather name="x" size={14} color={theme.textSecondary} />
+      </Pressable>
+    </Pressable>
+  ) : (
+    /* Search trigger */
+    <Pressable
+      style={[styles.searchTrigger, { borderColor: theme.border }]}
+      onPress={() => setShowPropertySearch(true)}
+    >
+      <Feather name="search" size={17} color={theme.textSecondary} />
+      <ThemedText style={[Typography.body, { marginLeft: 10, color: theme.textSecondary }]}>
+        Search for a listing to link...
+      </ThemedText>
+    </Pressable>
+  )}
+</View>
+
+{/* Property search modal */}
+<GroupPropertySearchModal
+  visible={showPropertySearch}
+  currentListingId={selectedListing?.id || null}
+  onSelect={(listing) => {
+    setSelectedListing(listing);
+    setSelectedListingId(listing?.id || null);
+    setShowPropertySearch(false);
+  }}
+  onClose={() => setShowPropertySearch(false)}
+/>
+```
+
+Add these styles to `CreateGroupScreen`:
+```ts
+selectedListing: {
+  flexDirection: 'row', alignItems: 'center',
+  padding: Spacing.sm, borderRadius: 12, borderWidth: 1.5,
+},
+selectedListingThumb: { width: 52, height: 52, borderRadius: 8 },
+clearListingBtn: {
+  width: 26, height: 26, borderRadius: 13,
+  alignItems: 'center', justifyContent: 'center', marginLeft: 6,
+},
+searchTrigger: {
+  flexDirection: 'row', alignItems: 'center',
+  padding: Spacing.md, borderRadius: 12, borderWidth: 1.5, borderStyle: 'dashed',
+},
+```
+
+---
+
+## Step 4 — Wire into `GroupChatScreen` (Add/Change After Creation)
+
+Add an "Add Property" or "Change Property" button to the group chat header area:
+
+```tsx
+// Add to imports
+import { GroupPropertySearchModal } from '../../components/GroupPropertySearchModal';
+import { linkListingToGroup } from '../../services/groupService';
+
+// Add state
+const [showPropertySearch, setShowPropertySearch] = useState(false);
+const isAdmin = group?.myRole === 'admin';
+
+// In the header or above the pinned listing card:
+{isAdmin && (
+  <Pressable
+    style={[styles.addPropertyBtn, { borderColor: theme.border }]}
+    onPress={() => setShowPropertySearch(true)}
+  >
+    <Feather
+      name={group.listingId ? 'edit-2' : 'home'}
+      size={14}
+      color={theme.textSecondary}
+    />
+    <ThemedText style={[Typography.small, { color: theme.textSecondary, marginLeft: 6 }]}>
+      {group.listingId ? 'Change property' : 'Link a property'}
+    </ThemedText>
+  </Pressable>
+)}
+
+{/* Property search modal */}
+<GroupPropertySearchModal
+  visible={showPropertySearch}
+  currentListingId={group?.listingId || null}
+  onSelect={async (listing) => {
+    setShowPropertySearch(false);
+    try {
+      await linkListingToGroup(group.id, listing?.id || null);
+      // Refresh group data to show new pinned card
+      await reloadGroup();
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to update property.');
+    }
+  }}
+  onClose={() => setShowPropertySearch(false)}
+/>
+```
+
+Add these styles to `GroupChatScreen`:
+```ts
+addPropertyBtn: {
+  flexDirection: 'row', alignItems: 'center',
+  alignSelf: 'center', paddingVertical: 6, paddingHorizontal: 14,
+  borderRadius: 20, borderWidth: 1, marginVertical: 6,
+},
+```
+
+---
+
+## Search Fields Reference
+
+The modal searches across these listing columns in Supabase:
+
+| Field | Search Type | Notes |
+|-------|-------------|-------|
+| `title` | `ilike %query%` | Listing name/title |
+| `address` | `ilike %query%` | Street address |
+| `city` | `ilike %query%` | City — also used for filter chips |
+| `neighborhood` | `ilike %query%` | Neighborhood name |
+| `rent` | Range filter | Min/max from price chips |
+| `bedrooms` | Exact / gte 4 | Bedroom count chips |
+
+---
+
+## Behavior Summary
+
+| Action | Where | Result |
+|--------|-------|--------|
+| Open search from CreateGroup | CreateGroupScreen | Searches all available listings |
+| Open search from GroupChat (admin only) | GroupChatScreen header | Searches with current listing highlighted |
+| Type in search bar | Modal | Live results update after 300ms debounce |
+| Tap City chip | Modal filter panel | Filters results to that city instantly |
+| Tap Price chip | Modal filter panel | Filters results to price range |
+| Tap Bedroom chip | Modal filter panel | Filters to exact bedroom count (4 = 4+) |
+| Each listing card | Modal | Shows bedroom count + calculated member cap (bedrooms + 1) |
+| Tap listing card | Modal | Closes modal, updates group — member cap now = bedrooms + 1 |
+| Tap "Remove linked property" | Modal (if listing already set) | Clears listing_id, member cap reverts to plan-based limit |
+| Filter badge on filter button | Modal | Shows count of active filters |

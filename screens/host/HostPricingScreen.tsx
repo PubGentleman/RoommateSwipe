@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
+import { useStripePayment } from '../../hooks/useStripePayment';
 
 const BG = '#111';
 const CARD_BG = '#1a1a1a';
@@ -152,7 +153,8 @@ const planOrder: Record<HostPlan, number> = { free: 0, none: 0, starter: 1, pro:
 export const HostPricingScreen = () => {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
-  const { getHostPlan, upgradeHostPlan, downgradeHostPlan, purchaseListingBoost, purchaseHostVerification, purchaseSuperInterest } = useAuth();
+  const { user, getHostPlan, upgradeHostPlan, downgradeHostPlan, purchaseListingBoost, purchaseHostVerification, purchaseSuperInterest } = useAuth();
+  const { processPayment } = useStripePayment();
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
   const [selectedTier, setSelectedTier] = useState<HostPlan>('pro');
   const currentPlan = getHostPlan();
@@ -213,6 +215,10 @@ export const HostPricingScreen = () => {
       { text: 'Cancel', style: 'cancel' },
       { text: actionText, onPress: async () => {
         if (isUpgrade) {
+          if (user) {
+            const { success } = await processPayment(user.id, user.email || '', `host_${plan.id}`, billingCycle);
+            if (!success) return;
+          }
           await upgradeHostPlan(plan.id as 'starter' | 'pro' | 'business', billingCycle);
         } else {
           await downgradeHostPlan(plan.id as 'free' | 'starter' | 'pro');

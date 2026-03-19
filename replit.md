@@ -65,6 +65,8 @@ Supabase Auth handles user authentication, with an `AuthContext` managing sessio
 
 The application features tiered subscription plans for renters (Basic, Plus, Elite) and hosts (Free, Starter, Pro, Business), alongside one-time purchases. A `PaywallSheet` prompts users for upgrades. Dedicated screens provide plan details, upgrade/downgrade options, and billing history. Host plans enforce listing caps and offer various features like boosts and analytics.
 
+**Stripe Payment Gating:** All paid plan upgrades are gated behind Stripe payment processing. The flow is: user selects plan → `processPayment()` calls `create-subscription` edge function → Stripe PaymentSheet is presented on native (web shows fallback message) → on success, local state is updated via AuthContext. Platform-specific hooks: `hooks/useStripePayment.native.ts` (Stripe SDK) and `hooks/useStripePayment.web.ts` (graceful fallback). Price ID mapping in `constants/stripePrices.ts` — placeholder IDs need replacing with real Stripe price IDs. The `create-subscription` edge function validates auth, creates/retrieves Stripe customers, and returns a PaymentIntent client secret. Subscription IDs are propagated back to AuthContext and persisted to Supabase.
+
 ## Data Layer
 
 The data layer uses Supabase PostgreSQL, complemented by local AsyncStorage for caching. TypeScript interfaces define core models such as `User`, `RoommateProfile`, `Property`, `Group`, `Conversation`, `Message`, `Match`, and `InterestCard`.

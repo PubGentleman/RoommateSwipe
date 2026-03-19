@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Modal, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Modal, ActivityIndicator, Alert } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
+import { useStripePayment } from '../../hooks/useStripePayment';
 
 const BG = '#111111';
 const CARD_BG = '#1a1a1a';
@@ -158,6 +159,7 @@ const getPerMonth = (plan: PlanOption, cycle: BillingCycle): string => {
 export const PlanSelectionScreen = () => {
   const insets = useSafeAreaInsets();
   const { user, upgradeToPlus, upgradeToElite, upgradeHostPlan, completeOnboardingStep } = useAuth();
+  const { processPayment } = useStripePayment();
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -178,25 +180,48 @@ export const PlanSelectionScreen = () => {
 
   const handleConfirmPlan = async (planIdOverride?: string) => {
     const planId = planIdOverride || selectedPlanId;
-    if (!planId) return;
+    if (!planId || !user) return;
+
+    const plan = plans.find(p => p.id === planId);
+    if (plan?.isFree) {
+      setProcessing(true);
+      try {
+        await completeOnboardingStep('complete');
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+      setShowConfirm(false);
+      setProcessing(false);
+      return;
+    }
+
     setProcessing(true);
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch {}
 
     try {
+      const stripePlan = isHost ? `host_${planId}` : planId;
+      const { success, subscriptionId } = await processPayment(user.id, user.email || '', stripePlan, billingCycle);
+
+      if (!success) {
+        setProcessing(false);
+        setShowConfirm(false);
+        return;
+      }
+
       if (isHost) {
         if (planId === 'starter') await upgradeHostPlan('starter', billingCycle);
         else if (planId === 'pro') await upgradeHostPlan('pro', billingCycle);
         else if (planId === 'business') await upgradeHostPlan('business', billingCycle);
       } else {
-        if (planId === 'plus') await upgradeToPlus(billingCycle);
-        else if (planId === 'elite') await upgradeToElite(billingCycle);
+        if (planId === 'plus') await upgradeToPlus(billingCycle, subscriptionId);
+        else if (planId === 'elite') await upgradeToElite(billingCycle, subscriptionId);
       }
       await completeOnboardingStep('complete');
       try {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } catch {}
+      Alert.alert('Welcome!', `You're now on the ${planId.charAt(0).toUpperCase() + planId.slice(1)} plan.`);
     } catch {
       setProcessing(false);
     }

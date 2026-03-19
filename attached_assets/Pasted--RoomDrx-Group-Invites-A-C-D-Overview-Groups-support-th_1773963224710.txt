@@ -1,0 +1,902 @@
+# RoomDrx — Group Invites (A + C + D)
+
+## Overview
+Groups support three invite methods:
+
+- **A — Invite from Matches:** Admin invites users they've already matched or chatted with
+- **C — Shareable Link/Code:** Admin generates a 6-character code anyone can use to join
+- **D — Host invites from Listing Interest:** When a group is tied to a listing, host can invite renters who swiped/expressed interest in that property
+
+---
+
+## Step 1 — Database Changes
+
+Add invite tracking columns to the existing tables. Run in Supabase SQL Editor:
+
+```sql
+-- Add invite code to groups table
+ALTER TABLE groups
+  ADD COLUMN IF NOT EXISTS invite_code TEXT UNIQUE,
+  ADD COLUMN IF NOT EXISTS invite_code_enabled BOOLEAN DEFAULT true;
+
+-- Create index for fast invite code lookup
+CREATE UNIQUE INDEX IF NOT EXISTS groups_invite_code_idx ON groups(invite_code);
+
+-- Track pending invites (Method A)
+CREATE TABLE IF NOT EXISTS group_invites (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id UUID REFERENCES groups(id) ON DELETE CASCADE,
+  invited_by UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  invited_user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'declined')),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(group_id, invited_user_id)
+);
+
+ALTER TABLE group_invites ENABLE ROW LEVEL SECURITY;
+
+-- Invited user can see their own invites
+CREATE POLICY "Users can view their invites"
+ON group_invites FOR SELECT
+USING (auth.uid() = invited_user_id OR auth.uid() = invited_by);
+
+-- Group admins can create invites
+CREATE POLICY "Admins can invite"
+ON group_invites FOR INSERT
+WITH CHECK (
+  invited_by = auth.uid()
+  AND group_id IN (
+    SELECT group_id FROM group_members
+    WHERE user_id = auth.uid() AND role = 'admin'
+  )
+);
+
+-- Invited user can update their own invite (accept/decline)
+CREATE POLICY "Users can respond to invites"
+ON group_invites FOR UPDATE
+USING (auth.uid() = invited_user_id);
+```
+
+---
+
+## Step 2 — Update `groupService.ts`
+
+Add these functions to the existing `services/groupService.ts` file:
+
+```ts
+import { supabase } from '../lib/supabase';
+
+// ─── METHOD A: Invite from Matches ───────────────────────────────────────────
+
+// Get users the current user has matched or chatted with (eligible to invite)
+export async function getInvitableMates(groupId: string): Promise<{
+  id: string;
+  name: string;
+  photo?: string;
+  alreadyInGroup: boolean;
+  alreadyInvited: boolean;
+}[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  // Get existing matches/conversations
+  const { data: conversations } = await supabase
+    .from('conversations')
+    .select('participant_ids')
+    .contains('participant_ids', [user.id]);
+
+  if (!conversations?.length) return [];
+
+  // Collect unique user IDs from conversations (excluding self)
+  const userIds = [...new Set(
+    conversations.flatMap((c: any) => c.participant_ids)
+  )].filter(id => id !== user.id);
+
+  if (!userIds.length) return [];
+
+  // Get their profiles
+  const { data: profiles } = await supabase
+    .from('users')
+    .select('id, name, photos')
+    .in('id', userIds);
+
+  // Get current group members
+  const { data: members } = await supabase
+    .from('group_members')
+    .select('user_id')
+    .eq('group_id', groupId);
+
+  // Get pending invites for this group
+  const { data: pendingInvites } = await supabase
+    .from('group_invites')
+    .select('invited_user_id')
+    .eq('group_id', groupId)
+    .eq('status', 'pending');
+
+  const memberIds = new Set((members || []).map((m: any) => m.user_id));
+  const invitedIds = new Set((pendingInvites || []).map((i: any) => i.invited_user_id));
+
+  return (profiles || []).map((p: any) => ({
+    id: p.id,
+    name: p.name,
+    photo: p.photos?.[0],
+    alreadyInGroup: memberIds.has(p.id),
+    alreadyInvited: invitedIds.has(p.id),
+  }));
+}
+
+// Send a direct invite to a matched user (Method A)
+export async function sendGroupInvite(groupId: string, invitedUserId: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  // Check member limit before inviting
+  const { data: group } = await supabase
+    .from('groups')
+    .select('created_by, listing_id, listings ( bedrooms )')
+    .eq('id', groupId)
+    .single();
+
+  const { data: memberData } = await supabase
+    .from('group_members')
+    .select('user_id')
+    .eq('group_id', groupId);
+
+  const creatorPlan = await getUserPlan(group?.created_by);
+  const linkedBedrooms = (group as any)?.listings?.bedrooms ?? null;
+  const limit = getMemberLimit(creatorPlan, linkedBedrooms);
+
+  if ((memberData?.length || 0) >= limit) {
+    const reason = linkedBedrooms
+      ? `This group is limited to ${limit} members based on the linked listing (${linkedBedrooms} bedrooms + 1).`
+      : `This group has reached its member limit of ${limit}.`;
+    throw new Error(reason);
+  }
+
+  const { error } = await supabase.from('group_invites').insert({
+    group_id: groupId,
+    invited_by: user.id,
+    invited_user_id: invitedUserId,
+    status: 'pending',
+  });
+  if (error && error.code !== '23505') throw error; // ignore duplicate
+}
+
+// Accept or decline an invite
+export async function respondToInvite(
+  inviteId: string,
+  response: 'accepted' | 'declined'
+): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { data: invite } = await supabase
+    .from('group_invites')
+    .update({ status: response })
+    .eq('id', inviteId)
+    .eq('invited_user_id', user.id)
+    .select()
+    .single();
+
+  if (response === 'accepted' && invite) {
+    // Add them to the group
+    await supabase.from('group_members').insert({
+      group_id: invite.group_id,
+      user_id: user.id,
+      role: 'member',
+    });
+  }
+}
+
+// Get pending invites for the current user
+export async function getMyPendingInvites(): Promise<{
+  id: string;
+  groupId: string;
+  groupName: string;
+  invitedByName: string;
+  listingTitle?: string;
+  createdAt: string;
+}[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from('group_invites')
+    .select(`
+      id, created_at, group_id,
+      groups ( name, listings ( title ) ),
+      users!invited_by ( name )
+    `)
+    .eq('invited_user_id', user.id)
+    .eq('status', 'pending');
+
+  if (error) throw error;
+
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    groupId: row.group_id,
+    groupName: row.groups?.name || 'Unknown Group',
+    invitedByName: row.users?.name || 'Someone',
+    listingTitle: row.groups?.listings?.title,
+    createdAt: row.created_at,
+  }));
+}
+
+
+// ─── METHOD C: Shareable Invite Code ─────────────────────────────────────────
+
+// Generate a random 6-character invite code
+function generateCode(): string {
+  return Math.random().toString(36).substring(2, 8).toUpperCase();
+}
+
+// Get or create an invite code for a group
+export async function getInviteCode(groupId: string): Promise<string> {
+  const { data: group } = await supabase
+    .from('groups')
+    .select('invite_code, invite_code_enabled')
+    .eq('id', groupId)
+    .single();
+
+  if (group?.invite_code && group.invite_code_enabled) {
+    return group.invite_code;
+  }
+
+  // Generate new code
+  const code = generateCode();
+  await supabase
+    .from('groups')
+    .update({ invite_code: code, invite_code_enabled: true })
+    .eq('id', groupId);
+
+  return code;
+}
+
+// Regenerate code (invalidates the old one)
+export async function regenerateInviteCode(groupId: string): Promise<string> {
+  const code = generateCode();
+  await supabase
+    .from('groups')
+    .update({ invite_code: code, invite_code_enabled: true })
+    .eq('id', groupId);
+  return code;
+}
+
+// Disable invite code (stops new joins via link)
+export async function disableInviteCode(groupId: string): Promise<void> {
+  await supabase
+    .from('groups')
+    .update({ invite_code_enabled: false })
+    .eq('id', groupId);
+}
+
+// Join a group using an invite code (Method C)
+export async function joinGroupByCode(code: string): Promise<{ groupId: string; groupName: string }> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  // Find the group by code
+  const { data: group } = await supabase
+    .from('groups')
+    .select('id, name, invite_code_enabled, created_by')
+    .eq('invite_code', code.toUpperCase())
+    .single();
+
+  if (!group) throw new Error('Invalid invite code. Please check and try again.');
+  if (!group.invite_code_enabled) throw new Error('This invite link has been disabled.');
+
+  // Check if already a member
+  const { data: existing } = await supabase
+    .from('group_members')
+    .select('id')
+    .eq('group_id', group.id)
+    .eq('user_id', user.id)
+    .single();
+
+  if (existing) throw new Error('You are already in this group.');
+
+  // Check member limit
+  const { data: memberData } = await supabase
+    .from('group_members')
+    .select('user_id')
+    .eq('group_id', group.id);
+
+  // Fetch bedrooms from linked listing if present
+  let linkedBedrooms: number | null = null;
+  if (group.listing_id) {
+    const { data: listing } = await supabase
+      .from('listings')
+      .select('bedrooms')
+      .eq('id', group.listing_id)
+      .single();
+    linkedBedrooms = listing?.bedrooms ?? null;
+  }
+
+  const creatorPlan = await getUserPlan(group.created_by);
+  const limit = getMemberLimit(creatorPlan, linkedBedrooms);
+
+  if ((memberData?.length || 0) >= limit) {
+    const reason = linkedBedrooms
+      ? `This group is full — limited to ${limit} members based on the linked listing (${linkedBedrooms} bedrooms + 1).`
+      : `This group is full (${limit} member limit).`;
+    throw new Error(reason);
+  }
+
+  // Add the user
+  const { error } = await supabase.from('group_members').insert({
+    group_id: group.id,
+    user_id: user.id,
+    role: 'member',
+  });
+  if (error) throw error;
+
+  return { groupId: group.id, groupName: group.name };
+}
+
+
+// ─── METHOD D: Host Invites from Listing Interest ────────────────────────────
+
+// Get renters who expressed interest in the listing tied to this group
+// Only available when the group has a listing_id and the caller is the host/creator
+export async function getRentersInterestedInListing(listingId: string): Promise<{
+  id: string;
+  name: string;
+  photo?: string;
+  interestedAt: string;
+}[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  // interest_cards = the table tracking renter swipes/expressions of interest
+  const { data, error } = await supabase
+    .from('interest_cards')
+    .select(`
+      created_at,
+      users!renter_id ( id, name, photos )
+    `)
+    .eq('listing_id', listingId)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+
+  return (data || []).map((row: any) => ({
+    id: row.users?.id,
+    name: row.users?.name || 'Unknown',
+    photo: row.users?.photos?.[0],
+    interestedAt: row.created_at,
+  })).filter(r => r.id);
+}
+
+
+// ─── HELPER ──────────────────────────────────────────────────────────────────
+
+async function getUserPlan(userId: string): Promise<string> {
+  const { data } = await supabase
+    .from('subscriptions')
+    .select('plan')
+    .eq('user_id', userId)
+    .single();
+  return data?.plan || 'basic';
+}
+```
+
+---
+
+## Step 3 — Group Invite Screen (`GroupInviteScreen.tsx`)
+
+Create `screens/shared/GroupInviteScreen.tsx`. This screen is the hub for all three invite methods — tabs switch between them.
+
+```tsx
+import React, { useState, useEffect } from 'react';
+import {
+  View, StyleSheet, Pressable, FlatList, TextInput,
+  Alert, Share, ActivityIndicator
+} from 'react-native';
+import { Feather } from '../../components/VectorIcons';
+import { ThemedText } from '../../components/ThemedText';
+import { useTheme } from '../../hooks/useTheme';
+import { useAuth } from '../../contexts/AuthContext';
+import { Typography, Spacing } from '../../constants/theme';
+import { Image } from 'expo-image';
+import {
+  getInvitableMates, sendGroupInvite,
+  getInviteCode, regenerateInviteCode, disableInviteCode,
+  getRentersInterestedInListing
+} from '../../services/groupService';
+
+type Tab = 'matches' | 'code' | 'listing';
+
+export function GroupInviteScreen({ navigation, route }: any) {
+  const { groupId, groupName, listingId } = route.params;
+  const { theme } = useTheme();
+  const { user } = useAuth();
+  const isHost = user?.role === 'host';
+
+  const [tab, setTab] = useState<Tab>('matches');
+  const [mates, setMates] = useState<any[]>([]);
+  const [interestedRenters, setInterestedRenters] = useState<any[]>([]);
+  const [inviteCode, setInviteCode] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [sendingTo, setSendingTo] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    loadData();
+  }, [tab]);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      if (tab === 'matches') {
+        const data = await getInvitableMates(groupId);
+        setMates(data);
+      } else if (tab === 'code') {
+        const code = await getInviteCode(groupId);
+        setInviteCode(code);
+      } else if (tab === 'listing' && listingId) {
+        const data = await getRentersInterestedInListing(listingId);
+        setInterestedRenters(data);
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleInvite = async (userId: string) => {
+    setSendingTo(userId);
+    try {
+      await sendGroupInvite(groupId, userId);
+      // Refresh list to show "Invited" state
+      const updated = await getInvitableMates(groupId);
+      setMates(updated);
+    } catch (err: any) {
+      Alert.alert('Error', err.message);
+    } finally {
+      setSendingTo(null);
+    }
+  };
+
+  const handleShareCode = async () => {
+    try {
+      await Share.share({
+        message: `Join my group "${groupName}" on RoomDrx!\n\nUse invite code: ${inviteCode}\n\nDownload the app at roomdrx.com`,
+      });
+    } catch {}
+  };
+
+  const handleRegenerateCode = async () => {
+    Alert.alert(
+      'Regenerate Code?',
+      'The old code will stop working immediately.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Regenerate',
+          style: 'destructive',
+          onPress: async () => {
+            const newCode = await regenerateInviteCode(groupId);
+            setInviteCode(newCode);
+          }
+        }
+      ]
+    );
+  };
+
+  const filteredMates = mates.filter(m =>
+    m.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const filteredRenters = interestedRenters.filter(r =>
+    r.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const tabs: { key: Tab; label: string; icon: string }[] = [
+    { key: 'matches', label: 'Matches', icon: 'users' },
+    { key: 'code', label: 'Link', icon: 'link' },
+    ...(isHost && listingId ? [{ key: 'listing' as Tab, label: 'Interested', icon: 'home' }] : []),
+  ];
+
+  return (
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+
+      {/* Header */}
+      <View style={styles.header}>
+        <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
+          <Feather name="x" size={24} color={theme.text} />
+        </Pressable>
+        <ThemedText style={[Typography.h3, { flex: 1, textAlign: 'center' }]}>
+          Invite to Group
+        </ThemedText>
+        <View style={{ width: 24 }} />
+      </View>
+
+      {/* Tab Bar */}
+      <View style={[styles.tabBar, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        {tabs.map(t => (
+          <Pressable
+            key={t.key}
+            style={[styles.tab, tab === t.key && { borderBottomWidth: 2, borderBottomColor: theme.primary }]}
+            onPress={() => setTab(t.key)}
+          >
+            <Feather name={t.icon as any} size={16} color={tab === t.key ? theme.primary : theme.textSecondary} />
+            <ThemedText style={[
+              Typography.small,
+              { marginLeft: 4, fontWeight: '600',
+                color: tab === t.key ? theme.primary : theme.textSecondary }
+            ]}>
+              {t.label}
+            </ThemedText>
+          </Pressable>
+        ))}
+      </View>
+
+      {loading ? (
+        <ActivityIndicator size="large" color={theme.primary} style={{ marginTop: 40 }} />
+      ) : (
+
+        <>
+          {/* ── TAB A: MATCHES ─────────────────────────────────────────── */}
+          {tab === 'matches' && (
+            <>
+              <View style={[styles.searchBar, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <Feather name="search" size={16} color={theme.textSecondary} />
+                <TextInput
+                  style={[styles.searchInput, { color: theme.text }]}
+                  placeholder="Search your matches..."
+                  placeholderTextColor={theme.textSecondary}
+                  value={search}
+                  onChangeText={setSearch}
+                />
+              </View>
+              {filteredMates.length === 0 ? (
+                <View style={styles.empty}>
+                  <Feather name="users" size={36} color={theme.textSecondary} />
+                  <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.sm, textAlign: 'center' }]}>
+                    {mates.length === 0
+                      ? 'You have no matches yet.\nStart swiping to connect with people!'
+                      : 'No matches found for that name.'}
+                  </ThemedText>
+                </View>
+              ) : (
+                <FlatList
+                  data={filteredMates}
+                  keyExtractor={item => item.id}
+                  contentContainerStyle={{ padding: Spacing.md }}
+                  renderItem={({ item }) => (
+                    <View style={[styles.userRow, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                      {item.photo ? (
+                        <Image source={{ uri: item.photo }} style={styles.avatar} />
+                      ) : (
+                        <View style={[styles.avatarPlaceholder, { backgroundColor: theme.primary + '30' }]}>
+                          <Feather name="user" size={20} color={theme.primary} />
+                        </View>
+                      )}
+                      <ThemedText style={[Typography.body, { flex: 1, marginLeft: Spacing.sm, fontWeight: '600' }]}>
+                        {item.name}
+                      </ThemedText>
+                      {item.alreadyInGroup ? (
+                        <View style={[styles.badge, { backgroundColor: theme.border }]}>
+                          <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>In Group</ThemedText>
+                        </View>
+                      ) : item.alreadyInvited ? (
+                        <View style={[styles.badge, { backgroundColor: theme.primary + '20' }]}>
+                          <ThemedText style={[Typography.small, { color: theme.primary }]}>Invited</ThemedText>
+                        </View>
+                      ) : (
+                        <Pressable
+                          style={[styles.inviteBtn, { backgroundColor: theme.primary, opacity: sendingTo === item.id ? 0.6 : 1 }]}
+                          onPress={() => handleInvite(item.id)}
+                          disabled={sendingTo === item.id}
+                        >
+                          {sendingTo === item.id
+                            ? <ActivityIndicator size="small" color="#fff" />
+                            : <ThemedText style={[Typography.small, { color: '#fff', fontWeight: '600' }]}>Invite</ThemedText>
+                          }
+                        </Pressable>
+                      )}
+                    </View>
+                  )}
+                />
+              )}
+            </>
+          )}
+
+          {/* ── TAB C: INVITE CODE ──────────────────────────────────────── */}
+          {tab === 'code' && (
+            <View style={styles.codeContainer}>
+              <ThemedText style={[Typography.body, { color: theme.textSecondary, textAlign: 'center', marginBottom: Spacing.xl }]}>
+                Share this code with anyone you want to invite. They can enter it from the Groups screen.
+              </ThemedText>
+
+              <View style={[styles.codeBox, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <ThemedText style={[styles.codeText, { color: theme.text, letterSpacing: 8 }]}>
+                  {inviteCode}
+                </ThemedText>
+              </View>
+
+              <Pressable
+                style={[styles.shareBtn, { backgroundColor: theme.primary }]}
+                onPress={handleShareCode}
+              >
+                <Feather name="share-2" size={18} color="#fff" style={{ marginRight: Spacing.sm }} />
+                <ThemedText style={[Typography.body, { color: '#fff', fontWeight: '600' }]}>
+                  Share Code
+                </ThemedText>
+              </Pressable>
+
+              <Pressable style={styles.regenBtn} onPress={handleRegenerateCode}>
+                <Feather name="refresh-cw" size={14} color={theme.textSecondary} style={{ marginRight: 6 }} />
+                <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+                  Regenerate code
+                </ThemedText>
+              </Pressable>
+            </View>
+          )}
+
+          {/* ── TAB D: LISTING INTEREST (HOST ONLY) ─────────────────────── */}
+          {tab === 'listing' && (
+            <>
+              <View style={[styles.infoBar, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <Feather name="info" size={14} color={theme.textSecondary} />
+                <ThemedText style={[Typography.small, { color: theme.textSecondary, marginLeft: 6, flex: 1 }]}>
+                  These renters expressed interest in your linked listing.
+                </ThemedText>
+              </View>
+              <View style={[styles.searchBar, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <Feather name="search" size={16} color={theme.textSecondary} />
+                <TextInput
+                  style={[styles.searchInput, { color: theme.text }]}
+                  placeholder="Search renters..."
+                  placeholderTextColor={theme.textSecondary}
+                  value={search}
+                  onChangeText={setSearch}
+                />
+              </View>
+              {filteredRenters.length === 0 ? (
+                <View style={styles.empty}>
+                  <Feather name="home" size={36} color={theme.textSecondary} />
+                  <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.sm, textAlign: 'center' }]}>
+                    No renters have expressed interest in this listing yet.
+                  </ThemedText>
+                </View>
+              ) : (
+                <FlatList
+                  data={filteredRenters}
+                  keyExtractor={item => item.id}
+                  contentContainerStyle={{ padding: Spacing.md }}
+                  renderItem={({ item }) => (
+                    <View style={[styles.userRow, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                      {item.photo ? (
+                        <Image source={{ uri: item.photo }} style={styles.avatar} />
+                      ) : (
+                        <View style={[styles.avatarPlaceholder, { backgroundColor: theme.primary + '30' }]}>
+                          <Feather name="user" size={20} color={theme.primary} />
+                        </View>
+                      )}
+                      <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+                        <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{item.name}</ThemedText>
+                        <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+                          Interested {new Date(item.interestedAt).toLocaleDateString()}
+                        </ThemedText>
+                      </View>
+                      <Pressable
+                        style={[styles.inviteBtn, { backgroundColor: theme.primary, opacity: sendingTo === item.id ? 0.6 : 1 }]}
+                        onPress={() => handleInvite(item.id)}
+                        disabled={sendingTo === item.id}
+                      >
+                        {sendingTo === item.id
+                          ? <ActivityIndicator size="small" color="#fff" />
+                          : <ThemedText style={[Typography.small, { color: '#fff', fontWeight: '600' }]}>Invite</ThemedText>
+                        }
+                      </Pressable>
+                    </View>
+                  )}
+                />
+              )}
+            </>
+          )}
+        </>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  header: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: Spacing.lg, paddingTop: 56, paddingBottom: Spacing.md,
+  },
+  tabBar: {
+    flexDirection: 'row', borderBottomWidth: 1,
+    paddingHorizontal: Spacing.lg,
+  },
+  tab: {
+    flex: 1, flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'center', paddingVertical: Spacing.md,
+  },
+  searchBar: {
+    flexDirection: 'row', alignItems: 'center',
+    marginHorizontal: Spacing.md, marginVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md, borderRadius: 12, borderWidth: 1, height: 44,
+  },
+  searchInput: { flex: 1, marginLeft: Spacing.sm, fontSize: 15 },
+  userRow: {
+    flexDirection: 'row', alignItems: 'center',
+    padding: Spacing.sm, borderRadius: 14, borderWidth: 1, marginBottom: Spacing.sm,
+  },
+  avatar: { width: 44, height: 44, borderRadius: 22 },
+  avatarPlaceholder: {
+    width: 44, height: 44, borderRadius: 22,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  badge: {
+    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12,
+  },
+  inviteBtn: {
+    paddingHorizontal: 14, paddingVertical: 7,
+    borderRadius: 10, minWidth: 60, alignItems: 'center',
+  },
+  empty: {
+    flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.xl,
+  },
+  codeContainer: {
+    flex: 1, alignItems: 'center', padding: Spacing.xl, paddingTop: Spacing.xl * 2,
+  },
+  codeBox: {
+    paddingVertical: Spacing.xl, paddingHorizontal: Spacing.xl * 2,
+    borderRadius: 20, borderWidth: 2, marginBottom: Spacing.xl,
+  },
+  codeText: { fontSize: 32, fontWeight: '800', fontFamily: 'Courier New' },
+  shareBtn: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 14, paddingHorizontal: Spacing.xl,
+    borderRadius: 14, marginBottom: Spacing.md,
+  },
+  regenBtn: {
+    flexDirection: 'row', alignItems: 'center', marginTop: Spacing.md,
+  },
+  infoBar: {
+    flexDirection: 'row', alignItems: 'center',
+    marginHorizontal: Spacing.md, marginTop: Spacing.md,
+    padding: Spacing.sm, borderRadius: 10, borderWidth: 1,
+  },
+});
+```
+
+---
+
+## Step 4 — Join by Code Entry
+
+Add an "Enter Code" input to the Groups list screen (wherever users see their groups). This handles people who received a code via text/DM outside the app:
+
+```tsx
+// In GroupsListScreen.tsx — add this below the group list
+
+const [codeInput, setCodeInput] = useState('');
+const [joiningByCode, setJoiningByCode] = useState(false);
+
+const handleJoinByCode = async () => {
+  if (codeInput.trim().length < 6) {
+    Alert.alert('Invalid Code', 'Please enter a 6-character invite code.');
+    return;
+  }
+  setJoiningByCode(true);
+  try {
+    const { groupId, groupName } = await joinGroupByCode(codeInput.trim());
+    navigation.navigate('GroupChat', { groupId, groupName });
+  } catch (err: any) {
+    Alert.alert('Could Not Join', err.message);
+  } finally {
+    setJoiningByCode(false);
+    setCodeInput('');
+  }
+};
+
+// UI:
+<View style={[styles.codeEntry, { backgroundColor: theme.card, borderColor: theme.border }]}>
+  <TextInput
+    style={[styles.codeEntryInput, { color: theme.text }]}
+    placeholder="Enter invite code..."
+    placeholderTextColor={theme.textSecondary}
+    value={codeInput}
+    onChangeText={text => setCodeInput(text.toUpperCase())}
+    maxLength={6}
+    autoCapitalize="characters"
+  />
+  <Pressable
+    style={[styles.codeEntryBtn, { backgroundColor: theme.primary, opacity: joiningByCode ? 0.6 : 1 }]}
+    onPress={handleJoinByCode}
+    disabled={joiningByCode}
+  >
+    {joiningByCode
+      ? <ActivityIndicator size="small" color="#fff" />
+      : <ThemedText style={[Typography.small, { color: '#fff', fontWeight: '700' }]}>Join</ThemedText>
+    }
+  </Pressable>
+</View>
+```
+
+---
+
+## Step 5 — Pending Invites Badge
+
+In the Groups tab / MessagesScreen, show a badge count for pending group invites:
+
+```tsx
+// In any screen where you show a Groups tab
+useEffect(() => {
+  getMyPendingInvites().then(invites => {
+    setPendingInviteCount(invites.length);
+  });
+}, []);
+
+// Show as a red badge on the Groups tab icon
+```
+
+In the Groups list screen, show a "Pending Invites" section at the top when there are invites:
+
+```tsx
+{pendingInvites.length > 0 && (
+  <View style={styles.pendingSection}>
+    <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: 8 }]}>
+      PENDING INVITES
+    </ThemedText>
+    {pendingInvites.map(invite => (
+      <View key={invite.id} style={[styles.inviteCard, { backgroundColor: theme.card, borderColor: theme.primary }]}>
+        <View style={{ flex: 1 }}>
+          <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{invite.groupName}</ThemedText>
+          <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+            Invited by {invite.invitedByName}
+            {invite.listingTitle ? ` · ${invite.listingTitle}` : ''}
+          </ThemedText>
+        </View>
+        <Pressable
+          style={[styles.acceptBtn, { backgroundColor: theme.primary }]}
+          onPress={() => respondToInvite(invite.id, 'accepted')}
+        >
+          <ThemedText style={[Typography.small, { color: '#fff', fontWeight: '700' }]}>Accept</ThemedText>
+        </Pressable>
+        <Pressable
+          style={[styles.declineBtn, { borderColor: theme.border }]}
+          onPress={() => respondToInvite(invite.id, 'declined')}
+        >
+          <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>Decline</ThemedText>
+        </Pressable>
+      </View>
+    ))}
+  </View>
+)}
+```
+
+---
+
+## Navigation
+
+Add the invite screen to your navigator:
+```ts
+<Stack.Screen name="GroupInvite" component={GroupInviteScreen} />
+```
+
+Open it from inside GroupChatScreen with an "Invite" button in the header:
+```ts
+navigation.navigate('GroupInvite', {
+  groupId,
+  groupName,
+  listingId: group.listingId || null,
+});
+```
+
+---
+
+## Summary
+
+| Method | Who Can Use | How It Works |
+|--------|-------------|-------------|
+| A — Matches | Any group admin | Search matches → tap Invite → they get a pending invite card |
+| C — Code | Any group admin | Share 6-char code via any app → recipient enters it in Groups screen |
+| D — Listing Interest | Host admins only (linked groups) | See renters who swiped your listing → tap Invite |
+| Member limit | Enforced on all 3 methods | Returns error if group is full before adding |
