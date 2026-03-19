@@ -407,21 +407,46 @@ export const GroupsScreen = () => {
     }
   };
 
-  const handleMessageGroupCreator = async (creatorId: string) => {
-    const users = await StorageService.getUsers();
-    const currentUser = users.find(u => u.id === user?.id);
-    const userPlan = currentUser?.subscription?.plan || 'basic';
-    const userStatus = currentUser?.subscription?.status || 'active';
-    
-    const isEliteMember = userPlan === 'elite' && userStatus === 'active';
-    
-    setMessageTargetUserId(creatorId);
-    
-    if (isEliteMember) {
-      handleSendDirectMessage(creatorId);
+  const handleMessageGroup = async (group: any) => {
+    if (!user) return;
+
+    const conversations = await StorageService.getConversations();
+    const groupConvId = `group-${group.id}`;
+    const existing = conversations.find(c => c.id === groupConvId);
+
+    if (existing) {
+      (navigation as any).navigate('Messages', { screen: 'MessagesList' });
+      setTimeout(() => {
+        (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: existing.id } });
+      }, 50);
     } else {
-      setShowMessageModal(true);
+      const memberIds: string[] = (group.members || []).map((m: any) => m.userId || m.id).filter((id: string) => id !== user.id);
+      const roommateProfiles = await StorageService.getRoommateProfiles();
+      const firstMember = roommateProfiles.find(p => memberIds.includes(p.id));
+
+      const newConversation = {
+        id: groupConvId,
+        participant: {
+          id: firstMember?.id || group.createdBy,
+          name: group.name,
+          photo: firstMember?.photos?.[0],
+          online: false,
+        },
+        lastMessage: '',
+        timestamp: new Date(),
+        unread: 0,
+        messages: [],
+        isGroup: true,
+        groupName: group.name,
+      };
+      await StorageService.addOrUpdateConversation(newConversation);
+      (navigation as any).navigate('Messages', { screen: 'MessagesList' });
+      setTimeout(() => {
+        (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: newConversation.id } });
+      }, 50);
     }
+
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
   const handleSendDirectMessage = async (targetUserId: string) => {
@@ -1706,12 +1731,12 @@ export const GroupsScreen = () => {
                       style={[styles.detailActionButton, { backgroundColor: theme.primary }]}
                       onPress={() => {
                         setShowGroupDetail(false);
-                        handleMessageGroupCreator(currentGroup.createdBy);
+                        handleMessageGroup(currentGroup);
                       }}
                     >
                       <Feather name="message-circle" size={20} color="#FFFFFF" />
                       <ThemedText style={[Typography.h3, { color: '#FFFFFF', marginLeft: Spacing.md }]}>
-                        Message Group Creator
+                        Message Group
                       </ThemedText>
                     </Pressable>
                   </View>
