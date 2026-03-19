@@ -18,6 +18,7 @@ export interface ListingData {
   is_paused?: boolean;
   is_rented?: boolean;
   coordinates?: { lat: number; lng: number };
+  transit_info?: any;
 }
 
 export async function getListings(filters?: {

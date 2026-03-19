@@ -99,6 +99,16 @@ export interface Property {
   hostProfileId?: string;
   walkScore?: number;
   listingBoost?: ListingBoost;
+  transitInfo?: {
+    stops: Array<{
+      name: string;
+      type: 'subway' | 'bus' | 'train' | 'tram' | 'ferry' | 'other';
+      distanceMiles: number;
+    }>;
+    noTransitNearby?: boolean;
+    manualOverride?: string;
+    fetchedAt: string;
+  };
 }
 
 export interface PropertyFilter {

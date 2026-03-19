@@ -144,6 +144,7 @@ export const ExploreScreen = () => {
             existingRoommates: l.existing_roommates || [],
             availableDate: l.available_date ? new Date(l.available_date) : undefined,
             coordinates: l.coordinates ? (l.coordinates.lat !== undefined ? { lat: l.coordinates.lat, lng: l.coordinates.lng } : l.coordinates.latitude !== undefined ? { lat: l.coordinates.latitude, lng: l.coordinates.longitude } : undefined) : undefined,
+            transitInfo: l.transit_info || undefined,
           }));
           setProperties(mapped);
           setFilteredProperties(mapped);
@@ -1487,6 +1488,38 @@ export const ExploreScreen = () => {
                         );
                       })()
                     ) : null}
+                    {selectedProperty.transitInfo ? (
+                      <View style={styles.transitSection}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.sm }}>
+                          <Feather name="navigation" size={16} color={theme.primary} />
+                          <ThemedText style={[Typography.body, { fontWeight: '600', marginLeft: Spacing.sm }]}>Nearby Transit</ThemedText>
+                        </View>
+                        {selectedProperty.transitInfo.manualOverride ? (
+                          <ThemedText style={[Typography.body, { color: theme.textSecondary, fontStyle: 'italic', lineHeight: 20 }]}>
+                            {selectedProperty.transitInfo.manualOverride}
+                          </ThemedText>
+                        ) : selectedProperty.transitInfo.stops.length > 0 ? (
+                          selectedProperty.transitInfo.stops.slice(0, 3).map((stop, index) => (
+                            <View key={index} style={styles.transitItem}>
+                              <ThemedText style={{ fontSize: 16, width: 24 }}>
+                                {stop.type === 'subway' ? '\u{1F687}' : stop.type === 'bus' ? '\u{1F68C}' : stop.type === 'train' ? '\u{1F686}' : stop.type === 'tram' ? '\u{1F68A}' : stop.type === 'ferry' ? '\u{26F4}' : '\u{1F68F}'}
+                              </ThemedText>
+                              <ThemedText style={[Typography.body, { flex: 1 }]} numberOfLines={1}>{stop.name}</ThemedText>
+                              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.sm }]}>
+                                {stop.distanceMiles} mi
+                              </ThemedText>
+                            </View>
+                          ))
+                        ) : (
+                          <View style={styles.transitItem}>
+                            <Feather name="info" size={14} color={theme.textSecondary} />
+                            <ThemedText style={[Typography.caption, { color: theme.textSecondary, fontStyle: 'italic', marginLeft: Spacing.sm }]}>
+                              No public transit nearby
+                            </ThemedText>
+                          </View>
+                        )}
+                      </View>
+                    ) : null}
                     {selectedProperty.availableDate ? (
                       <View style={styles.detailRow}>
                         <Feather name="calendar" size={20} color={theme.primary} />
@@ -2333,6 +2366,18 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  transitSection: {
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.md,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.08)',
+  },
+  transitItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
   },
   detailRow: {
     flexDirection: 'row',

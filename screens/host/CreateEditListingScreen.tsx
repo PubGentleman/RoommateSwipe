@@ -15,6 +15,7 @@ import { Spacing, BorderRadius } from '../../constants/theme';
 import { createListing as createListingSupa, updateListing as updateListingSupa, getListing, deleteListing as deleteListingSupa } from '../../services/listingService';
 import { DatePickerModal } from '../../components/DatePickerModal';
 import { formatDate } from '../../utils/dateUtils';
+import { geocodeAddress, fetchNearbyTransit } from '../../utils/transitService';
 
 type RouteParams = {
   CreateEditListing: { propertyId?: string };
@@ -76,6 +77,7 @@ export const CreateEditListingScreen = () => {
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [houseRules, setHouseRules] = useState('');
   const [photos, setPhotos] = useState<string[]>([]);
+  const [transitOverride, setTransitOverride] = useState('');
   const [saving, setSaving] = useState(false);
   const [showLimitModal, setShowLimitModal] = useState(false);
   const [showOverageModal, setShowOverageModal] = useState(false);
@@ -114,6 +116,7 @@ export const CreateEditListingScreen = () => {
           availableDate: supaListing.available_date ? new Date(supaListing.available_date) : undefined,
           amenities: supaListing.amenities || [],
           photos: supaListing.photos || [],
+          transitInfo: supaListing.transit_info || undefined,
         };
       }
     } catch {
@@ -140,6 +143,9 @@ export const CreateEditListingScreen = () => {
     setAvailableDate(prop.availableDate ? new Date(prop.availableDate).toISOString().split('T')[0] : '');
     setSelectedAmenities(prop.amenities);
     setPhotos(prop.photos);
+    if (prop.transitInfo?.manualOverride) {
+      setTransitOverride(prop.transitInfo.manualOverride);
+    }
 
     const descParts = prop.description.split('\n\nSecurity Deposit:');
     if (descParts.length > 1) {
@@ -209,7 +215,33 @@ export const CreateEditListingScreen = () => {
         fullDescription += `\n\nHouse Rules: ${houseRules.trim()}`;
       }
 
-      const supaData = {
+      let transitInfo: any = undefined;
+      let coordinates: any = undefined;
+      try {
+        const override = transitOverride.trim() || undefined;
+        const coords = await geocodeAddress(address.trim(), city.trim(), state.trim());
+        if (coords) {
+          coordinates = coords;
+          const stops = await fetchNearbyTransit(coords.lat, coords.lng);
+          transitInfo = {
+            stops,
+            noTransitNearby: stops.length === 0,
+            manualOverride: override,
+            fetchedAt: new Date().toISOString(),
+          };
+        } else {
+          transitInfo = {
+            stops: [],
+            noTransitNearby: true,
+            manualOverride: override,
+            fetchedAt: new Date().toISOString(),
+          };
+        }
+      } catch (transitError) {
+        console.warn('Transit fetch failed:', transitError);
+      }
+
+      const supaData: any = {
         title: title.trim(),
         description: fullDescription,
         rent: Number(price),
@@ -227,6 +259,8 @@ export const CreateEditListingScreen = () => {
         is_paused: false,
         is_rented: false,
       };
+      if (coordinates) supaData.coordinates = coordinates;
+      if (transitInfo) supaData.transit_info = transitInfo;
 
       try {
         if (isEditing && propertyId) {
@@ -256,6 +290,8 @@ export const CreateEditListingScreen = () => {
           hostId: user?.id || '',
           hostName: user?.name || '',
           hostProfileId: user?.id,
+          coordinates,
+          transitInfo,
         };
         await StorageService.addOrUpdateProperty(property);
       }
@@ -582,6 +618,23 @@ export const CreateEditListingScreen = () => {
             onChangeText={setAddress}
             placeholder="123 Main St"
             placeholderTextColor="#666"
+          />
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <ThemedText style={styles.label}>Transportation (optional)</ThemedText>
+          <ThemedText style={styles.labelHint}>
+            We auto-detect nearby transit from your address. Override below if needed.
+          </ThemedText>
+          <TextInput
+            style={[styles.input, styles.multilineInput, { minHeight: 60 }]}
+            placeholder="e.g. Near Metro Line 2, Bus Route 40, 5 min walk to station"
+            placeholderTextColor="#666"
+            value={transitOverride}
+            onChangeText={setTransitOverride}
+            multiline
+            numberOfLines={2}
+            textAlignVertical="top"
           />
         </View>
 
@@ -933,6 +986,12 @@ const styles = StyleSheet.create({
     color: '#555',
     marginBottom: 8,
     lineHeight: 18,
+  },
+  labelHint: {
+    fontSize: 12,
+    color: '#888',
+    marginBottom: 6,
+    marginTop: -4,
   },
   photosRow: {
     marginBottom: 8,
