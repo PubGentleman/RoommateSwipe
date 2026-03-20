@@ -874,9 +874,52 @@ export const GroupsScreen = () => {
         onPress={() => handleOpenGroupChat(group)}
       >
         <View style={styles.groupHeader}>
-          <View style={[styles.groupIcon, { backgroundColor: theme.primary }]}>
-            <Feather name="users" size={20} color="#FFFFFF" />
-          </View>
+          {(() => {
+            const photos = memberProfiles
+              .map(p => ({ uri: p?.photos?.[0] || p?.profilePicture, initial: (p?.name || '?').charAt(0).toUpperCase() }))
+              .slice(0, 3);
+            if (photos.length === 0) {
+              return (
+                <View style={[styles.groupIcon, { backgroundColor: theme.primary }]}>
+                  <Feather name="users" size={20} color="#FFFFFF" />
+                </View>
+              );
+            }
+            const sz = photos.length === 1 ? 40 : 28;
+            const olap = 10;
+            const totalW = sz + (photos.length - 1) * (sz - olap);
+            return (
+              <View style={{ width: 40, height: 40, justifyContent: 'center', alignItems: 'center', marginRight: 0 }}>
+                <View style={{ width: totalW, height: sz, flexDirection: 'row' }}>
+                  {photos.map((m, i) => (
+                    m.uri ? (
+                      <Image
+                        key={i}
+                        source={{ uri: m.uri }}
+                        style={{
+                          width: sz, height: sz, borderRadius: sz / 2,
+                          borderWidth: 2, borderColor: theme.backgroundDefault,
+                          position: 'absolute', left: i * (sz - olap), zIndex: photos.length - i,
+                        }}
+                      />
+                    ) : (
+                      <View
+                        key={i}
+                        style={{
+                          width: sz, height: sz, borderRadius: sz / 2,
+                          backgroundColor: theme.primary, borderWidth: 2, borderColor: theme.backgroundDefault,
+                          alignItems: 'center', justifyContent: 'center',
+                          position: 'absolute', left: i * (sz - olap), zIndex: photos.length - i,
+                        }}
+                      >
+                        <Text style={{ color: '#fff', fontWeight: '700', fontSize: sz * 0.38 }}>{m.initial}</Text>
+                      </View>
+                    )
+                  ))}
+                </View>
+              </View>
+            );
+          })()}
           <View style={styles.groupInfo}>
             <ThemedText style={[Typography.h3]}>{group.name}</ThemedText>
             <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
