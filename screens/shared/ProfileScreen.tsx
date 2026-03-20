@@ -59,15 +59,60 @@ export const ProfileScreen = () => {
     setDevTapTimer(setTimeout(() => setDevTapCount(0), 3000));
   };
 
+  const getRoleLabel = () => {
+    if (!user) return 'User';
+    return user.role.charAt(0).toUpperCase() + user.role.slice(1);
+  };
+
+  const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : 'U';
+  const isHost = user?.role === 'host';
+  const [matchCount, setMatchCount] = useState(0);
+  const [profileViewCount, setProfileViewCount] = useState(0);
+  const [likesCount, setLikesCount] = useState(0);
+  const [hostListingCount, setHostListingCount] = useState(0);
+  const [hostInquiryCount, setHostInquiryCount] = useState(0);
+  const [hostViewCount, setHostViewCount] = useState(0);
+
+  const loadProfileStats = React.useCallback(async () => {
+    if (!user) return;
+    try {
+      if (user.role === 'host') {
+        const allProperties = await StorageService.getProperties();
+        const myListings = allProperties.filter(p => p.hostId === user.id);
+        setHostListingCount(myListings.length);
+        const activeCount = myListings.filter(p => p.available && !p.rentedDate).length;
+        setHostViewCount(activeCount);
+        const interestCards = await StorageService.getInterestCardsForHost(user.id);
+        setHostInquiryCount(interestCards.length);
+      } else {
+        const matches = await StorageService.getMatches();
+        const userMatches = matches.filter(m =>
+          m.userId1 === user.id || m.userId2 === user.id
+        );
+        setMatchCount(userMatches.length);
+        const allUsers = await StorageService.getUsers();
+        const currentUser = allUsers.find(u => u.id === user.id);
+        const receivedLikes = currentUser?.receivedLikes || [];
+        const regularLikes = receivedLikes.filter((l: any) => !l.isSuperLike);
+        const superLikes = receivedLikes.filter((l: any) => l.isSuperLike);
+        setProfileViewCount(regularLikes.length);
+        setLikesCount(superLikes.length);
+      }
+    } catch (e) {
+      console.warn('Failed to load profile stats:', e);
+    }
+  }, [user?.id, user?.role]);
+
   useFocusEffect(
     React.useCallback(() => {
       checkAndUpdateBoostStatus();
+      loadProfileStats();
       if (user) {
         StorageService.getInterestCardsForRenter(user.id).then(cards => {
           setPendingInterestCount(cards.filter(c => c.status === 'pending').length);
         });
       }
-    }, [user])
+    }, [user, loadProfileStats])
   );
 
   const [boostTimeLabel, setBoostTimeLabel] = useState('');
@@ -102,40 +147,6 @@ export const ProfileScreen = () => {
     }
   };
 
-  const getRoleLabel = () => {
-    if (!user) return 'User';
-    return user.role.charAt(0).toUpperCase() + user.role.slice(1);
-  };
-
-  const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : 'U';
-  const [matchCount, setMatchCount] = useState(0);
-  const [profileViewCount, setProfileViewCount] = useState(0);
-  const [likesCount, setLikesCount] = useState(0);
-
-  useEffect(() => {
-    const loadStats = async () => {
-      if (!user) return;
-      try {
-        const matches = await StorageService.getMatches();
-        const userMatches = matches.filter(m =>
-          m.userId1 === user.id || m.userId2 === user.id
-        );
-        setMatchCount(userMatches.length);
-
-        const allUsers = await StorageService.getUsers();
-        const currentUser = allUsers.find(u => u.id === user.id);
-        const receivedLikes = currentUser?.receivedLikes || [];
-        const regularLikes = receivedLikes.filter((l: any) => !l.isSuperLike);
-        const superLikes = receivedLikes.filter((l: any) => l.isSuperLike);
-        setProfileViewCount(regularLikes.length);
-        setLikesCount(superLikes.length);
-      } catch (e) {
-        console.warn('Failed to load profile stats:', e);
-      }
-    };
-    loadStats();
-  }, [user?.id]);
-
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <View style={styles.topNav}>
@@ -155,7 +166,7 @@ export const ProfileScreen = () => {
       <AnimatedScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 100 }} onScroll={profileScrollHandler} scrollEventThrottle={16}>
         <Animated.View style={profileCollapsibleStyle}>
         <LinearGradient
-          colors={['rgba(255,107,91,0.08)', 'transparent']}
+          colors={[isHost ? 'rgba(123,94,167,0.08)' : 'rgba(255,107,91,0.08)', 'transparent']}
           start={{ x: 0.5, y: 0 }}
           end={{ x: 0.5, y: 1 }}
           style={styles.profileHeroGradient}
@@ -176,8 +187,8 @@ export const ProfileScreen = () => {
             </View>
           </View>
 
-          <View style={styles.roleBadge}>
-            <Text style={styles.roleBadgeText}>{getRoleLabel()}</Text>
+          <View style={[styles.roleBadge, isHost && styles.roleBadgeHost]}>
+            <Text style={[styles.roleBadgeText, isHost && styles.roleBadgeTextHost]}>{getRoleLabel()}</Text>
           </View>
 
           <View style={styles.nameRow}>
@@ -192,32 +203,64 @@ export const ProfileScreen = () => {
           <Text style={styles.profileEmail}>{user?.email || ''}</Text>
 
           <View style={styles.statsRow}>
-            <Pressable
-              style={styles.statBox}
-              onPress={() => navigation.navigate('MatchesList')}
-            >
-              <Text style={[styles.statValue, styles.statCoral]}>{matchCount}</Text>
-              <Text style={styles.statLabel}>Matches</Text>
-            </Pressable>
-            <View style={styles.statDivider} />
-            <Pressable
-              style={styles.statBox}
-              onPress={() => navigation.navigate('ProfileViews')}
-            >
-              <Text style={styles.statValue}>{profileViewCount}</Text>
-              <Text style={styles.statLabel}>Likes</Text>
-            </Pressable>
-            <View style={styles.statDivider} />
-            <Pressable
-              style={styles.statBox}
-              onPress={() => navigation.navigate('WhoLikedMe')}
-            >
-              <Text style={[styles.statValue, styles.statCoral]}>{likesCount}</Text>
-              <Text style={styles.statLabel}>Super Likes</Text>
-            </Pressable>
+            {isHost ? (
+              <>
+                <Pressable style={styles.statBox}>
+                  <Text style={[styles.statValue, styles.statPurple]}>{hostListingCount}</Text>
+                  <Text style={styles.statLabel}>Listings</Text>
+                </Pressable>
+                <View style={styles.statDivider} />
+                <Pressable style={styles.statBox}>
+                  <Text style={styles.statValue}>{hostInquiryCount}</Text>
+                  <Text style={styles.statLabel}>Inquiries</Text>
+                </Pressable>
+                <View style={styles.statDivider} />
+                <Pressable style={styles.statBox}>
+                  <Text style={[styles.statValue, styles.statPurple]}>{hostViewCount}</Text>
+                  <Text style={styles.statLabel}>Active</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Pressable
+                  style={styles.statBox}
+                  onPress={() => navigation.navigate('MatchesList')}
+                >
+                  <Text style={[styles.statValue, styles.statCoral]}>{matchCount}</Text>
+                  <Text style={styles.statLabel}>Matches</Text>
+                </Pressable>
+                <View style={styles.statDivider} />
+                <Pressable
+                  style={styles.statBox}
+                  onPress={() => navigation.navigate('ProfileViews')}
+                >
+                  <Text style={styles.statValue}>{profileViewCount}</Text>
+                  <Text style={styles.statLabel}>Likes</Text>
+                </Pressable>
+                <View style={styles.statDivider} />
+                <Pressable
+                  style={styles.statBox}
+                  onPress={() => navigation.navigate('WhoLikedMe')}
+                >
+                  <Text style={[styles.statValue, styles.statCoral]}>{likesCount}</Text>
+                  <Text style={styles.statLabel}>Super Likes</Text>
+                </Pressable>
+              </>
+            )}
           </View>
 
-          {user?.role === 'renter' ? (
+          {isHost ? (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => navigation.navigate('HostSubscription')}
+              style={styles.boostBtnWrap}
+            >
+              <View style={[styles.boostBtn, { backgroundColor: '#7B5EA7' }]}>
+                <Feather name="briefcase" size={14} color="#fff" />
+                <Text style={styles.boostBtnText}>Manage Plan</Text>
+              </View>
+            </TouchableOpacity>
+          ) : (
             <TouchableOpacity activeOpacity={0.7} onPress={handleBoostPress} style={styles.boostBtnWrap}>
               {boostIsActive ? (
                 <View style={styles.boostActiveBtn}>
@@ -231,7 +274,7 @@ export const ProfileScreen = () => {
                 </View>
               )}
             </TouchableOpacity>
-          ) : null}
+          )}
         </View>
         </LinearGradient>
         </Animated.View>
@@ -859,10 +902,17 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     marginBottom: 10,
   },
+  roleBadgeHost: {
+    backgroundColor: 'rgba(123,94,167,0.2)',
+    borderColor: 'rgba(123,94,167,0.35)',
+  },
   roleBadgeText: {
     fontSize: 11.5,
     fontWeight: '700',
     color: '#ff8070',
+  },
+  roleBadgeTextHost: {
+    color: '#a68dd4',
   },
   nameRow: {
     flexDirection: 'row',
@@ -928,6 +978,9 @@ const styles = StyleSheet.create({
   },
   statCoral: {
     color: '#ff6b5b',
+  },
+  statPurple: {
+    color: '#7B5EA7',
   },
   statLabel: {
     fontSize: 11,
