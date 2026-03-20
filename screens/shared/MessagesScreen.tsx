@@ -309,6 +309,12 @@ export const MessagesScreen = () => {
   };
 
   const navigateToChat = (conv: Conversation) => {
+    if (conv.unread > 0) {
+      setConversations(prev =>
+        prev.map(c => c.id === conv.id ? { ...c, unread: 0 } : c)
+      );
+      StorageService.updateConversation(conv.id, { unread: 0 });
+    }
     navigation.navigate('Chat', {
       conversationId: conv.id,
       otherUser: profilesMap.get(conv.participant.id) as unknown as RoommateProfile,
@@ -389,6 +395,12 @@ export const MessagesScreen = () => {
   };
 
   const navigateToInquiryConv = (conv: Conversation) => {
+    if (conv.unread > 0) {
+      setConversations(prev =>
+        prev.map(c => c.id === conv.id ? { ...c, unread: 0 } : c)
+      );
+      StorageService.updateConversation(conv.id, { unread: 0 });
+    }
     navigation.navigate('Chat', {
       conversationId: conv.id,
       inquiryGroup: {

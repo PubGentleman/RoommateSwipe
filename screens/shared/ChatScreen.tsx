@@ -164,6 +164,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
 
   useEffect(() => {
     loadMessages();
+    StorageService.updateConversation(conversationId, { unread: 0 });
   }, [conversationId]);
 
   useEffect(() => {
