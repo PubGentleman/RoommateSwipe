@@ -76,7 +76,7 @@ The data layer uses Supabase PostgreSQL, complemented by local AsyncStorage for 
 
 **Group Logic Rules:** Includes admin promotion before leaving, member removal, discoverable groups for listings, and join requests.
 
-**Host Group Outreach (Pay-Per-Use):** Hosts can pay a one-time fee to message groups forming on their previously rented listings. Payment is handled via Stripe.
+**Host Proactive Group Outreach:** Hosts on Pro/Business plans can browse discoverable renter groups and send them outreach messages about available listings. Robust spam controls include: daily caps (Pro: 3/day, Business: 10/day), hourly rate limits (Pro: 2/hr, Business: 3/hr), 30-day per-group cooldown, 50-character minimum message length, and auto-suspend after 3 reports. When daily limits are hit, hosts can purchase additional sends ($4.99 for +3, $12.99 for +10) that expire at midnight. Service layer: `services/hostOutreachService.ts`, constants: `constants/planLimits.ts`, screen: `screens/host/BrowseRenterGroupsScreen.tsx`.
 
 **Address Reveal System:** Full property addresses are hidden until a host accepts an inquiry.
 

@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, Pressable, Modal, ActivityIndicator, Alert } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, FlatList, StyleSheet, Pressable, Modal, ActivityIndicator, Alert, TextInput, Platform } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -10,13 +10,21 @@ import { StorageService } from '../../utils/storage';
 import { isFreePlan } from '../../utils/hostPricing';
 import { HostSubscriptionData } from '../../types/models';
 import { createListingInquiryGroup } from '../../services/groupService';
+import {
+  getOutreachQuotaStatus,
+  sendProactiveOutreach,
+  getRecentlySentGroupIds,
+  addPaidCreditsLocal,
+  OutreachQuotaStatus,
+} from '../../services/hostOutreachService';
+import { UNLOCK_PACKAGES } from '../../constants/planLimits';
 
-const isDev = __DEV__;
 const BG = '#111';
 const CARD_BG = '#1a1a1a';
 const ACCENT = '#ff6b5b';
 const PURPLE = '#a855f7';
 const ROOMDR_PURPLE = '#7B5EA7';
+const MIN_MSG_LENGTH = 50;
 
 interface RenterGroupCard {
   groupId: string;
@@ -40,25 +48,49 @@ export const BrowseRenterGroupsScreen = () => {
   const { user } = useAuth();
   const [groups, setGroups] = useState<RenterGroupCard[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sentRequests, setSentRequests] = useState<string[]>([]);
+  const [sentGroupIds, setSentGroupIds] = useState<Set<string>>(new Set());
   const [hostSub, setHostSub] = useState<HostSubscriptionData | null>(null);
-  const [showMessageModal, setShowMessageModal] = useState(false);
-  const [pendingMessageGroupId, setPendingMessageGroupId] = useState<string | null>(null);
-  const [messageSending, setMessageSending] = useState(false);
+  const [quota, setQuota] = useState<OutreachQuotaStatus | null>(null);
 
-  useEffect(() => {
+  const [composeTarget, setComposeTarget] = useState<RenterGroupCard | null>(null);
+  const [message, setMessage] = useState('');
+  const [sending, setSending] = useState(false);
+
+  const [showUnlock, setShowUnlock] = useState(false);
+  const [purchasing, setPurchasing] = useState<string | null>(null);
+
+  const plan = hostSub?.plan ?? 'free';
+
+  useFocusEffect(
+    useCallback(() => {
+      if (user) loadAll();
+    }, [user])
+  );
+
+  const loadAll = async () => {
     if (!user) return;
-    const load = async () => {
+    setLoading(true);
+    try {
       const sub = await StorageService.getHostSubscription(user.id);
       setHostSub(sub);
       if (isFreePlan(sub.plan)) {
         setLoading(false);
         return;
       }
+
+      const [quotaData, sentIds] = await Promise.all([
+        getOutreachQuotaStatus(user.id, sub.plan),
+        getRecentlySentGroupIds(user.id),
+      ]);
+      setQuota(quotaData);
+      setSentGroupIds(new Set(sentIds));
       await loadGroups();
-    };
-    load();
-  }, [user]);
+    } catch {
+      loadMockGroups();
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadGroups = async () => {
     try {
@@ -70,13 +102,10 @@ export const BrowseRenterGroupsScreen = () => {
       }
     } catch {
       loadMockGroups();
-    } finally {
-      setLoading(false);
     }
   };
 
   const loadMockGroups = () => {
-    if (!isDev) return;
     setGroups([
       {
         groupId: 'group_mock_1',
@@ -126,65 +155,101 @@ export const BrowseRenterGroupsScreen = () => {
     ]);
   };
 
-  const handleMessage = (groupId: string) => {
-    if (sentRequests.includes(groupId)) return;
+  const openCompose = (group: RenterGroupCard) => {
+    if (sentGroupIds.has(group.groupId)) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setPendingMessageGroupId(groupId);
-    setShowMessageModal(true);
+    setComposeTarget(group);
+    setMessage('');
   };
 
-  const confirmSendMessage = async () => {
-    if (!pendingMessageGroupId || !user) return;
-    setMessageSending(true);
+  const handleSend = async () => {
+    if (!composeTarget || !user) return;
 
+    if (message.trim().length < MIN_MSG_LENGTH) {
+      const msg = `Your message must be at least ${MIN_MSG_LENGTH} characters to prevent spam.`;
+      if (Platform.OS === 'web') window.alert(msg);
+      else Alert.alert('Too Short', msg);
+      return;
+    }
+
+    setSending(true);
     try {
+      await sendProactiveOutreach(user.id, composeTarget.groupId, message.trim(), plan);
+
       const properties = await StorageService.getProperties();
-      const activeListings = properties.filter(p => p.hostId === user.id && p.available);
-      const listing = activeListings[0];
-
-      if (!listing) {
-        Alert.alert(
-          'No Active Listing',
-          'You need an active listing to message a group. Go to the Listings tab to create one.',
-          [{ text: 'OK' }]
-        );
-        setMessageSending(false);
-        setShowMessageModal(false);
-        return;
+      const activeListing = properties.find(p => p.hostId === user.id && p.available);
+      if (activeListing) {
+        try {
+          const groupName = `Inquiry — ${composeTarget.location || composeTarget.neighborhoods[0] || 'Listing'}`;
+          await createListingInquiryGroup(
+            activeListing.id,
+            user.id,
+            activeListing.address || activeListing.city || 'Your listing',
+            composeTarget.groupId,
+            groupName,
+          );
+        } catch {}
       }
 
-      const group = groups.find(g => g.groupId === pendingMessageGroupId);
-      const groupName = group ? `Inquiry — ${group.location || group.neighborhoods[0] || 'Your Listing'}` : 'Listing Inquiry';
+      setSentGroupIds(prev => new Set([...prev, composeTarget.groupId]));
+      setComposeTarget(null);
+      setMessage('');
 
-      const inquiryGroup = await createListingInquiryGroup(
-        listing.id,
-        user.id,
-        listing.address || listing.city || 'Your listing',
-        pendingMessageGroupId,
-        groupName,
-      );
+      const newQuota = await getOutreachQuotaStatus(user.id, plan);
+      setQuota(newQuota);
 
-      setSentRequests(prev => [...prev, pendingMessageGroupId]);
-      setMessageSending(false);
-      setShowMessageModal(false);
-      setPendingMessageGroupId(null);
-
-      const parent = navigation.getParent();
-      if (parent) {
-        parent.navigate('Messages', {
-          screen: 'Chat',
-          params: { conversationId: inquiryGroup.id, isGroupChat: true },
-        });
+      const msg = 'Your message was delivered to the group.';
+      if (Platform.OS === 'web') window.alert(msg);
+      else Alert.alert('Message Sent', msg);
+    } catch (e: any) {
+      const errMsg = e.message || '';
+      if (errMsg === 'DAILY_LIMIT_REACHED') {
+        setComposeTarget(null);
+        setShowUnlock(true);
+      } else if (errMsg === 'HOURLY_LIMIT_REACHED') {
+        const msg = 'You can only send a few messages per hour. Try again shortly.';
+        if (Platform.OS === 'web') window.alert(msg);
+        else Alert.alert('Slow Down', msg);
+      } else if (errMsg === 'GROUP_COOLDOWN') {
+        const msg = 'You messaged this group recently. Wait 30 days before reaching out again.';
+        if (Platform.OS === 'web') window.alert(msg);
+        else Alert.alert('Already Contacted', msg);
+      } else if (errMsg === 'MESSAGE_TOO_SHORT') {
+        const msg = `Write at least ${MIN_MSG_LENGTH} characters.`;
+        if (Platform.OS === 'web') window.alert(msg);
+        else Alert.alert('Too Short', msg);
+      } else if (errMsg === 'SUSPENDED') {
+        const msg = 'Your outreach privileges have been suspended due to reports. Contact support to appeal.';
+        if (Platform.OS === 'web') window.alert(msg);
+        else Alert.alert('Outreach Suspended', msg);
       } else {
-        navigation.navigate('Messages', {
-          screen: 'Chat',
-          params: { conversationId: inquiryGroup.id, isGroupChat: true },
-        });
+        const msg = 'Could not send message. Please try again.';
+        if (Platform.OS === 'web') window.alert(msg);
+        else Alert.alert('Error', msg);
       }
-    } catch (error) {
-      console.error('[BrowseRenterGroups] Failed to create inquiry group:', error);
-      setMessageSending(false);
-      Alert.alert('Error', 'Failed to send message. Please try again.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleUnlock = async (packageId: string) => {
+    setPurchasing(packageId);
+    const pkg = UNLOCK_PACKAGES.find(p => p.id === packageId)!;
+    try {
+      await addPaidCreditsLocal(user!.id, pkg.credits);
+      const newQuota = await getOutreachQuotaStatus(user!.id, plan);
+      setQuota(newQuota);
+      setShowUnlock(false);
+
+      const msg = `${pkg.credits} additional messages added for today.`;
+      if (Platform.OS === 'web') window.alert(msg);
+      else Alert.alert('Unlocked!', msg);
+    } catch (e: any) {
+      const msg = e.message || 'Payment failed.';
+      if (Platform.OS === 'web') window.alert(msg);
+      else Alert.alert('Error', msg);
+    } finally {
+      setPurchasing(null);
     }
   };
 
@@ -229,11 +294,13 @@ export const BrowseRenterGroupsScreen = () => {
     );
   }
 
+  const quotaFill = quota && quota.dailyCap > 0 ? Math.min(1, quota.used / (quota.dailyCap + quota.paidExtra)) : 0;
+  const quotaColor = quotaFill >= 1 ? '#ef4444' : quotaFill >= 0.66 ? '#f59e0b' : '#22c55e';
+
   const renderGroup = ({ item }: { item: RenterGroupCard }) => {
-    const alreadySent = sentRequests.includes(item.groupId);
+    const alreadySent = sentGroupIds.has(item.groupId);
     const spotsLeft = item.maxMembers - item.memberCount;
 
-    const memberColors = ['#7B5EA7', '#4A90E2', '#22c55e', '#ff6b5b', '#f59e0b'];
     const gradients: [string, string][] = [['#667eea', '#764ba2'], ['#f093fb', '#f5576c'], ['#11998e', '#38ef7d'], ['#f6d365', '#fda085']];
     const memberLabels = Array.from({ length: item.memberCount }, (_, i) => ({
       gradient: gradients[i % gradients.length],
@@ -320,13 +387,13 @@ export const BrowseRenterGroupsScreen = () => {
 
         <Pressable
           style={[styles.ctaButton, alreadySent ? styles.ctaButtonSent : null]}
-          onPress={() => handleMessage(item.groupId)}
-          disabled={alreadySent}
+          onPress={() => openCompose(item)}
+          disabled={alreadySent || (quota?.suspended === true)}
         >
           {alreadySent ? (
             <View style={styles.ctaInner}>
               <Feather name="check-circle" size={15} color="#22c55e" />
-              <Text style={[styles.ctaText, { color: '#22c55e' }]}>Request Sent</Text>
+              <Text style={[styles.ctaText, { color: '#22c55e' }]}>Message Sent</Text>
             </View>
           ) : (
             <LinearGradient
@@ -358,6 +425,37 @@ export const BrowseRenterGroupsScreen = () => {
           <Text style={styles.headerBadgeText}>{groups.length}</Text>
         </View>
       </View>
+
+      {quota && !quota.suspended && quota.dailyCap > 0 ? (
+        <View style={styles.quotaBar}>
+          <Feather name="send" size={14} color={quotaColor} />
+          <Text style={styles.quotaText}>
+            {quota.remaining} of {quota.dailyCap + quota.paidExtra} left today
+          </Text>
+          <View style={styles.quotaTrack}>
+            <View style={[styles.quotaFill, { width: `${quotaFill * 100}%`, backgroundColor: quotaColor }]} />
+          </View>
+          {quota.hitDailyLimit ? (
+            <Pressable style={styles.unlockBtn} onPress={() => setShowUnlock(true)}>
+              <Feather name="unlock" size={12} color={ACCENT} />
+              <Text style={styles.unlockBtnText}>Unlock</Text>
+            </Pressable>
+          ) : null}
+          {quota.paidExtra > 0 ? (
+            <View style={styles.paidPill}>
+              <Text style={styles.paidPillText}>+{quota.paidExtra} paid</Text>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
+      {quota?.suspended ? (
+        <View style={styles.suspendedBar}>
+          <Feather name="alert-triangle" size={14} color="#ef4444" />
+          <Text style={styles.suspendedText}>Outreach suspended due to reports. Contact support to appeal.</Text>
+        </View>
+      ) : null}
+
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={PURPLE} />
@@ -380,44 +478,108 @@ export const BrowseRenterGroupsScreen = () => {
         />
       )}
 
-      <Modal
-        visible={showMessageModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowMessageModal(false)}
-      >
-        <Pressable style={styles.modalOverlay} onPress={() => setShowMessageModal(false)}>
-          <Pressable style={styles.modalSheet} onPress={() => {}}>
-            <View style={styles.modalIconWrap}>
-              <Feather name="send" size={26} color={PURPLE} />
+      <Modal visible={!!composeTarget} transparent animationType="slide" onRequestClose={() => setComposeTarget(null)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setComposeTarget(null)}>
+          <Pressable style={styles.composeSheet} onPress={() => {}}>
+            <View style={styles.composeHeader}>
+              <Text style={styles.composeTitle}>Message {composeTarget?.name}</Text>
+              <Pressable onPress={() => setComposeTarget(null)}>
+                <Feather name="x" size={20} color="rgba(255,255,255,0.4)" />
+              </Pressable>
             </View>
-            <Text style={styles.modalTitle}>Message This Group</Text>
-            <Text style={styles.modalDesc}>
-              A group chat will be created with all members of this group. Everyone will see your listing and can respond together.
+
+            <Text style={styles.composeHint}>
+              Introduce your listing and why it's a great fit for this group. Be specific and personal — groups respond better to tailored messages.
             </Text>
+
+            <TextInput
+              style={styles.composeInput}
+              multiline
+              placeholder="Hi! I have a beautiful 3-bedroom apartment in Williamsburg that I think would be perfect for your group..."
+              placeholderTextColor="rgba(255,255,255,0.2)"
+              value={message}
+              onChangeText={setMessage}
+              maxLength={500}
+            />
+
+            <View style={styles.charRow}>
+              <Text style={[
+                styles.charCount,
+                message.trim().length < MIN_MSG_LENGTH ? { color: '#ef4444' } : { color: 'rgba(255,255,255,0.3)' },
+              ]}>
+                {message.trim().length}/{MIN_MSG_LENGTH} min
+              </Text>
+              <Text style={styles.charMax}>{message.length}/500</Text>
+            </View>
+
+            {message.trim().length > 0 && message.trim().length < MIN_MSG_LENGTH ? (
+              <View style={styles.warningRow}>
+                <Feather name="alert-circle" size={14} color="#f59e0b" />
+                <Text style={styles.warningText}>
+                  {MIN_MSG_LENGTH - message.trim().length} more characters needed
+                </Text>
+              </View>
+            ) : null}
+
             <Pressable
-              style={[styles.modalConfirmBtn, { opacity: messageSending ? 0.7 : 1 }]}
-              onPress={confirmSendMessage}
-              disabled={messageSending}
+              style={[styles.sendBtn, { opacity: message.trim().length < MIN_MSG_LENGTH || sending ? 0.5 : 1 }]}
+              onPress={handleSend}
+              disabled={message.trim().length < MIN_MSG_LENGTH || sending}
             >
               <LinearGradient
                 colors={[ROOMDR_PURPLE, '#6a4d96']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                style={styles.modalConfirmGradient}
+                style={styles.sendBtnGradient}
               >
-                {messageSending ? (
+                {sending ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
                   <>
                     <Feather name="send" size={15} color="#fff" />
-                    <Text style={styles.modalConfirmText}>Send My Listing</Text>
+                    <Text style={styles.sendBtnText}>Send Message</Text>
                   </>
                 )}
               </LinearGradient>
             </Pressable>
-            <Pressable style={styles.modalCancelBtn} onPress={() => setShowMessageModal(false)}>
-              <Text style={styles.modalCancelText}>Cancel</Text>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal visible={showUnlock} transparent animationType="slide" onRequestClose={() => setShowUnlock(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setShowUnlock(false)}>
+          <Pressable style={styles.unlockSheet} onPress={() => {}}>
+            <View style={styles.unlockIconWrap}>
+              <Feather name="zap" size={28} color={ACCENT} />
+            </View>
+            <Text style={styles.unlockTitle}>Daily Limit Reached</Text>
+            <Text style={styles.unlockDesc}>
+              You've used all your outreach messages for today. Purchase additional sends to keep reaching groups.
+            </Text>
+
+            {UNLOCK_PACKAGES.map(pkg => (
+              <Pressable
+                key={pkg.id}
+                style={styles.unlockPackage}
+                onPress={() => handleUnlock(pkg.id)}
+                disabled={purchasing !== null}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.unlockPkgLabel}>{pkg.label}</Text>
+                  <Text style={styles.unlockPkgNote}>Expires at midnight</Text>
+                </View>
+                {purchasing === pkg.id ? (
+                  <ActivityIndicator size="small" color={ACCENT} />
+                ) : (
+                  <View style={styles.unlockPricePill}>
+                    <Text style={styles.unlockPriceText}>${(pkg.priceCents / 100).toFixed(2)}</Text>
+                  </View>
+                )}
+              </Pressable>
+            ))}
+
+            <Pressable style={styles.cancelUnlock} onPress={() => setShowUnlock(false)}>
+              <Text style={styles.cancelUnlockText}>Not Now</Text>
             </Pressable>
           </Pressable>
         </Pressable>
@@ -454,6 +616,55 @@ const styles = StyleSheet.create({
   },
   headerBadgeText: { fontSize: 13, fontWeight: '700', color: PURPLE },
 
+  quotaBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    gap: 8,
+  },
+  quotaText: { fontSize: 12, color: 'rgba(255,255,255,0.5)', fontWeight: '600' },
+  quotaTrack: { width: 70, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
+  quotaFill: { height: '100%', borderRadius: 3 },
+  unlockBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,107,91,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.25)',
+  },
+  unlockBtnText: { fontSize: 11, fontWeight: '700', color: ACCENT },
+  paidPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    backgroundColor: 'rgba(34,197,94,0.12)',
+  },
+  paidPillText: { fontSize: 10, fontWeight: '700', color: '#22c55e' },
+
+  suspendedBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.2)',
+    backgroundColor: 'rgba(239,68,68,0.06)',
+    gap: 8,
+  },
+  suspendedText: { fontSize: 12, color: '#ef4444', flex: 1 },
+
   list: { padding: 16, paddingBottom: 100 },
 
   card: {
@@ -488,7 +699,7 @@ const styles = StyleSheet.create({
   avatarLetter: { fontSize: 22, fontWeight: '800', color: '#fff' },
   avatarEmpty: {
     backgroundColor: 'rgba(255,255,255,0.08)',
-    borderStyle: 'dashed',
+    borderStyle: 'dashed' as any,
     borderColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -587,9 +798,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 14,
-    shadowColor: ROOMDR_PURPLE,
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
   },
   ctaInner: {
     flexDirection: 'row',
@@ -634,41 +842,118 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.7)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 28,
+    justifyContent: 'flex-end',
   },
-  modalSheet: {
+
+  composeSheet: {
     backgroundColor: '#1a1a1a',
-    borderRadius: 24,
-    padding: 28,
-    width: '100%',
-    alignItems: 'center',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     borderWidth: 1,
     borderColor: '#2a2a2a',
+    padding: 24,
   },
-  modalIconWrap: {
-    width: 68,
-    height: 68,
-    borderRadius: 22,
-    backgroundColor: 'rgba(123,94,167,0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(123,94,167,0.25)',
+  composeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 18,
+    marginBottom: 12,
   },
-  modalTitle: { fontSize: 20, fontWeight: '800', color: '#fff', marginBottom: 10, textAlign: 'center' },
-  modalDesc: { fontSize: 14, color: 'rgba(255,255,255,0.55)', textAlign: 'center', lineHeight: 21, marginBottom: 22 },
-  modalConfirmBtn: { borderRadius: 14, overflow: 'hidden', width: '100%', marginBottom: 10 },
-  modalConfirmGradient: {
+  composeTitle: { fontSize: 18, fontWeight: '800', color: '#fff' },
+  composeHint: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.4)',
+    lineHeight: 19,
+    marginBottom: 16,
+  },
+  composeInput: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 14,
+    padding: 14,
+    minHeight: 130,
+    color: '#fff',
+    fontSize: 14,
+    lineHeight: 20,
+    textAlignVertical: 'top',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+  },
+  charRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 6,
+    marginBottom: 8,
+  },
+  charCount: { fontSize: 11, fontWeight: '600' },
+  charMax: { fontSize: 11, color: 'rgba(255,255,255,0.2)' },
+  warningRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(245,158,11,0.2)',
+    backgroundColor: 'rgba(245,158,11,0.06)',
+    marginBottom: 12,
+  },
+  warningText: { fontSize: 12, color: '#f59e0b' },
+  sendBtn: { borderRadius: 14, overflow: 'hidden' },
+  sendBtnGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    height: 52,
+    paddingVertical: 16,
   },
-  modalConfirmText: { fontSize: 16, fontWeight: '700', color: '#fff' },
-  modalCancelBtn: { height: 44, alignItems: 'center', justifyContent: 'center' },
-  modalCancelText: { fontSize: 14, color: 'rgba(255,255,255,0.35)' },
+  sendBtnText: { fontSize: 16, fontWeight: '700', color: '#fff' },
+
+  unlockSheet: {
+    backgroundColor: '#1a1a1a',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
+    padding: 24,
+    alignItems: 'center',
+  },
+  unlockIconWrap: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255,107,91,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  unlockTitle: { fontSize: 20, fontWeight: '800', color: '#fff', marginBottom: 8 },
+  unlockDesc: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.5)',
+    textAlign: 'center',
+    lineHeight: 21,
+    marginBottom: 20,
+  },
+  unlockPackage: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    padding: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    marginBottom: 10,
+  },
+  unlockPkgLabel: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  unlockPkgNote: { fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 2 },
+  unlockPricePill: {
+    backgroundColor: ACCENT,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  unlockPriceText: { fontSize: 14, fontWeight: '800', color: '#fff' },
+  cancelUnlock: { marginTop: 8, paddingVertical: 10 },
+  cancelUnlockText: { fontSize: 14, color: 'rgba(255,255,255,0.35)' },
 });
