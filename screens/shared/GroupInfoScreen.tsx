@@ -517,7 +517,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
       <ScrollView
-        contentContainerStyle={{ paddingBottom: insets.bottom + 48 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
         showsVerticalScrollIndicator={false}
       >
         <LinearGradient
