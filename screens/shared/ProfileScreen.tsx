@@ -34,16 +34,16 @@ export const ProfileScreen = () => {
   const [devTapCount, setDevTapCount] = useState(0);
   const [devTapTimer, setDevTapTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
 
-  const PROFILE_COLLAPSE_H = 200;
+  const PROFILE_COLLAPSE_H = 280;
   const profileScrollY = useSharedValue(0);
   const profileScrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => { profileScrollY.value = event.contentOffset.y; },
   });
   const profileCollapsibleStyle = useAnimatedStyle(() => {
     const opacity = interpolate(profileScrollY.value, [0, PROFILE_COLLAPSE_H * 0.5], [1, 0], Extrapolation.CLAMP);
-    const scale = interpolate(profileScrollY.value, [0, PROFILE_COLLAPSE_H], [1, 0.9], Extrapolation.CLAMP);
-    const translateY = interpolate(profileScrollY.value, [0, PROFILE_COLLAPSE_H], [0, -PROFILE_COLLAPSE_H * 0.5], Extrapolation.CLAMP);
-    return { opacity, transform: [{ scale }, { translateY }] };
+    const maxH = interpolate(profileScrollY.value, [0, PROFILE_COLLAPSE_H], [PROFILE_COLLAPSE_H, 0], Extrapolation.CLAMP);
+    const translateY = interpolate(profileScrollY.value, [0, PROFILE_COLLAPSE_H], [0, -PROFILE_COLLAPSE_H * 0.3], Extrapolation.CLAMP);
+    return { opacity, maxHeight: maxH, overflow: 'hidden' as const, transform: [{ translateY }] };
   });
   const AnimatedScrollView = Animated.ScrollView;
 
@@ -840,43 +840,43 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   profileHeroGradient: {
-    paddingBottom: 24,
-    paddingTop: 12,
+    paddingBottom: 12,
+    paddingTop: 8,
   },
   profileHeader: {
     alignItems: 'center',
     paddingHorizontal: 22,
-    paddingTop: 8,
-    paddingBottom: 20,
+    paddingTop: 4,
+    paddingBottom: 10,
   },
   avatarRing: {
-    width: 106,
-    height: 106,
-    borderRadius: 53,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     padding: 3,
     borderWidth: 2.5,
     borderColor: '#ff6b5b',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 14,
+    marginBottom: 10,
   },
   avatarWrap: {
     position: 'relative',
   },
   avatarCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
   },
   avatarInitial: {
-    fontSize: 36,
+    fontSize: 30,
     fontWeight: '900',
     color: '#fff',
   },
