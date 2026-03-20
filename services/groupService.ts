@@ -1269,3 +1269,110 @@ export async function getContactedGroupIds(listingId: string): Promise<string[]>
 
   return (data || []).map((r: any) => r.group_id);
 }
+
+export async function likeGroup(groupId: string): Promise<void> {
+  const user = (await supabase.auth.getUser()).data.user;
+  if (!user) throw new Error('Not authenticated');
+  const { error } = await supabase
+    .from('group_likes')
+    .upsert({ group_id: groupId, user_id: user.id }, { onConflict: 'group_id,user_id' });
+  if (error) throw error;
+}
+
+export async function unlikeGroupLike(groupId: string): Promise<void> {
+  const user = (await supabase.auth.getUser()).data.user;
+  if (!user) throw new Error('Not authenticated');
+  const { error } = await supabase
+    .from('group_likes')
+    .delete()
+    .eq('group_id', groupId)
+    .eq('user_id', user.id);
+  if (error) throw error;
+}
+
+export async function getLikedGroups(): Promise<{
+  groupId: string;
+  mutualInterest: boolean;
+  canRequestToJoin: boolean;
+}[]> {
+  const user = (await supabase.auth.getUser()).data.user;
+  if (!user) return [];
+  const { data, error } = await supabase
+    .from('group_likes')
+    .select('group_id, admin_liked_back, dismissed')
+    .eq('user_id', user.id)
+    .eq('dismissed', false);
+  if (error) throw error;
+  return (data || []).map((r: any) => ({
+    groupId: r.group_id,
+    mutualInterest: r.admin_liked_back,
+    canRequestToJoin: r.admin_liked_back,
+  }));
+}
+
+export async function getGroupLikers(groupId: string): Promise<any[]> {
+  const { data, error } = await supabase
+    .from('group_likes')
+    .select(`
+      id, user_id, admin_liked_back, created_at,
+      profile:profiles(full_name, age, bio, avatar_url, zodiac_sign, gender, verified, occupation)
+    `)
+    .eq('group_id', groupId)
+    .eq('dismissed', false)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map((r: any) => ({
+    likeId: r.id,
+    userId: r.user_id,
+    name: r.profile?.full_name ?? 'Unknown',
+    age: r.profile?.age ?? 0,
+    bio: r.profile?.bio ?? '',
+    avatarUrl: r.profile?.avatar_url ?? null,
+    zodiacSign: r.profile?.zodiac_sign ?? '',
+    gender: r.profile?.gender ?? '',
+    verified: r.profile?.verified ?? false,
+    occupation: r.profile?.occupation ?? '',
+    likedAt: r.created_at,
+    adminLikedBack: r.admin_liked_back,
+  }));
+}
+
+export async function adminLikeBack(groupId: string, userId: string): Promise<void> {
+  const { error } = await supabase
+    .from('group_likes')
+    .update({ admin_liked_back: true, liked_back_at: new Date().toISOString() })
+    .eq('group_id', groupId)
+    .eq('user_id', userId);
+  if (error) throw error;
+}
+
+export async function dismissGroupLiker(groupId: string, userId: string): Promise<void> {
+  const { error } = await supabase
+    .from('group_likes')
+    .update({ dismissed: true })
+    .eq('group_id', groupId)
+    .eq('user_id', userId);
+  if (error) throw error;
+}
+
+export async function getGroupLikeCount(groupId: string): Promise<number> {
+  const { count } = await supabase
+    .from('group_likes')
+    .select('id', { count: 'exact', head: true })
+    .eq('group_id', groupId)
+    .eq('admin_liked_back', false)
+    .eq('dismissed', false);
+  return count ?? 0;
+}
+
+export async function checkMutualInterest(groupId: string): Promise<boolean> {
+  const user = (await supabase.auth.getUser()).data.user;
+  if (!user) return false;
+  const { data } = await supabase
+    .from('group_likes')
+    .select('admin_liked_back')
+    .eq('group_id', groupId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  return data?.admin_liked_back ?? false;
+}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, Dimensions, ActivityIndicator, TextInput, ScrollView, Alert, Modal, Image } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Dimensions, ActivityIndicator, TextInput, ScrollView, Alert, Modal, Image, Platform } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, runOnJS } from 'react-native-reanimated';
 import { Feather } from '../../components/VectorIcons';
@@ -57,6 +57,9 @@ export const GroupsScreen = () => {
   const [showCityPicker, setShowCityPicker] = useState(false);
   const [showAISheet, setShowAISheet] = useState(false);
   const [profileCache, setProfileCache] = useState<RoommateProfile[]>([]);
+  const [likedGroupIds, setLikedGroupIds] = useState<Set<string>>(new Set());
+  const [mutualGroupIds, setMutualGroupIds] = useState<Set<string>>(new Set());
+  const [groupLikeCounts, setGroupLikeCounts] = useState<Map<string, number>>(new Map());
   const [inquiryGroups, setInquiryGroups] = useState<any[]>([]);
   const [showPastInquiries, setShowPastInquiries] = useState(false);
   const [pendingInvites, setPendingInvites] = useState<any[]>([]);
@@ -83,6 +86,7 @@ export const GroupsScreen = () => {
   useFocusEffect(
     React.useCallback(() => {
       loadGroups();
+      loadLikedGroupState();
       if (user) {
         getMyPendingInvites()
           .then(setPendingInvites)
@@ -95,6 +99,30 @@ export const GroupsScreen = () => {
       }
     }, [user, activeCity])
   );
+
+  const loadLikedGroupState = async () => {
+    if (!user) return;
+    try {
+      const userLikes = await StorageService.getGroupLikesForUser(user.id);
+      setLikedGroupIds(new Set(userLikes.map((l: any) => l.group_id)));
+      setMutualGroupIds(new Set(
+        userLikes.filter((l: any) => l.admin_liked_back).map((l: any) => l.group_id)
+      ));
+    } catch {
+      // ignore
+    }
+  };
+
+  const loadGroupLikeCounts = async (groups: Group[]) => {
+    if (!user) return;
+    const adminGroups = groups.filter(g => g.createdBy === user.id);
+    const counts = new Map<string, number>();
+    for (const g of adminGroups) {
+      const count = await StorageService.getGroupLikeCount(g.id);
+      if (count > 0) counts.set(g.id, count);
+    }
+    setGroupLikeCounts(counts);
+  };
 
   const loadGroups = async () => {
     if (!user) return;
@@ -165,6 +193,7 @@ export const GroupsScreen = () => {
       setMyGroups(userGroups);
       setAllGroups(otherGroups);
       setCurrentIndex(0);
+      loadGroupLikeCounts(userGroups);
     } catch (error) {
       console.error('Error loading groups:', error);
     } finally {
@@ -300,58 +329,46 @@ export const GroupsScreen = () => {
   const handleLikeGroup = async (group: Group) => {
     if (!user) return;
 
-    const isPremium = user.subscription?.plan === 'plus' || user.subscription?.plan === 'elite';
-
-    if (!isPremium) {
-      try {
-        const allExistingGroups = await StorageService.getGroups();
-        const joinedGroups = allExistingGroups.filter(
-          g => g.members.includes(user.id) && g.createdBy !== user.id
-        );
-        
-        console.log('[GroupsScreen] User joined groups:', joinedGroups.length);
-        
-        if (joinedGroups.length >= 1) {
-          console.log('[GroupsScreen] Group join limit reached, showing alert');
-          Alert.alert(
-            'Upgrade Required',
-            'You can only join 1 group with the basic plan. Upgrade to Plus or Elite for unlimited group joining!',
-            [
-              { text: 'Maybe Later', style: 'cancel' },
-              {
-                text: 'View Plans',
-                onPress: () => navigation.navigate('Profile', { screen: 'Payment' }),
-              },
-            ]
-          );
-          return;
-        }
-      } catch (error) {
-        console.error('[GroupsScreen] Error checking join limits:', error);
-        Alert.alert('Error', 'Failed to check join limits');
-        return;
-      }
-    }
+    const alreadyLiked = likedGroupIds.has(group.id);
+    if (alreadyLiked) return;
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    
+
     try {
-      await joinGroupSupabase(group.id);
-    } catch (supabaseError) {
-      console.warn('[GroupsScreen] Supabase joinGroup failed, falling back to StorageService:', supabaseError);
-      await StorageService.likeGroup(group.id, user.id);
+      const { likeGroup: likeGroupSupabase } = await import('../../services/groupService');
+      await likeGroupSupabase(group.id);
+    } catch {
+      await StorageService.addGroupLike(group.id, user.id);
     }
-    
-    // Delay showing notification until card animation completes
+
+    setLikedGroupIds(prev => new Set([...prev, group.id]));
+
     setTimeout(() => {
       setLikedGroupName(group.name);
       setShowLikedNotification(true);
-      
-      // Hide notification after 0.8 seconds
-      setTimeout(() => {
-        setShowLikedNotification(false);
-      }, 800);
+      setTimeout(() => { setShowLikedNotification(false); }, 800);
     }, 300);
+  };
+
+  const handleRequestToJoin = async (group: Group) => {
+    if (!user) return;
+    const isMutual = mutualGroupIds.has(group.id);
+    if (!isMutual) {
+      const msg = 'Like this group first. If the admin likes you back, you can request to join.';
+      if (Platform.OS === 'web') { window.alert(msg); }
+      else { Alert.alert('Not Yet', msg); }
+      return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      const { requestToJoinGroup } = await import('../../services/groupService');
+      await requestToJoinGroup(group.id);
+    } catch {
+      await StorageService.likeGroup(group.id, user.id);
+    }
+    const msg = 'Join request sent! The admin will review it.';
+    if (Platform.OS === 'web') { window.alert(msg); }
+    else { Alert.alert('Request Sent', msg); }
   };
 
   const handleSwipeAction = async (action: 'like' | 'skip') => {
@@ -397,11 +414,12 @@ export const GroupsScreen = () => {
     try {
       if (action === 'like') {
         try {
-          await leaveGroupSupabase(groupId);
-        } catch (supabaseError) {
-          console.warn('[GroupsScreen] Supabase leaveGroup (undo) failed, falling back:', supabaseError);
-          await StorageService.unlikeGroup(groupId, user!.id);
+          const { unlikeGroupLike } = await import('../../services/groupService');
+          await unlikeGroupLike(groupId);
+        } catch {
+          await StorageService.removeGroupLike(groupId, user!.id);
         }
+        setLikedGroupIds(prev => { const s = new Set(prev); s.delete(groupId); return s; });
       }
     } catch (error) {
       console.error('[GroupsScreen] Error undoing swipe:', error);
@@ -962,6 +980,20 @@ export const GroupsScreen = () => {
                 <Text style={{ fontSize: 10, fontWeight: '800', color: '#fff' }}>{pendingCount}</Text>
               </View>
             ) : null}
+            {isCreator && (groupLikeCounts.get(group.id) ?? 0) > 0 ? (
+              <Pressable
+                style={styles.likeBadge}
+                onPress={(e) => {
+                  e.stopPropagation?.();
+                  navigation.navigate('InterestedUsers', { groupId: group.id, groupName: group.name });
+                }}
+              >
+                <Feather name="heart" size={11} color="#fff" />
+                <Text style={styles.likeBadgeText}>
+                  {(groupLikeCounts.get(group.id) ?? 0) > 9 ? '9+' : groupLikeCounts.get(group.id)}
+                </Text>
+              </Pressable>
+            ) : null}
           </View>
 
           {group.description ? (
@@ -1355,7 +1387,7 @@ export const GroupsScreen = () => {
               style={[styles.dkActBtn, styles.dkActXl, styles.dkActJoin]}
               onPress={() => handleSwipeAction('like')}
             >
-              <Feather name="heart" size={30} color="#2ecc71" />
+              <Feather name="heart" size={30} color={likedGroupIds.has(currentGroup?.id ?? '') ? '#22C55E' : '#2ecc71'} />
             </Pressable>
           </View>
 
@@ -1364,10 +1396,17 @@ export const GroupsScreen = () => {
               <Feather name="arrow-left" size={12} color="rgba(255,255,255,0.2)" />
               <Text style={styles.dkHintText}>Skip</Text>
             </View>
-            <View style={styles.swipeHintItem}>
-              <Text style={styles.dkHintText}>Request to Join</Text>
-              <Feather name="arrow-right" size={12} color="rgba(255,255,255,0.2)" />
-            </View>
+            {mutualGroupIds.has(currentGroup?.id ?? '') ? (
+              <Pressable style={styles.swipeHintItem} onPress={() => currentGroup && handleRequestToJoin(currentGroup)}>
+                <Text style={[styles.dkHintText, { color: '#ff6b5b', fontWeight: '700' }]}>Request to Join</Text>
+                <Feather name="arrow-right" size={12} color="#ff6b5b" />
+              </Pressable>
+            ) : (
+              <View style={styles.swipeHintItem}>
+                <Text style={styles.dkHintText}>Like</Text>
+                <Feather name="arrow-right" size={12} color="rgba(255,255,255,0.2)" />
+              </View>
+            )}
           </View>
         </View>
       );
@@ -1646,10 +1685,10 @@ export const GroupsScreen = () => {
         <View style={[styles.matchOverlay, { backgroundColor: theme.primary }]}>
           <Feather name="heart" size={64} color="#FFFFFF" />
           <ThemedText style={[Typography.hero, { color: '#FFFFFF', fontSize: 36, marginTop: Spacing.lg }]}>
-            Request Sent!
+            Interest Sent!
           </ThemedText>
           <ThemedText style={[Typography.body, { color: '#FFFFFF', marginTop: Spacing.md, textAlign: 'center' }]}>
-            Waiting for {likedGroupName} to accept you
+            {likedGroupName} admin will be notified
           </ThemedText>
         </View>
       ) : null}
@@ -3003,6 +3042,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 5,
     marginLeft: 8,
+  },
+  likeBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ff6b5b',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    gap: 3,
+  },
+  likeBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#fff',
   },
   chipRow: {
     flexDirection: 'row',

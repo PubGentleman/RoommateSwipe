@@ -19,6 +19,7 @@ const STORAGE_KEYS = {
   MOCK_DATA_VERSION: '@roomdr/mock_data_version',
   ONBOARDING_COMPLETED: '@roomdr/onboarding_completed',
   INTEREST_CARDS: '@roomdr/interestCards',
+  GROUP_LIKES: '@roomdr/group_likes',
   HOST_SUBSCRIPTIONS: '@roomdr/host_subscriptions',
   GROUP_INVITES: '@roomdr/group_invites',
 };
@@ -359,6 +360,96 @@ export const StorageService = {
     } catch (error) {
       console.error('Error unliking group:', error);
     }
+  },
+
+  async getGroupLikes(): Promise<any[]> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.GROUP_LIKES);
+      return data ? JSON.parse(data) : [];
+    } catch { return []; }
+  },
+
+  async setGroupLikes(likes: any[]): Promise<void> {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.GROUP_LIKES, JSON.stringify(likes));
+    } catch (error) {
+      console.error('Error saving group likes:', error);
+    }
+  },
+
+  async addGroupLike(groupId: string, userId: string): Promise<void> {
+    const likes = await this.getGroupLikes();
+    const existing = likes.find((l: any) => l.group_id === groupId && l.user_id === userId);
+    if (!existing) {
+      likes.push({
+        id: `gl-${Date.now()}`,
+        group_id: groupId,
+        user_id: userId,
+        admin_liked_back: false,
+        dismissed: false,
+        created_at: new Date().toISOString(),
+      });
+      await this.setGroupLikes(likes);
+    }
+  },
+
+  async removeGroupLike(groupId: string, userId: string): Promise<void> {
+    const likes = await this.getGroupLikes();
+    await this.setGroupLikes(likes.filter((l: any) => !(l.group_id === groupId && l.user_id === userId)));
+  },
+
+  async getGroupLikesForUser(userId: string): Promise<any[]> {
+    const likes = await this.getGroupLikes();
+    return likes.filter((l: any) => l.user_id === userId && !l.dismissed);
+  },
+
+  async getGroupLikersForGroup(groupId: string): Promise<any[]> {
+    const likes = await this.getGroupLikes();
+    const groupLikes = likes.filter((l: any) => l.group_id === groupId && !l.dismissed);
+    const profiles = await this.getRoommateProfiles();
+    const users = await this.getUsers();
+    return groupLikes.map((l: any) => {
+      const profile = profiles.find(p => p.id === l.user_id);
+      const u = users.find(u => u.id === l.user_id);
+      return {
+        likeId: l.id,
+        userId: l.user_id,
+        name: profile?.name || u?.fullName || 'Unknown',
+        age: profile?.age || 0,
+        bio: profile?.bio || '',
+        avatarUrl: profile?.photos?.[0] || u?.profilePicture || null,
+        zodiacSign: profile?.zodiacSign || '',
+        gender: profile?.gender || '',
+        verified: !!(profile?.verification && Object.values(profile.verification).some(Boolean)),
+        occupation: profile?.occupation || '',
+        likedAt: l.created_at,
+        adminLikedBack: l.admin_liked_back,
+      };
+    });
+  },
+
+  async adminLikeBackLocal(groupId: string, userId: string): Promise<void> {
+    const likes = await this.getGroupLikes();
+    const like = likes.find((l: any) => l.group_id === groupId && l.user_id === userId);
+    if (like) {
+      like.admin_liked_back = true;
+      like.liked_back_at = new Date().toISOString();
+      await this.setGroupLikes(likes);
+    }
+  },
+
+  async dismissGroupLikerLocal(groupId: string, userId: string): Promise<void> {
+    const likes = await this.getGroupLikes();
+    const like = likes.find((l: any) => l.group_id === groupId && l.user_id === userId);
+    if (like) {
+      like.dismissed = true;
+      await this.setGroupLikes(likes);
+    }
+  },
+
+  async getGroupLikeCount(groupId: string): Promise<number> {
+    const likes = await this.getGroupLikes();
+    return likes.filter((l: any) => l.group_id === groupId && !l.admin_liked_back && !l.dismissed).length;
   },
 
   async acceptGroupMember(groupId: string, userId: string): Promise<boolean> {
