@@ -15,7 +15,7 @@ import { RoomdrAISheet, ScreenContext } from '../../components/RoomdrAISheet';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { getMessages as getSupabaseMessages, sendMessage as sendSupabaseMessage, markMessagesAsRead as markSupabaseMessagesAsRead, subscribeToMessages } from '../../services/messageService';
 import { recordMessageActivity } from '../../utils/aiMemory';
-import { acceptInquiry, declineInquiry, linkListingToGroup, leaveGroup, removeMember } from '../../services/groupService';
+import { acceptInquiry, declineInquiry, linkListingToGroup, leaveGroup, removeMember, getGroupMessages, sendGroupMessage, subscribeToGroupMessages } from '../../services/groupService';
 import { supabase } from '../../lib/supabase';
 import { GroupPropertySearchModal } from '../../components/GroupPropertySearchModal';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence } from 'react-native-reanimated';
@@ -59,6 +59,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [linkedListing, setLinkedListing] = useState<any>(null);
   const [showPropertySearch, setShowPropertySearch] = useState(false);
   const [myGroupRole, setMyGroupRole] = useState<'admin' | 'member' | null>(null);
+  const [groupName, setGroupName] = useState<string>('Group Chat');
 
   const [inquiryStatus, setInquiryStatus] = useState<'pending' | 'accepted' | 'declined'>(
     inquiryGroup?.inquiryStatus || inquiryGroup?.inquiry_status || 'pending'
@@ -168,8 +169,15 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     const isGroupChat = conversationId.startsWith('group-');
     if (isGroupChat && !isInquiryChat) {
       reloadGroupListing();
+      const groupId = conversationId.replace('group-', '');
+      supabase.from('groups').select('name').eq('id', groupId).maybeSingle()
+        .then(({ data }) => { if (data?.name) setGroupName(data.name); })
+        .catch(async () => {
+          const groups = await StorageService.getGroups();
+          const g = groups.find((gr: any) => gr.id === groupId);
+          if (g?.name) setGroupName(g.name);
+        });
       if (user?.id) {
-        const groupId = conversationId.replace('group-', '');
         supabase.from('group_members').select('role').eq('group_id', groupId).eq('user_id', user.id).maybeSingle()
           .then(({ data }) => { if (data?.role) setMyGroupRole(data.role as 'admin' | 'member'); });
       }
@@ -195,7 +203,28 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   };
 
   useEffect(() => {
-    if (!matchIdFromConversation) return;
+    if (!conversationId.startsWith('group-')) return;
+    const groupId = conversationId.replace('group-', '');
+    const subscription = subscribeToGroupMessages(groupId, (newMsg: any) => {
+      if (newMsg.senderId !== user?.id) {
+        const mapped: Message = {
+          id: newMsg.id,
+          senderId: newMsg.senderId,
+          senderName: newMsg.senderName,
+          text: newMsg.content,
+          content: newMsg.content,
+          timestamp: new Date(newMsg.createdAt),
+          read: true,
+        } as any;
+        setMessages(prev => [...prev, mapped]);
+        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+      }
+    });
+    return () => { subscription.unsubscribe(); };
+  }, [conversationId, user?.id]);
+
+  useEffect(() => {
+    if (!matchIdFromConversation || conversationId.startsWith('group-')) return;
     const unsubscribe = subscribeToMessages(matchIdFromConversation, (newMsg: any) => {
       if (newMsg.sender_id !== user?.id || newMsg.sender_id === null || newMsg.is_system_message) {
         const mapped: Message = {
@@ -219,20 +248,39 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     let supabaseMessages: Message[] = [];
     let loadedFromSupabase = false;
 
+    const isGroupChatLoad = conversationId.startsWith('group-');
+
     try {
-      const supaMessages = await getSupabaseMessages(matchIdFromConversation);
-      if (supaMessages && supaMessages.length > 0) {
-        supabaseMessages = supaMessages.map((msg: any) => ({
-          id: msg.id,
-          senderId: msg.is_system_message ? 'system' : msg.sender_id,
-          text: msg.content,
-          content: msg.content,
-          timestamp: new Date(msg.created_at),
-          read: msg.read || false,
-          readAt: msg.read_at ? new Date(msg.read_at) : undefined,
-        }));
-        loadedFromSupabase = true;
-        try { markSupabaseMessagesAsRead(matchIdFromConversation); } catch (_e) {}
+      if (isGroupChatLoad) {
+        const groupId = conversationId.replace('group-', '');
+        const groupMsgs = await getGroupMessages(groupId);
+        if (groupMsgs && groupMsgs.length > 0) {
+          supabaseMessages = groupMsgs.map((msg: any) => ({
+            id: msg.id,
+            senderId: msg.senderId,
+            senderName: msg.senderName,
+            text: msg.content,
+            content: msg.content,
+            timestamp: new Date(msg.createdAt),
+            read: true,
+          }));
+          loadedFromSupabase = true;
+        }
+      } else {
+        const supaMessages = await getSupabaseMessages(matchIdFromConversation);
+        if (supaMessages && supaMessages.length > 0) {
+          supabaseMessages = supaMessages.map((msg: any) => ({
+            id: msg.id,
+            senderId: msg.is_system_message ? 'system' : msg.sender_id,
+            text: msg.content,
+            content: msg.content,
+            timestamp: new Date(msg.created_at),
+            read: msg.read || false,
+            readAt: msg.read_at ? new Date(msg.read_at) : undefined,
+          }));
+          loadedFromSupabase = true;
+          try { markSupabaseMessagesAsRead(matchIdFromConversation); } catch (_e) {}
+        }
       }
     } catch (supaError) {
       console.warn('Supabase getMessages failed, falling back to StorageService:', supaError);
@@ -363,7 +411,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
               photo: otherUser.photos?.[0] || otherUser.profilePicture || '',
               online: false,
             }
-          : { id: '', name: 'Unknown', photo: '', online: false },
+          : { id: '', name: conversationId.startsWith('group-') ? groupName : 'Unknown', photo: '', online: false },
         participants: otherUser ? [user.id, otherUser.id] : [user.id],
         messages: [],
         lastMessage: '',
@@ -398,18 +446,34 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
 
     let newMessage: Message;
     let sentViaSupabase = false;
+    const isGroupSend = conversationId.startsWith('group-');
 
     try {
-      const supaMsg = await sendSupabaseMessage(matchIdFromConversation, inputText.trim());
-      newMessage = {
-        id: supaMsg.id,
-        senderId: supaMsg.sender_id,
-        text: supaMsg.content,
-        content: supaMsg.content,
-        timestamp: new Date(supaMsg.created_at),
-        read: false,
-      };
-      sentViaSupabase = true;
+      if (isGroupSend) {
+        const groupId = conversationId.replace('group-', '');
+        await sendGroupMessage(groupId, inputText.trim());
+        newMessage = {
+          id: `msg_${Date.now()}`,
+          senderId: user.id,
+          senderName: user.name || user.email || 'You',
+          text: inputText.trim(),
+          content: inputText.trim(),
+          timestamp: new Date(),
+          read: true,
+        } as any;
+        sentViaSupabase = true;
+      } else {
+        const supaMsg = await sendSupabaseMessage(matchIdFromConversation, inputText.trim());
+        newMessage = {
+          id: supaMsg.id,
+          senderId: supaMsg.sender_id,
+          text: supaMsg.content,
+          content: supaMsg.content,
+          timestamp: new Date(supaMsg.created_at),
+          read: false,
+        };
+        sentViaSupabase = true;
+      }
     } catch (supaError) {
       console.warn('Supabase sendMessage failed, falling back to StorageService:', supaError);
       newMessage = {
@@ -554,7 +618,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     );
   };
 
-  if (!otherUser && !isInquiryChat) {
+  const isGroupChat = conversationId.startsWith('group-');
+  if (!otherUser && !isInquiryChat && !isGroupChat) {
     return (
       <View style={[styles.container, { backgroundColor: theme.backgroundRoot, justifyContent: 'center', alignItems: 'center' }]}>
         <ThemedText>Loading...</ThemedText>
@@ -706,25 +771,39 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             <Feather name="arrow-left" size={24} color={theme.text} />
           </Pressable>
           <View style={styles.headerCenter}>
-            <View style={styles.avatarWrapper}>
-              <Image source={{ uri: otherUser.photos?.[0] }} style={styles.headerAvatar} />
-              {canSeeOnlineStatus() && isOnline ? (
-                <View style={[styles.headerOnlineIndicator, { backgroundColor: theme.success }]} />
-              ) : null}
-            </View>
-            <View style={{ flex: 1, marginLeft: Spacing.md }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <ThemedText style={[Typography.h3]}>
-                  {otherUser.name}
-                </ThemedText>
-                <PlanBadge plan={otherUserPlan} size={15} />
-              </View>
-              {canSeeOnlineStatus() ? (
-                <ThemedText style={[Typography.caption, { color: isOnline ? theme.success : theme.textSecondary }]}>
-                  {isOnline ? 'Online' : 'Offline'}
-                </ThemedText>
-              ) : null}
-            </View>
+            {otherUser ? (
+              <>
+                <View style={styles.avatarWrapper}>
+                  <Image source={{ uri: otherUser.photos?.[0] }} style={styles.headerAvatar} />
+                  {canSeeOnlineStatus() && isOnline ? (
+                    <View style={[styles.headerOnlineIndicator, { backgroundColor: theme.success }]} />
+                  ) : null}
+                </View>
+                <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <ThemedText style={[Typography.h3]}>
+                      {otherUser.name}
+                    </ThemedText>
+                    <PlanBadge plan={otherUserPlan} size={15} />
+                  </View>
+                  {canSeeOnlineStatus() ? (
+                    <ThemedText style={[Typography.caption, { color: isOnline ? theme.success : theme.textSecondary }]}>
+                      {isOnline ? 'Online' : 'Offline'}
+                    </ThemedText>
+                  ) : null}
+                </View>
+              </>
+            ) : (
+              <>
+                <View style={[styles.headerAvatar, { backgroundColor: theme.primary + '20', alignItems: 'center', justifyContent: 'center' }]}>
+                  <Feather name="users" size={18} color={theme.primary} />
+                </View>
+                <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                  <ThemedText style={[Typography.h3]}>{groupName}</ThemedText>
+                  <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Group Chat</ThemedText>
+                </View>
+              </>
+            )}
           </View>
           <Pressable onPress={() => setShowAISheet(true)} style={styles.aiNavBtn}>
             <View style={styles.aiNavBtnInner}>
@@ -737,7 +816,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
                 const groupId = conversationId.replace('group-', '');
                 navigation.navigate('GroupInvite', {
                   groupId,
-                  groupName: otherUser?.name || 'Group',
+                  groupName: otherUser?.name || groupName,
                   listingId: linkedListing?.id || null,
                 });
               }}
@@ -807,7 +886,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
                         if (err.message === 'PROMOTE_REQUIRED') {
                           navigation.navigate('PromoteAdmin' as any, {
                             groupId,
-                            groupName: otherUser?.name || 'Group',
+                            groupName: otherUser?.name || groupName,
                           });
                         } else {
                           Alert.alert('Error', err.message);
