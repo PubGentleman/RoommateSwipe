@@ -280,8 +280,12 @@ export function GroupInfoScreen({ route, navigation }: Props) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: theme.background, paddingTop: insets.top }]}>
         <View style={[styles.headerBar, { borderBottomColor: theme.border }]}>
-          <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={styles.backBtn}>
-            <Feather name="arrow-left" size={22} color={theme.text} />
+          <Pressable
+            onPress={() => navigation.goBack()}
+            hitSlop={12}
+            style={[styles.backBtn, { backgroundColor: theme.card || theme.backgroundDefault, borderWidth: 1, borderColor: theme.border, borderRadius: 20 }]}
+          >
+            <Feather name="arrow-left" size={20} color={theme.text} />
           </Pressable>
           <ThemedText style={[Typography.h3, { flex: 1, textAlign: 'center' }]}>Group Info</ThemedText>
           <View style={{ width: 36 }} />
@@ -296,11 +300,15 @@ export function GroupInfoScreen({ route, navigation }: Props) {
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
       <View style={[styles.headerBar, { borderBottomColor: theme.border, paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={styles.backBtn}>
-          <Feather name="arrow-left" size={22} color={theme.text} />
+        <Pressable
+          onPress={() => navigation.goBack()}
+          hitSlop={12}
+          style={[styles.backBtn, { backgroundColor: theme.card || theme.backgroundDefault, borderWidth: 1, borderColor: theme.border, borderRadius: 20 }]}
+        >
+          <Feather name="arrow-left" size={20} color={theme.text} />
         </Pressable>
         <ThemedText style={[Typography.h3, { flex: 1, textAlign: 'center' }]}>Group Info</ThemedText>
-        <View style={{ width: 36 }} />
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
@@ -547,8 +555,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   backBtn: {
-    width: 36,
-    height: 36,
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
   },
