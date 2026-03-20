@@ -14,7 +14,7 @@ import { ProfileCompletionCard } from '../../components/ProfileCompletionCard';
 import { getVerificationLevel } from '../../components/VerificationBadge';
 import { StorageService } from '../../utils/storage';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
-import { getBoostTimeRemaining, getBoostDuration, isBoostExpired } from '../../utils/boostUtils';
+import { getBoostTimeRemaining, getBoostDuration, isBoostExpired, RENTER_BOOST_OPTIONS, RenterBoostOptionId } from '../../utils/boostUtils';
 import { isDev } from '../../utils/envUtils';
 import { isHostTypeEditable, daysRemainingInGracePeriod, getHostBadgeLabel, getHostBadgeColor, getHostBadgeIcon } from '../../utils/hostTypeUtils';
 import * as Linking from 'expo-linking';
@@ -28,6 +28,7 @@ export const ProfileScreen = () => {
   const insets = useSafeAreaInsets();
   const [showPurchaseBoostModal, setShowPurchaseBoostModal] = useState(false);
   const [processingBoost, setProcessingBoost] = useState(false);
+  const [selectedBoostTierId, setSelectedBoostTierId] = useState<RenterBoostOptionId>('standard');
   const [pendingInterestCount, setPendingInterestCount] = useState(0);
   const [showAISheet, setShowAISheet] = useState(false);
   const [aiSheetContext, setAiSheetContext] = useState<'profile' | 'profile_reminder'>('profile');
@@ -137,7 +138,12 @@ export const ProfileScreen = () => {
 
   const handleBoostConfirm = async (paid?: boolean) => {
     setProcessingBoost(true);
-    const result = paid ? await purchaseBoost() : await activateBoost();
+    const selectedOption = RENTER_BOOST_OPTIONS.find(o => o.id === selectedBoostTierId)!;
+    const plan = user?.subscription?.plan || 'basic';
+    const freeDuration = plan === 'elite' ? 24 : plan === 'plus' ? 12 : 6;
+    const result = paid
+      ? await purchaseBoost(selectedOption.price, selectedOption.durationHours)
+      : await activateBoost(freeDuration);
     setProcessingBoost(false);
     if (result.success) {
       setShowPurchaseBoostModal(false);
@@ -652,6 +658,7 @@ export const ProfileScreen = () => {
               }
 
               if (plan === 'basic') {
+                const selOpt = RENTER_BOOST_OPTIONS.find(o => o.id === selectedBoostTierId)!;
                 return (
                   <>
                     <View style={styles.boostSheetHeader}>
@@ -659,11 +666,35 @@ export const ProfileScreen = () => {
                         <Feather name="zap" size={28} color="#ff6b5b" />
                       </View>
                       <Text style={styles.boostSheetTitle}>Boost Your Profile</Text>
-                      <Text style={styles.boostSheetDesc}>Your profile appears near the top of swipe decks for {duration} hours</Text>
+                      <Text style={styles.boostSheetDesc}>Your profile appears near the top of swipe decks</Text>
                     </View>
-                    <View style={styles.boostSheetPriceRow}>
-                      <Text style={styles.boostSheetPrice}>$4.99</Text>
-                      <Text style={styles.boostSheetPriceSub}>{duration} hours of priority placement</Text>
+                    <View style={{ marginBottom: 16 }}>
+                      {RENTER_BOOST_OPTIONS.map(option => (
+                        <Pressable
+                          key={option.id}
+                          onPress={() => setSelectedBoostTierId(option.id)}
+                          style={[
+                            styles.boostTierRow,
+                            selectedBoostTierId === option.id && styles.boostTierRowSelected,
+                          ]}
+                        >
+                          <View style={{ flex: 1 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                              <Text style={styles.boostTierLabel}>{option.label}</Text>
+                              {option.badge ? (
+                                <View style={[
+                                  styles.boostTierBadge,
+                                  { backgroundColor: option.highlight ? '#FF6B6B' : '#22C55E' }
+                                ]}>
+                                  <Text style={styles.boostTierBadgeText}>{option.badge}</Text>
+                                </View>
+                              ) : null}
+                            </View>
+                            <Text style={styles.boostTierSub}>Priority placement for {option.label.toLowerCase()}</Text>
+                          </View>
+                          <Text style={styles.boostTierPrice}>${option.price.toFixed(2)}</Text>
+                        </Pressable>
+                      ))}
                     </View>
                     <Pressable
                       style={[styles.boostSheetCta, { opacity: processingBoost ? 0.7 : 1 }]}
@@ -671,7 +702,7 @@ export const ProfileScreen = () => {
                       disabled={processingBoost}
                     >
                       <LinearGradient colors={['#ff6b5b', '#e83a2a']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.boostSheetCtaGrad}>
-                        <Text style={styles.boostSheetCtaText}>{processingBoost ? 'Processing...' : 'Boost for $4.99'}</Text>
+                        <Text style={styles.boostSheetCtaText}>{processingBoost ? 'Processing...' : `Boost for $${selOpt.price.toFixed(2)}`}</Text>
                       </LinearGradient>
                     </Pressable>
                     <Pressable style={styles.boostSheetDismiss} onPress={() => setShowPurchaseBoostModal(false)}>
@@ -683,6 +714,7 @@ export const ProfileScreen = () => {
 
               if (plan === 'plus') {
                 const hasFree = boostCheck.hasFreeBoost;
+                const selOpt = RENTER_BOOST_OPTIONS.find(o => o.id === selectedBoostTierId)!;
                 return (
                   <>
                     <View style={styles.boostSheetHeader}>
@@ -705,19 +737,46 @@ export const ProfileScreen = () => {
                         disabled={processingBoost}
                       >
                         <LinearGradient colors={['#3ECF8E', '#2bb878']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.boostSheetCtaGrad}>
-                          <Text style={styles.boostSheetCtaText}>{processingBoost ? 'Activating...' : 'Activate Free Boost'}</Text>
+                          <Text style={styles.boostSheetCtaText}>{processingBoost ? 'Activating...' : `Activate Free Boost (${duration}h)`}</Text>
                         </LinearGradient>
                       </Pressable>
                     ) : (
-                      <Pressable
-                        style={[styles.boostSheetCta, { opacity: processingBoost ? 0.7 : 1 }]}
-                        onPress={() => handleBoostConfirm(true)}
-                        disabled={processingBoost}
-                      >
-                        <LinearGradient colors={['#ff6b5b', '#e83a2a']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.boostSheetCtaGrad}>
-                          <Text style={styles.boostSheetCtaText}>{processingBoost ? 'Processing...' : 'Boost now for $4.99 (12 hours)'}</Text>
-                        </LinearGradient>
-                      </Pressable>
+                      <>
+                        <View style={{ marginBottom: 16 }}>
+                          {RENTER_BOOST_OPTIONS.map(option => (
+                            <Pressable
+                              key={option.id}
+                              onPress={() => setSelectedBoostTierId(option.id)}
+                              style={[
+                                styles.boostTierRow,
+                                selectedBoostTierId === option.id && styles.boostTierRowSelected,
+                              ]}
+                            >
+                              <View style={{ flex: 1 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                  <Text style={styles.boostTierLabel}>{option.label}</Text>
+                                  {option.badge ? (
+                                    <View style={[styles.boostTierBadge, { backgroundColor: option.highlight ? '#FF6B6B' : '#22C55E' }]}>
+                                      <Text style={styles.boostTierBadgeText}>{option.badge}</Text>
+                                    </View>
+                                  ) : null}
+                                </View>
+                                <Text style={styles.boostTierSub}>Priority placement for {option.label.toLowerCase()}</Text>
+                              </View>
+                              <Text style={styles.boostTierPrice}>${option.price.toFixed(2)}</Text>
+                            </Pressable>
+                          ))}
+                        </View>
+                        <Pressable
+                          style={[styles.boostSheetCta, { opacity: processingBoost ? 0.7 : 1 }]}
+                          onPress={() => handleBoostConfirm(true)}
+                          disabled={processingBoost}
+                        >
+                          <LinearGradient colors={['#ff6b5b', '#e83a2a']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.boostSheetCtaGrad}>
+                            <Text style={styles.boostSheetCtaText}>{processingBoost ? 'Processing...' : `Boost for $${selOpt.price.toFixed(2)}`}</Text>
+                          </LinearGradient>
+                        </Pressable>
+                      </>
                     )}
                     <Pressable style={styles.boostSheetDismiss} onPress={() => setShowPurchaseBoostModal(false)}>
                       <Text style={styles.boostSheetDismissText}>Cancel</Text>
@@ -1350,6 +1409,45 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: 'rgba(255,255,255,0.4)',
+  },
+  boostTierRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 8,
+    borderWidth: 1.5,
+    borderColor: '#2a2a2a',
+  },
+  boostTierRowSelected: {
+    borderColor: '#ff6b5b',
+    backgroundColor: 'rgba(255,107,91,0.08)',
+  },
+  boostTierLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  boostTierSub: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.45)',
+    marginTop: 3,
+  },
+  boostTierPrice: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#ff6b5b',
+  },
+  boostTierBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  boostTierBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#fff',
   },
   bgCheckCard: {
     backgroundColor: '#1a1a1a',

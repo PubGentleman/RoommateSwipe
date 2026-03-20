@@ -16,6 +16,15 @@ export const STRIPE_PRICES: Record<string, string> = {
   'host_business_annual':  'price_host_business_annual',
 };
 
+export const BOOST_PRICE_IDS = {
+  renter_boost_6h: 'price_REPLACE_WITH_REAL_ID',
+  renter_boost_12h: 'price_REPLACE_WITH_REAL_ID',
+  renter_boost_24h: 'price_REPLACE_WITH_REAL_ID',
+  listing_boost_6h: 'price_REPLACE_WITH_REAL_ID',
+  listing_boost_12h: 'price_REPLACE_WITH_REAL_ID',
+  listing_boost_24h: 'price_REPLACE_WITH_REAL_ID',
+};
+
 export function getPriceId(plan: string, billingCycle: string): string | null {
   const key = `${plan}_${billingCycle}`;
   return STRIPE_PRICES[key] || null;

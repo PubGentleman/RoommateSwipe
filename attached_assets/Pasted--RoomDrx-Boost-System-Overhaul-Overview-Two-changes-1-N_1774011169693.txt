@@ -1,0 +1,567 @@
+# RoomDrx — Boost System Overhaul
+
+## Overview
+
+Two changes:
+1. **New unified boost tiers** — 6h/$2.99 · 12h/$4.99 (most popular) · 24h/$7.99, applied to both renter profile boosts and host listing boosts
+2. **Rotation system** — boosted items shuffle order every 30 minutes so no single boost permanently holds position #1
+
+---
+
+## Part 1 — New Boost Tiers
+
+### 1a. `utils/boostUtils.ts` — Renter Profile Boost
+
+**Replace** the old flat duration/price model with a tiered options array that both the UI and purchase flow reference.
+
+```ts
+// BEFORE:
+export function getBoostDuration(plan: string): 12 | 24 | 48 {
+  if (plan === 'elite') return 48;
+  if (plan === 'plus') return 24;
+  return 12;
+}
+
+// AFTER — Add RENTER_BOOST_OPTIONS and update getBoostDuration:
+
+export const RENTER_BOOST_OPTIONS = [
+  {
+    id: 'quick' as const,
+    durationHours: 6,
+    label: '6 Hours',
+    price: 2.99,
+    highlight: false,
+    badge: null as string | null,
+  },
+  {
+    id: 'standard' as const,
+    durationHours: 12,
+    label: '12 Hours',
+    price: 4.99,
+    highlight: true,
+    badge: 'Most Popular' as string | null,
+  },
+  {
+    id: 'extended' as const,
+    durationHours: 24,
+    label: '24 Hours',
+    price: 7.99,
+    highlight: false,
+    badge: 'Best Value' as string | null,
+  },
+] as const;
+
+export type RenterBoostOptionId = typeof RENTER_BOOST_OPTIONS[number]['id'];
+
+// Free boost durations by plan (unchanged behaviour — plan perk):
+export function getFreeBoostDurationHours(plan: string): number {
+  if (plan === 'elite') return 24;
+  if (plan === 'plus') return 12;
+  return 0; // free/basic must pay
+}
+
+// Keep getBoostDuration for backwards compat but map to new values:
+export function getBoostDuration(plan: string): 6 | 12 | 24 {
+  if (plan === 'elite') return 24;
+  if (plan === 'plus') return 12;
+  return 6;
+}
+```
+
+**Also update** `calculateBoostExpiry` equivalent for renters in `boostService.ts`:
+
+The existing `activateBoost(durationHours: number)` already accepts hours dynamically — no change needed there. Just pass the selected option's `durationHours`.
+
+---
+
+### 1b. `utils/hostPricing.ts` — Host Listing Boost
+
+**Replace** `BOOST_OPTIONS` with the new 3-tier structure and update `calculateBoostExpiry` to support `'6h'`.
+
+```ts
+// BEFORE:
+export const BOOST_OPTIONS = [
+  { id: 'quick', duration: '24h', label: 'Quick Boost', price: 4.99, ... },
+  { id: 'featured', duration: '72h', label: 'Featured Boost', price: 9.99, ... },
+  { id: 'extended', duration: '7d', label: 'Extended Featured', price: 19.99, ... },
+];
+
+// AFTER:
+export const BOOST_OPTIONS = [
+  {
+    id: 'quick' as const,
+    duration: '6h' as const,
+    label: 'Quick Boost',
+    price: 2.99,
+    description: 'Jump to the top of search in your city for 6 hours',
+    includesFeaturedBadge: false,
+    badgeLabel: null as string | null,
+    highlight: false,
+    popularBadge: null as string | null,
+  },
+  {
+    id: 'standard' as const,
+    duration: '12h' as const,
+    label: 'Standard Boost',
+    price: 4.99,
+    description: 'Top placement + Featured badge on your listing for 12 hours',
+    includesFeaturedBadge: true,
+    badgeLabel: 'Featured' as string | null,
+    highlight: true,
+    popularBadge: 'Most Popular' as string | null,
+  },
+  {
+    id: 'extended' as const,
+    duration: '24h' as const,
+    label: 'Extended Boost',
+    price: 7.99,
+    description: 'Top placement + Featured badge sustained for a full day',
+    includesFeaturedBadge: true,
+    badgeLabel: 'Featured' as string | null,
+    highlight: false,
+    popularBadge: 'Best Value' as string | null,
+  },
+];
+
+// Update calculateBoostExpiry to accept '6h' and '12h':
+export function calculateBoostExpiry(duration: '6h' | '12h' | '24h' | '72h' | '7d'): string {
+  const hoursMap: Record<string, number> = {
+    '6h': 6,
+    '12h': 12,
+    '24h': 24,
+    '72h': 72,
+    '7d': 168,
+  };
+  const hours = hoursMap[duration] ?? 24;
+  return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+}
+```
+
+**Update** `HOST_PLANS` free boost durations to match new tiers:
+
+```ts
+// In HOST_PLANS:
+starter: {
+  ...
+  freeBoosts: 1,
+  freeBoostDuration: '12h',   // was '24h'
+  ...
+},
+pro: {
+  ...
+  freeBoosts: 1,
+  freeBoostDuration: '12h',   // unchanged
+  ...
+},
+business: {
+  ...
+  freeBoosts: 2,
+  freeBoostDuration: '24h',   // was '7d' — align with new max tier
+  ...
+},
+```
+
+**Update** the duration type in `ListingBoost` model (`types/models.ts`):
+
+```ts
+// Find the ListingBoost type and update duration union:
+duration: '6h' | '12h' | '24h' | '72h' | '7d';
+```
+
+---
+
+### 1c. `screens/host/ListingBoostScreen.tsx` — Updated UI
+
+The listing boost screen renders options from `BOOST_OPTIONS`, so the new tiers will populate automatically. However update the duration label display which currently has hardcoded strings:
+
+```tsx
+// BEFORE:
+{option.duration === '24h' ? '24 HOURS' : option.duration === '72h' ? '72 HOURS' : '7 DAYS'}
+
+// AFTER — dynamic label:
+{option.duration.toUpperCase().replace('H', ' HRS').replace('D', ' DAYS')}
+```
+
+**Add popular/value badges** to the option card. After the existing `durationChip`, add:
+
+```tsx
+{option.popularBadge && (
+  <View style={[
+    styles.popularBadge,
+    { backgroundColor: option.highlight ? '#FF6B6B' : '#22C55E' }
+  ]}>
+    <Text style={styles.popularBadgeText}>{option.popularBadge}</Text>
+  </View>
+)}
+```
+
+**Add styles:**
+
+```ts
+popularBadge: {
+  alignSelf: 'flex-start',
+  borderRadius: 4,
+  paddingHorizontal: 6,
+  paddingVertical: 2,
+  marginTop: 4,
+},
+popularBadgeText: {
+  fontSize: 10,
+  fontWeight: '700',
+  color: '#fff',
+  letterSpacing: 0.5,
+},
+```
+
+Also update the confirmation text in `applyBoost` which has hardcoded duration strings:
+
+```tsx
+// BEFORE:
+? `Your listing is now featured for ${option.duration === '72h' ? '3 days' : '7 days'} with a Featured badge!`
+: `Your listing has been boosted to the top of search for 24 hours.`;
+
+// AFTER:
+const durationLabel = option.duration === '6h' ? '6 hours'
+  : option.duration === '12h' ? '12 hours'
+  : option.duration === '24h' ? '24 hours'
+  : option.duration === '72h' ? '3 days'
+  : '7 days';
+
+const resultLabel = option.includesFeaturedBadge
+  ? `Your listing is now featured for ${durationLabel} with a Featured badge!`
+  : `Your listing has been boosted to the top of search for ${durationLabel}.`;
+```
+
+---
+
+### 1d. `screens/shared/ProfileScreen.tsx` — Renter Boost Tier Picker
+
+Currently `ProfileScreen` shows a single $4.99 price with the plan-derived duration. Replace with a tier picker modal that matches the new `RENTER_BOOST_OPTIONS`.
+
+**Add state for selected tier:**
+
+```tsx
+import { RENTER_BOOST_OPTIONS, RenterBoostOptionId } from '../../utils/boostUtils';
+
+// Inside component:
+const [selectedBoostTierId, setSelectedBoostTierId] = useState<RenterBoostOptionId>('standard');
+```
+
+**Replace** the static price display in the boost modal with the tier picker:
+
+```tsx
+// BEFORE — single price row:
+<View style={styles.boostSheetPriceRow}>
+  <Text style={styles.boostSheetPrice}>$4.99</Text>
+  <Text style={styles.boostSheetPriceSub}>{duration} hours of priority placement</Text>
+</View>
+
+// AFTER — tier picker:
+<View style={{ marginBottom: 16 }}>
+  {RENTER_BOOST_OPTIONS.map(option => (
+    <Pressable
+      key={option.id}
+      onPress={() => setSelectedBoostTierId(option.id)}
+      style={[
+        styles.boostTierRow,
+        selectedBoostTierId === option.id && styles.boostTierRowSelected,
+      ]}
+    >
+      <View style={{ flex: 1 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Text style={styles.boostTierLabel}>{option.label}</Text>
+          {option.badge && (
+            <View style={[
+              styles.boostTierBadge,
+              { backgroundColor: option.highlight ? '#FF6B6B' : '#22C55E' }
+            ]}>
+              <Text style={styles.boostTierBadgeText}>{option.badge}</Text>
+            </View>
+          )}
+        </View>
+        <Text style={styles.boostTierSub}>Priority placement for {option.label.toLowerCase()}</Text>
+      </View>
+      <Text style={styles.boostTierPrice}>${option.price.toFixed(2)}</Text>
+    </Pressable>
+  ))}
+</View>
+```
+
+**Update** `handleBoostConfirm` to pass the selected duration:
+
+```tsx
+const handleBoostConfirm = async (paid?: boolean) => {
+  setProcessingBoost(true);
+  const selectedOption = RENTER_BOOST_OPTIONS.find(o => o.id === selectedBoostTierId)!;
+  // Pass duration hours — purchaseBoost and activateBoost need to accept durationHours:
+  const result = paid
+    ? await purchaseBoost(selectedOption.price, selectedOption.durationHours)
+    : await activateBoost(selectedOption.durationHours);
+  setProcessingBoost(false);
+  if (result.success) {
+    setShowPurchaseBoostModal(false);
+  } else {
+    Alert.alert('Cannot Boost', result.message);
+  }
+};
+```
+
+**Update** `purchaseBoost` and `activateBoost` in `AuthContext.tsx` to accept `durationHours`:
+
+```ts
+// In AuthContext:
+const activateBoost = async (durationHours: number = 12) => { ... }
+const purchaseBoost = async (price: number = 4.99, durationHours: number = 12) => { ... }
+// Pass durationHours to boostService.activateBoost(durationHours)
+```
+
+**Add styles for tier picker:**
+
+```ts
+boostTierRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  borderWidth: 1,
+  borderColor: 'rgba(255,255,255,0.12)',
+  borderRadius: 10,
+  padding: 12,
+  marginBottom: 8,
+  backgroundColor: 'rgba(255,255,255,0.04)',
+},
+boostTierRowSelected: {
+  borderColor: '#ff6b5b',
+  backgroundColor: 'rgba(255,107,91,0.1)',
+},
+boostTierLabel: {
+  color: '#fff',
+  fontWeight: '600',
+  fontSize: 15,
+},
+boostTierSub: {
+  color: 'rgba(255,255,255,0.5)',
+  fontSize: 12,
+  marginTop: 2,
+},
+boostTierPrice: {
+  color: '#fff',
+  fontWeight: '700',
+  fontSize: 17,
+},
+boostTierBadge: {
+  borderRadius: 4,
+  paddingHorizontal: 5,
+  paddingVertical: 2,
+},
+boostTierBadgeText: {
+  color: '#fff',
+  fontSize: 10,
+  fontWeight: '700',
+},
+```
+
+**Also apply** the same tier picker pattern to `RoommatesScreen.tsx` which has a duplicate boost modal at line ~1560. Same changes apply there.
+
+---
+
+## Part 2 — Boost Rotation System
+
+### How it works
+
+Every 30 minutes, the order of boosted listings/profiles is shuffled using a **deterministic seed** based on:
+- Current 30-minute time slot
+- The viewing user's ID
+
+This means:
+- Every user sees a different random order of boosted items (fairness)
+- The order is stable within each 30-minute window (no jitter on re-render)
+- Every boosted listing gets equal expected exposure over time
+
+### 2a. New shared utility — `utils/boostRotation.ts` (create new file)
+
+```ts
+/**
+ * Deterministic rotation for boosted listings/profiles.
+ * Boosted items shuffle order every ROTATION_WINDOW_MS using a seeded shuffle,
+ * so no single boost permanently occupies position #1.
+ */
+
+const ROTATION_WINDOW_MS = 30 * 60 * 1000; // 30 minutes
+
+/** Simple 32-bit hash of a string */
+function hashString(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = Math.imul(31, hash) + str.charCodeAt(i) | 0;
+  }
+  return hash >>> 0;
+}
+
+/** Current rotation slot index (changes every ROTATION_WINDOW_MS) */
+function currentSlot(): number {
+  return Math.floor(Date.now() / ROTATION_WINDOW_MS);
+}
+
+/** LCG-based deterministic shuffle — does not mutate input array */
+function seededShuffle<T>(arr: T[], seed: number): T[] {
+  const a = [...arr];
+  let s = seed;
+  for (let i = a.length - 1; i > 0; i--) {
+    // LCG step
+    s = (Math.imul(1664525, s) + 1013904223) | 0;
+    const j = (s >>> 0) % (i + 1);
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/**
+ * Returns a rotated copy of boosted items.
+ * Order changes every 30 minutes and is unique per viewerId.
+ * Non-boosted items are returned as-is after boosted.
+ */
+export function applyBoostRotation<T>(
+  boosted: T[],
+  normal: T[],
+  viewerId: string
+): T[] {
+  if (boosted.length <= 1) return [...boosted, ...normal];
+  const seed = currentSlot() ^ hashString(viewerId);
+  const rotated = seededShuffle(boosted, seed);
+  return [...rotated, ...normal];
+}
+
+/**
+ * For use in sort comparisons — returns a stable rotation index
+ * for a boosted item so sort() produces the rotated order.
+ */
+export function getBoostRotationIndex(
+  itemId: string,
+  allBoostedIds: string[],
+  viewerId: string
+): number {
+  const seed = currentSlot() ^ hashString(viewerId);
+  const shuffled = seededShuffle(allBoostedIds, seed);
+  return shuffled.indexOf(itemId);
+}
+```
+
+---
+
+### 2b. `services/discoverService.ts` — Renter Profile Rotation
+
+**Replace** the final sort in `getSwipeDeck`:
+
+```ts
+// BEFORE:
+return [...boosted, ...normal];
+
+// AFTER:
+import { applyBoostRotation } from '../utils/boostRotation';
+
+// user.id is already available in scope:
+return applyBoostRotation(boosted, normal, user.id);
+```
+
+---
+
+### 2c. `screens/renter/ExploreScreen.tsx` — Listing Boost Rotation
+
+Find the `filtered.sort(...)` block (around line 536). Within the boosted tier comparisons, add rotation ordering when both items are in the same boost tier.
+
+```tsx
+// Add import at top:
+import { getBoostRotationIndex } from '../../utils/boostRotation';
+
+// Inside the sort callback — after the existing boosted-tier checks,
+// before the plan priority check:
+
+// Collect all boosted IDs once (compute outside sort for efficiency):
+// Add this BEFORE the filtered.sort() call:
+const boostedIds = filtered
+  .filter(p => isPropertyBoosted(p))
+  .map(p => p.id);
+
+const featuredIds = filtered
+  .filter(p => isFeaturedBoosted(p))
+  .map(p => p.id);
+
+const viewerId = user?.id ?? 'anonymous';
+
+// Then inside filtered.sort((a, b) => { ... }):
+
+// Replace the existing featured comparison block:
+const aFeatured = isFeaturedBoosted(a);
+const bFeatured = isFeaturedBoosted(b);
+if (aFeatured && bFeatured) {
+  // Both featured — rotate between them
+  return getBoostRotationIndex(a.id, featuredIds, viewerId)
+       - getBoostRotationIndex(b.id, featuredIds, viewerId);
+}
+if (aFeatured && !bFeatured) return -1;
+if (!aFeatured && bFeatured) return 1;
+
+// Replace the existing regular boost comparison block:
+const aBoosted = isPropertyBoosted(a) && !aFeatured;
+const bBoosted = isPropertyBoosted(b) && !bFeatured;
+if (aBoosted && bBoosted) {
+  // Both regular boost — rotate between them
+  return getBoostRotationIndex(a.id, boostedIds, viewerId)
+       - getBoostRotationIndex(b.id, boostedIds, viewerId);
+}
+if (aBoosted && !bBoosted) return -1;
+if (!aBoosted && bBoosted) return 1;
+
+// ... rest of sort (plan priority, compatibility) unchanged
+```
+
+---
+
+## Part 3 — Stripe Price IDs
+
+The new boost tiers need Stripe one-time payment price objects. Add to `constants/stripePrices.ts`:
+
+```ts
+export const BOOST_PRICE_IDS = {
+  // Renter profile boosts
+  renter_boost_6h: 'price_REPLACE_WITH_REAL_ID',   // $2.99
+  renter_boost_12h: 'price_REPLACE_WITH_REAL_ID',  // $4.99
+  renter_boost_24h: 'price_REPLACE_WITH_REAL_ID',  // $7.99
+
+  // Host listing boosts
+  listing_boost_6h: 'price_REPLACE_WITH_REAL_ID',   // $2.99
+  listing_boost_12h: 'price_REPLACE_WITH_REAL_ID',  // $4.99
+  listing_boost_24h: 'price_REPLACE_WITH_REAL_ID',  // $7.99
+};
+```
+
+Create these as **one-time** (not recurring) prices in the Stripe Dashboard for each amount.
+
+---
+
+## Summary of File Changes
+
+| File | Change |
+|---|---|
+| `utils/boostUtils.ts` | Add `RENTER_BOOST_OPTIONS`, update `getBoostDuration`, add `getFreeBoostDurationHours` |
+| `utils/hostPricing.ts` | Replace `BOOST_OPTIONS` with 6h/12h/24h tiers, update `calculateBoostExpiry`, update `HOST_PLANS` free boost durations |
+| `utils/boostRotation.ts` | **New file** — `applyBoostRotation` + `getBoostRotationIndex` |
+| `types/models.ts` | Update `ListingBoost.duration` union to include `'6h' \| '12h'` |
+| `services/discoverService.ts` | Apply `applyBoostRotation` in `getSwipeDeck` |
+| `screens/renter/ExploreScreen.tsx` | Apply rotation in listing sort, add `boostedIds`/`featuredIds` arrays |
+| `screens/shared/ProfileScreen.tsx` | Replace flat $4.99 price with `RENTER_BOOST_OPTIONS` tier picker |
+| `screens/renter/RoommatesScreen.tsx` | Same tier picker as ProfileScreen (duplicate modal) |
+| `screens/host/ListingBoostScreen.tsx` | Dynamic duration label, popular/value badges, updated confirmation text |
+| `contexts/AuthContext.tsx` | `activateBoost(durationHours)` + `purchaseBoost(price, durationHours)` |
+| `constants/stripePrices.ts` | Add `BOOST_PRICE_IDS` (replace stubs with real IDs from Stripe Dashboard) |
+
+---
+
+## Boost Tier Summary
+
+| Tier | Duration | Price | Badge | Who can buy |
+|---|---|---|---|---|
+| Quick | 6 hours | $2.99 | — | Anyone |
+| Standard | 12 hours | $4.99 | Most Popular | Anyone |
+| Extended | 24 hours | $7.99 | Best Value | Anyone |
+| Free (Plus plan perk) | 12 hours | $0 | — | Plus subscribers (1/month) |
+| Free (Business/Elite plan perk) | 24 hours | $0 | — | Business/Elite subscribers |

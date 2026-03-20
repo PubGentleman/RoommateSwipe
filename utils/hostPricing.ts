@@ -6,7 +6,7 @@ export const HOST_PLANS: Record<HostPlanType, {
   listingsIncluded: number;
   overagePerListing: number;
   freeBoosts: number;
-  freeBoostDuration: '24h' | '72h' | '7d' | null;
+  freeBoostDuration: '6h' | '12h' | '24h' | '72h' | '7d' | null;
   simultaneousBoosts: number;
   features: { included: string[]; locked: string[] };
 }> = {
@@ -62,7 +62,7 @@ export const HOST_PLANS: Record<HostPlanType, {
     listingsIncluded: 5,
     overagePerListing: 0,
     freeBoosts: 1,
-    freeBoostDuration: '24h',
+    freeBoostDuration: '12h',
     simultaneousBoosts: 1,
     features: {
       included: [
@@ -70,7 +70,7 @@ export const HOST_PLANS: Record<HostPlanType, {
         'Proactive outreach to 3 groups/day',
         'Full renter group profiles',
         'Priority listing placement',
-        '1 free 24-hr boost per month',
+        '1 free 12-hr boost per month',
         'Verified host badge',
         'Inquiry management',
       ],
@@ -85,8 +85,8 @@ export const HOST_PLANS: Record<HostPlanType, {
     price: 49.99,
     listingsIncluded: Infinity,
     overagePerListing: 0,
-    freeBoosts: 2,
-    freeBoostDuration: '72h',
+    freeBoosts: 1,
+    freeBoostDuration: '12h',
     simultaneousBoosts: 3,
     features: {
       included: [
@@ -94,7 +94,7 @@ export const HOST_PLANS: Record<HostPlanType, {
         'Proactive outreach to 5 groups/day',
         'Top listing placement',
         'Basic analytics dashboard',
-        '2 free 72-hr boosts per month',
+        '1 free 12-hr boost per month',
         'Up to 3 simultaneous boosts',
         'Full renter group profiles',
       ],
@@ -110,7 +110,7 @@ export const HOST_PLANS: Record<HostPlanType, {
     listingsIncluded: Infinity,
     overagePerListing: 0,
     freeBoosts: 2,
-    freeBoostDuration: '7d',
+    freeBoostDuration: '24h',
     simultaneousBoosts: 10,
     features: {
       included: [
@@ -118,7 +118,7 @@ export const HOST_PLANS: Record<HostPlanType, {
         'Proactive outreach to 10 groups/day',
         'Featured listing badge',
         'Advanced analytics dashboard',
-        '2 free 7-day boosts per month',
+        '2 free 24-hr boosts per month',
         'Up to 10 simultaneous boosts',
         'Company/Agent profile branding',
         'Dedicated support',
@@ -131,33 +131,36 @@ export const HOST_PLANS: Record<HostPlanType, {
 export const BOOST_OPTIONS = [
   {
     id: 'quick' as const,
-    duration: '24h' as const,
+    duration: '6h' as const,
     label: 'Quick Boost',
-    price: 4.99,
-    description: 'Jump to the top of search in your city for 24 hours',
+    price: 2.99,
+    description: 'Jump to the top of search in your city for 6 hours',
     includesFeaturedBadge: false,
     badgeLabel: null as string | null,
     highlight: false,
+    popularBadge: null as string | null,
   },
   {
-    id: 'featured' as const,
-    duration: '72h' as const,
-    label: 'Featured Boost',
-    price: 9.99,
-    description: 'Top placement + Featured badge on your listing card for 3 days',
+    id: 'standard' as const,
+    duration: '12h' as const,
+    label: 'Standard Boost',
+    price: 4.99,
+    description: 'Top placement + Featured badge on your listing for 12 hours',
     includesFeaturedBadge: true,
     badgeLabel: 'Featured' as string | null,
     highlight: true,
+    popularBadge: 'Most Popular' as string | null,
   },
   {
     id: 'extended' as const,
-    duration: '7d' as const,
-    label: 'Extended Featured',
-    price: 19.99,
-    description: 'Top placement + Featured badge sustained for a full week',
+    duration: '24h' as const,
+    label: 'Extended Boost',
+    price: 7.99,
+    description: 'Top placement + Featured badge sustained for a full day',
     includesFeaturedBadge: true,
     badgeLabel: 'Featured' as string | null,
     highlight: false,
+    popularBadge: 'Best Value' as string | null,
   },
 ];
 
@@ -191,8 +194,15 @@ export function canAddListingCheck(subscription: HostSubscriptionData): { allowe
   return { allowed: true, message: '' };
 }
 
-export function calculateBoostExpiry(duration: '24h' | '72h' | '7d'): string {
-  const hours = duration === '24h' ? 24 : duration === '72h' ? 72 : 168;
+export function calculateBoostExpiry(duration: '6h' | '12h' | '24h' | '72h' | '7d'): string {
+  const hoursMap: Record<string, number> = {
+    '6h': 6,
+    '12h': 12,
+    '24h': 24,
+    '72h': 72,
+    '7d': 168,
+  };
+  const hours = hoursMap[duration] ?? 24;
   return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
 }
 
@@ -242,7 +252,7 @@ export function subscriptionFromPlan(plan: HostPlanType, existing?: Partial<Host
     overagePerListing: planData.overagePerListing,
     monthlyPrice: planData.price,
     freeBoostsRemaining: planData.freeBoosts,
-    freeBoostDuration: (planData.freeBoostDuration || null) as '24h' | '72h' | '7d' | null,
+    freeBoostDuration: (planData.freeBoostDuration || null) as '6h' | '12h' | '24h' | '72h' | '7d' | null,
     isVerifiedAgent: existing?.isVerifiedAgent || false,
     agentVerificationPaid: existing?.agentVerificationPaid || false,
     renewalDate: isFreePlan(plan) ? undefined : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),

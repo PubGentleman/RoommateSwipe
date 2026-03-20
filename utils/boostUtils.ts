@@ -1,9 +1,44 @@
 import { User } from '../types/models';
 
-export function getBoostDuration(plan: string): 12 | 24 | 48 {
-  if (plan === 'elite') return 48;
-  if (plan === 'plus') return 24;
-  return 12;
+export const RENTER_BOOST_OPTIONS = [
+  {
+    id: 'quick' as const,
+    durationHours: 6,
+    label: '6 Hours',
+    price: 2.99,
+    highlight: false,
+    badge: null as string | null,
+  },
+  {
+    id: 'standard' as const,
+    durationHours: 12,
+    label: '12 Hours',
+    price: 4.99,
+    highlight: true,
+    badge: 'Most Popular' as string | null,
+  },
+  {
+    id: 'extended' as const,
+    durationHours: 24,
+    label: '24 Hours',
+    price: 7.99,
+    highlight: false,
+    badge: 'Best Value' as string | null,
+  },
+] as const;
+
+export type RenterBoostOptionId = typeof RENTER_BOOST_OPTIONS[number]['id'];
+
+export function getFreeBoostDurationHours(plan: string): number {
+  if (plan === 'elite') return 24;
+  if (plan === 'plus') return 12;
+  return 0;
+}
+
+export function getBoostDuration(plan: string): 6 | 12 | 24 {
+  if (plan === 'elite') return 24;
+  if (plan === 'plus') return 12;
+  return 6;
 }
 
 export function isBoostExpired(boostExpiresAt?: string): boolean {

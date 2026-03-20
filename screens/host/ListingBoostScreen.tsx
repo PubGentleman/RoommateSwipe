@@ -128,9 +128,14 @@ export const ListingBoostScreen = () => {
           freeBoostsRemaining: hostSub.freeBoostsRemaining - 1,
         });
       }
+      const durationLabel = option.duration === '6h' ? '6 hours'
+        : option.duration === '12h' ? '12 hours'
+        : option.duration === '24h' ? '24 hours'
+        : option.duration === '72h' ? '3 days'
+        : '7 days';
       const resultLabel = option.includesFeaturedBadge
-        ? `Your listing is now featured for ${option.duration === '72h' ? '3 days' : '7 days'} with a Featured badge!`
-        : `Your listing has been boosted to the top of search for 24 hours.`;
+        ? `Your listing is now featured for ${durationLabel} with a Featured badge!`
+        : `Your listing has been boosted to the top of search for ${durationLabel}.`;
       Alert.alert('Boost Applied!', resultLabel, [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
@@ -269,9 +274,17 @@ export const ListingBoostScreen = () => {
                       <Text style={styles.optionLabel}>{option.label}</Text>
                       <View style={styles.durationChip}>
                         <Text style={styles.durationChipText}>
-                          {option.duration === '24h' ? '24 HOURS' : option.duration === '72h' ? '72 HOURS' : '7 DAYS'}
+                          {option.duration.toUpperCase().replace('H', ' HRS').replace('D', ' DAYS')}
                         </Text>
                       </View>
+                      {option.popularBadge ? (
+                        <View style={[
+                          styles.popularBadge,
+                          { backgroundColor: option.highlight ? '#FF6B6B' : '#22C55E' }
+                        ]}>
+                          <Text style={styles.popularBadgeText}>{option.popularBadge}</Text>
+                        </View>
+                      ) : null}
                     </View>
                     <Text style={[styles.optionPrice, isSelected ? { color: PURPLE } : null]}>
                       ${option.price}
@@ -326,7 +339,7 @@ export const ListingBoostScreen = () => {
             Featured = your listing gets a visible badge so renters click it over others.
           </Text>
           <Text style={[styles.explainerText, { color: 'rgba(255,255,255,0.5)', marginTop: 4 }]}>
-            Featured Boost and Extended Featured include both.
+            Standard Boost and Extended Boost include both.
           </Text>
         </View>
 
@@ -461,6 +474,19 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   durationChipText: { fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.4)', letterSpacing: 0.5 },
+  popularBadge: {
+    alignSelf: 'flex-start',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginTop: 4,
+  },
+  popularBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#fff',
+    letterSpacing: 0.5,
+  },
   optionDesc: { fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: 18, marginBottom: 10 },
   optionPrice: { fontSize: 20, fontWeight: '800', color: 'rgba(255,255,255,0.7)' },
   optionPerks: { gap: 6 },

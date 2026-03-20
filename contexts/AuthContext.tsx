@@ -31,10 +31,10 @@ interface AuthContextType {
   isUserBlocked: (otherUserId: string) => boolean;
   incrementMessageCount: () => Promise<void>;
   canSendMessage: () => boolean;
-  activateBoost: (paid?: boolean) => Promise<{ success: boolean; message: string }>;
+  activateBoost: (durationHours?: number) => Promise<{ success: boolean; message: string }>;
   canBoost: () => { canBoost: boolean; reason?: string; requiresPayment?: boolean; nextAvailableAt?: string; hasFreeBoost?: boolean };
   checkAndUpdateBoostStatus: () => Promise<void>;
-  purchaseBoost: () => Promise<{ success: boolean; message: string }>;
+  purchaseBoost: (price?: number, durationHours?: number) => Promise<{ success: boolean; message: string }>;
   purchaseUndoPass: () => Promise<{ success: boolean; message: string }>;
   hasActiveUndoPass: () => boolean;
   canRewind: () => { canRewind: boolean; remaining: number; limit: number; message?: string };
@@ -913,29 +913,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { canBoost: false };
   };
 
-  const activateBoost = async (paid?: boolean): Promise<{ success: boolean; message: string }> => {
+  const activateBoost = async (durationHoursParam?: number): Promise<{ success: boolean; message: string }> => {
     if (!user) {
       return { success: false, message: 'Not logged in' };
     }
     
     const plan = user.subscription?.plan || 'basic';
-    const durationMap: Record<string, 12 | 24 | 48> = { basic: 12, plus: 24, elite: 48 };
-    const durationHours = paid && plan === 'plus' ? 12 : (durationMap[plan] || 12);
+    const defaultDuration = plan === 'elite' ? 24 : plan === 'plus' ? 12 : 6;
+    const durationHours = durationHoursParam || defaultDuration;
     
     const now = new Date();
     const expiresAt = new Date(now.getTime() + durationHours * 60 * 60 * 1000).toISOString();
     
     const boostData = {
-      ...(user.boostData || { boostsUsed: 0, boostDurationHours: durationHours as 12 | 24 | 48 }),
+      ...(user.boostData || { boostsUsed: 0, boostDurationHours: durationHours as 6 | 12 | 24 | 48 }),
       isBoosted: true,
       boostExpiresAt: expiresAt,
       lastBoostActivatedAt: now.toISOString(),
-      boostDurationHours: durationHours as 12 | 24 | 48,
+      boostDurationHours: durationHours as 6 | 12 | 24 | 48,
       boostsUsed: (user.boostData?.boostsUsed || 0) + 1,
       lastBoostDate: now,
     };
     
-    if (plan === 'plus' && !paid) {
+    const isFreeBoost = (plan === 'plus' || plan === 'elite') && durationHours === defaultDuration;
+    if (plan === 'plus' && isFreeBoost) {
       const nextFree = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
       boostData.nextFreeBoostAvailableAt = nextFree.toISOString();
     }
@@ -956,12 +957,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { success: true, message: `Boost activated! Your profile will be prioritized for ${durationHours} hours.` };
   };
 
-  const purchaseBoost = async (): Promise<{ success: boolean; message: string }> => {
+  const purchaseBoost = async (price: number = 4.99, durationHours: number = 12): Promise<{ success: boolean; message: string }> => {
     if (!user) {
       return { success: false, message: 'Not logged in' };
     }
 
-    return activateBoost(true);
+    return activateBoost(durationHours);
   };
 
   const checkAndUpdateBoostStatus = async () => {
@@ -970,7 +971,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (user.boostData?.isBoosted && user.boostData.boostExpiresAt) {
       if (new Date().getTime() >= new Date(user.boostData.boostExpiresAt).getTime()) {
         const plan = user.subscription?.plan || 'basic';
-        let notifBody = 'Boost again for $4.99 to stay at the top';
+        let notifBody = 'Boost again starting at $2.99 to stay at the top';
         if (plan === 'plus') {
           const nextFree = user.boostData.nextFreeBoostAvailableAt;
           notifBody = nextFree

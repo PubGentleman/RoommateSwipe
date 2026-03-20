@@ -23,6 +23,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { formatMoveInDate, calculateCompatibility, getMatchQualityColor, getGenderSymbol, formatLocation } from '../../utils/matchingAlgorithm';
 import { getZodiacSymbol } from '../../utils/zodiacUtils';
+import { getBoostRotationIndex } from '../../utils/boostRotation';
 import { shouldShowMatchScore, getHostBadgeLabel, getHostBadgeColor, getHostBadgeIcon } from '../../utils/hostTypeUtils';
 import type { HostType } from '../../utils/hostTypeUtils';
 import { PropertyMapView } from '../../components/PropertyMapView';
@@ -539,6 +540,8 @@ export const ExploreScreen = () => {
       return isPropertyBoosted(property) && property.listingBoost?.includesFeaturedBadge === true;
     };
 
+    const allBoostedIds = filtered.filter(p => isPropertyBoosted(p)).map(p => p.id);
+
     filtered.sort((a, b) => {
       if (a.featured && !b.featured) return -1;
       if (!a.featured && b.featured) return 1;
@@ -548,10 +551,22 @@ export const ExploreScreen = () => {
       if (aFeatured && !bFeatured) return -1;
       if (!aFeatured && bFeatured) return 1;
 
+      if (aFeatured && bFeatured && user && allBoostedIds.length > 1) {
+        const rotA = getBoostRotationIndex(a.id, allBoostedIds, user.id);
+        const rotB = getBoostRotationIndex(b.id, allBoostedIds, user.id);
+        if (rotA !== rotB) return rotA - rotB;
+      }
+
       const aBoosted = isPropertyBoosted(a) && !aFeatured;
       const bBoosted = isPropertyBoosted(b) && !bFeatured;
       if (aBoosted && !bBoosted) return -1;
       if (!aBoosted && bBoosted) return 1;
+
+      if (aBoosted && bBoosted && user && allBoostedIds.length > 1) {
+        const rotA = getBoostRotationIndex(a.id, allBoostedIds, user.id);
+        const rotB = getBoostRotationIndex(b.id, allBoostedIds, user.id);
+        if (rotA !== rotB) return rotA - rotB;
+      }
 
       const planA = getHostPlanPriority(a);
       const planB = getHostPlanPriority(b);

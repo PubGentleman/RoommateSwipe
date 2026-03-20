@@ -47,7 +47,7 @@ export interface HostSubscriptionData {
   overagePerListing: number;
   monthlyPrice: number;
   freeBoostsRemaining: number;
-  freeBoostDuration: '24h' | '72h' | '7d' | null;
+  freeBoostDuration: '6h' | '12h' | '24h' | '72h' | '7d' | null;
   isVerifiedAgent: boolean;
   agentVerificationPaid: boolean;
   renewalDate?: string;
@@ -55,7 +55,7 @@ export interface HostSubscriptionData {
 
 export interface ListingBoost {
   listingId: string;
-  duration: '24h' | '72h' | '7d';
+  duration: '6h' | '12h' | '24h' | '72h' | '7d';
   price: number;
   startedAt: string;
   expiresAt: string;
@@ -371,7 +371,7 @@ export interface User {
     boostExpiresAt?: string;
     lastBoostActivatedAt?: string;
     nextFreeBoostAvailableAt?: string;
-    boostDurationHours: 12 | 24 | 48;
+    boostDurationHours: 6 | 12 | 24 | 48;
     boostsUsed: number;
     lastBoostDate?: Date;
   };

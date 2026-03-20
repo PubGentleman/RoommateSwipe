@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { applyBoostRotation } from '../utils/boostRotation';
 
 export async function getSwipeDeck(city?: string, filters?: {
   budgetMin?: number;
@@ -66,7 +67,7 @@ export async function getSwipeDeck(city?: string, filters?: {
     !p.boost?.some((b: any) => b.is_active && new Date(b.expires_at) > new Date())
   );
 
-  return [...boosted, ...normal];
+  return applyBoostRotation(boosted, normal, user.id);
 }
 
 export async function sendLike(recipientId: string) {
