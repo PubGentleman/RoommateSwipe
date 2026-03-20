@@ -742,15 +742,16 @@ export const ExploreScreen = () => {
                 </View>
               ) : null}
             </View>
+            {item.available ? (
+              <View style={styles.availBadge}>
+                <Text style={styles.availBadgeText}>Available now</Text>
+              </View>
+            ) : null}
             {isPetFriendly ? (
               <View style={styles.availBadge}>
                 <Text style={styles.availBadgeText}>Pet OK</Text>
               </View>
-            ) : (
-              <View style={styles.availBadge}>
-                <Text style={styles.availBadgeText}>Available now</Text>
-              </View>
-            )}
+            ) : null}
           </View>
           <View style={styles.locationRow2}>
             <Feather name="map-pin" size={12} color="rgba(255,107,91,0.55)" />
