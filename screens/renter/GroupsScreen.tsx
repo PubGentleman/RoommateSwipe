@@ -690,14 +690,28 @@ export const GroupsScreen = () => {
 
   const handleLeaveGroup = async (group: Group) => {
     if (!user) return;
+    const isGroupAdmin = group.createdBy === user.id;
+    const hasOtherMembers = group.members.length > 1;
 
+    if (isGroupAdmin && hasOtherMembers) {
+      Alert.alert(
+        'Promote Someone First',
+        'You are the admin. Open group settings to promote another member before leaving.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    const isLast = group.members.length <= 1;
     Alert.alert(
-      'Leave Group',
-      `Are you sure you want to leave "${group.name}"?`,
+      isLast ? 'Delete Group?' : 'Leave Group?',
+      isLast
+        ? `You are the last member of "${group.name}". Leaving will permanently delete this group.`
+        : `Are you sure you want to leave "${group.name}"?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Leave',
+          text: isLast ? 'Delete' : 'Leave',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -936,14 +950,12 @@ export const GroupsScreen = () => {
                 <Feather name="edit-2" size={16} color={theme.textSecondary} />
               </Pressable>
             ) : null}
-            {!isCreator ? (
-              <Pressable
-                style={[styles.leaveButton, { borderColor: theme.error }]}
-                onPress={(e) => { e.stopPropagation(); handleLeaveGroup(group); }}
-              >
-                <ThemedText style={[Typography.small, { color: theme.error }]}>Leave</ThemedText>
-              </Pressable>
-            ) : null}
+            <Pressable
+              style={[styles.leaveButton, { borderColor: theme.error }]}
+              onPress={(e) => { e.stopPropagation(); handleLeaveGroup(group); }}
+            >
+              <ThemedText style={[Typography.small, { color: theme.error }]}>Leave</ThemedText>
+            </Pressable>
             <View style={styles.groupChatChevron}>
               <Feather name="chevron-right" size={18} color={theme.textSecondary} />
             </View>
@@ -1004,23 +1016,33 @@ export const GroupsScreen = () => {
             <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.sm }]}>
               Members
             </ThemedText>
-            {memberProfiles.map(profile => (
-              <View key={profile.id} style={styles.memberRow}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                  <ThemedText style={Typography.body}>
-                    {profile.name || 'Unknown'}{profile.age ? `, ${profile.age}` : ''}{profile.zodiacSign ? ` ${getZodiacSymbol(profile.zodiacSign)}` : ''} {getGenderSymbol(profile.gender)}
-                  </ThemedText>
-                  {getVerificationLevel(profile.verification) >= 2 ? (
-                    <Feather name="check-circle" size={14} color="#2563EB" style={{ marginLeft: 4 }} />
+            {memberProfiles.map(profile => {
+              const isMemberAdmin = profile.id === group.createdBy;
+              const isMe = profile.id === user?.id;
+              return (
+                <View key={profile.id} style={styles.memberRow}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, flexWrap: 'wrap', gap: 4 }}>
+                    <ThemedText style={Typography.body}>
+                      {profile.name || 'Unknown'}{isMe ? ' (you)' : ''}{profile.age ? `, ${profile.age}` : ''}{profile.zodiacSign ? ` ${getZodiacSymbol(profile.zodiacSign)}` : ''} {getGenderSymbol(profile.gender)}
+                    </ThemedText>
+                    {isMemberAdmin ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.primary + '20', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10 }}>
+                        <Feather name="award" size={10} color={theme.primary} />
+                        <Text style={{ fontSize: 10, color: theme.primary, marginLeft: 3, fontWeight: '700' }}>Admin</Text>
+                      </View>
+                    ) : null}
+                    {getVerificationLevel(profile.verification) >= 2 ? (
+                      <Feather name="check-circle" size={14} color="#2563EB" />
+                    ) : null}
+                  </View>
+                  {isCreator && !isMe ? (
+                    <Pressable onPress={(e) => { e.stopPropagation(); handleRemoveMember(group.id, profile.id, profile.name || 'Member'); }}>
+                      <Feather name="x-circle" size={20} color={theme.error} />
+                    </Pressable>
                   ) : null}
                 </View>
-                {isCreator && profile.id !== user?.id ? (
-                  <Pressable onPress={(e) => { e.stopPropagation(); handleRemoveMember(group.id, profile.id, profile.name || 'Member'); }}>
-                    <Feather name="x-circle" size={20} color={theme.error} />
-                  </Pressable>
-                ) : null}
-              </View>
-            ))}
+              );
+            })}
           </View>
         ) : null}
 
