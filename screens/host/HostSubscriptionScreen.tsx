@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Pressable, Text, ScrollView, Alert } from 'react-native';
+import { View, StyleSheet, Pressable, Text, ScrollView, Alert, Platform } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -120,28 +120,36 @@ export const HostSubscriptionScreen = () => {
           billingCycle: billingCycle === 'annual' ? 'annual' as any : 'monthly' as const,
         },
       });
-      Alert.alert(
-        isFreePlan(plan) ? 'Downgraded to Free' : 'Plan Updated',
-        isFreePlan(plan)
-          ? 'Your host plan has been downgraded to Free.'
-          : `You're now on the ${planData.label} plan at $${price}/mo!`,
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
-      );
+      const successTitle = isFreePlan(plan) ? 'Downgraded to Free' : 'Plan Updated';
+      const successMsg = isFreePlan(plan)
+        ? 'Your host plan has been downgraded to Free.'
+        : `You're now on the ${planData.label} plan at $${price}/mo!`;
+      if (Platform.OS === 'web') {
+        window.alert(`${successTitle}\n\n${successMsg}`);
+        navigation.goBack();
+      } else {
+        Alert.alert(successTitle, successMsg, [{ text: 'OK', onPress: () => navigation.goBack() }]);
+      }
     };
 
-    if (isDev) {
+    const confirmTitle = 'Confirm Plan Change';
+    const confirmMsg = isFreePlan(plan)
+      ? 'Downgrade to Free plan (no charge).'
+      : `Subscribe to ${planData.label} at $${price}/mo (billed ${billingCycle})?`;
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`${confirmTitle}\n\n${confirmMsg}`)) {
+        await applyPlan();
+      }
+    } else {
       Alert.alert(
-        'Dev Mode',
-        isFreePlan(plan)
-          ? 'Downgrade to Free plan (no charge).'
-          : `Payment would process via Stripe: $${price}/mo for ${planData.label} (billed ${billingCycle}).`,
+        confirmTitle,
+        confirmMsg,
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Confirm (Mock)', onPress: applyPlan },
+          { text: 'Confirm', onPress: applyPlan },
         ]
       );
-    } else {
-      applyPlan();
     }
   };
 
