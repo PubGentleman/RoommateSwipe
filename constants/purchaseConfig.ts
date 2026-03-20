@@ -74,6 +74,24 @@ export const HOST_PLAN_CONFIGS: Record<string, PurchaseConfig> = {
   },
 };
 
+export const HOST_DOWNGRADE_CONFIG: PurchaseConfig = {
+  id: 'host_downgrade_free',
+  type: 'subscription',
+  title: 'Confirm Plan Change',
+  targetLabel: 'Free',
+  price: '$0',
+  priceNote: 'changes at end of billing period',
+  icon: 'user',
+  iconColor: '#8E8E93',
+  confirmLabel: 'Downgrade to Free',
+  disclaimer: "You'll keep your current features until the end of your billing period, then revert to the Free plan.",
+  perks: [
+    '1 active listing',
+    'Basic inquiry management',
+    'Standard placement in search',
+  ],
+};
+
 export const OUTREACH_PACKAGE_CONFIGS: Record<string, PurchaseConfig> = {
   single: {
     id: 'outreach_single',

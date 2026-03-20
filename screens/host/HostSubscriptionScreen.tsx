@@ -10,7 +10,7 @@ import { StorageService } from '../../utils/storage';
 import { HostPlanType, HostSubscriptionData } from '../../types/models';
 import { HOST_PLANS, AGENT_VERIFICATION_FEE, subscriptionFromPlan, calculateHostMonthlyCost, isFreePlan } from '../../utils/hostPricing';
 import { PurchaseConfirmModal } from '../../components/modals/PurchaseConfirmModal';
-import { HOST_PLAN_CONFIGS } from '../../constants/purchaseConfig';
+import { HOST_PLAN_CONFIGS, HOST_DOWNGRADE_CONFIG } from '../../constants/purchaseConfig';
 
 const isDev = __DEV__;
 const BG = '#111';
@@ -95,6 +95,8 @@ export const HostSubscriptionScreen = () => {
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [subscribing, setSubscribing] = useState(false);
+  const [showDowngradeModal, setShowDowngradeModal] = useState(false);
+  const [downgrading, setDowngrading] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -109,30 +111,36 @@ export const HostSubscriptionScreen = () => {
     if (isFreePlan(plan) && isFreePlan(hostSub.plan)) return;
 
     if (isFreePlan(plan)) {
-      const applyDowngrade = async () => {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        const newSub = subscriptionFromPlan(plan, hostSub);
-        await StorageService.updateHostSubscription(user.id, newSub);
-        setHostSub(newSub);
-        await updateUser({
-          hostSubscription: {
-            ...user.hostSubscription,
-            plan: 'free' as const,
-            status: 'active' as const,
-            billingCycle: 'monthly' as const,
-          },
-        });
-        const msg = 'Your host plan has been downgraded to Free.';
-        Alert.alert('Downgraded to Free', msg, [{ text: 'OK', onPress: () => navigation.goBack() }]);
-      };
-      Alert.alert('Confirm Downgrade', 'Downgrade to Free plan (no charge)?', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Confirm', onPress: applyDowngrade },
-      ]);
+      setShowDowngradeModal(true);
       return;
     }
 
     setSelectedPlan(plan);
+  };
+
+  const handleConfirmDowngrade = async () => {
+    if (!user || !hostSub) return;
+    setDowngrading(true);
+    try {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      const newSub = subscriptionFromPlan('free' as HostPlanType, hostSub);
+      await StorageService.updateHostSubscription(user.id, newSub);
+      setHostSub(newSub);
+      await updateUser({
+        hostSubscription: {
+          ...user.hostSubscription,
+          plan: 'free' as const,
+          status: 'active' as const,
+          billingCycle: 'monthly' as const,
+        },
+      });
+      setShowDowngradeModal(false);
+      navigation.goBack();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setDowngrading(false);
+    }
   };
 
   const handleConfirmSubscription = async () => {
@@ -435,6 +443,17 @@ export const HostSubscriptionScreen = () => {
           loading={subscribing}
           onConfirm={handleConfirmSubscription}
           onCancel={() => setSelectedPlan(null)}
+        />
+      ) : null}
+
+      {hostSub ? (
+        <PurchaseConfirmModal
+          visible={showDowngradeModal}
+          config={HOST_DOWNGRADE_CONFIG}
+          currentPlan={HOST_PLANS[hostSub.plan]?.label ?? 'Free'}
+          loading={downgrading}
+          onConfirm={handleConfirmDowngrade}
+          onCancel={() => setShowDowngradeModal(false)}
         />
       ) : null}
     </View>

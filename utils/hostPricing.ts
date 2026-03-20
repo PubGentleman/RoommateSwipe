@@ -106,7 +106,7 @@ export const HOST_PLANS: Record<HostPlanType, {
   },
   business: {
     label: 'Host Business',
-    price: 99,
+    price: 99.99,
     listingsIncluded: 999,
     overagePerListing: 0,
     freeBoosts: 2,

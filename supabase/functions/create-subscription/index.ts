@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { priceId } = await req.json();
+    const { priceId, planType, plan, billingCycle } = await req.json();
 
     if (!priceId) {
       return new Response(
@@ -69,6 +69,12 @@ Deno.serve(async (req) => {
       items: [{ price: priceId }],
       payment_behavior: 'default_incomplete',
       expand: ['latest_invoice.payment_intent'],
+      metadata: {
+        plan_type: planType ?? 'renter',
+        plan: plan ?? 'free',
+        billing_cycle: billingCycle ?? 'monthly',
+        supabase_user_id: user.id,
+      },
     });
 
     const invoice = subscription.latest_invoice as any;

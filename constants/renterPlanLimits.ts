@@ -68,10 +68,14 @@ export const RENTER_PLAN_LIMITS: Record<RenterPlan, RenterPlanLimits> = {
   },
 };
 
-export function normalizeRenterPlan(plan: string | undefined): RenterPlan {
-  if (plan === 'basic' || !plan) return 'free';
-  if (plan === 'plus') return 'plus';
-  if (plan === 'elite') return 'elite';
+/**
+ * Normalizes legacy plan values from the database.
+ * 'basic' was used in older webhook versions — now the webhook uses 'free'.
+ * Keep this function to handle any existing 'basic' rows in the subscriptions table.
+ */
+export function normalizeRenterPlan(plan: string | null | undefined): RenterPlan {
+  if (!plan || plan === 'basic') return 'free';
+  if (plan === 'plus' || plan === 'elite') return plan;
   return 'free';
 }
 
