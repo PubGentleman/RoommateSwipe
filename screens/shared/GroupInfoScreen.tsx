@@ -119,22 +119,46 @@ export function GroupInfoScreen({ route, navigation }: Props) {
       try {
         const groups = await StorageService.getGroups();
         const localGroup = groups.find((g: any) => g.id === groupId);
+        const allProfiles = await StorageService.getRoommateProfiles();
+
+        const buildMembers = (memberIds: string[]) => {
+          return memberIds.map(mid => {
+            const profile = allProfiles.find((p: any) => p.id === mid);
+            if (profile) {
+              return {
+                id: mid,
+                name: profile.name || 'Unknown',
+                photo: profile.photos?.[0] || profile.profilePicture || null,
+                role: profile.role || 'renter',
+                isAdmin: mid === (localGroup?.createdBy || user?.id),
+                isHost: profile.role === 'host',
+              };
+            }
+            if (mid === user?.id) {
+              return {
+                id: mid,
+                name: user?.name || 'You',
+                photo: user?.photos?.[0] || null,
+                role: user?.role || 'renter',
+                isAdmin: true,
+                isHost: false,
+              };
+            }
+            return { id: mid, name: 'Member', photo: null, role: 'renter', isAdmin: false, isHost: false };
+          });
+        };
+
         if (localGroup) {
+          const memberIds = localGroup.members?.length ? localGroup.members : [user?.id || 'demo-user'];
+          const members = buildMembers(memberIds);
           setGroup({
             id: localGroup.id,
             name: localGroup.name || routeGroupName || 'Group',
             description: localGroup.description || '',
             type: localGroup.type || 'roommate',
-            adminId: user?.id,
-            members: [{
-              id: user?.id || 'demo-user',
-              name: user?.name || 'You',
-              photo: user?.photos?.[0] || null,
-              role: user?.role || 'renter',
-              isAdmin: true,
-              isHost: false,
-            }],
-            memberCount: localGroup.memberCount || 1,
+            adminId: localGroup.createdBy || user?.id,
+            members,
+            memberCount: members.length,
             memberLimit: localGroup.maxMembers || 4,
             linkedListing: localGroup.linkedListing || null,
             discoverable: localGroup.discoverable !== false,
@@ -174,7 +198,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
           members: [{
             id: user?.id || 'demo-user',
             name: user?.name || 'You',
-            photo: null,
+            photo: user?.photos?.[0] || null,
             role: 'renter',
             isAdmin: true,
             isHost: false,
@@ -508,9 +532,62 @@ export function GroupInfoScreen({ route, navigation }: Props) {
             <Feather name="arrow-left" size={20} color={theme.text} />
           </Pressable>
 
-          <View style={[styles.heroAvatar, { backgroundColor: theme.primary }]}>
-            <Feather name="users" size={36} color="#fff" />
-          </View>
+          {(() => {
+            const memberPhotos = (group.members || [])
+              .map((m: any) => ({ uri: m.photo, initial: (m.name || '?').charAt(0).toUpperCase() }))
+              .slice(0, 4);
+            if (memberPhotos.length === 0 || memberPhotos.every((p: any) => !p.uri)) {
+              return (
+                <View style={[styles.heroAvatar, { backgroundColor: theme.primary }]}>
+                  <Feather name="users" size={36} color="#fff" />
+                </View>
+              );
+            }
+            if (memberPhotos.length === 1) {
+              const p = memberPhotos[0];
+              return p.uri ? (
+                <Image source={{ uri: p.uri }} style={[styles.heroAvatar, { borderWidth: 3, borderColor: '#fff' }]} />
+              ) : (
+                <View style={[styles.heroAvatar, { backgroundColor: theme.primary }]}>
+                  <ThemedText style={{ fontSize: 32, fontWeight: '800', color: '#fff' }}>{p.initial}</ThemedText>
+                </View>
+              );
+            }
+            const sz = memberPhotos.length <= 2 ? 52 : 44;
+            const overlap = 14;
+            const totalW = sz + (memberPhotos.length - 1) * (sz - overlap);
+            return (
+              <View style={{ width: 88, height: 88, alignItems: 'center', justifyContent: 'center' }}>
+                <View style={{ width: totalW, height: sz, flexDirection: 'row' }}>
+                  {memberPhotos.map((p: any, i: number) =>
+                    p.uri ? (
+                      <Image
+                        key={i}
+                        source={{ uri: p.uri }}
+                        style={{
+                          width: sz, height: sz, borderRadius: sz / 2,
+                          borderWidth: 2, borderColor: '#fff',
+                          position: 'absolute', left: i * (sz - overlap), zIndex: memberPhotos.length - i,
+                        }}
+                      />
+                    ) : (
+                      <View
+                        key={i}
+                        style={{
+                          width: sz, height: sz, borderRadius: sz / 2,
+                          backgroundColor: theme.primary, borderWidth: 2, borderColor: '#fff',
+                          alignItems: 'center', justifyContent: 'center',
+                          position: 'absolute', left: i * (sz - overlap), zIndex: memberPhotos.length - i,
+                        }}
+                      >
+                        <ThemedText style={{ fontSize: sz * 0.36, fontWeight: '800', color: '#fff' }}>{p.initial}</ThemedText>
+                      </View>
+                    )
+                  )}
+                </View>
+              </View>
+            );
+          })()}
 
           <ThemedText style={[Typography.h2, styles.heroName]}>
             {group.name}
