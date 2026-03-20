@@ -255,7 +255,7 @@ export const HostRenterGroupDetailScreen = () => {
         </View>
       ) : (
         <ScrollView
-          contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}
+          contentContainerStyle={{ paddingBottom: 180 }}
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.heroSection}>
@@ -421,7 +421,7 @@ export const HostRenterGroupDetailScreen = () => {
         </ScrollView>
       )}
 
-      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 10 }]}>
+      <View style={[styles.bottomBar, { bottom: 80, paddingBottom: 14 }]}>
         {alreadySent ? (
           <View style={styles.sentBar}>
             <Feather name="check-circle" size={18} color="#22c55e" />
