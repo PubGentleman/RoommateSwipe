@@ -1220,6 +1220,7 @@ export const StorageService = {
       }
       const data = await AsyncStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
       const notifications: Notification[] = data ? JSON.parse(data) : [];
+      if (notifications.some(n => n.id === notification.id)) return;
       notifications.push(notification);
       await AsyncStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(notifications));
     } catch (error) {

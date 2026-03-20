@@ -90,7 +90,7 @@ export const MyInterestsScreen = () => {
     const expired = await StorageService.expireOldInterestCards();
     if (expired.length > 0) {
       for (const card of expired) {
-        const notifId = `notif-expired-${card.id}-${Date.now()}`;
+        const notifId = `notif-expired-${card.id}`;
         await StorageService.addNotification({
           id: notifId,
           userId: card.renterId,
