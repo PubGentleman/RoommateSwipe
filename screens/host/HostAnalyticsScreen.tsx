@@ -9,9 +9,11 @@ import { useTheme } from '../../hooks/useTheme';
 import { StorageService } from '../../utils/storage';
 import { Property, InterestCard } from '../../types/models';
 import { Spacing, BorderRadius } from '../../constants/theme';
-import { PaywallSheet } from '../../components/PaywallSheet';
 import { getMyListings, mapListingToProperty } from '../../services/listingService';
 import { getReceivedInterestCards } from '../../services/discoverService';
+import { canAccessAnalytics } from '../../utils/planGates';
+import { LockedFeatureWall } from '../../components/host/LockedFeatureWall';
+import type { HostPlan } from '../../constants/planLimits';
 
 const ACCENT = '#ff6b5b';
 const CARD_BG = '#1a1a1a';
@@ -21,8 +23,7 @@ export const HostAnalyticsScreen = () => {
   const { user, getHostPlan } = useAuth();
   const navigation = useNavigation<any>();
   const hostPlan = getHostPlan();
-  const isStarter = hostPlan === 'starter';
-  const [showPaywall, setShowPaywall] = useState(false);
+  const analyticsLocked = !canAccessAnalytics(hostPlan as HostPlan);
   const { theme } = useTheme();
   const [properties, setProperties] = useState<Property[]>([]);
   const [inquiries, setInquiries] = useState<InterestCard[]>([]);
@@ -123,6 +124,20 @@ export const HostAnalyticsScreen = () => {
     return '#3ECF8E';
   };
 
+  if (analyticsLocked) {
+    return (
+      <ScreenScrollView style={{ backgroundColor: BG }}>
+        <LockedFeatureWall
+          icon="bar-chart-2"
+          title="Analytics"
+          description="Track listing views, match rates, and outreach performance. Upgrade to Pro to unlock detailed insights."
+          requiredPlan="Pro"
+          onUpgrade={() => navigation.navigate('HostPricing')}
+        />
+      </ScreenScrollView>
+    );
+  }
+
   return (
     <ScreenScrollView style={{ backgroundColor: BG }}>
       <ThemedText type="h2" style={styles.sectionTitle}>Overview</ThemedText>
@@ -141,52 +156,7 @@ export const HostAnalyticsScreen = () => {
         <StatusPill label="Paused" value={pausedListings} color="#FFA500" />
       </View>
 
-      {isStarter ? (
-        <Pressable onPress={() => setShowPaywall(true)}>
-          <ThemedText type="h2" style={styles.sectionTitle}>Conversion Funnel</ThemedText>
-          <View style={[styles.card, { backgroundColor: CARD_BG, overflow: 'hidden' }]}>  
-            <View style={{ opacity: 0.15 }}>
-              <FunnelRow label="Est. Views *" value={0} maxValue={1} color="#5B7FFF" />
-              <FunnelRow label="Est. Saves *" value={0} maxValue={1} color="#FFA500" />
-              <FunnelRow label="Inquiries" value={0} maxValue={1} color={ACCENT} />
-              <FunnelRow label="Accepted" value={0} maxValue={1} color="#3ECF8E" />
-            </View>
-            <View style={styles.lockedOverlay}>
-              <View style={styles.lockedBadge}>
-                <Feather name="lock" size={18} color={ACCENT} />
-                <ThemedText style={styles.lockedText}>Upgrade to Pro</ThemedText>
-              </View>
-            </View>
-          </View>
-          <ThemedText style={{ color: 'rgba(255,255,255,0.2)', fontSize: 10, marginTop: 6, paddingHorizontal: 4 }}>
-            * Estimated based on inquiry volume. Actual view tracking coming soon.
-          </ThemedText>
-
-          <ThemedText type="h2" style={styles.sectionTitle}>Per-Listing Breakdown</ThemedText>
-          <View style={[styles.card, { backgroundColor: CARD_BG, overflow: 'hidden' }]}>  
-            <View style={{ opacity: 0.15 }}>
-              <View style={styles.listingHeader}>
-                <ThemedText type="h3" style={{ flex: 1 }}>Sample Listing</ThemedText>
-              </View>
-              <ThemedText style={{ color: '#888', marginBottom: Spacing.sm }}>$0/mo</ThemedText>
-              <View style={styles.barRow}>
-                <ThemedText style={{ color: '#aaa', width: 80 }}>0 inquiries</ThemedText>
-                <View style={styles.barContainer}>
-                  <View style={[styles.bar, { width: '0%', backgroundColor: ACCENT }]} />
-                </View>
-              </View>
-            </View>
-            <View style={styles.lockedOverlay}>
-              <View style={styles.lockedBadge}>
-                <Feather name="lock" size={18} color={ACCENT} />
-                <ThemedText style={styles.lockedText}>Upgrade to Pro</ThemedText>
-              </View>
-            </View>
-          </View>
-        </Pressable>
-      ) : (
-        <>
-          <ThemedText type="h2" style={styles.sectionTitle}>Conversion Funnel</ThemedText>
+      <ThemedText type="h2" style={styles.sectionTitle}>Conversion Funnel</ThemedText>
           <View style={[styles.card, { backgroundColor: CARD_BG }]}>
             <FunnelRow label="Est. Views *" value={estimatedViews} maxValue={estimatedViews} color="#5B7FFF" />
             <FunnelRow label="Est. Saves *" value={estimatedSaves} maxValue={estimatedViews} color="#FFA500" />
@@ -232,8 +202,6 @@ export const HostAnalyticsScreen = () => {
               </View>
             ))
           )}
-        </>
-      )}
 
       <ThemedText type="h2" style={styles.sectionTitle}>Monthly Trend</ThemedText>
       <View style={[styles.card, { backgroundColor: CARD_BG }]}>
@@ -262,17 +230,6 @@ export const HostAnalyticsScreen = () => {
         </View>
       </View>
 
-      <PaywallSheet
-        visible={showPaywall}
-        featureName="Full Analytics"
-        requiredPlan="pro"
-        role="host"
-        onUpgrade={() => {
-          setShowPaywall(false);
-          navigation.navigate('HostPricing');
-        }}
-        onDismiss={() => setShowPaywall(false)}
-      />
     </ScreenScrollView>
   );
 };
@@ -387,28 +344,5 @@ const styles = StyleSheet.create({
   trendRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-  },
-  lockedOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(17, 17, 17, 0.7)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: BorderRadius.medium,
-  },
-  lockedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    backgroundColor: 'rgba(255,107,91,0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,107,91,0.3)',
-    borderRadius: BorderRadius.full,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-  },
-  lockedText: {
-    color: ACCENT,
-    fontWeight: '700',
-    fontSize: 14,
   },
 });

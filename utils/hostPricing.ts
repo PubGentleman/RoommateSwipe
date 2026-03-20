@@ -59,63 +59,69 @@ export const HOST_PLANS: Record<HostPlanType, {
   starter: {
     label: 'Host Starter',
     price: 19.99,
-    listingsIncluded: 1,
+    listingsIncluded: 5,
     overagePerListing: 0,
     freeBoosts: 1,
     freeBoostDuration: '24h',
     simultaneousBoosts: 1,
     features: {
       included: [
-        '1 active listing',
-        'Renter group browsing',
-        'AI assistant (host modes)',
+        'Up to 5 active listings',
+        'Proactive outreach to 3 groups/day',
+        'Full renter group profiles',
+        'Priority listing placement',
         '1 free 24-hr boost per month',
         'Verified host badge',
         'Inquiry management',
-        'Compatibility scores',
       ],
-      locked: [],
+      locked: [
+        'Analytics dashboard',
+        'Company/Agent branding',
+      ],
     },
   },
   pro: {
     label: 'Host Pro',
     price: 49.99,
-    listingsIncluded: 5,
+    listingsIncluded: 999,
     overagePerListing: 0,
     freeBoosts: 2,
     freeBoostDuration: '72h',
     simultaneousBoosts: 3,
     features: {
       included: [
-        'Up to 5 active listings',
-        'Priority placement in search',
+        'Unlimited property listings',
+        'Proactive outreach to 5 groups/day',
+        'Top listing placement',
+        'Basic analytics dashboard',
         '2 free 72-hr boosts per month',
         'Up to 3 simultaneous boosts',
-        'Advanced analytics dashboard',
-        'Renter group messaging',
-        'Response rate tracking',
+        'Full renter group profiles',
       ],
-      locked: [],
+      locked: [
+        'Company/Agent branding',
+        'Dedicated support',
+      ],
     },
   },
   business: {
     label: 'Host Business',
     price: 99,
-    listingsIncluded: 15,
-    overagePerListing: 5,
+    listingsIncluded: 999,
+    overagePerListing: 0,
     freeBoosts: 2,
     freeBoostDuration: '7d',
     simultaneousBoosts: 10,
     features: {
       included: [
-        'Up to 15 active listings',
+        'Unlimited property listings',
+        'Proactive outreach to 10 groups/day',
+        'Featured listing badge',
+        'Advanced analytics dashboard',
         '2 free 7-day boosts per month',
         'Up to 10 simultaneous boosts',
-        'Bulk boost across listings',
-        'Full analytics suite',
-        'Bulk messaging tools',
-        'Agent verification badge (add-on)',
-        'Priority support',
+        'Company/Agent profile branding',
+        'Dedicated support',
       ],
       locked: [],
     },
@@ -169,20 +175,17 @@ export function calculateHostMonthlyCost(plan: HostPlanType, activeListings: num
   return base + overage;
 }
 
-export function canAddListingCheck(subscription: HostSubscriptionData): { allowed: boolean; message: string } {
+export function canAddListingCheck(subscription: HostSubscriptionData): { allowed: boolean; message: string; upgradeRequired?: boolean } {
   const plan = HOST_PLANS[subscription.plan];
-  if (subscription.plan === 'business') {
-    if (subscription.activeListingCount >= subscription.listingsIncluded) {
-      const overageCost = (subscription.activeListingCount - subscription.listingsIncluded + 1) * plan.overagePerListing;
-      return { allowed: true, message: `This listing will add $${overageCost}/mo to your plan.` };
-    }
+  if (subscription.plan === 'pro' || subscription.plan === 'business') {
     return { allowed: true, message: '' };
   }
   if (subscription.activeListingCount >= plan.listingsIncluded) {
-    const upgradeTo = isFreePlan(subscription.plan) ? 'Starter' : subscription.plan === 'starter' ? 'Pro' : 'Business';
+    const upgradeTo = isFreePlan(subscription.plan) ? 'Starter' : 'Pro';
     return {
       allowed: false,
       message: `Your ${plan.label} plan allows up to ${plan.listingsIncluded} active listing${plan.listingsIncluded > 1 ? 's' : ''}. Upgrade to ${upgradeTo} to add more.`,
+      upgradeRequired: true,
     };
   }
   return { allowed: true, message: '' };

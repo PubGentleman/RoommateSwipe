@@ -218,7 +218,11 @@ export const CreateEditListingScreen = () => {
       return;
     }
 
-    if (!isEditing && hostSub) {
+    if (!isEditing) {
+      if (!hostSub) {
+        Alert.alert('Unable to verify plan', 'Please try again in a moment.');
+        return;
+      }
       const capResult = canAddListingCheck(hostSub);
       if (!capResult.allowed) {
         setLimitMessage(capResult.message);

@@ -17,9 +17,10 @@ import {
   addPaidCreditsLocal,
   OutreachQuotaStatus,
 } from '../../services/hostOutreachService';
-import { UNLOCK_PACKAGES } from '../../constants/planLimits';
+import { UNLOCK_PACKAGES, canUseProactiveOutreach, type HostPlan } from '../../constants/planLimits';
 import { PurchaseConfirmModal } from '../../components/modals/PurchaseConfirmModal';
 import { OUTREACH_CREDIT_CONFIGS } from '../../constants/purchaseConfig';
+import { LockedFeatureWall } from '../../components/host/LockedFeatureWall';
 
 const BG = '#111';
 const CARD_BG = '#1a1a1a';
@@ -278,7 +279,7 @@ export const BrowseRenterGroupsScreen = () => {
     }
   };
 
-  if (hostSub && isFreePlan(hostSub.plan)) {
+  if (hostSub && !canUseProactiveOutreach(hostSub.plan as HostPlan)) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
@@ -287,34 +288,13 @@ export const BrowseRenterGroupsScreen = () => {
             <Text style={styles.subtitle}>Groups actively looking for a place together</Text>
           </View>
         </View>
-        <View style={styles.lockedContainer}>
-          <LinearGradient
-            colors={['rgba(123,94,167,0.15)', 'transparent']}
-            style={styles.lockedGradient}
-          >
-            <View style={styles.lockedIconWrap}>
-              <Feather name="lock" size={32} color={PURPLE} />
-            </View>
-            <Text style={styles.lockedTitle}>Browse Renter Groups</Text>
-            <Text style={styles.lockedDesc}>
-              Upgrade your host plan to see groups of renters actively looking for a place together — and message them directly with your listing.
-            </Text>
-            <Pressable
-              onPress={() => navigation.navigate('Dashboard', { screen: 'HostSubscription' })}
-              style={styles.upgradeCta}
-            >
-              <LinearGradient
-                colors={[ROOMDR_PURPLE, '#6a4d96']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.upgradeCtaGradient}
-              >
-                <Feather name="zap" size={14} color="#fff" />
-                <Text style={styles.upgradeCtaText}>See Plans</Text>
-              </LinearGradient>
-            </Pressable>
-          </LinearGradient>
-        </View>
+        <LockedFeatureWall
+          icon="users"
+          title="Renter Group Outreach"
+          description="Upgrade to Starter or higher to browse renter groups and message them directly with your listing."
+          requiredPlan="Starter"
+          onUpgrade={() => navigation.navigate('Dashboard', { screen: 'HostSubscription' })}
+        />
       </View>
     );
   }
@@ -853,31 +833,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   ctaText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-
-  lockedContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 28 },
-  lockedGradient: { width: '100%', borderRadius: 24, padding: 32, alignItems: 'center' },
-  lockedIconWrap: {
-    width: 72,
-    height: 72,
-    borderRadius: 24,
-    backgroundColor: 'rgba(123,94,167,0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(123,94,167,0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
-  },
-  lockedTitle: { fontSize: 20, fontWeight: '800', color: '#fff', marginBottom: 10, textAlign: 'center' },
-  lockedDesc: { fontSize: 14, color: 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: 21, marginBottom: 24 },
-  upgradeCta: { borderRadius: 14, overflow: 'hidden', width: '100%' },
-  upgradeCtaGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    height: 50,
-  },
-  upgradeCtaText: { fontSize: 15, fontWeight: '700', color: '#fff' },
 
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14 },
   loadingText: { fontSize: 14, color: 'rgba(255,255,255,0.4)' },

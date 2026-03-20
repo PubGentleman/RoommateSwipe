@@ -27,10 +27,10 @@ export const HOST_PLAN_CONFIGS: Record<string, PurchaseConfig> = {
     confirmLabel: 'Subscribe Now',
     disclaimer: 'You will be charged $19.99 today and monthly after.\nCancel anytime in Account Settings.',
     perks: [
-      'Contact up to 3 renter groups per day',
+      'Proactive outreach to 3 groups per day',
       'List up to 5 properties',
       'Priority listing placement',
-      'Access full renter group profiles',
+      'Full renter group profiles',
     ],
   },
   pro: {
@@ -45,11 +45,11 @@ export const HOST_PLAN_CONFIGS: Record<string, PurchaseConfig> = {
     confirmLabel: 'Subscribe Now',
     disclaimer: 'You will be charged $49.99 today and monthly after.\nCancel anytime in Account Settings.',
     perks: [
-      'Contact up to 10 renter groups per day',
+      'Proactive outreach to 5 groups per day',
       'Unlimited property listings',
       'Top listing placement',
-      'Proactive group outreach (pre-rental)',
-      'Analytics dashboard',
+      'Basic analytics dashboard',
+      'Full renter group profiles',
     ],
   },
   business: {
@@ -64,11 +64,11 @@ export const HOST_PLAN_CONFIGS: Record<string, PurchaseConfig> = {
     confirmLabel: 'Subscribe Now',
     disclaimer: 'You will be charged $99.99 today and monthly after.\nCancel anytime in Account Settings.',
     perks: [
-      'Unlimited renter group outreach',
+      'Proactive outreach to 10 groups per day',
       'Unlimited property listings',
       'Featured listing badge',
+      'Advanced analytics dashboard',
       'Company/Agent profile branding',
-      'Bulk outreach tools',
       'Dedicated support',
     ],
   },

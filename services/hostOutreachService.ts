@@ -1,7 +1,17 @@
 import { supabase } from '../lib/supabase';
-import { OUTREACH_PLAN_LIMITS } from '../constants/planLimits';
+import { getPlanLimits, canUseProactiveOutreach, type HostPlan } from '../constants/planLimits';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isDev } from '../utils/logger';
+
+function getOutreachLimits(plan: HostPlan) {
+  const limits = getPlanLimits(plan);
+  return {
+    dailyCap: limits.proactiveOutreachPerDay,
+    hourlyCap: limits.proactiveOutreachPerHour,
+    cooldownDays: limits.groupCooldownDays,
+    canUnlock: limits.canPayToUnlock,
+  };
+}
 
 const OUTREACH_LOG_KEY = '@roomdr_host_outreach_log';
 const OUTREACH_QUOTA_KEY = '@roomdr_host_outreach_quota';
@@ -96,10 +106,10 @@ export async function getOutreachQuotaStatus(
   hostId: string,
   plan: string
 ): Promise<OutreachQuotaStatus> {
-  const limit = OUTREACH_PLAN_LIMITS[plan];
-  if (!limit || limit.dailyCap === 0) {
+  if (!canUseProactiveOutreach(plan as HostPlan)) {
     return buildQuotaResult(0, 0, 0, false);
   }
+  const { dailyCap } = getOutreachLimits(plan as HostPlan);
 
   const online = await isSupabaseAvailable();
   if (online) {
@@ -121,18 +131,18 @@ export async function getOutreachQuotaStatus(
       .maybeSingle();
 
     if (!qErr) {
-      return buildQuotaResult(quota?.used ?? 0, limit.dailyCap, quota?.paid_extra ?? 0, false);
+      return buildQuotaResult(quota?.used ?? 0, dailyCap, quota?.paid_extra ?? 0, false);
     }
   }
 
   const dateKey = todayKey();
   const quota = await getLocalQuota(hostId, dateKey);
-  return buildQuotaResult(quota.used, limit.dailyCap, quota.paidExtra, false);
+  return buildQuotaResult(quota.used, dailyCap, quota.paidExtra, false);
 }
 
 export async function checkHourlyLimit(hostId: string, plan: string): Promise<boolean> {
-  const limit = OUTREACH_PLAN_LIMITS[plan];
-  if (!limit) return false;
+  const { hourlyCap } = getOutreachLimits(plan as HostPlan);
+  if (hourlyCap === 0) return false;
 
   const online = await isSupabaseAvailable();
   if (online) {
@@ -142,13 +152,13 @@ export async function checkHourlyLimit(hostId: string, plan: string): Promise<bo
       .select('id', { count: 'exact', head: true })
       .eq('host_id', hostId)
       .gte('sent_at', oneHourAgo);
-    if (!error) return (count ?? 0) < limit.hourlyCap;
+    if (!error) return (count ?? 0) < hourlyCap;
   }
 
   const log = await getLocalLog();
   const oneHourAgo = Date.now() - 60 * 60 * 1000;
   const recentCount = log.filter(e => e.hostId === hostId && new Date(e.sentAt).getTime() > oneHourAgo).length;
-  return recentCount < limit.hourlyCap;
+  return recentCount < hourlyCap;
 }
 
 export async function checkGroupCooldown(hostId: string, groupId: string): Promise<boolean> {
