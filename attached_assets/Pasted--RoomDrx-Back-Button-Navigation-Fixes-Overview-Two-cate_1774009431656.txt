@@ -1,0 +1,380 @@
+# RoomDrx — Back Button & Navigation Fixes
+
+## Overview
+
+Two categories of problems found across the full navigation audit:
+
+**Category A — Missing back buttons:** 3 sub-screens have no back button at all, leaving users with no way to go back except the hardware gesture.
+
+**Category B — Wrong screen on back press:** When tapping upgrade/payment/plans buttons from the Messages, Groups, Roommates, or Explore tabs, the user lands on the Plans or Payment screen. Pressing back takes them to the Profile main screen instead of where they came from. Root cause: cross-tab navigation via `navigate('Profile', { screen: 'Plans' })` pushes the screen onto the Profile stack, so `goBack()` pops to ProfileMain — the wrong destination.
+
+---
+
+## Category A — Add Missing Back Buttons
+
+### A1 — `HostAnalyticsScreen`
+
+Accessed from the Dashboard tab via `navigate('Analytics')`. Has `useNavigation` but only uses it for the upgrade button — no back button in the UI.
+
+```tsx
+// screens/host/HostAnalyticsScreen.tsx
+// Add these imports if not already present:
+import { View, Pressable } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+// Inside the component, add:
+const insets = useSafeAreaInsets();
+
+// Replace the opening <ScreenScrollView> of the main (non-locked) return with:
+return (
+  <ScreenScrollView style={{ backgroundColor: BG }}>
+
+    {/* ── Back header ─────────────────────────────────────── */}
+    <View style={{
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingTop: insets.top + 8,
+      paddingHorizontal: 16,
+      paddingBottom: 8,
+    }}>
+      <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
+        <Feather name="chevron-left" size={28} color="#FFFFFF" />
+      </Pressable>
+      <ThemedText type="h2" style={{ marginLeft: 8 }}>Analytics</ThemedText>
+    </View>
+
+    {/* existing content below — Overview, funnel, etc. */}
+    <ThemedText type="h2" style={styles.sectionTitle}>Overview</ThemedText>
+    ...
+```
+
+Also update the `analyticsLocked` return to include the same back button so the user can go back from the locked wall:
+
+```tsx
+if (analyticsLocked) {
+  return (
+    <ScreenScrollView style={{ backgroundColor: BG }}>
+      <View style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingTop: insets.top + 8,
+        paddingHorizontal: 16,
+        paddingBottom: 8,
+      }}>
+        <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
+          <Feather name="chevron-left" size={28} color="#FFFFFF" />
+        </Pressable>
+        <ThemedText type="h2" style={{ marginLeft: 8 }}>Analytics</ThemedText>
+      </View>
+      <LockedFeatureWall ... />
+    </ScreenScrollView>
+  );
+}
+```
+
+---
+
+### A2 — `HostInquiriesScreen`
+
+Accessed from the Dashboard tab via `navigate('Inquiries')`. No back button or `goBack` call anywhere in the file.
+
+```tsx
+// screens/host/HostInquiriesScreen.tsx
+// Add to imports:
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+// Inside component:
+const insets = useSafeAreaInsets();
+
+// In the return, insert a header row BEFORE the filter tabs:
+return (
+  <ScreenScrollView style={{ backgroundColor: theme.background }}>
+
+    {/* ── Back header ─────────────────────────────────────── */}
+    <View style={{
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingTop: insets.top + 8,
+      paddingHorizontal: 16,
+      paddingBottom: 12,
+    }}>
+      <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
+        <Feather name="chevron-left" size={28} color={theme.text} />
+      </Pressable>
+      <ThemedText style={[Typography.h2, { marginLeft: 8 }]}>Inquiries</ThemedText>
+    </View>
+
+    {/* existing filter row and content below */}
+    ...
+```
+
+---
+
+### A3 — `InterestedUsersScreen`
+
+Accessed from `GroupsScreen` via `navigate('InterestedUsers', { groupId, groupName })`. Has a header with a title but no back button.
+
+```tsx
+// screens/shared/InterestedUsersScreen.tsx
+// The existing header is:
+<View style={styles.header}>
+  <ThemedText style={{ fontSize: 18, fontWeight: '700' }}>Interested in {groupName}</ThemedText>
+  <ThemedText style={{ color: theme.textSecondary, fontSize: 13, marginTop: 4 }}>
+    Like them back to unlock their join request
+  </ThemedText>
+</View>
+
+// Replace with:
+<View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+  <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={{ marginBottom: 8 }}>
+    <Feather name="chevron-left" size={28} color={theme.text} />
+  </Pressable>
+  <ThemedText style={{ fontSize: 18, fontWeight: '700' }}>Interested in {groupName}</ThemedText>
+  <ThemedText style={{ color: theme.textSecondary, fontSize: 13, marginTop: 4 }}>
+    Like them back to unlock their join request
+  </ThemedText>
+</View>
+
+// Add to imports:
+import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+// Inside component add:
+const navigation = useNavigation<any>();
+const insets = useSafeAreaInsets();
+```
+
+---
+
+## Category B — Wrong Screen on Back Press (Cross-Tab Navigation)
+
+### Root Cause
+
+Whenever a screen in Messages, Groups, Roommates, or Explore calls:
+```tsx
+navigation.navigate('Profile', { screen: 'Plans' })
+navigation.navigate('Profile', { screen: 'Payment' })
+```
+React Navigation switches to the Profile tab and pushes Plans/Payment onto the Profile stack. When the user presses back, `goBack()` pops Plans/Payment and reveals **ProfileMain** — the root of the Profile stack — instead of returning to where the user came from.
+
+### Fix: Promote Plans and Payment to the Root Navigator as Modals
+
+Add Plans and Payment as **modal screens in `RootNavigator.tsx`**, above the tab navigator. Because they're registered at the root level, any `navigate('Plans')` or `navigate('Payment')` call from anywhere in the app will present them as a modal overlay on top of everything. When dismissed (goBack), the user returns to exactly the screen they were on — regardless of which tab they came from.
+
+---
+
+### Step B1 — Update `RootNavigator.tsx`
+
+```tsx
+// navigation/RootNavigator.tsx
+
+import { PlansScreen } from '../screens/shared/PlansScreen';
+import { PaymentScreen } from '../screens/shared/PaymentScreen';
+
+// Inside the root Stack.Navigator, add these AFTER the 'Main' screen:
+
+<Stack.Screen
+  name="Main"
+  component={MainComponent}
+/>
+
+{/* ── Modal screens — accessible from any tab ──────────────────── */}
+<Stack.Screen
+  name="Plans"
+  component={PlansScreen}
+  options={{
+    presentation: 'modal',
+    headerShown: false,
+    animation: 'slide_from_bottom',
+  }}
+/>
+<Stack.Screen
+  name="Payment"
+  component={PaymentScreen}
+  options={{
+    presentation: 'modal',
+    headerShown: false,
+    animation: 'slide_from_bottom',
+  }}
+/>
+```
+
+Also update the root param list type:
+```tsx
+// In RootNavigator.tsx, update the root Stack type:
+type RootStackParamList = {
+  Login: undefined;
+  OnboardingProfile: undefined;
+  OnboardingHostType: undefined;
+  HostCompanySetup: undefined;
+  HostAgentSetup: undefined;
+  OnboardingPlan: undefined;
+  Main: undefined;
+  Plans: undefined;           // ← add
+  Payment: undefined;         // ← add
+};
+```
+
+---
+
+### Step B2 — Update All Cross-Tab Navigation Calls
+
+Replace every `navigate('Profile', { screen: 'Plans' })` and `navigate('Profile', { screen: 'Payment' })` called from **outside the Profile tab** with a root-level `navigate('Plans')` or `navigate('Payment')`. These will now hit the root navigator's modal screen instead of the Profile stack.
+
+**`screens/shared/ChatScreen.tsx`** (3 occurrences):
+```tsx
+// BEFORE:
+(navigation as any).navigate('Profile', { screen: 'Payment' })
+navigation.getParent()?.navigate('Profile', { screen: 'Plans' })
+
+// AFTER:
+(navigation as any).navigate('Payment')
+(navigation as any).navigate('Plans')
+```
+
+**`screens/renter/RoommatesScreen.tsx`** (3 occurrences):
+```tsx
+// BEFORE:
+(navigation as any).navigate('Profile', { screen: 'Payment' })
+(navigation as any).getParent()?.navigate('Profile', { screen: 'Plans' })
+
+// AFTER:
+(navigation as any).navigate('Payment')
+(navigation as any).navigate('Plans')
+```
+
+**`screens/renter/ExploreScreen.tsx`** (1 occurrence):
+```tsx
+// BEFORE:
+(navigation as any).navigate('Profile', { screen: 'Payment' })
+
+// AFTER:
+(navigation as any).navigate('Payment')
+```
+
+**`screens/renter/GroupsScreen.tsx`** (3 occurrences):
+```tsx
+// BEFORE:
+navigation.navigate('Profile', { screen: 'Payment' })
+
+// AFTER:
+(navigation as any).navigate('Payment')
+```
+
+**`screens/shared/CreateGroupScreen.tsx`** (from Fix 7b — already in fixes prompt):
+```tsx
+// BEFORE:
+navigation.navigate('PlanSelection')  // was already broken
+
+// AFTER (updated):
+(navigation as any).navigate('Plans')
+```
+
+**`screens/renter/GroupsScreen.tsx`** (the 'Settings' fix from Fix 7a — update to use root):
+```tsx
+// BEFORE:
+navigation.navigate('Settings')  // was already broken
+
+// AFTER (updated):
+(navigation as any).navigate('Plans')
+```
+
+**`screens/renter/RoommatesScreen.tsx`** (the 'Subscription' fix from Fix 7c — update to use root):
+```tsx
+// BEFORE:
+(navigation as any).navigate('Profile', { screen: 'Subscription' })  // was already broken
+
+// AFTER (updated):
+(navigation as any).navigate('Plans')
+```
+
+---
+
+### Step B3 — Keep Within-Profile-Stack Calls As-Is
+
+The following calls navigate to Plans/Payment **from within the Profile tab** (ProfileMain, WhoLikedMeScreen, MyInterestsScreen, ProfileViewsScreen). Since they're already in the Profile stack AND Plans/Payment are also registered in ProfileStackNavigator, these continue to work correctly — `navigate('Plans')` from within ProfileStack finds Plans in the current stack first. **Do not change these:**
+
+```tsx
+// ProfileScreen.tsx — stays as is
+navigation.navigate('Plans')
+navigation.navigate('HostSubscription')
+navigation.navigate('Payment')
+
+// WhoLikedMeScreen.tsx — stays as is
+navigation.navigate('Plans' as never)
+
+// ProfileViewsScreen.tsx — stays as is
+navigation.navigate('Plans' as never)
+
+// MyInterestsScreen.tsx — stays as is
+(navigation as any).navigate('Plans')
+```
+
+---
+
+### Step B4 — Fix Dashboard Notification Bell
+
+The bell icon on `HostDashboardScreen` navigates cross-tab to Notifications:
+```tsx
+// BEFORE (wrong — back from Notifications goes to ProfileMain, not Dashboard):
+parent.navigate('Profile', { screen: 'Notifications' });
+
+// AFTER — add Notifications to DashboardStack so back works correctly:
+navigation.navigate('Notifications' as any);
+```
+
+Then register `NotificationsScreen` in `DashboardStack` inside `HostTabNavigator.tsx`:
+```tsx
+// navigation/HostTabNavigator.tsx
+import { NotificationsScreen } from '../screens/shared/NotificationsScreen';
+
+// Inside DashboardStackNavigator():
+<DashboardStack.Screen name="Notifications" component={NotificationsScreen} />
+
+// Also update DashboardStackParamList type:
+export type HostDashboardStackParamList = {
+  DashboardMain: undefined;
+  CreateEditListing: { propertyId?: string };
+  Analytics: undefined;
+  Inquiries: undefined;
+  Notifications: undefined;   // ← add
+  HostPricing: undefined;
+  HostSubscription: undefined;
+  ListingBoost: { listingId: string };
+};
+```
+
+Similarly, the same bell icon pattern on `RoommatesScreen` navigates to Notifications cross-tab:
+```tsx
+// screens/renter/RoommatesScreen.tsx — 2 occurrences
+// BEFORE:
+(navigation as any).navigate('Profile', { screen: 'Notifications' })
+
+// AFTER:
+(navigation as any).navigate('Notifications')
+```
+
+Since Notifications is already in `ProfileStackNavigator`, this call from the Roommates tab would need Notifications added to the Renter tab navigators as well, OR use the same root-modal approach. The cleanest fix for the renter side is to add Notifications to `RoommatesStackNavigator`:
+```tsx
+// navigation/RoommatesStackNavigator.tsx
+import { NotificationsScreen } from '../screens/shared/NotificationsScreen';
+
+<Stack.Screen name="RoommatesList" component={RoommatesScreen} />
+<Stack.Screen name="AIAssistant" component={AIAssistantScreen} />
+<Stack.Screen name="Notifications" component={NotificationsScreen} />  // ← add
+```
+
+---
+
+## Summary of All Changes
+
+| # | File | Problem | Fix |
+|---|---|---|---|
+| A1 | `screens/host/HostAnalyticsScreen.tsx` | No back button | Add chevron-left header row |
+| A2 | `screens/host/HostInquiriesScreen.tsx` | No back button | Add chevron-left header row |
+| A3 | `screens/shared/InterestedUsersScreen.tsx` | No back button | Add chevron-left above title |
+| B1 | `navigation/RootNavigator.tsx` | Plans/Payment not at root | Add both as modal screens |
+| B2 | `ChatScreen`, `RoommatesScreen`, `ExploreScreen`, `GroupsScreen` | Cross-tab navigate to Profile stack | Change to root-level `navigate('Plans')` / `navigate('Payment')` |
+| B3 | `ProfileScreen`, `WhoLikedMeScreen`, `MyInterestsScreen`, `ProfileViewsScreen` | Already correct within Profile stack | No change needed |
+| B4 | `HostDashboardScreen` | Bell navigates cross-tab to Notifications | Add `Notifications` to DashboardStack, navigate locally |
+| B4b | `RoommatesScreen` | Bell navigates cross-tab to Notifications | Add `Notifications` to RoommatesStack, navigate locally |

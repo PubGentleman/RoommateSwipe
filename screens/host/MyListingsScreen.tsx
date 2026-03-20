@@ -164,6 +164,12 @@ export const MyListingsScreen = () => {
       const updated = { ...property, available: false, rentedDate: undefined };
       await StorageService.addOrUpdateProperty(updated);
     }
+    await StorageService.notifyPropertyEvent(
+      propertyId,
+      'property_update',
+      'Listing Paused',
+      `${property.title} has been temporarily paused by the host`,
+    );
     await loadData();
   };
 
@@ -210,9 +216,18 @@ export const MyListingsScreen = () => {
 
   const executeDeleteListing = async (propertyId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    const property = listings.find(p => p.id === propertyId);
     try {
       await deleteListingSupa(propertyId);
     } catch {
+    }
+    if (property) {
+      await StorageService.notifyPropertyEvent(
+        propertyId,
+        'property_update',
+        'Listing Removed',
+        `${property.title} is no longer available`,
+      );
     }
     await StorageService.deleteProperty(propertyId);
     await loadData();

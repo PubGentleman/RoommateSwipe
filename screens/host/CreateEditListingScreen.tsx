@@ -357,6 +357,14 @@ export const CreateEditListingScreen = () => {
           ]
         );
       } else {
+        if (propertyId) {
+          await StorageService.notifyPropertyEvent(
+            propertyId,
+            'property_update',
+            'Listing Updated',
+            `${title.trim()} has been updated with new details`,
+          );
+        }
         Alert.alert('Saved', 'Your listing has been updated.', [
           { text: 'OK', onPress: () => navigation.goBack() },
         ]);
@@ -370,6 +378,12 @@ export const CreateEditListingScreen = () => {
 
   const executeDelete = async () => {
     if (!propertyId) return;
+    await StorageService.notifyPropertyEvent(
+      propertyId,
+      'property_update',
+      'Listing Removed',
+      `${title.trim() || 'A listing'} is no longer available`,
+    );
     try {
       await deleteListingSupa(propertyId);
     } catch {

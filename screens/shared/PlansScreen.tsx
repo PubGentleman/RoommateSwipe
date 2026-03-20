@@ -7,6 +7,7 @@ import type { ProfileStackParamList } from '../../navigation/ProfileStackNavigat
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../contexts/AuthContext';
+import { StorageService } from '../../utils/storage';
 import * as Haptics from 'expo-haptics';
 import { useStripePayment } from '../../hooks/useStripePayment';
 import { PurchaseConfirmModal } from '../../components/modals/PurchaseConfirmModal';
@@ -190,8 +191,18 @@ export const PlansScreen = () => {
       if (selectedPlan === 'plus') await upgradeToPlus(billingCycle, subscriptionId);
       else await upgradeToElite(billingCycle, subscriptionId);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setSelectedPlan(null);
       const planName = selectedPlan === 'plus' ? 'Plus' : 'Elite';
+      await StorageService.addNotification({
+        id: `notif-renter-plan-${selectedPlan}-${Date.now()}`,
+        userId: user.id,
+        type: 'system',
+        title: 'Plan Updated',
+        body: `Welcome to ${planName}! You now have access to all ${planName} features.`,
+        isRead: false,
+        createdAt: new Date(),
+        data: { plan: selectedPlan },
+      });
+      setSelectedPlan(null);
       Alert.alert('Success!', `Welcome to ${planName}! You now have access to all ${planName} features.`);
     } catch (err: any) {
       Alert.alert('Error', err.message || 'Something went wrong.');

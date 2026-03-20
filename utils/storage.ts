@@ -286,6 +286,40 @@ export const StorageService = {
     }
   },
 
+  async notifyPropertyEvent(
+    propertyId: string,
+    type: 'property_update' | 'property_rented',
+    title: string,
+    body: string,
+  ): Promise<void> {
+    try {
+      const users = await this.getUsers();
+      const cards = await this.getInterestCards();
+      const inquirerIds = new Set(
+        cards
+          .filter(c => c.propertyId === propertyId && (c.status === 'pending' || c.status === 'accepted'))
+          .map(c => c.renterId)
+      );
+      for (const user of users) {
+        const saved = await this.getSavedProperties(user.id);
+        if (saved.includes(propertyId) || inquirerIds.has(user.id)) {
+          await this.addNotification({
+            id: generateNotificationId(),
+            userId: user.id,
+            type,
+            title,
+            body,
+            isRead: false,
+            createdAt: new Date(),
+            data: { propertyId },
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error sending property event notification:', error);
+    }
+  },
+
   async getVisibleRenterGroups(): Promise<any[]> {
     try {
       const groups = await this.getGroups();
@@ -1736,8 +1770,21 @@ export const StorageService = {
       const properties = await this.getProperties();
       const index = properties.findIndex(p => p.id === listingId);
       if (index >= 0) {
-        properties[index] = { ...properties[index], listingBoost: boost };
+        const property = properties[index];
+        properties[index] = { ...property, listingBoost: boost };
         await AsyncStorage.setItem(STORAGE_KEYS.PROPERTIES, JSON.stringify(properties));
+        if (property.hostId) {
+          await this.addNotification({
+            id: generateNotificationId(),
+            userId: property.hostId,
+            type: 'system',
+            title: 'Listing Boosted',
+            body: `${property.title} is now boosted and will appear at the top of search results`,
+            isRead: false,
+            createdAt: new Date(),
+            data: { propertyId: listingId },
+          });
+        }
       }
     } catch (error) {
       console.error('[StorageService] Error applying listing boost:', error);

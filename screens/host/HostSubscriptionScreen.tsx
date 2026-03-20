@@ -163,6 +163,16 @@ export const HostSubscriptionScreen = () => {
         },
       });
       setSelectedPlan(null);
+      await StorageService.addNotification({
+        id: `notif-host-plan-${plan}-${Date.now()}`,
+        userId: user.id,
+        type: 'system',
+        title: 'Plan Updated',
+        body: `You're now on the ${planData.label} plan at $${price}/mo`,
+        isRead: false,
+        createdAt: new Date(),
+        data: { plan },
+      });
       const successMsg = `You're now on the ${planData.label} plan at $${price}/mo!`;
       Alert.alert('Plan Updated', successMsg, [{ text: 'OK', onPress: () => navigation.goBack() }]);
     } catch (e) {
