@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { View, StyleSheet, Pressable, Text, ScrollView, Alert } from 'react-native';
+import Animated, { useSharedValue, useAnimatedScrollHandler, useAnimatedStyle, interpolate, Extrapolation } from 'react-native-reanimated';
 import { Feather } from '../../components/VectorIcons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -79,6 +80,19 @@ export const HostDashboardScreen = () => {
   const [showAISheet, setShowAISheet] = useState(false);
   const [hostSub, setHostSub] = useState<HostSubscriptionData | null>(null);
   const [showUpgradeBanner, setShowUpgradeBanner] = useState(false);
+
+  const DASH_COLLAPSE_H = 50;
+  const dashScrollY = useSharedValue(0);
+  const dashScrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => { dashScrollY.value = event.contentOffset.y; },
+  });
+  const dashCollapsibleStyle = useAnimatedStyle(() => {
+    const translateY = interpolate(dashScrollY.value, [0, DASH_COLLAPSE_H], [0, -DASH_COLLAPSE_H], Extrapolation.CLAMP);
+    const opacity = interpolate(dashScrollY.value, [0, DASH_COLLAPSE_H * 0.6], [1, 0], Extrapolation.CLAMP);
+    const maxH = interpolate(dashScrollY.value, [0, DASH_COLLAPSE_H], [DASH_COLLAPSE_H, 0], Extrapolation.CLAMP);
+    return { transform: [{ translateY }], opacity, maxHeight: maxH, overflow: 'hidden' as const };
+  });
+  const AnimatedScrollView = Animated.ScrollView;
 
   useEffect(() => {
     if (hostSub && isFreePlan(hostSub.plan)) {
@@ -293,20 +307,8 @@ export const HostDashboardScreen = () => {
   return (
     <View style={[styles.container, { backgroundColor: BG }]}>
       <View style={[styles.topNav, { paddingTop: insets.top + 14 }]}>
-        <View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Text style={styles.greetingSub}>{getGreeting()}</Text>
-            {hostSub ? <HostPlanBadge plan={hostSub.plan} isVerifiedAgent={hostSub.isVerifiedAgent} /> : null}
-          </View>
+        <View style={{ flex: 1 }}>
           <Text style={styles.greetingTitle}>Host Dashboard</Text>
-          {hostSub ? (
-            <Text style={styles.planSummaryText}>
-              {isFreePlan(hostSub.plan) ? 'Free Plan \u00B7 Upgrade to unlock all features' :
-               hostSub.plan === 'starter' ? 'Host Starter \u00B7 $19.99/mo' :
-               hostSub.plan === 'pro' ? 'Host Pro \u00B7 $49.99/mo' :
-               `Host Business \u00B7 $99/mo \u00B7 ${activeCount} listings active`}
-            </Text>
-          ) : null}
         </View>
         <View style={styles.navActions}>
           <Pressable style={styles.iconBtn} onPress={() => setShowAISheet(true)}>
@@ -329,11 +331,29 @@ export const HostDashboardScreen = () => {
           </Pressable>
         </View>
       </View>
+      <Animated.View style={dashCollapsibleStyle}>
+        <View style={{ paddingHorizontal: 20, paddingBottom: 6 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={styles.greetingSub}>{getGreeting()}</Text>
+            {hostSub ? <HostPlanBadge plan={hostSub.plan} isVerifiedAgent={hostSub.isVerifiedAgent} /> : null}
+          </View>
+          {hostSub ? (
+            <Text style={styles.planSummaryText}>
+              {isFreePlan(hostSub.plan) ? 'Free Plan \u00B7 Upgrade to unlock all features' :
+               hostSub.plan === 'starter' ? 'Host Starter \u00B7 $19.99/mo' :
+               hostSub.plan === 'pro' ? 'Host Pro \u00B7 $49.99/mo' :
+               `Host Business \u00B7 $99/mo \u00B7 ${activeCount} listings active`}
+            </Text>
+          ) : null}
+        </View>
+      </Animated.View>
 
-      <ScrollView
+      <AnimatedScrollView
         style={styles.scroll}
         contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
         showsVerticalScrollIndicator={false}
+        onScroll={dashScrollHandler}
+        scrollEventThrottle={16}
       >
         {showUpgradeBanner ? (
           <View style={styles.upgradeBanner}>
@@ -535,7 +555,7 @@ export const HostDashboardScreen = () => {
             </Pressable>
           ) : null}
         </View>
-      </ScrollView>
+      </AnimatedScrollView>
       <RoomdrAISheet
         visible={showAISheet}
         onDismiss={() => setShowAISheet(false)}

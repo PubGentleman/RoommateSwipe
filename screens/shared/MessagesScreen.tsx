@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Pressable, FlatList, ScrollView, TextInput, Alert } from 'react-native';
+import Animated, { useSharedValue, useAnimatedScrollHandler, useAnimatedStyle, interpolate, Extrapolation } from 'react-native-reanimated';
 import { Feather } from '../../components/VectorIcons';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
@@ -58,6 +59,19 @@ export const MessagesScreen = () => {
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [showAISheet, setShowAISheet] = useState(false);
   const [inquiryGroups, setInquiryGroups] = useState<Group[]>([]);
+
+  const MSG_COLLAPSE_H = 50;
+  const msgScrollY = useSharedValue(0);
+  const msgScrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => { msgScrollY.value = event.contentOffset.y; },
+  });
+  const msgCollapsibleStyle = useAnimatedStyle(() => {
+    const translateY = interpolate(msgScrollY.value, [0, MSG_COLLAPSE_H], [0, -MSG_COLLAPSE_H], Extrapolation.CLAMP);
+    const opacity = interpolate(msgScrollY.value, [0, MSG_COLLAPSE_H * 0.6], [1, 0], Extrapolation.CLAMP);
+    const maxH = interpolate(msgScrollY.value, [0, MSG_COLLAPSE_H], [MSG_COLLAPSE_H, 0], Extrapolation.CLAMP);
+    return { transform: [{ translateY }], opacity, maxHeight: maxH, overflow: 'hidden' as const };
+  });
+  const AnimatedFlatList = Animated.createAnimatedComponent(FlatList);
 
   useEffect(() => {
     if (!user) return;
@@ -786,28 +800,30 @@ export const MessagesScreen = () => {
       </View>
 
       {isSearchVisible ? (
-        <View style={styles.searchBarContainer}>
-          <Feather name="search" size={14} color="rgba(255,255,255,0.4)" />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search conversations..."
-            placeholderTextColor="rgba(255,255,255,0.3)"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            autoFocus
-          />
-          {searchQuery.length > 0 ? (
-            <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
-              <Feather name="x-circle" size={14} color="rgba(255,255,255,0.4)" />
-            </Pressable>
-          ) : null}
-        </View>
+        <Animated.View style={msgCollapsibleStyle}>
+          <View style={styles.searchBarContainer}>
+            <Feather name="search" size={14} color="rgba(255,255,255,0.4)" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search conversations..."
+              placeholderTextColor="rgba(255,255,255,0.3)"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoFocus
+            />
+            {searchQuery.length > 0 ? (
+              <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
+                <Feather name="x-circle" size={14} color="rgba(255,255,255,0.4)" />
+              </Pressable>
+            ) : null}
+          </View>
+        </Animated.View>
       ) : null}
 
-      <FlatList
+      <AnimatedFlatList
         data={filteredConversations}
         renderItem={renderConversation}
-        keyExtractor={item => item.id}
+        keyExtractor={(item: any) => item.id}
         ListHeaderComponent={!isSearchVisible ? renderHeader : null}
         ListFooterComponent={!isSearchVisible ? renderFooterNudge : null}
         ListEmptyComponent={!isLoading ? renderEmptyState : null}
@@ -816,6 +832,8 @@ export const MessagesScreen = () => {
           { paddingBottom: insets.bottom + 100, flexGrow: filteredConversations.length === 0 ? 1 : undefined },
         ]}
         showsVerticalScrollIndicator={false}
+        onScroll={msgScrollHandler}
+        scrollEventThrottle={16}
       />
 
       <RoomdrAISheet

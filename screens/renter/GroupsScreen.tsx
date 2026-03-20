@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, Dimensions, ActivityIndicator, TextInput, ScrollView, Alert, Modal, Image, Platform } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, runOnJS } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, useAnimatedScrollHandler, withSpring, withTiming, runOnJS, interpolate, Extrapolation } from 'react-native-reanimated';
 import { Feather } from '../../components/VectorIcons';
 import * as Haptics from 'expo-haptics';
 import { ThemedText } from '../../components/ThemedText';
@@ -56,6 +56,17 @@ export const GroupsScreen = () => {
   const { activeCity, recentCities, setActiveCity } = useCityContext();
   const [showCityPicker, setShowCityPicker] = useState(false);
   const [showAISheet, setShowAISheet] = useState(false);
+  const GRP_COLLAPSE_H = 52;
+  const grpScrollY = useSharedValue(0);
+  const grpScrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => { grpScrollY.value = event.contentOffset.y; },
+  });
+  const grpCollapsibleStyle = useAnimatedStyle(() => {
+    const translateY = interpolate(grpScrollY.value, [0, GRP_COLLAPSE_H], [0, -GRP_COLLAPSE_H], Extrapolation.CLAMP);
+    const opacity = interpolate(grpScrollY.value, [0, GRP_COLLAPSE_H * 0.6], [1, 0], Extrapolation.CLAMP);
+    const maxH = interpolate(grpScrollY.value, [0, GRP_COLLAPSE_H], [GRP_COLLAPSE_H, 0], Extrapolation.CLAMP);
+    return { transform: [{ translateY }], opacity, maxHeight: maxH, overflow: 'hidden' as const };
+  });
   const [profileCache, setProfileCache] = useState<RoommateProfile[]>([]);
   const [likedGroupIds, setLikedGroupIds] = useState<Set<string>>(new Set());
   const [mutualGroupIds, setMutualGroupIds] = useState<Set<string>>(new Set());
@@ -1079,10 +1090,12 @@ export const GroupsScreen = () => {
       const archivedInquiries = inquiryGroups.filter(g => g.isArchived);
 
       return (
-        <ScrollView 
+        <Animated.ScrollView 
           style={styles.scrollContent}
           contentContainerStyle={styles.myGroupsList}
           showsVerticalScrollIndicator={false}
+          onScroll={grpScrollHandler}
+          scrollEventThrottle={16}
         >
           {pendingInvites.length > 0 ? (
             <View style={styles.invitesSection}>
@@ -1206,7 +1219,7 @@ export const GroupsScreen = () => {
               {showPastInquiries ? archivedInquiries.map(group => renderInquiryGroup(group)) : null}
             </>
           ) : null}
-        </ScrollView>
+        </Animated.ScrollView>
       );
     }
 
@@ -1413,10 +1426,12 @@ export const GroupsScreen = () => {
     }
 
     return (
-      <ScrollView 
+      <Animated.ScrollView 
         style={styles.scrollContent}
         contentContainerStyle={styles.createForm}
         showsVerticalScrollIndicator={false}
+        onScroll={grpScrollHandler}
+        scrollEventThrottle={16}
       >
         <ThemedText style={[Typography.h3, { marginBottom: Spacing.xs }]}>
           Create a New Group
@@ -1636,7 +1651,7 @@ export const GroupsScreen = () => {
             Create Group
           </ThemedText>
         </Pressable>
-      </ScrollView>
+      </Animated.ScrollView>
     );
   };
 
@@ -1655,7 +1670,7 @@ export const GroupsScreen = () => {
           const isActive = activeTab === tab;
           const label = tab === 'my-groups' ? 'My Groups' : tab === 'discover' ? 'Discover' : 'Create';
           return (
-            <Pressable key={tab} style={styles.tab} onPress={() => setActiveTab(tab)}>
+            <Pressable key={tab} style={styles.tab} onPress={() => { grpScrollY.value = 0; setActiveTab(tab); }}>
               <Text style={[styles.tabText, isActive && styles.tabTextActive]}>{label}</Text>
               {isActive ? (
                 <LinearGradient
@@ -1671,11 +1686,13 @@ export const GroupsScreen = () => {
         <View style={styles.tabBarLine} />
       </View>
 
-      {activeTab === 'discover' ? (
-        <View style={styles.citySelectorRow}>
-          <CityPillButton activeCity={activeCity} onPress={() => setShowCityPicker(true)} />
-        </View>
-      ) : null}
+      <Animated.View style={grpCollapsibleStyle}>
+        {activeTab === 'discover' ? (
+          <View style={styles.citySelectorRow}>
+            <CityPillButton activeCity={activeCity} onPress={() => setShowCityPicker(true)} />
+          </View>
+        ) : null}
+      </Animated.View>
 
       <View style={styles.content}>
         {renderTabContent()}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, Image, Pressable, FlatList, Modal, TextInput, ScrollView, Switch, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import Animated, { useSharedValue, useAnimatedScrollHandler, useAnimatedStyle, interpolate, Extrapolation } from 'react-native-reanimated';
 import { Feather } from '../../components/VectorIcons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -106,6 +107,19 @@ export const ExploreScreen = () => {
   const [interestNote, setInterestNote] = useState('');
   const [userGroups, setUserGroups] = useState<Group[]>([]);
   const [showGroupPickerModal, setShowGroupPickerModal] = useState(false);
+
+  const COLLAPSIBLE_HEIGHT = 120;
+  const exploreScrollY = useSharedValue(0);
+  const exploreScrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => { exploreScrollY.value = event.contentOffset.y; },
+  });
+  const collapsibleAnimStyle = useAnimatedStyle(() => {
+    const translateY = interpolate(exploreScrollY.value, [0, COLLAPSIBLE_HEIGHT], [0, -COLLAPSIBLE_HEIGHT], Extrapolation.CLAMP);
+    const opacity = interpolate(exploreScrollY.value, [0, COLLAPSIBLE_HEIGHT * 0.6], [1, 0], Extrapolation.CLAMP);
+    const maxH = interpolate(exploreScrollY.value, [0, COLLAPSIBLE_HEIGHT], [COLLAPSIBLE_HEIGHT, 0], Extrapolation.CLAMP);
+    return { transform: [{ translateY }], opacity, maxHeight: maxH, overflow: 'hidden' as const };
+  });
+  const AnimatedFlatList = Animated.createAnimatedComponent(FlatList);
 
   const eligibleGroups = userGroups.filter(g =>
     (g.type === 'roommate' || !g.type) && !g.listingId
@@ -914,59 +928,61 @@ export const ExploreScreen = () => {
           {hasActiveFilters() ? <View style={styles.filterDot} /> : null}
         </Pressable>
       </View>
-      <View style={styles.cityRow}>
-        <CityPillButton activeCity={activeCity} onPress={() => setShowCityPicker(true)} />
-        <Text style={styles.listingCount}>{filteredProperties.length} listings</Text>
-      </View>
+      <Animated.View style={collapsibleAnimStyle}>
+        <View style={styles.cityRow}>
+          <CityPillButton activeCity={activeCity} onPress={() => setShowCityPicker(true)} />
+          <Text style={styles.listingCount}>{filteredProperties.length} listings</Text>
+        </View>
 
-      <View style={styles.tabsRow}>
-        <Pressable
-          style={viewMode === 'all' ? styles.tabActive : styles.tabInactive}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setViewMode('all'); }}
-        >
-          {viewMode === 'all' ? (
-            <LinearGradient colors={[ACCENT, '#e83a2a']} style={styles.tabGradient}>
-              <Feather name="home" size={13} color="#fff" />
-              <Text style={styles.tabActiveText}>All Listings</Text>
-            </LinearGradient>
-          ) : (
-            <>
-              <Feather name="home" size={13} color="rgba(255,255,255,0.4)" />
-              <Text style={styles.tabInactiveText}>All Listings</Text>
-            </>
-          )}
-        </Pressable>
-        <Pressable
-          style={viewMode === 'saved' ? styles.tabActive : styles.tabInactive}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setViewMode('saved'); }}
-        >
-          {viewMode === 'saved' ? (
-            <LinearGradient colors={[ACCENT, '#e83a2a']} style={styles.tabGradient}>
-              <Feather name="heart" size={13} color="#fff" />
-              <Text style={styles.tabActiveText}>Saved ({saved.size})</Text>
-            </LinearGradient>
-          ) : (
-            <>
-              <Feather name="heart" size={13} color="rgba(255,255,255,0.4)" />
-              <Text style={styles.tabInactiveText}>Saved ({saved.size})</Text>
-            </>
-          )}
-        </Pressable>
-      </View>
+        <View style={styles.tabsRow}>
+          <Pressable
+            style={viewMode === 'all' ? styles.tabActive : styles.tabInactive}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setViewMode('all'); }}
+          >
+            {viewMode === 'all' ? (
+              <LinearGradient colors={[ACCENT, '#e83a2a']} style={styles.tabGradient}>
+                <Feather name="home" size={13} color="#fff" />
+                <Text style={styles.tabActiveText}>All Listings</Text>
+              </LinearGradient>
+            ) : (
+              <>
+                <Feather name="home" size={13} color="rgba(255,255,255,0.4)" />
+                <Text style={styles.tabInactiveText}>All Listings</Text>
+              </>
+            )}
+          </Pressable>
+          <Pressable
+            style={viewMode === 'saved' ? styles.tabActive : styles.tabInactive}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setViewMode('saved'); }}
+          >
+            {viewMode === 'saved' ? (
+              <LinearGradient colors={[ACCENT, '#e83a2a']} style={styles.tabGradient}>
+                <Feather name="heart" size={13} color="#fff" />
+                <Text style={styles.tabActiveText}>Saved ({saved.size})</Text>
+              </LinearGradient>
+            ) : (
+              <>
+                <Feather name="heart" size={13} color="rgba(255,255,255,0.4)" />
+                <Text style={styles.tabInactiveText}>Saved ({saved.size})</Text>
+              </>
+            )}
+          </Pressable>
+        </View>
 
-      <View style={styles.chipScrollWrapper}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipScrollContent}>
-          {QUICK_FILTERS.map(f => {
-            const active = activeQuickFilters.has(f.key);
-            return (
-              <Pressable key={f.key} style={active ? styles.chipSelected : styles.chipUnselected} onPress={() => toggleQuickFilter(f.key)}>
-                {f.icon ? <Feather name={f.icon} size={10} color={active ? '#ff8070' : 'rgba(255,255,255,0.4)'} /> : null}
-                <Text style={active ? styles.chipSelectedText : styles.chipUnselectedText}>{f.label}</Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      </View>
+        <View style={styles.chipScrollWrapper}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipScrollContent}>
+            {QUICK_FILTERS.map(f => {
+              const active = activeQuickFilters.has(f.key);
+              return (
+                <Pressable key={f.key} style={active ? styles.chipSelected : styles.chipUnselected} onPress={() => toggleQuickFilter(f.key)}>
+                  {f.icon ? <Feather name={f.icon} size={10} color={active ? '#ff8070' : 'rgba(255,255,255,0.4)'} /> : null}
+                  <Text style={active ? styles.chipSelectedText : styles.chipUnselectedText}>{f.label}</Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </Animated.View>
       {displayMode === 'map' ? (
         <PropertyMapView
           properties={filteredProperties}
@@ -990,15 +1006,17 @@ export const ExploreScreen = () => {
           bottomInset={insets.bottom}
         />
       ) : (
-        <FlatList
+        <AnimatedFlatList
           data={filteredProperties}
           renderItem={renderProperty}
-          keyExtractor={item => item.id}
+          keyExtractor={(item: any) => item.id}
           contentContainerStyle={[
             styles.list,
             { paddingBottom: insets.bottom + 100, paddingTop: Spacing.lg },
           ]}
           showsVerticalScrollIndicator={false}
+          onScroll={exploreScrollHandler}
+          scrollEventThrottle={16}
           ListHeaderComponent={() => {
             const featuredListings = filteredProperties.filter(p => {
               const host = p.hostProfileId ? hostProfiles.get(p.hostProfileId) : null;

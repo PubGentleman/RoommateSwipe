@@ -46,6 +46,8 @@ The application is built with React Native and Expo using TypeScript, featuring 
 - **References System:** Users can request and display references.
 - **Personality Quiz:** A 5-question quiz integrated into the matching algorithm.
 
+- **Collapsible/Sticky Headers:** All main screens implement a collapsible header pattern using `react-native-reanimated`. The top title bar stays pinned while secondary content (city pills, tabs, quick filters, profile hero) collapses/fades on scroll. Applied to: ExploreScreen (120px), HostDashboardScreen (50px), MessagesScreen (50px), ProfileScreen (200px), and GroupsScreen (52px). Pattern: `useAnimatedScrollHandler` + `useAnimatedStyle` with `interpolate` for translateY, opacity, and maxHeight.
+
 Animations are powered by React Native Reanimated, gestures by React Native Gesture Handler, and state management uses React Context API and AsyncStorage.
 
 ## Backend (Supabase)

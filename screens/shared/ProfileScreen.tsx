@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, Pressable, Image, Alert, Modal, ScrollView, Text, TouchableOpacity, Platform } from 'react-native';
+import Animated, { useSharedValue, useAnimatedScrollHandler, useAnimatedStyle, interpolate, Extrapolation } from 'react-native-reanimated';
 import { Feather } from '../../components/VectorIcons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -32,6 +33,19 @@ export const ProfileScreen = () => {
   const [aiSheetContext, setAiSheetContext] = useState<'profile' | 'profile_reminder'>('profile');
   const [devTapCount, setDevTapCount] = useState(0);
   const [devTapTimer, setDevTapTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+
+  const PROFILE_COLLAPSE_H = 200;
+  const profileScrollY = useSharedValue(0);
+  const profileScrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => { profileScrollY.value = event.contentOffset.y; },
+  });
+  const profileCollapsibleStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(profileScrollY.value, [0, PROFILE_COLLAPSE_H * 0.5], [1, 0], Extrapolation.CLAMP);
+    const scale = interpolate(profileScrollY.value, [0, PROFILE_COLLAPSE_H], [1, 0.9], Extrapolation.CLAMP);
+    const translateY = interpolate(profileScrollY.value, [0, PROFILE_COLLAPSE_H], [0, -PROFILE_COLLAPSE_H * 0.5], Extrapolation.CLAMP);
+    return { opacity, transform: [{ scale }, { translateY }] };
+  });
+  const AnimatedScrollView = Animated.ScrollView;
 
   const handleDevTap = () => {
     const newCount = devTapCount + 1;
@@ -138,7 +152,8 @@ export const ProfileScreen = () => {
         </Pressable>
       </View>
 
-      <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}>
+      <AnimatedScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 100 }} onScroll={profileScrollHandler} scrollEventThrottle={16}>
+        <Animated.View style={profileCollapsibleStyle}>
         <LinearGradient
           colors={['rgba(255,107,91,0.08)', 'transparent']}
           start={{ x: 0.5, y: 0 }}
@@ -219,6 +234,7 @@ export const ProfileScreen = () => {
           ) : null}
         </View>
         </LinearGradient>
+        </Animated.View>
 
         {user?.role === 'renter' ? (
           <View style={styles.section}>
@@ -566,7 +582,7 @@ export const ProfileScreen = () => {
         </View>
 
         <View style={{ height: 20 }} />
-      </ScrollView>
+      </AnimatedScrollView>
 
       <Modal visible={showPurchaseBoostModal} animationType="slide" transparent onRequestClose={() => setShowPurchaseBoostModal(false)}>
         <Pressable style={styles.modalOverlay} onPress={() => setShowPurchaseBoostModal(false)}>
