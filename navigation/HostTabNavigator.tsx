@@ -16,6 +16,7 @@ import { HostSubscriptionScreen } from '../screens/host/HostSubscriptionScreen';
 import { ListingBoostScreen } from '../screens/host/ListingBoostScreen';
 import { HostGroupOutreachScreen } from '../screens/host/HostGroupOutreachScreen';
 import { BrowseRenterGroupsScreen } from '../screens/host/BrowseRenterGroupsScreen';
+import { HostRenterGroupDetailScreen } from '../screens/host/HostRenterGroupDetailScreen';
 import { HostMessagesStackNavigator } from './HostMessagesStackNavigator';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
 import { useTheme } from '../hooks/useTheme';
@@ -38,6 +39,11 @@ export type HostDashboardStackParamList = {
   ListingBoost: { listingId: string };
 };
 
+export type HostGroupsStackParamList = {
+  BrowseRenterGroups: undefined;
+  RenterGroupDetail: { group: any };
+};
+
 export type HostTabParamList = {
   Dashboard: undefined;
   Listings: undefined;
@@ -50,6 +56,7 @@ export type HostTabParamList = {
 const Tab = createBottomTabNavigator<HostTabParamList>();
 const ListingsStack = createNativeStackNavigator<HostListingsStackParamList>();
 const DashboardStack = createNativeStackNavigator<HostDashboardStackParamList>();
+const GroupsStack = createNativeStackNavigator<HostGroupsStackParamList>();
 
 function DashboardStackNavigator() {
   return (
@@ -73,6 +80,15 @@ function ListingsStackNavigator() {
       <ListingsStack.Screen name="ListingBoost" component={ListingBoostScreen} />
       <ListingsStack.Screen name="HostGroupOutreach" component={HostGroupOutreachScreen} />
     </ListingsStack.Navigator>
+  );
+}
+
+function HostGroupsStackNavigator() {
+  return (
+    <GroupsStack.Navigator screenOptions={{ headerShown: false }}>
+      <GroupsStack.Screen name="BrowseRenterGroups" component={BrowseRenterGroupsScreen} />
+      <GroupsStack.Screen name="RenterGroupDetail" component={HostRenterGroupDetailScreen} />
+    </GroupsStack.Navigator>
   );
 }
 
@@ -199,7 +215,7 @@ export const HostTabNavigator = () => {
       <Tab.Screen name="Dashboard" component={DashboardStackNavigator} />
       <Tab.Screen name="Listings" component={ListingsStackNavigator} />
       <Tab.Screen name="Roommates" component={RoommatesScreen} />
-      <Tab.Screen name="Groups" component={BrowseRenterGroupsScreen} />
+      <Tab.Screen name="Groups" component={HostGroupsStackNavigator} />
       <Tab.Screen name="Messages" component={HostMessagesStackNavigator} />
       <Tab.Screen name="Profile" component={ProfileStackNavigator} />
     </Tab.Navigator>

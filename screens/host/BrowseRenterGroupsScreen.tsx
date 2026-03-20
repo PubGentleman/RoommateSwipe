@@ -326,7 +326,7 @@ export const BrowseRenterGroupsScreen = () => {
     }));
 
     return (
-      <View style={styles.card}>
+      <Pressable style={styles.card} onPress={() => navigation.navigate('RenterGroupDetail', { group: item })}>
         <View style={styles.avatarCluster}>
           {avatarSlots.map((slot, i) => (
             <View
@@ -429,7 +429,7 @@ export const BrowseRenterGroupsScreen = () => {
             </LinearGradient>
           )}
         </Pressable>
-      </View>
+      </Pressable>
     );
   };
 
