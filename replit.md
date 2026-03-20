@@ -66,7 +66,7 @@ Supabase Auth manages user authentication, with an `AuthContext` handling sessio
 
 ## Subscription & Paywall System
 
-The application features tiered subscription plans for renters (Basic, Plus, Elite) and hosts (Free, Starter, Pro, Business), alongside one-time purchases. Stripe handles all payment processing via dedicated platform-specific hooks and Supabase Edge Functions.
+The application features tiered subscription plans for renters (Basic, Plus, Elite) and hosts (Free, Starter, Pro, Business), alongside one-time purchases. Stripe handles all payment processing via dedicated platform-specific hooks and Supabase Edge Functions. Both renter and host subscription screens share a uniform design language: eyebrow badge hero section, billing cycle toggle chips, plan cards with tier badges, big price display, feature checklists with check/x icons, and styled CTA buttons. Renter plans use coral accent (#ff6b5b), host plans use purple (#7B5EA7). Upgrade confirmations use the shared `PurchaseConfirmModal` component.
 
 ## Data Layer
 
