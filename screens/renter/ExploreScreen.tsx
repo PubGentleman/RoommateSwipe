@@ -1646,6 +1646,29 @@ export const ExploreScreen = () => {
                     })()}
                   </View>
 
+                  <Pressable
+                    style={[styles.inquireTogetherDetailBtn, { borderColor: theme.primary }]}
+                    onPress={() => {
+                      setShowDetailModal(false);
+                      if (selectedProperty) {
+                        navigation.navigate('CreateGroup', {
+                          listingId: selectedProperty.id,
+                          listingTitle: selectedProperty.title,
+                          listingBedrooms: selectedProperty.bedrooms || null,
+                          groupType: 'listing_inquiry',
+                        });
+                      }
+                    }}
+                  >
+                    <Feather name="users" size={16} color={theme.primary} />
+                    <ThemedText style={{ color: theme.primary, fontWeight: '700', marginLeft: 8, fontSize: 15 }}>
+                      Inquire Together
+                    </ThemedText>
+                  </Pressable>
+                  <ThemedText style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, textAlign: 'center', marginTop: 4, marginBottom: 10 }}>
+                    Create a group inquiry with your roommates
+                  </ThemedText>
+
                 </>
               ) : null}
             </ScrollView>
@@ -2452,6 +2475,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600' as const,
     color: '#ff6b5b',
+  },
+  inquireTogetherDetailBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    backgroundColor: 'rgba(255,107,91,0.06)',
+    marginTop: 12,
+    marginHorizontal: Spacing.lg,
   },
   inquireModalOverlay: {
     flex: 1,
