@@ -380,11 +380,6 @@ export const PlansScreen = () => {
 
         {isCurrentPlan && currentPlan !== 'basic' && subscriptionStatus === 'active' && !scheduledPlan ? (
           <View style={styles.manageRow}>
-            {currentPlan === 'elite' ? (
-              <Pressable style={styles.manageBtn} onPress={() => handleDowngrade('plus')} disabled={processing}>
-                <Text style={styles.manageBtnText}>Downgrade to Plus</Text>
-              </Pressable>
-            ) : null}
             <Pressable style={[styles.manageBtn, styles.manageBtnCancel]} onPress={handleCancel} disabled={processing}>
               <Text style={styles.manageBtnCancelText}>Cancel Subscription</Text>
             </Pressable>
