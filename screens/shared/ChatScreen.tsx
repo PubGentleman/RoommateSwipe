@@ -15,7 +15,8 @@ import { RoomdrAISheet, ScreenContext } from '../../components/RoomdrAISheet';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { getMessages as getSupabaseMessages, sendMessage as sendSupabaseMessage, markMessagesAsRead as markSupabaseMessagesAsRead, subscribeToMessages } from '../../services/messageService';
 import { recordMessageActivity } from '../../utils/aiMemory';
-import { acceptInquiry, declineInquiry, getGroupWithListing, linkListingToGroup } from '../../services/groupService';
+import { acceptInquiry, declineInquiry, linkListingToGroup, leaveGroup, removeMember } from '../../services/groupService';
+import { supabase } from '../../lib/supabase';
 import { GroupPropertySearchModal } from '../../components/GroupPropertySearchModal';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence } from 'react-native-reanimated';
 import { AdBanner } from '../../components/AdBanner';
@@ -57,6 +58,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [showChatLimitModal, setShowChatLimitModal] = useState(false);
   const [linkedListing, setLinkedListing] = useState<any>(null);
   const [showPropertySearch, setShowPropertySearch] = useState(false);
+  const [myGroupRole, setMyGroupRole] = useState<'admin' | 'member' | null>(null);
 
   const [inquiryStatus, setInquiryStatus] = useState<'pending' | 'accepted' | 'declined'>(
     inquiryGroup?.inquiryStatus || inquiryGroup?.inquiry_status || 'pending'
@@ -162,9 +164,15 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
 
   useEffect(() => {
     setLinkedListing(null);
+    setMyGroupRole(null);
     const isGroupChat = conversationId.startsWith('group-');
     if (isGroupChat && !isInquiryChat) {
       reloadGroupListing();
+      if (user?.id) {
+        const groupId = conversationId.replace('group-', '');
+        supabase.from('group_members').select('role').eq('group_id', groupId).eq('user_id', user.id).maybeSingle()
+          .then(({ data }) => { if (data?.role) setMyGroupRole(data.role as 'admin' | 'member'); });
+      }
     }
   }, [conversationId, isInquiryChat]);
 
@@ -172,15 +180,18 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     const isGroupChat = conversationId.startsWith('group-');
     if (!isGroupChat || isInquiryChat) return;
     const groupId = conversationId.replace('group-', '');
-    getGroupWithListing(groupId)
-      .then(group => {
-        if (group?.listing_id && group?.listing) {
-          const listing = Array.isArray(group.listing) ? group.listing[0] : group.listing;
+    supabase
+      .from('groups')
+      .select('listing_id, listings ( id, title, address, city, state, rent, photos, status )')
+      .eq('id', groupId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.listing_id && data?.listings) {
+          const listing = Array.isArray(data.listings) ? data.listings[0] : data.listings;
           if (listing) { setLinkedListing(listing); return; }
         }
         setLinkedListing(null);
-      })
-      .catch(() => {});
+      });
   };
 
   useEffect(() => {
@@ -736,15 +747,80 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             </Pressable>
           ) : null}
           <Pressable onPress={() => {
-            Alert.alert(
-              'Options',
-              undefined,
-              [
-                { text: 'Create Group', onPress: handleCreateGroup },
-                { text: 'Report / Block', onPress: () => setShowReportBlockModal(true) },
-                { text: 'Cancel', style: 'cancel' },
-              ]
-            );
+            const isGroupChat = conversationId.startsWith('group-');
+            const options: any[] = [];
+            if (!isGroupChat) {
+              options.push({ text: 'Create Group', onPress: handleCreateGroup });
+            }
+            if (isGroupChat) {
+              if (myGroupRole === 'admin') {
+                options.push({
+                  text: 'Remove a Member',
+                  onPress: async () => {
+                    const groupId = conversationId.replace('group-', '');
+                    const { data: members } = await supabase
+                      .from('group_members')
+                      .select('user_id, users ( name )')
+                      .eq('group_id', groupId)
+                      .neq('user_id', user?.id || '');
+                    if (!members || members.length === 0) {
+                      Alert.alert('No Members', 'There are no other members to remove.');
+                      return;
+                    }
+                    const memberOptions = members.map((m: any) => ({
+                      text: m.users?.name || 'Member',
+                      style: 'destructive' as const,
+                      onPress: () => {
+                        Alert.alert(
+                          'Remove Member',
+                          `Remove ${m.users?.name || 'this member'} from the group?`,
+                          [
+                            { text: 'Cancel', style: 'cancel' },
+                            { text: 'Remove', style: 'destructive', onPress: async () => {
+                              try {
+                                await removeMember(groupId, m.user_id);
+                                Alert.alert('Done', `${m.users?.name || 'Member'} has been removed.`);
+                              } catch (err: any) {
+                                Alert.alert('Error', err.message);
+                              }
+                            }},
+                          ]
+                        );
+                      },
+                    }));
+                    memberOptions.push({ text: 'Cancel', style: 'cancel' as const, onPress: () => {} });
+                    Alert.alert('Remove Member', 'Select a member to remove:', memberOptions);
+                  },
+                });
+              }
+              options.push({
+                text: 'Leave Group', style: 'destructive',
+                onPress: () => {
+                  Alert.alert('Leave Group', 'Are you sure you want to leave this group?', [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Leave', style: 'destructive', onPress: async () => {
+                      const groupId = conversationId.replace('group-', '');
+                      try {
+                        await leaveGroup(groupId);
+                        navigation.goBack();
+                      } catch (err: any) {
+                        if (err.message === 'PROMOTE_REQUIRED') {
+                          navigation.navigate('PromoteAdmin' as any, {
+                            groupId,
+                            groupName: otherUser?.name || 'Group',
+                          });
+                        } else {
+                          Alert.alert('Error', err.message);
+                        }
+                      }
+                    }},
+                  ]);
+                },
+              });
+            }
+            options.push({ text: 'Report / Block', onPress: () => setShowReportBlockModal(true) });
+            options.push({ text: 'Cancel', style: 'cancel' });
+            Alert.alert('Options', undefined, options);
           }} style={styles.moreButton}>
             <Feather name="more-vertical" size={24} color={theme.text} />
           </Pressable>
@@ -819,7 +895,14 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             </View>
           )}
           <View style={{ flex: 1, marginLeft: Spacing.sm }}>
-            <ThemedText style={{ fontSize: 11, color: theme.textSecondary, fontWeight: '600' }}>Linked Property</ThemedText>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <ThemedText style={{ fontSize: 11, color: theme.textSecondary, fontWeight: '600' }}>Linked Property</ThemedText>
+              {linkedListing.status === 'rented' ? (
+                <View style={{ backgroundColor: '#e83a2a', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, marginLeft: 6 }}>
+                  <ThemedText style={{ fontSize: 9, fontWeight: '800', color: '#fff' }}>RENTED</ThemedText>
+                </View>
+              ) : null}
+            </View>
             <ThemedText style={{ fontSize: 13, fontWeight: '600', color: theme.text }} numberOfLines={1}>
               {linkedListing.title}
             </ThemedText>

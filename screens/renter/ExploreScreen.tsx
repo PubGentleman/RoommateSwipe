@@ -16,6 +16,7 @@ import { CityPickerModal, CityPillButton } from '../../components/CityPickerModa
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { StorageService } from '../../utils/storage';
 import { getListings, mapListingToProperty } from '../../services/listingService';
+import { getDiscoverableGroupsForListing } from '../../services/groupService';
 import { Property, PropertyFilter, User, RoommateProfile, InterestCard, Conversation } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -88,6 +89,7 @@ export const ExploreScreen = () => {
   const { activeCity, recentCities, setActiveCity } = useCityContext();
   const [hostProfiles, setHostProfiles] = useState<Map<string, User>>(new Map());
   const [interestMap, setInterestMap] = useState<Map<string, InterestCard>>(new Map());
+  const [discoverableGroups, setDiscoverableGroups] = useState<Map<string, number>>(new Map());
   const [showUnifiedInterestSheet, setShowUnifiedInterestSheet] = useState(false);
   const [showInterestConfirmation, setShowInterestConfirmation] = useState(false);
   const [sendingInterest, setSendingInterest] = useState(false);
@@ -123,6 +125,7 @@ export const ExploreScreen = () => {
           const mapped: Property[] = supabaseListings.map((l: any) => mapListingToProperty(l));
           setProperties(mapped);
           setFilteredProperties(mapped);
+          loadDiscoverableGroups(mapped);
           return;
         }
       } catch (supabaseErr) {
@@ -139,6 +142,22 @@ export const ExploreScreen = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const loadDiscoverableGroups = async (props: Property[]) => {
+    const map = new Map<string, number>();
+    await Promise.all(
+      props.slice(0, 30).map(async (p) => {
+        try {
+          const groups = await getDiscoverableGroupsForListing(p.id);
+          if (groups.length > 0) {
+            const totalMembers = groups.reduce((s, g) => s + g.memberCount, 0);
+            map.set(p.id, totalMembers);
+          }
+        } catch {}
+      })
+    );
+    if (map.size > 0) setDiscoverableGroups(map);
   };
 
   const loadSavedProperties = async () => {
@@ -709,6 +728,24 @@ export const ExploreScreen = () => {
               <Text style={styles.respBadgeText}>Fast reply</Text>
             </View>
           </View>
+          {discoverableGroups.has(item.id) ? (
+            <Pressable
+              style={styles.groupDiscoveryBadge}
+              onPress={(e) => {
+                e.stopPropagation?.();
+                (navigation as any).navigate('Messages', {
+                  screen: 'ListingGroups',
+                  params: { listingId: item.id },
+                });
+              }}
+            >
+              <Feather name="users" size={13} color="#ff6b5b" />
+              <Text style={styles.groupDiscoveryText}>
+                {discoverableGroups.get(item.id)} {discoverableGroups.get(item.id) === 1 ? 'person' : 'people'} forming a group
+              </Text>
+              <Feather name="chevron-right" size={14} color="rgba(255,107,91,0.6)" />
+            </Pressable>
+          ) : null}
           {!isBasic ? (
             <Pressable
               style={styles.inquireTogetherBtn}
@@ -2372,6 +2409,24 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
+  },
+  groupDiscoveryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,107,91,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.2)',
+  },
+  groupDiscoveryText: {
+    fontSize: 12,
+    fontWeight: '600' as const,
+    color: '#ff6b5b',
+    flex: 1,
+    marginLeft: 6,
   },
   inquireTogetherBtn: {
     flexDirection: 'row',

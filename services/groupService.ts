@@ -308,28 +308,39 @@ export async function joinGroup(groupId: string) {
   return data;
 }
 
-export async function leaveGroup(groupId: string) {
+export async function leaveGroup(groupId: string): Promise<'deleted' | 'left'> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
-  const { error } = await supabase
+  const { data: myMembership } = await supabase
+    .from('group_members')
+    .select('role')
+    .eq('group_id', groupId)
+    .eq('user_id', user.id)
+    .single();
+
+  if (myMembership?.role === 'admin') {
+    const { count } = await supabase
+      .from('group_members')
+      .select('id', { count: 'exact', head: true })
+      .eq('group_id', groupId)
+      .neq('user_id', user.id);
+
+    if ((count || 0) > 0) {
+      throw new Error('PROMOTE_REQUIRED');
+    }
+
+    await supabase.from('groups').delete().eq('id', groupId);
+    return 'deleted';
+  }
+
+  await supabase
     .from('group_members')
     .delete()
     .eq('group_id', groupId)
     .eq('user_id', user.id);
 
-  if (error) throw error;
-
-  const { data: remaining } = await supabase
-    .from('group_members')
-    .select('user_id, is_host')
-    .eq('group_id', groupId)
-    .eq('status', 'active');
-
-  const rentersLeft = (remaining || []).filter(m => !m.is_host);
-  if (rentersLeft.length === 0) {
-    await archiveGroup(groupId);
-  }
+  return 'left';
 }
 
 export async function archiveGroup(groupId: string) {
@@ -868,4 +879,256 @@ export async function linkListingToGroup(
     .update({ listing_id: listingId, updated_at: new Date().toISOString() })
     .eq('id', groupId);
   if (error) throw error;
+}
+
+export async function promoteMember(groupId: string, userId: string): Promise<void> {
+  const { data: { user: currentUser } } = await supabase.auth.getUser();
+  if (!currentUser) throw new Error('Not authenticated');
+
+  const { data: callerMember } = await supabase
+    .from('group_members')
+    .select('role')
+    .eq('group_id', groupId)
+    .eq('user_id', currentUser.id)
+    .single();
+
+  if (callerMember?.role !== 'admin') throw new Error('Only admins can promote members.');
+
+  const { error } = await supabase
+    .from('group_members')
+    .update({ role: 'admin' })
+    .eq('group_id', groupId)
+    .eq('user_id', userId);
+
+  if (error) throw error;
+
+  await supabase
+    .from('group_members')
+    .update({ role: 'member' })
+    .eq('group_id', groupId)
+    .eq('user_id', currentUser.id);
+
+  await supabase.from('notifications').insert({
+    user_id: userId,
+    type: 'group_promoted',
+    title: 'You are now a group admin',
+    body: `You have been made the admin of a group.`,
+    data: { group_id: groupId },
+    read: false,
+    created_at: new Date().toISOString(),
+  }).then(() => {});
+}
+
+export async function removeMember(groupId: string, targetUserId: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  if (targetUserId === user.id) throw new Error('Use Leave Group to remove yourself.');
+
+  const { data: callerMember } = await supabase
+    .from('group_members')
+    .select('role')
+    .eq('group_id', groupId)
+    .eq('user_id', user.id)
+    .single();
+
+  if (callerMember?.role !== 'admin') throw new Error('Only admins can remove members.');
+
+  const { error } = await supabase
+    .from('group_members')
+    .delete()
+    .eq('group_id', groupId)
+    .eq('user_id', targetUserId);
+
+  if (error) throw error;
+
+  const { data: group } = await supabase
+    .from('groups')
+    .select('name')
+    .eq('id', groupId)
+    .single();
+
+  await supabase.from('notifications').insert({
+    user_id: targetUserId,
+    type: 'group_removed',
+    title: 'Removed from group',
+    body: `You were removed from "${group?.name || 'a group'}".`,
+    data: { group_id: groupId },
+    read: false,
+    created_at: new Date().toISOString(),
+  }).then(() => {});
+}
+
+export async function setGroupDiscoverable(groupId: string, discoverable: boolean): Promise<void> {
+  const { error } = await supabase
+    .from('groups')
+    .update({ discoverable })
+    .eq('id', groupId);
+  if (error) throw error;
+}
+
+export async function getDiscoverableGroupsForListing(listingId: string): Promise<{
+  id: string;
+  name: string;
+  memberCount: number;
+}[]> {
+  const { data, error } = await supabase
+    .from('groups')
+    .select('id, name, group_members ( count )')
+    .eq('listing_id', listingId)
+    .eq('discoverable', true);
+
+  if (error) return [];
+
+  return (data || []).map((g: any) => ({
+    id: g.id,
+    name: g.name,
+    memberCount: g.group_members?.[0]?.count || 0,
+  }));
+}
+
+export async function requestToJoinGroup(groupId: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { data: group } = await supabase
+    .from('groups')
+    .select('discoverable')
+    .eq('id', groupId)
+    .single();
+
+  if (!group?.discoverable) throw new Error('This group is not accepting join requests.');
+
+  const { data: existing } = await supabase
+    .from('group_members')
+    .select('id')
+    .eq('group_id', groupId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (existing) throw new Error('You are already in this group.');
+
+  const { error } = await supabase.from('group_join_requests').insert({
+    group_id: groupId,
+    user_id: user.id,
+    status: 'pending',
+  });
+  if (error && error.code !== '23505') throw error;
+}
+
+export async function getJoinRequests(groupId: string): Promise<{
+  id: string;
+  userId: string;
+  name: string;
+  photo?: string;
+  requestedAt: string;
+}[]> {
+  const { data, error } = await supabase
+    .from('group_join_requests')
+    .select('id, user_id, created_at, users ( name, photos )')
+    .eq('group_id', groupId)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: true });
+
+  if (error) return [];
+
+  return (data || []).map((r: any) => ({
+    id: r.id,
+    userId: r.user_id,
+    name: r.users?.name || 'Unknown',
+    photo: r.users?.photos?.[0],
+    requestedAt: r.created_at,
+  }));
+}
+
+export async function respondToJoinRequest(
+  requestId: string,
+  groupId: string,
+  response: 'approved' | 'declined'
+): Promise<void> {
+  const { data: { user: currentUser } } = await supabase.auth.getUser();
+  if (!currentUser) throw new Error('Not authenticated');
+
+  const { data: callerMember } = await supabase
+    .from('group_members')
+    .select('role')
+    .eq('group_id', groupId)
+    .eq('user_id', currentUser.id)
+    .single();
+
+  if (callerMember?.role !== 'admin') throw new Error('Only admins can respond to join requests.');
+
+  const { data: request } = await supabase
+    .from('group_join_requests')
+    .update({ status: response })
+    .eq('id', requestId)
+    .eq('group_id', groupId)
+    .select()
+    .single();
+
+  if (!request) throw new Error('Request not found.');
+
+  if (response === 'approved') {
+    const { data: group } = await supabase
+      .from('groups')
+      .select('created_by, listing_id, listings ( bedrooms ), name')
+      .eq('id', groupId)
+      .single();
+
+    const { count } = await supabase
+      .from('group_members')
+      .select('id', { count: 'exact', head: true })
+      .eq('group_id', groupId);
+
+    const creatorPlan = await getUserPlan(group?.created_by);
+    const linkedBedrooms = (group as any)?.listings?.bedrooms ?? null;
+    const limit = getMemberLimit(creatorPlan, linkedBedrooms);
+
+    if ((count || 0) >= limit) {
+      await supabase
+        .from('group_join_requests')
+        .update({ status: 'declined' })
+        .eq('id', requestId);
+
+      await supabase.from('notifications').insert({
+        user_id: request.user_id,
+        type: 'join_request_declined',
+        title: 'Group is full',
+        body: `The group you requested to join is at its member limit.`,
+        data: { group_id: groupId },
+        read: false,
+        created_at: new Date().toISOString(),
+      }).then(() => {});
+      return;
+    }
+
+    await supabase.from('group_members').insert({
+      group_id: groupId,
+      user_id: request.user_id,
+      role: 'member',
+    });
+
+    await supabase.from('notifications').insert({
+      user_id: request.user_id,
+      type: 'join_request_approved',
+      title: 'Join request approved',
+      body: `You have been added to "${group?.name}".`,
+      data: { group_id: groupId },
+      read: false,
+      created_at: new Date().toISOString(),
+    }).then(() => {});
+  } else {
+    const { data: group2 } = await supabase
+      .from('groups').select('name').eq('id', groupId).single();
+
+    await supabase.from('notifications').insert({
+      user_id: request.user_id,
+      type: 'join_request_declined',
+      title: 'Join request declined',
+      body: `Your request to join "${group2?.name}" was declined.`,
+      data: { group_id: groupId },
+      read: false,
+      created_at: new Date().toISOString(),
+    }).then(() => {});
+  }
 }

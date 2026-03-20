@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, StyleSheet, Pressable, FlatList, TextInput,
-  Alert, Share, ActivityIndicator,
+  Alert, Share, ActivityIndicator, Switch,
 } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { ThemedText } from '../../components/ThemedText';
@@ -13,9 +13,12 @@ import {
   getInvitableMates, sendGroupInvite,
   getInviteCode, regenerateInviteCode,
   getRentersInterestedInListing,
+  getJoinRequests, respondToJoinRequest,
+  setGroupDiscoverable,
 } from '../../services/groupService';
+import { supabase } from '../../lib/supabase';
 
-type Tab = 'matches' | 'code' | 'listing';
+type Tab = 'matches' | 'code' | 'listing' | 'requests';
 
 export function GroupInviteScreen({ navigation, route }: any) {
   const { groupId, groupName, listingId } = route.params;
@@ -30,10 +33,24 @@ export function GroupInviteScreen({ navigation, route }: any) {
   const [loading, setLoading] = useState(false);
   const [sendingTo, setSendingTo] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [joinRequests, setJoinRequests] = useState<any[]>([]);
+  const [respondingTo, setRespondingTo] = useState<string | null>(null);
+  const [discoverable, setDiscoverable] = useState(false);
+  const [discoverableLoaded, setDiscoverableLoaded] = useState(false);
 
   useEffect(() => {
     loadData();
   }, [tab]);
+
+  useEffect(() => {
+    if (!discoverableLoaded) {
+      supabase.from('groups').select('discoverable').eq('id', groupId).maybeSingle()
+        .then(({ data }) => {
+          setDiscoverable(data?.discoverable === true);
+          setDiscoverableLoaded(true);
+        });
+    }
+  }, []);
 
   const loadData = async () => {
     setLoading(true);
@@ -47,11 +64,37 @@ export function GroupInviteScreen({ navigation, route }: any) {
       } else if (tab === 'listing' && listingId) {
         const data = await getRentersInterestedInListing(listingId);
         setInterestedRenters(data);
+      } else if (tab === 'requests') {
+        const data = await getJoinRequests(groupId);
+        setJoinRequests(data);
       }
     } catch (err: any) {
       console.warn('[GroupInviteScreen] Load error:', err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRespondToJoinRequest = async (requestId: string, response: 'approved' | 'declined') => {
+    setRespondingTo(requestId);
+    try {
+      await respondToJoinRequest(requestId, groupId, response);
+      const updated = await getJoinRequests(groupId);
+      setJoinRequests(updated);
+    } catch (err: any) {
+      Alert.alert('Error', err.message);
+    } finally {
+      setRespondingTo(null);
+    }
+  };
+
+  const handleToggleDiscoverable = async (val: boolean) => {
+    setDiscoverable(val);
+    try {
+      await setGroupDiscoverable(groupId, val);
+    } catch (err: any) {
+      setDiscoverable(!val);
+      Alert.alert('Error', err.message);
     }
   };
 
@@ -110,6 +153,7 @@ export function GroupInviteScreen({ navigation, route }: any) {
     ...(isHost && listingId
       ? [{ key: 'listing' as Tab, label: 'Interested', icon: 'home' }]
       : []),
+    { key: 'requests', label: 'Requests', icon: 'inbox' },
   ];
 
   return (
@@ -298,6 +342,79 @@ export function GroupInviteScreen({ navigation, route }: any) {
                           : <ThemedText style={[Typography.small, { color: '#fff', fontWeight: '600' }]}>Invite</ThemedText>
                         }
                       </Pressable>
+                    </View>
+                  )}
+                />
+              )}
+            </>
+          )}
+
+          {tab === 'requests' && (
+            <>
+              <View style={{
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md,
+                borderBottomWidth: 1, borderBottomColor: theme.border,
+              }}>
+                <View style={{ flex: 1 }}>
+                  <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
+                    Group Discovery
+                  </ThemedText>
+                  <ThemedText style={[Typography.small, { color: theme.textSecondary, marginTop: 2 }]}>
+                    Let others find and request to join this group
+                  </ThemedText>
+                </View>
+                <Switch
+                  value={discoverable}
+                  onValueChange={handleToggleDiscoverable}
+                  trackColor={{ false: theme.border, true: theme.primary + '50' }}
+                  thumbColor={discoverable ? theme.primary : theme.textSecondary}
+                />
+              </View>
+
+              {joinRequests.length === 0 ? (
+                <View style={styles.empty}>
+                  <Feather name="inbox" size={36} color={theme.textSecondary} />
+                  <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.sm, textAlign: 'center' }]}>
+                    No pending join requests.
+                  </ThemedText>
+                </View>
+              ) : (
+                <FlatList
+                  data={joinRequests}
+                  keyExtractor={item => item.id}
+                  contentContainerStyle={{ padding: Spacing.md }}
+                  renderItem={({ item }) => (
+                    <View style={[styles.userRow, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                      {item.photo ? (
+                        <Image source={{ uri: item.photo }} style={styles.avatar} />
+                      ) : (
+                        <View style={[styles.avatarPlaceholder, { backgroundColor: theme.primary + '30' }]}>
+                          <Feather name="user" size={20} color={theme.primary} />
+                        </View>
+                      )}
+                      <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+                        <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{item.name}</ThemedText>
+                        <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+                          Requested {new Date(item.requestedAt).toLocaleDateString()}
+                        </ThemedText>
+                      </View>
+                      <View style={{ flexDirection: 'row', gap: 6 }}>
+                        <Pressable
+                          style={[styles.inviteBtn, { backgroundColor: theme.primary, opacity: respondingTo === item.id ? 0.6 : 1 }]}
+                          onPress={() => handleRespondToJoinRequest(item.id, 'approved')}
+                          disabled={respondingTo === item.id}
+                        >
+                          <ThemedText style={[Typography.small, { color: '#fff', fontWeight: '600' }]}>Accept</ThemedText>
+                        </Pressable>
+                        <Pressable
+                          style={[styles.inviteBtn, { backgroundColor: theme.border, opacity: respondingTo === item.id ? 0.6 : 1 }]}
+                          onPress={() => handleRespondToJoinRequest(item.id, 'declined')}
+                          disabled={respondingTo === item.id}
+                        >
+                          <ThemedText style={[Typography.small, { color: theme.textSecondary, fontWeight: '600' }]}>Decline</ThemedText>
+                        </Pressable>
+                      </View>
                     </View>
                   )}
                 />
