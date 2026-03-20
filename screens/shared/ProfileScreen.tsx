@@ -354,15 +354,6 @@ export const ProfileScreen = () => {
               </Pressable>
             ) : null}
           </Pressable>
-          {user?.role !== 'host' && user?.subscription?.plan !== 'basic' ? (
-            <Pressable style={styles.manageSubRow} onPress={() => navigation.navigate('ManageSubscription')}>
-              <View style={styles.manageSubLeft}>
-                <Feather name="settings" size={14} color="rgba(255,255,255,0.5)" />
-                <Text style={styles.manageSubText}>Manage Subscription</Text>
-              </View>
-              <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.3)" />
-            </Pressable>
-          ) : null}
           {user?.subscription?.status === 'cancelling' ? (
             <View style={styles.cancellingBanner}>
               <Feather name="info" size={14} color="#ff6b5b" />
@@ -1017,28 +1008,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#fff',
-  },
-  manageSubRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#1a1a1a',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.07)',
-    borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    marginTop: 8,
-  },
-  manageSubLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  manageSubText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.6)',
   },
   cancellingBanner: {
     flexDirection: 'row',
