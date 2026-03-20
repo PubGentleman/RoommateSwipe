@@ -89,15 +89,17 @@ export const MyListingsScreen = () => {
         const mapped: Property[] = supaListings.map((l: any) => mapListingToProperty(l, user.name));
         setListings(mapped);
       } else {
-        await StorageService.initializeWithMockData();
-        await StorageService.assignPropertiesToHost(user.id, user.name);
         const allProperties = await StorageService.getProperties();
         const myListings = allProperties.filter(p => p.hostId === user.id);
-        setListings(myListings);
+        if (myListings.length > 0) {
+          setListings(myListings);
+        } else {
+          await StorageService.assignPropertiesToHost(user.id, user.name);
+          const refreshed = await StorageService.getProperties();
+          setListings(refreshed.filter(p => p.hostId === user.id));
+        }
       }
     } catch {
-      await StorageService.initializeWithMockData();
-      await StorageService.assignPropertiesToHost(user.id, user.name);
       const allProperties = await StorageService.getProperties();
       const myListings = allProperties.filter(p => p.hostId === user.id);
       setListings(myListings);

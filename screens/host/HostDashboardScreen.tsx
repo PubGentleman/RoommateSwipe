@@ -122,11 +122,15 @@ export const HostDashboardScreen = () => {
         const mapped: Property[] = supaListings.map((l: any) => mapListingToProperty(l, user.name));
         setListings(mapped);
       } else {
-        setListings([]);
+        const allProperties = await StorageService.getProperties();
+        const myListings = allProperties.filter(p => p.hostId === user.id);
+        if (myListings.length > 0) {
+          setListings(myListings);
+        } else {
+          setListings([]);
+        }
       }
     } catch {
-      await StorageService.initializeWithMockData();
-      await StorageService.assignPropertiesToHost(user.id, user.name);
       const allProperties = await StorageService.getProperties();
       const myListings = allProperties.filter(p => p.hostId === user.id);
       setListings(myListings);
