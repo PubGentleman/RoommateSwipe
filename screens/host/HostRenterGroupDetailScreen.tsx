@@ -421,7 +421,7 @@ export const HostRenterGroupDetailScreen = () => {
         </ScrollView>
       )}
 
-      <View style={[styles.bottomBar, { bottom: 80, paddingBottom: 14 }]}>
+      <View style={[styles.bottomBar, { paddingBottom: 80 + 14 }]}>
         {alreadySent ? (
           <View style={styles.sentBar}>
             <Feather name="check-circle" size={18} color="#22c55e" />
