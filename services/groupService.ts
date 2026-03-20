@@ -542,21 +542,6 @@ export function getMemberLimit(plan: string, linkedListingBedrooms?: number | nu
   return limits[plan] || 3;
 }
 
-async function getGroupListingBedrooms(groupId: string): Promise<number | null> {
-  const { data } = await supabase
-    .from('groups')
-    .select('listing_id')
-    .eq('id', groupId)
-    .single();
-  if (!data?.listing_id) return null;
-  const { data: listing } = await supabase
-    .from('listings')
-    .select('bedrooms')
-    .eq('id', data.listing_id)
-    .single();
-  return listing?.bedrooms || null;
-}
-
 // ─── METHOD A: Invite from Matches ───────────────────────────────────────────
 
 export async function getInvitableMates(groupId: string): Promise<{
@@ -616,7 +601,7 @@ export async function sendGroupInvite(groupId: string, invitedUserId: string): P
 
   const { data: group } = await supabase
     .from('groups')
-    .select('created_by')
+    .select('created_by, listing_id, listings ( bedrooms )')
     .eq('id', groupId)
     .single();
 
@@ -626,11 +611,14 @@ export async function sendGroupInvite(groupId: string, invitedUserId: string): P
     .eq('group_id', groupId);
 
   const creatorPlan = await getUserPlan(group?.created_by);
-  const bedrooms = await getGroupListingBedrooms(groupId);
-  const limit = getMemberLimit(creatorPlan, bedrooms);
+  const linkedBedrooms = (group as any)?.listings?.bedrooms ?? null;
+  const limit = getMemberLimit(creatorPlan, linkedBedrooms);
 
   if ((memberData?.length || 0) >= limit) {
-    throw new Error(`This group has reached its member limit of ${limit}.`);
+    const reason = linkedBedrooms
+      ? `This group is limited to ${limit} members based on the linked listing (${linkedBedrooms} bedrooms + 1).`
+      : `This group has reached its member limit of ${limit}.`;
+    throw new Error(reason);
   }
 
   const { error } = await supabase.from('group_invites').insert({
@@ -660,7 +648,7 @@ export async function respondToInvite(
   if (response === 'accepted' && invite) {
     const { data: group } = await supabase
       .from('groups')
-      .select('created_by')
+      .select('created_by, listing_id, listings ( bedrooms )')
       .eq('id', invite.group_id)
       .single();
 
@@ -670,15 +658,18 @@ export async function respondToInvite(
       .eq('group_id', invite.group_id);
 
     const creatorPlan = await getUserPlan(group?.created_by);
-    const bedrooms = await getGroupListingBedrooms(invite.group_id);
-    const limit = getMemberLimit(creatorPlan, bedrooms);
+    const linkedBedrooms = (group as any)?.listings?.bedrooms ?? null;
+    const limit = getMemberLimit(creatorPlan, linkedBedrooms);
 
     if ((memberData?.length || 0) >= limit) {
       await supabase
         .from('group_invites')
         .update({ status: 'pending' })
         .eq('id', inviteId);
-      throw new Error(`This group is full (${limit} member limit).`);
+      const reason = linkedBedrooms
+        ? `This group is full — limited to ${limit} members based on the linked listing (${linkedBedrooms} bedrooms + 1).`
+        : `This group is full (${limit} member limit).`;
+      throw new Error(reason);
     }
 
     await supabase.from('group_members').insert({
@@ -770,7 +761,7 @@ export async function joinGroupByCode(code: string): Promise<{ groupId: string; 
 
   const { data: group } = await supabase
     .from('groups')
-    .select('id, name, invite_code_enabled, created_by')
+    .select('id, name, invite_code_enabled, created_by, listing_id, listings ( bedrooms )')
     .eq('invite_code', code.toUpperCase())
     .single();
 
@@ -792,11 +783,14 @@ export async function joinGroupByCode(code: string): Promise<{ groupId: string; 
     .eq('group_id', group.id);
 
   const creatorPlan = await getUserPlan(group.created_by);
-  const bedrooms = await getGroupListingBedrooms(group.id);
-  const limit = getMemberLimit(creatorPlan, bedrooms);
+  const linkedBedrooms = (group as any)?.listings?.bedrooms ?? null;
+  const limit = getMemberLimit(creatorPlan, linkedBedrooms);
 
   if ((memberData?.length || 0) >= limit) {
-    throw new Error(`This group is full (${limit} member limit).`);
+    const reason = linkedBedrooms
+      ? `This group is full — limited to ${limit} members based on the linked listing (${linkedBedrooms} bedrooms + 1).`
+      : `This group is full (${limit} member limit).`;
+    throw new Error(reason);
   }
 
   const { error } = await supabase.from('group_members').insert({
