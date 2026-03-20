@@ -11,6 +11,7 @@ import { Image } from 'expo-image';
 import { supabase } from '../lib/supabase';
 import { StorageService } from '../utils/storage';
 import { useAuth } from '../contexts/AuthContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface ListingResult {
   id: string;
@@ -64,6 +65,7 @@ interface Props {
 export function GroupPropertySearchModal({ visible, currentListingId, onSelect, onClose }: Props) {
   const { theme } = useTheme();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [results, setResults] = useState<ListingResult[]>([]);
@@ -71,33 +73,74 @@ export function GroupPropertySearchModal({ visible, currentListingId, onSelect, 
   const [showFilters, setShowFilters] = useState(false);
   const [cities, setCities] = useState<string[]>([]);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [initialLoaded, setInitialLoaded] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (visible) {
+      setInitialLoaded(false);
       loadSavedIds();
-      supabase
-        .from('listings')
-        .select('city')
-        .eq('status', 'available')
-        .then(({ data, error }) => {
-          if (error || !data || data.length === 0) {
-            StorageService.getProperties().then((props: any[]) => {
-              const unique = [...new Set(props.map((p: any) => p.city).filter(Boolean))].sort();
-              setCities(unique.slice(0, 20) as string[]);
-            }).catch(() => {});
-            return;
-          }
-          const unique = [...new Set((data || []).map((r: any) => r.city))].sort();
-          setCities(unique.slice(0, 20));
-        });
-      searchListings('', DEFAULT_FILTERS);
+      loadCities();
+      loadInitialListings();
     } else {
       setQuery('');
       setFilters(DEFAULT_FILTERS);
       setShowFilters(false);
+      setInitialLoaded(false);
     }
   }, [visible]);
+
+  const loadCities = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('listings')
+        .select('city')
+        .eq('status', 'available');
+      if (!error && data && data.length > 0) {
+        const unique = [...new Set(data.map((r: any) => r.city))].sort();
+        setCities(unique.slice(0, 20));
+        return;
+      }
+    } catch {}
+    try {
+      const props = await StorageService.getProperties();
+      const unique = [...new Set(props.map((p: any) => p.city).filter(Boolean))].sort();
+      setCities(unique.slice(0, 20) as string[]);
+    } catch {}
+  };
+
+  const loadInitialListings = async () => {
+    setLoading(true);
+    try {
+      const localResults = await searchLocalListings('', DEFAULT_FILTERS);
+      if (localResults.length > 0) {
+        setResults(sortWithSavedFirst(localResults));
+        setInitialLoaded(true);
+        setLoading(false);
+        return;
+      }
+    } catch {}
+
+    try {
+      const { data, error } = await supabase
+        .from('listings')
+        .select('id, title, address, city, state, rent, bedrooms, photos, transit_info')
+        .eq('status', 'available')
+        .order('created_at', { ascending: false })
+        .limit(30);
+      if (!error && data && data.length > 0) {
+        const mapped = data.map((r: any) => ({
+          id: r.id, title: r.title, address: r.address,
+          city: r.city, state: r.state, rent: r.rent,
+          bedrooms: r.bedrooms, photos: r.photos || [],
+          transitInfo: r.transit_info || [],
+        }));
+        setResults(sortWithSavedFirst(mapped));
+      }
+    } catch {}
+    setInitialLoaded(true);
+    setLoading(false);
+  };
 
   const loadSavedIds = async () => {
     try {
@@ -125,12 +168,13 @@ export function GroupPropertySearchModal({ visible, currentListingId, onSelect, 
   };
 
   useEffect(() => {
+    if (!initialLoaded) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       searchListings(query, filters);
     }, 300);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [query, filters]);
+  }, [query, filters, initialLoaded]);
 
   const searchLocalListings = async (q: string, f: Filters): Promise<ListingResult[]> => {
     try {
@@ -250,7 +294,7 @@ export function GroupPropertySearchModal({ visible, currentListingId, onSelect, 
       onRequestClose={onClose}
     >
       <View style={[styles.container, { backgroundColor: theme.background }]}>
-        <View style={[styles.header, { borderBottomColor: theme.border }]}>
+        <View style={[styles.header, { borderBottomColor: theme.border, paddingTop: Math.max(insets.top, 20) }]}>
           <Pressable
             onPress={onClose}
             hitSlop={12}
@@ -513,7 +557,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: Spacing.lg, paddingTop: 20, paddingBottom: Spacing.md,
+    paddingHorizontal: Spacing.lg, paddingBottom: Spacing.md,
     borderBottomWidth: 1,
   },
   searchRow: {
