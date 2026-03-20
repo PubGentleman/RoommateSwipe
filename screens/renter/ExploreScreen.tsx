@@ -1700,7 +1700,7 @@ export const ExploreScreen = () => {
                       >
                         <Feather name="users" size={16} color={theme.primary} />
                         <ThemedText style={{ color: theme.primary, fontWeight: '700', marginLeft: 8, fontSize: 15 }}>
-                          Inquire as a Group
+                          Group Inquiry
                         </ThemedText>
                       </Pressable>
                       <ThemedText style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, textAlign: 'center', marginTop: 4, marginBottom: 10 }}>
