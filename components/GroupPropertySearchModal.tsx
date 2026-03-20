@@ -9,6 +9,7 @@ import { useTheme } from '../hooks/useTheme';
 import { Typography, Spacing } from '../constants/theme';
 import { Image } from 'expo-image';
 import { supabase } from '../lib/supabase';
+import { StorageService } from '../utils/storage';
 
 interface ListingResult {
   id: string;
@@ -75,7 +76,14 @@ export function GroupPropertySearchModal({ visible, currentListingId, onSelect, 
         .from('listings')
         .select('city')
         .eq('status', 'available')
-        .then(({ data }) => {
+        .then(({ data, error }) => {
+          if (error || !data || data.length === 0) {
+            StorageService.getProperties().then((props: any[]) => {
+              const unique = [...new Set(props.map((p: any) => p.city).filter(Boolean))].sort();
+              setCities(unique.slice(0, 20) as string[]);
+            }).catch(() => {});
+            return;
+          }
           const unique = [...new Set((data || []).map((r: any) => r.city))].sort();
           setCities(unique.slice(0, 20));
         });
@@ -94,6 +102,51 @@ export function GroupPropertySearchModal({ visible, currentListingId, onSelect, 
     }, 300);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [query, filters]);
+
+  const searchLocalListings = async (q: string, f: Filters): Promise<ListingResult[]> => {
+    try {
+      const properties = await StorageService.getProperties();
+      let filtered = properties.filter((p: any) => p.status === 'available' || !p.status);
+
+      if (q.trim()) {
+        const lower = q.toLowerCase();
+        filtered = filtered.filter((p: any) =>
+          (p.title || '').toLowerCase().includes(lower) ||
+          (p.address || '').toLowerCase().includes(lower) ||
+          (p.city || '').toLowerCase().includes(lower) ||
+          (p.neighborhood || '').toLowerCase().includes(lower)
+        );
+      }
+
+      if (f.city) {
+        const cityLower = f.city.toLowerCase();
+        filtered = filtered.filter((p: any) => (p.city || '').toLowerCase().includes(cityLower));
+      }
+      if (f.minRent !== null) filtered = filtered.filter((p: any) => (p.rent || p.price || 0) >= f.minRent!);
+      if (f.maxRent !== null) filtered = filtered.filter((p: any) => (p.rent || p.price || 0) <= f.maxRent!);
+      if (f.bedrooms !== null) {
+        if (f.bedrooms >= 4) {
+          filtered = filtered.filter((p: any) => (p.bedrooms || 0) >= 4);
+        } else {
+          filtered = filtered.filter((p: any) => (p.bedrooms || 0) === f.bedrooms);
+        }
+      }
+
+      return filtered.slice(0, 30).map((p: any) => ({
+        id: p.id,
+        title: p.title || 'Untitled Listing',
+        address: p.address || '',
+        city: p.city || '',
+        state: p.state || '',
+        rent: p.rent || p.price || 0,
+        bedrooms: p.bedrooms || 0,
+        photos: p.photos || [],
+        transitInfo: p.transitInfo || [],
+      }));
+    } catch {
+      return [];
+    }
+  };
 
   const searchListings = async (q: string, f: Filters) => {
     setLoading(true);
@@ -126,7 +179,7 @@ export function GroupPropertySearchModal({ visible, currentListingId, onSelect, 
       const { data, error } = await req;
       if (error) throw error;
 
-      setResults((data || []).map((r: any) => ({
+      const supaResults = (data || []).map((r: any) => ({
         id: r.id,
         title: r.title,
         address: r.address,
@@ -136,9 +189,17 @@ export function GroupPropertySearchModal({ visible, currentListingId, onSelect, 
         bedrooms: r.bedrooms,
         photos: r.photos || [],
         transitInfo: r.transit_info || [],
-      })));
+      }));
+
+      if (supaResults.length > 0) {
+        setResults(supaResults);
+      } else {
+        const localResults = await searchLocalListings(q, f);
+        setResults(localResults);
+      }
     } catch {
-      setResults([]);
+      const localResults = await searchLocalListings(q, f);
+      setResults(localResults);
     } finally {
       setLoading(false);
     }

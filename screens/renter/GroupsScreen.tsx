@@ -24,6 +24,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useCityContext } from '../../contexts/CityContext';
 import { CityPickerModal, CityPillButton } from '../../components/CityPickerModal';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
+import { GroupPropertySearchModal } from '../../components/GroupPropertySearchModal';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - Spacing.xxl;
@@ -70,6 +71,7 @@ export const GroupsScreen = () => {
   const [groupDescription, setGroupDescription] = useState('');
   const [selectedListingId, setSelectedListingId] = useState<string | null>(null);
   const [selectedListingBedrooms, setSelectedListingBedrooms] = useState<number | null>(null);
+  const [showCreatePropertySearch, setShowCreatePropertySearch] = useState(false);
   const [hostListings, setHostListings] = useState<any[]>([]);
   const userPlan = user?.subscription?.plan || 'basic';
   const planMemberLimit = getMemberLimit(userPlan);
@@ -1486,6 +1488,40 @@ export const GroupsScreen = () => {
             <ThemedText style={[Typography.caption, { color: theme.textSecondary, fontStyle: 'italic', marginTop: 4 }]}>
               No listings found. Create a listing first to link it here.
             </ThemedText>
+          ) : selectedListingId ? (
+            <View style={{ marginBottom: 8 }}>
+              <Pressable
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  padding: 12,
+                  borderRadius: 12,
+                  borderWidth: 1.5,
+                  borderColor: theme.primary,
+                  backgroundColor: `${theme.primary}15`,
+                }}
+                onPress={() => setShowCreatePropertySearch(true)}
+              >
+                <Feather name="home" size={18} color={theme.primary} />
+                <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+                  <ThemedText style={[Typography.body, { color: theme.text }]} numberOfLines={1}>
+                    Listing linked
+                  </ThemedText>
+                  {selectedListingBedrooms ? (
+                    <ThemedText style={[Typography.caption, { color: theme.primary }]}>
+                      {selectedListingBedrooms} BR — {selectedListingBedrooms + 1} max members
+                    </ThemedText>
+                  ) : null}
+                </View>
+                <Pressable
+                  onPress={() => { setSelectedListingId(null); setSelectedListingBedrooms(null); }}
+                  hitSlop={8}
+                  style={{ marginLeft: 8 }}
+                >
+                  <Feather name="x" size={18} color={theme.textSecondary} />
+                </Pressable>
+              </Pressable>
+            </View>
           ) : (
             <Pressable
               style={{
@@ -1498,13 +1534,7 @@ export const GroupsScreen = () => {
                 backgroundColor: theme.backgroundDefault,
                 marginBottom: 8,
               }}
-              onPress={() => {
-                Alert.alert(
-                  'Link a Listing',
-                  'Browse listings on the Explore tab, then use "Create Group" from a listing to link it automatically.',
-                  [{ text: 'OK' }]
-                );
-              }}
+              onPress={() => setShowCreatePropertySearch(true)}
             >
               <Feather name="search" size={18} color={theme.textSecondary} />
               <ThemedText style={[Typography.body, { marginLeft: Spacing.sm, color: theme.textSecondary }]}>
@@ -2050,6 +2080,22 @@ export const GroupsScreen = () => {
           </View>
         </View>
       </Modal>
+
+      <GroupPropertySearchModal
+        visible={showCreatePropertySearch}
+        currentListingId={selectedListingId}
+        onSelect={(listing) => {
+          if (listing) {
+            setSelectedListingId(listing.id);
+            setSelectedListingBedrooms(listing.bedrooms || null);
+          } else {
+            setSelectedListingId(null);
+            setSelectedListingBedrooms(null);
+          }
+          setShowCreatePropertySearch(false);
+        }}
+        onClose={() => setShowCreatePropertySearch(false)}
+      />
 
       <RoomdrAISheet
         visible={showAISheet}
