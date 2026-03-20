@@ -873,7 +873,9 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
 
       {linkedListing && !isInquiryChat ? (
         <Pressable
-          style={[styles.pinnedListingCard, { borderColor: theme.border }]}
+          style={[styles.pinnedListingCard, {
+            borderColor: linkedListing.status === 'rented' ? '#EF4444' : theme.border,
+          }]}
           onPress={() => {
             const tabNav = navigation.getParent();
             if (tabNav && linkedListing.id) {
@@ -898,8 +900,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <ThemedText style={{ fontSize: 11, color: theme.textSecondary, fontWeight: '600' }}>Linked Property</ThemedText>
               {linkedListing.status === 'rented' ? (
-                <View style={{ backgroundColor: '#e83a2a', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, marginLeft: 6 }}>
-                  <ThemedText style={{ fontSize: 9, fontWeight: '800', color: '#fff' }}>RENTED</ThemedText>
+                <View style={{ backgroundColor: '#FEE2E2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginLeft: 6 }}>
+                  <ThemedText style={{ fontSize: 10, fontWeight: '800', color: '#EF4444', letterSpacing: 0.5 }}>RENTED</ThemedText>
                 </View>
               ) : null}
             </View>

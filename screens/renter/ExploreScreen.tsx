@@ -739,11 +739,10 @@ export const ExploreScreen = () => {
                 });
               }}
             >
-              <Feather name="users" size={13} color="#ff6b5b" />
+              <Feather name="users" size={12} color="#ff6b5b" />
               <Text style={styles.groupDiscoveryText}>
                 {discoverableGroups.get(item.id)} {discoverableGroups.get(item.id) === 1 ? 'person' : 'people'} forming a group
               </Text>
-              <Feather name="chevron-right" size={14} color="rgba(255,107,91,0.6)" />
             </Pressable>
           ) : null}
           {!isBasic ? (
@@ -2413,20 +2412,20 @@ const styles = StyleSheet.create({
   groupDiscoveryBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
-    paddingVertical: 7,
+    marginTop: 6,
+    paddingVertical: 4,
     paddingHorizontal: 10,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,107,91,0.08)',
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,107,91,0.12)',
     borderWidth: 1,
-    borderColor: 'rgba(255,107,91,0.2)',
+    borderColor: 'rgba(255,107,91,0.35)',
+    alignSelf: 'flex-start',
   },
   groupDiscoveryText: {
     fontSize: 12,
     fontWeight: '600' as const,
     color: '#ff6b5b',
-    flex: 1,
-    marginLeft: 6,
+    marginLeft: 4,
   },
   inquireTogetherBtn: {
     flexDirection: 'row',
