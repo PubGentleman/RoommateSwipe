@@ -127,6 +127,48 @@ export const OUTREACH_PACKAGE_CONFIGS: Record<string, PurchaseConfig> = {
   },
 };
 
+export const RENTER_PLAN_CONFIGS: Record<string, PurchaseConfig> = {
+  plus: {
+    id: 'renter_plus',
+    type: 'subscription',
+    title: 'Upgrade Your Search',
+    targetLabel: 'Plus',
+    price: '$14.99/mo',
+    priceNote: 'billed monthly',
+    icon: 'star',
+    iconColor: '#6C63FF',
+    confirmLabel: 'Subscribe Now',
+    disclaimer: 'You will be charged $14.99 today and monthly after.\nCancel anytime in Account Settings.',
+    perks: [
+      'Unlimited daily swipes',
+      'Join up to 3 groups',
+      'Advanced search filters',
+      'See who liked your profile',
+      'Verified profile badge',
+    ],
+  },
+  elite: {
+    id: 'renter_elite',
+    type: 'subscription',
+    title: 'Upgrade Your Search',
+    targetLabel: 'Elite',
+    price: '$29.99/mo',
+    priceNote: 'billed monthly',
+    icon: 'zap',
+    iconColor: '#F59E0B',
+    confirmLabel: 'Subscribe Now',
+    disclaimer: 'You will be charged $29.99 today and monthly after.\nCancel anytime in Account Settings.',
+    perks: [
+      'Unlimited swipes + unlimited groups',
+      'Full match breakdown details',
+      'Profile boost — appear higher in searches',
+      'Read receipts on messages',
+      'Incognito mode — browse without being seen',
+      'Dedicated support',
+    ],
+  },
+};
+
 export const OUTREACH_CREDIT_CONFIGS: Record<string, PurchaseConfig> = {
   small: {
     id: 'outreach_credits_small',
