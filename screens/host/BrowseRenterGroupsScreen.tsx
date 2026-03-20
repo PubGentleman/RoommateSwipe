@@ -18,6 +18,8 @@ import {
   OutreachQuotaStatus,
 } from '../../services/hostOutreachService';
 import { UNLOCK_PACKAGES } from '../../constants/planLimits';
+import { PurchaseConfirmModal } from '../../components/modals/PurchaseConfirmModal';
+import { OUTREACH_CREDIT_CONFIGS } from '../../constants/purchaseConfig';
 
 const BG = '#111';
 const CARD_BG = '#1a1a1a';
@@ -59,6 +61,8 @@ export const BrowseRenterGroupsScreen = () => {
 
   const [showUnlock, setShowUnlock] = useState(false);
   const [purchasing, setPurchasing] = useState<string | null>(null);
+  const [unlockPackage, setUnlockPackage] = useState<'small' | 'large' | null>(null);
+  const [unlocking, setUnlocking] = useState(false);
 
   const plan = hostSub?.plan ?? 'free';
 
@@ -248,16 +252,21 @@ export const BrowseRenterGroupsScreen = () => {
     }
   };
 
-  const handleUnlock = async (packageId: string) => {
-    setPurchasing(packageId);
-    const pkg = UNLOCK_PACKAGES.find(p => p.id === packageId)!;
-    try {
-      await addPaidCreditsLocal(user!.id, pkg.credits);
-      const newQuota = await getOutreachQuotaStatus(user!.id, plan);
-      setQuota(newQuota);
-      setShowUnlock(false);
+  const handleUnlock = (packageId: string) => {
+    setShowUnlock(false);
+    setUnlockPackage(packageId as 'small' | 'large');
+  };
 
-      const msg = `${pkg.credits} additional messages added for today.`;
+  const handleConfirmUnlock = async () => {
+    if (!unlockPackage || !user) return;
+    setUnlocking(true);
+    const credits = unlockPackage === 'small' ? 3 : 10;
+    try {
+      await addPaidCreditsLocal(user.id, credits);
+      const newQuota = await getOutreachQuotaStatus(user.id, plan);
+      setQuota(newQuota);
+      setUnlockPackage(null);
+      const msg = `${credits} additional messages added for today.`;
       if (Platform.OS === 'web') window.alert(msg);
       else Alert.alert('Unlocked!', msg);
     } catch (e: any) {
@@ -265,7 +274,7 @@ export const BrowseRenterGroupsScreen = () => {
       if (Platform.OS === 'web') window.alert(msg);
       else Alert.alert('Error', msg);
     } finally {
-      setPurchasing(null);
+      setUnlocking(false);
     }
   };
 
@@ -606,6 +615,16 @@ export const BrowseRenterGroupsScreen = () => {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {unlockPackage ? (
+        <PurchaseConfirmModal
+          visible={!!unlockPackage}
+          config={OUTREACH_CREDIT_CONFIGS[unlockPackage]}
+          loading={unlocking}
+          onConfirm={handleConfirmUnlock}
+          onCancel={() => setUnlockPackage(null)}
+        />
+      ) : null}
     </View>
   );
 };

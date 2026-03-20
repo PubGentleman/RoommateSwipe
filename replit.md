@@ -45,6 +45,7 @@ The application is built with React Native and Expo using TypeScript, featuring 
 - **Identity Verification:** Supports phone, government ID (via Stripe Identity SDK), social media, and optional background/income checks.
 - **References System:** Users can request and display references.
 - **Personality Quiz:** A 5-question quiz integrated into the matching algorithm.
+- **Universal Purchase Confirmation Modal:** A reusable `PurchaseConfirmModal` component (`components/modals/PurchaseConfirmModal.tsx`) replaces all native `Alert.alert`/`window.confirm` payment dialogs. Handles three purchase types: subscriptions (host plans), one-time payments (outreach packages), and credit top-ups (extra sends). All purchasable items are centralized in `constants/purchaseConfig.ts` with configs for host plans, outreach packages, and outreach credits. Wired into `HostSubscriptionScreen` (plan upgrades) and `BrowseRenterGroupsScreen` (credit unlocks).
 
 - **Collapsible/Sticky Headers:** All main screens implement a collapsible header pattern using `react-native-reanimated`. The top title bar stays pinned while secondary content (city pills, tabs, quick filters, profile hero) collapses/fades on scroll. Applied to: ExploreScreen (120px), HostDashboardScreen (50px), MessagesScreen (50px), ProfileScreen (200px), and GroupsScreen (52px). Pattern: `useAnimatedScrollHandler` + `useAnimatedStyle` with `interpolate` for translateY, opacity, and maxHeight.
 
