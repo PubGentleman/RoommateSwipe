@@ -877,208 +877,158 @@ export const GroupsScreen = () => {
     const memberProfiles = (group.members || [])
       .map(id => profileCache.find(p => p.id === id))
       .filter((p): p is NonNullable<typeof p> => p !== null && p !== undefined);
-    const pendingProfiles = (group.pendingMembers || [])
-      .map(id => profileCache.find(p => p.id === id))
-      .filter((p): p is NonNullable<typeof p> => p !== null && p !== undefined);
+    const pendingCount = (group.pendingMembers || []).length;
+    const filled = group.members.length;
+    const total = group.maxMembers || 4;
+    const fillPercent = filled / total;
 
     return (
       <Pressable
         key={group.id}
-        style={[styles.myGroupCard, { backgroundColor: theme.backgroundDefault }]}
+        style={[styles.redesignCard, { backgroundColor: theme.card, borderColor: theme.border }]}
         onPress={() => handleOpenGroupChat(group)}
       >
-        <View style={styles.groupHeader}>
-          {(() => {
-            const photos = memberProfiles
-              .map(p => ({ uri: p?.photos?.[0] || p?.profilePicture, initial: (p?.name || '?').charAt(0).toUpperCase() }))
-              .slice(0, 3);
-            if (photos.length === 0) {
-              return (
-                <View style={[styles.groupIcon, { backgroundColor: theme.primary }]}>
-                  <Feather name="users" size={20} color="#FFFFFF" />
-                </View>
-              );
-            }
-            const sz = photos.length === 1 ? 40 : 28;
-            const olap = 10;
-            const totalW = sz + (photos.length - 1) * (sz - olap);
-            return (
-              <View style={{ width: 40, height: 40, justifyContent: 'center', alignItems: 'center', marginRight: 0 }}>
-                <View style={{ width: totalW, height: sz, flexDirection: 'row' }}>
-                  {photos.map((m, i) => (
-                    m.uri ? (
-                      <Image
-                        key={i}
-                        source={{ uri: m.uri }}
-                        style={{
-                          width: sz, height: sz, borderRadius: sz / 2,
-                          borderWidth: 2, borderColor: theme.backgroundDefault,
-                          position: 'absolute', left: i * (sz - olap), zIndex: photos.length - i,
-                        }}
-                      />
-                    ) : (
-                      <View
-                        key={i}
-                        style={{
-                          width: sz, height: sz, borderRadius: sz / 2,
-                          backgroundColor: theme.primary, borderWidth: 2, borderColor: theme.backgroundDefault,
-                          alignItems: 'center', justifyContent: 'center',
-                          position: 'absolute', left: i * (sz - olap), zIndex: photos.length - i,
-                        }}
-                      >
-                        <Text style={{ color: '#fff', fontWeight: '700', fontSize: sz * 0.38 }}>{m.initial}</Text>
-                      </View>
-                    )
-                  ))}
-                </View>
-              </View>
-            );
-          })()}
-          <View style={styles.groupInfo}>
-            <ThemedText style={[Typography.h3]}>{group.name}</ThemedText>
-            <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
-              {group.members.length}/{group.maxMembers} members
-            </ThemedText>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            {isCreator ? (
-              <Pressable
-                style={styles.groupActionBtn}
-                onPress={(e) => { e.stopPropagation(); handleEditGroup(group); }}
-                hitSlop={8}
-              >
-                <Feather name="edit-2" size={16} color={theme.textSecondary} />
-              </Pressable>
-            ) : null}
-            <Pressable
-              style={[styles.leaveButton, { borderColor: theme.error }]}
-              onPress={(e) => { e.stopPropagation(); handleLeaveGroup(group); }}
-            >
-              <ThemedText style={[Typography.small, { color: theme.error }]}>Leave</ThemedText>
-            </Pressable>
-            <View style={styles.groupChatChevron}>
-              <Feather name="chevron-right" size={18} color={theme.textSecondary} />
-            </View>
-          </View>
-        </View>
+        <View style={[styles.accentBar, { backgroundColor: theme.primary }]} />
 
-        {group.description ? (
-          <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.md }]}>
-            {group.description}
-          </ThemedText>
-        ) : null}
-
-        <View style={{ flexDirection: 'row', gap: Spacing.lg, marginTop: Spacing.md, flexWrap: 'wrap' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
-            <Feather name="dollar-sign" size={16} color={theme.primary} />
-            <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
-              Min ${group.budget}/mo
-            </ThemedText>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
-            <Feather name="map-pin" size={16} color={theme.primary} />
-            <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
-              {group.preferredLocation}
-            </ThemedText>
-          </View>
-          {group.apartmentPrice ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
-              <Feather name="home" size={16} color={theme.primary} />
-              <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
-                ${group.apartmentPrice} total
-              </ThemedText>
-            </View>
-          ) : null}
-          {group.bedrooms ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
-              <Feather name="grid" size={16} color={theme.primary} />
-              <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
-                {group.bedrooms} bedrooms
-              </ThemedText>
-            </View>
-          ) : null}
-        </View>
-
-        {group.members.length <= 1 ? (
-          <View style={styles.soloGroupBanner}>
-            <Feather name="user-plus" size={20} color="#ff6b5b" />
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <ThemedText style={styles.soloGroupTitle}>Looking for Roommates</ThemedText>
-              <ThemedText style={styles.soloGroupDesc}>
-                Your group is visible to other renters. Share your group code to invite people directly.
-              </ThemedText>
-            </View>
-          </View>
-        ) : null}
-
-        {memberProfiles.length > 0 ? (
-          <View style={styles.membersSection}>
-            <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.sm }]}>
-              Members
-            </ThemedText>
-            {memberProfiles.map(profile => {
-              const isMemberAdmin = profile.id === group.createdBy;
-              const isMe = profile.id === user?.id;
-              return (
-                <View key={profile.id} style={styles.memberRow}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, flexWrap: 'wrap', gap: 4 }}>
-                    <ThemedText style={Typography.body}>
-                      {profile.name || 'Unknown'}{isMe ? ' (you)' : ''}{profile.age ? `, ${profile.age}` : ''}{profile.zodiacSign ? ` ${getZodiacSymbol(profile.zodiacSign)}` : ''} {getGenderSymbol(profile.gender)}
-                    </ThemedText>
-                    {isMemberAdmin ? (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.primary + '20', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10 }}>
-                        <Feather name="award" size={10} color={theme.primary} />
-                        <Text style={{ fontSize: 10, color: theme.primary, marginLeft: 3, fontWeight: '700' }}>Admin</Text>
-                      </View>
-                    ) : null}
-                    {getVerificationLevel(profile.verification) >= 2 ? (
-                      <Feather name="check-circle" size={14} color="#2563EB" />
-                    ) : null}
+        <View style={{ flex: 1, paddingLeft: 14 }}>
+          <View style={styles.cardTopRow}>
+            <View style={styles.avatarStack}>
+              {memberProfiles.slice(0, 3).map((profile, i) => {
+                const photo = profile?.photos?.[0] || profile?.profilePicture;
+                return photo ? (
+                  <Image
+                    key={profile.id}
+                    source={{ uri: photo }}
+                    style={[
+                      styles.stackAvatar,
+                      { borderColor: theme.card, zIndex: 3 - i, marginLeft: i === 0 ? 0 : -10 },
+                    ]}
+                  />
+                ) : (
+                  <View
+                    key={profile.id}
+                    style={[
+                      styles.stackAvatar,
+                      { backgroundColor: theme.primary, borderColor: theme.card, zIndex: 3 - i, marginLeft: i === 0 ? 0 : -10, alignItems: 'center', justifyContent: 'center' },
+                    ]}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: '800', color: '#fff' }}>
+                      {(profile.name || '?').charAt(0).toUpperCase()}
+                    </Text>
                   </View>
-                  {isCreator && !isMe ? (
-                    <Pressable onPress={(e) => { e.stopPropagation(); handleRemoveMember(group.id, profile.id, profile.name || 'Member'); }}>
-                      <Feather name="x-circle" size={20} color={theme.error} />
-                    </Pressable>
-                  ) : null}
+                );
+              })}
+              {memberProfiles.length === 0 ? (
+                <View style={[styles.stackAvatar, { backgroundColor: theme.primary, borderColor: theme.card, alignItems: 'center', justifyContent: 'center' }]}>
+                  <Feather name="users" size={14} color="#fff" />
                 </View>
-              );
-            })}
-          </View>
-        ) : null}
+              ) : null}
+              {filled > 3 ? (
+                <View style={[styles.stackAvatar, { backgroundColor: theme.border, borderColor: theme.card, marginLeft: -10, alignItems: 'center', justifyContent: 'center' }]}>
+                  <Text style={{ fontSize: 9, fontWeight: '700', color: theme.textSecondary }}>+{filled - 3}</Text>
+                </View>
+              ) : null}
+            </View>
 
-        {pendingProfiles.length > 0 ? (
-          <View style={styles.pendingSection}>
-            <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.sm }]}>
-              Pending Requests ({pendingProfiles.length})
-            </ThemedText>
-            {pendingProfiles.map(profile => (
-              <View key={profile.id} style={styles.pendingRow}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                  <ThemedText style={Typography.body}>
-                    {profile.name || 'Unknown'}{profile.age ? `, ${profile.age}` : ''}{profile.zodiacSign ? ` ${getZodiacSymbol(profile.zodiacSign)}` : ''} {getGenderSymbol(profile.gender)}
-                  </ThemedText>
-                  {getVerificationLevel(profile.verification) >= 2 ? (
-                    <Feather name="check-circle" size={14} color="#2563EB" style={{ marginLeft: 4 }} />
-                  ) : null}
-                </View>
-                <View style={styles.pendingActions}>
-                  <Pressable
-                    style={[styles.pendingButton, { backgroundColor: theme.primary }]}
-                    onPress={(e) => { e.stopPropagation(); handleAcceptMember(group.id, profile.id, profile.name || 'Member'); }}
-                  >
-                    <Feather name="check" size={16} color="#FFFFFF" />
-                  </Pressable>
-                  <Pressable
-                    style={[styles.pendingButton, { backgroundColor: theme.error }]}
-                    onPress={(e) => { e.stopPropagation(); handleRejectMember(group.id, profile.id); }}
-                  >
-                    <Feather name="x" size={16} color="#FFFFFF" />
-                  </Pressable>
-                </View>
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                <ThemedText style={[Typography.body, { fontWeight: '800' }]} numberOfLines={1}>
+                  {group.name}
+                </ThemedText>
+                {isCreator ? (
+                  <View style={[styles.adminPill, { backgroundColor: theme.primary + '25' }]}>
+                    <Text style={{ fontSize: 10, color: theme.primary, fontWeight: '700' }}>Admin</Text>
+                  </View>
+                ) : null}
               </View>
-            ))}
+              <View style={styles.progressRow}>
+                <View style={[styles.progressTrack, { backgroundColor: theme.border }]}>
+                  <View
+                    style={[
+                      styles.progressFill,
+                      {
+                        backgroundColor: fillPercent >= 1 ? '#22C55E' : theme.primary,
+                        width: `${Math.min(fillPercent * 100, 100)}%` as any,
+                      },
+                    ]}
+                  />
+                </View>
+                <Text style={[styles.slotText, { color: theme.textSecondary }]}>{filled}/{total}</Text>
+              </View>
+            </View>
+
+            {pendingCount > 0 ? (
+              <View style={[styles.pendingBadge, { backgroundColor: '#F59E0B' }]}>
+                <Text style={{ fontSize: 10, fontWeight: '800', color: '#fff' }}>{pendingCount}</Text>
+              </View>
+            ) : null}
           </View>
-        ) : null}
+
+          {group.description ? (
+            <ThemedText
+              style={[Typography.small, { color: theme.textSecondary, marginTop: 8, marginBottom: 8 }]}
+              numberOfLines={2}
+            >
+              {group.description}
+            </ThemedText>
+          ) : null}
+
+          <View style={styles.chipRow}>
+            {group.budget ? (
+              <View style={[styles.chip, { backgroundColor: theme.primary + '15', borderColor: theme.primary + '30' }]}>
+                <Feather name="dollar-sign" size={10} color={theme.primary} />
+                <Text style={[styles.chipText, { color: theme.primary }]}>${group.budget}/mo</Text>
+              </View>
+            ) : null}
+            {group.preferredLocation ? (
+              <View style={[styles.chip, { backgroundColor: theme.border + '60', borderColor: theme.border }]}>
+                <Feather name="map-pin" size={10} color={theme.textSecondary} />
+                <Text style={[styles.chipText, { color: theme.textSecondary }]}>{group.preferredLocation}</Text>
+              </View>
+            ) : null}
+            {group.linkedListing || group.listingId ? (
+              <View style={[styles.chip, { backgroundColor: '#22C55E15', borderColor: '#22C55E40' }]}>
+                <Feather name="home" size={10} color="#22C55E" />
+                <Text style={[styles.chipText, { color: '#22C55E' }]}>Property Linked</Text>
+              </View>
+            ) : null}
+            {group.bedrooms ? (
+              <View style={[styles.chip, { backgroundColor: theme.border + '60', borderColor: theme.border }]}>
+                <Feather name="grid" size={10} color={theme.textSecondary} />
+                <Text style={[styles.chipText, { color: theme.textSecondary }]}>{group.bedrooms} bed</Text>
+              </View>
+            ) : null}
+          </View>
+
+          <View style={[styles.actionRow, { borderTopColor: theme.border }]}>
+            {group.members.length <= 1 ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 4 }}>
+                <Feather name="user-plus" size={12} color={theme.primary} />
+                <Text style={{ fontSize: 12, color: theme.primary, fontWeight: '600' }}>Looking for roommates</Text>
+              </View>
+            ) : (
+              <Text style={{ fontSize: 12, color: theme.textSecondary, flex: 1 }} numberOfLines={1}>
+                {memberProfiles.map(p => p.name?.split(' ')[0] || '').filter(Boolean).join(', ')}
+              </Text>
+            )}
+
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Pressable
+                style={[styles.cardActionBtn, { backgroundColor: theme.primary }]}
+                onPress={() => handleOpenGroupChat(group)}
+              >
+                <Feather name="message-circle" size={13} color="#fff" />
+                <Text style={{ fontSize: 12, color: '#fff', fontWeight: '700', marginLeft: 4 }}>Chat</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.cardActionBtn, { backgroundColor: theme.border }]}
+                onPress={() => navigation.navigate('GroupInfo', { groupId: group.id, groupName: group.name })}
+              >
+                <Feather name="info" size={13} color={theme.text} />
+              </Pressable>
+            </View>
+          </View>
+        </View>
       </Pressable>
     );
   };
@@ -1138,10 +1088,13 @@ export const GroupsScreen = () => {
             </View>
           ) : null}
 
-          <View style={[styles.codeEntry, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <View style={[styles.redesignInviteCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <View style={[styles.inviteIconCircle, { backgroundColor: theme.primary + '20' }]}>
+              <Feather name="hash" size={16} color={theme.primary} />
+            </View>
             <TextInput
-              style={[styles.codeEntryInput, { color: theme.text }]}
-              placeholder="Enter invite code..."
+              style={[styles.redesignInviteInput, { color: theme.text }]}
+              placeholder="Enter invite code"
               placeholderTextColor={theme.textSecondary}
               value={codeInput}
               onChangeText={text => setCodeInput(text.toUpperCase())}
@@ -1149,20 +1102,24 @@ export const GroupsScreen = () => {
               autoCapitalize="characters"
             />
             <Pressable
-              style={[styles.codeEntryBtn, { backgroundColor: theme.primary, opacity: joiningByCode ? 0.6 : 1 }]}
+              style={[styles.redesignJoinBtn, { backgroundColor: codeInput.length === 6 ? theme.primary : theme.border }]}
               onPress={handleJoinByCode}
-              disabled={joiningByCode}
+              disabled={joiningByCode || codeInput.length < 1}
             >
               {joiningByCode
                 ? <ActivityIndicator size="small" color="#fff" />
-                : <ThemedText style={[Typography.small, { color: '#fff', fontWeight: '700' }]}>Join</ThemedText>
+                : <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Join</Text>
               }
             </Pressable>
           </View>
 
-          <View style={styles.sectionHeader}>
-            <Feather name="users" size={16} color="#ff6b5b" />
-            <ThemedText style={[Typography.h3, { marginLeft: 8 }]}>My Roommate Groups</ThemedText>
+          <View style={[styles.sectionHeader, styles.sectionRow]}>
+            <ThemedText style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+              MY ROOMMATE GROUPS
+            </ThemedText>
+            <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+              {myGroups.length} {myGroups.length === 1 ? 'group' : 'groups'}
+            </ThemedText>
           </View>
           {myGroups.length === 0 ? (
             <View style={[styles.emptyState, { paddingVertical: 30 }]}>
@@ -1175,9 +1132,13 @@ export const GroupsScreen = () => {
             myGroups.map(group => renderMyGroup(group))
           )}
 
-          <View style={[styles.sectionHeader, { marginTop: 24 }]}>
-            <Feather name="home" size={16} color="#ff6b5b" />
-            <ThemedText style={[Typography.h3, { marginLeft: 8 }]}>Listing Inquiries</ThemedText>
+          <View style={[styles.sectionHeader, styles.sectionRow, { marginTop: 24 }]}>
+            <ThemedText style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+              LISTING INQUIRIES
+            </ThemedText>
+            <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+              {activeInquiries.length} {activeInquiries.length === 1 ? 'inquiry' : 'inquiries'}
+            </ThemedText>
           </View>
           {activeInquiries.length === 0 ? (
             <View style={[styles.emptyState, { paddingVertical: 30 }]}>
@@ -2979,5 +2940,143 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minWidth: 60,
+  },
+  redesignCard: {
+    flexDirection: 'row',
+    borderRadius: 18,
+    borderWidth: 1,
+    marginBottom: 12,
+    overflow: 'hidden',
+    paddingVertical: 14,
+    paddingRight: 14,
+  },
+  accentBar: {
+    width: 4,
+    borderRadius: 2,
+    alignSelf: 'stretch',
+    marginLeft: 12,
+  },
+  cardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatarStack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  stackAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 2,
+  },
+  adminPill: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  progressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 5,
+    gap: 6,
+  },
+  progressTrack: {
+    flex: 1,
+    height: 4,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: 4,
+    borderRadius: 2,
+  },
+  slotText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  pendingBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+    marginLeft: 8,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 10,
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 20,
+    borderWidth: 1,
+    gap: 4,
+  },
+  chipText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 10,
+    borderTopWidth: 1,
+    gap: 8,
+  },
+  cardActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 3,
+  },
+  sectionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+  },
+  redesignInviteCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 10,
+    marginBottom: Spacing.md,
+    marginHorizontal: Spacing.md,
+    gap: 8,
+  },
+  inviteIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  redesignInviteInput: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 3,
+  },
+  redesignJoinBtn: {
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
