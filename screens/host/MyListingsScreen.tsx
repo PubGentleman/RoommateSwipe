@@ -796,7 +796,7 @@ const styles = StyleSheet.create({
   },
   boostedPill: {
     position: 'absolute',
-    top: 12,
+    top: 40,
     left: 12,
     backgroundColor: 'rgba(30,10,50,0.85)',
     borderWidth: 1,
