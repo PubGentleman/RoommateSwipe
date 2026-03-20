@@ -123,17 +123,12 @@ export const HostSubscriptionScreen = () => {
           },
         });
         const msg = 'Your host plan has been downgraded to Free.';
-        if (Platform.OS === 'web') { window.alert(msg); navigation.goBack(); }
-        else Alert.alert('Downgraded to Free', msg, [{ text: 'OK', onPress: () => navigation.goBack() }]);
+        Alert.alert('Downgraded to Free', msg, [{ text: 'OK', onPress: () => navigation.goBack() }]);
       };
-      if (Platform.OS === 'web') {
-        if (window.confirm('Downgrade to Free plan (no charge)?')) applyDowngrade();
-      } else {
-        Alert.alert('Confirm Downgrade', 'Downgrade to Free plan (no charge)?', [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Confirm', onPress: applyDowngrade },
-        ]);
-      }
+      Alert.alert('Confirm Downgrade', 'Downgrade to Free plan (no charge)?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Confirm', onPress: applyDowngrade },
+      ]);
       return;
     }
 
@@ -161,8 +156,7 @@ export const HostSubscriptionScreen = () => {
       });
       setSelectedPlan(null);
       const successMsg = `You're now on the ${planData.label} plan at $${price}/mo!`;
-      if (Platform.OS === 'web') { window.alert(successMsg); navigation.goBack(); }
-      else Alert.alert('Plan Updated', successMsg, [{ text: 'OK', onPress: () => navigation.goBack() }]);
+      Alert.alert('Plan Updated', successMsg, [{ text: 'OK', onPress: () => navigation.goBack() }]);
     } catch (e) {
       console.error(e);
     } finally {

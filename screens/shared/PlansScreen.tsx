@@ -192,9 +192,7 @@ export const PlansScreen = () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setSelectedPlan(null);
       const planName = selectedPlan === 'plus' ? 'Plus' : 'Elite';
-      Alert.alert('Success!', `Welcome to ${planName}! You now have access to all ${planName} features.`, [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
+      Alert.alert('Success!', `Welcome to ${planName}! You now have access to all ${planName} features.`);
     } catch (err: any) {
       Alert.alert('Error', err.message || 'Something went wrong.');
     } finally {
@@ -263,20 +261,14 @@ export const PlansScreen = () => {
         const expiryDate = user?.subscription?.expiresAt
           ? new Date(user.subscription.expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
           : 'the end of your billing period';
-        const successMsg = `You'll keep your features until ${expiryDate}.`;
-        if (Platform.OS === 'web') window.alert(successMsg);
-        else Alert.alert('Subscription Cancelled', successMsg);
+        Alert.alert('Subscription Cancelled', `You'll keep your features until ${expiryDate}.`);
       } else {
         await downgradeToPlan(pendingAction.target);
         const planLabel = pendingAction.target === 'basic' ? 'Free' : 'Plus';
-        const successMsg = `Your plan will change to ${planLabel} at the end of your billing period.`;
-        if (Platform.OS === 'web') window.alert(successMsg);
-        else Alert.alert('Downgrade Scheduled', successMsg);
+        Alert.alert('Downgrade Scheduled', `Your plan will change to ${planLabel} at the end of your billing period.`);
       }
     } catch (err: any) {
-      const errMsg = err.message || 'Something went wrong.';
-      if (Platform.OS === 'web') window.alert(errMsg);
-      else Alert.alert('Error', errMsg);
+      Alert.alert('Error', err.message || 'Something went wrong.');
     } finally {
       setProcessing(false);
       setPendingAction(null);
