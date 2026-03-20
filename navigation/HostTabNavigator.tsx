@@ -191,6 +191,7 @@ export const HostTabNavigator = () => {
     <Tab.Navigator
       initialRouteName="Dashboard"
       tabBar={(props) => <HostCustomTabBar {...props} />}
+      backBehavior="history"
       screenOptions={{
         headerShown: false,
       }}

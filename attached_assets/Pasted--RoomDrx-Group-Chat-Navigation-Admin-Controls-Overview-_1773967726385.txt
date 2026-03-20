@@ -1,0 +1,826 @@
+# RoomDrx — Group Chat Navigation + Admin Controls
+
+## Overview
+
+Tapping a group card on the Groups screen opens `GroupChatScreen` — a full, rich group experience. Admin controls (add/remove members, manage property, leave group) live behind a single tap on the group header, which opens `GroupInfoScreen`. The Chat tab displays a unified inbox of both DMs and group conversations.
+
+---
+
+## Navigation Map
+
+```
+GroupsScreen
+  └── tap group card
+        └── GroupChatScreen
+              ├── tap header (group name / member count)
+              │     └── GroupInfoScreen  ← admin controls live here
+              │           ├── tap "Add Members"
+              │           │     └── GroupInviteScreen (methods A, C, D)
+              │           ├── tap ✕ on member → remove confirmation
+              │           ├── tap "Promote" on member → PromoteAdminScreen
+              │           ├── tap "Change Property" → GroupPropertySearchModal
+              │           └── tap "Leave Group" → promote check or confirm
+              └── host outreach card (if applicable)
+
+ChatScreen (unified inbox)
+  ├── DM rows → existing DirectMessageScreen
+  └── Group rows → same GroupChatScreen (same destination, different entry)
+```
+
+---
+
+## Screen 1: `GroupChatScreen`
+
+### Header Layout
+
+```
+┌─────────────────────────────────────────────────────┐
+│  ←   [Group Avatar]  Tech Professionals  (2 members) │  ← entire header is tappable
+│                                                  ⚙️  │  ← gear opens GroupInfoScreen
+└─────────────────────────────────────────────────────┘
+```
+
+- Tapping **anywhere on the header** (name, avatar, member count) opens `GroupInfoScreen`
+- The ⚙️ gear icon (top right) also opens `GroupInfoScreen`
+- Pinned property card sits just below the header (if listing is linked)
+- Messages fill the rest of the screen
+- Host outreach card renders above the message input if any outreach exists
+
+### Full Screen Structure
+
+```tsx
+// GroupChatScreen.tsx
+
+<SafeAreaView>
+  {/* Tappable header → GroupInfoScreen */}
+  <TouchableOpacity onPress={() => navigation.navigate('GroupInfo', { groupId })}>
+    <View style={styles.header}>
+      <TouchableOpacity onPress={() => navigation.goBack()}>
+        <Feather name="arrow-left" size={22} color={theme.text} />
+      </TouchableOpacity>
+
+      <View style={styles.headerCenter}>
+        {/* Group avatar */}
+        <View style={[styles.groupAvatar, { backgroundColor: theme.primary }]}>
+          <Feather name="users" size={18} color="#fff" />
+        </View>
+
+        <View>
+          <ThemedText style={[Typography.body, { fontWeight: '700' }]}>
+            {group.name}
+          </ThemedText>
+          <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+            {group.memberCount} members
+          </ThemedText>
+        </View>
+      </View>
+
+      {/* Gear icon */}
+      <TouchableOpacity
+        onPress={() => navigation.navigate('GroupInfo', { groupId })}
+        style={styles.gearBtn}
+      >
+        <Feather name="settings" size={20} color={theme.textSecondary} />
+      </TouchableOpacity>
+    </View>
+  </TouchableOpacity>
+
+  {/* Pinned property card (if listing linked) */}
+  {group.linkedListing && <PinnedPropertyCard listing={group.linkedListing} />}
+
+  {/* Host outreach card (if any) */}
+  {outreachMessages.map(msg => <HostOutreachCard key={msg.id} outreach={msg} />)}
+
+  {/* Message list */}
+  <FlatList
+    data={messages}
+    inverted
+    renderItem={({ item }) => <MessageBubble message={item} currentUserId={user.id} />}
+    keyExtractor={item => item.id}
+  />
+
+  {/* Message input */}
+  <MessageInputBar onSend={handleSend} />
+</SafeAreaView>
+```
+
+---
+
+## Screen 2: `GroupInfoScreen`
+
+This is where all admin controls live. Regular members see a read-only view. Admins see full management controls.
+
+### Layout
+
+```
+┌─────────────────────────────────────────────────────┐
+│  ←   Group Info                                      │
+├─────────────────────────────────────────────────────┤
+│                                                      │
+│  [Group Avatar]                                      │
+│  Tech Professionals                                  │
+│  Software engineers looking for a place              │
+│  📍 Financial District  💰 Min $2,800/mo            │
+│                                                      │
+├─────────────────────────────────────────────────────┤
+│  LINKED PROPERTY                                     │
+│  ┌──────────────────────────────────────────────┐   │
+│  │ 📷  2BR Apt · Financial District · $3,200/mo │   │
+│  │     [RENTED badge if rented]    [Remove] ←admin│  │
+│  └──────────────────────────────────────────────┘   │
+│  [+ Link a Property]  ← admin only, shown if none   │
+│                                                      │
+├─────────────────────────────────────────────────────┤
+│  MEMBERS  (2/4)             [+ Add Members] ←admin  │
+│                                                      │
+│  👤 Sarah Johnson, 24  ♍ ♀ ✓     ADMIN  [Crown]    │
+│  👤 Michael Chen, 26   ♌ ♂       [Promote] [✕]←admin│
+│                                                      │
+├─────────────────────────────────────────────────────┤
+│  SETTINGS  (admin only)                              │
+│  🔍 Discoverable  [toggle]                          │
+│                                                      │
+├─────────────────────────────────────────────────────┤
+│  [Leave Group]  ← red, all members see this         │
+└─────────────────────────────────────────────────────┘
+```
+
+### Full Implementation
+
+```tsx
+// screens/groups/GroupInfoScreen.tsx
+
+import React, { useEffect, useState } from 'react';
+import {
+  View, ScrollView, TouchableOpacity, Switch,
+  Alert, ActivityIndicator, StyleSheet
+} from 'react-native';
+import { ThemedText } from '../../components/ThemedText';
+import { Feather } from '@expo/vector-icons';
+import { useTheme } from '../../context/ThemeContext';
+import { Typography, Spacing } from '../../constants/theme';
+import { useAuth } from '../../context/AuthContext';
+import {
+  getGroupDetails,
+  removeMember,
+  promoteMember,
+  leaveGroup,
+  setGroupDiscoverable,
+} from '../../services/groupService';
+
+interface Props {
+  route: { params: { groupId: string } };
+  navigation: any;
+}
+
+export default function GroupInfoScreen({ route, navigation }: Props) {
+  const { groupId } = route.params;
+  const { theme } = useTheme();
+  const { user } = useAuth();
+
+  const [group, setGroup] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+
+  const isAdmin = group?.adminId === user?.id;
+
+  useEffect(() => {
+    loadGroup();
+  }, [groupId]);
+
+  async function loadGroup() {
+    try {
+      const data = await getGroupDetails(groupId);
+      setGroup(data);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ─── Remove Member ────────────────────────────────────────────────────────
+  function handleRemoveMember(memberId: string, memberName: string) {
+    Alert.alert(
+      `Remove ${memberName}?`,
+      `${memberName} will be removed from the group and notified.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            setRemovingId(memberId);
+            try {
+              await removeMember(groupId, memberId);
+              setGroup((prev: any) => ({
+                ...prev,
+                members: prev.members.filter((m: any) => m.id !== memberId),
+                memberCount: prev.memberCount - 1,
+              }));
+            } catch {
+              Alert.alert('Error', 'Could not remove member.');
+            } finally {
+              setRemovingId(null);
+            }
+          },
+        },
+      ]
+    );
+  }
+
+  // ─── Promote Member ───────────────────────────────────────────────────────
+  function handlePromoteMember(memberId: string, memberName: string) {
+    Alert.alert(
+      `Promote ${memberName}?`,
+      `${memberName} will become the new admin. You will become a regular member.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Promote',
+          onPress: async () => {
+            try {
+              await promoteMember(groupId, memberId);
+              setGroup((prev: any) => ({ ...prev, adminId: memberId }));
+            } catch {
+              Alert.alert('Error', 'Could not promote member.');
+            }
+          },
+        },
+      ]
+    );
+  }
+
+  // ─── Leave Group ──────────────────────────────────────────────────────────
+  async function handleLeaveGroup() {
+    if (isAdmin && group.memberCount > 1) {
+      Alert.alert(
+        'Promote Someone First',
+        'You are the admin. Promote another member before leaving.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Go to Promote',
+            onPress: () => navigation.navigate('PromoteAdmin', { groupId }),
+          },
+        ]
+      );
+      return;
+    }
+
+    const isLastMember = group.memberCount === 1;
+    Alert.alert(
+      isLastMember ? 'Delete Group?' : 'Leave Group?',
+      isLastMember
+        ? 'You are the last member. Leaving will permanently delete this group.'
+        : 'Are you sure you want to leave this group?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: isLastMember ? 'Delete' : 'Leave',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await leaveGroup(groupId);
+              // Pop back to GroupsScreen
+              navigation.popToTop();
+            } catch {
+              Alert.alert('Error', 'Could not leave group.');
+            }
+          },
+        },
+      ]
+    );
+  }
+
+  // ─── Toggle Discoverable ─────────────────────────────────────────────────
+  async function handleDiscoverableToggle(value: boolean) {
+    try {
+      await setGroupDiscoverable(groupId, value);
+      setGroup((prev: any) => ({ ...prev, discoverable: value }));
+    } catch {
+      Alert.alert('Error', 'Could not update discovery setting.');
+    }
+  }
+
+  if (loading || !group) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator color={theme.primary} />
+      </View>
+    );
+  }
+
+  const otherMembers = group.members.filter((m: any) => m.id !== user?.id);
+  const memberLimit = group.memberLimit ?? 4;
+
+  return (
+    <ScrollView
+      style={{ flex: 1, backgroundColor: theme.background }}
+      contentContainerStyle={{ paddingBottom: 40 }}
+    >
+      {/* ── Group Identity ─────────────────────────────────────── */}
+      <View style={[styles.identityCard, { backgroundColor: theme.card }]}>
+        <View style={[styles.bigAvatar, { backgroundColor: theme.primary }]}>
+          <Feather name="users" size={32} color="#fff" />
+        </View>
+        <ThemedText style={[Typography.h2, { textAlign: 'center', marginTop: Spacing.sm }]}>
+          {group.name}
+        </ThemedText>
+        {group.description ? (
+          <ThemedText style={[Typography.body, { color: theme.textSecondary, textAlign: 'center', marginTop: 4 }]}>
+            {group.description}
+          </ThemedText>
+        ) : null}
+        <View style={styles.metaRow}>
+          {group.minBudget && (
+            <View style={styles.metaChip}>
+              <Feather name="dollar-sign" size={12} color={theme.textSecondary} />
+              <ThemedText style={[Typography.small, { color: theme.textSecondary, marginLeft: 4 }]}>
+                Min ${group.minBudget.toLocaleString()}/mo
+              </ThemedText>
+            </View>
+          )}
+          {group.targetNeighborhood && (
+            <View style={styles.metaChip}>
+              <Feather name="map-pin" size={12} color={theme.textSecondary} />
+              <ThemedText style={[Typography.small, { color: theme.textSecondary, marginLeft: 4 }]}>
+                {group.targetNeighborhood}
+              </ThemedText>
+            </View>
+          )}
+        </View>
+      </View>
+
+      {/* ── Linked Property ────────────────────────────────────── */}
+      <View style={styles.section}>
+        <ThemedText style={[Typography.small, styles.sectionLabel, { color: theme.textSecondary }]}>
+          LINKED PROPERTY
+        </ThemedText>
+
+        {group.linkedListing ? (
+          <View style={[styles.propertyRow, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <View style={{ flex: 1 }}>
+              <ThemedText style={[Typography.body, { fontWeight: '600' }]} numberOfLines={1}>
+                {group.linkedListing.title}
+              </ThemedText>
+              <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+                {group.linkedListing.bedrooms}BR · {group.linkedListing.city} · ${group.linkedListing.price.toLocaleString()}/mo
+              </ThemedText>
+              {group.linkedListing.status === 'rented' && (
+                <View style={[styles.rentedBadge, { backgroundColor: '#FF6B6B20' }]}>
+                  <ThemedText style={[Typography.small, { color: '#FF6B6B', fontWeight: '700' }]}>
+                    RENTED
+                  </ThemedText>
+                </View>
+              )}
+            </View>
+            {isAdmin && (
+              <TouchableOpacity
+                onPress={() => Alert.alert(
+                  'Remove Property?',
+                  'The group will no longer be linked to this listing.',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Remove', style: 'destructive', onPress: () => {/* unlinkListing */} },
+                  ]
+                )}
+              >
+                <ThemedText style={[Typography.small, { color: '#FF6B6B' }]}>Remove</ThemedText>
+              </TouchableOpacity>
+            )}
+          </View>
+        ) : (
+          isAdmin && (
+            <TouchableOpacity
+              style={[styles.addPropertyBtn, { borderColor: theme.primary }]}
+              onPress={() => navigation.navigate('GroupPropertySearch', { groupId })}
+            >
+              <Feather name="plus" size={16} color={theme.primary} />
+              <ThemedText style={[Typography.body, { color: theme.primary, marginLeft: 8 }]}>
+                Link a Property
+              </ThemedText>
+            </TouchableOpacity>
+          )
+        )}
+
+        {!group.linkedListing && !isAdmin && (
+          <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+            No property linked yet.
+          </ThemedText>
+        )}
+      </View>
+
+      {/* ── Members ────────────────────────────────────────────── */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeaderRow}>
+          <ThemedText style={[Typography.small, styles.sectionLabel, { color: theme.textSecondary }]}>
+            MEMBERS ({group.memberCount}/{memberLimit})
+          </ThemedText>
+          {isAdmin && group.memberCount < memberLimit && (
+            <TouchableOpacity
+              style={[styles.addMembersBtn, { backgroundColor: theme.primary }]}
+              onPress={() => navigation.navigate('GroupInvite', { groupId })}
+            >
+              <Feather name="user-plus" size={14} color="#fff" />
+              <ThemedText style={[Typography.small, { color: '#fff', fontWeight: '700', marginLeft: 6 }]}>
+                Add Members
+              </ThemedText>
+            </TouchableOpacity>
+          )}
+          {isAdmin && group.memberCount >= memberLimit && (
+            <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+              Group full
+            </ThemedText>
+          )}
+        </View>
+
+        {group.members.map((member: any) => {
+          const isCurrentUser = member.id === user?.id;
+          const isMemberAdmin = member.id === group.adminId;
+          const isRemoving = removingId === member.id;
+
+          return (
+            <View
+              key={member.id}
+              style={[styles.memberRow, { backgroundColor: theme.card, borderColor: theme.border }]}
+            >
+              {/* Avatar */}
+              <View style={[styles.memberAvatar, { backgroundColor: theme.primary + '30' }]}>
+                {member.avatarUrl ? (
+                  // <Image source={{ uri: member.avatarUrl }} style={styles.memberAvatar} />
+                  <ThemedText style={[Typography.body, { fontWeight: '700', color: theme.primary }]}>
+                    {member.name.charAt(0)}
+                  </ThemedText>
+                ) : (
+                  <ThemedText style={[Typography.body, { fontWeight: '700', color: theme.primary }]}>
+                    {member.name.charAt(0)}
+                  </ThemedText>
+                )}
+              </View>
+
+              {/* Name + badges */}
+              <View style={{ flex: 1 }}>
+                <View style={styles.nameRow}>
+                  <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
+                    {member.name}{isCurrentUser ? ' (you)' : ''}, {member.age}
+                  </ThemedText>
+                  {isMemberAdmin && (
+                    <View style={[styles.adminBadge, { backgroundColor: theme.primary + '20' }]}>
+                      <Feather name="award" size={10} color={theme.primary} />
+                      <ThemedText style={[Typography.small, { color: theme.primary, marginLeft: 3, fontSize: 10 }]}>
+                        Admin
+                      </ThemedText>
+                    </View>
+                  )}
+                </View>
+                <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+                  {member.zodiacSign} · {member.gender}
+                  {member.verified ? ' · ✓ Verified' : ''}
+                </ThemedText>
+              </View>
+
+              {/* Admin controls — only shown to admin, only for non-admin members */}
+              {isAdmin && !isCurrentUser && !isMemberAdmin && (
+                <View style={styles.adminActions}>
+                  {/* Promote button */}
+                  <TouchableOpacity
+                    style={[styles.actionBtn, { borderColor: theme.primary }]}
+                    onPress={() => handlePromoteMember(member.id, member.name)}
+                  >
+                    <Feather name="arrow-up" size={13} color={theme.primary} />
+                  </TouchableOpacity>
+
+                  {/* Remove button */}
+                  <TouchableOpacity
+                    style={[styles.actionBtn, { borderColor: '#FF6B6B', marginLeft: 6 }]}
+                    onPress={() => handleRemoveMember(member.id, member.name)}
+                    disabled={isRemoving}
+                  >
+                    {isRemoving ? (
+                      <ActivityIndicator size="small" color="#FF6B6B" />
+                    ) : (
+                      <Feather name="x" size={13} color="#FF6B6B" />
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          );
+        })}
+      </View>
+
+      {/* ── Settings (admin only) ──────────────────────────────── */}
+      {isAdmin && (
+        <View style={styles.section}>
+          <ThemedText style={[Typography.small, styles.sectionLabel, { color: theme.textSecondary }]}>
+            SETTINGS
+          </ThemedText>
+
+          <View style={[styles.settingRow, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <View style={{ flex: 1 }}>
+              <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
+                Discoverable
+              </ThemedText>
+              <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+                Allow others to find and request to join this group
+              </ThemedText>
+            </View>
+            <Switch
+              value={group.discoverable}
+              onValueChange={handleDiscoverableToggle}
+              trackColor={{ false: theme.border, true: theme.primary }}
+              thumbColor="#fff"
+            />
+          </View>
+        </View>
+      )}
+
+      {/* ── Leave Group ────────────────────────────────────────── */}
+      <View style={[styles.section, { marginTop: Spacing.lg }]}>
+        <TouchableOpacity
+          style={[styles.leaveBtn, { borderColor: '#FF6B6B' }]}
+          onPress={handleLeaveGroup}
+        >
+          <Feather name="log-out" size={16} color="#FF6B6B" />
+          <ThemedText style={[Typography.body, { color: '#FF6B6B', fontWeight: '600', marginLeft: 8 }]}>
+            Leave Group
+          </ThemedText>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  identityCard: {
+    alignItems: 'center',
+    padding: Spacing.xl,
+    marginBottom: Spacing.sm,
+  },
+  bigAvatar: {
+    width: 72, height: 72, borderRadius: 36,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  metaRow: {
+    flexDirection: 'row', gap: Spacing.sm,
+    marginTop: Spacing.sm, flexWrap: 'wrap', justifyContent: 'center',
+  },
+  metaChip: { flexDirection: 'row', alignItems: 'center' },
+  section: { paddingHorizontal: Spacing.md, marginBottom: Spacing.md },
+  sectionLabel: { fontWeight: '700', letterSpacing: 0.5, marginBottom: Spacing.sm },
+  sectionHeaderRow: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'center', marginBottom: Spacing.sm,
+  },
+  addMembersBtn: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
+  },
+  propertyRow: {
+    flexDirection: 'row', alignItems: 'center',
+    padding: Spacing.sm, borderRadius: 12, borderWidth: 1,
+  },
+  rentedBadge: {
+    alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2,
+    borderRadius: 4, marginTop: 4,
+  },
+  addPropertyBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    padding: Spacing.sm, borderRadius: 12, borderWidth: 1.5, borderStyle: 'dashed',
+  },
+  memberRow: {
+    flexDirection: 'row', alignItems: 'center',
+    padding: Spacing.sm, borderRadius: 12, borderWidth: 1,
+    marginBottom: Spacing.sm, gap: Spacing.sm,
+  },
+  memberAvatar: {
+    width: 42, height: 42, borderRadius: 21,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  adminBadge: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10,
+  },
+  adminActions: { flexDirection: 'row', alignItems: 'center' },
+  actionBtn: {
+    width: 30, height: 30, borderRadius: 8, borderWidth: 1.5,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  settingRow: {
+    flexDirection: 'row', alignItems: 'center',
+    padding: Spacing.sm, borderRadius: 12, borderWidth: 1,
+  },
+  leaveBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 14, borderRadius: 12, borderWidth: 1.5,
+  },
+});
+```
+
+---
+
+## Screen 3: Unified Chat Tab (`ChatScreen`)
+
+The Chat tab becomes an inbox showing both DMs and group threads, sorted by most recent activity.
+
+```tsx
+// screens/ChatScreen.tsx — replace or update existing
+
+import React, { useEffect, useState } from 'react';
+import {
+  View, FlatList, TouchableOpacity, StyleSheet
+} from 'react-native';
+import { ThemedText } from '../components/ThemedText';
+import { Feather } from '@expo/vector-icons';
+import { useTheme } from '../context/ThemeContext';
+import { Typography, Spacing } from '../constants/theme';
+import { getUnifiedInbox, InboxItem } from '../services/chatService';
+import { useAuth } from '../context/AuthContext';
+
+export default function ChatScreen({ navigation }: any) {
+  const { theme } = useTheme();
+  const { user } = useAuth();
+  const [inbox, setInbox] = useState<InboxItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getUnifiedInbox(user!.id)
+      .then(setInbox)
+      .finally(() => setLoading(false));
+  }, []);
+
+  function handlePress(item: InboxItem) {
+    if (item.type === 'group') {
+      navigation.navigate('GroupChat', { groupId: item.id, groupName: item.name });
+    } else {
+      navigation.navigate('DirectMessage', { matchId: item.id, userName: item.name });
+    }
+  }
+
+  return (
+    <View style={{ flex: 1, backgroundColor: theme.background }}>
+      <View style={styles.header}>
+        <ThemedText style={Typography.h2}>Messages</ThemedText>
+      </View>
+
+      <FlatList
+        data={inbox}
+        keyExtractor={item => item.id}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={[styles.row, { borderBottomColor: theme.border }]}
+            onPress={() => handlePress(item)}
+          >
+            {/* Avatar or group icon */}
+            <View style={[
+              styles.avatar,
+              { backgroundColor: item.type === 'group' ? theme.primary : theme.primary + '30' }
+            ]}>
+              {item.type === 'group' ? (
+                <Feather name="users" size={18} color="#fff" />
+              ) : (
+                <ThemedText style={[Typography.body, { fontWeight: '700', color: theme.primary }]}>
+                  {item.name.charAt(0)}
+                </ThemedText>
+              )}
+            </View>
+
+            {/* Content */}
+            <View style={{ flex: 1 }}>
+              <View style={styles.rowTop}>
+                <ThemedText style={[Typography.body, { fontWeight: item.unread ? '700' : '500' }]}>
+                  {item.name}
+                </ThemedText>
+                <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+                  {item.timeAgo}
+                </ThemedText>
+              </View>
+              <ThemedText
+                style={[
+                  Typography.small,
+                  { color: item.unread ? theme.text : theme.textSecondary, fontWeight: item.unread ? '600' : '400' }
+                ]}
+                numberOfLines={1}
+              >
+                {item.type === 'group' && item.lastSenderName
+                  ? `${item.lastSenderName}: ${item.lastMessage}`
+                  : item.lastMessage}
+              </ThemedText>
+            </View>
+
+            {/* Unread badge */}
+            {item.unread && (
+              <View style={[styles.unreadDot, { backgroundColor: theme.primary }]} />
+            )}
+          </TouchableOpacity>
+        )}
+        ListEmptyComponent={
+          !loading ? (
+            <View style={styles.empty}>
+              <Feather name="message-circle" size={40} color={theme.border} />
+              <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.sm }]}>
+                No messages yet
+              </ThemedText>
+            </View>
+          ) : null
+        }
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  header: { padding: Spacing.md, paddingBottom: Spacing.sm },
+  row: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm,
+    borderBottomWidth: 1,
+  },
+  avatar: {
+    width: 48, height: 48, borderRadius: 24,
+    alignItems: 'center', justifyContent: 'center', marginRight: Spacing.sm,
+  },
+  rowTop: {
+    flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2,
+  },
+  unreadDot: {
+    width: 10, height: 10, borderRadius: 5, marginLeft: Spacing.sm,
+  },
+  empty: { alignItems: 'center', marginTop: 80 },
+});
+```
+
+### `getUnifiedInbox` in `chatService.ts`
+
+```ts
+export interface InboxItem {
+  id: string;
+  type: 'dm' | 'group';
+  name: string;
+  lastMessage: string;
+  lastSenderName?: string; // for group threads
+  timeAgo: string;
+  unread: boolean;
+}
+
+export async function getUnifiedInbox(userId: string): Promise<InboxItem[]> {
+  // Fetch DM threads
+  const { data: dms } = await supabase
+    .from('matches')
+    .select(`
+      id,
+      messages:direct_messages(content, created_at, sender_id, read)
+    `)
+    .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
+    .order('updated_at', { ascending: false });
+
+  // Fetch group threads
+  const { data: groups } = await supabase
+    .from('group_members')
+    .select(`
+      group:groups(
+        id, name,
+        messages:group_messages(content, created_at, sender_id,
+          sender:profiles(full_name))
+      )
+    `)
+    .eq('user_id', userId);
+
+  // Combine, format, and sort by recency
+  const dmItems: InboxItem[] = (dms || []).map(formatDmThread);
+  const groupItems: InboxItem[] = (groups || []).map(formatGroupThread);
+
+  return [...dmItems, ...groupItems].sort(
+    (a, b) => new Date(b.timeAgo).getTime() - new Date(a.timeAgo).getTime()
+  );
+}
+```
+
+---
+
+## Navigation Additions
+
+```ts
+// Add to your navigator:
+
+<Stack.Screen
+  name="GroupInfo"
+  component={GroupInfoScreen}
+  options={{ title: 'Group Info' }}
+/>
+```
+
+---
+
+## Summary: Where Admin Controls Live
+
+| Action | Where | How |
+|--------|-------|-----|
+| **Add members** | GroupInfoScreen | "Add Members" button → GroupInviteScreen (methods A, C, D) |
+| **Remove a member** | GroupInfoScreen | ✕ button next to member → confirmation alert |
+| **Promote to admin** | GroupInfoScreen | ↑ button next to member → confirmation alert |
+| **Link a property** | GroupInfoScreen | "Link a Property" dashed button → GroupPropertySearchModal |
+| **Remove property** | GroupInfoScreen | "Remove" button on property card |
+| **Toggle discoverable** | GroupInfoScreen | Switch toggle in Settings section |
+| **Leave group** | GroupInfoScreen | Red "Leave Group" button at bottom |
+| **All of the above** | Accessible from GroupChatScreen | Tap header or ⚙️ icon |

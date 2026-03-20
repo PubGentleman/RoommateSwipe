@@ -1,0 +1,50 @@
+import React from 'react';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { GroupsScreen } from '../screens/renter/GroupsScreen';
+import { ChatScreen } from '../screens/shared/ChatScreen';
+import { CreateGroupScreen } from '../screens/shared/CreateGroupScreen';
+import { GroupInviteScreen } from '../screens/shared/GroupInviteScreen';
+import { PromoteAdminScreen } from '../screens/shared/PromoteAdminScreen';
+import { ListingGroupsScreen } from '../screens/shared/ListingGroupsScreen';
+import { RoommateProfile } from '../types/models';
+
+export type GroupsStackParamList = {
+  GroupsList: undefined;
+  Chat: {
+    conversationId: string;
+    otherUser?: RoommateProfile;
+    inquiryGroup?: any;
+  };
+  CreateGroup: {
+    matchedUserId?: string;
+    matchedUserName?: string;
+    preselectedListingId?: string;
+  };
+  GroupInvite: {
+    groupId: string;
+    groupName: string;
+    listingId?: string | null;
+  };
+  PromoteAdmin: {
+    groupId: string;
+    groupName: string;
+  };
+  ListingGroups: {
+    listingId: string;
+  };
+};
+
+const Stack = createNativeStackNavigator<GroupsStackParamList>();
+
+export const GroupsStackNavigator = () => {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="GroupsList" component={GroupsScreen} />
+      <Stack.Screen name="Chat" component={ChatScreen} />
+      <Stack.Screen name="CreateGroup" component={CreateGroupScreen} />
+      <Stack.Screen name="GroupInvite" component={GroupInviteScreen} />
+      <Stack.Screen name="PromoteAdmin" component={PromoteAdminScreen} />
+      <Stack.Screen name="ListingGroups" component={ListingGroupsScreen} />
+    </Stack.Navigator>
+  );
+};

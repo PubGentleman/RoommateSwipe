@@ -429,12 +429,7 @@ export const GroupsScreen = () => {
     const groupConvId = `group-${group.id}`;
     const existing = conversations.find(c => c.id === groupConvId);
 
-    if (existing) {
-      (navigation as any).navigate('Messages', { screen: 'MessagesList' });
-      setTimeout(() => {
-        (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: existing.id } });
-      }, 50);
-    } else {
+    if (!existing) {
       const memberIds: string[] = (group.members || []).map((m: any) => m.userId || m.id).filter((id: string) => id !== user.id);
       const roommateProfiles = await StorageService.getRoommateProfiles();
       const firstMember = roommateProfiles.find(p => memberIds.includes(p.id));
@@ -455,12 +450,9 @@ export const GroupsScreen = () => {
         groupName: group.name,
       };
       await StorageService.addOrUpdateConversation(newConversation);
-      (navigation as any).navigate('Messages', { screen: 'MessagesList' });
-      setTimeout(() => {
-        (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: newConversation.id } });
-      }, 50);
     }
 
+    navigation.navigate('Chat', { conversationId: groupConvId });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
@@ -472,11 +464,9 @@ export const GroupsScreen = () => {
       c.participant.id === targetUserId
     );
     
+    let conversationId: string;
     if (existingConversation) {
-      (navigation as any).navigate('Messages', { screen: 'MessagesList' });
-      setTimeout(() => {
-        (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: existingConversation.id } });
-      }, 50);
+      conversationId = existingConversation.id;
     } else {
       const roommateProfiles = await StorageService.getRoommateProfiles();
       const targetProfile = roommateProfiles.find(p => p.id === targetUserId);
@@ -497,12 +487,10 @@ export const GroupsScreen = () => {
         messages: [],
       };
       await StorageService.addOrUpdateConversation(newConversation);
-      (navigation as any).navigate('Messages', { screen: 'MessagesList' });
-      setTimeout(() => {
-        (navigation as any).navigate('Messages', { screen: 'Chat', params: { conversationId: newConversation.id } });
-      }, 50);
+      conversationId = newConversation.id;
     }
     
+    navigation.navigate('Chat', { conversationId });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
@@ -782,10 +770,7 @@ export const GroupsScreen = () => {
   };
 
   const handleOpenGroupChat = (group: Group) => {
-    navigation.navigate('Messages', {
-      screen: 'Chat',
-      params: { conversationId: `group-${group.id}` },
-    });
+    navigation.navigate('Chat', { conversationId: `group-${group.id}` });
   };
 
   const handleEditGroup = (group: Group) => {
@@ -823,10 +808,7 @@ export const GroupsScreen = () => {
         key={group.id}
         style={[styles.myGroupCard, { backgroundColor: theme.backgroundDefault }]}
         onPress={() => {
-          navigation.navigate('Messages', {
-            screen: 'Chat',
-            params: { conversationId: `inquiry_${group.id}`, inquiryGroup: group },
-          });
+          navigation.navigate('Chat', { conversationId: `inquiry_${group.id}`, inquiryGroup: group });
         }}
         onLongPress={() => {
           if (!group.isArchived) handleArchiveInquiry(group);

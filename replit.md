@@ -92,6 +92,8 @@ The application supports over 10 US cities with a centralized location data syst
 
 Key technical decisions include Babel module resolver, platform-specific UI adaptations, performance optimizations via React Native's New Architecture, React Compiler, and Reanimated, and robust error handling through an error boundary component.
 
+**Navigation Architecture:** Each major tab (Groups, Messages, Profile, Roommates) has its own stack navigator so back navigation stays within the tab. Tab navigators use `backBehavior="history"` for proper tab-level back navigation. Navigation files: `GroupsStackNavigator.tsx`, `MessagesStackNavigator.tsx`, `HostMessagesStackNavigator.tsx`, `RoommatesStackNavigator.tsx`, `ProfileStackNavigator.tsx`.
+
 # External Dependencies
 
 **Core Framework:**

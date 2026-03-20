@@ -6,7 +6,7 @@ import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ExploreScreen } from '../screens/renter/ExploreScreen';
 import { RoommatesStackNavigator } from './RoommatesStackNavigator';
-import { GroupsScreen } from '../screens/renter/GroupsScreen';
+import { GroupsStackNavigator } from './GroupsStackNavigator';
 import { MessagesStackNavigator } from './MessagesStackNavigator';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
 import { useTheme } from '../hooks/useTheme';
@@ -136,13 +136,14 @@ export const RenterTabNavigator = () => {
     <Tab.Navigator
       initialRouteName="Roommates"
       tabBar={(props) => <CustomTabBar {...props} />}
+      backBehavior="history"
       screenOptions={{
         headerShown: false,
       }}
     >
       <Tab.Screen name="Explore" component={ExploreScreen} />
       <Tab.Screen name="Roommates" component={RoommatesStackNavigator} />
-      <Tab.Screen name="Groups" component={GroupsScreen} />
+      <Tab.Screen name="Groups" component={GroupsStackNavigator} />
       <Tab.Screen name="Messages" component={MessagesStackNavigator} />
       <Tab.Screen name="Profile" component={ProfileStackNavigator} />
     </Tab.Navigator>
