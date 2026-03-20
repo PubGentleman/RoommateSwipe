@@ -441,6 +441,15 @@ export const ExploreScreen = () => {
     if (activeQuickFilters.has('availableNow')) {
       filtered = filtered.filter(p => p.available);
     }
+    if (activeQuickFilters.has('nearTransit')) {
+      filtered = filtered.filter(p =>
+        p.transitInfo &&
+        !p.transitInfo.noTransitNearby &&
+        p.transitInfo.stops &&
+        p.transitInfo.stops.length > 0 &&
+        p.transitInfo.stops.some(s => s.distanceMiles <= 0.5)
+      );
+    }
 
     const getHostPlanPriority = (property: Property) => {
       const host = property.hostProfileId ? hostProfiles.get(property.hostProfileId) : null;
