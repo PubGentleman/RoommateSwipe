@@ -59,9 +59,12 @@ export function PurchaseConfirmModal({
 
   function renderSubtitle() {
     if (config.type === 'subscription' && currentPlan) {
+      const isCancel = config.id.includes('cancel');
+      const isDowngrade = config.id.includes('downgrade');
+      const verb = isCancel ? 'Cancelling' : isDowngrade ? 'Switching from' : 'Upgrading from';
       return (
         <ThemedText style={[Typography.body, styles.subtitle, { color: theme.textSecondary }]}>
-          Upgrading from{' '}
+          {verb}{' '}
           <ThemedText style={{ fontWeight: '700', color: theme.text }}>{currentPlan}</ThemedText>
           {' '}to{' '}
           <ThemedText style={{ fontWeight: '700', color: iconColor }}>{config.targetLabel}</ThemedText>.

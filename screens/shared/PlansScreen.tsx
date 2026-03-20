@@ -125,6 +125,7 @@ export const PlansScreen = () => {
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [subscribing, setSubscribing] = useState(false);
+  const [pendingAction, setPendingAction] = useState<{ type: 'downgrade' | 'cancel'; target: 'basic' | 'plus' } | null>(null);
 
   const currentPlan = normalizeRenterPlan(user?.subscription?.plan);
   const subscriptionStatus = user?.subscription?.status || 'active';
@@ -201,44 +202,63 @@ export const PlansScreen = () => {
     }
   };
 
-  const handleDowngrade = async (targetPlan: 'basic' | 'plus') => {
-    const planLabel = targetPlan === 'basic' ? 'Free' : 'Plus';
-    const msg = `Your plan will change to ${planLabel} at the end of your billing period. You'll keep features until then.`;
-
-    const doDowngrade = async () => {
-      setProcessing(true);
-      try {
-        await new Promise(r => setTimeout(r, 1000));
-        await downgradeToPlan(targetPlan);
-        const successMsg = `Your plan will change to ${planLabel} at the end of your billing period.`;
-        if (Platform.OS === 'web') window.alert(successMsg);
-        else Alert.alert('Downgrade Scheduled', successMsg);
-      } catch (err: any) {
-        const errMsg = err.message || 'Something went wrong.';
-        if (Platform.OS === 'web') window.alert(errMsg);
-        else Alert.alert('Error', errMsg);
-      } finally {
-        setProcessing(false);
-      }
-    };
-
-    if (Platform.OS === 'web') {
-      if (window.confirm(`Downgrade to ${planLabel}?\n\n${msg}`)) doDowngrade();
-    } else {
-      Alert.alert(`Downgrade to ${planLabel}`, msg, [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Downgrade', onPress: doDowngrade },
-      ]);
-    }
+  const handleDowngrade = (targetPlan: 'basic' | 'plus') => {
+    setPendingAction({ type: 'downgrade', target: targetPlan });
   };
 
   const handleCancel = () => {
-    const msg = `Are you sure? You'll keep features until the end of your billing period, then revert to Free.`;
+    setPendingAction({ type: 'cancel', target: 'basic' });
+  };
 
-    const doCancel = async () => {
-      setProcessing(true);
-      try {
-        await new Promise(r => setTimeout(r, 1000));
+  const getActionModalConfig = (): PurchaseConfig | null => {
+    if (!pendingAction) return null;
+    if (pendingAction.type === 'cancel') {
+      const expiryDate = user?.subscription?.expiresAt
+        ? new Date(user.subscription.expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        : 'the end of your billing period';
+      return {
+        id: 'renter_cancel',
+        type: 'subscription',
+        title: 'Cancel Subscription',
+        targetLabel: 'Free',
+        price: '$0',
+        priceNote: `active until ${expiryDate}`,
+        icon: 'x-circle',
+        iconColor: '#EF4444',
+        confirmLabel: 'Cancel Subscription',
+        disclaimer: `You'll keep your current features until ${expiryDate}, then revert to the Free plan.`,
+        perks: [
+          '10 swipes per day',
+          '1 group membership',
+        ],
+      };
+    }
+    const planLabel = pendingAction.target === 'basic' ? 'Free' : 'Plus';
+    const targetPlan = pendingAction.target === 'basic' ? 'free' : 'plus';
+    const accent = PLAN_ACCENT[targetPlan as RenterPlan];
+    const icon = PLAN_ICON[targetPlan as RenterPlan];
+    const features = PLAN_FEATURES[targetPlan as RenterPlan];
+    return {
+      id: `renter_downgrade_${pendingAction.target}`,
+      type: 'subscription',
+      title: 'Confirm Plan Change',
+      targetLabel: planLabel,
+      price: pendingAction.target === 'plus' ? `$${getMonthlyRate('plus').toFixed(2)}/mo` : '$0',
+      priceNote: pendingAction.target === 'plus' ? 'changes at end of billing period' : 'changes at end of billing period',
+      icon,
+      iconColor: accent,
+      confirmLabel: `Switch to ${planLabel}`,
+      disclaimer: `Your plan will change to ${planLabel} at the end of your billing period. You'll keep your current features until then.`,
+      perks: features.map(f => f.label),
+    };
+  };
+
+  const handleConfirmAction = async () => {
+    if (!pendingAction) return;
+    setProcessing(true);
+    try {
+      await new Promise(r => setTimeout(r, 1000));
+      if (pendingAction.type === 'cancel') {
         await cancelSubscriptionAtPeriodEnd();
         const expiryDate = user?.subscription?.expiresAt
           ? new Date(user.subscription.expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -246,22 +266,20 @@ export const PlansScreen = () => {
         const successMsg = `You'll keep your features until ${expiryDate}.`;
         if (Platform.OS === 'web') window.alert(successMsg);
         else Alert.alert('Subscription Cancelled', successMsg);
-      } catch (err: any) {
-        const errMsg = err.message || 'Something went wrong.';
-        if (Platform.OS === 'web') window.alert(errMsg);
-        else Alert.alert('Error', errMsg);
-      } finally {
-        setProcessing(false);
+      } else {
+        await downgradeToPlan(pendingAction.target);
+        const planLabel = pendingAction.target === 'basic' ? 'Free' : 'Plus';
+        const successMsg = `Your plan will change to ${planLabel} at the end of your billing period.`;
+        if (Platform.OS === 'web') window.alert(successMsg);
+        else Alert.alert('Downgrade Scheduled', successMsg);
       }
-    };
-
-    if (Platform.OS === 'web') {
-      if (window.confirm(`Cancel Subscription?\n\n${msg}`)) doCancel();
-    } else {
-      Alert.alert('Cancel Subscription', msg, [
-        { text: 'Keep Plan', style: 'cancel' },
-        { text: 'Cancel Subscription', style: 'destructive', onPress: doCancel },
-      ]);
+    } catch (err: any) {
+      const errMsg = err.message || 'Something went wrong.';
+      if (Platform.OS === 'web') window.alert(errMsg);
+      else Alert.alert('Error', errMsg);
+    } finally {
+      setProcessing(false);
+      setPendingAction(null);
     }
   };
 
@@ -502,6 +520,17 @@ export const PlansScreen = () => {
           loading={subscribing}
           onConfirm={handleConfirmSubscription}
           onCancel={() => setSelectedPlan(null)}
+        />
+      ) : null}
+
+      {pendingAction && getActionModalConfig() ? (
+        <PurchaseConfirmModal
+          visible={!!pendingAction}
+          config={getActionModalConfig()!}
+          currentPlan={RENTER_PLAN_LIMITS[currentPlan].label}
+          loading={processing}
+          onConfirm={handleConfirmAction}
+          onCancel={() => setPendingAction(null)}
         />
       ) : null}
     </View>
