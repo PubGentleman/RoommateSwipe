@@ -69,6 +69,7 @@ export const GroupsScreen = () => {
   const [groupName, setGroupName] = useState('');
   const [groupDescription, setGroupDescription] = useState('');
   const [selectedListingId, setSelectedListingId] = useState<string | null>(null);
+  const [selectedListingBedrooms, setSelectedListingBedrooms] = useState<number | null>(null);
   const [hostListings, setHostListings] = useState<any[]>([]);
   const userPlan = user?.subscription?.plan || 'basic';
   const planMemberLimit = getMemberLimit(userPlan);
@@ -125,7 +126,7 @@ export const GroupsScreen = () => {
           moveInDate: g.move_in_date,
           photoUrl: g.photo_url,
           preferredLocation: g.city || '',
-          maxMembers: g.max_members || 4,
+          maxMembers: g.listing?.bedrooms ? g.listing.bedrooms + 1 : (g.max_members || getMemberLimit(userPlan)),
           createdAt: new Date(g.created_at),
           createdBy: g.created_by,
           listingId: g.listing_id,
@@ -678,7 +679,7 @@ export const GroupsScreen = () => {
         pendingMembers: [],
         budget: 0,
         preferredLocation: '',
-        maxMembers: planMemberLimit,
+        maxMembers: getMemberLimit(userPlan, selectedListingBedrooms),
         createdAt: new Date(),
         createdBy: user.id,
         listingId: selectedListingId || undefined,
@@ -689,6 +690,7 @@ export const GroupsScreen = () => {
     setGroupName('');
     setGroupDescription('');
     setSelectedListingId(null);
+    setSelectedListingBedrooms(null);
 
     await loadGroups();
     setActiveTab('my-groups');
@@ -1428,7 +1430,7 @@ export const GroupsScreen = () => {
               backgroundColor: !selectedListingId ? `${theme.primary}15` : theme.backgroundDefault,
               marginBottom: 8,
             }}
-            onPress={() => setSelectedListingId(null)}
+            onPress={() => { setSelectedListingId(null); setSelectedListingBedrooms(null); }}
           >
             <Feather name="slash" size={18} color={!selectedListingId ? theme.primary : theme.textSecondary} />
             <ThemedText style={[Typography.body, {
@@ -1458,7 +1460,7 @@ export const GroupsScreen = () => {
                     backgroundColor: selectedListingId === listing.id ? `${theme.primary}15` : theme.backgroundDefault,
                     marginBottom: 8,
                   }}
-                  onPress={() => setSelectedListingId(listing.id)}
+                  onPress={() => { setSelectedListingId(listing.id); setSelectedListingBedrooms(listing.bedrooms || null); }}
                 >
                   {listing.photos?.[0] ? (
                     <Image source={{ uri: listing.photos[0] }} style={{ width: 44, height: 44, borderRadius: 8 }} />
@@ -1522,15 +1524,18 @@ export const GroupsScreen = () => {
           flexDirection: 'row',
           alignItems: 'center',
           gap: 8,
-          backgroundColor: 'rgba(255,255,255,0.04)',
+          backgroundColor: selectedListingBedrooms ? 'rgba(255,107,91,0.08)' : 'rgba(255,255,255,0.04)',
           borderRadius: 10,
           paddingHorizontal: 12,
           paddingVertical: 10,
           marginTop: 4,
         }}>
-          <Feather name="info" size={13} color="rgba(255,255,255,0.3)" />
-          <ThemedText style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', flex: 1, lineHeight: 17 }}>
-            Your {userPlan.charAt(0).toUpperCase() + userPlan.slice(1)} plan allows up to {planMemberLimit} members per group.
+          <Feather name="users" size={13} color={selectedListingBedrooms ? theme.primary : 'rgba(255,255,255,0.3)'} />
+          <ThemedText style={{ fontSize: 12, color: selectedListingBedrooms ? theme.primary : 'rgba(255,255,255,0.35)', flex: 1, lineHeight: 17 }}>
+            {selectedListingBedrooms
+              ? `Up to ${selectedListingBedrooms + 1} members (${selectedListingBedrooms} bedrooms + 1)`
+              : `Member limit: ${planMemberLimit} (${userPlan.charAt(0).toUpperCase() + userPlan.slice(1)} plan)`
+            }
           </ThemedText>
         </View>
 

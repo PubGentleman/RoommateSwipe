@@ -527,7 +527,10 @@ export function getGroupLimit(plan: string): number {
   return limits[plan] || 1;
 }
 
-export function getMemberLimit(plan: string): number {
+export function getMemberLimit(plan: string, linkedListingBedrooms?: number | null): number {
+  if (linkedListingBedrooms != null && linkedListingBedrooms > 0) {
+    return linkedListingBedrooms + 1;
+  }
   const limits: Record<string, number> = {
     basic: 3,
     plus: 5,
@@ -537,6 +540,21 @@ export function getMemberLimit(plan: string): number {
     business: 6,
   };
   return limits[plan] || 3;
+}
+
+async function getGroupListingBedrooms(groupId: string): Promise<number | null> {
+  const { data } = await supabase
+    .from('groups')
+    .select('listing_id')
+    .eq('id', groupId)
+    .single();
+  if (!data?.listing_id) return null;
+  const { data: listing } = await supabase
+    .from('listings')
+    .select('bedrooms')
+    .eq('id', data.listing_id)
+    .single();
+  return listing?.bedrooms || null;
 }
 
 // ─── METHOD A: Invite from Matches ───────────────────────────────────────────
@@ -608,7 +626,8 @@ export async function sendGroupInvite(groupId: string, invitedUserId: string): P
     .eq('group_id', groupId);
 
   const creatorPlan = await getUserPlan(group?.created_by);
-  const limit = getMemberLimit(creatorPlan);
+  const bedrooms = await getGroupListingBedrooms(groupId);
+  const limit = getMemberLimit(creatorPlan, bedrooms);
 
   if ((memberData?.length || 0) >= limit) {
     throw new Error(`This group has reached its member limit of ${limit}.`);
@@ -651,7 +670,8 @@ export async function respondToInvite(
       .eq('group_id', invite.group_id);
 
     const creatorPlan = await getUserPlan(group?.created_by);
-    const limit = getMemberLimit(creatorPlan);
+    const bedrooms = await getGroupListingBedrooms(invite.group_id);
+    const limit = getMemberLimit(creatorPlan, bedrooms);
 
     if ((memberData?.length || 0) >= limit) {
       await supabase
@@ -772,7 +792,8 @@ export async function joinGroupByCode(code: string): Promise<{ groupId: string; 
     .eq('group_id', group.id);
 
   const creatorPlan = await getUserPlan(group.created_by);
-  const limit = getMemberLimit(creatorPlan);
+  const bedrooms = await getGroupListingBedrooms(group.id);
+  const limit = getMemberLimit(creatorPlan, bedrooms);
 
   if ((memberData?.length || 0) >= limit) {
     throw new Error(`This group is full (${limit} member limit).`);

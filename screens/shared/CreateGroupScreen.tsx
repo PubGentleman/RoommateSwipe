@@ -7,7 +7,7 @@ import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
 import { Spacing, Typography } from '../../constants/theme';
-import { createGroup as createGroupSupabase, getGroupLimit } from '../../services/groupService';
+import { createGroup as createGroupSupabase, getGroupLimit, getMemberLimit } from '../../services/groupService';
 import { StorageService } from '../../utils/storage';
 import { supabase } from '../../lib/supabase';
 import { ScreenKeyboardAwareScrollView } from '../../components/ScreenKeyboardAwareScrollView';
@@ -90,13 +90,14 @@ export const CreateGroupScreen = ({ navigation, route }: any) => {
         }, 100);
       } catch (supaError) {
         console.warn('[CreateGroupScreen] Supabase failed, using local fallback:', supaError);
+        const userPlanForLimit = (user as any)?.subscription?.plan || 'basic';
         const localGroup = {
           id: `group_${Date.now()}`,
           name: name.trim(),
           description: description.trim() || 'A group looking for roommates',
           members: matchedUserId ? [user.id, matchedUserId] : [user.id],
           pendingMembers: [],
-          maxMembers: 10,
+          maxMembers: getMemberLimit(userPlanForLimit, selectedListing?.bedrooms || null),
           budget: user?.profileData?.budget || 2000,
           preferredLocation: user?.profileData?.city || 'Your City',
           createdAt: new Date(),
@@ -224,6 +225,22 @@ export const CreateGroupScreen = ({ navigation, route }: any) => {
         )}
       </View>
 
+      <View style={[styles.memberCapNote, {
+        backgroundColor: selectedListing?.bedrooms ? theme.primary + '10' : theme.card,
+        borderColor: selectedListing?.bedrooms ? theme.primary + '30' : theme.border,
+      }]}>
+        <Feather name="users" size={14} color={selectedListing?.bedrooms ? theme.primary : theme.textSecondary} />
+        <ThemedText style={[Typography.small, {
+          color: selectedListing?.bedrooms ? theme.primary : theme.textSecondary,
+          marginLeft: 6, flex: 1,
+        }]}>
+          {selectedListing?.bedrooms
+            ? `Up to ${selectedListing.bedrooms + 1} members (${selectedListing.bedrooms} bedrooms + 1)`
+            : `Member limit: ${getMemberLimit((user as any)?.subscription?.plan || 'basic')} (no listing linked)`
+          }
+        </ThemedText>
+      </View>
+
       <GroupPropertySearchModal
         visible={showPropertySearch}
         currentListingId={selectedListingId}
@@ -279,5 +296,10 @@ const styles = StyleSheet.create({
   searchTrigger: {
     flexDirection: 'row', alignItems: 'center',
     padding: Spacing.md, borderRadius: 12, borderWidth: 1.5, borderStyle: 'dashed',
+  },
+  memberCapNote: {
+    flexDirection: 'row', alignItems: 'center',
+    padding: Spacing.sm, borderRadius: 10, borderWidth: 1,
+    marginHorizontal: Spacing.lg, marginBottom: Spacing.md,
   },
 });
