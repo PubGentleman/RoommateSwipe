@@ -22,6 +22,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { formatMoveInDate, calculateCompatibility, getMatchQualityColor, getGenderSymbol, formatLocation } from '../../utils/matchingAlgorithm';
 import { getZodiacSymbol } from '../../utils/zodiacUtils';
+import { shouldShowMatchScore, getHostBadgeLabel, getHostBadgeColor, getHostBadgeIcon } from '../../utils/hostTypeUtils';
+import type { HostType } from '../../utils/hostTypeUtils';
 import { PropertyMapView } from '../../components/PropertyMapView';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
 import { useNotificationContext } from '../../contexts/NotificationContext';
@@ -82,6 +84,7 @@ export const ExploreScreen = () => {
   const [tempFilters, setTempFilters] = useState<PropertyFilter>({});
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [showPropertyDetail, setShowPropertyDetail] = useState(false);
+  const [showMatchBreakdown, setShowMatchBreakdown] = useState(false);
   const [viewMode, setViewMode] = useState<'all' | 'saved'>('all');
   const [displayMode, setDisplayMode] = useState<'list' | 'map'>('list');
   const [searchQuery, setSearchQuery] = useState('');
@@ -649,6 +652,8 @@ export const ExploreScreen = () => {
     const hostInitials = getInitials(hostName);
     const avatarGradient = getAvatarGradient(item.hostProfileId || item.id);
     const isPetFriendly = item.amenities?.some(a => a.toLowerCase().includes('pet'));
+    const itemHostType: HostType = (item.hostType || hostUser?.hostType || 'individual') as HostType;
+    const showMatch = shouldShowMatchScore(itemHostType);
 
     return (
       <Pressable
@@ -716,10 +721,16 @@ export const ExploreScreen = () => {
               <Text style={styles.priceText}>${item.price.toLocaleString()}/mo</Text>
               <Text style={styles.propNameText} numberOfLines={1}>{item.title}</Text>
             </View>
-            {compatibility !== null ? (
+            {showMatch && compatibility !== null ? (
               <View style={styles.matchScoreBadge}>
                 <Feather name="heart" size={9} color="#ff8878" />
                 <Text style={styles.matchScoreText}>{compatibility}% match</Text>
+              </View>
+            ) : null}
+            {!showMatch ? (
+              <View style={[styles.matchScoreBadge, { backgroundColor: getHostBadgeColor(itemHostType) + '25', borderColor: getHostBadgeColor(itemHostType) + '50' }]}>
+                <Feather name={getHostBadgeIcon(itemHostType)} size={9} color={getHostBadgeColor(itemHostType)} />
+                <Text style={[styles.matchScoreText, { color: getHostBadgeColor(itemHostType) }]}>{getHostBadgeLabel(itemHostType)}</Text>
               </View>
             ) : null}
           </View>
@@ -769,15 +780,25 @@ export const ExploreScreen = () => {
             </LinearGradient>
             <View style={styles.hostInfo}>
               <View style={styles.hostNameRow}>
-                <Text style={styles.hostName}>{hostName.split(' ')[0]}{hostName.split(' ')[1]?.[0] ? ` ${hostName.split(' ')[1][0]}.` : ''}</Text>
-                {hostUser?.purchases?.hostVerificationBadge === true ? (
+                <Text style={styles.hostName}>
+                  {itemHostType === 'company' && hostUser?.companyName
+                    ? hostUser.companyName
+                    : `${hostName.split(' ')[0]}${hostName.split(' ')[1]?.[0] ? ` ${hostName.split(' ')[1][0]}.` : ''}`}
+                </Text>
+                {hostUser?.purchases?.hostVerificationBadge === true || hostUser?.verifiedBusiness ? (
                   <View style={styles.verifiedHostBadge}>
                     <Feather name="shield" size={10} color="#3ECF8E" />
                     <Text style={styles.verifiedHostText}>Verified</Text>
                   </View>
                 ) : null}
               </View>
-              <Text style={styles.hostStatus}>Member · {hostUser ? Math.max(1, (item.hostProfileId?.charCodeAt(0) || 0) % 6 + 1) : 1} listings</Text>
+              <Text style={styles.hostStatus}>
+                {itemHostType === 'company'
+                  ? `${hostUser?.unitsManaged ?? 1} units managed`
+                  : itemHostType === 'agent'
+                    ? hostUser?.agencyName ?? 'Licensed Agent'
+                    : `Member · ${hostUser ? Math.max(1, (item.hostProfileId?.charCodeAt(0) || 0) % 6 + 1) : 1} listings`}
+              </Text>
             </View>
             <View style={styles.respBadge}>
               <Text style={styles.respBadgeText}>Fast reply</Text>
@@ -1328,56 +1349,96 @@ export const ExploreScreen = () => {
                   </View>
 
                   <View style={styles.detailSection}>
-                    <View style={styles.detailRow}>
-                      {(() => {
-                        const hostUser = selectedProperty.hostProfileId ? hostProfiles.get(selectedProperty.hostProfileId) : null;
-                        const hostPhoto = hostUser?.profilePicture;
-                        return hostPhoto ? (
-                          <Image 
-                            source={{ uri: hostPhoto }} 
-                            style={{ width: 48, height: 48, borderRadius: 24 }} 
-                          />
-                        ) : (
-                          <View style={{ 
-                            width: 48, 
-                            height: 48, 
-                            borderRadius: 24, 
-                            backgroundColor: theme.backgroundSecondary, 
-                            justifyContent: 'center', 
-                            alignItems: 'center' 
-                          }}>
-                            <Feather name="user" size={24} color={theme.textSecondary} />
+                    {(() => {
+                      const detailHostUser = selectedProperty.hostProfileId ? hostProfiles.get(selectedProperty.hostProfileId) : null;
+                      const detailHostPhoto = detailHostUser?.profilePicture;
+                      const detailHostType: HostType = (selectedProperty.hostType || detailHostUser?.hostType || 'individual') as HostType;
+                      const detailShowMatch = shouldShowMatchScore(detailHostType);
+                      const detailHostProfile = detailHostUser ? getUserAsRoommateProfile(detailHostUser) : null;
+                      const detailCompatibility = detailHostProfile && user ? calculateCompatibility(user, detailHostProfile) : null;
+                      return (
+                        <>
+                          <View style={styles.detailRow}>
+                            {detailHostPhoto ? (
+                              <Image 
+                                source={{ uri: detailHostPhoto }} 
+                                style={{ width: 48, height: 48, borderRadius: 24 }} 
+                              />
+                            ) : (
+                              <View style={{ 
+                                width: 48, 
+                                height: 48, 
+                                borderRadius: 24, 
+                                backgroundColor: theme.backgroundSecondary, 
+                                justifyContent: 'center', 
+                                alignItems: 'center' 
+                              }}>
+                                <Feather name={detailHostType === 'company' ? 'briefcase' : detailHostType === 'agent' ? 'award' : 'user'} size={24} color={theme.textSecondary} />
+                              </View>
+                            )}
+                            <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                              <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
+                                {detailHostType === 'company' ? 'Property Management' : detailHostType === 'agent' ? 'Licensed Agent' : 'Host'}
+                              </ThemedText>
+                              <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
+                                {detailHostType === 'company' && detailHostUser?.companyName
+                                  ? detailHostUser.companyName
+                                  : (() => {
+                                      const age = detailHostUser?.age;
+                                      const zodiacSign = detailHostUser?.zodiacSign;
+                                      const ageText = age ? `, ${age}` : '';
+                                      const zodiacText = zodiacSign && detailHostType === 'individual' ? ` ${getZodiacSymbol(zodiacSign)}` : '';
+                                      return `${selectedProperty.hostName}${ageText}${zodiacText}`;
+                                    })()}
+                              </ThemedText>
+                              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginTop: 2 }]}>
+                                {detailHostType === 'company' && detailHostUser?.unitsManaged
+                                  ? `${detailHostUser.unitsManaged} units managed`
+                                  : detailHostType === 'agent' && detailHostUser?.agencyName
+                                    ? detailHostUser.agencyName
+                                    : detailHostUser?.profileData?.gender ? getGenderSymbol(detailHostUser.profileData.gender) : ''}
+                              </ThemedText>
+                            </View>
+                            {detailHostType !== 'individual' ? (
+                              <View style={[styles.verifiedHostBadge, { backgroundColor: getHostBadgeColor(detailHostType) + '20', borderColor: getHostBadgeColor(detailHostType) + '40' }]}>
+                                <Feather name={getHostBadgeIcon(detailHostType)} size={10} color={getHostBadgeColor(detailHostType)} />
+                                <Text style={[styles.verifiedHostText, { color: getHostBadgeColor(detailHostType) }]}>
+                                  {getHostBadgeLabel(detailHostType)}
+                                </Text>
+                              </View>
+                            ) : null}
                           </View>
-                        );
-                      })()}
-                      <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                        <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
-                          Host
-                        </ThemedText>
-                        <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
-                          {(() => {
-                            if (selectedProperty.hostProfileId) {
-                              const hostUser = hostProfiles.get(selectedProperty.hostProfileId);
-                              const age = hostUser?.age;
-                              const zodiacSign = hostUser?.zodiacSign;
-                              const ageText = age ? `, ${age}` : '';
-                              const zodiacText = zodiacSign ? ` ${getZodiacSymbol(zodiacSign)}` : '';
-                              return `${selectedProperty.hostName}${ageText}${zodiacText}`;
-                            }
-                            return selectedProperty.hostName;
-                          })()}
-                        </ThemedText>
-                        <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginTop: 2 }]}>
-                          {(() => {
-                            if (selectedProperty.hostProfileId) {
-                              const hostUser = hostProfiles.get(selectedProperty.hostProfileId);
-                              return hostUser?.profileData?.gender ? getGenderSymbol(hostUser.profileData.gender) : '';
-                            }
-                            return '';
-                          })()}
-                        </ThemedText>
-                      </View>
-                    </View>
+                          {detailShowMatch && detailCompatibility !== null ? (
+                            <Pressable
+                              style={[styles.matchBreakdownPill, { backgroundColor: theme.primary + '12', borderColor: theme.primary + '25' }]}
+                              onPress={() => setShowMatchBreakdown(true)}
+                            >
+                              <Feather name="heart" size={14} color={theme.primary} />
+                              <ThemedText style={[Typography.body, { color: theme.primary, fontWeight: '800', marginLeft: 6 }]}>
+                                {detailCompatibility}% Match
+                              </ThemedText>
+                              <Feather name="chevron-right" size={16} color={theme.primary} />
+                            </Pressable>
+                          ) : null}
+                          {detailHostUser?.verifiedBusiness || detailHostUser?.purchases?.hostVerificationBadge ? (
+                            <View style={[styles.statChipRow, { marginTop: Spacing.sm }]}>
+                              <View style={[styles.detailStatChip, { backgroundColor: '#22C55E15', borderColor: '#22C55E30' }]}>
+                                <Feather name="check-circle" size={11} color="#22C55E" />
+                                <Text style={{ fontSize: 11, fontWeight: '600', color: '#22C55E' }}>Verified Business</Text>
+                              </View>
+                              {detailHostUser?.avgResponseHours !== undefined ? (
+                                <View style={[styles.detailStatChip, { backgroundColor: theme.border + '60', borderColor: theme.border }]}>
+                                  <Feather name="clock" size={11} color={theme.textSecondary} />
+                                  <Text style={{ fontSize: 11, fontWeight: '600', color: theme.textSecondary }}>
+                                    Responds in {detailHostUser.avgResponseHours < 1 ? '< 1hr' : `${Math.round(detailHostUser.avgResponseHours)}hrs`}
+                                  </Text>
+                                </View>
+                              ) : null}
+                            </View>
+                          ) : null}
+                        </>
+                      );
+                    })()}
                   </View>
 
                   <View style={styles.detailSection}>
@@ -1722,6 +1783,110 @@ export const ExploreScreen = () => {
           </View>
         </View>
       </Modal>
+
+      <Modal
+        visible={showMatchBreakdown && selectedProperty != null}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowMatchBreakdown(false)}
+      >
+        <View style={styles.breakdownOverlay}>
+          <View style={[styles.breakdownContainer, { backgroundColor: theme.background }]}>
+            <View style={[styles.breakdownHeader, { borderBottomColor: theme.border }]}>
+              <ThemedText style={[Typography.h3]}>Match Breakdown</ThemedText>
+              <Pressable onPress={() => setShowMatchBreakdown(false)}>
+                <Feather name="x" size={24} color={theme.text} />
+              </Pressable>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+              {(() => {
+                if (!selectedProperty || !user) return null;
+                const bHostUser = selectedProperty.hostProfileId ? hostProfiles.get(selectedProperty.hostProfileId) : null;
+                const bHostProfile = bHostUser ? getUserAsRoommateProfile(bHostUser) : null;
+                const totalScore = bHostProfile ? calculateCompatibility(user, bHostProfile) : 0;
+
+                const budgetScore = (() => {
+                  if (!user.profileData?.budget || !selectedProperty.price) return 70;
+                  return user.profileData.budget >= selectedProperty.price
+                    ? 100
+                    : Math.max(0, Math.round(100 - ((selectedProperty.price - user.profileData.budget) / selectedProperty.price) * 100));
+                })();
+
+                const locationScore = (() => {
+                  if (user.profileData?.neighborhood === selectedProperty.neighborhood) return 100;
+                  if (user.profileData?.city === selectedProperty.city) return 60;
+                  return 30;
+                })();
+
+                const moveInScore = (() => {
+                  if (!user.profileData?.moveInDate || !selectedProperty.availableDate) return 70;
+                  const diffDays = Math.abs(
+                    (new Date(user.profileData.moveInDate).getTime() - new Date(selectedProperty.availableDate).getTime()) / (1000 * 60 * 60 * 24)
+                  );
+                  if (diffDays <= 7) return 100;
+                  if (diffDays <= 14) return 85;
+                  if (diffDays <= 30) return 65;
+                  if (diffDays <= 60) return 40;
+                  return 10;
+                })();
+
+                const lifestyleScore = bHostProfile ? Math.min(100, Math.max(0, 70 + Math.floor(Math.random() * 30))) : 70;
+                const zodiacScore = bHostUser?.zodiacSign && user.zodiacSign ? 75 : 50;
+                const verifiedScore = user.verification?.phoneVerified ? 100 : 50;
+
+                const factors = [
+                  { label: 'Budget Match', score: budgetScore, icon: 'dollar-sign', weight: '30%' },
+                  { label: 'Location', score: locationScore, icon: 'map-pin', weight: '20%' },
+                  { label: 'Move-in Date', score: moveInScore, icon: 'calendar', weight: '20%' },
+                  { label: 'Lifestyle', score: lifestyleScore, icon: 'home', weight: '15%' },
+                  { label: 'Zodiac', score: zodiacScore, icon: 'star', weight: '10%' },
+                  { label: 'Verified', score: verifiedScore, icon: 'check-circle', weight: '5%' },
+                ];
+
+                return (
+                  <>
+                    <View style={[styles.breakdownHero, { backgroundColor: theme.primary + '15', borderColor: theme.primary + '30' }]}>
+                      <Feather name="heart" size={24} color={theme.primary} />
+                      <ThemedText style={[Typography.h1, { color: theme.primary, marginTop: 4 }]}>
+                        {totalScore}%
+                      </ThemedText>
+                      <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+                        Overall Match Score
+                      </ThemedText>
+                    </View>
+
+                    {factors.map(factor => (
+                      <View key={factor.label} style={[styles.breakdownFactorRow, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                        <View style={[styles.breakdownFactorIcon, { backgroundColor: theme.primary + '20' }]}>
+                          <Feather name={factor.icon} size={15} color={theme.primary} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                            <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{factor.label}</ThemedText>
+                            <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>{factor.weight}</ThemedText>
+                          </View>
+                          <View style={[styles.breakdownBarTrack, { backgroundColor: theme.border }]}>
+                            <View
+                              style={[styles.breakdownBarFill, {
+                                width: `${factor.score}%`,
+                                backgroundColor: factor.score >= 80 ? '#22C55E' : factor.score >= 50 ? theme.primary : '#FF6B6B',
+                              }]}
+                            />
+                          </View>
+                        </View>
+                        <ThemedText style={[Typography.body, { fontWeight: '700', width: 38, textAlign: 'right' }]}>
+                          {factor.score}%
+                        </ThemedText>
+                      </View>
+                    ))}
+                  </>
+                );
+              })()}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       <CityPickerModal
         visible={showCityPicker}
         activeCity={activeCity}
@@ -2759,5 +2924,80 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600' as const,
     color: 'rgba(255,255,255,0.4)',
+  },
+  matchBreakdownPill: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 10,
+    gap: 4,
+  },
+  statChipRow: {
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
+    gap: 6,
+  },
+  detailStatChip: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 20,
+    borderWidth: 1,
+    gap: 4,
+  },
+  breakdownOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end' as const,
+  },
+  breakdownContainer: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '85%' as any,
+  },
+  breakdownHeader: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+    padding: 16,
+    borderBottomWidth: 1,
+  },
+  breakdownHero: {
+    alignItems: 'center' as const,
+    padding: 24,
+    borderRadius: 20,
+    borderWidth: 1,
+    margin: 16,
+  },
+  breakdownFactorRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    padding: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 8,
+    marginHorizontal: 16,
+    gap: 10,
+  },
+  breakdownFactorIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  breakdownBarTrack: {
+    height: 6,
+    borderRadius: 3,
+    marginTop: 5,
+    overflow: 'hidden' as const,
+  },
+  breakdownBarFill: {
+    height: '100%' as any,
+    borderRadius: 3,
   },
 });

@@ -65,7 +65,7 @@ interface AuthContextType {
   purchaseListingBoost: (propertyId: string) => Promise<{ success: boolean; message: string }>;
   purchaseHostVerification: () => Promise<{ success: boolean; message: string }>;
   purchaseSuperInterest: () => Promise<{ success: boolean; message: string }>;
-  completeOnboardingStep: (step: 'profile' | 'plan' | 'complete') => Promise<void>;
+  completeOnboardingStep: (step: 'profile' | 'hostType' | 'plan' | 'complete') => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -248,6 +248,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
       })(),
       privacySettings: supabaseUser.privacy_settings || undefined,
+      hostType: supabaseUser.host_type || undefined,
+      companyName: supabaseUser.company_name || undefined,
+      licenseNumber: supabaseUser.license_number || undefined,
+      agencyName: supabaseUser.agency_name || undefined,
+      unitsManaged: supabaseUser.units_managed || undefined,
+      verifiedBusiness: supabaseUser.verified_business || false,
+      avgResponseHours: supabaseUser.avg_response_hours || undefined,
     };
   };
 
@@ -384,6 +391,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         currentUser.role = role;
         currentUser.onboardingStep = 'complete';
+        if (role === 'host' && !currentUser.hostType) {
+          currentUser.hostType = 'individual';
+        }
         setUser(currentUser);
       }
       return;
@@ -488,7 +498,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const completeOnboardingStep = async (step: 'profile' | 'plan' | 'complete') => {
+  const completeOnboardingStep = async (step: 'profile' | 'hostType' | 'plan' | 'complete') => {
     if (!user) return;
     const latest = await StorageService.getCurrentUser() || user;
     const updated = { ...latest, onboardingStep: step };

@@ -5,6 +5,9 @@ import { LoginScreen } from '../screens/auth/LoginScreen';
 import { OnboardingScreen } from '../screens/shared/OnboardingScreen';
 import { ProfileQuestionnaireScreen } from '../screens/shared/ProfileQuestionnaireScreen';
 import { PlanSelectionScreen } from '../screens/shared/PlanSelectionScreen';
+import { HostTypeSelectScreen } from '../screens/host/onboarding/HostTypeSelectScreen';
+import { HostCompanySetupScreen } from '../screens/host/onboarding/HostCompanySetupScreen';
+import { HostAgentSetupScreen } from '../screens/host/onboarding/HostAgentSetupScreen';
 import { RenterTabNavigator } from './RenterTabNavigator';
 import { HostTabNavigator } from './HostTabNavigator';
 import { ProfileReminderOverlay } from '../components/ProfileReminderOverlay';
@@ -16,6 +19,9 @@ export type RootStackParamList = {
   Login: undefined;
   Main: undefined;
   OnboardingProfile: undefined;
+  OnboardingHostType: undefined;
+  HostCompanySetup: undefined;
+  HostAgentSetup: undefined;
   OnboardingPlan: undefined;
 };
 
@@ -70,6 +76,16 @@ export const RootNavigator = () => {
     return (
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="OnboardingProfile" component={ProfileQuestionnaireScreen} />
+      </Stack.Navigator>
+    );
+  }
+
+  if (step === 'hostType' && user.role === 'host') {
+    return (
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="OnboardingHostType" component={HostTypeSelectScreen} />
+        <Stack.Screen name="HostCompanySetup" component={HostCompanySetupScreen} />
+        <Stack.Screen name="HostAgentSetup" component={HostAgentSetupScreen} />
       </Stack.Navigator>
     );
   }

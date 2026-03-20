@@ -97,6 +97,7 @@ export interface Property {
     userId?: string;
   }>;
   hostProfileId?: string;
+  hostType?: 'individual' | 'company' | 'agent';
   walkScore?: number;
   walkScoreLabel?: string;
   transitScore?: number;
@@ -288,7 +289,16 @@ export interface User {
   birthday?: string;
   zodiacSign?: ZodiacSign;
   role: 'renter' | 'host';
-  onboardingStep?: 'profile' | 'plan' | 'complete';
+  onboardingStep?: 'profile' | 'hostType' | 'plan' | 'complete';
+  hostType?: 'individual' | 'company' | 'agent';
+  companyName?: string;
+  companyLogoUrl?: string;
+  licenseNumber?: string;
+  agencyName?: string;
+  unitsManaged?: number;
+  verifiedBusiness?: boolean;
+  verifiedBusinessAt?: string;
+  avgResponseHours?: number;
   profilePicture?: string;
   verification?: VerificationStatus;
   photos?: string[];

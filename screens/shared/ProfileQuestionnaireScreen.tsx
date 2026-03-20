@@ -437,7 +437,7 @@ export const ProfileQuestionnaireScreen = () => {
     try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
     setIsSaving(false);
     if (user?.onboardingStep === 'profile') {
-      await completeOnboardingStep('plan');
+      await completeOnboardingStep(user?.role === 'host' ? 'hostType' : 'plan');
     } else {
       navigation.goBack();
     }
