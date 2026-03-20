@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Pressable, Alert, Text, ScrollView } from 'react-native';
+import { View, StyleSheet, Pressable, Alert, Text, ScrollView, Platform } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -228,57 +228,67 @@ export const PlansScreen = () => {
   };
 
   const handleDowngrade = async (targetPlan: 'basic' | 'plus') => {
-    Alert.alert(
-      `Downgrade to ${targetPlan.charAt(0).toUpperCase() + targetPlan.slice(1)}`,
-      `Your plan will change at the end of your billing period. You'll keep features until then.`,
-      [
+    const planLabel = targetPlan.charAt(0).toUpperCase() + targetPlan.slice(1);
+    const msg = `Your plan will change to ${planLabel} at the end of your billing period. You'll keep features until then.`;
+
+    const doDowngrade = async () => {
+      setProcessing(true);
+      try {
+        await new Promise(r => setTimeout(r, 1000));
+        await downgradeToPlan(targetPlan);
+        const successMsg = `Your plan will change to ${planLabel} at the end of your billing period.`;
+        if (Platform.OS === 'web') window.alert(successMsg);
+        else Alert.alert('Downgrade Scheduled', successMsg);
+      } catch (err: any) {
+        const errMsg = err.message || 'Something went wrong.';
+        if (Platform.OS === 'web') window.alert(errMsg);
+        else Alert.alert('Error', errMsg);
+      } finally {
+        setProcessing(false);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Downgrade to ${planLabel}?\n\n${msg}`)) doDowngrade();
+    } else {
+      Alert.alert(`Downgrade to ${planLabel}`, msg, [
         { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Downgrade',
-          onPress: async () => {
-            setProcessing(true);
-            try {
-              await new Promise(r => setTimeout(r, 1000));
-              await downgradeToPlan(targetPlan);
-              Alert.alert('Downgrade Scheduled', `Your plan will change to ${targetPlan.charAt(0).toUpperCase() + targetPlan.slice(1)} at the end of your billing period.`);
-            } catch (err: any) {
-              Alert.alert('Error', err.message || 'Something went wrong.');
-            } finally {
-              setProcessing(false);
-            }
-          },
-        },
-      ]
-    );
+        { text: 'Downgrade', onPress: doDowngrade },
+      ]);
+    }
   };
 
   const handleCancel = () => {
-    Alert.alert(
-      'Cancel Subscription',
-      `Are you sure? You'll keep features until the end of your billing period, then revert to Basic.`,
-      [
+    const msg = `Are you sure? You'll keep features until the end of your billing period, then revert to Basic.`;
+
+    const doCancel = async () => {
+      setProcessing(true);
+      try {
+        await new Promise(r => setTimeout(r, 1000));
+        await cancelSubscriptionAtPeriodEnd();
+        const expiryDate = user?.subscription?.expiresAt
+          ? new Date(user.subscription.expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+          : 'the end of your billing period';
+        const successMsg = `You'll keep your features until ${expiryDate}.`;
+        if (Platform.OS === 'web') window.alert(successMsg);
+        else Alert.alert('Subscription Cancelled', successMsg);
+      } catch (err: any) {
+        const errMsg = err.message || 'Something went wrong.';
+        if (Platform.OS === 'web') window.alert(errMsg);
+        else Alert.alert('Error', errMsg);
+      } finally {
+        setProcessing(false);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Cancel Subscription?\n\n${msg}`)) doCancel();
+    } else {
+      Alert.alert('Cancel Subscription', msg, [
         { text: 'Keep Plan', style: 'cancel' },
-        {
-          text: 'Cancel Subscription',
-          style: 'destructive',
-          onPress: async () => {
-            setProcessing(true);
-            try {
-              await new Promise(r => setTimeout(r, 1000));
-              await cancelSubscriptionAtPeriodEnd();
-              const expiryDate = user?.subscription?.expiresAt
-                ? new Date(user.subscription.expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                : 'the end of your billing period';
-              Alert.alert('Subscription Cancelled', `You'll keep your features until ${expiryDate}.`);
-            } catch (err: any) {
-              Alert.alert('Error', err.message || 'Something went wrong.');
-            } finally {
-              setProcessing(false);
-            }
-          },
-        },
-      ]
-    );
+        { text: 'Cancel Subscription', style: 'destructive', onPress: doCancel },
+      ]);
+    }
   };
 
   const renderPlanCard = (display: PlanDisplayInfo) => {
