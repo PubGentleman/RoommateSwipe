@@ -66,6 +66,11 @@ interface AuthContextType {
   purchaseHostVerification: () => Promise<{ success: boolean; message: string }>;
   purchaseSuperInterest: () => Promise<{ success: boolean; message: string }>;
   completeOnboardingStep: (step: 'profile' | 'hostType' | 'plan' | 'complete') => Promise<void>;
+  cancelHostSubscriptionAtPeriodEnd: () => Promise<void>;
+  reactivateHostSubscription: () => Promise<void>;
+  softDeleteAccount: () => Promise<void>;
+  recoverDeletedAccount: () => Promise<void>;
+  updateLastActive: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -98,6 +103,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
       if (appStateRef.current.match(/inactive|background/) && nextState === 'active') {
         checkAndUpdateBoostStatus();
+        updateLastActive();
       }
       appStateRef.current = nextState;
     });
@@ -299,6 +305,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       let mappedUser = mapSupabaseToUser(userData, profileData, subscriptionData);
       mappedUser = await checkAndApplyScheduledChanges(mappedUser);
+      mappedUser.lastActiveAt = new Date();
+
+      if (userData.is_deleted) {
+        const deletedAt = userData.deleted_at ? new Date(userData.deleted_at) : null;
+        const RECOVERY_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+        const isWithinRecoveryWindow = !deletedAt || (Date.now() - deletedAt.getTime() < RECOVERY_WINDOW_MS);
+
+        if (isWithinRecoveryWindow) {
+          mappedUser.isDeleted = false;
+          mappedUser.deletedAt = undefined;
+          try {
+            await supabase.from('users').update({ is_deleted: false, deleted_at: null, last_active_at: new Date().toISOString() }).eq('id', session.user.id);
+          } catch (e) {}
+          console.log('[Auth] Recovered previously deleted account (within 30-day window)');
+        } else {
+          console.log('[Auth] Account deletion is past 30-day recovery window — cannot recover');
+          await supabase.auth.signOut();
+          setUser(null);
+          setIsLoading(false);
+          return;
+        }
+      } else {
+        try {
+          await supabase.from('users').update({ last_active_at: new Date().toISOString() }).eq('id', session.user.id);
+        } catch (e) {}
+      }
 
       await StorageService.setCurrentUser(mappedUser);
       await StorageService.addOrUpdateUser(mappedUser);
@@ -393,9 +425,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         currentUser.role = role;
         currentUser.onboardingStep = 'complete';
+        currentUser.lastActiveAt = new Date();
         if (role === 'host' && !currentUser.hostType) {
           currentUser.hostType = 'individual';
         }
+        if (currentUser.isDeleted) {
+          currentUser.isDeleted = false;
+          currentUser.deletedAt = undefined;
+        }
+        await StorageService.setCurrentUser(currentUser);
+        await StorageService.addOrUpdateUser(currentUser);
         setUser(currentUser);
       }
       return;
@@ -513,6 +552,108 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .eq('id', user.id);
 
     setUser(updated);
+  };
+
+  const cancelHostSubscriptionAtPeriodEnd = async () => {
+    if (!user || !user.hostSubscription || user.hostSubscription.plan === 'free') return;
+    const expiresAt = user.hostSubscription.expiresAt
+      ? new Date(user.hostSubscription.expiresAt)
+      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const updatedUser: User = {
+      ...user,
+      hostSubscription: {
+        ...user.hostSubscription,
+        status: 'cancelling',
+        scheduledPlan: 'free',
+        scheduledChangeDate: expiresAt,
+      },
+    };
+    await StorageService.setCurrentUser(updatedUser);
+    await StorageService.addOrUpdateUser(updatedUser);
+    setUser(updatedUser);
+    try {
+      await supabase.from('subscriptions').update({
+        host_status: 'cancelling',
+        host_scheduled_plan: 'free',
+        host_scheduled_change_date: expiresAt.toISOString(),
+      }).eq('user_id', user.id);
+    } catch (e) {
+      console.log('[Auth] Supabase host cancel sync failed:', e);
+    }
+    console.log(`[Auth] Host subscription set to cancel at period end: ${expiresAt}`);
+  };
+
+  const reactivateHostSubscription = async () => {
+    if (!user || !user.hostSubscription) return;
+    const updatedUser: User = {
+      ...user,
+      hostSubscription: {
+        ...user.hostSubscription,
+        status: 'active',
+        scheduledPlan: undefined,
+        scheduledChangeDate: undefined,
+      },
+    };
+    await StorageService.setCurrentUser(updatedUser);
+    await StorageService.addOrUpdateUser(updatedUser);
+    setUser(updatedUser);
+    try {
+      await supabase.from('subscriptions').update({
+        host_status: 'active',
+        host_scheduled_plan: null,
+        host_scheduled_change_date: null,
+      }).eq('user_id', user.id);
+    } catch (e) {
+      console.log('[Auth] Supabase host reactivate sync failed:', e);
+    }
+  };
+
+  const softDeleteAccount = async () => {
+    if (!user) return;
+    const updatedUser: User = {
+      ...user,
+      isDeleted: true,
+      deletedAt: new Date(),
+    };
+    await StorageService.setCurrentUser(updatedUser);
+    await StorageService.addOrUpdateUser(updatedUser);
+    try {
+      await supabase.from('users').update({ is_deleted: true, deleted_at: new Date().toISOString() }).eq('id', user.id);
+    } catch (e) {
+      console.log('[Auth] Supabase soft-delete update failed:', e);
+    }
+    await supabase.auth.signOut();
+    await StorageService.logoutAndReset();
+    setUser(null);
+  };
+
+  const recoverDeletedAccount = async () => {
+    if (!user) return;
+    const updatedUser: User = {
+      ...user,
+      isDeleted: false,
+      deletedAt: undefined,
+    };
+    await StorageService.setCurrentUser(updatedUser);
+    await StorageService.addOrUpdateUser(updatedUser);
+    try {
+      await supabase.from('users').update({ is_deleted: false, deleted_at: null }).eq('id', user.id);
+    } catch (e) {
+      console.log('[Auth] Supabase account recovery failed:', e);
+    }
+    setUser(updatedUser);
+  };
+
+  const updateLastActive = async () => {
+    if (!user) return;
+    const now = new Date();
+    const updatedUser: User = { ...user, lastActiveAt: now };
+    await StorageService.setCurrentUser(updatedUser);
+    await StorageService.addOrUpdateUser(updatedUser);
+    setUser(updatedUser);
+    try {
+      await supabase.from('users').update({ last_active_at: now.toISOString() }).eq('id', user.id);
+    } catch (e) {}
   };
 
   const logout = async () => {
@@ -1917,7 +2058,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout, abandonSignup, resetPassword, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, cancelSubscriptionAtPeriodEnd, reactivateSubscription, getSubscriptionDetails, updateUser, blockUser: blockUserAction, unblockUser: unblockUserAction, reportUser: reportUserAction, isUserBlocked: isUserBlockedCheck, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike, watchAdForCredit, getAdCredits, useAdCredit, isBasicUser, canViewListing, useListingView, canSendInterest, canSendSuperInterest, useSuperInterestCredit, canSendColdMessage, useColdMessage, getSuperInterestCount, upgradeHostPlan, downgradeHostPlan, getHostPlan, canAddListing, canRespondToInquiry, useInquiryResponse, purchaseListingBoost, purchaseHostVerification, purchaseSuperInterest, completeOnboardingStep }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout, abandonSignup, resetPassword, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, cancelSubscriptionAtPeriodEnd, reactivateSubscription, getSubscriptionDetails, updateUser, blockUser: blockUserAction, unblockUser: unblockUserAction, reportUser: reportUserAction, isUserBlocked: isUserBlockedCheck, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike, watchAdForCredit, getAdCredits, useAdCredit, isBasicUser, canViewListing, useListingView, canSendInterest, canSendSuperInterest, useSuperInterestCredit, canSendColdMessage, useColdMessage, getSuperInterestCount, upgradeHostPlan, downgradeHostPlan, getHostPlan, canAddListing, canRespondToInquiry, useInquiryResponse, purchaseListingBoost, purchaseHostVerification, purchaseSuperInterest, completeOnboardingStep, cancelHostSubscriptionAtPeriodEnd, reactivateHostSubscription, softDeleteAccount, recoverDeletedAccount, updateLastActive }}>
       {children}
     </AuthContext.Provider>
   );

@@ -90,13 +90,15 @@ function billingPrice(base: number, cycle: BillingCycle): number {
 export const HostSubscriptionScreen = () => {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, cancelHostSubscriptionAtPeriodEnd, reactivateHostSubscription } = useAuth();
   const [hostSub, setHostSub] = useState<HostSubscriptionData | null>(null);
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [subscribing, setSubscribing] = useState(false);
   const [showDowngradeModal, setShowDowngradeModal] = useState(false);
   const [downgrading, setDowngrading] = useState(false);
+  const [showCancelSheet, setShowCancelSheet] = useState(false);
+  const [processingCancel, setProcessingCancel] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -116,6 +118,23 @@ export const HostSubscriptionScreen = () => {
     }
 
     setSelectedPlan(plan);
+  };
+
+  const handleCancelHostSub = async () => {
+    setShowCancelSheet(false);
+    setProcessingCancel(true);
+    await cancelHostSubscriptionAtPeriodEnd();
+    setProcessingCancel(false);
+    const expiryDate = user?.hostSubscription?.expiresAt
+      ? new Date(user.hostSubscription.expiresAt)
+      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    Alert.alert('Subscription Cancelled', `You'll keep your features until ${expiryDate.toLocaleDateString()}. After that, your plan will switch to Free.`);
+  };
+
+  const handleReactivateHostSub = async () => {
+    setProcessingCancel(true);
+    await reactivateHostSubscription();
+    setProcessingCancel(false);
   };
 
   const handleConfirmDowngrade = async () => {
@@ -415,6 +434,39 @@ export const HostSubscriptionScreen = () => {
           </Pressable>
         ) : null}
 
+        {user?.hostSubscription?.status === 'cancelling' || user?.hostSubscription?.status === 'cancelled' ? (
+          <View style={styles.cancelledBanner}>
+            <View style={styles.cancelledBannerInner}>
+              <Feather name="alert-circle" size={18} color="#f59e0b" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cancelledBannerTitle}>
+                  {user.hostSubscription.status === 'cancelled' ? 'Subscription Cancelled' : 'Cancellation Scheduled'}
+                </Text>
+                <Text style={styles.cancelledBannerDesc}>
+                  {user.hostSubscription.scheduledChangeDate
+                    ? `Your plan will switch to Free on ${new Date(user.hostSubscription.scheduledChangeDate).toLocaleDateString()}`
+                    : 'Your plan will switch to Free at the end of your billing period'}
+                </Text>
+              </View>
+            </View>
+            <Pressable
+              style={styles.reactivateBtn}
+              onPress={handleReactivateHostSub}
+              disabled={processingCancel}
+            >
+              <Text style={styles.reactivateBtnText}>{processingCancel ? 'Processing...' : 'Reactivate Plan'}</Text>
+            </Pressable>
+          </View>
+        ) : !isFreePlan(hostSub.plan) ? (
+          <Pressable
+            style={styles.cancelBtn}
+            onPress={() => setShowCancelSheet(true)}
+            disabled={processingCancel}
+          >
+            <Text style={styles.cancelBtnText}>{processingCancel ? 'Processing...' : 'Cancel Subscription'}</Text>
+          </Pressable>
+        ) : null}
+
         {!isFreePlan(hostSub.plan) ? (
           <View style={styles.costSummary}>
             <Text style={styles.costTitle}>Monthly Cost Summary</Text>
@@ -464,6 +516,25 @@ export const HostSubscriptionScreen = () => {
           onConfirm={handleConfirmDowngrade}
           onCancel={() => setShowDowngradeModal(false)}
         />
+      ) : null}
+
+      {showCancelSheet ? (
+        <View style={styles.cancelOverlay}>
+          <Pressable style={styles.cancelOverlayBg} onPress={() => setShowCancelSheet(false)} />
+          <View style={styles.cancelSheet}>
+            <Feather name="alert-circle" size={28} color="#f59e0b" style={{ alignSelf: 'center', marginBottom: 12 }} />
+            <Text style={styles.cancelSheetTitle}>Cancel Subscription?</Text>
+            <Text style={styles.cancelSheetDesc}>
+              Your plan will remain active until the end of your current billing period. After that, it will switch to the Free plan. You can reactivate at any time before then.
+            </Text>
+            <Pressable style={styles.cancelSheetConfirmBtn} onPress={handleCancelHostSub}>
+              <Text style={styles.cancelSheetConfirmText}>Yes, Cancel Plan</Text>
+            </Pressable>
+            <Pressable style={styles.cancelSheetKeepBtn} onPress={() => setShowCancelSheet(false)}>
+              <Text style={styles.cancelSheetKeepText}>Keep My Plan</Text>
+            </Pressable>
+          </View>
+        </View>
       ) : null}
     </View>
   );
@@ -722,4 +793,97 @@ const styles = StyleSheet.create({
   },
   costLabel: { fontSize: 13, color: 'rgba(255,255,255,0.5)' },
   costValue: { fontSize: 14, color: 'rgba(255,255,255,0.7)', fontWeight: '600' },
+
+  cancelledBanner: {
+    backgroundColor: 'rgba(245,158,11,0.08)',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(245,158,11,0.25)',
+  },
+  cancelledBannerInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+  cancelledBannerTitle: { fontSize: 14, fontWeight: '700', color: '#f59e0b' },
+  cancelledBannerDesc: { fontSize: 13, color: '#999', lineHeight: 18 },
+  reactivateBtn: {
+    backgroundColor: ROOMDR_PURPLE,
+    borderRadius: 10,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reactivateBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' },
+
+  cancelBtn: {
+    borderRadius: 10,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(220,38,38,0.3)',
+    marginBottom: 16,
+  },
+  cancelBtnText: { fontSize: 13, fontWeight: '600', color: '#DC2626' },
+
+  cancelOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'flex-end',
+    zIndex: 100,
+  },
+  cancelOverlayBg: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  cancelSheet: {
+    backgroundColor: '#1a1a1a',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 24,
+    paddingBottom: 40,
+  },
+  cancelSheetTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  cancelSheetDesc: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  cancelSheetConfirmBtn: {
+    backgroundColor: '#DC2626',
+    borderRadius: 12,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  cancelSheetConfirmText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  cancelSheetKeepBtn: {
+    borderRadius: 12,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  cancelSheetKeepText: { fontSize: 15, fontWeight: '700', color: '#fff' },
 });

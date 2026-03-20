@@ -16,7 +16,7 @@ type PrivacySecurityScreenNavigationProp = NativeStackNavigationProp<ProfileStac
 
 export const PrivacySecurityScreen = () => {
   const { theme } = useTheme();
-  const { user, logout, updateUser } = useAuth();
+  const { user, logout, updateUser, softDeleteAccount } = useAuth();
   const navigation = useNavigation<PrivacySecurityScreenNavigationProp>();
   
   const [showPasswordSection, setShowPasswordSection] = useState(false);
@@ -104,22 +104,8 @@ export const PrivacySecurityScreen = () => {
 
   const confirmDeleteAccount = async () => {
     if (!user) return;
-
     setShowDeleteModal(false);
-
-    try {
-      await supabase.from('profiles').delete().eq('user_id', user.id);
-      await supabase.from('subscriptions').delete().eq('user_id', user.id);
-      await supabase.from('usage_tracking').delete().eq('user_id', user.id);
-      await supabase.from('notifications').delete().eq('user_id', user.id);
-      await supabase.from('users').delete().eq('id', user.id);
-    } catch (error) {
-      console.log('[PrivacySecurity] Supabase delete failed, continuing with local cleanup:', error);
-    }
-
-    await StorageService.deleteUser(user.id);
-
-    logout();
+    await softDeleteAccount();
   };
 
   const MenuItem = ({ icon, label, onPress, showArrow = true, rightElement }: any) => (
@@ -314,7 +300,7 @@ export const PrivacySecurityScreen = () => {
         >
           <Feather name="trash-2" size={20} color="#DC2626" />
           <ThemedText style={[Typography.body, { marginLeft: Spacing.md, color: '#DC2626', fontWeight: '600' }]}>
-            Delete Account
+            Deactivate Account
           </ThemedText>
         </Pressable>
       </View>
@@ -333,10 +319,10 @@ export const PrivacySecurityScreen = () => {
             
             <View style={styles.modalContent}>
               <ThemedText style={[Typography.h2, { textAlign: 'center', marginBottom: Spacing.sm }]}>
-                Delete Account
+                Deactivate Account
               </ThemedText>
               <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary, marginBottom: Spacing.xl }]}>
-                Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently deleted.
+                Your account will be deactivated and hidden from other users. You can recover it by logging back in within 30 days. After 30 days, your data will be permanently deleted.
               </ThemedText>
               
               <View style={styles.modalButtons}>
@@ -354,7 +340,7 @@ export const PrivacySecurityScreen = () => {
                   onPress={confirmDeleteAccount}
                 >
                   <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>
-                    Delete
+                    Deactivate
                   </ThemedText>
                 </Pressable>
               </View>

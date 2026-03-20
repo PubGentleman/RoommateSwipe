@@ -473,6 +473,9 @@ export interface User {
     boostReminders: boolean;
     systemAlerts: boolean;
   };
+  lastActiveAt?: Date;
+  isDeleted?: boolean;
+  deletedAt?: Date;
   blockedUsers?: string[];
   reportedUsers?: Array<{
     userId: string;
