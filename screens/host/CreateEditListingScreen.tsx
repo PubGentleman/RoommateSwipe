@@ -669,84 +669,94 @@ export const CreateEditListingScreen = () => {
 
         <View style={[styles.fieldContainer, { zIndex: 1000 }]}>
           <ThemedText style={styles.label}>Address</ThemedText>
-          <GooglePlacesAutocomplete
-            placeholder="Start typing your address..."
-            fetchDetails={true}
-            onPress={(data: any, details: any = null) => {
-              if (!details) return;
-              const components = details.address_components;
-              const getComponent = (type: string) =>
-                components.find((c: any) => c.types.includes(type));
-              const streetNumber = getComponent('street_number')?.long_name || '';
-              const streetName = getComponent('route')?.long_name || '';
-              const cityName =
-                getComponent('locality')?.long_name ||
-                getComponent('sublocality')?.long_name ||
-                getComponent('administrative_area_level_2')?.long_name || '';
-              const stateName =
-                getComponent('administrative_area_level_1')?.short_name || '';
-              const neighborhoodName =
-                getComponent('neighborhood')?.long_name ||
-                getComponent('sublocality_level_1')?.long_name || '';
-              setAddress(`${streetNumber} ${streetName}`.trim());
-              setCity(cityName);
-              setState(stateName);
-              if (neighborhoodName) setNeighborhood(neighborhoodName);
-              const loc = details.geometry.location;
-              setCoordinates({ lat: loc.lat, lng: loc.lng });
-              setAddressFromAutocomplete(true);
-            }}
-            query={{
-              key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
-              language: 'en',
-              types: 'address',
-            }}
-            textInputProps={{
-              value: address,
-              onChangeText: handleManualAddressChange,
-              placeholderTextColor: '#666',
-            }}
-            styles={{
-              container: { flex: 0 },
-              textInput: {
-                height: 50,
-                backgroundColor: '#1c1c1c',
-                borderWidth: 1,
-                borderColor: '#333',
-                borderRadius: 12,
-                paddingHorizontal: 16,
-                fontSize: 15,
-                color: '#fff',
-              },
-              listView: {
-                backgroundColor: '#1a1a1a',
-                borderWidth: 1,
-                borderColor: '#333',
-                borderRadius: 12,
-                marginTop: 4,
-                zIndex: 1000,
-              },
-              row: {
-                paddingHorizontal: 12,
-                paddingVertical: 10,
-                backgroundColor: '#1a1a1a',
-              },
-              description: {
-                fontSize: 14,
-                color: '#ccc',
-              },
-              separator: {
-                height: 1,
-                backgroundColor: '#333',
-              },
-            }}
-            enablePoweredByContainer={false}
-            minLength={3}
-            debounce={300}
-            keyboardShouldPersistTaps="handled"
-            onFail={(error: any) => console.warn('Places autocomplete error:', error)}
-            onNotFound={() => {}}
-          />
+          {process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ? (
+            <GooglePlacesAutocomplete
+              placeholder="Start typing your address..."
+              fetchDetails={true}
+              onPress={(data: any, details: any = null) => {
+                if (!details) return;
+                const components = details.address_components;
+                const getComponent = (type: string) =>
+                  components.find((c: any) => c.types.includes(type));
+                const streetNumber = getComponent('street_number')?.long_name || '';
+                const streetName = getComponent('route')?.long_name || '';
+                const cityName =
+                  getComponent('locality')?.long_name ||
+                  getComponent('sublocality')?.long_name ||
+                  getComponent('administrative_area_level_2')?.long_name || '';
+                const stateName =
+                  getComponent('administrative_area_level_1')?.short_name || '';
+                const neighborhoodName =
+                  getComponent('neighborhood')?.long_name ||
+                  getComponent('sublocality_level_1')?.long_name || '';
+                setAddress(`${streetNumber} ${streetName}`.trim());
+                setCity(cityName);
+                setState(stateName);
+                if (neighborhoodName) setNeighborhood(neighborhoodName);
+                const loc = details.geometry.location;
+                setCoordinates({ lat: loc.lat, lng: loc.lng });
+                setAddressFromAutocomplete(true);
+              }}
+              query={{
+                key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
+                language: 'en',
+                types: 'address',
+              }}
+              textInputProps={{
+                value: address,
+                onChangeText: handleManualAddressChange,
+                placeholderTextColor: '#666',
+              }}
+              styles={{
+                container: { flex: 0 },
+                textInput: {
+                  height: 50,
+                  backgroundColor: '#1c1c1c',
+                  borderWidth: 1,
+                  borderColor: '#333',
+                  borderRadius: 12,
+                  paddingHorizontal: 16,
+                  fontSize: 15,
+                  color: '#fff',
+                },
+                listView: {
+                  backgroundColor: '#1a1a1a',
+                  borderWidth: 1,
+                  borderColor: '#333',
+                  borderRadius: 12,
+                  marginTop: 4,
+                  zIndex: 1000,
+                },
+                row: {
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
+                  backgroundColor: '#1a1a1a',
+                },
+                description: {
+                  fontSize: 14,
+                  color: '#ccc',
+                },
+                separator: {
+                  height: 1,
+                  backgroundColor: '#333',
+                },
+              }}
+              enablePoweredByContainer={false}
+              minLength={3}
+              debounce={300}
+              keyboardShouldPersistTaps="handled"
+              onFail={(error: any) => console.warn('Places autocomplete error:', error)}
+              onNotFound={() => {}}
+            />
+          ) : (
+            <TextInput
+              style={styles.input}
+              value={address}
+              onChangeText={handleManualAddressChange}
+              placeholder="Enter your address"
+              placeholderTextColor="#666"
+            />
+          )}
         </View>
 
         <View style={styles.fieldContainer}>
