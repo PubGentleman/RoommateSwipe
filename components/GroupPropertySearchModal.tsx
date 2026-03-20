@@ -222,13 +222,17 @@ export function GroupPropertySearchModal({ visible, currentListingId, onSelect, 
     >
       <View style={[styles.container, { backgroundColor: theme.background }]}>
         <View style={[styles.header, { borderBottomColor: theme.border }]}>
-          <Pressable onPress={onClose} hitSlop={8}>
-            <Feather name="x" size={24} color={theme.text} />
+          <Pressable
+            onPress={onClose}
+            hitSlop={12}
+            style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: theme.card, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Feather name="arrow-left" size={20} color={theme.text} />
           </Pressable>
           <ThemedText style={[Typography.h3, { flex: 1, textAlign: 'center' }]}>
             Find a Property
           </ThemedText>
-          <View style={{ width: 24 }} />
+          <View style={{ width: 36 }} />
         </View>
 
         <View style={styles.searchRow}>
