@@ -6,6 +6,7 @@ import { CreateGroupScreen } from '../screens/shared/CreateGroupScreen';
 import { GroupInviteScreen } from '../screens/shared/GroupInviteScreen';
 import { PromoteAdminScreen } from '../screens/shared/PromoteAdminScreen';
 import { ListingGroupsScreen } from '../screens/shared/ListingGroupsScreen';
+import { HostGroupOutreachScreen } from '../screens/host/HostGroupOutreachScreen';
 import { RoommateProfile } from '../types/models';
 
 export type HostMessagesStackParamList = {
@@ -32,6 +33,10 @@ export type HostMessagesStackParamList = {
   ListingGroups: {
     listingId: string;
   };
+  HostGroupOutreach: {
+    listingId: string;
+    listingTitle: string;
+  };
 };
 
 const Stack = createNativeStackNavigator<HostMessagesStackParamList>();
@@ -49,6 +54,7 @@ export const HostMessagesStackNavigator = () => {
       <Stack.Screen name="GroupInvite" component={GroupInviteScreen} />
       <Stack.Screen name="PromoteAdmin" component={PromoteAdminScreen} />
       <Stack.Screen name="ListingGroups" component={ListingGroupsScreen} />
+      <Stack.Screen name="HostGroupOutreach" component={HostGroupOutreachScreen} />
     </Stack.Navigator>
   );
 };

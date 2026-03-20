@@ -1132,3 +1132,81 @@ export async function respondToJoinRequest(
     }).then(() => {});
   }
 }
+
+export interface OutreachPackage {
+  id: string;
+  label: string;
+  groupCount: number | null;
+  priceCents: number;
+  description: string;
+}
+
+export const OUTREACH_PACKAGES: OutreachPackage[] = [
+  { id: 'single', label: 'Contact 1 Group', groupCount: 1, priceCents: 299, description: 'Send to one group' },
+  { id: 'triple', label: 'Contact 3 Groups', groupCount: 3, priceCents: 699, description: 'Best value — save ~30%' },
+  { id: 'all', label: 'Contact All Groups', groupCount: null, priceCents: 999, description: 'Reach every group on your listing' },
+];
+
+export async function getGroupsForListing(listingId: string): Promise<{
+  id: string;
+  name: string;
+  memberCount: number;
+  members: { name: string; userId: string }[];
+}[]> {
+  const { data, error } = await supabase
+    .from('groups')
+    .select('id, name, group_members(user_id, users(full_name))')
+    .eq('listing_id', listingId);
+
+  if (error) return [];
+
+  return (data || []).map((g: any) => {
+    const members = (g.group_members || []).map((m: any) => ({
+      name: m.users?.full_name || 'Unknown',
+      userId: m.user_id,
+    }));
+    return {
+      id: g.id,
+      name: g.name,
+      memberCount: members.length,
+      members,
+    };
+  });
+}
+
+export async function createOutreachPayment(
+  listingId: string,
+  packageId: string,
+  groupIds: string[],
+  message: string
+): Promise<{ clientSecret: string; paymentIntentId: string; amountCents: number }> {
+  const { data, error } = await supabase.functions.invoke('create-outreach-payment', {
+    body: { listingId, packageId, groupIds },
+  });
+
+  if (error) throw error;
+
+  const { clientSecret, paymentIntentId, amountCents } = data;
+
+  const { data: { user } } = await supabase.auth.getUser();
+  await supabase
+    .from('host_outreach_pending')
+    .insert({
+      payment_intent_id: paymentIntentId,
+      host_id: user?.id,
+      listing_id: listingId,
+      message,
+      group_ids: groupIds,
+    });
+
+  return { clientSecret, paymentIntentId, amountCents };
+}
+
+export async function getContactedGroupIds(listingId: string): Promise<string[]> {
+  const { data } = await supabase
+    .from('host_outreach')
+    .select('group_id')
+    .eq('listing_id', listingId);
+
+  return (data || []).map((r: any) => r.group_id);
+}

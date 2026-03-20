@@ -31,6 +31,7 @@ export interface ListingData {
   host_name?: string;
   host_profile_id?: string;
   existing_roommates?: any[];
+  outreach_unlocked_at?: string;
 }
 
 export function mapListingToProperty(l: any, fallbackHostName?: string): Property {
@@ -159,6 +160,33 @@ export async function deleteListing(id: string) {
     .eq('id', id);
 
   if (error) throw error;
+}
+
+export async function getOutreachStatus(listingId: string): Promise<{
+  unlocked: boolean;
+  hoursRemaining: number;
+}> {
+  try {
+    const { data } = await supabase
+      .from('listings')
+      .select('status, outreach_unlocked_at')
+      .eq('id', listingId)
+      .single();
+
+    if (!data || data.status !== 'rented' || !data.outreach_unlocked_at) {
+      return { unlocked: false, hoursRemaining: 48 };
+    }
+
+    const unlockTime = new Date(data.outreach_unlocked_at).getTime();
+    const now = Date.now();
+    if (now >= unlockTime) {
+      return { unlocked: true, hoursRemaining: 0 };
+    }
+    const hoursRemaining = Math.ceil((unlockTime - now) / (1000 * 60 * 60));
+    return { unlocked: false, hoursRemaining };
+  } catch {
+    return { unlocked: false, hoursRemaining: 48 };
+  }
 }
 
 export async function uploadListingPhoto(uri: string, fileName: string) {

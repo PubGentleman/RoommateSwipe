@@ -14,6 +14,7 @@ import { HostAnalyticsScreen } from '../screens/host/HostAnalyticsScreen';
 import { HostPricingScreen } from '../screens/host/HostPricingScreen';
 import { HostSubscriptionScreen } from '../screens/host/HostSubscriptionScreen';
 import { ListingBoostScreen } from '../screens/host/ListingBoostScreen';
+import { HostGroupOutreachScreen } from '../screens/host/HostGroupOutreachScreen';
 import { BrowseRenterGroupsScreen } from '../screens/host/BrowseRenterGroupsScreen';
 import { HostMessagesStackNavigator } from './HostMessagesStackNavigator';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
@@ -24,6 +25,7 @@ export type HostListingsStackParamList = {
   MyListings: undefined;
   CreateEditListing: { propertyId?: string };
   ListingBoost: { listingId: string };
+  HostGroupOutreach: { listingId: string; listingTitle: string };
 };
 
 export type HostDashboardStackParamList = {
@@ -69,6 +71,7 @@ function ListingsStackNavigator() {
       <ListingsStack.Screen name="MyListings" component={MyListingsScreen} />
       <ListingsStack.Screen name="CreateEditListing" component={CreateEditListingScreen} />
       <ListingsStack.Screen name="ListingBoost" component={ListingBoostScreen} />
+      <ListingsStack.Screen name="HostGroupOutreach" component={HostGroupOutreachScreen} />
     </ListingsStack.Navigator>
   );
 }

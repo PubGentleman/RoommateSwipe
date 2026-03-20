@@ -167,9 +167,28 @@ export const MyListingsScreen = () => {
 
   const markAsRented = async (propertyId: string) => {
     if (!user) return;
+    const confirmRent = () => {
+      return new Promise<boolean>((resolve) => {
+        if (Platform.OS === 'web') {
+          resolve(window.confirm('Mark this listing as rented? A 48-hour cooldown will begin before you can message interested groups.'));
+        } else {
+          Alert.alert(
+            'Mark as Rented',
+            'A 48-hour cooldown will begin before you can message interested groups.',
+            [
+              { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+              { text: 'Mark Rented', style: 'destructive', onPress: () => resolve(true) },
+            ]
+          );
+        }
+      });
+    };
+    const confirmed = await confirmRent();
+    if (!confirmed) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
-      await updateListing(propertyId, { is_rented: true, is_active: false });
+      const unlockAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+      await updateListing(propertyId, { is_rented: true, is_active: false, outreach_unlocked_at: unlockAt });
     } catch {
       await StorageService.markPropertyAsRented(propertyId);
     }
@@ -445,10 +464,26 @@ export const MyListingsScreen = () => {
                 </Pressable>
               </>
             ) : (
-              <Pressable style={styles.actRented} onPress={() => markAsAvailable(listing.id)}>
-                <Feather name="refresh-cw" size={13} color={GREEN} />
-                <Text style={styles.actRentedText}>Available</Text>
-              </Pressable>
+              <>
+                <Pressable style={styles.actRented} onPress={() => markAsAvailable(listing.id)}>
+                  <Feather name="refresh-cw" size={13} color={GREEN} />
+                  <Text style={styles.actRentedText}>Available</Text>
+                </Pressable>
+                {status === 'rented' ? (
+                  <Pressable
+                    style={styles.actOutreach}
+                    onPress={() => {
+                      navigation.navigate('HostGroupOutreach', {
+                        listingId: listing.id,
+                        listingTitle: listing.title,
+                      });
+                    }}
+                  >
+                    <Feather name="mail" size={13} color={BLUE} />
+                    <Text style={styles.actOutreachText}>Groups</Text>
+                  </Pressable>
+                ) : null}
+              </>
             )}
             <Pressable style={styles.actDelete} onPress={() => deleteListingHandler(listing.id)}>
               <Feather name="trash-2" size={14} color="#ff4d4d" />
@@ -1012,6 +1047,19 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(46,204,113,0.2)',
   },
   actRentedText: { fontSize: 12, fontWeight: '700', color: GREEN },
+  actOutreach: {
+    flex: 1,
+    height: 36,
+    borderRadius: 11,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(91,140,255,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(91,140,255,0.2)',
+  },
+  actOutreachText: { fontSize: 12, fontWeight: '700', color: '#5b8cff' },
   actDelete: {
     width: 36,
     height: 36,
