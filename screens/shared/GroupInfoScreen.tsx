@@ -4,6 +4,7 @@ import {
   Alert, ActivityIndicator, StyleSheet, Platform,
   Share, Linking,
 } from 'react-native';
+
 import { ThemedText } from '../../components/ThemedText';
 import { Feather } from '../../components/VectorIcons';
 import { useTheme } from '../../hooks/useTheme';
@@ -74,7 +75,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
             memberCount: localGroup.memberCount || 1,
             memberLimit: localGroup.maxMembers || 4,
             linkedListing: localGroup.linkedListing || null,
-            discoverable: false,
+            discoverable: localGroup.discoverable !== false,
             minBudget: localGroup.budgetMin || null,
             targetNeighborhood: localGroup.city || null,
           });
@@ -96,7 +97,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
             memberCount: 1,
             memberLimit: 4,
             linkedListing: null,
-            discoverable: false,
+            discoverable: true,
             minBudget: null,
             targetNeighborhood: null,
           });
@@ -119,7 +120,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
           memberCount: 1,
           memberLimit: 4,
           linkedListing: null,
-          discoverable: false,
+          discoverable: true,
           minBudget: null,
           targetNeighborhood: null,
         });
@@ -228,14 +229,45 @@ export function GroupInfoScreen({ route, navigation }: Props) {
     );
   }
 
-  async function handleDiscoverableToggle(value: boolean) {
-    const prev = group?.discoverable;
-    setGroup((p: any) => ({ ...p, discoverable: value }));
+  function handleDiscoverableToggle(value: boolean) {
+    if (!value) {
+      const doTurnOff = () => {
+        setGroup((p: any) => ({ ...p, discoverable: false }));
+        applyDiscoverable(false);
+      };
+      if (Platform.OS === 'web') {
+        const confirmed = window.confirm(
+          'Turning off discoverable means other users won\'t be able to find or request to join your group. Are you sure?'
+        );
+        if (confirmed) doTurnOff();
+      } else {
+        Alert.alert(
+          'Turn Off Discoverable?',
+          'Other users won\'t be able to find or request to join your group. Are you sure?',
+          [
+            { text: 'Keep On', style: 'cancel' },
+            { text: 'Turn Off', style: 'destructive', onPress: doTurnOff },
+          ]
+        );
+      }
+    } else {
+      setGroup((p: any) => ({ ...p, discoverable: true }));
+      applyDiscoverable(true);
+    }
+  }
+
+  async function applyDiscoverable(value: boolean) {
     try {
       await setGroupDiscoverable(groupId, value);
     } catch {
-      setGroup((p: any) => ({ ...p, discoverable: prev }));
-      Alert.alert('Error', 'Could not update discovery setting.');
+      try {
+        const groups = await StorageService.getGroups();
+        const idx = groups.findIndex((g: any) => g.id === groupId);
+        if (idx >= 0) {
+          (groups[idx] as any).discoverable = value;
+          await StorageService.setGroups(groups);
+        }
+      } catch {}
     }
   }
 
