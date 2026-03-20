@@ -232,14 +232,17 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       const g = groups.find((gr: any) => gr.id === groupId);
       if (g?.members) {
         const users = await StorageService.getUsers();
+        const profiles = await StorageService.getRoommateProfiles();
         const members = g.members.map((memberId: string) => {
           const u = users.find((usr: any) => usr.id === memberId);
+          const p = profiles.find((pr: any) => pr.id === memberId);
+          const photo = p?.photos?.[0] || p?.profilePicture || u?.profilePicture || u?.profileData?.photos?.[0] || null;
           return {
             id: memberId,
-            name: u?.name || u?.profileData?.name || 'Member',
-            photo: u?.profilePicture || u?.profileData?.photos?.[0] || null,
+            name: p?.name || u?.name || u?.profileData?.name || 'Member',
+            photo,
             role: u?.role || 'renter',
-            groupRole: memberId === g.adminId ? 'admin' : 'member',
+            groupRole: memberId === (g.createdBy || g.adminId) ? 'admin' : 'member',
           };
         });
         setGroupMembers(members);
