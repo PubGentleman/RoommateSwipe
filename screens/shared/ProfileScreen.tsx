@@ -15,6 +15,8 @@ import { StorageService } from '../../utils/storage';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
 import { getBoostTimeRemaining, getBoostDuration, isBoostExpired } from '../../utils/boostUtils';
 import { isDev } from '../../utils/envUtils';
+import { isHostTypeEditable, daysRemainingInGracePeriod, getHostBadgeLabel, getHostBadgeColor, getHostBadgeIcon } from '../../utils/hostTypeUtils';
+import * as Linking from 'expo-linking';
 
 type ProfileScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'ProfileMain'>;
 
@@ -385,6 +387,58 @@ export const ProfileScreen = () => {
             </View>
           </View>
           <View style={styles.settingsCard}>
+            {user?.role === 'host' ? (() => {
+              const hostType = user?.hostType || 'individual';
+              const canEdit = isHostTypeEditable(user?.hostTypeLockedAt || null);
+              const daysLeft = daysRemainingInGracePeriod(user?.hostTypeLockedAt || null);
+              const typeLabel = hostType === 'individual' ? 'Individual Host' : getHostBadgeLabel(hostType);
+              const badgeColor = getHostBadgeColor(hostType) || '#6C63FF';
+              const badgeIcon = getHostBadgeIcon(hostType);
+
+              return (
+                <Pressable
+                  style={[styles.hostTypeRow, { borderBottomColor: 'rgba(255,255,255,0.06)' }]}
+                  onPress={() => {
+                    if (canEdit) {
+                      navigation.navigate('HostTypeSelect');
+                    } else {
+                      updateUser({ hostTypeChangeRequested: true });
+                      const subject = encodeURIComponent('Host Type Change Request');
+                      const body = encodeURIComponent(
+                        `Hi Roomdr Support,\n\nI'd like to change my host type.\n\nAccount email: ${user?.email}\nCurrent type: ${hostType}\nRequested type: [FILL IN]\n\nReason: [FILL IN]`
+                      );
+                      if (Platform.OS === 'web') {
+                        window.open(`mailto:support@roomdr.com?subject=${subject}&body=${body}`);
+                      } else {
+                        Linking.openURL(`mailto:support@roomdr.com?subject=${subject}&body=${body}`);
+                      }
+                    }
+                  }}
+                >
+                  <View style={[styles.hostTypeIcon, { backgroundColor: badgeColor + '20' }]}>
+                    <Feather name={badgeIcon} size={16} color={badgeColor} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 15, fontWeight: '600', color: '#fff' }}>Account Type</Text>
+                    <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>{typeLabel}</Text>
+                  </View>
+                  {canEdit ? (
+                    <View style={[styles.hostTypeChangeBtn, { borderColor: '#ff6b5b' }]}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#ff6b5b' }}>
+                        Change ({daysLeft}d left)
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={[styles.hostTypeChangeBtn, { borderColor: 'rgba(255,255,255,0.15)', flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+                      <Feather name="mail" size={11} color="rgba(255,255,255,0.5)" />
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.5)' }}>
+                        Contact Support
+                      </Text>
+                    </View>
+                  )}
+                </Pressable>
+              );
+            })() : null}
             <SettingsItem
               iconName="user"
               iconColor="#667eea"
@@ -1049,6 +1103,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(255,255,255,0.4)',
     marginTop: 1,
+  },
+  hostTypeRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    padding: 16,
+    gap: 14,
+    borderBottomWidth: 1,
+  },
+  hostTypeIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  hostTypeChangeBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1.5,
   },
   switchRoleBtn: {
     flexDirection: 'row',

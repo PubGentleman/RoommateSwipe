@@ -47,14 +47,20 @@ export function HostTypeSelectScreen() {
     if (!selected || !user) return;
     setSaving(true);
     try {
-      await updateUser({ hostType: selected });
+      const isFromSettings = user.onboardingStep === 'complete';
+      await updateUser({ hostType: selected, hostTypeLockedAt: undefined });
 
       if (selected === 'company') {
         navigation.navigate('HostCompanySetup');
       } else if (selected === 'agent') {
         navigation.navigate('HostAgentSetup');
       } else {
-        await completeOnboardingStep('plan');
+        await updateUser({ hostTypeLockedAt: new Date().toISOString() });
+        if (isFromSettings) {
+          navigation.goBack();
+        } else {
+          await completeOnboardingStep('plan');
+        }
       }
     } catch (e) {
       console.error(e);

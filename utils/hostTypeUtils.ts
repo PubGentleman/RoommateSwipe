@@ -35,3 +35,21 @@ export function getContactLabel(hostType: HostType): string {
     default:        return 'Send Message';
   }
 }
+
+export function isHostTypeEditable(hostTypeLockedAt: string | null | undefined): boolean {
+  if (!hostTypeLockedAt) return true;
+  const lockedAt = new Date(hostTypeLockedAt);
+  if (isNaN(lockedAt.getTime())) return true;
+  const now = new Date();
+  const daysSinceLock = (now.getTime() - lockedAt.getTime()) / (1000 * 60 * 60 * 24);
+  return daysSinceLock <= 7;
+}
+
+export function daysRemainingInGracePeriod(hostTypeLockedAt: string | null | undefined): number {
+  if (!hostTypeLockedAt) return 7;
+  const lockedAt = new Date(hostTypeLockedAt);
+  if (isNaN(lockedAt.getTime())) return 7;
+  const now = new Date();
+  const daysSinceLock = (now.getTime() - lockedAt.getTime()) / (1000 * 60 * 60 * 24);
+  return Math.max(0, Math.ceil(7 - daysSinceLock));
+}

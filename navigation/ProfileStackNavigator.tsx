@@ -24,9 +24,15 @@ import { HostPricingScreen } from '../screens/host/HostPricingScreen';
 import { HostSubscriptionScreen } from '../screens/host/HostSubscriptionScreen';
 import { ManageSubscriptionScreen } from '../screens/shared/ManageSubscriptionScreen';
 import { DiagnosticScreen } from '../screens/shared/DiagnosticScreen';
+import { HostTypeSelectScreen } from '../screens/host/onboarding/HostTypeSelectScreen';
+import { HostCompanySetupScreen } from '../screens/host/onboarding/HostCompanySetupScreen';
+import { HostAgentSetupScreen } from '../screens/host/onboarding/HostAgentSetupScreen';
 
 export type ProfileStackParamList = {
   ProfileMain: undefined;
+  HostTypeSelect: undefined;
+  HostCompanySetup: undefined;
+  HostAgentSetup: undefined;
   Payment: undefined;
   Plans: undefined;
   HostPricing: undefined;
@@ -107,6 +113,21 @@ export const ProfileStackNavigator = () => {
       <Stack.Screen 
         name="Diagnostic" 
         component={DiagnosticScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="HostTypeSelect" 
+        component={HostTypeSelectScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="HostCompanySetup" 
+        component={HostCompanySetupScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="HostAgentSetup" 
+        component={HostAgentSetupScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen 

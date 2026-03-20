@@ -41,6 +41,7 @@ The application is built with React Native and Expo using TypeScript, featuring 
 - **Listing Boost System:** Tier-based boosting options for hosts to increase listing visibility.
 - **Address Autocomplete & Transit Auto-Fill:** Streamlined listing creation with `react-native-google-places-autocomplete` for address and auto-detection of nearby transit stops via Google Places API.
 - **AI Memory Layer:** Tracks user interactions to refine AI suggestions.
+- **Host Type Differentiation:** Hosts select their type during onboarding (Individual, Company, or Agent). Each type has different profile cards, listing badges, and contact labels. Individual hosts show match scores; Company/Agent hosts show type-specific badges. Host type is locked after a 7-day grace period; changes require contacting support. Settings: `screens/host/onboarding/HostTypeSelectScreen.tsx`, `HostCompanySetupScreen.tsx`, `HostAgentSetupScreen.tsx`. Utils: `utils/hostTypeUtils.ts`.
 - **Identity Verification:** Supports phone, government ID (via Stripe Identity SDK), social media, and optional background/income checks.
 - **References System:** Users can request and display references.
 - **Personality Quiz:** A 5-question quiz integrated into the matching algorithm.

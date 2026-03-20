@@ -8,6 +8,7 @@ import { useTheme } from '../../../hooks/useTheme';
 import { Typography, Spacing } from '../../../constants/theme';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 
 const FIELDS = [
   { key: 'companyName', label: 'Company Name', placeholder: 'Skyline Properties LLC', keyboardType: 'default' as const },
@@ -16,11 +17,13 @@ const FIELDS = [
 
 export function HostCompanySetupScreen() {
   const { theme } = useTheme();
-  const { updateUser, completeOnboardingStep } = useAuth();
+  const { user, updateUser, completeOnboardingStep } = useAuth();
+  const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const [values, setValues] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
+  const isFromSettings = user?.onboardingStep === 'complete';
   const canContinue = (values.companyName ?? '').trim().length > 0;
 
   async function handleContinue() {
@@ -30,8 +33,13 @@ export function HostCompanySetupScreen() {
       await updateUser({
         companyName: values.companyName?.trim(),
         unitsManaged: values.unitsManaged ? parseInt(values.unitsManaged, 10) : undefined,
+        hostTypeLockedAt: new Date().toISOString(),
       });
-      await completeOnboardingStep('plan');
+      if (isFromSettings) {
+        navigation.goBack();
+      } else {
+        await completeOnboardingStep('plan');
+      }
     } catch (e) {
       console.error(e);
     } finally {

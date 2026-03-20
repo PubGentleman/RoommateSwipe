@@ -255,6 +255,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       unitsManaged: supabaseUser.units_managed || undefined,
       verifiedBusiness: supabaseUser.verified_business || false,
       avgResponseHours: supabaseUser.avg_response_hours || undefined,
+      hostTypeLockedAt: supabaseUser.host_type_locked_at || undefined,
+      hostTypeChangeRequested: supabaseUser.host_type_change_requested || false,
     };
   };
 

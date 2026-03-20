@@ -299,6 +299,8 @@ export interface User {
   verifiedBusiness?: boolean;
   verifiedBusinessAt?: string;
   avgResponseHours?: number;
+  hostTypeLockedAt?: string;
+  hostTypeChangeRequested?: boolean;
   profilePicture?: string;
   verification?: VerificationStatus;
   photos?: string[];

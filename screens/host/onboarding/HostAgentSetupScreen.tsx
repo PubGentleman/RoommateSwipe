@@ -8,6 +8,7 @@ import { useTheme } from '../../../hooks/useTheme';
 import { Typography, Spacing } from '../../../constants/theme';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 
 const FIELDS = [
   { key: 'licenseNumber', label: 'License Number', placeholder: 'NY-12345678' },
@@ -16,11 +17,13 @@ const FIELDS = [
 
 export function HostAgentSetupScreen() {
   const { theme } = useTheme();
-  const { updateUser, completeOnboardingStep } = useAuth();
+  const { user, updateUser, completeOnboardingStep } = useAuth();
+  const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const [values, setValues] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
+  const isFromSettings = user?.onboardingStep === 'complete';
   const canContinue = (values.licenseNumber ?? '').trim().length > 0;
 
   async function handleContinue() {
@@ -30,8 +33,13 @@ export function HostAgentSetupScreen() {
       await updateUser({
         licenseNumber: values.licenseNumber?.trim(),
         agencyName: values.agencyName?.trim() || undefined,
+        hostTypeLockedAt: new Date().toISOString(),
       });
-      await completeOnboardingStep('plan');
+      if (isFromSettings) {
+        navigation.goBack();
+      } else {
+        await completeOnboardingStep('plan');
+      }
     } catch (e) {
       console.error(e);
     } finally {
