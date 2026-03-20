@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, FlatList, StyleSheet, Pressable, Modal, ActivityIndicator, Alert, TextInput, Platform } from 'react-native';
+import { View, Text, FlatList, StyleSheet, Pressable, Modal, ActivityIndicator, Alert, TextInput, Platform, Image } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -39,6 +39,7 @@ interface RenterGroupCard {
   neighborhoods: string[];
   lifestyleTags: string[];
   occupationTypes: string[];
+  memberPhotos: string[];
   createdAt: string;
 }
 
@@ -120,6 +121,11 @@ export const BrowseRenterGroupsScreen = () => {
         neighborhoods: ['Brooklyn', 'Bushwick', 'Bed-Stuy'],
         lifestyleTags: ['Pet-friendly', 'Non-smoker', 'Remote work'],
         occupationTypes: ['Professional', 'Creative'],
+        memberPhotos: [
+          'https://picsum.photos/200/200?random=31',
+          'https://picsum.photos/200/200?random=32',
+          'https://picsum.photos/200/200?random=33',
+        ],
         createdAt: new Date().toISOString(),
       },
       {
@@ -135,6 +141,10 @@ export const BrowseRenterGroupsScreen = () => {
         neighborhoods: ['Astoria', 'Long Island City'],
         lifestyleTags: ['Early riser', 'Clean', 'Social'],
         occupationTypes: ['Student', 'Professional'],
+        memberPhotos: [
+          'https://picsum.photos/200/200?random=34',
+          'https://picsum.photos/200/200?random=35',
+        ],
         createdAt: new Date().toISOString(),
       },
       {
@@ -150,6 +160,12 @@ export const BrowseRenterGroupsScreen = () => {
         neighborhoods: ['Manhattan', 'Upper West Side', 'Harlem'],
         lifestyleTags: ['Quiet hours', 'Non-smoker', 'Professional'],
         occupationTypes: ['Professional', 'Finance'],
+        memberPhotos: [
+          'https://picsum.photos/200/200?random=36',
+          'https://picsum.photos/200/200?random=37',
+          'https://picsum.photos/200/200?random=38',
+          'https://picsum.photos/200/200?random=39',
+        ],
         createdAt: new Date().toISOString(),
       },
     ]);
@@ -301,8 +317,10 @@ export const BrowseRenterGroupsScreen = () => {
     const alreadySent = sentGroupIds.has(item.groupId);
     const spotsLeft = item.maxMembers - item.memberCount;
 
+    const photos = item.memberPhotos || [];
     const gradients: [string, string][] = [['#667eea', '#764ba2'], ['#f093fb', '#f5576c'], ['#11998e', '#38ef7d'], ['#f6d365', '#fda085']];
-    const memberLabels = Array.from({ length: item.memberCount }, (_, i) => ({
+    const avatarSlots = Array.from({ length: Math.min(item.memberCount, 3) }, (_, i) => ({
+      photo: photos[i] || null,
       gradient: gradients[i % gradients.length],
       label: String.fromCharCode(65 + i),
     }));
@@ -310,14 +328,18 @@ export const BrowseRenterGroupsScreen = () => {
     return (
       <View style={styles.card}>
         <View style={styles.avatarCluster}>
-          {memberLabels.slice(0, 3).map((m, i) => (
+          {avatarSlots.map((slot, i) => (
             <View
               key={i}
-              style={[styles.avatarWrap, i > 0 && { marginLeft: -18 }, { zIndex: memberLabels.length - i }]}
+              style={[styles.avatarWrap, i > 0 && { marginLeft: -18 }, { zIndex: avatarSlots.length - i }]}
             >
-              <LinearGradient colors={m.gradient} style={styles.avatarCircle}>
-                <Text style={styles.avatarLetter}>{m.label}</Text>
-              </LinearGradient>
+              {slot.photo ? (
+                <Image source={{ uri: slot.photo }} style={styles.avatarImage} />
+              ) : (
+                <LinearGradient colors={slot.gradient} style={styles.avatarCircle}>
+                  <Text style={styles.avatarLetter}>{slot.label}</Text>
+                </LinearGradient>
+              )}
             </View>
           ))}
           {spotsLeft > 0 ? (
@@ -695,6 +717,11 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 30,
   },
   avatarLetter: { fontSize: 22, fontWeight: '800', color: '#fff' },
   avatarEmpty: {

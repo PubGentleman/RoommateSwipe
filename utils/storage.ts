@@ -293,23 +293,39 @@ export const StorageService = {
         (g.type === 'roommate' || !g.type) &&
         (g as any).is_visible_to_hosts !== false
       );
+      const profiles = await this.getRoommateProfiles();
       return roommateGroups
         .filter(g => !g.isArchived)
-        .map(g => ({
-          groupId: g.id,
-          name: g.name || 'Roommate Group',
-          description: g.description || '',
-          memberCount: g.members?.length || 2,
-          maxMembers: g.maxMembers || 4,
-          budgetMin: (g as any).budgetMin ?? (g as any).budget_min ?? 1500,
-          budgetMax: (g as any).budgetMax ?? (g as any).budget_max ?? 2500,
-          moveInDate: (g as any).moveInDate ?? (g as any).move_in_date ?? 'Flexible',
-          location: g.preferredLocation || g.city || '',
-          neighborhoods: (g as any).neighborhoods ?? [],
-          lifestyleTags: (g as any).lifestyleTags ?? (g as any).lifestyle_tags ?? [],
-          occupationTypes: (g as any).occupationTypes ?? (g as any).occupation_types ?? [],
-          createdAt: g.createdAt instanceof Date ? g.createdAt.toISOString() : g.createdAt,
-        }));
+        .map(g => {
+          const memberIds: string[] = Array.isArray(g.members)
+            ? g.members.map((m: any) => typeof m === 'string' ? m : m.userId || m.id)
+            : [];
+          const memberPhotos: string[] = memberIds
+            .map(uid => {
+              const gm = Array.isArray(g.members) ? g.members.find((m: any) => (typeof m === 'object' && (m.userId === uid || m.id === uid))) : null;
+              if (typeof gm === 'object' && gm?.user?.avatar_url) return gm.user.avatar_url;
+              const profile = profiles.find(p => p.userId === uid);
+              if (profile?.photos?.[0]) return profile.photos[0];
+              return '';
+            })
+            .filter(Boolean);
+          return {
+            groupId: g.id,
+            name: g.name || 'Roommate Group',
+            description: g.description || '',
+            memberCount: g.members?.length || 2,
+            maxMembers: g.maxMembers || 4,
+            budgetMin: (g as any).budgetMin ?? (g as any).budget_min ?? 1500,
+            budgetMax: (g as any).budgetMax ?? (g as any).budget_max ?? 2500,
+            moveInDate: (g as any).moveInDate ?? (g as any).move_in_date ?? 'Flexible',
+            location: g.preferredLocation || g.city || '',
+            neighborhoods: (g as any).neighborhoods ?? [],
+            lifestyleTags: (g as any).lifestyleTags ?? (g as any).lifestyle_tags ?? [],
+            occupationTypes: (g as any).occupationTypes ?? (g as any).occupation_types ?? [],
+            memberPhotos,
+            createdAt: g.createdAt instanceof Date ? g.createdAt.toISOString() : g.createdAt,
+          };
+        });
     } catch (error) {
       console.error('Error getting visible renter groups:', error);
       return [];
