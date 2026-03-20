@@ -218,13 +218,13 @@ export function createBoostRecord(
 
 export function getDefaultHostSubscription(): HostSubscriptionData {
   return {
-    plan: 'starter',
-    listingsIncluded: HOST_PLANS.pro.listingsIncluded,
+    plan: 'free',
+    listingsIncluded: HOST_PLANS.free.listingsIncluded,
     activeListingCount: 0,
     overagePerListing: 0,
-    monthlyPrice: HOST_PLANS.starter.price,
-    freeBoostsRemaining: HOST_PLANS.starter.freeBoosts,
-    freeBoostDuration: HOST_PLANS.starter.freeBoostDuration,
+    monthlyPrice: 0,
+    freeBoostsRemaining: HOST_PLANS.free.freeBoosts,
+    freeBoostDuration: HOST_PLANS.free.freeBoostDuration,
     isVerifiedAgent: false,
     agentVerificationPaid: false,
   };
