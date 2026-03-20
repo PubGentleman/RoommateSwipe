@@ -16,7 +16,7 @@ import { useCityContext } from '../../contexts/CityContext';
 import { CityPickerModal, CityPillButton } from '../../components/CityPickerModal';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { StorageService } from '../../utils/storage';
-import { getListings, mapListingToProperty } from '../../services/listingService';
+import { getListings, mapListingToProperty, recordListingView } from '../../services/listingService';
 import { getDiscoverableGroupsForListing } from '../../services/groupService';
 import { Property, PropertyFilter, User, RoommateProfile, InterestCard, Conversation, Group } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -274,6 +274,12 @@ export const ExploreScreen = () => {
       navigation.setParams({ viewListingId: undefined } as any);
     }
   }, [route.params?.viewListingId, properties]);
+
+  useEffect(() => {
+    if (selectedProperty?.id) {
+      recordListingView(selectedProperty.id);
+    }
+  }, [selectedProperty?.id]);
 
   const getPropertyCompatibility = (property: Property): number => {
     if (!property.hostProfileId || !user) return 0;

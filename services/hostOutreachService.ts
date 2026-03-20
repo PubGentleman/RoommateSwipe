@@ -243,6 +243,28 @@ export async function addPaidCreditsLocal(hostId: string, credits: number): Prom
   await saveLocalQuota(q);
 }
 
+export async function getOutreachLogForHost(hostId: string): Promise<OutreachLogEntry[]> {
+  try {
+    const { data } = await supabase
+      .from('host_group_outreach')
+      .select('id, host_id, group_id, listing_id, message, sent_at')
+      .eq('host_id', hostId)
+      .order('sent_at', { ascending: false })
+      .limit(500);
+    if (data) {
+      return data.map((r: any) => ({
+        id: r.id,
+        hostId: r.host_id,
+        groupId: r.group_id,
+        listingId: r.listing_id,
+        message: r.message,
+        sentAt: r.sent_at,
+      }));
+    }
+  } catch {}
+  return getLocalLog();
+}
+
 export async function getRecentlySentGroupIds(hostId: string): Promise<string[]> {
   const online = await isSupabaseAvailable();
   if (online) {

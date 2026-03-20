@@ -102,6 +102,7 @@ export interface Property {
   walkScoreLabel?: string;
   transitScore?: number;
   transitScoreLabel?: string;
+  createdAt?: string;
   listingBoost?: ListingBoost;
   transitInfo?: {
     stops: Array<{
