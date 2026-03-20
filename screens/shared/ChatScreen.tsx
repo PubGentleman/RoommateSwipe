@@ -61,6 +61,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [myGroupRole, setMyGroupRole] = useState<'admin' | 'member' | null>(null);
   const [groupName, setGroupName] = useState<string>('Group Chat');
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+  const [groupMembers, setGroupMembers] = useState<any[]>([]);
+  const [showMembersOverlay, setShowMembersOverlay] = useState(false);
 
   const [inquiryStatus, setInquiryStatus] = useState<'pending' | 'accepted' | 'declined'>(
     inquiryGroup?.inquiryStatus || inquiryGroup?.inquiry_status || 'pending'
@@ -178,6 +180,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           const g = groups.find((gr: any) => gr.id === groupId);
           if (g?.name) setGroupName(g.name);
         });
+      loadGroupMembers(groupId);
       if (user?.id) {
         supabase.from('group_members').select('role').eq('group_id', groupId).eq('user_id', user.id).maybeSingle()
           .then(({ data }) => { if (data?.role) setMyGroupRole(data.role as 'admin' | 'member'); });
@@ -201,6 +204,47 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         }
         setLinkedListing(null);
       });
+  };
+
+  const loadGroupMembers = async (groupId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('group_members')
+        .select('user_id, role, users ( id, name, profile_picture, role )')
+        .eq('group_id', groupId);
+      if (!error && data && data.length > 0) {
+        const members = data.map((m: any) => {
+          const u = Array.isArray(m.users) ? m.users[0] : m.users;
+          return {
+            id: m.user_id,
+            name: u?.name || 'Member',
+            photo: u?.profile_picture || null,
+            role: u?.role || 'renter',
+            groupRole: m.role,
+          };
+        });
+        setGroupMembers(members);
+        return;
+      }
+    } catch {}
+    try {
+      const groups = await StorageService.getGroups();
+      const g = groups.find((gr: any) => gr.id === groupId);
+      if (g?.members) {
+        const users = await StorageService.getUsers();
+        const members = g.members.map((memberId: string) => {
+          const u = users.find((usr: any) => usr.id === memberId);
+          return {
+            id: memberId,
+            name: u?.name || u?.profileData?.name || 'Member',
+            photo: u?.profilePicture || u?.profileData?.photos?.[0] || null,
+            role: u?.role || 'renter',
+            groupRole: memberId === g.adminId ? 'admin' : 'member',
+          };
+        });
+        setGroupMembers(members);
+      }
+    } catch {}
   };
 
   useEffect(() => {
@@ -795,24 +839,54 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
                 </View>
               </>
             ) : (
-              <Pressable
-                style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
-                onPress={() => {
-                  const groupId = conversationId.replace('group-', '');
-                  navigation.navigate('GroupInfo' as any, {
-                    groupId,
-                    groupName: groupName,
-                  });
-                }}
-              >
-                <View style={[styles.headerAvatar, { backgroundColor: theme.primary + '20', alignItems: 'center', justifyContent: 'center' }]}>
-                  <Feather name="users" size={18} color={theme.primary} />
-                </View>
-                <View style={{ flex: 1, marginLeft: Spacing.md }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                <Pressable onPress={() => setShowMembersOverlay(true)}>
+                  <View style={{ flexDirection: 'row', width: Math.min(groupMembers.length, 3) * 22 + 18, height: 40 }}>
+                    {(groupMembers.length > 0 ? groupMembers.slice(0, 3) : [null]).map((member, idx) => (
+                      <View key={member?.id || 'fallback'} style={{ position: 'absolute', left: idx * 22, zIndex: 3 - idx }}>
+                        {member?.photo ? (
+                          <Image
+                            source={{ uri: member.photo }}
+                            style={{ width: 38, height: 38, borderRadius: 19, borderWidth: 2, borderColor: theme.background || theme.backgroundRoot }}
+                          />
+                        ) : (
+                          <View style={{
+                            width: 38, height: 38, borderRadius: 19, borderWidth: 2,
+                            borderColor: theme.background || theme.backgroundRoot,
+                            backgroundColor: theme.primary + '25', alignItems: 'center', justifyContent: 'center',
+                          }}>
+                            <Feather name="user" size={16} color={theme.primary} />
+                          </View>
+                        )}
+                      </View>
+                    ))}
+                    {groupMembers.length > 3 ? (
+                      <View style={{
+                        position: 'absolute', left: 3 * 22, zIndex: 0,
+                        width: 38, height: 38, borderRadius: 19, borderWidth: 2,
+                        borderColor: theme.background || theme.backgroundRoot,
+                        backgroundColor: theme.primary + '20', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        <ThemedText style={{ fontSize: 11, fontWeight: '700', color: theme.primary }}>
+                          +{groupMembers.length - 3}
+                        </ThemedText>
+                      </View>
+                    ) : null}
+                  </View>
+                </Pressable>
+                <Pressable
+                  style={{ flex: 1, marginLeft: Spacing.md }}
+                  onPress={() => {
+                    const groupId = conversationId.replace('group-', '');
+                    navigation.navigate('GroupInfo' as any, { groupId, groupName });
+                  }}
+                >
                   <ThemedText style={[Typography.h3]}>{groupName}</ThemedText>
-                  <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Tap for group info</ThemedText>
-                </View>
-              </Pressable>
+                  <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
+                    {groupMembers.length > 0 ? `${groupMembers.length} member${groupMembers.length > 1 ? 's' : ''}` : 'Tap for group info'}
+                  </ThemedText>
+                </Pressable>
+              </View>
             )}
           </View>
           <Pressable onPress={() => setShowAISheet(true)} style={styles.aiNavBtn}>
@@ -1183,6 +1257,84 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             </Pressable>
           </View>
         </View>
+      </Modal>
+      <Modal
+        visible={showMembersOverlay}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowMembersOverlay(false)}
+      >
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 24 }}
+          onPress={() => setShowMembersOverlay(false)}
+        >
+          <Pressable
+            style={{ backgroundColor: theme.card || theme.backgroundDefault, borderRadius: 20, width: '100%', maxWidth: 360, maxHeight: '70%', overflow: 'hidden' }}
+            onPress={() => {}}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: theme.border }}>
+              <ThemedText style={[Typography.h3]}>Group Members</ThemedText>
+              <Pressable onPress={() => setShowMembersOverlay(false)} hitSlop={8}>
+                <Feather name="x" size={20} color={theme.textSecondary} />
+              </Pressable>
+            </View>
+            <FlatList
+              data={groupMembers}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={{ padding: 12 }}
+              renderItem={({ item }) => (
+                <Pressable
+                  style={{
+                    flexDirection: 'row', alignItems: 'center', padding: 12,
+                    borderRadius: 14, borderWidth: 1, borderColor: theme.border,
+                    marginBottom: 8, backgroundColor: theme.background || theme.backgroundRoot,
+                  }}
+                  onPress={() => {
+                    setShowMembersOverlay(false);
+                    if (item.id !== user?.id) {
+                      const groupId = conversationId.replace('group-', '');
+                      navigation.navigate('GroupInfo' as any, { groupId, groupName });
+                    }
+                  }}
+                >
+                  {item.photo ? (
+                    <Image source={{ uri: item.photo }} style={{ width: 52, height: 52, borderRadius: 26 }} />
+                  ) : (
+                    <View style={{
+                      width: 52, height: 52, borderRadius: 26,
+                      backgroundColor: theme.primary + '20', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <Feather name="user" size={22} color={theme.primary} />
+                    </View>
+                  )}
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <ThemedText style={[Typography.body, { fontWeight: '700' }]}>
+                        {item.name}{item.id === user?.id ? ' (you)' : ''}
+                      </ThemedText>
+                      {item.groupRole === 'admin' ? (
+                        <View style={{ backgroundColor: theme.primary + '20', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
+                          <ThemedText style={{ fontSize: 10, fontWeight: '700', color: theme.primary }}>Admin</ThemedText>
+                        </View>
+                      ) : null}
+                    </View>
+                    <ThemedText style={[Typography.small, { color: theme.textSecondary, marginTop: 2 }]}>
+                      {item.role === 'host' ? 'Host' : 'Renter'}
+                    </ThemedText>
+                  </View>
+                  {item.id !== user?.id ? (
+                    <Feather name="chevron-right" size={18} color={theme.textSecondary} />
+                  ) : null}
+                </Pressable>
+              )}
+              ListEmptyComponent={
+                <View style={{ padding: 20, alignItems: 'center' }}>
+                  <ThemedText style={{ color: theme.textSecondary }}>No members found</ThemedText>
+                </View>
+              }
+            />
+          </Pressable>
+        </Pressable>
       </Modal>
     </KeyboardAvoidingView>
   );
