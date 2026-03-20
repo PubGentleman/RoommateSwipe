@@ -10,6 +10,7 @@ import { Typography, Spacing } from '../constants/theme';
 import { Image } from 'expo-image';
 import { supabase } from '../lib/supabase';
 import { StorageService } from '../utils/storage';
+import { useAuth } from '../contexts/AuthContext';
 
 interface ListingResult {
   id: string;
@@ -62,16 +63,19 @@ interface Props {
 
 export function GroupPropertySearchModal({ visible, currentListingId, onSelect, onClose }: Props) {
   const { theme } = useTheme();
+  const { user } = useAuth();
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [results, setResults] = useState<ListingResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [cities, setCities] = useState<string[]>([]);
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (visible) {
+      loadSavedIds();
       supabase
         .from('listings')
         .select('city')
@@ -94,6 +98,31 @@ export function GroupPropertySearchModal({ visible, currentListingId, onSelect, 
       setShowFilters(false);
     }
   }, [visible]);
+
+  const loadSavedIds = async () => {
+    try {
+      const uid = user?.id;
+      if (!uid) return;
+      const ids = await StorageService.getSavedProperties(uid);
+      setSavedIds(new Set(ids));
+    } catch {
+      setSavedIds(new Set());
+    }
+  };
+
+  const sortWithSavedFirst = (items: ListingResult[]): ListingResult[] => {
+    if (savedIds.size === 0) return items;
+    const saved: ListingResult[] = [];
+    const rest: ListingResult[] = [];
+    for (const item of items) {
+      if (savedIds.has(item.id)) {
+        saved.push(item);
+      } else {
+        rest.push(item);
+      }
+    }
+    return [...saved, ...rest];
+  };
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -192,14 +221,14 @@ export function GroupPropertySearchModal({ visible, currentListingId, onSelect, 
       }));
 
       if (supaResults.length > 0) {
-        setResults(supaResults);
+        setResults(sortWithSavedFirst(supaResults));
       } else {
         const localResults = await searchLocalListings(q, f);
-        setResults(localResults);
+        setResults(sortWithSavedFirst(localResults));
       }
     } catch {
       const localResults = await searchLocalListings(q, f);
-      setResults(localResults);
+      setResults(sortWithSavedFirst(localResults));
     } finally {
       setLoading(false);
     }
@@ -244,7 +273,6 @@ export function GroupPropertySearchModal({ visible, currentListingId, onSelect, 
               placeholderTextColor={theme.textSecondary}
               value={query}
               onChangeText={setQuery}
-              autoFocus
               returnKeyType="search"
             />
             {query.length > 0 ? (
@@ -383,64 +411,97 @@ export function GroupPropertySearchModal({ visible, currentListingId, onSelect, 
             keyExtractor={item => item.id}
             contentContainerStyle={{ padding: Spacing.md, paddingBottom: 40 }}
             keyboardShouldPersistTaps="handled"
-            renderItem={({ item }) => (
-              <Pressable
-                style={[
-                  styles.listingCard,
-                  { backgroundColor: theme.card, borderColor: item.id === currentListingId ? theme.primary : theme.border,
-                    borderWidth: item.id === currentListingId ? 2 : 1 }
-                ]}
-                onPress={() => onSelect(item)}
-              >
-                {item.photos[0] ? (
-                  <Image source={{ uri: item.photos[0] }} style={styles.listingPhoto} />
-                ) : (
-                  <View style={[styles.listingPhotoPlaceholder, { backgroundColor: theme.border }]}>
-                    <Feather name="home" size={24} color={theme.textSecondary} />
-                  </View>
-                )}
+            keyboardDismissMode="on-drag"
+            renderItem={({ item, index }) => {
+              const isSaved = savedIds.has(item.id);
+              const prevIsSaved = index > 0 ? savedIds.has(results[index - 1].id) : false;
+              const showSavedHeader = isSaved && index === 0 && savedIds.size > 0;
+              const showAllHeader = !isSaved && (index === 0 || prevIsSaved);
 
-                <View style={styles.listingInfo}>
-                  <ThemedText style={[Typography.body, { fontWeight: '700' }]} numberOfLines={1}>
-                    {item.title}
-                  </ThemedText>
-                  <ThemedText style={[Typography.small, { color: theme.textSecondary }]} numberOfLines={1}>
-                    {item.address}, {item.city}, {item.state}
-                  </ThemedText>
-                  <View style={styles.listingMeta}>
-                    <View style={[styles.metaChip, { backgroundColor: theme.primary + '15' }]}>
-                      <ThemedText style={[Typography.small, { color: theme.primary, fontWeight: '700' }]}>
-                        ${item.rent.toLocaleString()}/mo
+              return (
+                <>
+                  {showSavedHeader ? (
+                    <View style={styles.sectionHeader}>
+                      <Feather name="heart" size={13} color={theme.primary} />
+                      <ThemedText style={[Typography.small, { color: theme.primary, fontWeight: '700', marginLeft: 6 }]}>
+                        YOUR SAVED PROPERTIES
                       </ThemedText>
                     </View>
-                    <View style={[styles.metaChip, { backgroundColor: theme.border }]}>
-                      <Feather name="home" size={11} color={theme.textSecondary} />
-                      <ThemedText style={[Typography.small, { color: theme.textSecondary, marginLeft: 3 }]}>
-                        {item.bedrooms} BR
+                  ) : null}
+                  {showAllHeader ? (
+                    <View style={[styles.sectionHeader, index > 0 ? { marginTop: Spacing.md } : undefined]}>
+                      <Feather name="grid" size={13} color={theme.textSecondary} />
+                      <ThemedText style={[Typography.small, { color: theme.textSecondary, fontWeight: '700', marginLeft: 6 }]}>
+                        ALL PROPERTIES
                       </ThemedText>
                     </View>
-                    <View style={[styles.metaChip, { backgroundColor: theme.primary + '15' }]}>
-                      <Feather name="users" size={11} color={theme.primary} />
-                      <ThemedText style={[Typography.small, { color: theme.primary, marginLeft: 3 }]}>
-                        {item.bedrooms + 1} max members
-                      </ThemedText>
+                  ) : null}
+                  <Pressable
+                    style={[
+                      styles.listingCard,
+                      { backgroundColor: theme.card, borderColor: item.id === currentListingId ? theme.primary : theme.border,
+                        borderWidth: item.id === currentListingId ? 2 : 1 }
+                    ]}
+                    onPress={() => onSelect(item)}
+                  >
+                    <View>
+                      {item.photos[0] ? (
+                        <Image source={{ uri: item.photos[0] }} style={styles.listingPhoto} />
+                      ) : (
+                        <View style={[styles.listingPhotoPlaceholder, { backgroundColor: theme.border }]}>
+                          <Feather name="home" size={24} color={theme.textSecondary} />
+                        </View>
+                      )}
+                      {isSaved ? (
+                        <View style={styles.savedBadge}>
+                          <Feather name="heart" size={10} color="#fff" />
+                        </View>
+                      ) : null}
                     </View>
-                    {item.transitInfo && item.transitInfo.length > 0 ? (
-                      <View style={[styles.metaChip, { backgroundColor: theme.border }]}>
-                        <Feather name="navigation" size={11} color={theme.textSecondary} />
-                        <ThemedText style={[Typography.small, { color: theme.textSecondary, marginLeft: 3 }]}>
-                          Transit
-                        </ThemedText>
+
+                    <View style={styles.listingInfo}>
+                      <ThemedText style={[Typography.body, { fontWeight: '700' }]} numberOfLines={1}>
+                        {item.title}
+                      </ThemedText>
+                      <ThemedText style={[Typography.small, { color: theme.textSecondary }]} numberOfLines={1}>
+                        {item.address}, {item.city}, {item.state}
+                      </ThemedText>
+                      <View style={styles.listingMeta}>
+                        <View style={[styles.metaChip, { backgroundColor: theme.primary + '15' }]}>
+                          <ThemedText style={[Typography.small, { color: theme.primary, fontWeight: '700' }]}>
+                            ${item.rent.toLocaleString()}/mo
+                          </ThemedText>
+                        </View>
+                        <View style={[styles.metaChip, { backgroundColor: theme.border }]}>
+                          <Feather name="home" size={11} color={theme.textSecondary} />
+                          <ThemedText style={[Typography.small, { color: theme.textSecondary, marginLeft: 3 }]}>
+                            {item.bedrooms} BR
+                          </ThemedText>
+                        </View>
+                        <View style={[styles.metaChip, { backgroundColor: theme.primary + '15' }]}>
+                          <Feather name="users" size={11} color={theme.primary} />
+                          <ThemedText style={[Typography.small, { color: theme.primary, marginLeft: 3 }]}>
+                            {item.bedrooms + 1} max members
+                          </ThemedText>
+                        </View>
+                        {item.transitInfo && item.transitInfo.length > 0 ? (
+                          <View style={[styles.metaChip, { backgroundColor: theme.border }]}>
+                            <Feather name="navigation" size={11} color={theme.textSecondary} />
+                            <ThemedText style={[Typography.small, { color: theme.textSecondary, marginLeft: 3 }]}>
+                              Transit
+                            </ThemedText>
+                          </View>
+                        ) : null}
                       </View>
-                    ) : null}
-                  </View>
-                </View>
+                    </View>
 
-                {item.id === currentListingId ? (
-                  <Feather name="check-circle" size={22} color={theme.primary} style={{ marginLeft: 4 }} />
-                ) : null}
-              </Pressable>
-            )}
+                    {item.id === currentListingId ? (
+                      <Feather name="check-circle" size={22} color={theme.primary} style={{ marginLeft: 4 }} />
+                    ) : null}
+                  </Pressable>
+                </>
+              );
+            }}
           />
         )}
       </View>
@@ -506,5 +567,14 @@ const styles = StyleSheet.create({
   metaChip: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8,
+  },
+  sectionHeader: {
+    flexDirection: 'row', alignItems: 'center',
+    marginBottom: Spacing.sm, paddingVertical: 4,
+  },
+  savedBadge: {
+    position: 'absolute', top: 4, right: 4,
+    backgroundColor: '#ff6b5b', borderRadius: 10,
+    width: 20, height: 20, alignItems: 'center', justifyContent: 'center',
   },
 });
