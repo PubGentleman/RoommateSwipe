@@ -17,7 +17,7 @@ import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme
 import { StorageService } from '../../utils/storage';
 import { getListings, mapListingToProperty } from '../../services/listingService';
 import { getDiscoverableGroupsForListing } from '../../services/groupService';
-import { Property, PropertyFilter, User, RoommateProfile, InterestCard, Conversation } from '../../types/models';
+import { Property, PropertyFilter, User, RoommateProfile, InterestCard, Conversation, Group } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { formatMoveInDate, calculateCompatibility, getMatchQualityColor, getGenderSymbol, formatLocation } from '../../utils/matchingAlgorithm';
@@ -101,11 +101,18 @@ export const ExploreScreen = () => {
   const [activeQuickFilters, setActiveQuickFilters] = useState<Set<string>>(new Set(['bestMatch']));
   const [showAISheet, setShowAISheet] = useState(false);
   const [interestNote, setInterestNote] = useState('');
+  const [userGroups, setUserGroups] = useState<Group[]>([]);
+  const [showGroupPickerModal, setShowGroupPickerModal] = useState(false);
+
+  const eligibleGroups = userGroups.filter(g =>
+    (g.type === 'roommate' || !g.type) && !g.listingId
+  );
 
   useEffect(() => {
     loadProperties();
     loadSavedProperties();
     loadHostProfiles();
+    loadUserGroups();
   }, []);
 
   useEffect(() => {
@@ -189,6 +196,37 @@ export const ExploreScreen = () => {
     }
   };
 
+  const loadUserGroups = async () => {
+    try {
+      const groups = await StorageService.getGroups();
+      if (!user?.id) { setUserGroups([]); return; }
+      const mine = groups.filter(g => {
+        const memberIds = Array.isArray(g.members)
+          ? g.members.map((m: any) => typeof m === 'string' ? m : m.userId || m.id)
+          : [];
+        return g.createdBy === user.id || memberIds.includes(user.id);
+      });
+      setUserGroups(mine);
+    } catch (err) {
+      setUserGroups([]);
+    }
+  };
+
+  const handleInquireAsGroup = (group: Group) => {
+    setShowGroupPickerModal(false);
+    setShowPropertyDetail(false);
+    if (selectedProperty) {
+      navigation.navigate('CreateGroup' as never, {
+        listingId: selectedProperty.id,
+        listingTitle: selectedProperty.title,
+        listingBedrooms: selectedProperty.bedrooms || null,
+        groupType: 'listing_inquiry',
+        existingGroupId: group.id,
+        existingGroupName: group.name,
+      } as never);
+    }
+  };
+
   const loadInterestCards = useCallback(async () => {
     if (!user?.id) return;
     try {
@@ -204,6 +242,7 @@ export const ExploreScreen = () => {
   useFocusEffect(
     useCallback(() => {
       loadInterestCards();
+      loadUserGroups();
     }, [loadInterestCards])
   );
 
@@ -1646,28 +1685,29 @@ export const ExploreScreen = () => {
                     })()}
                   </View>
 
-                  <Pressable
-                    style={[styles.inquireTogetherDetailBtn, { borderColor: theme.primary }]}
-                    onPress={() => {
-                      setShowDetailModal(false);
-                      if (selectedProperty) {
-                        navigation.navigate('CreateGroup', {
-                          listingId: selectedProperty.id,
-                          listingTitle: selectedProperty.title,
-                          listingBedrooms: selectedProperty.bedrooms || null,
-                          groupType: 'listing_inquiry',
-                        });
-                      }
-                    }}
-                  >
-                    <Feather name="users" size={16} color={theme.primary} />
-                    <ThemedText style={{ color: theme.primary, fontWeight: '700', marginLeft: 8, fontSize: 15 }}>
-                      Inquire Together
-                    </ThemedText>
-                  </Pressable>
-                  <ThemedText style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, textAlign: 'center', marginTop: 4, marginBottom: 10 }}>
-                    Create a group inquiry with your roommates
-                  </ThemedText>
+                  {eligibleGroups.length > 0 ? (
+                    <>
+                      <Pressable
+                        style={[styles.inquireTogetherDetailBtn, { borderColor: theme.primary }]}
+                        onPress={() => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          if (eligibleGroups.length === 1) {
+                            handleInquireAsGroup(eligibleGroups[0]);
+                          } else {
+                            setShowGroupPickerModal(true);
+                          }
+                        }}
+                      >
+                        <Feather name="users" size={16} color={theme.primary} />
+                        <ThemedText style={{ color: theme.primary, fontWeight: '700', marginLeft: 8, fontSize: 15 }}>
+                          Inquire as a Group
+                        </ThemedText>
+                      </Pressable>
+                      <ThemedText style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, textAlign: 'center', marginTop: 4, marginBottom: 10 }}>
+                        Send a group inquiry with your roommates
+                      </ThemedText>
+                    </>
+                  ) : null}
 
                 </>
               ) : null}
@@ -1704,6 +1744,54 @@ export const ExploreScreen = () => {
           },
         }}
       />
+      <Modal
+        visible={showGroupPickerModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowGroupPickerModal(false)}
+      >
+        <Pressable style={styles.groupPickerOverlay} onPress={() => setShowGroupPickerModal(false)}>
+          <Pressable style={[styles.groupPickerSheet, { backgroundColor: theme.card }]} onPress={() => {}}>
+            <View style={styles.groupPickerHandle} />
+            <ThemedText style={styles.groupPickerTitle}>Choose a Group</ThemedText>
+            <ThemedText style={{ color: theme.textSecondary, fontSize: 13, textAlign: 'center', marginBottom: 16 }}>
+              Select which group to inquire with
+            </ThemedText>
+            <ScrollView style={{ maxHeight: 300 }} showsVerticalScrollIndicator={false}>
+              {eligibleGroups.map((g) => {
+                const memberCount = Array.isArray(g.members) ? g.members.length : 0;
+                return (
+                  <Pressable
+                    key={g.id}
+                    style={[styles.groupPickerItem, { borderColor: theme.border }]}
+                    onPress={() => handleInquireAsGroup(g)}
+                  >
+                    <View style={styles.groupPickerItemLeft}>
+                      <View style={[styles.groupPickerIcon, { backgroundColor: 'rgba(255,107,91,0.12)' }]}>
+                        <Feather name="users" size={16} color="#ff6b5b" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <ThemedText style={{ fontWeight: '700', fontSize: 15 }}>{g.name}</ThemedText>
+                        <ThemedText style={{ color: theme.textSecondary, fontSize: 12, marginTop: 2 }}>
+                          {memberCount} {memberCount === 1 ? 'member' : 'members'}
+                          {g.city ? ` \u00B7 ${g.city}` : ''}
+                        </ThemedText>
+                      </View>
+                    </View>
+                    <Feather name="chevron-right" size={18} color={theme.textSecondary} />
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+            <Pressable
+              style={[styles.groupPickerCancel, { borderColor: theme.border }]}
+              onPress={() => setShowGroupPickerModal(false)}
+            >
+              <ThemedText style={{ color: theme.textSecondary, fontWeight: '600', fontSize: 15 }}>Cancel</ThemedText>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 };
@@ -2486,6 +2574,64 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,107,91,0.06)',
     marginTop: 12,
     marginHorizontal: Spacing.lg,
+  },
+  groupPickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  groupPickerSheet: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: 20,
+    padding: 20,
+    paddingTop: 12,
+  },
+  groupPickerHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  groupPickerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  groupPickerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  groupPickerItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+  },
+  groupPickerIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  groupPickerCancel: {
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 8,
   },
   inquireModalOverlay: {
     flex: 1,

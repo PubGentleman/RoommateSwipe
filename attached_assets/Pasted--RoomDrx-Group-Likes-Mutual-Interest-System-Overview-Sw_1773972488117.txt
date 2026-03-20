@@ -1,0 +1,806 @@
+# RoomDrx — Group Likes & Mutual Interest System
+
+## Overview
+
+Swiping right or tapping ♥ on a group in the Discover tab means **"I'm interested"** — not a join request. When both the discoverer and the group admin show mutual interest, the **"Request to Join"** button unlocks. The admin receives a push notification when someone likes their group, and can see all interested users from a badge on their group card.
+
+---
+
+## Full Flow
+
+```
+[Discoverer]                          [Admin]
+     │                                   │
+     │  Swipes right / taps ♥            │
+     │  on "Pet Lovers" in Discover      │
+     ▼                                   │
+Interest saved in DB                     │
+     │                                   ▼
+     │                        Push notification:
+     │                        "Someone liked Pet Lovers"
+     │                                   │
+     │                        ♥ badge appears on group card
+     │                        in My Groups (e.g. "♥ 3")
+     │                                   │
+     │                        Admin opens Interested Users
+     │                        screen → sees profile cards
+     │                                   │
+     │                        Admin taps ♥ back (or dismisses)
+     │                                   │
+     ▼                                   ▼
+MUTUAL INTEREST — both sides liked
+     │
+     ▼
+Discoverer sees: "Pet Lovers liked you back!"
+"Request to Join" button now active
+     │
+     ▼
+Discoverer sends join request
+     │
+     ▼
+Admin approves / declines → user joins
+```
+
+---
+
+## Database Changes
+
+### 1. `group_likes` table
+
+Tracks who liked which group and whether the admin liked them back.
+
+```sql
+CREATE TABLE group_likes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id UUID REFERENCES groups(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,  -- person who liked
+  admin_liked_back BOOLEAN DEFAULT false,  -- true when admin swipes right on them
+  dismissed BOOLEAN DEFAULT false,          -- admin dismissed without liking back
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(group_id, user_id)
+);
+
+-- User can insert their own like
+CREATE POLICY "Users can like groups"
+ON group_likes FOR INSERT
+WITH CHECK (auth.uid() = user_id);
+
+-- User can read their own likes
+CREATE POLICY "Users read own likes"
+ON group_likes FOR SELECT
+USING (auth.uid() = user_id);
+
+-- Admin of the group can read + update likes on their group
+CREATE POLICY "Admins read group likes"
+ON group_likes FOR SELECT
+USING (
+  group_id IN (
+    SELECT id FROM groups WHERE admin_id = auth.uid()
+  )
+);
+
+CREATE POLICY "Admins update group likes"
+ON group_likes FOR UPDATE
+USING (
+  group_id IN (
+    SELECT id FROM groups WHERE admin_id = auth.uid()
+  )
+);
+```
+
+### 2. Add `liked_back_at` for timeline tracking (optional)
+
+```sql
+ALTER TABLE group_likes
+  ADD COLUMN IF NOT EXISTS liked_back_at TIMESTAMPTZ;
+```
+
+---
+
+## Service Layer: `groupService.ts` — Like Functions
+
+```ts
+// ─── Like a group (discoverer swipes right) ───────────────────────────────
+
+export async function likeGroup(groupId: string): Promise<void> {
+  const user = (await supabase.auth.getUser()).data.user;
+  if (!user) throw new Error('Not authenticated');
+
+  // Upsert — safe to call multiple times
+  const { error } = await supabase
+    .from('group_likes')
+    .upsert({ group_id: groupId, user_id: user.id }, { onConflict: 'group_id,user_id' });
+
+  if (error) throw error;
+
+  // Notify group admin via edge function
+  await supabase.functions.invoke('send-push-notification', {
+    body: {
+      groupId,               // edge function looks up admin_id from this
+      type: 'group_liked',
+      title: '❤️ Someone liked your group',
+      body: 'A new person is interested in joining. Tap to see their profile.',
+      data: { type: 'group_liked', groupId },
+    },
+  });
+}
+
+// ─── Unlike a group (discoverer un-likes) ────────────────────────────────
+
+export async function unlikeGroup(groupId: string): Promise<void> {
+  const user = (await supabase.auth.getUser()).data.user;
+  if (!user) throw new Error('Not authenticated');
+
+  const { error } = await supabase
+    .from('group_likes')
+    .delete()
+    .eq('group_id', groupId)
+    .eq('user_id', user.id);
+
+  if (error) throw error;
+}
+
+// ─── Get groups the current user has liked ───────────────────────────────
+
+export async function getLikedGroups(): Promise<{
+  groupId: string;
+  mutualInterest: boolean;
+  canRequestToJoin: boolean;
+}[]> {
+  const user = (await supabase.auth.getUser()).data.user;
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from('group_likes')
+    .select('group_id, admin_liked_back, dismissed')
+    .eq('user_id', user.id)
+    .eq('dismissed', false);
+
+  if (error) throw error;
+
+  return (data || []).map((r: any) => ({
+    groupId: r.group_id,
+    mutualInterest: r.admin_liked_back,
+    canRequestToJoin: r.admin_liked_back, // unlocks when admin likes back
+  }));
+}
+
+// ─── Get users who liked a group (admin view) ────────────────────────────
+
+export async function getGroupLikers(groupId: string): Promise<{
+  likeId: string;
+  userId: string;
+  name: string;
+  age: number;
+  bio: string;
+  avatarUrl: string | null;
+  zodiacSign: string;
+  gender: string;
+  verified: boolean;
+  occupation: string;
+  likedAt: string;
+  adminLikedBack: boolean;
+}[]> {
+  const { data, error } = await supabase
+    .from('group_likes')
+    .select(`
+      id,
+      user_id,
+      admin_liked_back,
+      created_at,
+      profile:profiles(full_name, age, bio, avatar_url, zodiac_sign, gender, verified, occupation)
+    `)
+    .eq('group_id', groupId)
+    .eq('dismissed', false)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+
+  return (data || []).map((r: any) => ({
+    likeId: r.id,
+    userId: r.user_id,
+    name: r.profile?.full_name ?? 'Unknown',
+    age: r.profile?.age ?? 0,
+    bio: r.profile?.bio ?? '',
+    avatarUrl: r.profile?.avatar_url ?? null,
+    zodiacSign: r.profile?.zodiac_sign ?? '',
+    gender: r.profile?.gender ?? '',
+    verified: r.profile?.verified ?? false,
+    occupation: r.profile?.occupation ?? '',
+    likedAt: r.created_at,
+    adminLikedBack: r.admin_liked_back,
+  }));
+}
+
+// ─── Admin likes user back → creates mutual interest ─────────────────────
+
+export async function adminLikeBack(groupId: string, userId: string): Promise<void> {
+  const { error } = await supabase
+    .from('group_likes')
+    .update({ admin_liked_back: true, liked_back_at: new Date().toISOString() })
+    .eq('group_id', groupId)
+    .eq('user_id', userId);
+
+  if (error) throw error;
+
+  // Notify the user that mutual interest was established
+  await supabase.functions.invoke('send-push-notification', {
+    body: {
+      userId,
+      type: 'group_mutual_interest',
+      title: '🎉 Mutual Interest!',
+      body: 'A group liked you back — you can now request to join!',
+      data: { type: 'group_mutual_interest', groupId },
+    },
+  });
+}
+
+// ─── Admin dismisses a liker ──────────────────────────────────────────────
+
+export async function dismissGroupLiker(groupId: string, userId: string): Promise<void> {
+  const { error } = await supabase
+    .from('group_likes')
+    .update({ dismissed: true })
+    .eq('group_id', groupId)
+    .eq('user_id', userId);
+
+  if (error) throw error;
+}
+
+// ─── Get unread like count for a group (for badge) ───────────────────────
+
+export async function getGroupLikeCount(groupId: string): Promise<number> {
+  const { count } = await supabase
+    .from('group_likes')
+    .select('id', { count: 'exact', head: true })
+    .eq('group_id', groupId)
+    .eq('admin_liked_back', false)
+    .eq('dismissed', false);
+
+  return count ?? 0;
+}
+
+// ─── Check if current user has mutual interest with a group ──────────────
+
+export async function checkMutualInterest(groupId: string): Promise<boolean> {
+  const user = (await supabase.auth.getUser()).data.user;
+  if (!user) return false;
+
+  const { data } = await supabase
+    .from('group_likes')
+    .select('admin_liked_back')
+    .eq('group_id', groupId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  return data?.admin_liked_back ?? false;
+}
+```
+
+---
+
+## Screen 1: Discover Tab Updates
+
+### Update swipe / heart logic in `DiscoverGroupsScreen.tsx`
+
+```tsx
+// State
+const [likedGroupIds, setLikedGroupIds] = useState<Set<string>>(new Set());
+const [mutualGroupIds, setMutualGroupIds] = useState<Set<string>>(new Set());
+
+// On mount — load which groups the user already liked
+useEffect(() => {
+  getLikedGroups().then(liked => {
+    setLikedGroupIds(new Set(liked.map(l => l.groupId)));
+    setMutualGroupIds(new Set(liked.filter(l => l.mutualInterest).map(l => l.groupId)));
+  });
+}, []);
+
+// Swipe right / heart = like (NOT request to join)
+async function handleLike(group: any) {
+  const isLiked = likedGroupIds.has(group.id);
+  if (isLiked) {
+    // Unlike (swipe back with ↩ button)
+    await unlikeGroup(group.id);
+    setLikedGroupIds(prev => { const s = new Set(prev); s.delete(group.id); return s; });
+  } else {
+    await likeGroup(group.id);
+    setLikedGroupIds(prev => new Set([...prev, group.id]));
+    // Show toast: "Interest sent!"
+    showToast('Interest sent! The admin will be notified.');
+  }
+  // Move to next card
+  goToNextGroup();
+}
+
+// "Request to Join" button — only active when mutual interest exists
+async function handleRequestToJoin(group: any) {
+  const isMutual = mutualGroupIds.has(group.id);
+  if (!isMutual) {
+    Alert.alert(
+      'Not Yet',
+      'Like this group first. If the admin likes you back, you can request to join.'
+    );
+    return;
+  }
+  // Send join request (existing requestToJoinGroup function)
+  await requestToJoinGroup(group.id);
+  showToast('Join request sent!');
+}
+```
+
+### Update the action buttons UI
+
+```tsx
+{/* Bottom action row */}
+<View style={styles.actionRow}>
+  {/* Undo */}
+  <TouchableOpacity style={styles.undoBtn} onPress={handleUndo}>
+    <Feather name="rotate-ccw" size={20} color={theme.textSecondary} />
+  </TouchableOpacity>
+
+  {/* Dislike / Pass */}
+  <TouchableOpacity style={styles.passBtn} onPress={handlePass}>
+    <Feather name="x" size={26} color="#FF6B6B" />
+  </TouchableOpacity>
+
+  {/* Like / Heart */}
+  <TouchableOpacity
+    style={[
+      styles.likeBtn,
+      { borderColor: likedGroupIds.has(currentGroup?.id) ? '#22C55E' : theme.primary }
+    ]}
+    onPress={() => handleLike(currentGroup)}
+  >
+    <Feather
+      name="heart"
+      size={26}
+      color={likedGroupIds.has(currentGroup?.id) ? '#22C55E' : theme.primary}
+    />
+  </TouchableOpacity>
+</View>
+
+{/* Bottom label — context-aware */}
+<View style={styles.bottomLabels}>
+  <TouchableOpacity onPress={handlePass}>
+    <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+      ← Skip
+    </ThemedText>
+  </TouchableOpacity>
+
+  <TouchableOpacity
+    onPress={() => handleRequestToJoin(currentGroup)}
+    disabled={!mutualGroupIds.has(currentGroup?.id)}
+  >
+    <ThemedText style={[
+      Typography.small,
+      {
+        color: mutualGroupIds.has(currentGroup?.id)
+          ? theme.primary
+          : theme.textSecondary,
+        fontWeight: mutualGroupIds.has(currentGroup?.id) ? '700' : '400',
+      }
+    ]}>
+      {mutualGroupIds.has(currentGroup?.id)
+        ? '🎉 Request to Join →'
+        : 'Request to Join →'}
+    </ThemedText>
+  </TouchableOpacity>
+</View>
+```
+
+### Add "Liked" filter chip in Discover tab header
+
+```tsx
+const [showLikedOnly, setShowLikedOnly] = useState(false);
+
+{/* Filter chips below city selector */}
+<View style={styles.filterRow}>
+  <TouchableOpacity
+    style={[
+      styles.filterChip,
+      {
+        backgroundColor: !showLikedOnly ? theme.primary : theme.card,
+        borderColor: theme.primary,
+      }
+    ]}
+    onPress={() => setShowLikedOnly(false)}
+  >
+    <ThemedText style={[Typography.small, { color: !showLikedOnly ? '#fff' : theme.primary, fontWeight: '600' }]}>
+      All Groups
+    </ThemedText>
+  </TouchableOpacity>
+
+  <TouchableOpacity
+    style={[
+      styles.filterChip,
+      {
+        backgroundColor: showLikedOnly ? theme.primary : theme.card,
+        borderColor: theme.primary,
+      }
+    ]}
+    onPress={() => setShowLikedOnly(true)}
+  >
+    <Feather name="heart" size={12} color={showLikedOnly ? '#fff' : theme.primary} />
+    <ThemedText style={[Typography.small, { color: showLikedOnly ? '#fff' : theme.primary, fontWeight: '600', marginLeft: 4 }]}>
+      Groups I Liked
+    </ThemedText>
+  </TouchableOpacity>
+</View>
+```
+
+---
+
+## Screen 2: `InterestedUsersScreen.tsx`
+
+Admin views all users who liked their group and can like back or dismiss.
+
+```tsx
+// screens/groups/InterestedUsersScreen.tsx
+
+import React, { useEffect, useState } from 'react';
+import {
+  View, FlatList, TouchableOpacity,
+  ActivityIndicator, Alert, StyleSheet,
+} from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { ThemedText } from '../../components/ThemedText';
+import { useTheme } from '../../context/ThemeContext';
+import { Typography, Spacing } from '../../constants/theme';
+import { getGroupLikers, adminLikeBack, dismissGroupLiker } from '../../services/groupService';
+
+interface Props {
+  route: { params: { groupId: string; groupName: string } };
+  navigation: any;
+}
+
+export default function InterestedUsersScreen({ route, navigation }: Props) {
+  const { groupId, groupName } = route.params;
+  const { theme } = useTheme();
+  const [likers, setLikers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [actingOn, setActingOn] = useState<string | null>(null);
+
+  useEffect(() => {
+    getGroupLikers(groupId).then(setLikers).finally(() => setLoading(false));
+  }, [groupId]);
+
+  async function handleLikeBack(userId: string, userName: string) {
+    setActingOn(userId);
+    try {
+      await adminLikeBack(groupId, userId);
+      setLikers(prev =>
+        prev.map(l => l.userId === userId ? { ...l, adminLikedBack: true } : l)
+      );
+      Alert.alert(
+        '🎉 Mutual Interest!',
+        `${userName} will be notified they can now request to join.`
+      );
+    } catch {
+      Alert.alert('Error', 'Could not like back. Please try again.');
+    } finally {
+      setActingOn(null);
+    }
+  }
+
+  async function handleDismiss(userId: string, userName: string) {
+    Alert.alert(
+      `Dismiss ${userName}?`,
+      'They will be removed from your interested list.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Dismiss',
+          style: 'destructive',
+          onPress: async () => {
+            setActingOn(userId);
+            try {
+              await dismissGroupLiker(groupId, userId);
+              setLikers(prev => prev.filter(l => l.userId !== userId));
+            } finally {
+              setActingOn(null);
+            }
+          },
+        },
+      ]
+    );
+  }
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator color={theme.primary} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ flex: 1, backgroundColor: theme.background }}>
+      <View style={styles.header}>
+        <ThemedText style={Typography.h3}>Interested in {groupName}</ThemedText>
+        <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+          Like them back to unlock their join request
+        </ThemedText>
+      </View>
+
+      {likers.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Feather name="heart" size={40} color={theme.border} />
+          <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.sm }]}>
+            No one has liked your group yet
+          </ThemedText>
+        </View>
+      ) : (
+        <FlatList
+          data={likers}
+          keyExtractor={item => item.likeId}
+          contentContainerStyle={{ padding: Spacing.md }}
+          renderItem={({ item }) => (
+            <View style={[styles.likerCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              {/* Avatar */}
+              <View style={[styles.avatar, { backgroundColor: theme.primary + '25' }]}>
+                <ThemedText style={[Typography.body, { fontWeight: '800', color: theme.primary }]}>
+                  {item.name.charAt(0)}
+                </ThemedText>
+              </View>
+
+              {/* Info */}
+              <View style={{ flex: 1 }}>
+                <View style={styles.nameRow}>
+                  <ThemedText style={[Typography.body, { fontWeight: '700' }]}>
+                    {item.name}, {item.age}
+                  </ThemedText>
+                  {item.verified && (
+                    <Feather name="check-circle" size={13} color={theme.primary} />
+                  )}
+                  {item.adminLikedBack && (
+                    <View style={[styles.mutualBadge, { backgroundColor: '#22C55E20' }]}>
+                      <ThemedText style={{ fontSize: 10, color: '#22C55E', fontWeight: '700' }}>
+                        Mutual
+                      </ThemedText>
+                    </View>
+                  )}
+                </View>
+                <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+                  {item.occupation} · {item.zodiacSign} · {item.gender}
+                </ThemedText>
+                {item.bio ? (
+                  <ThemedText
+                    style={[Typography.small, { color: theme.textSecondary, marginTop: 3 }]}
+                    numberOfLines={2}
+                  >
+                    {item.bio}
+                  </ThemedText>
+                ) : null}
+              </View>
+
+              {/* Actions */}
+              {!item.adminLikedBack ? (
+                <View style={{ gap: 8 }}>
+                  {/* Like back */}
+                  <TouchableOpacity
+                    style={[styles.actionBtn, { backgroundColor: theme.primary }]}
+                    onPress={() => handleLikeBack(item.userId, item.name)}
+                    disabled={actingOn === item.userId}
+                  >
+                    {actingOn === item.userId
+                      ? <ActivityIndicator size="small" color="#fff" />
+                      : <Feather name="heart" size={16} color="#fff" />
+                    }
+                  </TouchableOpacity>
+
+                  {/* Dismiss */}
+                  <TouchableOpacity
+                    style={[styles.actionBtn, { backgroundColor: theme.border }]}
+                    onPress={() => handleDismiss(item.userId, item.name)}
+                    disabled={actingOn === item.userId}
+                  >
+                    <Feather name="x" size={16} color={theme.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={[styles.mutualCheck, { backgroundColor: '#22C55E20' }]}>
+                  <Feather name="check" size={16} color="#22C55E" />
+                </View>
+              )}
+            </View>
+          )}
+        />
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  header: { padding: Spacing.md, paddingBottom: Spacing.sm },
+  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  likerCard: {
+    flexDirection: 'row', alignItems: 'flex-start',
+    padding: Spacing.sm, borderRadius: 14, borderWidth: 1,
+    marginBottom: Spacing.sm, gap: 10,
+  },
+  avatar: {
+    width: 48, height: 48, borderRadius: 24,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  mutualBadge: {
+    paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8,
+  },
+  actionBtn: {
+    width: 36, height: 36, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  mutualCheck: {
+    width: 36, height: 36, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center',
+  },
+});
+```
+
+---
+
+## My Groups Screen — Like Badge on Group Cards
+
+In `GroupsScreen.tsx`, update `GroupCard` to show the interest badge for admin groups:
+
+```tsx
+// In GroupCard component — add likeCount prop
+function GroupCard({
+  group, currentUserId, theme, onChatPress, onInfoPress, onLikesPress,
+}: {
+  group: any;
+  currentUserId: string;
+  theme: any;
+  onChatPress: () => void;
+  onInfoPress: () => void;
+  onLikesPress: () => void;  // ← NEW
+}) {
+  const isAdmin = group.adminId === currentUserId;
+  const likeCount = group.likeCount ?? 0; // pre-fetched with group data
+
+  return (
+    <TouchableOpacity
+      style={[styles.groupCard, { backgroundColor: theme.card, borderColor: theme.border }]}
+      onPress={onChatPress}
+    >
+      {/* ... existing card content ... */}
+
+      {/* ♥ Interested badge — admin only, top right corner */}
+      {isAdmin && likeCount > 0 && (
+        <TouchableOpacity
+          style={[styles.likeBadge, { backgroundColor: theme.primary }]}
+          onPress={e => { e.stopPropagation(); onLikesPress(); }}
+        >
+          <Feather name="heart" size={11} color="#fff" />
+          <ThemedText style={styles.likeBadgeText}>
+            {likeCount > 9 ? '9+' : likeCount}
+          </ThemedText>
+        </TouchableOpacity>
+      )}
+    </TouchableOpacity>
+  );
+}
+```
+
+Add to styles:
+```tsx
+likeBadge: {
+  position: 'absolute',
+  top: 12,
+  right: 12,
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+  borderRadius: 20,
+  gap: 4,
+},
+likeBadgeText: {
+  fontSize: 11,
+  fontWeight: '800',
+  color: '#fff',
+},
+```
+
+Pass handler in `GroupsScreen`:
+```tsx
+<GroupCard
+  key={group.id}
+  group={group}
+  currentUserId={user!.id}
+  theme={theme}
+  onChatPress={() => navigation.navigate('GroupChat', { groupId: group.id })}
+  onInfoPress={() => navigation.navigate('GroupInfo', { groupId: group.id })}
+  onLikesPress={() => navigation.navigate('InterestedUsers', {   // ← NEW
+    groupId: group.id,
+    groupName: group.name,
+  })}
+/>
+```
+
+---
+
+## Notification Center — New Notification Types
+
+Add to notification type handling in `NotificationCenterScreen`:
+
+```tsx
+case 'group_liked':
+  // Navigate admin to InterestedUsers screen
+  navigation.navigate('InterestedUsers', {
+    groupId: notification.data.groupId,
+    groupName: notification.data.groupName,
+  });
+  break;
+
+case 'group_mutual_interest':
+  // Navigate discoverer to Discover tab filtered to liked groups
+  navigation.navigate('Groups', { screen: 'Discover', params: { showLikedOnly: true } });
+  break;
+```
+
+Notification icons to add to the type map:
+```tsx
+group_liked: { icon: 'heart', color: theme.primary },
+group_mutual_interest: { icon: 'heart', color: '#22C55E' },
+```
+
+---
+
+## Navigation
+
+```ts
+<Stack.Screen
+  name="InterestedUsers"
+  component={InterestedUsersScreen}
+  options={{ title: 'Interested Users' }}
+/>
+```
+
+---
+
+## Update `getMyGroups()` to Include Like Count
+
+```ts
+export async function getMyGroups(userId: string): Promise<any[]> {
+  const { data, error } = await supabase
+    .from('group_members')
+    .select(`
+      group:groups(
+        id, name, description, admin_id, member_limit,
+        min_budget, target_neighborhood, discoverable,
+        invite_code,
+        members:group_members(
+          user:profiles(id, full_name, avatar_url)
+        ),
+        linked_listing:listings(id, title, city, bedrooms, price, status),
+        like_count:group_likes(count)   -- ← add like count
+      )
+    `)
+    .eq('user_id', userId);
+
+  if (error) throw error;
+
+  return (data || []).map((row: any) => ({
+    ...row.group,
+    memberCount: row.group.members?.length ?? 0,
+    adminId: row.group.admin_id,
+    likeCount: row.group.like_count?.[0]?.count ?? 0,
+  }));
+}
+```
+
+---
+
+## Summary of All Changes
+
+| File | Change |
+|------|--------|
+| `groupService.ts` | Add `likeGroup()`, `unlikeGroup()`, `getLikedGroups()`, `getGroupLikers()`, `adminLikeBack()`, `dismissGroupLiker()`, `getGroupLikeCount()`, `checkMutualInterest()` |
+| `DiscoverGroupsScreen.tsx` | Swipe right = like (not join request), liked state tracking, "Groups I Liked" filter chip, context-aware "Request to Join" button |
+| `GroupsScreen.tsx` | `♥ N` badge on group cards for admins, `onLikesPress` handler |
+| `InterestedUsersScreen.tsx` | New screen — admin sees all likers, can like back or dismiss |
+| `NotificationCenterScreen.tsx` | Handle `group_liked` and `group_mutual_interest` notification types |
+| `database` | New `group_likes` table with RLS policies |
+| `send-push-notification` edge function | Handle `group_liked` and `group_mutual_interest` types |
