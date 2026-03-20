@@ -54,6 +54,65 @@ export async function getGroup(id: string) {
   return data;
 }
 
+export async function getGroupDetails(groupId: string) {
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const { data, error } = await supabase
+    .from('groups')
+    .select(`
+      *,
+      members:group_members(
+        user_id, role, is_admin, is_host, status,
+        user:users(id, full_name, avatar_url, age, role)
+      ),
+      listing:listings(id, title, address, city, state, rent, bedrooms, photos, status)
+    `)
+    .eq('id', groupId)
+    .single();
+
+  if (error) throw error;
+
+  const members = (data.members || [])
+    .filter((m: any) => m.status === 'active')
+    .map((m: any) => ({
+      id: m.user_id || m.user?.id,
+      name: m.user?.full_name || 'Unknown',
+      photo: m.user?.avatar_url || null,
+      age: m.user?.age || null,
+      role: m.user?.role || m.role || 'renter',
+      isAdmin: m.is_admin || false,
+      isHost: m.is_host || false,
+    }));
+
+  const listing = data.listing;
+
+  return {
+    id: data.id,
+    name: data.name,
+    description: data.description || '',
+    type: data.type || 'roommate',
+    adminId: data.created_by || members.find((m: any) => m.isAdmin)?.id,
+    members,
+    memberCount: members.length,
+    memberLimit: listing ? (listing.bedrooms || 1) + 1 : (data.max_members || 4),
+    linkedListing: listing ? {
+      id: listing.id,
+      title: listing.title,
+      address: listing.address,
+      city: listing.city,
+      state: listing.state,
+      rent: listing.rent,
+      bedrooms: listing.bedrooms,
+      photos: listing.photos || [],
+      status: listing.status,
+    } : null,
+    discoverable: data.discoverable || false,
+    minBudget: data.budget_min || null,
+    targetNeighborhood: data.city || null,
+    createdAt: data.created_at,
+  };
+}
+
 export async function getMyGroups(type?: GroupType) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return [];
