@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import {
   View, ScrollView, Pressable, Switch,
   Alert, ActivityIndicator, StyleSheet, Platform,
-  Share, Linking,
+  Share,
 } from 'react-native';
+import * as Linking from 'expo-linking';
 
 import { ThemedText } from '../../components/ThemedText';
 import { Feather } from '../../components/VectorIcons';
@@ -18,7 +19,10 @@ import {
   leaveGroup,
   setGroupDiscoverable,
   linkListingToGroup,
+  getInviteCode,
+  regenerateInviteCode,
 } from '../../services/groupService';
+import * as Clipboard from 'expo-clipboard';
 import { GroupPropertySearchModal } from '../../components/GroupPropertySearchModal';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StorageService } from '../../utils/storage';
@@ -38,6 +42,8 @@ export function GroupInfoScreen({ route, navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [showPropertySearch, setShowPropertySearch] = useState(false);
+  const [inviteCode, setInviteCode] = useState('');
+  const [codeCopied, setCodeCopied] = useState(false);
 
   const isAdmin = group?.adminId === user?.id;
   const memberCount = group?.members?.length || 0;
@@ -127,6 +133,81 @@ export function GroupInfoScreen({ route, navigation }: Props) {
       }
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadInviteCode() {
+    try {
+      const code = await getInviteCode(groupId);
+      setInviteCode(code);
+    } catch {
+      const groups = await StorageService.getGroups();
+      const g = groups.find((gr: any) => gr.id === groupId);
+      if (g && (g as any).inviteCode) {
+        setInviteCode((g as any).inviteCode);
+      } else {
+        const fallback = Math.random().toString(36).substring(2, 8).toUpperCase();
+        setInviteCode(fallback);
+        if (g) {
+          (g as any).inviteCode = fallback;
+          await StorageService.setGroups(groups);
+        }
+      }
+    }
+  }
+
+  useEffect(() => {
+    loadInviteCode();
+  }, [groupId]);
+
+  async function handleCopyCode() {
+    try {
+      if (Platform.OS === 'web') {
+        await navigator.clipboard.writeText(inviteCode);
+      } else {
+        await Clipboard.setStringAsync(inviteCode);
+      }
+      setCodeCopied(true);
+      setTimeout(() => setCodeCopied(false), 2000);
+    } catch {}
+  }
+
+  async function handleShareCode() {
+    const deepLink = Linking.createURL('join-group', { queryParams: { code: inviteCode, group: group?.name || '' } });
+    try {
+      await Share.share({
+        message: `Join my group "${group?.name}" on Roomdr!\n\nTap to join: ${deepLink}\n\nOr enter code: ${inviteCode}`,
+      });
+    } catch {}
+  }
+
+  async function handleRegenerateCode() {
+    const doRegen = async () => {
+      try {
+        const newCode = await regenerateInviteCode(groupId);
+        setInviteCode(newCode);
+      } catch {
+        const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+        setInviteCode(newCode);
+        try {
+          const groups = await StorageService.getGroups();
+          const g = groups.find((gr: any) => gr.id === groupId);
+          if (g) {
+            (g as any).inviteCode = newCode;
+            await StorageService.setGroups(groups);
+          }
+        } catch {}
+      }
+    };
+    if (Platform.OS === 'web') {
+      if (window.confirm('Generate a new invite code? The old code will stop working.')) {
+        doRegen();
+      }
+    } else {
+      Alert.alert('Regenerate Code?', 'The old code will stop working.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Regenerate', onPress: doRegen },
+      ]);
     }
   }
 
@@ -522,6 +603,55 @@ export function GroupInfoScreen({ route, navigation }: Props) {
           </Pressable>
         </View>
 
+        <View style={styles.section}>
+          <ThemedText style={[Typography.small, styles.sectionLabel, { color: theme.textSecondary }]}>
+            INVITE CODE
+          </ThemedText>
+          <View style={[styles.inviteCodeCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <Pressable onPress={handleCopyCode} style={styles.codeBoxTap}>
+              <ThemedText style={[styles.codeText, { color: theme.text }]}>
+                {inviteCode || '------'}
+              </ThemedText>
+              <ThemedText style={[Typography.small, { color: codeCopied ? theme.primary : theme.textSecondary, marginTop: 4 }]}>
+                {codeCopied ? 'Copied!' : 'Tap to copy'}
+              </ThemedText>
+            </Pressable>
+            <View style={styles.codeActions}>
+              <Pressable
+                style={[styles.shareBtn, { backgroundColor: theme.primary }]}
+                onPress={handleShareCode}
+              >
+                <Feather name="share-2" size={14} color="#fff" />
+                <ThemedText style={{ color: '#fff', fontWeight: '700', fontSize: 13, marginLeft: 6 }}>
+                  Share Link
+                </ThemedText>
+              </Pressable>
+              <Pressable
+                style={[styles.copyBtn, { borderColor: theme.border }]}
+                onPress={handleCopyCode}
+              >
+                <Feather name="copy" size={14} color={theme.text} />
+                <ThemedText style={{ color: theme.text, fontWeight: '600', fontSize: 13, marginLeft: 6 }}>
+                  Copy
+                </ThemedText>
+              </Pressable>
+            </View>
+            {isAdmin ? (
+              <Pressable onPress={handleRegenerateCode} style={{ alignItems: 'center', marginTop: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Feather name="refresh-cw" size={12} color={theme.textSecondary} />
+                  <ThemedText style={[Typography.small, { color: theme.textSecondary, marginLeft: 4 }]}>
+                    Regenerate code
+                  </ThemedText>
+                </View>
+              </Pressable>
+            ) : null}
+          </View>
+          <ThemedText style={[Typography.small, { color: theme.textSecondary, marginTop: 6 }]}>
+            This code is unique to your group and stays the same until regenerated.
+          </ThemedText>
+        </View>
+
         {isAdmin ? (
           <View style={styles.section}>
             <ThemedText style={[Typography.small, styles.sectionLabel, { color: theme.textSecondary }]}>
@@ -658,5 +788,28 @@ const styles = StyleSheet.create({
   leaveBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     paddingVertical: 14, borderRadius: 12, borderWidth: 1.5,
+  },
+  inviteCodeCard: {
+    borderRadius: 14, borderWidth: 1, padding: Spacing.md, alignItems: 'center',
+  },
+  codeBoxTap: {
+    alignItems: 'center', paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg, borderRadius: 10,
+  },
+  codeText: {
+    fontSize: 28, fontWeight: '800', letterSpacing: 6,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  codeActions: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    marginTop: Spacing.sm, width: '100%',
+  },
+  shareBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 12, borderRadius: 10,
+  },
+  copyBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 12, paddingHorizontal: 16, borderRadius: 10, borderWidth: 1,
   },
 });
