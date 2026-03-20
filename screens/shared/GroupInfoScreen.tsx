@@ -521,6 +521,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
 
       <GroupPropertySearchModal
         visible={showPropertySearch}
+        memberCount={memberCount}
         onClose={() => setShowPropertySearch(false)}
         onSelect={async (listing: any) => {
           setShowPropertySearch(false);

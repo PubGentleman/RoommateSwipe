@@ -244,6 +244,7 @@ export const CreateGroupScreen = ({ navigation, route }: any) => {
       <GroupPropertySearchModal
         visible={showPropertySearch}
         currentListingId={selectedListingId}
+        memberCount={matchedUserId ? 2 : 1}
         onSelect={(listing) => {
           setSelectedListing(listing);
           setSelectedListingId(listing?.id || null);

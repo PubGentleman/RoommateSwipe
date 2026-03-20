@@ -58,14 +58,16 @@ const BEDROOM_OPTIONS = [
 interface Props {
   visible: boolean;
   currentListingId?: string | null;
+  memberCount?: number;
   onSelect: (listing: ListingResult | null) => void;
   onClose: () => void;
 }
 
-export function GroupPropertySearchModal({ visible, currentListingId, onSelect, onClose }: Props) {
+export function GroupPropertySearchModal({ visible, currentListingId, memberCount = 1, onSelect, onClose }: Props) {
   const { theme } = useTheme();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
+  const minBedrooms = Math.max(1, memberCount - 1);
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [results, setResults] = useState<ListingResult[]>([]);
@@ -122,12 +124,18 @@ export function GroupPropertySearchModal({ visible, currentListingId, onSelect, 
     } catch {}
 
     try {
-      const { data, error } = await supabase
+      let initReq = supabase
         .from('listings')
         .select('id, title, address, city, state, rent, bedrooms, photos, transit_info')
         .eq('status', 'available')
         .order('created_at', { ascending: false })
         .limit(30);
+      if (minBedrooms >= 4) {
+        initReq = initReq.gte('bedrooms', 4);
+      } else if (minBedrooms > 1) {
+        initReq = initReq.gte('bedrooms', minBedrooms);
+      }
+      const { data, error } = await initReq;
       if (!error && data && data.length > 0) {
         const mapped = data.map((r: any) => ({
           id: r.id, title: r.title, address: r.address,
@@ -181,6 +189,13 @@ export function GroupPropertySearchModal({ visible, currentListingId, onSelect, 
       const properties = await StorageService.getProperties();
       let filtered = properties.filter((p: any) => p.status === 'available' || !p.status);
 
+      const bedroomFloor = f.bedrooms !== null ? f.bedrooms : minBedrooms;
+      if (bedroomFloor >= 4) {
+        filtered = filtered.filter((p: any) => (p.bedrooms || 0) >= 4);
+      } else if (bedroomFloor > 0) {
+        filtered = filtered.filter((p: any) => (p.bedrooms || 0) >= bedroomFloor);
+      }
+
       if (q.trim()) {
         const lower = q.toLowerCase();
         filtered = filtered.filter((p: any) =>
@@ -197,14 +212,6 @@ export function GroupPropertySearchModal({ visible, currentListingId, onSelect, 
       }
       if (f.minRent !== null) filtered = filtered.filter((p: any) => (p.rent || p.price || 0) >= f.minRent!);
       if (f.maxRent !== null) filtered = filtered.filter((p: any) => (p.rent || p.price || 0) <= f.maxRent!);
-      if (f.bedrooms !== null) {
-        if (f.bedrooms >= 4) {
-          filtered = filtered.filter((p: any) => (p.bedrooms || 0) >= 4);
-        } else {
-          filtered = filtered.filter((p: any) => (p.bedrooms || 0) === f.bedrooms);
-        }
-      }
-
       return filtered.slice(0, 30).map((p: any) => ({
         id: p.id,
         title: p.title || 'Untitled Listing',
@@ -241,12 +248,11 @@ export function GroupPropertySearchModal({ visible, currentListingId, onSelect, 
       if (f.minRent !== null) req = req.gte('rent', f.minRent);
       if (f.maxRent !== null) req = req.lte('rent', f.maxRent);
 
-      if (f.bedrooms !== null) {
-        if (f.bedrooms >= 4) {
-          req = req.gte('bedrooms', 4);
-        } else {
-          req = req.eq('bedrooms', f.bedrooms);
-        }
+      const bedroomFloor = f.bedrooms !== null ? f.bedrooms : minBedrooms;
+      if (bedroomFloor >= 4) {
+        req = req.gte('bedrooms', 4);
+      } else if (bedroomFloor > 0) {
+        req = req.gte('bedrooms', bedroomFloor);
       }
 
       const { data, error } = await req;
@@ -302,9 +308,16 @@ export function GroupPropertySearchModal({ visible, currentListingId, onSelect, 
           >
             <Feather name="arrow-left" size={20} color={theme.text} />
           </Pressable>
-          <ThemedText style={[Typography.h3, { flex: 1, textAlign: 'center' }]}>
-            Find a Property
-          </ThemedText>
+          <View style={{ flex: 1, alignItems: 'center' }}>
+            <ThemedText style={[Typography.h3]}>
+              Find a Property
+            </ThemedText>
+            {minBedrooms > 1 ? (
+              <ThemedText style={[Typography.small, { color: theme.textSecondary, marginTop: 2 }]}>
+                {minBedrooms}BR+ · group needs {minBedrooms} bedroom{minBedrooms > 1 ? 's' : ''}
+              </ThemedText>
+            ) : null}
+          </View>
           <View style={{ width: 36 }} />
         </View>
 
@@ -401,7 +414,7 @@ export function GroupPropertySearchModal({ visible, currentListingId, onSelect, 
               BEDROOMS
             </ThemedText>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }}>
-              {BEDROOM_OPTIONS.map(opt => {
+              {BEDROOM_OPTIONS.filter(opt => opt.value === null || opt.value >= minBedrooms).map(opt => {
                 const active = filters.bedrooms === opt.value;
                 return (
                   <Pressable
@@ -533,6 +546,14 @@ export function GroupPropertySearchModal({ visible, currentListingId, onSelect, 
                             <Feather name="navigation" size={11} color={theme.textSecondary} />
                             <ThemedText style={[Typography.small, { color: theme.textSecondary, marginLeft: 3 }]}>
                               Transit
+                            </ThemedText>
+                          </View>
+                        ) : null}
+                        {item.bedrooms + 1 >= memberCount ? (
+                          <View style={[styles.metaChip, { backgroundColor: '#22C55E20' }]}>
+                            <Feather name="check" size={11} color="#22C55E" />
+                            <ThemedText style={[Typography.small, { color: '#22C55E', marginLeft: 3 }]}>
+                              Fits group
                             </ThemedText>
                           </View>
                         ) : null}
