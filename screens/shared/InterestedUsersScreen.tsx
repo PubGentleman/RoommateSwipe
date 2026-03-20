@@ -11,6 +11,7 @@ import {
   dismissGroupLiker as dismissGroupLikerSupabase,
 } from '../../services/groupService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 
@@ -33,6 +34,7 @@ export const InterestedUsersScreen = ({ route }: any) => {
   const { groupId, groupName } = route.params;
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<any>();
   const [likers, setLikers] = useState<Liker[]>([]);
   const [loading, setLoading] = useState(true);
   const [actingOn, setActingOn] = useState<string | null>(null);
@@ -179,7 +181,10 @@ export const InterestedUsersScreen = ({ route }: any) => {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background, paddingBottom: insets.bottom + Spacing.lg }]}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+        <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={{ marginBottom: 8 }}>
+          <Feather name="chevron-left" size={28} color={theme.text} />
+        </Pressable>
         <ThemedText style={{ fontSize: 18, fontWeight: '700' }}>Interested in {groupName}</ThemedText>
         <ThemedText style={{ color: theme.textSecondary, fontSize: 13, marginTop: 4 }}>
           Like them back to unlock their join request

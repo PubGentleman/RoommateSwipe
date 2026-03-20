@@ -3,6 +3,7 @@ import {
   View, StyleSheet, Pressable, Share,
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '../../components/VectorIcons';
 import { ScreenScrollView } from '../../components/ScreenScrollView';
 import { ThemedText } from '../../components/ThemedText';
@@ -33,6 +34,7 @@ export const HostAnalyticsScreen = () => {
   const analyticsLevel = getPlanLimits(hostPlan).analyticsLevel;
   const isAdvanced = analyticsLevel === 'advanced';
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const [properties, setProperties] = useState<Property[]>([]);
   const [inquiries, setInquiries] = useState<InterestCard[]>([]);
@@ -277,6 +279,18 @@ export const HostAnalyticsScreen = () => {
   if (analyticsLocked) {
     return (
       <ScreenScrollView style={{ backgroundColor: BG }}>
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingTop: insets.top + 8,
+          paddingHorizontal: 16,
+          paddingBottom: 8,
+        }}>
+          <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
+            <Feather name="chevron-left" size={28} color="#FFFFFF" />
+          </Pressable>
+          <ThemedText type="h2" style={{ marginLeft: 8 }}>Analytics</ThemedText>
+        </View>
         <LockedFeatureWall
           icon="bar-chart-2"
           title="Analytics"
@@ -290,6 +304,19 @@ export const HostAnalyticsScreen = () => {
 
   return (
     <ScreenScrollView style={{ backgroundColor: BG }}>
+
+      <View style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingTop: insets.top + 8,
+        paddingHorizontal: 16,
+        paddingBottom: 8,
+      }}>
+        <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
+          <Feather name="chevron-left" size={28} color="#FFFFFF" />
+        </Pressable>
+        <ThemedText type="h2" style={{ marginLeft: 8 }}>Analytics</ThemedText>
+      </View>
 
       <ThemedText type="h2" style={styles.sectionTitle}>Overview</ThemedText>
       <View style={styles.overviewGrid}>

@@ -937,7 +937,7 @@ export const RoommatesScreen = () => {
           </Pressable>
           <RoomdrLogo variant="horizontal" size="sm" />
           <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Pressable onPress={() => (navigation as any).navigate('Profile', { screen: 'Notifications' })} style={styles.navIconBtn}>
+            <Pressable onPress={() => (navigation as any).navigate('Notifications')} style={styles.navIconBtn}>
               <View style={[styles.navIconBtnInner, { backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }]}>
                 <Feather name="bell" size={18} color="#FFFFFF" />
               </View>
@@ -1001,7 +1001,7 @@ export const RoommatesScreen = () => {
 
   const handleUpgradeToPaid = () => {
     setShowPaywall(false);
-    (navigation as any).navigate('Profile', { screen: 'Payment' });
+    (navigation as any).navigate('Payment');
   };
 
 
@@ -1017,7 +1017,7 @@ export const RoommatesScreen = () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } else {
       if (result.message.includes('payment method')) {
-        (navigation as any).navigate('Profile', { screen: 'Payment' });
+        (navigation as any).navigate('Payment');
         setShowUndoUpgradeModal(false);
       }
     }
@@ -1039,7 +1039,7 @@ export const RoommatesScreen = () => {
           'Daily Limit Reached',
           coldCheck.reason || "You've used all your messages for today. Resets at midnight.",
           [
-            { text: 'Upgrade for More', onPress: () => (navigation as any).getParent()?.navigate('Profile', { screen: 'Plans' }) },
+            { text: 'Upgrade for More', onPress: () => (navigation as any).navigate('Plans') },
             { text: 'OK', style: 'cancel' },
           ]
         );
@@ -1167,7 +1167,7 @@ export const RoommatesScreen = () => {
               <Feather name="zap" size={18} color={user?.boostData?.isBoosted && user?.boostData?.boostExpiresAt && !isBoostExpired(String(user.boostData.boostExpiresAt)) ? '#000000' : '#FFD700'} />
             </View>
           </Pressable>
-          <Pressable onPress={() => (navigation as any).navigate('Profile', { screen: 'Notifications' })} style={styles.navIconBtn}>
+          <Pressable onPress={() => (navigation as any).navigate('Notifications')} style={styles.navIconBtn}>
             <View style={[styles.navIconBtnInner, { backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }]}>
               <Feather name="bell" size={18} color="#FFFFFF" />
             </View>
@@ -1898,7 +1898,7 @@ export const RoommatesScreen = () => {
                 style={[styles.vipUpgradeButton, { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: '#ff6b5b', marginBottom: Spacing.sm }]}
                 onPress={() => {
                   setShowSuperInterestUpsell(false);
-                  (navigation as any).navigate('Profile', { screen: 'Subscription' });
+                  (navigation as any).navigate('Plans');
                 }}
               >
                 <ThemedText style={[Typography.h3, { color: '#ff6b5b' }]}>
@@ -2221,7 +2221,7 @@ export const RoommatesScreen = () => {
                           'Daily Limit Reached',
                           coldCheck.reason || "You've used all your messages for today. Resets at midnight.",
                           [
-                            { text: 'Upgrade for More', onPress: () => (navigation as any).getParent()?.navigate('Profile', { screen: 'Plans' }) },
+                            { text: 'Upgrade for More', onPress: () => (navigation as any).navigate('Plans') },
                             { text: 'OK', style: 'cancel' },
                           ]
                         );

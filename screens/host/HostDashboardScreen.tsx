@@ -325,8 +325,7 @@ export const HostDashboardScreen = () => {
             </LinearGradient>
           </Pressable>
           <Pressable style={styles.iconBtn} onPress={() => {
-            const parent = navigation.getParent();
-            if (parent) parent.navigate('Profile', { screen: 'Notifications' });
+            navigation.navigate('Notifications');
           }}>
             <Feather name="bell" size={16} color="rgba(255,255,255,0.6)" />
             {pendingInquiries > 0 ? <View style={styles.notifDot} /> : null}

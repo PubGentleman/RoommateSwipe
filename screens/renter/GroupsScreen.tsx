@@ -447,7 +447,7 @@ export const GroupsScreen = () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } else {
       if (result.message.includes('payment method')) {
-        navigation.navigate('Profile', { screen: 'Payment' });
+        (navigation as any).navigate('Payment');
         setShowUndoUpgradeModal(false);
       }
     }
@@ -558,7 +558,7 @@ export const GroupsScreen = () => {
 
   const handleUpgradeForMessaging = () => {
     setShowMessageModal(false);
-    navigation.navigate('Profile', { screen: 'Payment' });
+    (navigation as any).navigate('Payment');
   };
 
   const openGroupDetail = () => {
@@ -671,7 +671,7 @@ export const GroupsScreen = () => {
           'Group Limit Reached',
           `Your ${planLabel} plan allows up to ${groupLimit} group${groupLimit === 1 ? '' : 's'}. Upgrade to create more.`,
           [
-            { text: 'Upgrade', onPress: () => navigation.navigate('Profile', { screen: 'Payment' }) },
+            { text: 'Upgrade', onPress: () => (navigation as any).navigate('Payment') },
             { text: 'Cancel', style: 'cancel' },
           ]
         );

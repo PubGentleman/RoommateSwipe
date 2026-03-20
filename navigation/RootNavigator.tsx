@@ -11,6 +11,9 @@ import { HostAgentSetupScreen } from '../screens/host/onboarding/HostAgentSetupS
 import { RenterTabNavigator } from './RenterTabNavigator';
 import { HostTabNavigator } from './HostTabNavigator';
 import { ProfileReminderOverlay } from '../components/ProfileReminderOverlay';
+import { PlansScreen } from '../screens/shared/PlansScreen';
+import { PaymentScreen } from '../screens/shared/PaymentScreen';
+import { NotificationsScreen } from '../screens/shared/NotificationsScreen';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useTheme } from '../hooks/useTheme';
 import { StorageService } from '../utils/storage';
@@ -23,6 +26,9 @@ export type RootStackParamList = {
   HostCompanySetup: undefined;
   HostAgentSetup: undefined;
   OnboardingPlan: undefined;
+  Plans: undefined;
+  Payment: undefined;
+  Notifications: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -106,6 +112,33 @@ export const RootNavigator = () => {
     <>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Main" component={MainComponent} />
+        <Stack.Screen
+          name="Plans"
+          component={PlansScreen}
+          options={{
+            presentation: 'modal',
+            headerShown: false,
+            animation: 'slide_from_bottom',
+          }}
+        />
+        <Stack.Screen
+          name="Payment"
+          component={PaymentScreen}
+          options={{
+            presentation: 'modal',
+            headerShown: false,
+            animation: 'slide_from_bottom',
+          }}
+        />
+        <Stack.Screen
+          name="Notifications"
+          component={NotificationsScreen}
+          options={{
+            presentation: 'modal',
+            headerShown: false,
+            animation: 'slide_from_bottom',
+          }}
+        />
       </Stack.Navigator>
       <ProfileReminderOverlay />
     </>

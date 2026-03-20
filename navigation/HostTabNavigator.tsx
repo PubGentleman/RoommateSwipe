@@ -18,6 +18,7 @@ import { HostGroupOutreachScreen } from '../screens/host/HostGroupOutreachScreen
 import { BrowseRenterGroupsScreen } from '../screens/host/BrowseRenterGroupsScreen';
 import { HostRenterGroupDetailScreen } from '../screens/host/HostRenterGroupDetailScreen';
 import { HostMessagesStackNavigator } from './HostMessagesStackNavigator';
+import { NotificationsScreen } from '../screens/shared/NotificationsScreen';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
 import { useTheme } from '../hooks/useTheme';
 import { useNotificationContext } from '../contexts/NotificationContext';
@@ -34,6 +35,7 @@ export type HostDashboardStackParamList = {
   CreateEditListing: { propertyId?: string };
   Analytics: undefined;
   Inquiries: undefined;
+  Notifications: undefined;
   HostPricing: undefined;
   HostSubscription: undefined;
   ListingBoost: { listingId: string };
@@ -65,6 +67,7 @@ function DashboardStackNavigator() {
       <DashboardStack.Screen name="CreateEditListing" component={CreateEditListingScreen} />
       <DashboardStack.Screen name="Analytics" component={HostAnalyticsScreen} />
       <DashboardStack.Screen name="Inquiries" component={HostInquiriesScreen} />
+      <DashboardStack.Screen name="Notifications" component={NotificationsScreen} />
       <DashboardStack.Screen name="HostPricing" component={HostPricingScreen} />
       <DashboardStack.Screen name="HostSubscription" component={HostSubscriptionScreen} />
       <DashboardStack.Screen name="ListingBoost" component={ListingBoostScreen} />

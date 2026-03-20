@@ -1232,7 +1232,7 @@ export const ExploreScreen = () => {
         role="renter"
         onUpgrade={() => {
           setShowPaywall(false);
-          (navigation as any).navigate('Profile', { screen: 'Payment' });
+          (navigation as any).navigate('Payment');
         }}
         onDismiss={() => setShowPaywall(false)}
       />

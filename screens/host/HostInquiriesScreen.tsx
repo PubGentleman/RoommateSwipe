@@ -9,6 +9,7 @@ import { Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { StorageService } from '../../utils/storage';
 import { InterestCard, Conversation, Message } from '../../types/models';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNotificationContext } from '../../contexts/NotificationContext';
@@ -23,6 +24,7 @@ export const HostInquiriesScreen = () => {
   const { user, canRespondToInquiry, useInquiryResponse, getHostPlan } = useAuth();
   const { refreshUnreadCount } = useNotificationContext();
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const [interestCards, setInterestCards] = useState<InterestCard[]>([]);
   const [filter, setFilter] = useState<FilterStatus>('all');
   const [showAISheet, setShowAISheet] = useState(false);
@@ -432,8 +434,20 @@ export const HostInquiriesScreen = () => {
   return (
     <ScreenScrollView>
       <View style={styles.container}>
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingTop: insets.top + 8,
+          paddingHorizontal: 16,
+          paddingBottom: 12,
+        }}>
+          <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
+            <Feather name="chevron-left" size={28} color={theme.text} />
+          </Pressable>
+          <ThemedText style={[Typography.h2, { marginLeft: 8 }]}>Inquiries</ThemedText>
+        </View>
         <View style={styles.headerRow}>
-          <ThemedText style={[Typography.h2]}>Inquiries</ThemedText>
+          <View />
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             {pendingCount > 0 ? (
               <View style={styles.pendingBadge}>

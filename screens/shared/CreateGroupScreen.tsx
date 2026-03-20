@@ -54,7 +54,7 @@ export const CreateGroupScreen = ({ navigation, route }: any) => {
             'Group Limit Reached',
             `Your ${planLabel} plan allows up to ${groupLimit} group${groupLimit === 1 ? '' : 's'}. Upgrade to create more.`,
             [
-              { text: 'Upgrade', onPress: () => navigation.navigate('PlanSelection') },
+              { text: 'Upgrade', onPress: () => (navigation as any).navigate('Plans') },
               { text: 'Cancel', style: 'cancel' },
             ]
           );

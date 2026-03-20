@@ -17,7 +17,7 @@ export const AdBanner = ({ placement, userPlan }: AdBannerProps) => {
       <Text style={styles.adLabel}>Ad</Text>
       <Text style={styles.adText}>Advertisement</Text>
       <Pressable
-        onPress={() => navigation.navigate('Profile', { screen: 'Payment' })}
+        onPress={() => (navigation as any).navigate('Payment')}
         hitSlop={8}
       >
         <Text style={styles.upgradeLink}>Remove Ads — Upgrade to Plus</Text>

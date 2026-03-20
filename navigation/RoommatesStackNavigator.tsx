@@ -2,10 +2,12 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { RoommatesScreen } from '../screens/renter/RoommatesScreen';
 import { AIAssistantScreen } from '../screens/renter/AIAssistantScreen';
+import { NotificationsScreen } from '../screens/shared/NotificationsScreen';
 
 export type RoommatesStackParamList = {
   RoommatesList: undefined;
   AIAssistant: undefined;
+  Notifications: undefined;
 };
 
 const Stack = createNativeStackNavigator<RoommatesStackParamList>();
@@ -15,6 +17,7 @@ export const RoommatesStackNavigator = () => {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="RoommatesList" component={RoommatesScreen} />
       <Stack.Screen name="AIAssistant" component={AIAssistantScreen} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
     </Stack.Navigator>
   );
 };

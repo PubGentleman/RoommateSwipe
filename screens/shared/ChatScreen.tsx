@@ -434,7 +434,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           'Daily Limit Reached',
           coldCheck.reason || "You've used all your messages for today. Resets at midnight.",
           [
-            { text: 'Upgrade for More', onPress: () => navigation.getParent()?.navigate('Profile', { screen: 'Plans' }) },
+            { text: 'Upgrade for More', onPress: () => (navigation as any).navigate('Plans') },
             { text: 'OK', style: 'cancel' },
           ]
         );
@@ -970,7 +970,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       {!isInquiryChat && !canSeeOnlineStatus() ? (
         <Pressable
           style={[styles.premiumBanner, { backgroundColor: theme.backgroundSecondary }]}
-          onPress={() => (navigation as any).navigate('Profile', { screen: 'Payment' })}
+          onPress={() => (navigation as any).navigate('Payment')}
         >
           <Feather name="zap" size={18} color={theme.primary} />
           <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.sm, flex: 1 }]}>
@@ -1210,7 +1210,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
               style={{ backgroundColor: theme.primary, paddingVertical: 14, borderRadius: 12, alignItems: 'center', marginBottom: 12 }}
               onPress={() => {
                 setShowDailyLimitModal(false);
-                (navigation as any).navigate('Profile', { screen: 'Payment' });
+                (navigation as any).navigate('Payment');
               }}
             >
               <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
@@ -1246,7 +1246,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
               style={{ backgroundColor: theme.primary, paddingVertical: 14, borderRadius: 12, alignItems: 'center', marginBottom: 12 }}
               onPress={() => {
                 setShowChatLimitModal(false);
-                (navigation as any).navigate('Profile', { screen: 'Payment' });
+                (navigation as any).navigate('Payment');
               }}
             >
               <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
