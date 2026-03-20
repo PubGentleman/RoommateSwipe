@@ -140,15 +140,33 @@ export const StorageService = {
     try {
       const data = await AsyncStorage.getItem(STORAGE_KEYS.PROPERTIES);
       if (!data) return [];
-      const properties = JSON.parse(data);
-      return properties.map((p: any) => ({
-        ...p,
-        propertyType: p.propertyType || 'lease',
-        roomType: p.roomType || 'entire',
-        existingRoommates: p.existingRoommates || [],
-        availableDate: p.availableDate ? new Date(p.availableDate) : undefined,
-        rentedDate: p.rentedDate ? new Date(p.rentedDate) : undefined,
-      }));
+      const raw = JSON.parse(data);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      let needsSave = false;
+      const properties = raw.map((p: any) => {
+        const parsed = {
+          ...p,
+          propertyType: p.propertyType || 'lease',
+          roomType: p.roomType || 'entire',
+          existingRoommates: p.existingRoommates || [],
+          availableDate: p.availableDate ? new Date(p.availableDate) : undefined,
+          rentedDate: p.rentedDate ? new Date(p.rentedDate) : undefined,
+        };
+        if (!parsed.available && parsed.availableDate && !parsed.is_rented) {
+          const avail = new Date(parsed.availableDate);
+          avail.setHours(0, 0, 0, 0);
+          if (avail <= today) {
+            parsed.available = true;
+            needsSave = true;
+          }
+        }
+        return parsed;
+      });
+      if (needsSave) {
+        await AsyncStorage.setItem(STORAGE_KEYS.PROPERTIES, JSON.stringify(properties));
+      }
+      return properties;
     } catch (error) {
       console.error('Error getting properties:', error);
       return [];

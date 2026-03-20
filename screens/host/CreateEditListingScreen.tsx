@@ -325,7 +325,7 @@ export const CreateEditListingScreen = () => {
           availableDate: availableDate ? new Date(availableDate) : undefined,
           amenities: selectedAmenities,
           photos: photos,
-          available: true,
+          available: !availableDate || new Date(availableDate).setHours(0,0,0,0) <= new Date().setHours(0,0,0,0),
           hostId: user?.id || '',
           hostName: user?.name || '',
           hostProfileId: user?.id,

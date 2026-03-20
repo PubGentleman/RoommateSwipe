@@ -746,6 +746,12 @@ export const ExploreScreen = () => {
               <View style={styles.availBadge}>
                 <Text style={styles.availBadgeText}>Available now</Text>
               </View>
+            ) : item.availableDate ? (
+              <View style={[styles.availBadge, { borderColor: 'rgba(255,165,0,0.4)' }]}>
+                <Text style={[styles.availBadgeText, { color: '#FFA500' }]}>
+                  {formatMoveInDate(item.availableDate.toString())}
+                </Text>
+              </View>
             ) : null}
             {isPetFriendly ? (
               <View style={styles.availBadge}>

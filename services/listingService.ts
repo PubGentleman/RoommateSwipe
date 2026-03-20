@@ -61,7 +61,7 @@ export function mapListingToProperty(l: any, fallbackHostName?: string): Propert
     rentedDate: l.rented_date ? new Date(l.rented_date) : undefined,
     amenities: l.amenities || [],
     photos: l.photos || [],
-    available: (l.is_active ?? true) && !(l.is_paused ?? false) && !(l.is_rented ?? false),
+    available: (l.is_active ?? true) && !(l.is_paused ?? false) && !(l.is_rented ?? false) && (!l.available_date || new Date(l.available_date).setHours(0,0,0,0) <= new Date().setHours(0,0,0,0)),
     hostId: l.host_id || '',
     hostName: l.host?.full_name || l.host_name || fallbackHostName || 'Host',
     hostProfileId: l.host_profile_id || l.host_id || '',
