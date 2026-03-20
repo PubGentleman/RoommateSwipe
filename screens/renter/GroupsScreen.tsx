@@ -1476,11 +1476,23 @@ export const GroupsScreen = () => {
                     <ThemedText style={[Typography.caption, { color: theme.textSecondary }]} numberOfLines={1}>
                       {listing.address}{listing.city ? `, ${listing.city}` : ''}
                     </ThemedText>
-                    {listing.rent || listing.price ? (
-                      <ThemedText style={[Typography.caption, { color: theme.primary, fontWeight: '600' }]}>
-                        ${listing.rent || listing.price}/mo
-                      </ThemedText>
-                    ) : null}
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 2 }}>
+                      {listing.rent || listing.price ? (
+                        <ThemedText style={[Typography.caption, { color: theme.primary, fontWeight: '600' }]}>
+                          ${listing.rent || listing.price}/mo
+                        </ThemedText>
+                      ) : null}
+                      {listing.bedrooms ? (
+                        <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
+                          {listing.bedrooms} BR
+                        </ThemedText>
+                      ) : null}
+                      {listing.bedrooms ? (
+                        <ThemedText style={[Typography.caption, { color: theme.primary }]}>
+                          {listing.bedrooms + 1} max members
+                        </ThemedText>
+                      ) : null}
+                    </View>
                   </View>
                   {selectedListingId === listing.id ? (
                     <Feather name="check" size={18} color={theme.primary} />

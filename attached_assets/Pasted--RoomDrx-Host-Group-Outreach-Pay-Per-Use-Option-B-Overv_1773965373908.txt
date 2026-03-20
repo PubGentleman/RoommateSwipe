@@ -1,0 +1,775 @@
+# RoomDrx — Host Group Outreach: Pay-Per-Use (Option B)
+
+## Overview
+
+After a listing is marked as rented (and the 48-hour safeguard cooldown passes), the host can pay a one-time fee to send an outreach message to each group that was forming on that listing. Pricing is à la carte — hosts only pay when they actually use the feature. Stripe PaymentSheet handles the charge.
+
+---
+
+## Pricing
+
+| Option | Price | Best For |
+|--------|-------|---------|
+| Contact 1 group | **$2.99** | Testing the feature |
+| Contact 3 groups | **$6.99** | Most hosts (saves ~30%) |
+| Contact all groups on listing | **$9.99** | Hosts with 4+ groups |
+
+All prices are one-time charges — no subscription required.
+
+---
+
+## How It Works (User Flow)
+
+1. Host marks listing as rented (two-step confirmation modal — see safeguard prompt)
+2. 48-hour cooldown countdown shown on listing card
+3. After cooldown, **"Message Groups"** button activates
+4. Host taps button → `HostGroupOutreachScreen` opens
+5. Host sees groups, selects which to contact, writes message
+6. Host taps **"Pay & Send"** → price shown → Stripe PaymentSheet opens
+7. Payment succeeds → message delivered to group's chat screen
+8. Group members see host outreach card with report button
+
+---
+
+## Database Changes
+
+### Remove quota table (no longer needed)
+Drop `host_outreach_quota` — replaced by per-transaction Stripe charges.
+
+### Keep `host_outreach` table (from safeguard prompt)
+Add `payment_intent_id` column to track payment proof:
+
+```sql
+ALTER TABLE host_outreach
+  ADD COLUMN IF NOT EXISTS payment_intent_id TEXT,
+  ADD COLUMN IF NOT EXISTS amount_paid_cents INT;
+```
+
+### Add outreach packages table (optional — for dynamic pricing)
+
+```sql
+CREATE TABLE outreach_packages (
+  id TEXT PRIMARY KEY,          -- 'single', 'triple', 'all'
+  label TEXT NOT NULL,          -- 'Contact 1 Group'
+  group_count INT,              -- NULL = unlimited (all)
+  price_cents INT NOT NULL,
+  description TEXT
+);
+
+INSERT INTO outreach_packages VALUES
+  ('single', 'Contact 1 Group',   1,    299, 'Send to one group'),
+  ('triple', 'Contact 3 Groups',  3,    699, 'Best value — save 30%'),
+  ('all',    'Contact All Groups', NULL, 999, 'Reach every group on your listing');
+```
+
+---
+
+## Supabase Edge Function: `create-outreach-payment`
+
+Create new file `supabase/functions/create-outreach-payment/index.ts`:
+
+```ts
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import Stripe from 'https://esm.sh/stripe@13.3.0?target=deno';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!, {
+  apiVersion: '2023-10-16',
+});
+
+serve(async (req) => {
+  const { listingId, packageId, groupIds } = await req.json();
+
+  // Auth check
+  const authHeader = req.headers.get('Authorization')!;
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_ANON_KEY')!,
+    { global: { headers: { Authorization: authHeader } } }
+  );
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return new Response('Unauthorized', { status: 401 });
+
+  // Validate listing belongs to host and is rented
+  const { data: listing } = await supabase
+    .from('listings')
+    .select('id, status, outreach_unlocked_at, host_id')
+    .eq('id', listingId)
+    .single();
+
+  if (!listing || listing.host_id !== user.id) {
+    return new Response('Listing not found', { status: 404 });
+  }
+  if (listing.status !== 'rented') {
+    return new Response('Listing is not rented', { status: 400 });
+  }
+  if (!listing.outreach_unlocked_at || new Date() < new Date(listing.outreach_unlocked_at)) {
+    return new Response('Outreach not yet unlocked', { status: 400 });
+  }
+
+  // Get package pricing
+  const packages: Record<string, { cents: number; maxGroups: number | null }> = {
+    single: { cents: 299,  maxGroups: 1    },
+    triple: { cents: 699,  maxGroups: 3    },
+    all:    { cents: 999,  maxGroups: null },
+  };
+
+  const pkg = packages[packageId];
+  if (!pkg) return new Response('Invalid package', { status: 400 });
+
+  // Check selected groups don't exceed package limit
+  if (pkg.maxGroups !== null && groupIds.length > pkg.maxGroups) {
+    return new Response(`Package only allows ${pkg.maxGroups} group(s)`, { status: 400 });
+  }
+
+  // Ensure none of the groups were already contacted from this listing
+  const { data: existing } = await supabase
+    .from('host_outreach')
+    .select('group_id')
+    .eq('listing_id', listingId)
+    .in('group_id', groupIds);
+
+  if (existing && existing.length > 0) {
+    return new Response('One or more groups already contacted', { status: 400 });
+  }
+
+  // Get or create Stripe customer
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('stripe_customer_id, full_name, email')
+    .eq('id', user.id)
+    .single();
+
+  let customerId = profile?.stripe_customer_id;
+  if (!customerId) {
+    const customer = await stripe.customers.create({
+      email: profile?.email || user.email,
+      name: profile?.full_name,
+      metadata: { supabase_uid: user.id },
+    });
+    customerId = customer.id;
+    await supabase
+      .from('profiles')
+      .update({ stripe_customer_id: customerId })
+      .eq('id', user.id);
+  }
+
+  // Create PaymentIntent
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount: pkg.cents,
+    currency: 'usd',
+    customer: customerId,
+    automatic_payment_methods: { enabled: true },
+    metadata: {
+      listing_id: listingId,
+      host_id: user.id,
+      package_id: packageId,
+      group_ids: groupIds.join(','),
+    },
+  });
+
+  return new Response(
+    JSON.stringify({
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+      amountCents: pkg.cents,
+    }),
+    { headers: { 'Content-Type': 'application/json' } }
+  );
+});
+```
+
+---
+
+## Stripe Webhook: Handle Outreach Payment Success
+
+Add handler to existing `stripe-webhook` edge function:
+
+```ts
+// Inside the switch(event.type) block:
+
+case 'payment_intent.succeeded': {
+  const intent = event.data.object as Stripe.PaymentIntent;
+  const { listing_id, host_id, package_id, group_ids } = intent.metadata;
+
+  if (!listing_id || !group_ids) break; // not an outreach payment
+
+  const groupIdList = group_ids.split(',').filter(Boolean);
+
+  // Read the pending outreach message from our temp storage
+  // (stored in host_outreach_pending table, keyed by payment_intent_id)
+  const { data: pending } = await supabase
+    .from('host_outreach_pending')
+    .select('message')
+    .eq('payment_intent_id', intent.id)
+    .single();
+
+  if (!pending) break;
+
+  // Insert outreach records for each group
+  const rows = groupIdList.map(groupId => ({
+    host_id,
+    listing_id,
+    group_id: groupId,
+    message: pending.message,
+    payment_intent_id: intent.id,
+    amount_paid_cents: intent.amount,
+  }));
+
+  await supabase.from('host_outreach').insert(rows);
+
+  // Clean up pending record
+  await supabase
+    .from('host_outreach_pending')
+    .delete()
+    .eq('payment_intent_id', intent.id);
+
+  break;
+}
+```
+
+### Add `host_outreach_pending` table
+
+Temporarily holds the message until payment confirms:
+
+```sql
+CREATE TABLE host_outreach_pending (
+  payment_intent_id TEXT PRIMARY KEY,
+  host_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  listing_id UUID REFERENCES listings(id) ON DELETE CASCADE,
+  message TEXT NOT NULL,
+  group_ids TEXT[] NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Auto-clean stale pending records after 1 hour
+-- (Run as a scheduled job or cron in Supabase)
+DELETE FROM host_outreach_pending WHERE created_at < NOW() - INTERVAL '1 hour';
+```
+
+RLS:
+```sql
+CREATE POLICY "Hosts manage own pending outreach"
+ON host_outreach_pending FOR ALL
+USING (auth.uid() = host_id)
+WITH CHECK (auth.uid() = host_id);
+```
+
+---
+
+## Service Layer: `groupService.ts` — Outreach Functions
+
+```ts
+import { supabase } from '../lib/supabase';
+
+export interface OutreachPackage {
+  id: string;
+  label: string;
+  groupCount: number | null; // null = all
+  priceCents: number;
+  description: string;
+}
+
+export const OUTREACH_PACKAGES: OutreachPackage[] = [
+  { id: 'single', label: 'Contact 1 Group',    groupCount: 1,    priceCents: 299, description: 'Send to one group' },
+  { id: 'triple', label: 'Contact 3 Groups',   groupCount: 3,    priceCents: 699, description: 'Best value — save ~30%' },
+  { id: 'all',    label: 'Contact All Groups',  groupCount: null, priceCents: 999, description: 'Reach every group on your listing' },
+];
+
+/**
+ * Create a Stripe PaymentIntent for outreach and save pending message.
+ * Returns the clientSecret for PaymentSheet.
+ */
+export async function createOutreachPayment(
+  listingId: string,
+  packageId: string,
+  groupIds: string[],
+  message: string
+): Promise<{ clientSecret: string; paymentIntentId: string; amountCents: number }> {
+  const { data, error } = await supabase.functions.invoke('create-outreach-payment', {
+    body: { listingId, packageId, groupIds },
+  });
+
+  if (error) throw error;
+
+  const { clientSecret, paymentIntentId, amountCents } = data;
+
+  // Store message + payment intent for webhook to use after payment confirms
+  const { error: pendingError } = await supabase
+    .from('host_outreach_pending')
+    .insert({
+      payment_intent_id: paymentIntentId,
+      listing_id: listingId,
+      message,
+      group_ids: groupIds,
+    });
+
+  if (pendingError) throw pendingError;
+
+  return { clientSecret, paymentIntentId, amountCents };
+}
+
+/**
+ * Check which groups on a listing have already been contacted.
+ */
+export async function getContactedGroupIds(listingId: string): Promise<string[]> {
+  const { data } = await supabase
+    .from('host_outreach')
+    .select('group_id')
+    .eq('listing_id', listingId);
+
+  return (data || []).map((r: any) => r.group_id);
+}
+```
+
+---
+
+## Screen: `HostGroupOutreachScreen.tsx`
+
+Replace the quota-based screen with this pay-per-use version.
+
+```tsx
+import React, { useEffect, useState, useCallback } from 'react';
+import {
+  View, ScrollView, TextInput, TouchableOpacity,
+  ActivityIndicator, Alert, StyleSheet
+} from 'react-native';
+import { useStripe } from '@stripe/stripe-react-native';
+import { ThemedText } from '../../components/ThemedText';
+import { Feather } from '@expo/vector-icons';
+import { useTheme } from '../../context/ThemeContext';
+import { Typography, Spacing } from '../../constants/theme';
+import {
+  getGroupsForListing,
+  createOutreachPayment,
+  getContactedGroupIds,
+  OUTREACH_PACKAGES,
+  OutreachPackage,
+} from '../../services/groupService';
+import { getOutreachStatus } from '../../services/listingService';
+
+interface Props {
+  route: { params: { listingId: string; listingTitle: string } };
+  navigation: any;
+}
+
+export default function HostGroupOutreachScreen({ route, navigation }: Props) {
+  const { listingId, listingTitle } = route.params;
+  const { theme } = useTheme();
+  const { initPaymentSheet, presentPaymentSheet } = useStripe();
+
+  const [groups, setGroups] = useState<any[]>([]);
+  const [contactedIds, setContactedIds] = useState<Set<string>>(new Set());
+  const [outreachStatus, setOutreachStatus] = useState<{
+    unlocked: boolean; hoursRemaining: number;
+  }>({ unlocked: false, hoursRemaining: 48 });
+
+  const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
+  const [selectedPackage, setSelectedPackage] = useState<OutreachPackage | null>(null);
+  const [message, setMessage] = useState('');
+  const [paying, setPaying] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const [groupData, status, contacted] = await Promise.all([
+          getGroupsForListing(listingId),
+          getOutreachStatus(listingId),
+          getContactedGroupIds(listingId),
+        ]);
+        setGroups(groupData);
+        setOutreachStatus(status);
+        setContactedIds(new Set(contacted));
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, [listingId]);
+
+  // Auto-select best package when group selection changes
+  useEffect(() => {
+    const count = selectedGroupIds.size;
+    if (count === 0) { setSelectedPackage(null); return; }
+
+    // Find cheapest package that covers the selection
+    const available = OUTREACH_PACKAGES.filter(
+      p => p.groupCount === null || p.groupCount >= count
+    );
+    setSelectedPackage(available[0] || OUTREACH_PACKAGES[OUTREACH_PACKAGES.length - 1]);
+  }, [selectedGroupIds]);
+
+  function toggleGroup(groupId: string) {
+    setSelectedGroupIds(prev => {
+      const next = new Set(prev);
+      next.has(groupId) ? next.delete(groupId) : next.add(groupId);
+      return next;
+    });
+  }
+
+  async function handlePayAndSend() {
+    if (!selectedPackage) return;
+    if (!message.trim()) { Alert.alert('Write your message first'); return; }
+    if (selectedGroupIds.size === 0) { Alert.alert('Select at least one group'); return; }
+
+    setPaying(true);
+    try {
+      const groupIds = Array.from(selectedGroupIds);
+      const { clientSecret } = await createOutreachPayment(
+        listingId,
+        selectedPackage.id,
+        groupIds,
+        message.trim()
+      );
+
+      const { error: initError } = await initPaymentSheet({
+        paymentIntentClientSecret: clientSecret,
+        merchantDisplayName: 'RoomDrx',
+        appearance: {
+          colors: {
+            primary: theme.primary,
+            background: theme.card,
+            componentBackground: theme.background,
+            componentText: theme.text,
+          },
+        },
+      });
+
+      if (initError) throw new Error(initError.message);
+
+      const { error: presentError } = await presentPaymentSheet();
+
+      if (presentError) {
+        if (presentError.code !== 'Canceled') {
+          Alert.alert('Payment Failed', presentError.message);
+        }
+        return;
+      }
+
+      // Payment succeeded — webhook will deliver messages async
+      Alert.alert(
+        '✅ Messages Sent!',
+        `Your message is on its way to ${groupIds.length} group${groupIds.length > 1 ? 's' : ''}.`,
+        [{ text: 'Done', onPress: () => navigation.goBack() }]
+      );
+
+      // Optimistically update UI
+      setContactedIds(prev => new Set([...prev, ...groupIds]));
+      setSelectedGroupIds(new Set());
+      setMessage('');
+    } catch (e: any) {
+      console.error(e);
+      Alert.alert('Error', e.message || 'Something went wrong. Please try again.');
+    } finally {
+      setPaying(false);
+    }
+  }
+
+  const availableGroups = groups.filter(g => !contactedIds.has(g.id));
+  const allSelected = availableGroups.length > 0 &&
+    availableGroups.every(g => selectedGroupIds.has(g.id));
+
+  function toggleSelectAll() {
+    if (allSelected) {
+      setSelectedGroupIds(new Set());
+    } else {
+      setSelectedGroupIds(new Set(availableGroups.map(g => g.id)));
+    }
+  }
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator color={theme.primary} />
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView
+      style={{ flex: 1, backgroundColor: theme.background }}
+      contentContainerStyle={{ padding: Spacing.md, paddingBottom: 100 }}
+    >
+      <ThemedText style={[Typography.h2, { marginBottom: 4 }]}>Group Outreach</ThemedText>
+      <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.lg }]}>
+        {listingTitle} · Rented
+      </ThemedText>
+
+      {/* Cooldown warning */}
+      {!outreachStatus.unlocked && (
+        <View style={[styles.infoCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <Feather name="clock" size={16} color={theme.textSecondary} />
+          <ThemedText style={[Typography.small, { color: theme.textSecondary, marginLeft: 8, flex: 1 }]}>
+            Outreach unlocks in{' '}
+            <ThemedText style={{ fontWeight: '700', color: theme.text }}>
+              {outreachStatus.hoursRemaining}h
+            </ThemedText>
+            . This 48-hour window ensures the listing is genuinely rented.
+          </ThemedText>
+        </View>
+      )}
+
+      {/* Message composer */}
+      {outreachStatus.unlocked && (
+        <>
+          <View style={[styles.composerCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <ThemedText style={[Typography.body, { fontWeight: '600', marginBottom: 4 }]}>
+              Your message
+            </ThemedText>
+            <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.sm }]}>
+              One message sent to each group you select below.
+            </ThemedText>
+            <TextInput
+              value={message}
+              onChangeText={setMessage}
+              multiline
+              numberOfLines={4}
+              placeholder="Hi! Your group was interested in my listing — I have a similar property available that might be a great fit..."
+              placeholderTextColor={theme.textSecondary}
+              style={[
+                styles.messageInput,
+                { backgroundColor: theme.background, borderColor: theme.border, color: theme.text }
+              ]}
+              maxLength={500}
+            />
+            <ThemedText style={[Typography.small, { color: theme.textSecondary, textAlign: 'right', marginTop: 4 }]}>
+              {message.length}/500
+            </ThemedText>
+          </View>
+
+          {/* Groups list */}
+          <View style={styles.sectionHeader}>
+            <ThemedText style={[Typography.body, { fontWeight: '700' }]}>
+              Select groups to contact
+            </ThemedText>
+            {availableGroups.length > 1 && (
+              <TouchableOpacity onPress={toggleSelectAll}>
+                <ThemedText style={[Typography.small, { color: theme.primary }]}>
+                  {allSelected ? 'Deselect all' : 'Select all'}
+                </ThemedText>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {availableGroups.length === 0 && (
+            <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+              All groups have already been contacted.
+            </ThemedText>
+          )}
+
+          {availableGroups.map(group => {
+            const isSelected = selectedGroupIds.has(group.id);
+            return (
+              <TouchableOpacity
+                key={group.id}
+                style={[
+                  styles.groupRow,
+                  {
+                    backgroundColor: isSelected ? theme.primary + '15' : theme.card,
+                    borderColor: isSelected ? theme.primary : theme.border,
+                  }
+                ]}
+                onPress={() => toggleGroup(group.id)}
+              >
+                <View style={[
+                  styles.checkbox,
+                  {
+                    backgroundColor: isSelected ? theme.primary : 'transparent',
+                    borderColor: isSelected ? theme.primary : theme.border,
+                  }
+                ]}>
+                  {isSelected && <Feather name="check" size={12} color="#fff" />}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <ThemedText style={[Typography.body, { fontWeight: '600' }]} numberOfLines={1}>
+                    {group.name}
+                  </ThemedText>
+                  <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+                    {group.memberCount} {group.memberCount === 1 ? 'member' : 'members'} ·{' '}
+                    {group.members.slice(0, 3).map((m: any) => m.name.split(' ')[0]).join(', ')}
+                    {group.members.length > 3 ? ` +${group.members.length - 3}` : ''}
+                  </ThemedText>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+
+          {/* Already contacted */}
+          {groups.filter(g => contactedIds.has(g.id)).map(group => (
+            <View
+              key={group.id}
+              style={[styles.groupRow, { backgroundColor: theme.card, borderColor: theme.border, opacity: 0.5 }]}
+            >
+              <View style={[styles.checkbox, { backgroundColor: '#22C55E', borderColor: '#22C55E' }]}>
+                <Feather name="check" size={12} color="#fff" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <ThemedText style={[Typography.body, { fontWeight: '600' }]} numberOfLines={1}>
+                  {group.name}
+                </ThemedText>
+                <ThemedText style={[Typography.small, { color: '#22C55E' }]}>
+                  Already contacted
+                </ThemedText>
+              </View>
+            </View>
+          ))}
+
+          {/* Package selector + CTA */}
+          {selectedGroupIds.size > 0 && selectedPackage && (
+            <View style={[styles.ctaCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              <ThemedText style={[Typography.body, { fontWeight: '700', marginBottom: Spacing.sm }]}>
+                Pricing
+              </ThemedText>
+
+              {OUTREACH_PACKAGES.map(pkg => {
+                const covers = pkg.groupCount === null || pkg.groupCount >= selectedGroupIds.size;
+                const isSelected = pkg.id === selectedPackage.id;
+                return (
+                  <TouchableOpacity
+                    key={pkg.id}
+                    style={[
+                      styles.packageRow,
+                      {
+                        backgroundColor: isSelected ? theme.primary + '15' : 'transparent',
+                        borderColor: isSelected ? theme.primary : theme.border,
+                        opacity: covers ? 1 : 0.4,
+                      }
+                    ]}
+                    onPress={() => covers && setSelectedPackage(pkg)}
+                    disabled={!covers}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
+                        {pkg.label}
+                      </ThemedText>
+                      <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+                        {pkg.description}
+                      </ThemedText>
+                    </View>
+                    <ThemedText style={[Typography.h3, { color: isSelected ? theme.primary : theme.text }]}>
+                      ${(pkg.priceCents / 100).toFixed(2)}
+                    </ThemedText>
+                    {isSelected && (
+                      <Feather name="check-circle" size={16} color={theme.primary} style={{ marginLeft: 8 }} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+
+              <ThemedText style={[Typography.small, { color: theme.textSecondary, marginTop: Spacing.sm, marginBottom: Spacing.md }]}>
+                {selectedGroupIds.size} group{selectedGroupIds.size > 1 ? 's' : ''} selected ·{' '}
+                ${(selectedPackage.priceCents / 100).toFixed(2)} total
+              </ThemedText>
+
+              <TouchableOpacity
+                style={[styles.payBtn, { backgroundColor: paying ? theme.border : theme.primary }]}
+                onPress={handlePayAndSend}
+                disabled={paying}
+              >
+                {paying ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <>
+                    <Feather name="send" size={16} color="#fff" />
+                    <ThemedText style={[Typography.body, { color: '#fff', fontWeight: '700', marginLeft: 8 }]}>
+                      Pay ${(selectedPackage.priceCents / 100).toFixed(2)} & Send
+                    </ThemedText>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
+        </>
+      )}
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  infoCard: {
+    flexDirection: 'row', alignItems: 'flex-start',
+    padding: Spacing.sm, borderRadius: 12, borderWidth: 1,
+    marginBottom: Spacing.md,
+  },
+  composerCard: {
+    padding: Spacing.md, borderRadius: 14, borderWidth: 1,
+    marginBottom: Spacing.lg,
+  },
+  messageInput: {
+    borderWidth: 1, borderRadius: 10,
+    padding: Spacing.sm, minHeight: 100,
+    textAlignVertical: 'top', fontSize: 14,
+  },
+  sectionHeader: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'center', marginBottom: Spacing.sm,
+  },
+  groupRow: {
+    flexDirection: 'row', alignItems: 'center',
+    padding: Spacing.sm, borderRadius: 12, borderWidth: 1,
+    marginBottom: Spacing.sm, gap: Spacing.sm,
+  },
+  checkbox: {
+    width: 22, height: 22, borderRadius: 6, borderWidth: 1.5,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  ctaCard: {
+    padding: Spacing.md, borderRadius: 16, borderWidth: 1,
+    marginTop: Spacing.md,
+  },
+  packageRow: {
+    flexDirection: 'row', alignItems: 'center',
+    padding: Spacing.sm, borderRadius: 10, borderWidth: 1,
+    marginBottom: Spacing.sm,
+  },
+  payBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 16, borderRadius: 14,
+  },
+});
+```
+
+---
+
+## Navigation
+
+Add to host navigator:
+
+```ts
+<Stack.Screen
+  name="HostGroupOutreach"
+  component={HostGroupOutreachScreen}
+  options={{ title: 'Message Groups' }}
+/>
+```
+
+---
+
+## Revenue Math
+
+With pay-per-use pricing, outreach becomes a meaningful direct revenue stream:
+
+| Scenario | Price | Your Revenue (after Stripe) |
+|----------|-------|-----------------------------|
+| Host contacts 1 group | $2.99 | **~$2.60** |
+| Host contacts 3 groups | $6.99 | **~$6.49** |
+| Host contacts all groups | $9.99 | **~$9.40** |
+
+If 20 hosts/month use outreach averaging $6.99 each:
+→ **~$130/mo in pure outreach revenue** on top of subscriptions.
+
+---
+
+## Summary of Changes vs. Safeguard Prompt
+
+| What Changed | Why |
+|---|---|
+| Removed `host_outreach_quota` table | Replaced by per-transaction Stripe charges |
+| Removed plan-based quota check | All plans can use outreach — you pay per use |
+| Added `create-outreach-payment` edge function | Creates PaymentIntent for each outreach batch |
+| Added `host_outreach_pending` table | Holds message until webhook confirms payment |
+| Added package selector UI in outreach screen | Let host choose 1 / 3 / all package |
+| Stripe PaymentSheet wired to "Pay & Send" | Standard flow same as subscription payments |
+| 48-hour cooldown safeguard unchanged | Still prevents false "rented" abuse |

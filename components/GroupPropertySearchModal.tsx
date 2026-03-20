@@ -354,6 +354,12 @@ export function GroupPropertySearchModal({ visible, currentListingId, onSelect, 
                         {item.bedrooms} BR
                       </ThemedText>
                     </View>
+                    <View style={[styles.metaChip, { backgroundColor: theme.primary + '15' }]}>
+                      <Feather name="users" size={11} color={theme.primary} />
+                      <ThemedText style={[Typography.small, { color: theme.primary, marginLeft: 3 }]}>
+                        {item.bedrooms + 1} max members
+                      </ThemedText>
+                    </View>
                     {item.transitInfo && item.transitInfo.length > 0 ? (
                       <View style={[styles.metaChip, { backgroundColor: theme.border }]}>
                         <Feather name="navigation" size={11} color={theme.textSecondary} />
