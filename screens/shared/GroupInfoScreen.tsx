@@ -2,9 +2,10 @@ import React, { useEffect, useState } from 'react';
 import {
   View, ScrollView, Pressable, Switch,
   Alert, ActivityIndicator, StyleSheet, Platform,
-  Share,
+  Share, Dimensions,
 } from 'react-native';
 import * as Linking from 'expo-linking';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { ThemedText } from '../../components/ThemedText';
 import { Feather } from '../../components/VectorIcons';
@@ -27,9 +28,63 @@ import { GroupPropertySearchModal } from '../../components/GroupPropertySearchMo
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StorageService } from '../../utils/storage';
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
 interface Props {
   route: { params: { groupId: string; groupName?: string } };
   navigation: any;
+}
+
+function Section({ label, children, action, theme }: {
+  label: string;
+  children: React.ReactNode;
+  action?: { label: string; icon?: string; onPress: () => void };
+  theme: any;
+}) {
+  return (
+    <View style={styles.section}>
+      <View style={styles.sectionHeader}>
+        <ThemedText style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+          {label}
+        </ThemedText>
+        {action ? (
+          <Pressable
+            style={[styles.sectionActionBtn, { backgroundColor: theme.primary }]}
+            onPress={action.onPress}
+          >
+            <Feather name={(action.icon || 'user-plus') as any} size={13} color="#fff" />
+            <ThemedText style={{ fontSize: 13, color: '#fff', fontWeight: '700', marginLeft: 5 }}>
+              {action.label}
+            </ThemedText>
+          </Pressable>
+        ) : null}
+      </View>
+      {children}
+    </View>
+  );
+}
+
+function SettingRow({ icon, label, description, value, onChange, theme }: {
+  icon: string; label: string; description: string;
+  value: boolean; onChange: (v: boolean) => void; theme: any;
+}) {
+  return (
+    <View style={[styles.settingRow, { backgroundColor: theme.card, borderColor: theme.border }]}>
+      <View style={[styles.settingIcon, { backgroundColor: theme.primary + '20' }]}>
+        <Feather name={icon as any} size={15} color={theme.primary} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{label}</ThemedText>
+        <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>{description}</ThemedText>
+      </View>
+      <Switch
+        value={value}
+        onValueChange={onChange}
+        trackColor={{ false: theme.border, true: theme.primary }}
+        thumbColor="#fff"
+      />
+    </View>
+  );
 }
 
 export function GroupInfoScreen({ route, navigation }: Props) {
@@ -44,6 +99,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
   const [showPropertySearch, setShowPropertySearch] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
   const [codeCopied, setCodeCopied] = useState(false);
+  const [muted, setMuted] = useState(false);
 
   const isAdmin = group?.adminId === user?.id;
   const memberCount = group?.members?.length || 0;
@@ -310,6 +366,28 @@ export function GroupInfoScreen({ route, navigation }: Props) {
     );
   }
 
+  async function handleDeleteGroup() {
+    Alert.alert(
+      'Delete Group?',
+      'This will permanently delete the group and all its messages. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Group',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await leaveGroup(groupId);
+              navigation.popToTop();
+            } catch {
+              Alert.alert('Error', 'Could not delete group.');
+            }
+          },
+        },
+      ]
+    );
+  }
+
   function handleDiscoverableToggle(value: boolean) {
     if (!value) {
       const doTurnOff = () => {
@@ -396,7 +474,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
           <Pressable
             onPress={() => navigation.goBack()}
             hitSlop={12}
-            style={[styles.backBtn, { backgroundColor: theme.card || theme.backgroundDefault, borderWidth: 1, borderColor: theme.border, borderRadius: 20 }]}
+            style={[styles.backBtn, { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, borderRadius: 20 }]}
           >
             <Feather name="arrow-left" size={20} color={theme.text} />
           </Pressable>
@@ -410,69 +488,73 @@ export function GroupInfoScreen({ route, navigation }: Props) {
     );
   }
 
+  const inviteCodeChars = (inviteCode || 'XXXXXX').split('');
+
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
-      <View style={[styles.headerBar, { borderBottomColor: theme.border, paddingTop: insets.top + 8 }]}>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          hitSlop={12}
-          style={[styles.backBtn, { backgroundColor: theme.card || theme.backgroundDefault, borderWidth: 1, borderColor: theme.border, borderRadius: 20 }]}
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: insets.bottom + 48 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <LinearGradient
+          colors={[theme.primary + '40', theme.primary + '08', theme.background]}
+          style={[styles.hero, { paddingTop: insets.top + 16 }]}
         >
-          <Feather name="arrow-left" size={20} color={theme.text} />
-        </Pressable>
-        <ThemedText style={[Typography.h3, { flex: 1, textAlign: 'center' }]}>Group Info</ThemedText>
-        <View style={{ width: 40 }} />
-      </View>
+          <Pressable
+            onPress={() => navigation.goBack()}
+            hitSlop={12}
+            style={[styles.heroBackBtn, { backgroundColor: theme.card, borderColor: theme.border, top: insets.top + 16 }]}
+          >
+            <Feather name="arrow-left" size={20} color={theme.text} />
+          </Pressable>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
-        <View style={[styles.identityCard, { backgroundColor: theme.card }]}>
-          <View style={[styles.bigAvatar, { backgroundColor: theme.primary }]}>
-            <Feather name="users" size={32} color="#fff" />
+          <View style={[styles.heroAvatar, { backgroundColor: theme.primary }]}>
+            <Feather name="users" size={36} color="#fff" />
           </View>
-          <ThemedText style={[Typography.h2, { textAlign: 'center', marginTop: Spacing.sm }]}>
+
+          <ThemedText style={[Typography.h2, styles.heroName]}>
             {group.name}
           </ThemedText>
+
           {group.description ? (
-            <ThemedText style={[Typography.body, { color: theme.textSecondary, textAlign: 'center', marginTop: 4 }]}>
+            <ThemedText style={[Typography.body, { color: theme.textSecondary, textAlign: 'center', marginTop: 4, paddingHorizontal: Spacing.xl }]}>
               {group.description}
             </ThemedText>
           ) : null}
-          <View style={styles.metaRow}>
+
+          <View style={styles.chipRow}>
             {group.minBudget ? (
-              <View style={styles.metaChip}>
-                <Feather name="dollar-sign" size={12} color={theme.textSecondary} />
-                <ThemedText style={[Typography.small, { color: theme.textSecondary, marginLeft: 4 }]}>
+              <View style={[styles.chip, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <Feather name="dollar-sign" size={12} color={theme.primary} />
+                <ThemedText style={[Typography.small, { color: theme.text, marginLeft: 4 }]}>
                   Min ${group.minBudget.toLocaleString()}/mo
                 </ThemedText>
               </View>
             ) : null}
             {group.targetNeighborhood ? (
-              <View style={styles.metaChip}>
-                <Feather name="map-pin" size={12} color={theme.textSecondary} />
-                <ThemedText style={[Typography.small, { color: theme.textSecondary, marginLeft: 4 }]}>
+              <View style={[styles.chip, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <Feather name="map-pin" size={12} color={theme.primary} />
+                <ThemedText style={[Typography.small, { color: theme.text, marginLeft: 4 }]}>
                   {group.targetNeighborhood}
                 </ThemedText>
               </View>
             ) : null}
           </View>
-        </View>
+        </LinearGradient>
 
-        <View style={styles.section}>
-          <ThemedText style={[Typography.small, styles.sectionLabel, { color: theme.textSecondary }]}>
-            LINKED PROPERTY
-          </ThemedText>
+        <Section label="LINKED PROPERTY" theme={theme}>
           {group.linkedListing ? (
-            <View style={[styles.propertyRow, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
               <View style={{ flex: 1 }}>
-                <ThemedText style={[Typography.body, { fontWeight: '600' }]} numberOfLines={1}>
+                <ThemedText style={[Typography.body, { fontWeight: '700' }]} numberOfLines={1}>
                   {group.linkedListing.title}
                 </ThemedText>
-                <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
-                  {group.linkedListing.bedrooms}BR · {group.linkedListing.city} · ${group.linkedListing.rent?.toLocaleString()}/mo
+                <ThemedText style={[Typography.small, { color: theme.textSecondary, marginTop: 2 }]}>
+                  {group.linkedListing.bedrooms}BR · {group.linkedListing.city} · ${group.linkedListing.rent?.toLocaleString() || group.linkedListing.price?.toLocaleString()}/mo
                 </ThemedText>
                 {group.linkedListing.status === 'rented' ? (
                   <View style={styles.rentedBadge}>
-                    <ThemedText style={[Typography.small, { color: '#EF4444', fontWeight: '700', fontSize: 10 }]}>
+                    <ThemedText style={[Typography.small, { color: '#FF6B6B', fontWeight: '700', fontSize: 10 }]}>
                       RENTED
                     </ThemedText>
                   </View>
@@ -480,17 +562,17 @@ export function GroupInfoScreen({ route, navigation }: Props) {
               </View>
               {isAdmin ? (
                 <Pressable onPress={handleRemoveProperty} hitSlop={8}>
-                  <ThemedText style={[Typography.small, { color: '#EF4444' }]}>Remove</ThemedText>
+                  <ThemedText style={[Typography.small, { color: '#FF6B6B' }]}>Remove</ThemedText>
                 </Pressable>
               ) : null}
             </View>
           ) : isAdmin ? (
             <Pressable
-              style={[styles.addPropertyBtn, { borderColor: theme.primary }]}
+              style={[styles.dashedCard, { borderColor: theme.primary }]}
               onPress={() => setShowPropertySearch(true)}
             >
               <Feather name="plus" size={16} color={theme.primary} />
-              <ThemedText style={[Typography.body, { color: theme.primary, marginLeft: 8 }]}>
+              <ThemedText style={[Typography.body, { color: theme.primary, marginLeft: 8, fontWeight: '600' }]}>
                 Link a Property
               </ThemedText>
             </Pressable>
@@ -499,32 +581,25 @@ export function GroupInfoScreen({ route, navigation }: Props) {
               No property linked yet.
             </ThemedText>
           )}
-        </View>
+        </Section>
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeaderRow}>
-            <ThemedText style={[Typography.small, styles.sectionLabel, { color: theme.textSecondary, marginBottom: 0 }]}>
-              MEMBERS ({memberCount}/{memberLimit})
-            </ThemedText>
-            {isAdmin && memberCount < memberLimit ? (
-              <Pressable
-                style={[styles.addMembersBtn, { backgroundColor: theme.primary }]}
-                onPress={() => navigation.navigate('GroupInvite', {
-                  groupId,
-                  groupName: group.name,
-                  listingId: group.linkedListing?.id || null,
-                })}
-              >
-                <Feather name="user-plus" size={14} color="#fff" />
-                <ThemedText style={[Typography.small, { color: '#fff', fontWeight: '700', marginLeft: 6 }]}>
-                  Add
-                </ThemedText>
-              </Pressable>
-            ) : isAdmin ? (
-              <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>Group full</ThemedText>
-            ) : null}
-          </View>
-
+        <Section
+          label={`MEMBERS (${memberCount}/${memberLimit})`}
+          action={
+            isAdmin && memberCount < memberLimit
+              ? {
+                  label: 'Add',
+                  icon: 'user-plus',
+                  onPress: () => navigation.navigate('GroupInvite', {
+                    groupId,
+                    groupName: group.name,
+                    listingId: group.linkedListing?.id || null,
+                  }),
+                }
+              : undefined
+          }
+          theme={theme}
+        >
           {(group.members || []).map((member: any) => {
             const isCurrentUser = member.id === user?.id;
             const isMemberAdmin = member.id === group.adminId;
@@ -538,51 +613,50 @@ export function GroupInfoScreen({ route, navigation }: Props) {
                 {member.photo ? (
                   <Image source={{ uri: member.photo }} style={styles.memberAvatar} />
                 ) : (
-                  <View style={[styles.memberAvatar, { backgroundColor: theme.primary + '30', alignItems: 'center', justifyContent: 'center' }]}>
-                    <ThemedText style={[Typography.body, { fontWeight: '700', color: theme.primary }]}>
-                      {(member.name || '?').charAt(0)}
+                  <View style={[styles.memberAvatar, { backgroundColor: theme.primary + '25', alignItems: 'center', justifyContent: 'center' }]}>
+                    <ThemedText style={[Typography.body, { fontWeight: '800', color: theme.primary }]}>
+                      {(member.name || '?').charAt(0).toUpperCase()}
                     </ThemedText>
                   </View>
                 )}
 
                 <View style={{ flex: 1 }}>
                   <View style={styles.nameRow}>
-                    <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
+                    <ThemedText style={[Typography.body, { fontWeight: '700' }]}>
                       {member.name}{isCurrentUser ? ' (you)' : ''}
                     </ThemedText>
                     {isMemberAdmin ? (
                       <View style={[styles.adminBadge, { backgroundColor: theme.primary + '20' }]}>
-                        <Feather name="award" size={10} color={theme.primary} />
-                        <ThemedText style={[Typography.small, { color: theme.primary, marginLeft: 3, fontSize: 10 }]}>
+                        <Feather name="award" size={9} color={theme.primary} />
+                        <ThemedText style={{ fontSize: 10, color: theme.primary, marginLeft: 3, fontWeight: '700' }}>
                           Admin
                         </ThemedText>
                       </View>
                     ) : null}
                   </View>
-                  {member.role ? (
-                    <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
-                      {member.role === 'host' ? 'Host' : 'Renter'}
-                    </ThemedText>
-                  ) : null}
+                  <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+                    {member.role === 'host' ? 'Host' : 'Renter'}
+                    {member.verified ? ' · Verified' : ''}
+                  </ThemedText>
                 </View>
 
                 {isAdmin && !isCurrentUser && !isMemberAdmin ? (
-                  <View style={styles.adminActions}>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
                     <Pressable
-                      style={[styles.actionBtn, { borderColor: theme.primary }]}
+                      style={[styles.iconBtn, { borderColor: theme.primary }]}
                       onPress={() => handlePromoteMember(member.id, member.name)}
                     >
                       <Feather name="arrow-up" size={13} color={theme.primary} />
                     </Pressable>
                     <Pressable
-                      style={[styles.actionBtn, { borderColor: '#EF4444', marginLeft: 6 }]}
+                      style={[styles.iconBtn, { borderColor: '#FF6B6B' }]}
                       onPress={() => handleRemoveMember(member.id, member.name)}
                       disabled={isRemoving}
                     >
                       {isRemoving ? (
-                        <ActivityIndicator size="small" color="#EF4444" />
+                        <ActivityIndicator size="small" color="#FF6B6B" />
                       ) : (
-                        <Feather name="x" size={13} color="#EF4444" />
+                        <Feather name="x" size={13} color="#FF6B6B" />
                       )}
                     </Pressable>
                   </View>
@@ -591,53 +665,54 @@ export function GroupInfoScreen({ route, navigation }: Props) {
             );
           })}
 
-          <Pressable
-            style={[styles.textInviteBtn, { borderColor: theme.border }]}
-            onPress={handleInviteViaText}
-          >
-            <Feather name="message-circle" size={16} color="#10B981" />
-            <ThemedText style={[Typography.body, { color: theme.text, marginLeft: 8, flex: 1 }]}>
-              Invite via Text Message
+          <View style={[styles.inviteCodeCard, { backgroundColor: theme.primary + '12', borderColor: theme.primary + '30' }]}>
+            <ThemedText style={[Typography.small, { color: theme.primary, fontWeight: '700', letterSpacing: 1, marginBottom: Spacing.sm }]}>
+              INVITE CODE
             </ThemedText>
-            <Feather name="chevron-right" size={16} color={theme.textSecondary} />
-          </Pressable>
-        </View>
 
-        <View style={styles.section}>
-          <ThemedText style={[Typography.small, styles.sectionLabel, { color: theme.textSecondary }]}>
-            INVITE CODE
-          </ThemedText>
-          <View style={[styles.inviteCodeCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <Pressable onPress={handleCopyCode} style={styles.codeBoxTap}>
-              <ThemedText style={[styles.codeText, { color: theme.text }]}>
-                {inviteCode || '------'}
-              </ThemedText>
-              <ThemedText style={[Typography.small, { color: codeCopied ? theme.primary : theme.textSecondary, marginTop: 4 }]}>
-                {codeCopied ? 'Copied!' : 'Tap to copy'}
-              </ThemedText>
+            <Pressable onPress={handleCopyCode}>
+              <View style={styles.codeBoxRow}>
+                {inviteCodeChars.map((char: string, i: number) => (
+                  <View
+                    key={i}
+                    style={[styles.codeCharBox, { backgroundColor: theme.card, borderColor: theme.border }]}
+                  >
+                    <ThemedText style={[styles.codeChar, { color: theme.primary }]}>
+                      {char}
+                    </ThemedText>
+                  </View>
+                ))}
+              </View>
             </Pressable>
+
             <View style={styles.codeActions}>
               <Pressable
-                style={[styles.shareBtn, { backgroundColor: theme.primary }]}
+                style={[styles.codeActionBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
+                onPress={handleCopyCode}
+              >
+                <Feather
+                  name={codeCopied ? 'check' : 'copy'}
+                  size={14}
+                  color={codeCopied ? '#22C55E' : theme.text}
+                />
+                <ThemedText style={[Typography.small, { marginLeft: 6, color: codeCopied ? '#22C55E' : theme.text, fontWeight: '600' }]}>
+                  {codeCopied ? 'Copied!' : 'Copy'}
+                </ThemedText>
+              </Pressable>
+
+              <Pressable
+                style={[styles.codeActionBtn, { backgroundColor: theme.primary, borderColor: theme.primary }]}
                 onPress={handleShareCode}
               >
                 <Feather name="share-2" size={14} color="#fff" />
-                <ThemedText style={{ color: '#fff', fontWeight: '700', fontSize: 13, marginLeft: 6 }}>
-                  Share Link
-                </ThemedText>
-              </Pressable>
-              <Pressable
-                style={[styles.copyBtn, { borderColor: theme.border }]}
-                onPress={handleCopyCode}
-              >
-                <Feather name="copy" size={14} color={theme.text} />
-                <ThemedText style={{ color: theme.text, fontWeight: '600', fontSize: 13, marginLeft: 6 }}>
-                  Copy
+                <ThemedText style={[Typography.small, { marginLeft: 6, color: '#fff', fontWeight: '700' }]}>
+                  Share Invite
                 </ThemedText>
               </Pressable>
             </View>
+
             {isAdmin ? (
-              <Pressable onPress={handleRegenerateCode} style={{ alignItems: 'center', marginTop: 8 }}>
+              <Pressable onPress={handleRegenerateCode} style={{ alignItems: 'center', marginTop: 10 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <Feather name="refresh-cw" size={12} color={theme.textSecondary} />
                   <ThemedText style={[Typography.small, { color: theme.textSecondary, marginLeft: 4 }]}>
@@ -647,45 +722,93 @@ export function GroupInfoScreen({ route, navigation }: Props) {
               </Pressable>
             ) : null}
           </View>
-          <ThemedText style={[Typography.small, { color: theme.textSecondary, marginTop: 6 }]}>
-            This code is unique to your group and stays the same until regenerated.
-          </ThemedText>
-        </View>
 
-        {isAdmin ? (
-          <View style={styles.section}>
-            <ThemedText style={[Typography.small, styles.sectionLabel, { color: theme.textSecondary }]}>
-              SETTINGS
-            </ThemedText>
-            <View style={[styles.settingRow, { backgroundColor: theme.card, borderColor: theme.border }]}>
-              <View style={{ flex: 1 }}>
-                <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
-                  Discoverable
-                </ThemedText>
-                <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
-                  Allow others to find and request to join
-                </ThemedText>
+          {isAdmin ? (
+            <Pressable
+              style={[styles.inviteRow, { backgroundColor: theme.card, borderColor: theme.border }]}
+              onPress={() => navigation.navigate('GroupInvite', {
+                groupId,
+                groupName: group.name,
+                listingId: group.linkedListing?.id || null,
+                defaultTab: 'matches',
+              })}
+            >
+              <View style={[styles.inviteIcon, { backgroundColor: theme.primary + '20' }]}>
+                <Feather name="heart" size={15} color={theme.primary} />
               </View>
-              <Switch
-                value={group.discoverable ?? false}
-                onValueChange={handleDiscoverableToggle}
-                trackColor={{ false: theme.border, true: theme.primary }}
-                thumbColor="#fff"
-              />
-            </View>
-          </View>
-        ) : null}
+              <ThemedText style={[Typography.body, { flex: 1, fontWeight: '500' }]}>
+                Invite from Matches
+              </ThemedText>
+              <Feather name="chevron-right" size={18} color={theme.textSecondary} />
+            </Pressable>
+          ) : null}
 
-        <View style={[styles.section, { marginTop: Spacing.lg }]}>
           <Pressable
-            style={[styles.leaveBtn, { borderColor: '#EF4444' }]}
+            style={[styles.inviteRow, { backgroundColor: theme.card, borderColor: theme.border }]}
+            onPress={handleInviteViaText}
+          >
+            <View style={[styles.inviteIcon, { backgroundColor: '#10B98120' }]}>
+              <Feather name="message-circle" size={15} color="#10B981" />
+            </View>
+            <ThemedText style={[Typography.body, { flex: 1, fontWeight: '500' }]}>
+              Invite via Text Message
+            </ThemedText>
+            <Feather name="chevron-right" size={18} color={theme.textSecondary} />
+          </Pressable>
+        </Section>
+
+        <Section label="SETTINGS" theme={theme}>
+          {isAdmin ? (
+            <SettingRow
+              icon="compass"
+              label="Discoverable"
+              description="Let others find and request to join"
+              value={group.discoverable ?? false}
+              onChange={handleDiscoverableToggle}
+              theme={theme}
+            />
+          ) : null}
+          <SettingRow
+            icon="bell-off"
+            label="Mute Notifications"
+            description="Silence messages from this group"
+            value={muted}
+            onChange={setMuted}
+            theme={theme}
+          />
+        </Section>
+
+        <View style={[styles.section, { marginTop: Spacing.sm }]}>
+          {isAdmin ? (
+            <Pressable
+              style={[styles.dangerBtn, { borderColor: '#FF6B6B', marginBottom: 10 }]}
+              onPress={handleDeleteGroup}
+            >
+              <Feather name="trash-2" size={16} color="#FF6B6B" />
+              <ThemedText style={[Typography.body, { color: '#FF6B6B', fontWeight: '600', marginLeft: 8 }]}>
+                Delete Group
+              </ThemedText>
+            </Pressable>
+          ) : null}
+
+          <Pressable
+            style={[styles.dangerBtn, { borderColor: '#FF6B6B' }]}
             onPress={handleLeaveGroup}
           >
-            <Feather name="log-out" size={16} color="#EF4444" />
-            <ThemedText style={[Typography.body, { color: '#EF4444', fontWeight: '600', marginLeft: 8 }]}>
+            <Feather name="log-out" size={16} color="#FF6B6B" />
+            <ThemedText style={[Typography.body, { color: '#FF6B6B', fontWeight: '600', marginLeft: 8 }]}>
               Leave Group
             </ThemedText>
           </Pressable>
+
+          {!isAdmin ? (
+            <Pressable style={styles.reportBtn} onPress={() => Alert.alert('Report', 'This group has been reported.')}>
+              <Feather name="flag" size={13} color={theme.textSecondary} />
+              <ThemedText style={[Typography.small, { color: theme.textSecondary, marginLeft: 6 }]}>
+                Report this group
+              </ThemedText>
+            </Pressable>
+          ) : null}
         </View>
       </ScrollView>
 
@@ -722,94 +845,217 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  identityCard: {
+  hero: {
     alignItems: 'center',
-    padding: Spacing.xl,
+    paddingBottom: Spacing.xl,
+    position: 'relative',
+  },
+  heroBackBtn: {
+    position: 'absolute',
+    top: 0,
+    left: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    zIndex: 10,
+  },
+  heroAvatar: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: Spacing.sm,
   },
-  bigAvatar: {
-    width: 72, height: 72, borderRadius: 36,
-    alignItems: 'center', justifyContent: 'center',
+  heroName: { textAlign: 'center', marginTop: 4 },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'center',
+    marginTop: Spacing.sm,
+    paddingHorizontal: Spacing.md,
   },
-  metaRow: {
-    flexDirection: 'row', gap: Spacing.sm,
-    marginTop: Spacing.sm, flexWrap: 'wrap', justifyContent: 'center',
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
   },
-  metaChip: { flexDirection: 'row', alignItems: 'center' },
-  section: { paddingHorizontal: Spacing.md, marginBottom: Spacing.md },
-  sectionLabel: { fontWeight: '700', letterSpacing: 0.5, marginBottom: Spacing.sm },
-  sectionHeaderRow: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: Spacing.sm,
+  section: {
+    paddingHorizontal: Spacing.md,
+    marginBottom: Spacing.md,
+    marginTop: Spacing.sm,
   },
-  addMembersBtn: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
   },
-  propertyRow: {
-    flexDirection: 'row', alignItems: 'center',
-    padding: Spacing.sm, borderRadius: 12, borderWidth: 1,
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  },
+  sectionActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.sm,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  dashedCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.sm + 2,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
   },
   rentedBadge: {
-    alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2,
-    borderRadius: 4, marginTop: 4, backgroundColor: '#FEE2E2',
-  },
-  addPropertyBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    padding: Spacing.sm, borderRadius: 12, borderWidth: 1.5, borderStyle: 'dashed',
+    alignSelf: 'flex-start',
+    backgroundColor: '#FF6B6B20',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginTop: 4,
   },
   memberRow: {
-    flexDirection: 'row', alignItems: 'center',
-    padding: Spacing.sm, borderRadius: 12, borderWidth: 1,
-    marginBottom: Spacing.sm, gap: Spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.sm,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 8,
+    gap: 10,
   },
   memberAvatar: {
-    width: 42, height: 42, borderRadius: 21,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
   },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
   adminBadge: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 10,
   },
-  adminActions: { flexDirection: 'row', alignItems: 'center' },
-  actionBtn: {
-    width: 30, height: 30, borderRadius: 8, borderWidth: 1.5,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  textInviteBtn: {
-    flexDirection: 'row', alignItems: 'center',
-    padding: Spacing.sm, borderRadius: 12, borderWidth: 1,
-    marginTop: Spacing.xs,
-  },
-  settingRow: {
-    flexDirection: 'row', alignItems: 'center',
-    padding: Spacing.sm, borderRadius: 12, borderWidth: 1,
-  },
-  leaveBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    paddingVertical: 14, borderRadius: 12, borderWidth: 1.5,
+  iconBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   inviteCodeCard: {
-    borderRadius: 14, borderWidth: 1, padding: Spacing.md, alignItems: 'center',
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: Spacing.md,
+    alignItems: 'center',
+    marginBottom: 8,
+    marginTop: 4,
   },
-  codeBoxTap: {
-    alignItems: 'center', paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.lg, borderRadius: 10,
+  codeBoxRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: Spacing.md,
   },
-  codeText: {
-    fontSize: 28, fontWeight: '800', letterSpacing: 6,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  codeCharBox: {
+    width: 42,
+    height: 50,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  codeChar: {
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: 1,
   },
   codeActions: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    marginTop: Spacing.sm, width: '100%',
+    flexDirection: 'row',
+    gap: 10,
+    width: '100%',
   },
-  shareBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    paddingVertical: 12, borderRadius: 10,
+  codeActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
   },
-  copyBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    paddingVertical: 12, paddingHorizontal: 16, borderRadius: 10, borderWidth: 1,
+  inviteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.sm,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 8,
+    gap: 10,
+  },
+  inviteIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.sm,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 8,
+    gap: 10,
+  },
+  settingIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dangerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1.5,
+  },
+  reportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+    paddingVertical: 8,
   },
 });
