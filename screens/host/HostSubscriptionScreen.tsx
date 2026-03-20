@@ -276,13 +276,12 @@ export const HostSubscriptionScreen = () => {
           <Feather name="layers" size={16} color={display.badgeColor} />
           <View>
             <Text style={styles.listingCapStrong}>
-              {plan.listingsIncluded === 1 ? '1 Active Listing' : `Up to ${plan.listingsIncluded} Active Listings`}
+              {plan.listingsIncluded === 1 ? '1 Active Listing' : !isFinite(plan.listingsIncluded) ? 'Unlimited Active Listings' : `Up to ${plan.listingsIncluded} Active Listings`}
             </Text>
             <Text style={styles.listingCapSub}>
               {isFreePlan(planKey) ? 'Post and receive inquiries' :
                planKey === 'starter' ? 'Hard cap - upgrade to add more' :
-               planKey === 'pro' ? 'Hard cap - upgrade for more' :
-               '+$5/mo per listing beyond 15'}
+               'List as many properties as you need'}
             </Text>
           </View>
         </View>

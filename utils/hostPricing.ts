@@ -83,7 +83,7 @@ export const HOST_PLANS: Record<HostPlanType, {
   pro: {
     label: 'Host Pro',
     price: 49.99,
-    listingsIncluded: 999,
+    listingsIncluded: Infinity,
     overagePerListing: 0,
     freeBoosts: 2,
     freeBoostDuration: '72h',
@@ -107,7 +107,7 @@ export const HOST_PLANS: Record<HostPlanType, {
   business: {
     label: 'Host Business',
     price: 99.99,
-    listingsIncluded: 999,
+    listingsIncluded: Infinity,
     overagePerListing: 0,
     freeBoosts: 2,
     freeBoostDuration: '7d',
