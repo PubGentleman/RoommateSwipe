@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, StyleSheet, Pressable, FlatList, TextInput,
-  Alert, Share, ActivityIndicator, Switch,
+  Alert, Share, ActivityIndicator, Switch, Platform,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
+import * as Linking from 'expo-linking';
 import { Feather } from '../../components/VectorIcons';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
@@ -37,6 +39,8 @@ export function GroupInviteScreen({ navigation, route }: any) {
   const [respondingTo, setRespondingTo] = useState<string | null>(null);
   const [discoverable, setDiscoverable] = useState(false);
   const [discoverableLoaded, setDiscoverableLoaded] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [pasteCode, setPasteCode] = useState('');
 
   useEffect(() => {
     loadData();
@@ -113,11 +117,42 @@ export function GroupInviteScreen({ navigation, route }: any) {
     }
   };
 
+  const getDeepLink = () => {
+    return Linking.createURL('join-group', { queryParams: { code: inviteCode, group: groupName } });
+  };
+
+  const handleCopyCode = async () => {
+    try {
+      await Clipboard.setStringAsync(inviteCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      if (Platform.OS === 'web') {
+        try {
+          await navigator.clipboard.writeText(inviteCode);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        } catch {}
+      }
+    }
+  };
+
   const handleShareCode = async () => {
+    const deepLink = getDeepLink();
     try {
       await Share.share({
-        message: `Join my group "${groupName}" on Roomdr!\n\nUse invite code: ${inviteCode}\n\nDownload the app at roomdr.com`,
+        message: `Join my group "${groupName}" on Roomdr!\n\nTap the link to join instantly:\n${deepLink}\n\nOr enter invite code: ${inviteCode}`,
+        url: deepLink,
       });
+    } catch {}
+  };
+
+  const handlePasteCode = async () => {
+    try {
+      const text = await Clipboard.getStringAsync();
+      if (text && text.trim().length > 0) {
+        setPasteCode(text.trim().toUpperCase());
+      }
     } catch {}
   };
 
@@ -258,25 +293,56 @@ export function GroupInviteScreen({ navigation, route }: any) {
 
           {tab === 'code' && (
             <View style={styles.codeContainer}>
-              <ThemedText style={[Typography.body, { color: theme.textSecondary, textAlign: 'center', marginBottom: Spacing.xl }]}>
-                Share this code with anyone you want to invite. They can enter it from the Groups screen.
+              <ThemedText style={[Typography.body, { color: theme.textSecondary, textAlign: 'center', marginBottom: Spacing.lg }]}>
+                Share this code or link with anyone you want to invite.
               </ThemedText>
 
-              <View style={[styles.codeBox, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              <Pressable
+                onPress={handleCopyCode}
+                style={[styles.codeBox, {
+                  backgroundColor: copied ? theme.primary + '15' : theme.card,
+                  borderColor: copied ? theme.primary : theme.border,
+                }]}
+              >
                 <ThemedText style={[styles.codeText, { color: theme.text, letterSpacing: 8 }]}>
                   {inviteCode || '------'}
                 </ThemedText>
-              </View>
-
-              <Pressable
-                style={[styles.shareBtn, { backgroundColor: theme.primary }]}
-                onPress={handleShareCode}
-              >
-                <Feather name="share-2" size={18} color="#fff" style={{ marginRight: Spacing.sm }} />
-                <ThemedText style={[Typography.body, { color: '#fff', fontWeight: '600' }]}>
-                  Share Code
-                </ThemedText>
+                <View style={styles.copyHint}>
+                  <Feather
+                    name={copied ? 'check' : 'copy'}
+                    size={13}
+                    color={copied ? theme.primary : theme.textSecondary}
+                  />
+                  <ThemedText style={[Typography.small, {
+                    color: copied ? theme.primary : theme.textSecondary,
+                    marginLeft: 4, fontWeight: '600',
+                  }]}>
+                    {copied ? 'Copied!' : 'Tap to copy'}
+                  </ThemedText>
+                </View>
               </Pressable>
+
+              <View style={styles.codeActions}>
+                <Pressable
+                  style={[styles.actionBtn, { backgroundColor: theme.primary, flex: 1 }]}
+                  onPress={handleShareCode}
+                >
+                  <Feather name="share-2" size={16} color="#fff" style={{ marginRight: 6 }} />
+                  <ThemedText style={[Typography.body, { color: '#fff', fontWeight: '600' }]}>
+                    Share Link
+                  </ThemedText>
+                </Pressable>
+
+                <Pressable
+                  style={[styles.actionBtn, { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border }]}
+                  onPress={handleCopyCode}
+                >
+                  <Feather name="copy" size={16} color={theme.text} style={{ marginRight: 6 }} />
+                  <ThemedText style={[Typography.body, { color: theme.text, fontWeight: '600' }]}>
+                    Copy
+                  </ThemedText>
+                </Pressable>
+              </View>
 
               <Pressable style={styles.regenBtn} onPress={handleRegenerateCode}>
                 <Feather name="refresh-cw" size={14} color={theme.textSecondary} style={{ marginRight: 6 }} />
@@ -284,6 +350,26 @@ export function GroupInviteScreen({ navigation, route }: any) {
                   Regenerate code
                 </ThemedText>
               </Pressable>
+
+              <View style={[styles.divider, { backgroundColor: theme.border }]} />
+
+              <ThemedText style={[Typography.small, { color: theme.textSecondary, textAlign: 'center', marginBottom: Spacing.sm }]}>
+                HAVE A CODE? PASTE IT HERE
+              </ThemedText>
+              <View style={[styles.pasteRow, { borderColor: theme.border, backgroundColor: theme.card }]}>
+                <TextInput
+                  style={[styles.pasteInput, { color: theme.text }]}
+                  placeholder="Enter invite code..."
+                  placeholderTextColor={theme.textSecondary}
+                  value={pasteCode}
+                  onChangeText={(t) => setPasteCode(t.toUpperCase())}
+                  autoCapitalize="characters"
+                  maxLength={8}
+                />
+                <Pressable onPress={handlePasteCode} hitSlop={8} style={{ marginRight: 6 }}>
+                  <Feather name="clipboard" size={18} color={theme.primary} />
+                </Pressable>
+              </View>
             </View>
           )}
 
@@ -467,20 +553,42 @@ const styles = StyleSheet.create({
     flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.xl,
   },
   codeContainer: {
-    flex: 1, alignItems: 'center', padding: Spacing.xl, paddingTop: Spacing.xl * 2,
+    flex: 1, alignItems: 'center', padding: Spacing.xl, paddingTop: Spacing.xl,
   },
   codeBox: {
-    paddingVertical: Spacing.xl, paddingHorizontal: Spacing.xl * 2,
-    borderRadius: 20, borderWidth: 2, marginBottom: Spacing.xl,
+    paddingVertical: Spacing.lg, paddingHorizontal: Spacing.xl * 2,
+    borderRadius: 20, borderWidth: 2, marginBottom: Spacing.lg,
+    alignItems: 'center',
   },
   codeText: { fontSize: 32, fontWeight: '800' },
-  shareBtn: {
+  copyHint: {
     flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 14, paddingHorizontal: Spacing.xl,
-    borderRadius: 14, marginBottom: Spacing.md,
+    marginTop: Spacing.sm,
+  },
+  codeActions: {
+    flexDirection: 'row', gap: 10,
+    width: '100%', marginBottom: Spacing.sm,
+  },
+  actionBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 13, paddingHorizontal: Spacing.lg,
+    borderRadius: 14,
   },
   regenBtn: {
-    flexDirection: 'row', alignItems: 'center', marginTop: Spacing.md,
+    flexDirection: 'row', alignItems: 'center', marginTop: Spacing.sm,
+  },
+  divider: {
+    height: 1, width: '80%',
+    marginVertical: Spacing.xl,
+  },
+  pasteRow: {
+    flexDirection: 'row', alignItems: 'center',
+    borderRadius: 12, borderWidth: 1,
+    paddingHorizontal: Spacing.md, height: 48,
+    width: '100%',
+  },
+  pasteInput: {
+    flex: 1, fontSize: 16, fontWeight: '600', letterSpacing: 3,
   },
   infoBar: {
     flexDirection: 'row', alignItems: 'center',
