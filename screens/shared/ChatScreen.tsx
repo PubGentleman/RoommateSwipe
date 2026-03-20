@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Pressable, FlatList, TextInput, KeyboardAvoidingView, Platform, Alert, Modal, Linking } from 'react-native';
+import { View, StyleSheet, Pressable, FlatList, TextInput, KeyboardAvoidingView, Platform, Alert, Modal, Linking, Share } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
@@ -60,6 +60,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [showPropertySearch, setShowPropertySearch] = useState(false);
   const [myGroupRole, setMyGroupRole] = useState<'admin' | 'member' | null>(null);
   const [groupName, setGroupName] = useState<string>('Group Chat');
+  const [showOptionsMenu, setShowOptionsMenu] = useState(false);
 
   const [inquiryStatus, setInquiryStatus] = useState<'pending' | 'accepted' | 'declined'>(
     inquiryGroup?.inquiryStatus || inquiryGroup?.inquiry_status || 'pending'
@@ -825,86 +826,203 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
               <Feather name="user-plus" size={22} color={theme.primary} />
             </Pressable>
           ) : null}
-          <Pressable onPress={() => {
-            const isGroupChat = conversationId.startsWith('group-');
-            const options: any[] = [];
-            if (!isGroupChat) {
-              options.push({ text: 'Create Group', onPress: handleCreateGroup });
-            }
-            if (isGroupChat) {
-              if (myGroupRole === 'admin') {
-                options.push({
-                  text: 'Remove a Member',
-                  onPress: async () => {
-                    const groupId = conversationId.replace('group-', '');
-                    const { data: members } = await supabase
-                      .from('group_members')
-                      .select('user_id, users ( name )')
-                      .eq('group_id', groupId)
-                      .neq('user_id', user?.id || '');
-                    if (!members || members.length === 0) {
-                      Alert.alert('No Members', 'There are no other members to remove.');
-                      return;
-                    }
-                    const memberOptions = members.map((m: any) => ({
-                      text: m.users?.name || 'Member',
-                      style: 'destructive' as const,
-                      onPress: () => {
-                        Alert.alert(
-                          'Remove Member',
-                          `Remove ${m.users?.name || 'this member'} from the group?`,
-                          [
-                            { text: 'Cancel', style: 'cancel' },
-                            { text: 'Remove', style: 'destructive', onPress: async () => {
-                              try {
-                                await removeMember(groupId, m.user_id);
-                                Alert.alert('Done', `${m.users?.name || 'Member'} has been removed.`);
-                              } catch (err: any) {
-                                Alert.alert('Error', err.message);
-                              }
-                            }},
-                          ]
-                        );
-                      },
-                    }));
-                    memberOptions.push({ text: 'Cancel', style: 'cancel' as const, onPress: () => {} });
-                    Alert.alert('Remove Member', 'Select a member to remove:', memberOptions);
-                  },
-                });
-              }
-              options.push({
-                text: 'Leave Group', style: 'destructive',
-                onPress: () => {
-                  Alert.alert('Leave Group', 'Are you sure you want to leave this group?', [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Leave', style: 'destructive', onPress: async () => {
-                      const groupId = conversationId.replace('group-', '');
-                      try {
-                        await leaveGroup(groupId);
-                        navigation.goBack();
-                      } catch (err: any) {
-                        if (err.message === 'PROMOTE_REQUIRED') {
-                          navigation.navigate('PromoteAdmin' as any, {
-                            groupId,
-                            groupName: otherUser?.name || groupName,
-                          });
-                        } else {
-                          Alert.alert('Error', err.message);
-                        }
-                      }
-                    }},
-                  ]);
-                },
-              });
-            }
-            options.push({ text: 'Report / Block', onPress: () => setShowReportBlockModal(true) });
-            options.push({ text: 'Cancel', style: 'cancel' });
-            Alert.alert('Options', undefined, options);
-          }} style={styles.moreButton}>
+          <Pressable onPress={() => setShowOptionsMenu(true)} style={styles.moreButton}>
             <Feather name="more-vertical" size={24} color={theme.text} />
           </Pressable>
         </View>
       )}
+
+      <Modal
+        visible={showOptionsMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowOptionsMenu(false)}
+      >
+        <Pressable
+          style={styles.menuOverlay}
+          onPress={() => setShowOptionsMenu(false)}
+        >
+          <View style={[styles.menuSheet, { backgroundColor: theme.card }]}>
+            <View style={[styles.menuHandle, { backgroundColor: theme.border }]} />
+            <ThemedText style={[Typography.h3, { textAlign: 'center', marginBottom: Spacing.lg }]}>
+              Options
+            </ThemedText>
+
+            {!conversationId.startsWith('group-') ? (
+              <Pressable
+                style={[styles.menuItem, { borderBottomColor: theme.border }]}
+                onPress={() => { setShowOptionsMenu(false); handleCreateGroup(); }}
+              >
+                <View style={[styles.menuIconCircle, { backgroundColor: theme.primary + '15' }]}>
+                  <Feather name="users" size={18} color={theme.primary} />
+                </View>
+                <ThemedText style={[Typography.body, { flex: 1 }]}>Create Group</ThemedText>
+                <Feather name="chevron-right" size={18} color={theme.textSecondary} />
+              </Pressable>
+            ) : null}
+
+            {conversationId.startsWith('group-') ? (
+              <>
+                <Pressable
+                  style={[styles.menuItem, { borderBottomColor: theme.border }]}
+                  onPress={() => {
+                    setShowOptionsMenu(false);
+                    const groupId = conversationId.replace('group-', '');
+                    navigation.navigate('GroupInvite', {
+                      groupId,
+                      groupName: otherUser?.name || groupName,
+                      listingId: linkedListing?.id || null,
+                    });
+                  }}
+                >
+                  <View style={[styles.menuIconCircle, { backgroundColor: theme.primary + '15' }]}>
+                    <Feather name="user-plus" size={18} color={theme.primary} />
+                  </View>
+                  <ThemedText style={[Typography.body, { flex: 1 }]}>Invite Members</ThemedText>
+                  <Feather name="chevron-right" size={18} color={theme.textSecondary} />
+                </Pressable>
+
+                <Pressable
+                  style={[styles.menuItem, { borderBottomColor: theme.border }]}
+                  onPress={async () => {
+                    setShowOptionsMenu(false);
+                    const inviteMsg = `Join my group "${groupName}" on Roomdr!\n\nDownload the app at roomdr.com`;
+                    if (Platform.OS === 'web') {
+                      try { await Share.share({ message: inviteMsg }); } catch {}
+                    } else {
+                      const smsUrl = Platform.OS === 'ios'
+                        ? `sms:&body=${encodeURIComponent(inviteMsg)}`
+                        : `sms:?body=${encodeURIComponent(inviteMsg)}`;
+                      try { await Linking.openURL(smsUrl); } catch {
+                        try { await Share.share({ message: inviteMsg }); } catch {}
+                      }
+                    }
+                  }}
+                >
+                  <View style={[styles.menuIconCircle, { backgroundColor: '#10B98115' }]}>
+                    <Feather name="message-circle" size={18} color="#10B981" />
+                  </View>
+                  <ThemedText style={[Typography.body, { flex: 1 }]}>Invite via Text Message</ThemedText>
+                  <Feather name="chevron-right" size={18} color={theme.textSecondary} />
+                </Pressable>
+
+                <Pressable
+                  style={[styles.menuItem, { borderBottomColor: theme.border }]}
+                  onPress={async () => {
+                    setShowOptionsMenu(false);
+                    const shareMsg = `Join my group "${groupName}" on Roomdr!\n\nDownload the app at roomdr.com`;
+                    try { await Share.share({ message: shareMsg }); } catch {}
+                  }}
+                >
+                  <View style={[styles.menuIconCircle, { backgroundColor: '#6366F115' }]}>
+                    <Feather name="share-2" size={18} color="#6366F1" />
+                  </View>
+                  <ThemedText style={[Typography.body, { flex: 1 }]}>Share Invite Link</ThemedText>
+                  <Feather name="chevron-right" size={18} color={theme.textSecondary} />
+                </Pressable>
+
+                {myGroupRole === 'admin' ? (
+                  <Pressable
+                    style={[styles.menuItem, { borderBottomColor: theme.border }]}
+                    onPress={async () => {
+                      setShowOptionsMenu(false);
+                      const groupId = conversationId.replace('group-', '');
+                      const { data: members } = await supabase
+                        .from('group_members')
+                        .select('user_id, users ( name )')
+                        .eq('group_id', groupId)
+                        .neq('user_id', user?.id || '');
+                      if (!members || members.length === 0) {
+                        Alert.alert('No Members', 'There are no other members to remove.');
+                        return;
+                      }
+                      const memberOptions = members.map((m: any) => ({
+                        text: m.users?.name || 'Member',
+                        style: 'destructive' as const,
+                        onPress: () => {
+                          Alert.alert(
+                            'Remove Member',
+                            `Remove ${m.users?.name || 'this member'} from the group?`,
+                            [
+                              { text: 'Cancel', style: 'cancel' },
+                              { text: 'Remove', style: 'destructive', onPress: async () => {
+                                try {
+                                  await removeMember(groupId, m.user_id);
+                                  Alert.alert('Done', `${m.users?.name || 'Member'} has been removed.`);
+                                } catch (err: any) {
+                                  Alert.alert('Error', err.message);
+                                }
+                              }},
+                            ]
+                          );
+                        },
+                      }));
+                      memberOptions.push({ text: 'Cancel', style: 'cancel' as const, onPress: () => {} });
+                      Alert.alert('Remove Member', 'Select a member to remove:', memberOptions);
+                    }}
+                  >
+                    <View style={[styles.menuIconCircle, { backgroundColor: '#F59E0B15' }]}>
+                      <Feather name="user-minus" size={18} color="#F59E0B" />
+                    </View>
+                    <ThemedText style={[Typography.body, { flex: 1 }]}>Remove a Member</ThemedText>
+                    <Feather name="chevron-right" size={18} color={theme.textSecondary} />
+                  </Pressable>
+                ) : null}
+
+                <Pressable
+                  style={[styles.menuItem, { borderBottomColor: theme.border }]}
+                  onPress={() => {
+                    setShowOptionsMenu(false);
+                    Alert.alert('Leave Group', 'Are you sure you want to leave this group?', [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Leave', style: 'destructive', onPress: async () => {
+                        const groupId = conversationId.replace('group-', '');
+                        try {
+                          await leaveGroup(groupId);
+                          navigation.goBack();
+                        } catch (err: any) {
+                          if (err.message === 'PROMOTE_REQUIRED') {
+                            navigation.navigate('PromoteAdmin' as any, {
+                              groupId,
+                              groupName: otherUser?.name || groupName,
+                            });
+                          } else {
+                            Alert.alert('Error', err.message);
+                          }
+                        }
+                      }},
+                    ]);
+                  }}
+                >
+                  <View style={[styles.menuIconCircle, { backgroundColor: '#EF444415' }]}>
+                    <Feather name="log-out" size={18} color="#EF4444" />
+                  </View>
+                  <ThemedText style={[Typography.body, { flex: 1, color: '#EF4444' }]}>Leave Group</ThemedText>
+                  <Feather name="chevron-right" size={18} color={theme.textSecondary} />
+                </Pressable>
+              </>
+            ) : null}
+
+            <Pressable
+              style={[styles.menuItem, { borderBottomWidth: 0 }]}
+              onPress={() => { setShowOptionsMenu(false); setShowReportBlockModal(true); }}
+            >
+              <View style={[styles.menuIconCircle, { backgroundColor: '#EF444415' }]}>
+                <Feather name="alert-triangle" size={18} color="#EF4444" />
+              </View>
+              <ThemedText style={[Typography.body, { flex: 1 }]}>Report / Block</ThemedText>
+              <Feather name="chevron-right" size={18} color={theme.textSecondary} />
+            </Pressable>
+
+            <Pressable
+              style={[styles.menuCancelBtn, { backgroundColor: theme.background }]}
+              onPress={() => setShowOptionsMenu(false)}
+            >
+              <ThemedText style={[Typography.body, { fontWeight: '600', textAlign: 'center' }]}>Cancel</ThemedText>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
 
       {!isInquiryChat && !canSeeOnlineStatus() ? (
         <Pressable
@@ -1437,5 +1555,43 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(255,255,255,0.5)',
     textAlign: 'center' as const,
+  },
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  menuSheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    paddingBottom: 40,
+  },
+  menuHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: Spacing.lg,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    gap: Spacing.md,
+  },
+  menuIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuCancelBtn: {
+    marginTop: Spacing.lg,
+    paddingVertical: 14,
+    borderRadius: 14,
   },
 });
