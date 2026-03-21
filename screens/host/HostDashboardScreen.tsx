@@ -833,7 +833,7 @@ const styles = StyleSheet.create({
   },
   qaPrimary: { flex: 1 },
   qaPrimaryInner: {
-    height: 48,
+    height: 52,
     borderRadius: 14,
     flexDirection: 'row',
     alignItems: 'center',
@@ -843,7 +843,7 @@ const styles = StyleSheet.create({
   qaPrimaryText: { fontSize: 12.5, fontWeight: '700', color: '#fff' },
   qaSecondary: {
     flex: 1,
-    height: 48,
+    height: 52,
     borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.06)',
     borderWidth: 1,
