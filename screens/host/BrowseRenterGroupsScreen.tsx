@@ -331,23 +331,22 @@ export const BrowseRenterGroupsScreen = () => {
               )}
             </View>
           ))}
-          {spotsLeft > 0 ? (
-            <View style={[styles.avatarWrap, styles.avatarEmpty, { marginLeft: -18, zIndex: 0 }]}>
-              <Text style={styles.avatarPlus}>+</Text>
-            </View>
-          ) : null}
         </View>
 
         <View style={styles.memberCountRow}>
-          <Feather name="users" size={13} color="rgba(255,255,255,0.4)" />
+          <Feather name="users" size={12} color="rgba(255,255,255,0.35)" />
           <Text style={styles.memberCountText}>
-            {item.memberCount} of {item.maxMembers} members filled
+            {item.memberCount} of {item.maxMembers} filled
           </Text>
           {spotsLeft > 0 ? (
             <View style={styles.spotPill}>
-              <Text style={styles.spotPillText}>{spotsLeft} left</Text>
+              <Text style={styles.spotPillText}>{spotsLeft} spot{spotsLeft > 1 ? 's' : ''} left</Text>
             </View>
-          ) : null}
+          ) : (
+            <View style={[styles.spotPill, { backgroundColor: 'rgba(255,107,91,0.1)', borderColor: 'rgba(255,107,91,0.2)' }]}>
+              <Text style={[styles.spotPillText, { color: '#ff6b5b' }]}>Full</Text>
+            </View>
+          )}
         </View>
 
         <Text style={styles.groupName}>{item.name}</Text>
@@ -407,15 +406,10 @@ export const BrowseRenterGroupsScreen = () => {
               <Text style={[styles.ctaText, { color: '#22c55e' }]}>Message Sent</Text>
             </View>
           ) : (
-            <LinearGradient
-              colors={[ROOMDR_PURPLE, '#6a4d96']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.ctaGradient}
-            >
-              <Feather name="send" size={15} color="#fff" />
+            <>
+              <Feather name="message-circle" size={16} color="#fff" />
               <Text style={styles.ctaText}>Message This Group</Text>
-            </LinearGradient>
+            </>
           )}
         </Pressable>
       </Pressable>
@@ -444,7 +438,8 @@ export const BrowseRenterGroupsScreen = () => {
             {quota.remaining} of {quota.dailyCap + quota.paidExtra} left today
           </Text>
           <View style={styles.quotaTrack}>
-            <View style={[styles.quotaFill, { width: `${quotaFill * 100}%`, backgroundColor: quotaColor }]} />
+            <View style={[styles.quotaFill, { flex: quotaFill, backgroundColor: quotaColor }]} />
+            <View style={{ flex: 1 - quotaFill }} />
           </View>
           {quota.hitDailyLimit ? (
             <Pressable style={styles.unlockBtn} onPress={() => setShowUnlock(true)}>
@@ -537,21 +532,14 @@ export const BrowseRenterGroupsScreen = () => {
               onPress={handleSend}
               disabled={message.trim().length < MIN_MSG_LENGTH || sending}
             >
-              <LinearGradient
-                colors={[ROOMDR_PURPLE, '#6a4d96']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.sendBtnGradient}
-              >
-                {sending ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <>
-                    <Feather name="send" size={15} color="#fff" />
-                    <Text style={styles.sendBtnText}>Send Message</Text>
-                  </>
-                )}
-              </LinearGradient>
+              {sending ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Feather name="send" size={15} color="#fff" />
+                  <Text style={styles.sendBtnText}>Send Message</Text>
+                </>
+              )}
             </Pressable>
           </Pressable>
         </Pressable>
@@ -650,8 +638,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   quotaText: { fontSize: 12, color: 'rgba(255,255,255,0.5)', fontWeight: '600' },
-  quotaTrack: { width: 70, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
-  quotaFill: { height: '100%', borderRadius: 3 },
+  quotaTrack: { flex: 1, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden', flexDirection: 'row' },
+  quotaFill: { height: 6, borderRadius: 3 },
   unlockBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -691,24 +679,30 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: CARD_BG,
     borderRadius: 20,
-    padding: 20,
+    padding: 18,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.07)',
-    marginBottom: 16,
+    borderColor: 'rgba(255,255,255,0.08)',
+    marginBottom: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 6,
   },
 
   avatarCluster: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 14,
+    marginBottom: 8,
   },
   avatarWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    borderWidth: 3,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 2.5,
     borderColor: CARD_BG,
+    overflow: 'hidden',
   },
   avatarCircle: {
     width: '100%',
@@ -722,15 +716,7 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 30,
   },
-  avatarLetter: { fontSize: 22, fontWeight: '800', color: '#fff' },
-  avatarEmpty: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderStyle: 'dashed' as any,
-    borderColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarPlus: { fontSize: 22, fontWeight: '600', color: 'rgba(255,255,255,0.3)' },
+  avatarLetter: { fontSize: 18, fontWeight: '800', color: '#fff' },
 
   memberCountRow: {
     flexDirection: 'row',
@@ -741,12 +727,15 @@ const styles = StyleSheet.create({
   },
   memberCountText: { fontSize: 13, color: 'rgba(255,255,255,0.45)' },
   spotPill: {
-    backgroundColor: 'rgba(34,197,94,0.12)',
-    borderRadius: 10,
+    backgroundColor: 'rgba(46,204,113,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(46,204,113,0.2)',
+    borderRadius: 20,
     paddingHorizontal: 8,
     paddingVertical: 2,
+    marginLeft: 6,
   },
-  spotPillText: { fontSize: 11, fontWeight: '700', color: '#22c55e' },
+  spotPillText: { fontSize: 10, fontWeight: '700', color: '#2ecc71', letterSpacing: 0.3 },
 
   groupName: {
     fontSize: 20,
@@ -794,14 +783,14 @@ const styles = StyleSheet.create({
 
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
   lifestyleChip: {
-    backgroundColor: 'rgba(123,94,167,0.12)',
+    backgroundColor: 'rgba(168,85,247,0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(123,94,167,0.25)',
-    borderRadius: 8,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
+    borderColor: 'rgba(168,85,247,0.35)',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
-  lifestyleText: { fontSize: 12, fontWeight: '500', color: PURPLE },
+  lifestyleText: { fontSize: 11, fontWeight: '600', color: 'rgba(168,85,247,0.75)' },
 
   moveInRow: {
     flexDirection: 'row',
@@ -811,28 +800,28 @@ const styles = StyleSheet.create({
   },
   moveInText: { fontSize: 12, color: 'rgba(255,255,255,0.4)' },
 
-  ctaButton: { borderRadius: 14, overflow: 'hidden' },
-  ctaButtonSent: {
-    backgroundColor: 'rgba(34,197,94,0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(34,197,94,0.2)',
-    borderRadius: 14,
-  },
-  ctaGradient: {
+  ctaButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+    backgroundColor: '#ff6b5b',
+    borderRadius: 14,
     paddingVertical: 14,
+    marginTop: 16,
+  },
+  ctaButtonSent: {
+    backgroundColor: 'rgba(34,197,94,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(34,197,94,0.2)',
   },
   ctaInner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 14,
   },
-  ctaText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  ctaText: { color: '#fff', fontWeight: '700', fontSize: 15, letterSpacing: 0.3 },
 
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14 },
   loadingText: { fontSize: 14, color: 'rgba(255,255,255,0.4)' },
@@ -899,12 +888,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   warningText: { fontSize: 12, color: '#f59e0b' },
-  sendBtn: { borderRadius: 14, overflow: 'hidden' },
-  sendBtnGradient: {
+  sendBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+    backgroundColor: '#ff6b5b',
+    borderRadius: 14,
     paddingVertical: 16,
   },
   sendBtnText: { fontSize: 16, fontWeight: '700', color: '#fff' },
