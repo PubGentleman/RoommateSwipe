@@ -599,7 +599,13 @@ export const ExploreScreen = () => {
       return 0;
     });
 
-    setFilteredProperties(filtered);
+    const seen = new Set<string>();
+    const deduped = filtered.filter(p => {
+      if (seen.has(p.id)) return false;
+      seen.add(p.id);
+      return true;
+    });
+    setFilteredProperties(deduped);
   };
 
   const handleFilterPress = () => {
@@ -1045,7 +1051,7 @@ export const ExploreScreen = () => {
         <AnimatedFlatList
           data={filteredProperties}
           renderItem={renderProperty}
-          keyExtractor={(item: any) => item.id}
+          keyExtractor={(item: any, index: number) => `${item.id}-${index}`}
           contentContainerStyle={[
             styles.list,
             { paddingBottom: insets.bottom + 100, paddingTop: Spacing.lg },
