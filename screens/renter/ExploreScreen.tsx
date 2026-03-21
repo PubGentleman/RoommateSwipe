@@ -1023,19 +1023,22 @@ export const ExploreScreen = () => {
           </Pressable>
         </View>
 
-        <View style={styles.chipScrollWrapper}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ overflow: 'visible' }} contentContainerStyle={styles.chipScrollContent}>
-            {QUICK_FILTERS.map(f => {
-              const active = activeQuickFilters.has(f.key);
-              return (
-                <Pressable key={f.key} style={active ? styles.chipSelected : styles.chipUnselected} onPress={() => toggleQuickFilter(f.key)}>
-                  {f.icon ? <Feather name={f.icon} size={10} color={active ? '#fff' : 'rgba(255,255,255,0.45)'} /> : null}
-                  <Text style={active ? styles.chipSelectedText : styles.chipUnselectedText}>{f.label}</Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.filterScrollView}
+          contentContainerStyle={styles.chipScrollContent}
+        >
+          {QUICK_FILTERS.map(f => {
+            const active = activeQuickFilters.has(f.key);
+            return (
+              <Pressable key={f.key} style={active ? styles.chipSelected : styles.chipUnselected} onPress={() => toggleQuickFilter(f.key)}>
+                {f.icon ? <Feather name={f.icon} size={10} color={active ? '#fff' : 'rgba(255,255,255,0.45)'} /> : null}
+                <Text style={active ? styles.chipSelectedText : styles.chipUnselectedText}>{f.label}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
       </Animated.View>
       {displayMode === 'map' ? (
         <PropertyMapView
@@ -2101,14 +2104,13 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#fff',
   },
-  chipScrollWrapper: {
-    paddingTop: 4,
-    paddingBottom: 2,
+  filterScrollView: {
+    flexGrow: 0,
     marginBottom: 6,
   },
   chipScrollContent: {
     paddingHorizontal: 20,
-    paddingVertical: 4,
+    paddingVertical: 6,
     gap: 8,
     flexDirection: 'row',
     alignItems: 'center',
