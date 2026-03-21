@@ -939,7 +939,7 @@ export const RoommatesScreen = () => {
     );
   }
 
-  const lowProfileCount = profiles.length > 0 && profiles.length < 5 && activeCity;
+  const lowProfileCount = profiles.length > 0 && profiles.length <= 2 && activeCity;
 
   if (!currentProfile) {
     return (
