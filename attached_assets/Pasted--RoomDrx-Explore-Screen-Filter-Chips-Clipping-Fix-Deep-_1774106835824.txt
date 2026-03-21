@@ -1,0 +1,221 @@
+# RoomDrx — Explore Screen Filter Chips Clipping Fix (Deep Fix)
+
+## File: `screens/renter/ExploreScreen.tsx`
+
+---
+
+## Root Cause
+
+The filter chips are clipped both **vertically** (top of chips hidden) and **horizontally** (first/last chips cut off).
+This is NOT just a ScrollView issue. The **parent View that wraps both the tab row (All Listings / Saved) AND the filter chips ScrollView** has `overflow: hidden` — either explicitly, or implicitly because it has a `borderRadius` (on Android, any `borderRadius` forces `overflow: hidden` on the View).
+
+---
+
+## Fix — Separate the Tabs and Filter Chips into Sibling Views
+
+The key change is to **pull the filter chips ScrollView OUT of any container that has `borderRadius` or `overflow: hidden`**.
+
+### Before (likely current structure):
+
+```tsx
+{/* ❌ WRONG — single wrapper with borderRadius clips the ScrollView inside */}
+<View style={styles.listingHeader}>         {/* has borderRadius or overflow:hidden */}
+  <View style={styles.tabRow}>
+    <Pressable>All Listings</Pressable>
+    <Pressable>Saved</Pressable>
+  </View>
+  <ScrollView horizontal style={styles.filterScroll}>
+    {/* chips — GET CLIPPED */}
+  </ScrollView>
+</View>
+```
+
+### After (correct structure):
+
+```tsx
+{/* ✅ CORRECT — tabs and chips are siblings, not parent/child */}
+
+{/* Tab row — can have its own styling/borderRadius */}
+<View style={styles.tabRow}>
+  <Pressable
+    style={[styles.listingTab, activeTab === 'all' && styles.listingTabActive]}
+    onPress={() => setActiveTab('all')}
+  >
+    <Feather name="home" size={16} color={activeTab === 'all' ? '#fff' : 'rgba(255,255,255,0.45)'} />
+    <Text style={[styles.listingTabText, activeTab === 'all' && styles.listingTabTextActive]}>
+      All Listings
+    </Text>
+  </Pressable>
+  <Pressable
+    style={[styles.listingTab, activeTab === 'saved' && styles.listingTabActive]}
+    onPress={() => setActiveTab('saved')}
+  >
+    <View style={styles.tabLabelRow}>
+      <Feather name="heart" size={16} color={activeTab === 'saved' ? '#fff' : 'rgba(255,255,255,0.45)'} />
+      <Text style={[styles.listingTabText, activeTab === 'saved' && styles.listingTabTextActive]}>
+        Saved
+      </Text>
+      {savedCount > 0 && (
+        <View style={styles.savedBadge}>
+          <Text style={styles.savedBadgeText}>{savedCount}</Text>
+        </View>
+      )}
+    </View>
+  </Pressable>
+</View>
+
+{/* Filter chips — COMPLETELY SEPARATE, no shared parent with borderRadius */}
+<ScrollView
+  horizontal
+  showsHorizontalScrollIndicator={false}
+  style={styles.filterScrollView}        {/* ← no borderRadius here */}
+  contentContainerStyle={styles.filterScrollContent}
+>
+  {FILTER_OPTIONS.map((filter) => (
+    <Pressable
+      key={filter.key}
+      style={[styles.filterChip, activeFilter === filter.key && styles.filterChipActive]}
+      onPress={() => setActiveFilter(filter.key)}
+    >
+      {filter.icon && (
+        <Feather
+          name={filter.icon}
+          size={13}
+          color={activeFilter === filter.key ? '#fff' : 'rgba(255,255,255,0.45)'}
+        />
+      )}
+      <Text style={[styles.filterChipText, activeFilter === filter.key && styles.filterChipTextActive]}>
+        {filter.label}
+      </Text>
+    </Pressable>
+  ))}
+</ScrollView>
+```
+
+---
+
+## Updated Styles
+
+```ts
+// Tab row — no overflow:hidden, no borderRadius on this wrapper
+tabRow: {
+  flexDirection: 'row',
+  gap: 10,
+  paddingHorizontal: 20,
+  paddingTop: 12,
+  paddingBottom: 8,
+},
+listingTab: {
+  flex: 1,
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 7,
+  paddingVertical: 12,
+  borderRadius: 14,
+  backgroundColor: 'rgba(255,255,255,0.07)',
+},
+listingTabActive: {
+  backgroundColor: '#ff6b5b',
+},
+listingTabText: {
+  fontSize: 14,
+  fontWeight: '600',
+  color: 'rgba(255,255,255,0.45)',
+},
+listingTabTextActive: {
+  color: '#fff',
+  fontWeight: '700',
+},
+tabLabelRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 5,
+},
+savedBadge: {
+  backgroundColor: 'rgba(255,255,255,0.25)',
+  borderRadius: 10,
+  minWidth: 18,
+  height: 18,
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingHorizontal: 5,
+},
+savedBadgeText: {
+  fontSize: 10,
+  fontWeight: '800',
+  color: '#fff',
+},
+
+// Filter chips — standalone, NOT nested in a borderRadius container
+filterScrollView: {
+  // ⚠️ NO borderRadius here
+  // ⚠️ NO overflow: 'hidden' here
+  flexGrow: 0,          // don't stretch to fill remaining height
+},
+filterScrollContent: {
+  paddingHorizontal: 20,
+  paddingVertical: 6,   // vertical padding prevents shadow clipping
+  gap: 8,
+  flexDirection: 'row',
+  alignItems: 'center',
+},
+filterChip: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 5,
+  paddingHorizontal: 14,
+  paddingVertical: 9,
+  borderRadius: 20,
+  backgroundColor: 'rgba(255,255,255,0.07)',
+  borderWidth: 1,
+  borderColor: 'rgba(255,255,255,0.1)',
+},
+filterChipActive: {
+  backgroundColor: '#ff6b5b',
+  borderColor: 'transparent',
+},
+filterChipText: {
+  fontSize: 13,
+  fontWeight: '600',
+  color: 'rgba(255,255,255,0.45)',
+},
+filterChipTextActive: {
+  color: '#fff',
+  fontWeight: '700',
+},
+```
+
+---
+
+## Also Check These Common Culprits
+
+Search the file for any of the following applied to the **parent View** that wraps the tabs + chips, and either remove them or move the `ScrollView` outside:
+
+```ts
+// Any of these on a parent View will clip children on Android:
+overflow: 'hidden'     // ← remove entirely from chips parent
+borderRadius: <any>    // ← move to an inner View that does NOT contain the ScrollView
+elevation: <any>       // ← elevation alone won't clip, but combined with borderRadius will
+```
+
+If the entire screen is inside a `<View style={{ overflow: 'hidden' }}>` for some animation reason, replace it with:
+```ts
+// Instead of overflow hidden on the whole screen:
+<View style={{ flex: 1, backgroundColor: '#111' }}>
+```
+
+---
+
+## Quick Diagnostic
+
+If you're unsure which parent is causing it, temporarily add this to the filter ScrollView and its parent:
+
+```ts
+// Add temporarily to find the culprit:
+{ borderWidth: 2, borderColor: 'red' }    // on the ScrollView
+{ borderWidth: 2, borderColor: 'blue' }   // on its direct parent View
+{ borderWidth: 2, borderColor: 'green' }  // on its grandparent View
+```
+
+Whichever red/blue/green box is SMALLER than the chips you see rendered — that's the clipping container. Remove its `borderRadius` or `overflow: hidden`.

@@ -8,6 +8,7 @@ import { RoommateProfile } from '../../types/models';
 import { getZodiacSymbol, getZodiacCompatibilityScore, getZodiacCompatibilityLevel, getZodiacElement } from '../../utils/zodiacUtils';
 import { shouldAskMicroQuestion, getNextMicroQuestion, parseAnswerAndUpdatePreferences, markQuestionAsAsked, MicroQuestion } from '../../utils/aiMicroQuestions';
 import { LinearGradient } from 'expo-linear-gradient';
+import { sendAIMessage, createSessionId } from '../../utils/aiService';
 
 type AIMessage = {
   id: string;
@@ -45,7 +46,9 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [pendingMicroQuestion, setPendingMicroQuestion] = useState<MicroQuestion | null>(null);
+  const [limitWarning, setLimitWarning] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
+  const sessionId = useRef(createSessionId());
 
   useEffect(() => {
     sendWelcomeMessage();
@@ -275,10 +278,35 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
     setInputText('');
     setIsTyping(true);
 
+    try {
+      const { reply, remainingMessages } = await sendAIMessage(
+        messageText,
+        sessionId.current
+      );
+
+      setMessages(prev => [...prev, {
+        id: `ai_${Date.now()}`,
+        text: reply,
+        isUser: false,
+        timestamp: new Date(),
+      }]);
+
+      if (remainingMessages <= 2) {
+        setLimitWarning(`${remainingMessages} message${remainingMessages !== 1 ? 's' : ''} left today`);
+      }
+
+      setIsTyping(false);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+    } catch {
+      await handleSendFallback(messageText);
+    }
+  };
+
+  const handleSendFallback = async (messageText: string) => {
     setTimeout(async () => {
       if (pendingMicroQuestion) {
         const updatedUser = await parseAnswerAndUpdatePreferences(
-          user, messageText, pendingMicroQuestion.category
+          user!, messageText, pendingMicroQuestion.category
         );
         updateUser(updatedUser);
         const confirmationResponse: AIMessage = {
@@ -299,7 +327,7 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
           const microQuestion = getNextMicroQuestion(user);
           if (microQuestion) {
             setTimeout(async () => {
-              const updatedUser = await markQuestionAsAsked(user, microQuestion.id);
+              const updatedUser = await markQuestionAsAsked(user!, microQuestion.id);
               updateUser(updatedUser);
               const microQuestionMessage: AIMessage = {
                 id: `ai_micro_${Date.now()}`,
@@ -433,6 +461,12 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
         </View>
       ) : null}
 
+      {limitWarning ? (
+        <View style={styles.limitWarningBar}>
+          <Feather name="alert-circle" size={12} color="#f59e0b" />
+          <Text style={styles.limitWarningText}>{limitWarning}</Text>
+        </View>
+      ) : null}
       <View style={[styles.inputBar, { paddingBottom: insets.bottom + 12 }]}>
         <View style={styles.inputWrap}>
           <TextInput
@@ -683,5 +717,20 @@ const styles = StyleSheet.create({
   },
   sendBtnDisabled: {
     backgroundColor: 'rgba(255,107,91,0.3)',
+  },
+  limitWarningBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(245,158,11,0.1)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(245,158,11,0.2)',
+  },
+  limitWarningText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#f59e0b',
   },
 });

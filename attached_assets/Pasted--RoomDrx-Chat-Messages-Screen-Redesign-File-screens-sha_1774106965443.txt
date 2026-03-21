@@ -1,0 +1,629 @@
+# RoomDrx — Chat / Messages Screen Redesign
+
+## File: `screens/shared/ChatListScreen.tsx`
+(may also be named `MessagesScreen.tsx` or `InboxScreen.tsx`)
+
+---
+
+## Issues Being Fixed
+
+1. **"Unmatched" badge is the first thing you see** — dominates both rows, looks like an error state
+2. **"Direct" chip is purple** — breaks the coral accent system used everywhere else
+3. **Conversation rows are cramped** — name, badges, match %, and timestamp all crammed on one line
+4. **No filter tabs** — no way to separate Matches / Groups / Direct messages
+5. **Header is plain** — compose button is a grey circle with no visual weight; AI button has no label
+6. **Online dot is tiny** — easy to miss, not clearly indicating active status
+7. **Massive empty space** — bottom 80% of screen is dead black
+8. **No unread count on individual rows** — the badge shows 2 unread but it's small and in an odd position
+
+---
+
+## Change 1 — Header: Title + Compose Button
+
+Replace the plain grey circles with a proper header.
+
+```tsx
+<View style={styles.chatHeader}>
+  {/* Title */}
+  <View style={styles.chatHeaderLeft}>
+    <Text style={styles.chatHeaderTitle}>Messages</Text>
+    <View style={styles.chatHeaderBadge}>
+      <Text style={styles.chatHeaderBadgeText}>{totalUnread}</Text>
+    </View>
+  </View>
+
+  {/* Actions */}
+  <View style={styles.chatHeaderActions}>
+    <Pressable style={styles.chatHeaderBtn} onPress={handleSearch}>
+      <Feather name="search" size={18} color="rgba(255,255,255,0.6)" />
+    </Pressable>
+    <Pressable style={styles.chatHeaderBtn} onPress={handleNewMessage}>
+      <Feather name="edit-2" size={18} color="rgba(255,255,255,0.6)" />
+    </Pressable>
+  </View>
+</View>
+```
+
+**Styles:**
+
+```ts
+chatHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  paddingHorizontal: 20,
+  paddingTop: 16,
+  paddingBottom: 12,
+},
+chatHeaderLeft: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 10,
+},
+chatHeaderTitle: {
+  fontSize: 28,
+  fontWeight: '800',
+  color: '#fff',
+  letterSpacing: -0.5,
+},
+chatHeaderBadge: {
+  backgroundColor: '#ff6b5b',
+  borderRadius: 12,
+  minWidth: 24,
+  height: 24,
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingHorizontal: 7,
+},
+chatHeaderBadgeText: {
+  fontSize: 12,
+  fontWeight: '800',
+  color: '#fff',
+},
+chatHeaderActions: {
+  flexDirection: 'row',
+  gap: 8,
+},
+chatHeaderBtn: {
+  width: 38,
+  height: 38,
+  borderRadius: 19,
+  backgroundColor: 'rgba(255,255,255,0.08)',
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+```
+
+> **Remove the floating coral AI button from the top left** — move it into a dedicated AI section or as a pinned conversation row (see Change 4).
+
+---
+
+## Change 2 — Filter Tabs: All / Matches / Groups / Direct
+
+Add a horizontal filter row so users can quickly navigate between conversation types.
+
+```tsx
+<View style={styles.chatFilterWrap}>
+  <ScrollView
+    horizontal
+    showsHorizontalScrollIndicator={false}
+    style={{ overflow: 'visible' }}
+    contentContainerStyle={styles.chatFilterScroll}
+  >
+    {[
+      { key: 'all',     label: 'All',     count: totalUnread    },
+      { key: 'matches', label: 'Matches', count: matchUnread    },
+      { key: 'groups',  label: 'Groups',  count: groupUnread    },
+      { key: 'direct',  label: 'Direct',  count: directUnread   },
+    ].map((tab) => (
+      <Pressable
+        key={tab.key}
+        style={[styles.chatFilterTab, chatFilter === tab.key && styles.chatFilterTabActive]}
+        onPress={() => setChatFilter(tab.key)}
+      >
+        <Text style={[styles.chatFilterText, chatFilter === tab.key && styles.chatFilterTextActive]}>
+          {tab.label}
+        </Text>
+        {tab.count > 0 && (
+          <View style={[styles.chatFilterBadge, chatFilter === tab.key && styles.chatFilterBadgeActive]}>
+            <Text style={[styles.chatFilterBadgeText, chatFilter === tab.key && styles.chatFilterBadgeTextActive]}>
+              {tab.count}
+            </Text>
+          </View>
+        )}
+      </Pressable>
+    ))}
+  </ScrollView>
+</View>
+```
+
+**Styles:**
+
+```ts
+chatFilterWrap: {
+  paddingBottom: 8,
+},
+chatFilterScroll: {
+  paddingHorizontal: 20,
+  paddingVertical: 4,
+  gap: 8,
+  flexDirection: 'row',
+},
+chatFilterTab: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 6,
+  paddingHorizontal: 16,
+  paddingVertical: 8,
+  borderRadius: 20,
+  backgroundColor: 'rgba(255,255,255,0.06)',
+  borderWidth: 1,
+  borderColor: 'rgba(255,255,255,0.08)',
+},
+chatFilterTabActive: {
+  backgroundColor: '#ff6b5b',
+  borderColor: 'transparent',
+},
+chatFilterText: {
+  fontSize: 13,
+  fontWeight: '600',
+  color: 'rgba(255,255,255,0.45)',
+},
+chatFilterTextActive: {
+  color: '#fff',
+  fontWeight: '700',
+},
+chatFilterBadge: {
+  backgroundColor: 'rgba(255,255,255,0.12)',
+  borderRadius: 10,
+  paddingHorizontal: 6,
+  paddingVertical: 1,
+  minWidth: 20,
+  alignItems: 'center',
+},
+chatFilterBadgeActive: {
+  backgroundColor: 'rgba(255,255,255,0.25)',
+},
+chatFilterBadgeText: {
+  fontSize: 10,
+  fontWeight: '800',
+  color: 'rgba(255,255,255,0.5)',
+},
+chatFilterBadgeTextActive: {
+  color: '#fff',
+},
+```
+
+---
+
+## Change 3 — Conversation Rows: Full Redesign
+
+Replace the cramped single-line layout with a clean 3-row card structure.
+
+```tsx
+const renderConversation = ({ item }: { item: Conversation }) => {
+  const isUnmatched = item.status === 'unmatched';
+  const isOnline = item.isOnline;
+
+  return (
+    <Pressable
+      style={[styles.convRow, isUnmatched && styles.convRowUnmatched]}
+      onPress={() => !isUnmatched && navigation.navigate('Chat', { id: item.id })}
+    >
+      {/* Avatar */}
+      <View style={styles.convAvatarWrap}>
+        {item.photo ? (
+          <Image source={{ uri: item.photo }} style={[styles.convAvatar, isUnmatched && { opacity: 0.4 }]} />
+        ) : (
+          <LinearGradient
+            colors={['#667eea', '#764ba2']}
+            style={[styles.convAvatar, isUnmatched && { opacity: 0.4 }]}
+          >
+            <Text style={styles.convAvatarLetter}>{item.name[0]}</Text>
+          </LinearGradient>
+        )}
+        {/* Online dot */}
+        {isOnline && !isUnmatched && (
+          <View style={styles.onlineDot} />
+        )}
+      </View>
+
+      {/* Content */}
+      <View style={styles.convContent}>
+        {/* Row 1: Name + timestamp */}
+        <View style={styles.convTopRow}>
+          <Text style={[styles.convName, isUnmatched && styles.convNameMuted]} numberOfLines={1}>
+            {item.name}
+          </Text>
+          <Text style={[styles.convTime, item.unreadCount > 0 && styles.convTimeUnread]}>
+            {item.timestamp}
+          </Text>
+        </View>
+
+        {/* Row 2: Message preview + unread badge */}
+        <View style={styles.convMidRow}>
+          <Text
+            style={[styles.convPreview, isUnmatched && styles.convPreviewMuted]}
+            numberOfLines={1}
+          >
+            {isUnmatched ? 'This match has ended' : item.lastMessage}
+          </Text>
+          {item.unreadCount > 0 && !isUnmatched && (
+            <View style={styles.unreadBadge}>
+              <Text style={styles.unreadBadgeText}>{item.unreadCount}</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Row 3: Tags (only shown when NOT unmatched) */}
+        {!isUnmatched && (
+          <View style={styles.convTagRow}>
+            {item.matchScore && (
+              <View style={styles.matchTag}>
+                <Feather name="heart" size={9} color="#ff6b5b" />
+                <Text style={styles.matchTagText}>{item.matchScore}% match</Text>
+              </View>
+            )}
+            {item.type === 'direct' && (
+              <View style={styles.directTag}>
+                <Feather name="send" size={9} color="rgba(255,255,255,0.4)" />
+                <Text style={styles.directTagText}>Direct</Text>
+              </View>
+            )}
+            {item.type === 'group' && (
+              <View style={styles.groupTag}>
+                <Feather name="users" size={9} color="rgba(255,255,255,0.4)" />
+                <Text style={styles.groupTagText}>Group</Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Unmatched state: subtle archive prompt */}
+        {isUnmatched && (
+          <Text style={styles.unmatchedHint}>Tap to archive</Text>
+        )}
+      </View>
+    </Pressable>
+  );
+};
+```
+
+**Styles:**
+
+```ts
+convRow: {
+  flexDirection: 'row',
+  alignItems: 'flex-start',
+  paddingHorizontal: 20,
+  paddingVertical: 14,
+  gap: 14,
+  borderBottomWidth: 1,
+  borderBottomColor: 'rgba(255,255,255,0.05)',
+},
+convRowUnmatched: {
+  opacity: 0.55,  // dim unmatched rows instead of showing big red badge
+},
+convAvatarWrap: {
+  position: 'relative',
+  flexShrink: 0,
+},
+convAvatar: {
+  width: 54,
+  height: 54,
+  borderRadius: 27,
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+convAvatarLetter: {
+  fontSize: 22,
+  fontWeight: '700',
+  color: '#fff',
+},
+onlineDot: {
+  position: 'absolute',
+  bottom: 1,
+  right: 1,
+  width: 13,
+  height: 13,
+  borderRadius: 7,
+  backgroundColor: '#2ecc71',
+  borderWidth: 2,
+  borderColor: '#111',
+},
+convContent: {
+  flex: 1,
+  gap: 4,
+},
+convTopRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+},
+convName: {
+  fontSize: 15,
+  fontWeight: '700',
+  color: '#fff',
+  flex: 1,
+  marginRight: 8,
+},
+convNameMuted: {
+  color: 'rgba(255,255,255,0.4)',
+},
+convTime: {
+  fontSize: 12,
+  color: 'rgba(255,255,255,0.3)',
+  fontWeight: '500',
+  flexShrink: 0,
+},
+convTimeUnread: {
+  color: '#ff6b5b',
+  fontWeight: '700',
+},
+convMidRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+},
+convPreview: {
+  fontSize: 13,
+  color: 'rgba(255,255,255,0.45)',
+  flex: 1,
+  marginRight: 8,
+},
+convPreviewMuted: {
+  color: 'rgba(255,255,255,0.25)',
+  fontStyle: 'italic',
+},
+unreadBadge: {
+  backgroundColor: '#ff6b5b',
+  borderRadius: 12,
+  minWidth: 22,
+  height: 22,
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingHorizontal: 6,
+  flexShrink: 0,
+},
+unreadBadgeText: {
+  fontSize: 11,
+  fontWeight: '800',
+  color: '#fff',
+},
+convTagRow: {
+  flexDirection: 'row',
+  gap: 6,
+  marginTop: 2,
+},
+matchTag: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 4,
+  backgroundColor: 'rgba(255,107,91,0.1)',
+  borderRadius: 10,
+  paddingHorizontal: 8,
+  paddingVertical: 3,
+},
+matchTagText: {
+  fontSize: 10,
+  fontWeight: '700',
+  color: '#ff6b5b',
+},
+directTag: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 4,
+  backgroundColor: 'rgba(255,255,255,0.06)',
+  borderRadius: 10,
+  paddingHorizontal: 8,
+  paddingVertical: 3,
+},
+directTagText: {
+  fontSize: 10,
+  fontWeight: '600',
+  color: 'rgba(255,255,255,0.35)',
+},
+groupTag: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 4,
+  backgroundColor: 'rgba(255,255,255,0.06)',
+  borderRadius: 10,
+  paddingHorizontal: 8,
+  paddingVertical: 3,
+},
+groupTagText: {
+  fontSize: 10,
+  fontWeight: '600',
+  color: 'rgba(255,255,255,0.35)',
+},
+unmatchedHint: {
+  fontSize: 11,
+  color: 'rgba(255,255,255,0.2)',
+  marginTop: 1,
+},
+```
+
+---
+
+## Change 4 — Pinned AI Assistant Row (Replaces Floating AI Button)
+
+Instead of a floating coral AI button with no label, add a pinned AI conversation row at the top of the list — always visible, always accessible.
+
+```tsx
+// Render this ABOVE the FlatList, below the filter tabs:
+<Pressable
+  style={styles.aiConvRow}
+  onPress={() => navigation.navigate('AIMatchAssistant')}
+>
+  <LinearGradient colors={['#ff6b5b', '#ff8c7a']} style={styles.aiConvAvatar}>
+    <Feather name="cpu" size={22} color="#fff" />
+  </LinearGradient>
+  <View style={styles.aiConvContent}>
+    <View style={styles.convTopRow}>
+      <Text style={styles.aiConvName}>AI Match Assistant</Text>
+      <View style={styles.proBadge}>
+        <Text style={styles.proBadgeText}>PRO</Text>
+      </View>
+    </View>
+    <Text style={styles.aiConvSubtitle}>Find roommates, neighborhoods, zodiac tips...</Text>
+  </View>
+  <Feather name="chevron-right" size={18} color="rgba(255,255,255,0.25)" />
+</Pressable>
+
+{/* Divider */}
+<View style={styles.sectionLabel}>
+  <Text style={styles.sectionLabelText}>CONVERSATIONS</Text>
+</View>
+```
+
+**Styles:**
+
+```ts
+aiConvRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingHorizontal: 20,
+  paddingVertical: 14,
+  gap: 14,
+  borderBottomWidth: 1,
+  borderBottomColor: 'rgba(255,255,255,0.05)',
+},
+aiConvAvatar: {
+  width: 54,
+  height: 54,
+  borderRadius: 27,
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexShrink: 0,
+},
+aiConvContent: {
+  flex: 1,
+  gap: 4,
+},
+aiConvName: {
+  fontSize: 15,
+  fontWeight: '700',
+  color: '#fff',
+},
+aiConvSubtitle: {
+  fontSize: 13,
+  color: 'rgba(255,255,255,0.35)',
+},
+proBadge: {
+  backgroundColor: 'rgba(168,85,247,0.2)',
+  borderRadius: 8,
+  paddingHorizontal: 7,
+  paddingVertical: 2,
+  borderWidth: 1,
+  borderColor: 'rgba(168,85,247,0.35)',
+},
+proBadgeText: {
+  fontSize: 9,
+  fontWeight: '800',
+  color: '#a855f7',
+  letterSpacing: 0.5,
+},
+sectionLabel: {
+  paddingHorizontal: 20,
+  paddingTop: 16,
+  paddingBottom: 8,
+},
+sectionLabelText: {
+  fontSize: 11,
+  fontWeight: '700',
+  color: 'rgba(255,255,255,0.25)',
+  letterSpacing: 1.2,
+  textTransform: 'uppercase',
+},
+```
+
+---
+
+## Change 5 — Empty State
+
+For when the filtered list has no conversations:
+
+```tsx
+// Inside FlatList ListEmptyComponent:
+<View style={styles.chatEmptyWrap}>
+  <View style={styles.chatEmptyIcon}>
+    <Feather name="message-circle" size={30} color="rgba(255,107,91,0.5)" />
+  </View>
+  <Text style={styles.chatEmptyTitle}>No conversations yet</Text>
+  <Text style={styles.chatEmptySubtitle}>
+    {chatFilter === 'matches'
+      ? 'Match with someone to start chatting'
+      : chatFilter === 'groups'
+      ? 'Join or create a group to start a group chat'
+      : 'Start a conversation from a listing or profile'}
+  </Text>
+  <Pressable style={styles.chatEmptyCta} onPress={() => navigation.navigate('Explore')}>
+    <Text style={styles.chatEmptyCtaText}>Browse Listings</Text>
+    <Feather name="arrow-right" size={14} color="#ff6b5b" />
+  </Pressable>
+</View>
+```
+
+**Styles:**
+
+```ts
+chatEmptyWrap: {
+  flex: 1,
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingHorizontal: 40,
+  paddingTop: 60,
+},
+chatEmptyIcon: {
+  width: 70,
+  height: 70,
+  borderRadius: 35,
+  backgroundColor: 'rgba(255,107,91,0.1)',
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginBottom: 20,
+},
+chatEmptyTitle: {
+  fontSize: 20,
+  fontWeight: '800',
+  color: '#fff',
+  marginBottom: 10,
+  letterSpacing: -0.3,
+},
+chatEmptySubtitle: {
+  fontSize: 14,
+  color: 'rgba(255,255,255,0.35)',
+  textAlign: 'center',
+  lineHeight: 20,
+  marginBottom: 24,
+},
+chatEmptyCta: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 6,
+  paddingHorizontal: 20,
+  paddingVertical: 12,
+  backgroundColor: 'rgba(255,107,91,0.1)',
+  borderWidth: 1,
+  borderColor: 'rgba(255,107,91,0.25)',
+  borderRadius: 14,
+},
+chatEmptyCtaText: {
+  fontSize: 14,
+  fontWeight: '700',
+  color: '#ff6b5b',
+},
+```
+
+---
+
+## Summary of Changes
+
+| # | What changes | Where |
+|---|---|---|
+| 1 | Header: "Messages" title + unread count badge + clean search/compose buttons | Header JSX + styles |
+| 2 | Filter tabs: All / Matches / Groups / Direct with unread counts | New filter row below header |
+| 3 | Conversation rows: 3-row layout (name+time / preview+badge / tags), unmatched rows dimmed instead of big red badge, "Direct" chip changes from purple to neutral grey | `renderConversation` + styles |
+| 4 | AI floating button removed → replaced with pinned AI Assistant row at top of list | Above FlatList |
+| 5 | Empty state per filter tab with CTA to browse listings | `ListEmptyComponent` |
