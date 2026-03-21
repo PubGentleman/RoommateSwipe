@@ -123,7 +123,7 @@ const STEP_SUBTITLES: Record<StepId, string> = {
   noiseTolerance: 'How much noise can you handle?',
   workPets: 'Where do you work and how do you feel about pets?',
   housing: 'What are your housing needs?',
-  interests: 'Pick at least 3 tags that match your lifestyle. This helps us find your perfect roommate.',
+  interests: 'Pick at least 1 tag from each category. This helps us find your perfect roommate.',
   expenses: 'How would you like to split shared costs?',
   personality: '5 quick questions to find your best matches',
 };

@@ -12,7 +12,7 @@ const ACCENT = '#ff6b5b';
 const SHEET_BG = '#1a1a1a';
 
 const CATEGORY_ORDER = ['lifestyle', 'habits', 'hobbies', 'social', 'diet'] as const;
-const REQUIRED_CATEGORIES = ['lifestyle', 'habits', 'hobbies'];
+const REQUIRED_CATEGORIES = ['lifestyle', 'habits', 'hobbies', 'social', 'diet'];
 
 type CategoryKey = typeof CATEGORY_ORDER[number];
 
@@ -20,8 +20,8 @@ const CATEGORY_META: Record<CategoryKey, { required: boolean }> = {
   lifestyle: { required: true },
   habits: { required: true },
   hobbies: { required: true },
-  social: { required: false },
-  diet: { required: false },
+  social: { required: true },
+  diet: { required: true },
 };
 
 const TAG_IDS_BY_CATEGORY: Record<string, string[]> = {};
@@ -90,14 +90,13 @@ export const InterestCategoryBars = ({ selectedTags: rawSelectedTags, onChange, 
             <View key={key} style={styles.dotItem}>
               <View style={[styles.dot, hasSelection && styles.dotFilled]} />
               <Text style={styles.dotLabel}>{INTEREST_TAGS[key].label}</Text>
-              {!meta.required ? <Text style={styles.dotOptional}>Optional</Text> : null}
             </View>
           );
         })}
       </View>
 
-      <Text style={[styles.totalCount, selectedTags.length >= 3 && { color: ACCENT }]}>
-        {selectedTags.length} / 3 tags selected
+      <Text style={[styles.totalCount, selectedTags.length >= 5 && { color: ACCENT }]}>
+        {selectedTags.length} / 5 tags selected
       </Text>
 
       {CATEGORY_ORDER.map((key) => {
@@ -107,7 +106,7 @@ export const InterestCategoryBars = ({ selectedTags: rawSelectedTags, onChange, 
         const hasSelection = catTags.length > 0;
 
         return (
-          <Pressable key={key} style={[styles.categoryBar, hasSelection && meta.required && styles.categoryBarRequired]} onPress={() => openModal(key)}>
+          <Pressable key={key} style={({ pressed }) => [styles.categoryBar, hasSelection && styles.categoryBarFilled, !hasSelection && meta.required && styles.categoryBarRequired, pressed && { opacity: 0.7 }]} onPress={() => openModal(key)} android_ripple={{ color: 'rgba(255,107,91,0.15)' }}>
             <View style={styles.categoryBarLeft}>
               <Feather name={category.icon as any} size={18} color="#fff" />
               <Text style={styles.categoryBarName}>{category.label}</Text>
@@ -252,9 +251,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     marginBottom: 8,
   },
-  categoryBarRequired: {
+  categoryBarFilled: {
     borderLeftWidth: 3,
     borderLeftColor: ACCENT,
+  },
+  categoryBarRequired: {
+    borderColor: 'rgba(255,107,91,0.25)',
   },
   categoryBarLeft: {
     flexDirection: 'row',

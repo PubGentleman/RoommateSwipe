@@ -213,6 +213,8 @@ export const HostTabNavigator = () => {
       backBehavior="history"
       screenOptions={{
         headerShown: false,
+        lazy: true,
+        freezeOnBlur: true,
       }}
     >
       <Tab.Screen name="Dashboard" component={DashboardStackNavigator} />

@@ -117,7 +117,7 @@ export const validateInterestTags = (
   selectedTags: string[],
   tagIdsByCategory: Record<string, string[]>,
 ): { valid: boolean; message: string } => {
-  const requiredCategories = ['lifestyle', 'habits', 'hobbies'];
+  const requiredCategories = ['lifestyle', 'habits', 'hobbies', 'social', 'diet'];
   const missing: string[] = [];
   for (const cat of requiredCategories) {
     const ids = tagIdsByCategory[cat] || [];
@@ -128,8 +128,8 @@ export const validateInterestTags = (
   if (missing.length > 0) {
     return { valid: false, message: `Pick at least 1 from: ${missing.join(', ')}` };
   }
-  if (selectedTags.length < 3) {
-    return { valid: false, message: `Pick at least 3 tags to continue` };
+  if (selectedTags.length < 5) {
+    return { valid: false, message: `Pick at least 5 tags to continue (1 per category)` };
   }
   return { valid: true, message: '' };
 };

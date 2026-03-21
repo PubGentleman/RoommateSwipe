@@ -139,6 +139,8 @@ export const RenterTabNavigator = () => {
       backBehavior="history"
       screenOptions={{
         headerShown: false,
+        lazy: true,
+        freezeOnBlur: true,
       }}
     >
       <Tab.Screen name="Explore" component={ExploreScreen} />
