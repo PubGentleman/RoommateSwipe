@@ -105,8 +105,11 @@ export const ProfileScreen = () => {
     }
   }, [user?.id, user?.role]);
 
+  const scrollRef = useRef<any>(null);
+
   useFocusEffect(
     React.useCallback(() => {
+      scrollRef.current?.scrollTo?.({ y: 0, animated: false });
       checkAndUpdateBoostStatus();
       loadProfileStats();
       if (user) {
@@ -166,7 +169,7 @@ export const ProfileScreen = () => {
         </Pressable>
       </View>
 
-      <AnimatedScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 100 }} onScroll={profileScrollHandler} scrollEventThrottle={16}>
+      <AnimatedScrollView ref={scrollRef} style={styles.scrollContent} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 100 }} onScroll={profileScrollHandler} scrollEventThrottle={16}>
         <Animated.View style={profileCollapsibleStyle}>
         <LinearGradient
           colors={[isHost ? 'rgba(123,94,167,0.08)' : 'rgba(255,107,91,0.08)', 'transparent']}
