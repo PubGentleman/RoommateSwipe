@@ -43,10 +43,21 @@ const ACCENT = '#ff6b5b';
 const QUICK_FILTERS = [
   { key: 'bestMatch', label: 'Best Match', icon: 'heart' as const },
   { key: 'under2k', label: 'Under $2k' },
-  { key: 'privateRoom', label: 'Private Room' },
   { key: 'petFriendly', label: 'Pet Friendly' },
   { key: 'availableNow', label: 'Available Now' },
-  { key: 'nearTransit', label: 'Near Transit' },
+];
+
+const LISTING_TYPE_CHIPS = [
+  { key: 'room' as const, label: 'Private Room', icon: 'user' as const },
+  { key: 'entire' as const, label: 'Entire Unit', icon: 'home' as const },
+  { key: 'sublet' as const, label: 'Sublet', icon: 'clock' as const },
+];
+
+const LISTING_TYPE_OPTIONS = [
+  { key: 'any' as const, icon: 'grid' as const, label: 'Any Type' },
+  { key: 'room' as const, icon: 'user' as const, label: 'Private Room' },
+  { key: 'entire' as const, icon: 'home' as const, label: 'Entire Unit' },
+  { key: 'sublet' as const, icon: 'clock' as const, label: 'Sublet' },
 ];
 
 const AVATAR_GRADIENTS: [string, string][] = [
@@ -106,6 +117,7 @@ export const ExploreScreen = () => {
   const [paywallFeature, setPaywallFeature] = useState('');
   const [paywallPlan, setPaywallPlan] = useState<'plus' | 'elite'>('plus');
   const [activeQuickFilters, setActiveQuickFilters] = useState<Set<string>>(new Set(['bestMatch']));
+  const [listingTypeFilter, setListingTypeFilter] = useState<'any' | 'room' | 'entire' | 'sublet'>('any');
   const [showAISheet, setShowAISheet] = useState(false);
   const [interestNote, setInterestNote] = useState('');
   const [userGroups, setUserGroups] = useState<Group[]>([]);
@@ -137,7 +149,7 @@ export const ExploreScreen = () => {
 
   useEffect(() => {
     applyFilters();
-  }, [properties, filters, viewMode, saved, activeCity, activeSubArea, selectedNeighborhood, activeQuickFilters]);
+  }, [properties, filters, viewMode, saved, activeCity, activeSubArea, selectedNeighborhood, activeQuickFilters, listingTypeFilter]);
 
   const loadProperties = async () => {
     try {
@@ -509,26 +521,30 @@ export const ExploreScreen = () => {
       );
     }
 
+    if (listingTypeFilter !== 'any') {
+      const TYPE_MAP: Record<string, string[]> = {
+        room:   ['room', 'private_room', 'Private Room'],
+        entire: ['entire', 'entire_unit', 'Entire Unit'],
+        sublet: ['sublet', 'Sublet'],
+      };
+      const allowedValues = TYPE_MAP[listingTypeFilter] ?? [];
+      filtered = filtered.filter(p =>
+        allowedValues.some(v =>
+          p.roomType?.toLowerCase() === v.toLowerCase() ||
+          (p as any).listing_type?.toLowerCase() === v.toLowerCase() ||
+          (p as any).type?.toLowerCase() === v.toLowerCase()
+        )
+      );
+    }
+
     if (activeQuickFilters.has('under2k')) {
       filtered = filtered.filter(p => p.price < 2000);
-    }
-    if (activeQuickFilters.has('privateRoom')) {
-      filtered = filtered.filter(p => p.roomType === 'room');
     }
     if (activeQuickFilters.has('petFriendly')) {
       filtered = filtered.filter(p => p.amenities?.some(a => a.toLowerCase().includes('pet')));
     }
     if (activeQuickFilters.has('availableNow')) {
       filtered = filtered.filter(p => p.available);
-    }
-    if (activeQuickFilters.has('nearTransit')) {
-      filtered = filtered.filter(p =>
-        p.transitInfo &&
-        !p.transitInfo.noTransitNearby &&
-        p.transitInfo.stops &&
-        p.transitInfo.stops.length > 0 &&
-        p.transitInfo.stops.some(s => s.distanceMiles <= 0.5)
-      );
     }
 
     const getHostPlanPriority = (property: Property) => {
@@ -636,6 +652,7 @@ export const ExploreScreen = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setTempFilters({});
     setFilters({});
+    setListingTypeFilter('any');
     setShowFilterModal(false);
   };
 
@@ -648,9 +665,10 @@ export const ExploreScreen = () => {
   };
 
   const hasActiveFilters = () => {
-    return Object.keys(filters).length > 0 && Object.values(filters).some(v => 
+    const hasModalFilters = Object.keys(filters).length > 0 && Object.values(filters).some(v => 
       v !== undefined && (Array.isArray(v) ? v.length > 0 : true)
     );
+    return hasModalFilters || listingTypeFilter !== 'any';
   };
 
 
@@ -693,6 +711,11 @@ export const ExploreScreen = () => {
       else next.add(key);
       return next;
     });
+  };
+
+  const handleListingTypeChip = (type: 'room' | 'entire' | 'sublet') => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setListingTypeFilter(prev => prev === type ? 'any' : type);
   };
 
   const isBasic = (user?.subscription?.plan || 'basic') === 'basic';
@@ -1029,6 +1052,16 @@ export const ExploreScreen = () => {
               </Pressable>
             );
           })}
+          <View style={styles.chipDivider} />
+          {LISTING_TYPE_CHIPS.map(t => {
+            const active = listingTypeFilter === t.key;
+            return (
+              <Pressable key={t.key} style={active ? styles.chipSelected : styles.chipUnselected} onPress={() => handleListingTypeChip(t.key)}>
+                <Feather name={t.icon} size={11} color={active ? '#fff' : 'rgba(255,255,255,0.45)'} />
+                <Text style={active ? styles.chipSelectedText : styles.chipUnselectedText}>{t.label}</Text>
+              </Pressable>
+            );
+          })}
         </ScrollView>
       </Animated.View>
       {displayMode === 'map' ? (
@@ -1149,6 +1182,40 @@ export const ExploreScreen = () => {
           </View>
 
           <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+            <View style={styles.filterSection}>
+              <Text style={styles.filterSectionTitle}>Listing Type</Text>
+              <View style={styles.listingTypeGrid}>
+                {LISTING_TYPE_OPTIONS.map((opt) => {
+                  const isActive = listingTypeFilter === opt.key;
+                  return (
+                    <Pressable
+                      key={opt.key}
+                      style={[styles.listingTypeCard, isActive && styles.listingTypeCardActive]}
+                      onPress={() => setListingTypeFilter(opt.key)}
+                    >
+                      <View style={[styles.listingTypeIcon, isActive && styles.listingTypeIconActive]}>
+                        <Feather
+                          name={opt.icon as any}
+                          size={18}
+                          color={isActive ? '#fff' : 'rgba(255,255,255,0.4)'}
+                        />
+                      </View>
+                      <Text style={[styles.listingTypeLabel, isActive && styles.listingTypeLabelActive]}>
+                        {opt.label}
+                      </Text>
+                      {isActive ? (
+                        <View style={styles.listingTypeCheck}>
+                          <Feather name="check" size={10} color="#fff" />
+                        </View>
+                      ) : null}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
+            <View style={styles.filterDivider} />
+
             <View style={styles.filterSection}>
               <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Budget Range</ThemedText>
               <View style={styles.budgetInputs}>
@@ -2687,6 +2754,75 @@ const styles = StyleSheet.create({
   },
   filterSection: {
     paddingVertical: Spacing.lg,
+  },
+  filterSectionTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#fff',
+    marginBottom: 16,
+    letterSpacing: -0.2,
+  },
+  filterDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    marginHorizontal: 0,
+  },
+  listingTypeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  listingTypeCard: {
+    width: '47%' as any,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.08)',
+    gap: 10,
+    position: 'relative' as const,
+  },
+  listingTypeCardActive: {
+    borderColor: '#ff6b5b',
+    backgroundColor: 'rgba(255,107,91,0.08)',
+  },
+  listingTypeIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  listingTypeIconActive: {
+    backgroundColor: '#ff6b5b',
+  },
+  listingTypeLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.5)',
+  },
+  listingTypeLabelActive: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  listingTypeCheck: {
+    position: 'absolute' as const,
+    top: 10,
+    right: 10,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#ff6b5b',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  chipDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    marginHorizontal: 4,
+    alignSelf: 'center' as const,
   },
   budgetInputs: {
     flexDirection: 'row',

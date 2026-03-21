@@ -124,6 +124,7 @@ export interface PropertyFilter {
   minBathrooms?: number;
   amenities?: string[];
   availableFrom?: Date;
+  listingType?: 'any' | 'room' | 'entire' | 'sublet';
 }
 
 export type GroupType = 'roommate' | 'listing_inquiry';
