@@ -39,6 +39,8 @@ const QUICK_ACTION_PROMPTS: Record<string, string> = {
   food: 'Recommend some restaurants near my area',
 };
 
+const TAB_BAR_HEIGHT = 80;
+
 export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
   const { user, updateUser } = useAuth();
   const insets = useSafeAreaInsets();
@@ -418,8 +420,8 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
   return (
     <KeyboardAvoidingView
       style={[styles.container, { paddingTop: insets.top }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={0}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={TAB_BAR_HEIGHT}
     >
       <View style={styles.aiHeader}>
         <Pressable onPress={() => navigation.goBack()} style={styles.aiBackBtn}>
@@ -448,6 +450,7 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
         contentContainerStyle={styles.messagesList}
         onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       />
 
       {isTyping ? (
@@ -467,7 +470,7 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
           <Text style={styles.limitWarningText}>{limitWarning}</Text>
         </View>
       ) : null}
-      <View style={[styles.inputBar, { paddingBottom: insets.bottom + 12 }]}>
+      <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 12) + TAB_BAR_HEIGHT }]}>
         <View style={styles.inputWrap}>
           <TextInput
             style={styles.inputField}
@@ -479,6 +482,7 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
             maxLength={500}
             returnKeyType="send"
             onSubmitEditing={() => handleSend()}
+            blurOnSubmit={false}
           />
         </View>
         <Pressable
@@ -556,7 +560,8 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   messagesList: {
-    paddingBottom: 20,
+    paddingTop: 8,
+    paddingBottom: 24,
   },
   messageWrapper: {
     marginBottom: 8,
