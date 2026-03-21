@@ -91,7 +91,7 @@ export const ExploreScreen = () => {
   const [displayMode, setDisplayMode] = useState<'list' | 'map'>('list');
   const [searchQuery, setSearchQuery] = useState('');
   const [showCityPicker, setShowCityPicker] = useState(false);
-  const { activeCity, recentCities, setActiveCity } = useCityContext();
+  const { activeCity, activeSubArea, recentCities, setActiveCity, setActiveSubArea } = useCityContext();
   const [hostProfiles, setHostProfiles] = useState<Map<string, User>>(new Map());
   const [interestMap, setInterestMap] = useState<Map<string, InterestCard>>(new Map());
   const [discoverableGroups, setDiscoverableGroups] = useState<Map<string, number>>(new Map());
@@ -135,7 +135,7 @@ export const ExploreScreen = () => {
 
   useEffect(() => {
     applyFilters();
-  }, [properties, filters, viewMode, saved, searchQuery, activeCity, activeQuickFilters]);
+  }, [properties, filters, viewMode, saved, searchQuery, activeCity, activeSubArea, activeQuickFilters]);
 
   const loadProperties = async () => {
     try {
@@ -460,7 +460,22 @@ export const ExploreScreen = () => {
     }
 
     if (activeCity) {
-      filtered = filtered.filter(p => p.city === activeCity);
+      if (activeSubArea) {
+        const { getNeighborhoodsBySubArea } = require('../../utils/locationData');
+        const subAreaNeighborhoods = getNeighborhoodsBySubArea(activeCity, activeSubArea);
+        filtered = filtered.filter(p =>
+          p.city === activeCity && (
+            subAreaNeighborhoods.length === 0 ||
+            subAreaNeighborhoods.some((n: string) =>
+              p.neighborhood?.toLowerCase().includes(n.toLowerCase()) ||
+              p.address?.toLowerCase().includes(n.toLowerCase()) ||
+              p.title?.toLowerCase().includes(n.toLowerCase())
+            )
+          )
+        );
+      } else {
+        filtered = filtered.filter(p => p.city === activeCity);
+      }
     }
 
     if (searchQuery.trim()) {
@@ -951,7 +966,7 @@ export const ExploreScreen = () => {
       </View>
       <Animated.View style={collapsibleAnimStyle}>
         <View style={styles.cityRow}>
-          <CityPillButton activeCity={activeCity} onPress={() => setShowCityPicker(true)} />
+          <CityPillButton activeCity={activeCity} activeSubArea={activeSubArea} onPress={() => setShowCityPicker(true)} />
           <Text style={styles.listingCount}>{filteredProperties.length} listings</Text>
         </View>
 
@@ -1929,8 +1944,10 @@ export const ExploreScreen = () => {
       <CityPickerModal
         visible={showCityPicker}
         activeCity={activeCity}
+        activeSubArea={activeSubArea}
         recentCities={recentCities}
         onCitySelect={(city) => { setActiveCity(city); setShowCityPicker(false); }}
+        onSubAreaSelect={setActiveSubArea}
         onClose={() => setShowCityPicker(false)}
       />
       <InterestConfirmationModal

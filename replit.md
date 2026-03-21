@@ -70,7 +70,7 @@ A consistent dark theme with a specific color palette is used, featuring a `Room
 
 ## Location System
 
-The application supports over 10 US cities with a centralized location data system, a `LocationPicker` component, and a `CityContext` for city synchronization.
+The application supports over 10 US cities with a centralized location data system, a `LocationPicker` component, and a `CityContext` for city synchronization. Major cities (NYC, LA, Chicago, Miami, Houston) support **sub-area filtering** — boroughs for NYC, sides for Chicago, areas for LA/Miami/Houston. Sub-area data is defined in `utils/locationData.ts` (`CITY_SUB_AREAS`), persisted in `CityContext` (`activeSubArea`), and surfaced in the `CityPickerModal` as filter chips below the city selection. The pill button shows "City - SubArea" when a sub-area is active.
 
 ## Technical Decisions
 

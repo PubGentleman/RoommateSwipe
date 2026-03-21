@@ -74,7 +74,7 @@ export const RoommatesScreen = () => {
   const superInterestScale = useSharedValue(1);
   const [showReportBlockModal, setShowReportBlockModal] = useState(false);
   const [matchedProfileData, setMatchedProfileData] = useState<{ profile: RoommateProfile; compatibility: number } | null>(null);
-  const { activeCity, recentCities, setActiveCity, initialized: cityInitialized } = useCityContext();
+  const { activeCity, activeSubArea, recentCities, setActiveCity, setActiveSubArea, initialized: cityInitialized } = useCityContext();
   const [showCityPicker, setShowCityPicker] = useState(false);
   const [showCityPrompt, setShowCityPrompt] = useState(false);
   const [showFilterSheet, setShowFilterSheet] = useState(false);
@@ -131,7 +131,7 @@ export const RoommatesScreen = () => {
 
   useEffect(() => {
     loadProfiles();
-  }, [activeCity, matchFilters]);
+  }, [activeCity, activeSubArea, matchFilters]);
 
   const checkRefinementTrigger = async () => {
     if (showAISheet) return;
@@ -306,6 +306,10 @@ export const RoommatesScreen = () => {
 
         const blockedIds = new Set(user?.blockedUsers || []);
         const filterCity = activeCity;
+        const filterSubArea = activeSubArea;
+        const subAreaNeighborhoods = filterCity && filterSubArea
+          ? require('../../utils/locationData').getNeighborhoodsBySubArea(filterCity, filterSubArea) as string[]
+          : [];
         const unseen = allProfiles.filter(p => {
           if (history.has(p.id) || p.id === user?.id || blockedIds.has(p.id)) return false;
           if (filterCity) {
@@ -315,6 +319,12 @@ export const RoommatesScreen = () => {
             if (!profileUserCity && p.preferences?.location) {
               const profileCity = getCityFromNeighborhood(p.preferences.location);
               if (profileCity && profileCity !== filterCity) return false;
+            }
+            if (filterSubArea && subAreaNeighborhoods.length > 0) {
+              const profileNeighborhood = profileUser?.profileData?.neighborhood || p.preferences?.location || '';
+              if (profileNeighborhood && !subAreaNeighborhoods.some((n: string) =>
+                profileNeighborhood.toLowerCase().includes(n.toLowerCase())
+              )) return false;
             }
           }
           return true;
@@ -845,7 +855,7 @@ export const RoommatesScreen = () => {
 
   const renderCitySelector = () => (
     <View style={styles.citySelectorRow}>
-      <CityPillButton activeCity={activeCity} onPress={() => setShowCityPicker(true)} />
+      <CityPillButton activeCity={activeCity} activeSubArea={activeSubArea} onPress={() => setShowCityPicker(true)} />
       <Pressable
         style={[styles.filterIconButton, getActiveFilterCount(matchFilters) > 0 ? { borderColor: '#ff6b5b' } : null]}
         onPress={() => {
@@ -893,8 +903,10 @@ export const RoommatesScreen = () => {
         <CityPickerModal
           visible={showCityPicker}
           activeCity={activeCity}
+          activeSubArea={activeSubArea}
           recentCities={recentCities}
           onCitySelect={handleCityChange}
+          onSubAreaSelect={setActiveSubArea}
           onClose={() => setShowCityPicker(false)}
         />
       </View>
@@ -917,8 +929,10 @@ export const RoommatesScreen = () => {
         <CityPickerModal
           visible={showCityPicker}
           activeCity={activeCity}
+          activeSubArea={activeSubArea}
           recentCities={recentCities}
           onCitySelect={handleCityChange}
+          onSubAreaSelect={setActiveSubArea}
           onClose={() => setShowCityPicker(false)}
         />
       </View>
@@ -984,8 +998,10 @@ export const RoommatesScreen = () => {
         <CityPickerModal
           visible={showCityPicker}
           activeCity={activeCity}
+          activeSubArea={activeSubArea}
           recentCities={recentCities}
           onCitySelect={handleCityChange}
+          onSubAreaSelect={setActiveSubArea}
           onClose={() => setShowCityPicker(false)}
         />
         <RoommateFilterSheet
@@ -2311,8 +2327,10 @@ export const RoommatesScreen = () => {
       <CityPickerModal
         visible={showCityPicker}
         activeCity={activeCity}
+        activeSubArea={activeSubArea}
         recentCities={recentCities}
         onCitySelect={handleCityChange}
+        onSubAreaSelect={setActiveSubArea}
         onClose={() => setShowCityPicker(false)}
       />
 

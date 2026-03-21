@@ -53,7 +53,7 @@ export const GroupsScreen = () => {
   const [showMemberProfile, setShowMemberProfile] = useState(false);
   const [selectedMember, setSelectedMember] = useState<RoommateProfile | null>(null);
   const [avatarsExpanded, setAvatarsExpanded] = useState(false);
-  const { activeCity, recentCities, setActiveCity } = useCityContext();
+  const { activeCity, activeSubArea, recentCities, setActiveCity, setActiveSubArea } = useCityContext();
   const [showCityPicker, setShowCityPicker] = useState(false);
   const [showAISheet, setShowAISheet] = useState(false);
   const GRP_COLLAPSE_H = 52;
@@ -108,7 +108,7 @@ export const GroupsScreen = () => {
       if (user?.role === 'host') {
         getMyListings().then(setHostListings).catch(() => {});
       }
-    }, [user, activeCity])
+    }, [user, activeCity, activeSubArea])
   );
 
   const loadLikedGroupState = async () => {
@@ -190,12 +190,21 @@ export const GroupsScreen = () => {
         const groups = await StorageService.getGroups();
         userGroups = groups.filter(g => g.members.includes(user.id));
         const filterCity = activeCity;
+        const filterSubArea = activeSubArea;
+        const subAreaNeighborhoods = filterCity && filterSubArea
+          ? require('../../utils/locationData').getNeighborhoodsBySubArea(filterCity, filterSubArea) as string[]
+          : [];
         otherGroups = groups.filter(g => {
           if (!g.members || g.members.length === 0) return false;
           if (g.members.includes(user.id) || g.pendingMembers.includes(user.id)) return false;
           if (filterCity && g.preferredLocation) {
             const groupCity = getCityFromNeighborhood(g.preferredLocation);
             if (groupCity && groupCity !== filterCity) return false;
+            if (filterSubArea && subAreaNeighborhoods.length > 0) {
+              if (!subAreaNeighborhoods.some((n: string) =>
+                g.preferredLocation.toLowerCase().includes(n.toLowerCase())
+              )) return false;
+            }
           }
           return true;
         });
@@ -1687,7 +1696,7 @@ export const GroupsScreen = () => {
       <Animated.View style={grpCollapsibleStyle}>
         {activeTab === 'discover' ? (
           <View style={styles.citySelectorRow}>
-            <CityPillButton activeCity={activeCity} onPress={() => setShowCityPicker(true)} />
+            <CityPillButton activeCity={activeCity} activeSubArea={activeSubArea} onPress={() => setShowCityPicker(true)} />
           </View>
         ) : null}
       </Animated.View>
@@ -2110,8 +2119,10 @@ export const GroupsScreen = () => {
       <CityPickerModal
         visible={showCityPicker}
         activeCity={activeCity}
+        activeSubArea={activeSubArea}
         recentCities={recentCities}
         onCitySelect={(city) => { setActiveCity(city); setShowCityPicker(false); }}
+        onSubAreaSelect={setActiveSubArea}
         onClose={() => setShowCityPicker(false)}
       />
 

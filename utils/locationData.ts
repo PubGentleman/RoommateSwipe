@@ -799,6 +799,77 @@ export const NEIGHBORHOODS: Record<string, Neighborhood> = {
   },
 };
 
+export const CITY_SUB_AREAS: Record<string, { label: string; areas: string[] }> = {
+  'New York': {
+    label: 'Borough',
+    areas: ['Manhattan', 'Brooklyn', 'Queens', 'Bronx'],
+  },
+  'Los Angeles': {
+    label: 'Area',
+    areas: ['Westside', 'Hollywood/Central', 'Eastside', 'Downtown'],
+  },
+  'Chicago': {
+    label: 'Side',
+    areas: ['North Side', 'South Side', 'West Side', 'Downtown/Loop'],
+  },
+  'Houston': {
+    label: 'Area',
+    areas: ['Inner Loop', 'Midtown/Montrose', 'The Heights'],
+  },
+  'Miami': {
+    label: 'Area',
+    areas: ['Beach', 'Downtown/Brickell', 'Design/Wynwood', 'Coral Gables/Grove'],
+  },
+};
+
+const LA_AREA_MAP: Record<string, string[]> = {
+  'Westside': ['Venice', 'Santa Monica', 'West Hollywood'],
+  'Hollywood/Central': ['Hollywood', 'Los Feliz', 'Koreatown'],
+  'Eastside': ['Silver Lake', 'Echo Park', 'Arts District'],
+  'Downtown': ['Downtown LA'],
+};
+
+const CHICAGO_AREA_MAP: Record<string, string[]> = {
+  'North Side': ['Lincoln Park', 'Wicker Park', 'Logan Square', 'Lakeview'],
+  'South Side': ['Hyde Park'],
+  'West Side': ['West Loop'],
+  'Downtown/Loop': ['The Loop', 'River North'],
+};
+
+const HOUSTON_AREA_MAP: Record<string, string[]> = {
+  'Inner Loop': ['Downtown Houston', 'EaDo'],
+  'Midtown/Montrose': ['Midtown Houston', 'Montrose', 'Museum District', 'Rice Village'],
+  'The Heights': ['The Heights Houston'],
+};
+
+const MIAMI_AREA_MAP: Record<string, string[]> = {
+  'Beach': ['South Beach'],
+  'Downtown/Brickell': ['Downtown Miami', 'Brickell'],
+  'Design/Wynwood': ['Wynwood', 'Design District'],
+  'Coral Gables/Grove': ['Coconut Grove', 'Coral Gables', 'Little Havana'],
+};
+
+export function getSubAreasForCity(city: string): string[] | null {
+  return CITY_SUB_AREAS[city]?.areas || null;
+}
+
+export function getSubAreaLabel(city: string): string {
+  return CITY_SUB_AREAS[city]?.label || 'Area';
+}
+
+export function getNeighborhoodsBySubArea(city: string, subArea: string): string[] {
+  if (city === 'New York') {
+    return Object.keys(NEIGHBORHOODS).filter(
+      n => NEIGHBORHOODS[n].city === city && NEIGHBORHOODS[n].borough === subArea
+    );
+  }
+  if (city === 'Los Angeles') return LA_AREA_MAP[subArea] || [];
+  if (city === 'Chicago') return CHICAGO_AREA_MAP[subArea] || [];
+  if (city === 'Houston') return HOUSTON_AREA_MAP[subArea] || [];
+  if (city === 'Miami') return MIAMI_AREA_MAP[subArea] || [];
+  return [];
+}
+
 export function getCityFromNeighborhood(neighborhood: string): string | null {
   const neighborhoodData = NEIGHBORHOODS[neighborhood];
   return neighborhoodData ? neighborhoodData.city : null;

@@ -3,7 +3,7 @@ import { View, StyleSheet, Pressable, Modal, TextInput, ScrollView, KeyboardAvoi
 import { Feather } from './VectorIcons';
 import { ThemedText } from './ThemedText';
 import { BorderRadius, Spacing } from '../constants/theme';
-import { getAllCities } from '../utils/locationData';
+import { getAllCities, getSubAreasForCity, getSubAreaLabel } from '../utils/locationData';
 import * as Haptics from 'expo-haptics';
 
 const POPULAR_CITIES = ['New York', 'Los Angeles', 'Chicago', 'Miami', 'Austin', 'Atlanta', 'Seattle', 'Boston'];
@@ -11,16 +11,20 @@ const POPULAR_CITIES = ['New York', 'Los Angeles', 'Chicago', 'Miami', 'Austin',
 interface CityPickerModalProps {
   visible: boolean;
   activeCity: string | null;
+  activeSubArea?: string | null;
   recentCities: string[];
   onCitySelect: (city: string | null) => void;
+  onSubAreaSelect?: (subArea: string | null) => void;
   onClose: () => void;
 }
 
 export const CityPickerModal: React.FC<CityPickerModalProps> = ({
   visible,
   activeCity,
+  activeSubArea,
   recentCities,
   onCitySelect,
+  onSubAreaSelect,
   onClose,
 }) => {
   const [citySearch, setCitySearch] = useState('');
@@ -33,6 +37,14 @@ export const CityPickerModal: React.FC<CityPickerModalProps> = ({
   const handleSelect = (city: string | null) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onCitySelect(city);
+    onSubAreaSelect?.(null);
+    setCitySearch('');
+  };
+
+  const handleSubAreaSelect = (subArea: string | null) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onSubAreaSelect?.(subArea);
+    onClose();
     setCitySearch('');
   };
 
@@ -40,6 +52,9 @@ export const CityPickerModal: React.FC<CityPickerModalProps> = ({
     setCitySearch('');
     onClose();
   };
+
+  const currentSubAreas = activeCity ? getSubAreasForCity(activeCity) : null;
+  const subAreaLabel = activeCity ? getSubAreaLabel(activeCity) : 'Area';
 
   return (
     <Modal
@@ -61,11 +76,11 @@ export const CityPickerModal: React.FC<CityPickerModalProps> = ({
               {recentCities.map(city => (
                 <Pressable
                   key={`recent-${city}`}
-                  style={[styles.chip, activeCity === city ? styles.chipActive : null]}
+                  style={[styles.chip, activeCity === city && !activeSubArea ? styles.chipActive : null]}
                   onPress={() => handleSelect(city)}
                 >
-                  <Feather name="clock" size={13} color={activeCity === city ? '#fff' : 'rgba(255,255,255,0.5)'} />
-                  <ThemedText style={[styles.chipText, activeCity === city ? styles.chipTextActive : null]}>
+                  <Feather name="clock" size={13} color={activeCity === city && !activeSubArea ? '#fff' : 'rgba(255,255,255,0.5)'} />
+                  <ThemedText style={[styles.chipText, activeCity === city && !activeSubArea ? styles.chipTextActive : null]}>
                     {city}
                   </ThemedText>
                 </Pressable>
@@ -80,16 +95,50 @@ export const CityPickerModal: React.FC<CityPickerModalProps> = ({
             {POPULAR_CITIES.map(city => (
               <Pressable
                 key={`popular-${city}`}
-                style={[styles.chip, activeCity === city ? styles.chipActive : null]}
+                style={[styles.chip, activeCity === city && !activeSubArea ? styles.chipActive : null]}
                 onPress={() => handleSelect(city)}
               >
-                <ThemedText style={[styles.chipText, activeCity === city ? styles.chipTextActive : null]}>
+                <ThemedText style={[styles.chipText, activeCity === city && !activeSubArea ? styles.chipTextActive : null]}>
                   {city}
                 </ThemedText>
               </Pressable>
             ))}
           </View>
         </View>
+
+        {currentSubAreas && currentSubAreas.length > 0 ? (
+          <View style={styles.section}>
+            <ThemedText style={styles.sectionLabel}>
+              {activeCity} — Filter by {subAreaLabel}
+            </ThemedText>
+            <View style={styles.chips}>
+              <Pressable
+                style={[styles.chip, activeCity && !activeSubArea ? styles.chipActiveOutline : null]}
+                onPress={() => handleSubAreaSelect(null)}
+              >
+                <Feather name="globe" size={13} color={!activeSubArea ? '#ff4d4d' : 'rgba(255,255,255,0.5)'} />
+                <ThemedText style={[styles.chipText, !activeSubArea ? styles.chipTextActiveOutline : null]}>
+                  All {activeCity}
+                </ThemedText>
+              </Pressable>
+              {currentSubAreas.map(area => {
+                const isActive = activeSubArea === area;
+                return (
+                  <Pressable
+                    key={`sub-${area}`}
+                    style={[styles.chip, isActive ? styles.chipActive : null]}
+                    onPress={() => handleSubAreaSelect(area)}
+                  >
+                    <Feather name="map-pin" size={13} color={isActive ? '#fff' : 'rgba(255,255,255,0.5)'} />
+                    <ThemedText style={[styles.chipText, isActive ? styles.chipTextActive : null]}>
+                      {area}
+                    </ThemedText>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        ) : null}
 
         <View style={styles.section}>
           <ThemedText style={styles.sectionLabel}>Search</ThemedText>
@@ -149,22 +198,29 @@ export const CityPickerModal: React.FC<CityPickerModalProps> = ({
 
 export const CityPillButton: React.FC<{
   activeCity: string | null;
+  activeSubArea?: string | null;
   onPress: () => void;
-}> = ({ activeCity, onPress }) => (
-  <Pressable
-    style={styles.pillButton}
-    onPress={() => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      onPress();
-    }}
-  >
-    <Feather name="map-pin" size={16} color="#ff4d4d" />
-    <ThemedText style={styles.pillText} numberOfLines={1}>
-      {activeCity || 'All Cities'}
-    </ThemedText>
-    <Feather name="chevron-down" size={16} color="rgba(255,255,255,0.6)" />
-  </Pressable>
-);
+}> = ({ activeCity, activeSubArea, onPress }) => {
+  const displayText = activeSubArea && activeCity
+    ? `${activeCity} - ${activeSubArea}`
+    : activeCity || 'All Cities';
+
+  return (
+    <Pressable
+      style={styles.pillButton}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onPress();
+      }}
+    >
+      <Feather name="map-pin" size={16} color="#ff4d4d" />
+      <ThemedText style={styles.pillText} numberOfLines={1}>
+        {displayText}
+      </ThemedText>
+      <Feather name="chevron-down" size={16} color="rgba(255,255,255,0.6)" />
+    </Pressable>
+  );
+};
 
 const styles = StyleSheet.create({
   overlay: {
@@ -228,6 +284,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#ff4d4d',
     borderColor: '#ff4d4d',
   },
+  chipActiveOutline: {
+    borderColor: '#ff4d4d',
+    backgroundColor: 'rgba(255,77,77,0.1)',
+  },
   chipText: {
     fontSize: 14,
     fontWeight: '500',
@@ -235,6 +295,10 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  chipTextActiveOutline: {
+    color: '#ff4d4d',
     fontWeight: '600',
   },
   searchContainer: {
