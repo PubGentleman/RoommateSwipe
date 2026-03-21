@@ -789,6 +789,10 @@ export const RoommatesScreen = () => {
       }
     });
 
+  const trackProfileView = (viewedId: string, viewerId: string) => {
+    StorageService.addProfileView(viewedId, viewerId).catch(() => {});
+  };
+
   const tap = Gesture.Tap()
     .maxDistance(10)
     .maxDuration(200)
@@ -797,7 +801,7 @@ export const RoommatesScreen = () => {
       runOnJS(setCurrentPhotoIndex)(0);
       runOnJS(setShowProfileDetail)(true);
       if (currentProfile && user && currentProfile.id !== user.id) {
-        runOnJS(StorageService.addProfileView)(currentProfile.id, user.id);
+        runOnJS(trackProfileView)(currentProfile.id, user.id);
       }
     });
 
