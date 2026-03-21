@@ -2156,8 +2156,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   chipScrollWrapper: {
-    height: 38,
-    marginBottom: 8,
+    height: 42,
+    marginBottom: 6,
     overflow: 'visible',
   },
   chipScrollContent: {
