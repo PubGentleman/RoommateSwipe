@@ -47,10 +47,9 @@ const QUICK_FILTERS = [
   { key: 'availableNow', label: 'Available Now' },
 ];
 
-const LISTING_TYPE_CHIPS = [
-  { key: 'room' as const, label: 'Private Room', icon: 'user' as const },
-  { key: 'entire' as const, label: 'Entire Unit', icon: 'home' as const },
-  { key: 'sublet' as const, label: 'Sublet', icon: 'clock' as const },
+const LISTING_TYPE_CHIPS: { key: 'room' | 'entire' | 'sublet'; label: string; icon: 'user' | 'home' }[] = [
+  { key: 'room', label: 'Private Room', icon: 'user' },
+  { key: 'entire', label: 'Entire Unit', icon: 'home' },
 ];
 
 const LISTING_TYPE_OPTIONS = [
@@ -637,13 +636,16 @@ export const ExploreScreen = () => {
       setPaywallPlan('plus');
       setShowPaywall(true);
     } else {
-      setTempFilters({ ...filters });
+      setTempFilters({ ...filters, listingType: listingTypeFilter });
       setShowFilterModal(true);
     }
   };
 
   const handleApplyFilters = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (tempFilters.listingType) {
+      setListingTypeFilter(tempFilters.listingType);
+    }
     setFilters(tempFilters);
     setShowFilterModal(false);
   };
@@ -1043,7 +1045,7 @@ export const ExploreScreen = () => {
           style={styles.filterScrollView}
           contentContainerStyle={styles.chipScrollContent}
         >
-          {QUICK_FILTERS.map(f => {
+          {QUICK_FILTERS.slice(0, 2).map(f => {
             const active = activeQuickFilters.has(f.key);
             return (
               <Pressable key={f.key} style={active ? styles.chipSelected : styles.chipUnselected} onPress={() => toggleQuickFilter(f.key)}>
@@ -1052,13 +1054,20 @@ export const ExploreScreen = () => {
               </Pressable>
             );
           })}
-          <View style={styles.chipDivider} />
           {LISTING_TYPE_CHIPS.map(t => {
             const active = listingTypeFilter === t.key;
             return (
               <Pressable key={t.key} style={active ? styles.chipSelected : styles.chipUnselected} onPress={() => handleListingTypeChip(t.key)}>
                 <Feather name={t.icon} size={11} color={active ? '#fff' : 'rgba(255,255,255,0.45)'} />
                 <Text style={active ? styles.chipSelectedText : styles.chipUnselectedText}>{t.label}</Text>
+              </Pressable>
+            );
+          })}
+          {QUICK_FILTERS.slice(2).map(f => {
+            const active = activeQuickFilters.has(f.key);
+            return (
+              <Pressable key={f.key} style={active ? styles.chipSelected : styles.chipUnselected} onPress={() => toggleQuickFilter(f.key)}>
+                <Text style={active ? styles.chipSelectedText : styles.chipUnselectedText}>{f.label}</Text>
               </Pressable>
             );
           })}
@@ -1186,12 +1195,12 @@ export const ExploreScreen = () => {
               <Text style={styles.filterSectionTitle}>Listing Type</Text>
               <View style={styles.listingTypeGrid}>
                 {LISTING_TYPE_OPTIONS.map((opt) => {
-                  const isActive = listingTypeFilter === opt.key;
+                  const isActive = (tempFilters.listingType || 'any') === opt.key;
                   return (
                     <Pressable
                       key={opt.key}
                       style={[styles.listingTypeCard, isActive && styles.listingTypeCardActive]}
-                      onPress={() => setListingTypeFilter(opt.key)}
+                      onPress={() => setTempFilters({ ...tempFilters, listingType: opt.key })}
                     >
                       <View style={[styles.listingTypeIcon, isActive && styles.listingTypeIconActive]}>
                         <Feather
