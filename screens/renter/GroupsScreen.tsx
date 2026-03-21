@@ -1262,14 +1262,24 @@ export const GroupsScreen = () => {
                 contentContainerStyle={styles.cardContent}
                 showsVerticalScrollIndicator={false}
               >
+                <LinearGradient
+                  colors={[
+                    compatibility >= 80 ? 'rgba(46,204,113,0.12)' :
+                    compatibility >= 60 ? 'rgba(255,107,91,0.10)' :
+                    'rgba(255,255,255,0.04)',
+                    'transparent'
+                  ]}
+                  style={styles.dkCardHeaderGlow}
+                />
+
                 <View style={styles.dkAvatarCluster}>
-                  {memberProfiles.slice(0, 2).map((profile, i) => {
+                  {memberProfiles.slice(0, 3).map((profile, i) => {
                     const gradients: [string, string][] = [['#667eea', '#764ba2'], ['#f093fb', '#f5576c'], ['#11998e', '#38ef7d']];
                     return (
                       <Pressable
                         key={profile.id}
                         onPress={() => { setSelectedMember(profile); setShowMemberProfile(true); }}
-                        style={[styles.dkAvatar, i > 0 && { marginLeft: -18 }, { zIndex: 3 - i }]}
+                        style={[styles.dkAvatar, i > 0 && { marginLeft: -16 }, { zIndex: 3 - i }]}
                       >
                         {profile.photos?.[0] ? (
                           <Image source={{ uri: profile.photos[0] }} style={styles.dkAvatarImg} />
@@ -1281,11 +1291,22 @@ export const GroupsScreen = () => {
                       </Pressable>
                     );
                   })}
+                </View>
+
+                <View style={styles.dkMembersCount}>
+                  <Feather name="users" size={12} color="rgba(255,255,255,0.35)" />
+                  <Text style={styles.dkMembersCountText}>
+                    {currentGroup.members.length} of {currentGroup.maxMembers} filled
+                  </Text>
                   {spotsLeft > 0 ? (
-                    <View style={[styles.dkAvatar, styles.dkAvatarEmpty, { marginLeft: -18, zIndex: 0 }]}>
-                      <Text style={styles.dkAvatarPlus}>+</Text>
+                    <View style={styles.dkSpotPill}>
+                      <Text style={styles.dkSpotPillText}>{spotsLeft} spot{spotsLeft > 1 ? 's' : ''} left</Text>
                     </View>
-                  ) : null}
+                  ) : (
+                    <View style={[styles.dkSpotPill, { backgroundColor: 'rgba(255,107,91,0.1)', borderColor: 'rgba(255,107,91,0.2)' }]}>
+                      <Text style={[styles.dkSpotPillText, { color: '#ff6b5b' }]}>Full</Text>
+                    </View>
+                  )}
                 </View>
 
                 <View style={styles.dkMatchBadge}>
@@ -1294,18 +1315,6 @@ export const GroupsScreen = () => {
                 </View>
 
                 <Text style={styles.dkGroupName}>{currentGroup.name}</Text>
-
-                <View style={styles.dkMembersCount}>
-                  <Feather name="users" size={13} color="rgba(255,255,255,0.4)" />
-                  <Text style={styles.dkMembersCountText}>
-                    {currentGroup.members.length} of {currentGroup.maxMembers} members filled
-                  </Text>
-                  {spotsLeft > 0 ? (
-                    <View style={styles.dkSpotPill}>
-                      <Text style={styles.dkSpotPillText}>{spotsLeft} left</Text>
-                    </View>
-                  ) : null}
-                </View>
 
                 {currentGroup.description ? (
                   <Text style={styles.dkGroupDesc}>{currentGroup.description}</Text>
@@ -1361,7 +1370,7 @@ export const GroupsScreen = () => {
                                 ) : null}
                               </View>
                               <Text style={styles.dkMemberMeta}>
-                                {profile.occupation?.split(' ')[0] || 'Member'} {getGenderSymbol(profile.gender)}
+                                {profile.occupation?.split(' ')[0] || 'Member'}
                               </Text>
                             </View>
                           </Pressable>
@@ -1374,22 +1383,6 @@ export const GroupsScreen = () => {
             </Animated.View>
           </GestureDetector>
 
-          <View style={styles.dkAdCard}>
-            <View style={styles.dkAdLeft}>
-              <LinearGradient colors={['#11998e', '#38ef7d']} style={styles.dkAdLogo}>
-                <Feather name="home" size={16} color="#fff" />
-              </LinearGradient>
-              <View>
-                <Text style={styles.dkAdSponsored}>SPONSORED</Text>
-                <Text style={styles.dkAdTitle}>List your room on Roomdr</Text>
-                <Text style={styles.dkAdSub}>Reach 50k+ renters in your area</Text>
-              </View>
-            </View>
-            <Pressable style={styles.dkAdBtn}>
-              <Text style={styles.dkAdBtnText}>View</Text>
-            </Pressable>
-          </View>
-
           <View style={styles.actionButtons}>
             <Pressable
               style={[styles.dkActBtn, styles.dkActSm, styles.dkActUndo, { opacity: lastSwipedGroup ? 1 : 0.4 }]}
@@ -1397,18 +1390,22 @@ export const GroupsScreen = () => {
             >
               <Feather name="rotate-ccw" size={18} color="rgba(255,255,255,0.4)" />
             </Pressable>
-            <Pressable
-              style={[styles.dkActBtn, styles.dkActLg, styles.dkActPass]}
-              onPress={() => handleSwipeAction('skip')}
-            >
-              <Feather name="x" size={26} color="#ff4d4d" />
-            </Pressable>
-            <Pressable
-              style={[styles.dkActBtn, styles.dkActXl, styles.dkActJoin]}
-              onPress={() => handleSwipeAction('like')}
-            >
-              <Feather name="heart" size={30} color={likedGroupIds.has(currentGroup?.id ?? '') ? '#22C55E' : '#2ecc71'} />
-            </Pressable>
+            <View style={styles.dkActGlowRed}>
+              <Pressable
+                style={[styles.dkActBtn, styles.dkActLg, styles.dkActPass]}
+                onPress={() => handleSwipeAction('skip')}
+              >
+                <Feather name="x" size={26} color="#ff4d4d" />
+              </Pressable>
+            </View>
+            <View style={styles.dkActGlowGreen}>
+              <Pressable
+                style={[styles.dkActBtn, styles.dkActXl, styles.dkActJoin]}
+                onPress={() => handleSwipeAction('like')}
+              >
+                <Feather name="heart" size={30} color={likedGroupIds.has(currentGroup?.id ?? '') ? '#22C55E' : '#2ecc71'} />
+              </Pressable>
+            </View>
           </View>
 
           <View style={styles.swipeHint}>
@@ -1666,9 +1663,15 @@ export const GroupsScreen = () => {
     <View style={[styles.container, { backgroundColor: '#111111', paddingTop: insets.top, paddingBottom: insets.bottom + 80 }]}>
       <View style={styles.groupsTopNav}>
         <Pressable onPress={() => setShowAISheet(true)} style={styles.groupsAiBtn}>
-          <View style={styles.groupsAiBtnInner}>
-            <Feather name="cpu" size={18} color="#FFFFFF" />
-          </View>
+          <LinearGradient
+            colors={['#ff6b5b', '#e83a2a']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.groupsAiBtnInner}
+          >
+            <Feather name="cpu" size={16} color="#FFFFFF" />
+            <Text style={styles.groupsAiBtnLabel}>AI</Text>
+          </LinearGradient>
         </Pressable>
       </View>
 
@@ -2219,18 +2222,22 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   groupsAiBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    borderRadius: 20,
     overflow: 'hidden',
   },
   groupsAiBtnInner: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#ff4d4d',
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 20,
+  },
+  groupsAiBtnLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#fff',
+    letterSpacing: 0.5,
   },
   tabBar: {
     flexDirection: 'row',
@@ -2410,11 +2417,16 @@ const styles = StyleSheet.create({
   card: {
     flex: 1,
     width: '100%',
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#1c1c1e',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.07)',
+    borderColor: 'rgba(255,255,255,0.09)',
     borderRadius: 24,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
   },
   cardContent: {
     padding: 24,
@@ -2426,14 +2438,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 10,
   },
   dkAvatar: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     borderWidth: 3,
-    borderColor: '#1a1a1a',
+    borderColor: '#1f1f1f',
     overflow: 'hidden',
   },
   dkAvatarImg: {
@@ -2448,21 +2460,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#fff',
   },
-  dkAvatarEmpty: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.2)',
-    borderStyle: 'dashed',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dkAvatarPlus: {
-    fontSize: 18,
-    color: 'rgba(255,255,255,0.4)',
-    fontWeight: '700',
+  dkCardHeaderGlow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 120,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
   },
   dkMatchBadge: {
     flexDirection: 'row',
@@ -2587,82 +2592,47 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.07)',
+    borderColor: 'rgba(255,255,255,0.09)',
     borderRadius: 24,
-    paddingVertical: 6,
-    paddingRight: 12,
-    paddingLeft: 6,
+    paddingVertical: 7,
+    paddingRight: 14,
+    paddingLeft: 7,
   },
   dkMemberAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     justifyContent: 'center',
     alignItems: 'center',
   },
   dkMemberName: {
-    fontSize: 12,
+    fontSize: 12.5,
     fontWeight: '700',
     color: '#fff',
-    lineHeight: 14,
+    lineHeight: 15,
   },
   dkMemberMeta: {
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.35)',
+    fontSize: 10.5,
+    color: 'rgba(255,255,255,0.4)',
     fontWeight: '500',
   },
-  dkAdCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.07)',
-    borderRadius: 16,
-    padding: 10,
-    paddingHorizontal: 14,
+  dkActGlowRed: {
+    shadowColor: '#ff4d4d',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    elevation: 6,
+    borderRadius: 100,
   },
-  dkAdLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
-  },
-  dkAdLogo: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dkAdSponsored: {
-    fontSize: 9,
-    color: 'rgba(255,255,255,0.2)',
-    letterSpacing: 0.5,
-  },
-  dkAdTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  dkAdSub: {
-    fontSize: 10.5,
-    color: 'rgba(255,255,255,0.35)',
-  },
-  dkAdBtn: {
-    backgroundColor: 'rgba(255,255,255,0.09)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 10,
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-  },
-  dkAdBtnText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#fff',
+  dkActGlowGreen: {
+    shadowColor: '#2ecc71',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 6,
+    borderRadius: 100,
   },
   actionButtons: {
     flexDirection: 'row',
@@ -2679,8 +2649,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   dkActSm: { width: 46, height: 46 },
-  dkActLg: { width: 62, height: 62 },
-  dkActXl: { width: 70, height: 70 },
+  dkActLg: { width: 60, height: 60 },
+  dkActXl: { width: 72, height: 72 },
   dkActUndo: {
     borderColor: 'rgba(255,255,255,0.12)',
     backgroundColor: 'rgba(255,255,255,0.05)',
@@ -2696,18 +2666,21 @@ const styles = StyleSheet.create({
   swipeHint: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 28,
-    paddingBottom: 6,
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    paddingBottom: 4,
+    width: '100%',
   },
   swipeHintItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
   },
   dkHintText: {
     fontSize: 12,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.2)',
+    color: 'rgba(255,255,255,0.22)',
+    letterSpacing: 0.3,
   },
   emptyState: {
     flex: 1,
