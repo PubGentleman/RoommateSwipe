@@ -334,7 +334,7 @@ export const ProfileQuestionnaireScreen = () => {
         if (isNaN(parseInt(bedrooms)) || parseInt(bedrooms) <= 0) { Alert.alert('Error', 'Please enter a valid number of bedrooms'); return false; }
         if (!bathrooms.trim()) { Alert.alert('Required', 'Please enter the number of bathrooms'); return false; }
         if (isNaN(parseInt(bathrooms)) || parseInt(bathrooms) <= 0) { Alert.alert('Error', 'Please enter a valid number of bathrooms'); return false; }
-        if (privateBathroom === undefined) { Alert.alert('Required', 'Please select whether you need a private or shared bathroom'); return false; }
+        if (lookingFor !== 'entire_apartment' && privateBathroom === undefined) { Alert.alert('Required', 'Please select whether you need a private or shared bathroom'); return false; }
         return true;
       case 'interests': {
         const tagIdsByCategory: Record<string, string[]> = {};
@@ -397,7 +397,7 @@ export const ProfileQuestionnaireScreen = () => {
           moveInDate: moveInDate.trim() || undefined,
           bedrooms: bedrooms.trim() ? parseInt(bedrooms) : undefined,
           bathrooms: bathrooms.trim() ? parseInt(bathrooms) : undefined,
-          privateBathroom,
+          privateBathroom: lookingFor === 'entire_apartment' ? true : privateBathroom,
           sharedExpenses: {
             utilities: expenseUtilities,
             groceries: expenseGroceries,
@@ -748,9 +748,13 @@ export const ProfileQuestionnaireScreen = () => {
               />
             </View>
 
-            <ThemedText style={[styles.inputLabel, { marginBottom: 10, marginTop: 4 }]}>Private Bathroom</ThemedText>
-            <SelectionCard icon="check-circle" title="Yes, I need a private bathroom" isSelected={privateBathroom === true} onPress={() => setPrivateBathroom(true)} index={0} />
-            <SelectionCard icon="users" title="Shared bathroom is fine" isSelected={privateBathroom === false} onPress={() => setPrivateBathroom(false)} index={1} />
+            {lookingFor !== 'entire_apartment' ? (
+              <>
+                <ThemedText style={[styles.inputLabel, { marginBottom: 10, marginTop: 4 }]}>Private Bathroom</ThemedText>
+                <SelectionCard icon="check-circle" title="Yes, I need a private bathroom" isSelected={privateBathroom === true} onPress={() => setPrivateBathroom(true)} index={0} />
+                <SelectionCard icon="users" title="Shared bathroom is fine" isSelected={privateBathroom === false} onPress={() => setPrivateBathroom(false)} index={1} />
+              </>
+            ) : null}
           </View>
         );
 
