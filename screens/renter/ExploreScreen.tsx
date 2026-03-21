@@ -13,7 +13,6 @@ import { PaywallSheet } from '../../components/PaywallSheet';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCityContext } from '../../contexts/CityContext';
-import { CityPickerModal, CityPillButton } from '../../components/CityPickerModal';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { StorageService } from '../../utils/storage';
 import { getListings, mapListingToProperty, recordListingView } from '../../services/listingService';
@@ -22,13 +21,14 @@ import { Property, PropertyFilter, User, RoommateProfile, InterestCard, Conversa
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { formatMoveInDate, calculateCompatibility, getMatchQualityColor, getGenderSymbol, formatLocation } from '../../utils/matchingAlgorithm';
+import { getNeighborhoodsByCity, getAllCities } from '../../utils/locationData';
 import { getZodiacSymbol } from '../../utils/zodiacUtils';
 import { getBoostRotationIndex } from '../../utils/boostRotation';
 import { shouldShowMatchScore, getHostBadgeLabel, getHostBadgeColor, getHostBadgeIcon } from '../../utils/hostTypeUtils';
 import type { HostType } from '../../utils/hostTypeUtils';
 import { PropertyMapView } from '../../components/PropertyMapView';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
-import { AIFloatingButton } from '../../components/AIFloatingButton';
+
 import { useNotificationContext } from '../../contexts/NotificationContext';
 
 const COMMON_AMENITIES = [
@@ -91,8 +91,8 @@ export const ExploreScreen = () => {
   const [showMatchBreakdown, setShowMatchBreakdown] = useState(false);
   const [viewMode, setViewMode] = useState<'all' | 'saved'>('all');
   const [displayMode, setDisplayMode] = useState<'list' | 'map'>('list');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showCityPicker, setShowCityPicker] = useState(false);
+  const [showLocationSheet, setShowLocationSheet] = useState(false);
+  const [selectedNeighborhood, setSelectedNeighborhood] = useState<string | null>(null);
   const { activeCity, activeSubArea, recentCities, setActiveCity, setActiveSubArea } = useCityContext();
   const [hostProfiles, setHostProfiles] = useState<Map<string, User>>(new Map());
   const [interestMap, setInterestMap] = useState<Map<string, InterestCard>>(new Map());
@@ -137,7 +137,7 @@ export const ExploreScreen = () => {
 
   useEffect(() => {
     applyFilters();
-  }, [properties, filters, viewMode, saved, searchQuery, activeCity, activeSubArea, activeQuickFilters]);
+  }, [properties, filters, viewMode, saved, activeCity, activeSubArea, selectedNeighborhood, activeQuickFilters]);
 
   const loadProperties = async () => {
     try {
@@ -481,12 +481,11 @@ export const ExploreScreen = () => {
       }
     }
 
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim();
-      filtered = filtered.filter(p => 
-        p.title.toLowerCase().includes(query) ||
-        p.address.toLowerCase().includes(query) ||
-        p.neighborhood?.toLowerCase().includes(query)
+    if (selectedNeighborhood) {
+      filtered = filtered.filter(p =>
+        p.neighborhood?.toLowerCase().includes(selectedNeighborhood.toLowerCase()) ||
+        p.address?.toLowerCase().includes(selectedNeighborhood.toLowerCase()) ||
+        p.title?.toLowerCase().includes(selectedNeighborhood.toLowerCase())
       );
     }
 
@@ -654,10 +653,6 @@ export const ExploreScreen = () => {
     );
   };
 
-  const handleClearSearch = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setSearchQuery('');
-  };
 
   const toggleSave = async (id: string) => {
     if (!user?.id) return;
@@ -936,45 +931,41 @@ export const ExploreScreen = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: BG }]}>
-      <View style={[styles.searchBarRow, { paddingTop: insets.top + 12 }]}>
-        <AIFloatingButton onPress={() => setShowAISheet(true)} position="inline" />
-        <View style={styles.searchInput}>
-          <Feather name="search" size={15} color="rgba(255,255,255,0.3)" />
-          <TextInput
-            style={styles.searchInputText}
-            placeholder={activeCity ? `Search in ${activeCity}...` : 'Search neighborhoods, streets...'}
-            placeholderTextColor="rgba(255,255,255,0.3)"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            autoCapitalize="words"
-            autoCorrect={false}
-            returnKeyType="search"
-          />
-          {searchQuery.length > 0 ? (
-            <Pressable onPress={handleClearSearch} hitSlop={8}>
-              <Feather name="x-circle" size={16} color="rgba(255,255,255,0.3)" />
-            </Pressable>
-          ) : null}
-        </View>
+      <View style={[styles.exploreHeaderRow, { paddingTop: insets.top + 12 }]}>
+        <Pressable style={styles.aiBtnWrap} onPress={() => setShowAISheet(true)}>
+          <LinearGradient colors={['#ff6b5b', '#ff8c7a']} style={styles.aiBtn}>
+            <Feather name="cpu" size={15} color="#fff" />
+            <Text style={styles.aiBtnText}>AI</Text>
+          </LinearGradient>
+        </Pressable>
+
+        <Pressable style={styles.locationPickerBtn} onPress={() => setShowLocationSheet(true)}>
+          <Feather name="map-pin" size={14} color={ACCENT} />
+          <View style={styles.locationPickerText}>
+            <Text style={styles.locationCity} numberOfLines={1}>{activeCity || 'Select City'}</Text>
+            {selectedNeighborhood
+              ? <Text style={styles.locationNeighborhood} numberOfLines={1}>{selectedNeighborhood}</Text>
+              : <Text style={styles.locationNeighborhood}>{filteredProperties.length} listing{filteredProperties.length !== 1 ? 's' : ''}</Text>
+            }
+          </View>
+          <Feather name="chevron-down" size={14} color="rgba(255,255,255,0.4)" />
+        </Pressable>
+
         <Pressable
-          style={styles.iconBtn}
+          style={styles.headerIconBtn}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             setDisplayMode(displayMode === 'list' ? 'map' : 'list');
           }}
         >
-          <Feather name={displayMode === 'list' ? 'map' : 'list'} size={18} color="rgba(255,255,255,0.55)" />
+          <Feather name={displayMode === 'list' ? 'map' : 'list'} size={18} color="rgba(255,255,255,0.6)" />
         </Pressable>
-        <Pressable style={styles.filterBtn} onPress={handleFilterPress}>
-          <Feather name="sliders" size={17} color={ACCENT} />
+        <Pressable style={[styles.headerIconBtn, hasActiveFilters() ? styles.headerIconBtnActive : null]} onPress={handleFilterPress}>
+          <Feather name="sliders" size={18} color={hasActiveFilters() ? ACCENT : 'rgba(255,255,255,0.6)'} />
           {hasActiveFilters() ? <View style={styles.filterDot} /> : null}
         </Pressable>
       </View>
       <Animated.View style={collapsibleAnimStyle}>
-        <View style={styles.cityRow}>
-          <CityPillButton activeCity={activeCity} activeSubArea={activeSubArea} onPress={() => setShowCityPicker(true)} />
-          <Text style={styles.listingCount}>{filteredProperties.length} listings</Text>
-        </View>
 
         <View style={styles.tabsRow}>
           <Pressable
@@ -1877,15 +1868,93 @@ export const ExploreScreen = () => {
         </View>
       </Modal>
 
-      <CityPickerModal
-        visible={showCityPicker}
-        activeCity={activeCity}
-        activeSubArea={activeSubArea}
-        recentCities={recentCities}
-        onCitySelect={(city) => { setActiveCity(city); setShowCityPicker(false); }}
-        onSubAreaSelect={setActiveSubArea}
-        onClose={() => setShowCityPicker(false)}
-      />
+      <Modal
+        visible={showLocationSheet}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowLocationSheet(false)}
+      >
+        <Pressable style={styles.locSheetOverlay} onPress={() => setShowLocationSheet(false)} />
+        <View style={styles.locSheet}>
+          <View style={styles.locSheetHandle} />
+          <Text style={styles.locSheetTitle}>Choose Location</Text>
+
+          <Text style={styles.locSheetSectionLabel}>City</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ overflow: 'visible' }}
+            contentContainerStyle={styles.locCityScroll}
+          >
+            <Pressable
+              style={[styles.locCityChip, !activeCity && styles.locCityChipActive]}
+              onPress={() => {
+                setActiveCity(null);
+                setSelectedNeighborhood(null);
+                setActiveSubArea(null);
+              }}
+            >
+              <Text style={[styles.locCityText, !activeCity && styles.locCityTextActive]}>All Cities</Text>
+            </Pressable>
+            {getAllCities().map((city) => (
+              <Pressable
+                key={city}
+                style={[styles.locCityChip, activeCity === city && styles.locCityChipActive]}
+                onPress={() => {
+                  setActiveCity(city);
+                  setSelectedNeighborhood(null);
+                  setActiveSubArea(null);
+                }}
+              >
+                <Text style={[styles.locCityText, activeCity === city && styles.locCityTextActive]}>
+                  {city}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+
+          <Text style={styles.locSheetSectionLabel}>Neighborhood</Text>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.locNeighborhoodGrid}
+            style={{ maxHeight: 300 }}
+          >
+            <Pressable
+              style={[
+                styles.locHoodChip,
+                styles.locHoodChipAll,
+                selectedNeighborhood === null && styles.locHoodChipActive,
+              ]}
+              onPress={() => {
+                setSelectedNeighborhood(null);
+                setShowLocationSheet(false);
+              }}
+            >
+              <Text style={[styles.locHoodText, selectedNeighborhood === null && styles.locHoodTextActive]}>
+                All Neighborhoods
+              </Text>
+            </Pressable>
+            {(activeCity ? getNeighborhoodsByCity(activeCity) : []).map((hood) => (
+              <Pressable
+                key={hood}
+                style={[
+                  styles.locHoodChip,
+                  selectedNeighborhood === hood && styles.locHoodChipActive,
+                ]}
+                onPress={() => {
+                  setSelectedNeighborhood(hood);
+                  setShowLocationSheet(false);
+                }}
+              >
+                <Text style={[styles.locHoodText, selectedNeighborhood === hood && styles.locHoodTextActive]}>
+                  {hood}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      </Modal>
+
       <InterestConfirmationModal
         visible={showInterestConfirmation}
         onClose={() => setShowInterestConfirmation(false)}
@@ -1964,85 +2033,174 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  searchBarRow: {
+  exploreHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingBottom: 10,
-    gap: 8,
+    gap: 10,
   },
-  aiNavBtn: {
-    width: 42,
-    height: 42,
-    justifyContent: 'center',
+  aiBtnWrap: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    flexShrink: 0,
+  },
+  aiBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 20,
   },
-  aiNavBtnInner: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#ff4d4d',
-    justifyContent: 'center',
-    alignItems: 'center',
+  aiBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#fff',
   },
-  searchInput: {
+  locationPickerBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    height: 44,
-    borderRadius: 14,
+    gap: 8,
     backgroundColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 14,
     paddingHorizontal: 14,
+    paddingVertical: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: 'rgba(255,255,255,0.1)',
   },
-  searchInputText: {
+  locationPickerText: {
     flex: 1,
-    marginLeft: 8,
+  },
+  locationCity: {
+    fontSize: 14,
+    fontWeight: '700',
     color: '#fff',
-    fontSize: 13,
-    paddingVertical: 0,
+    lineHeight: 18,
   },
-  iconBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+  locationNeighborhood: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.4)',
+    fontWeight: '500',
+  },
+  headerIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     backgroundColor: 'rgba(255,255,255,0.07)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
   },
-  filterBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,107,91,0.1)',
+  headerIconBtnActive: {
+    backgroundColor: 'rgba(255,107,91,0.15)',
     borderWidth: 1,
-    borderColor: 'rgba(255,107,91,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
+    borderColor: 'rgba(255,107,91,0.3)',
   },
   filterDot: {
     position: 'absolute',
-    top: 10,
-    right: 10,
+    top: 8,
+    right: 8,
     width: 7,
     height: 7,
     borderRadius: 4,
     backgroundColor: ACCENT,
   },
-  cityRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingBottom: 8,
+  locSheetOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
   },
-  listingCount: {
-    fontSize: 12,
+  locSheet: {
+    backgroundColor: '#161616',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: 40,
+    maxHeight: '75%',
+  },
+  locSheetHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 16,
+  },
+  locSheetTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#fff',
+    paddingHorizontal: 20,
+    marginBottom: 20,
+    letterSpacing: -0.3,
+  },
+  locSheetSectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
     color: 'rgba(255,255,255,0.3)',
-    marginLeft: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    paddingHorizontal: 20,
+    marginBottom: 10,
+  },
+  locCityScroll: {
+    paddingHorizontal: 20,
+    paddingVertical: 4,
+    gap: 8,
+    marginBottom: 20,
+  },
+  locCityChip: {
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  locCityChipActive: {
+    backgroundColor: '#ff6b5b',
+    borderColor: 'transparent',
+  },
+  locCityText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.5)',
+  },
+  locCityTextActive: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  locNeighborhoodGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 16,
+    gap: 8,
+    paddingBottom: 10,
+  },
+  locHoodChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  locHoodChipActive: {
+    backgroundColor: '#ff6b5b',
+    borderColor: 'transparent',
+  },
+  locHoodChipAll: {
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  locHoodText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.5)',
+  },
+  locHoodTextActive: {
+    color: '#fff',
+    fontWeight: '700',
   },
   tabsRow: {
     flexDirection: 'row',

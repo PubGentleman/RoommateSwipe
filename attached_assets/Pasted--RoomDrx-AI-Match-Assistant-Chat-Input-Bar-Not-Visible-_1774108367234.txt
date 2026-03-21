@@ -1,0 +1,290 @@
+# RoomDrx — AI Match Assistant: Chat Input Bar Not Visible Fix
+
+## File: `screens/renter/AIMatchAssistantScreen.tsx`
+(may also be `AIChatScreen.tsx` or `AIAssistantScreen.tsx`)
+
+---
+
+## Root Cause
+
+The chat input bar is either:
+1. **Rendered behind the tab bar** — the tab bar overlays the input at `bottom: 0`, making it invisible
+2. **Missing `paddingBottom`** on the `ScrollView` so content fills the exact space where the input bar sits
+3. **`KeyboardAvoidingView` not wrapping the screen**, so the input bar doesn't push up when the keyboard opens
+4. **`useSafeAreaInsets` not applied** — the bottom safe area (home indicator on iPhone) is swallowing the input bar
+
+---
+
+## Fix — Full Screen Structure
+
+Replace the current screen wrapper with this exact structure:
+
+```tsx
+import { KeyboardAvoidingView, Platform, TextInput, ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+export default function AIMatchAssistantScreen() {
+  const insets = useSafeAreaInsets();
+  const [inputText, setInputText] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+
+  // TAB_BAR_HEIGHT — set this to match your app's tab bar height
+  // Typical values: 49 (standard) or 80-90 (custom tab bar with padding)
+  const TAB_BAR_HEIGHT = 80; // ← adjust to match your actual tab bar height
+
+  return (
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: '#111' }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={TAB_BAR_HEIGHT} // ← offsets keyboard above tab bar
+    >
+      {/* ── Header ── */}
+      <View style={styles.aiHeader}>
+        <Pressable onPress={() => navigation.goBack()} style={styles.aiBackBtn}>
+          <Feather name="chevron-left" size={26} color="#fff" />
+        </Pressable>
+        <LinearGradient colors={['#ff6b5b', '#ff8c7a']} style={styles.aiAvatarCircle}>
+          <Feather name="cpu" size={18} color="#fff" />
+        </LinearGradient>
+        <View style={styles.aiTitleWrap}>
+          <View style={styles.aiTitleRow}>
+            <Text style={styles.aiTitle}>AI Match Assistant</Text>
+            <View style={styles.premiumBadge}>
+              <Feather name="zap" size={9} color="#a855f7" />
+              <Text style={styles.premiumBadgeText}>PRO</Text>
+            </View>
+          </View>
+          <Text style={styles.aiSubtitle}>Powered by RoomDrx AI</Text>
+        </View>
+      </View>
+
+      {/* ── Messages ScrollView ── */}
+      <ScrollView
+        ref={scrollRef}
+        style={styles.messageList}
+        contentContainerStyle={{
+          paddingTop: 16,
+          // ⚠️ KEY FIX: paddingBottom must be large enough to
+          // clear the input bar height so last message isn't hidden behind it
+          paddingBottom: 20,
+        }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+      >
+        {/* AI greeting bubble */}
+        <View style={styles.messageRow}>
+          <LinearGradient colors={['#ff6b5b', '#ff8c7a']} style={styles.msgAvatar}>
+            <Feather name="cpu" size={12} color="#fff" />
+          </LinearGradient>
+          <View style={styles.aiBubble}>
+            <Text style={styles.aiBubbleText}>
+              Hi {userName}! I'm your AI Match Assistant. I can help you find roommates,
+              discover great neighborhoods, recommend restaurants, suggest activities,
+              analyze zodiac compatibility, and give home decor tips.
+            </Text>
+            <Text style={styles.aiBubbleText}>What would you like to explore?</Text>
+          </View>
+        </View>
+
+        {/* Quick action cards */}
+        <View style={styles.quickActionsWrap}>
+          <Text style={styles.quickActionsLabel}>Quick actions</Text>
+          <View style={styles.quickActionsGrid}>
+            {QUICK_ACTIONS.map((item) => (
+              <Pressable
+                key={item.action}
+                style={styles.quickCard}
+                onPress={() => handleQuickAction(item.action)}
+              >
+                <View style={styles.quickCardIcon}>
+                  <Feather name={item.icon} size={18} color="#ff6b5b" />
+                </View>
+                <Text style={styles.quickCardText}>{item.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
+        {/* Conversation messages */}
+        {messages.map((msg) =>
+          msg.role === 'assistant' ? (
+            <View key={msg.id} style={styles.messageRow}>
+              <LinearGradient colors={['#ff6b5b', '#ff8c7a']} style={styles.msgAvatar}>
+                <Feather name="cpu" size={12} color="#fff" />
+              </LinearGradient>
+              <View style={styles.aiBubble}>
+                <Text style={styles.aiBubbleText}>{msg.content}</Text>
+              </View>
+            </View>
+          ) : (
+            <View key={msg.id} style={styles.userBubbleRow}>
+              <View style={styles.userBubble}>
+                <Text style={styles.userBubbleText}>{msg.content}</Text>
+              </View>
+            </View>
+          )
+        )}
+
+        {/* Typing indicator */}
+        {isTyping && (
+          <View style={styles.messageRow}>
+            <LinearGradient colors={['#ff6b5b', '#ff8c7a']} style={styles.msgAvatar}>
+              <Feather name="cpu" size={12} color="#fff" />
+            </LinearGradient>
+            <View style={styles.aiBubble}>
+              <Text style={[styles.aiBubbleText, { color: 'rgba(255,255,255,0.35)' }]}>
+                Thinking...
+              </Text>
+            </View>
+          </View>
+        )}
+      </ScrollView>
+
+      {/* ── Input Bar ── */}
+      {/* ⚠️ KEY FIX: paddingBottom uses insets.bottom to clear the home indicator */}
+      <View style={[
+        styles.inputBar,
+        { paddingBottom: Math.max(insets.bottom, 12) }
+      ]}>
+        <View style={styles.inputWrap}>
+          <TextInput
+            style={styles.inputField}
+            placeholder="Ask me anything..."
+            placeholderTextColor="rgba(255,255,255,0.25)"
+            value={inputText}
+            onChangeText={setInputText}
+            multiline
+            maxLength={500}
+            returnKeyType="send"
+            onSubmitEditing={handleSend}
+            blurOnSubmit={false}
+          />
+        </View>
+        <Pressable
+          style={[styles.sendBtn, (!inputText.trim() || isTyping) && styles.sendBtnDisabled]}
+          onPress={handleSend}
+          disabled={!inputText.trim() || isTyping}
+        >
+          <Feather name="send" size={18} color="#fff" />
+        </Pressable>
+      </View>
+
+    </KeyboardAvoidingView>
+  );
+}
+```
+
+---
+
+## Critical Styles for the Input Bar
+
+```ts
+messageList: {
+  flex: 1,
+},
+inputBar: {
+  flexDirection: 'row',
+  alignItems: 'flex-end',
+  gap: 10,
+  paddingHorizontal: 16,
+  paddingTop: 10,
+  // paddingBottom is set inline using insets.bottom (see JSX above)
+  borderTopWidth: 1,
+  borderTopColor: 'rgba(255,255,255,0.08)',
+  backgroundColor: '#111',   // ← MUST match screen background so it's visible
+},
+inputWrap: {
+  flex: 1,
+  backgroundColor: '#1e1e1e',
+  borderRadius: 22,
+  borderWidth: 1,
+  borderColor: 'rgba(255,255,255,0.1)',
+  paddingHorizontal: 16,
+  paddingVertical: 10,
+  minHeight: 44,
+  justifyContent: 'center',
+},
+inputField: {
+  fontSize: 15,
+  color: '#fff',
+  maxHeight: 100,
+  lineHeight: 20,
+  // ⚠️ Do NOT set a fixed height — let it grow with multiline
+},
+sendBtn: {
+  width: 44,
+  height: 44,
+  borderRadius: 22,
+  backgroundColor: '#ff6b5b',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexShrink: 0,
+  marginBottom: 2,
+},
+sendBtnDisabled: {
+  backgroundColor: 'rgba(255,107,91,0.3)',
+},
+```
+
+---
+
+## If the Screen Uses React Navigation Stack (Most Likely Cause)
+
+If this screen is pushed onto a stack navigator that has a tab bar at the bottom, the tab bar height is already handled by React Navigation — but the `KeyboardAvoidingView` doesn't know about it. Add this:
+
+```tsx
+// Get the bottom tab bar height from navigation:
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+
+// Inside the component:
+let tabBarHeight = 0;
+try {
+  tabBarHeight = useBottomTabBarHeight();
+} catch {
+  tabBarHeight = 80; // fallback if not inside a tab navigator
+}
+
+// Pass to KeyboardAvoidingView:
+<KeyboardAvoidingView
+  style={{ flex: 1, backgroundColor: '#111' }}
+  behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+  keyboardVerticalOffset={tabBarHeight}
+>
+```
+
+---
+
+## If the Tab Bar is Still Overlapping
+
+If the input bar appears but is still partially hidden behind the tab bar, the screen needs to render **outside** the tab navigator. Promote the AI screen to a modal stack:
+
+```tsx
+// In your navigation setup (App.tsx or RootNavigator.tsx):
+// Move AIMatchAssistantScreen OUT of the Tab.Screen group
+// and into a Stack.Screen with presentation: 'modal' or fullScreenModal
+
+<Stack.Screen
+  name="AIMatchAssistant"
+  component={AIMatchAssistantScreen}
+  options={{
+    presentation: 'fullScreenModal',
+    headerShown: false,
+  }}
+/>
+```
+
+This makes the screen render as a full-screen modal that slides up over the tab bar, so there's no tab bar overlapping the input at all — which is the cleanest solution for a chat screen.
+
+---
+
+## Summary
+
+| Issue | Fix |
+|---|---|
+| Input bar hidden behind tab bar | Wrap screen in `KeyboardAvoidingView` with `keyboardVerticalOffset` set to tab bar height |
+| Input bar cut off by home indicator | Apply `insets.bottom` from `useSafeAreaInsets` to `inputBar` paddingBottom |
+| Content scrolls behind input bar | `ScrollView` contentContainerStyle `paddingBottom: 20` (content clears the input bar) |
+| Keyboard covers input bar | `behavior="padding"` on iOS, `behavior="height"` on Android inside `KeyboardAvoidingView` |
+| Cleanest fix | Promote AI screen to `fullScreenModal` stack screen — tab bar disappears entirely |
