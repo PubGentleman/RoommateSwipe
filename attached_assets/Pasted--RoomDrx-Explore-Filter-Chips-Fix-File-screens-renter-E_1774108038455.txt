@@ -1,0 +1,261 @@
+# RoomDrx — Explore Filter Chips Fix
+
+## File: `screens/renter/ExploreScreen.tsx`
+
+---
+
+## Two Problems Being Fixed
+
+1. **"Near Transit" chip has no real logic** — filtering by transit proximity requires Walk Score API data or a `transit_score` / `distance_to_subway` field on every listing. Without that backend data, the chip either does nothing or filters incorrectly. Remove it now. If you add Walk Score data to listings later, it can live in the full Filters modal with a distance slider.
+
+2. **"Entire Unit" chip is missing** — "Private Room" exists but its counterpart doesn't. Renters who only want a full apartment have no way to filter for that from the quick chips.
+
+---
+
+## Change 1 — Remove "Near Transit" chip
+
+Find and delete the "Near Transit" chip from the filter chips `ScrollView`:
+
+```tsx
+// DELETE this entirely:
+<Pressable
+  style={[styles.filterChip, activeFilter === 'near_transit' && styles.filterChipActive]}
+  onPress={() => setActiveFilter('near_transit')}
+>
+  <Feather name="navigation" size={13} color={...} />
+  <Text style={...}>Near Transit</Text>
+</Pressable>
+```
+
+Also remove `'near_transit'` from:
+- The `activeFilter` type definition: `'best_match' | 'under_2k' | 'room' | 'entire' | 'pet_friendly' | 'available_now'`
+- Any switch/case or if/else in the filter logic that handles `'near_transit'`
+- Any filter count badge logic
+
+> **Why:** Transit proximity filtering needs a `transit_score` or `subway_distance_meters` column in your `listings` Supabase table, plus either a Walk Score API integration or manual data entry per listing. Until that exists, the chip is a dead end. Add it back to the **Filters modal** (not the quick chips) once the data is in place.
+
+---
+
+## Change 2 — Add "Entire Unit" chip + make type chips mutually exclusive
+
+Add an "Entire Unit" chip directly after "Private Room". The two chips should be **mutually exclusive** — selecting one clears the other.
+
+### Update filter state:
+
+```ts
+// Change from a single activeFilter string to a separate listingType state
+// so it doesn't conflict with other chip filters (Best Match, Under $2k, etc.):
+
+const [quickFilter, setQuickFilter] = useState<'best_match' | 'under_2k' | 'pet_friendly' | 'available_now' | null>(null);
+const [listingTypeFilter, setListingTypeFilter] = useState<'room' | 'entire' | null>(null);
+
+// Handlers:
+const handleQuickFilter = (filter: typeof quickFilter) => {
+  setQuickFilter(prev => prev === filter ? null : filter);
+};
+
+const handleListingTypeFilter = (type: 'room' | 'entire') => {
+  setListingTypeFilter(prev => prev === type ? null : type);
+};
+```
+
+### Updated chips row:
+
+```tsx
+<ScrollView
+  horizontal
+  showsHorizontalScrollIndicator={false}
+  style={{ overflow: 'visible' }}
+  contentContainerStyle={styles.filterScrollContent}
+>
+  {/* Best Match */}
+  <Pressable
+    style={[styles.filterChip, quickFilter === 'best_match' && styles.filterChipActive]}
+    onPress={() => handleQuickFilter('best_match')}
+  >
+    <Feather name="heart" size={13} color={quickFilter === 'best_match' ? '#fff' : 'rgba(255,255,255,0.45)'} />
+    <Text style={[styles.filterChipText, quickFilter === 'best_match' && styles.filterChipTextActive]}>
+      Best Match
+    </Text>
+  </Pressable>
+
+  {/* Under $2k */}
+  <Pressable
+    style={[styles.filterChip, quickFilter === 'under_2k' && styles.filterChipActive]}
+    onPress={() => handleQuickFilter('under_2k')}
+  >
+    <Text style={[styles.filterChipText, quickFilter === 'under_2k' && styles.filterChipTextActive]}>
+      Under $2k
+    </Text>
+  </Pressable>
+
+  {/* Private Room — type chip */}
+  <Pressable
+    style={[styles.filterChip, listingTypeFilter === 'room' && styles.filterChipActive]}
+    onPress={() => handleListingTypeFilter('room')}
+  >
+    <Feather name="user" size={13} color={listingTypeFilter === 'room' ? '#fff' : 'rgba(255,255,255,0.45)'} />
+    <Text style={[styles.filterChipText, listingTypeFilter === 'room' && styles.filterChipTextActive]}>
+      Private Room
+    </Text>
+  </Pressable>
+
+  {/* Entire Unit — NEW type chip, mutually exclusive with Private Room */}
+  <Pressable
+    style={[styles.filterChip, listingTypeFilter === 'entire' && styles.filterChipActive]}
+    onPress={() => handleListingTypeFilter('entire')}
+  >
+    <Feather name="home" size={13} color={listingTypeFilter === 'entire' ? '#fff' : 'rgba(255,255,255,0.45)'} />
+    <Text style={[styles.filterChipText, listingTypeFilter === 'entire' && styles.filterChipTextActive]}>
+      Entire Unit
+    </Text>
+  </Pressable>
+
+  {/* Pet Friendly */}
+  <Pressable
+    style={[styles.filterChip, quickFilter === 'pet_friendly' && styles.filterChipActive]}
+    onPress={() => handleQuickFilter('pet_friendly')}
+  >
+    <Text style={[styles.filterChipText, quickFilter === 'pet_friendly' && styles.filterChipTextActive]}>
+      Pet Friendly
+    </Text>
+  </Pressable>
+
+  {/* Available Now */}
+  <Pressable
+    style={[styles.filterChip, quickFilter === 'available_now' && styles.filterChipActive]}
+    onPress={() => handleQuickFilter('available_now')}
+  >
+    <Text style={[styles.filterChipText, quickFilter === 'available_now' && styles.filterChipTextActive]}>
+      Available Now
+    </Text>
+  </Pressable>
+
+  {/* Near Transit — REMOVED */}
+
+</ScrollView>
+```
+
+---
+
+## Change 3 — Update Filter Logic
+
+Update the `filteredListings` memo to use the split state:
+
+```ts
+const filteredListings = useMemo(() => {
+  let results = allListings;
+
+  // City / neighborhood filters (existing)
+  results = results.filter(l => l.city === selectedCity);
+  if (selectedNeighborhood) {
+    results = results.filter(l =>
+      l.neighborhood?.toLowerCase().includes(selectedNeighborhood.toLowerCase())
+    );
+  }
+
+  // Listing type filter (Private Room / Entire Unit) — mutually exclusive
+  if (listingTypeFilter === 'room') {
+    results = results.filter(l =>
+      ['room', 'private_room', 'Private Room'].some(v =>
+        l.type?.toLowerCase() === v.toLowerCase()
+      )
+    );
+  } else if (listingTypeFilter === 'entire') {
+    results = results.filter(l =>
+      ['entire', 'entire_unit', 'Entire Unit'].some(v =>
+        l.type?.toLowerCase() === v.toLowerCase()
+      )
+    );
+  }
+
+  // Quick filters
+  if (quickFilter === 'best_match') {
+    results = [...results].sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0));
+  }
+  if (quickFilter === 'under_2k') {
+    results = results.filter(l => l.price <= 2000);
+  }
+  if (quickFilter === 'pet_friendly') {
+    results = results.filter(l => l.petFriendly === true);
+  }
+  if (quickFilter === 'available_now') {
+    results = results.filter(l => l.availableNow === true || l.status === 'available');
+  }
+
+  // Full Filters modal filters (budget range, bedrooms, amenities)
+  results = results.filter(l => l.price >= budgetMin && l.price <= budgetMax);
+  if (bedroomsFilter > 0) results = results.filter(l => l.bedrooms >= bedroomsFilter);
+  if (bathroomsFilter > 0) results = results.filter(l => l.bathrooms >= bathroomsFilter);
+  if (amenitiesFilter.length > 0) {
+    results = results.filter(l =>
+      amenitiesFilter.every(a => l.amenities?.includes(a))
+    );
+  }
+
+  return results;
+}, [
+  allListings,
+  selectedCity,
+  selectedNeighborhood,
+  listingTypeFilter,   // ← new
+  quickFilter,         // ← replaces old activeFilter
+  budgetMin,
+  budgetMax,
+  bedroomsFilter,
+  bathroomsFilter,
+  amenitiesFilter,
+]);
+```
+
+---
+
+## Change 4 — Keep Chips in Sync with Filters Modal
+
+When the Filters modal is applied, sync `listingTypeFilter` from the modal's selection:
+
+```ts
+const handleApplyFilters = (filters: AppliedFilters) => {
+  setBudgetMin(filters.budgetMin);
+  setBudgetMax(filters.budgetMax);
+  setBedroomsFilter(filters.bedrooms);
+  setBathroomsFilter(filters.bathrooms);
+  setAmenitiesFilter(filters.amenities);
+  setListingTypeFilter(filters.listingType ?? null); // ← sync type filter from modal
+};
+```
+
+And when navigating to the Filters modal, pass the current `listingTypeFilter` as the initial value so the modal shows the right card pre-selected:
+
+```ts
+navigation.navigate('Filters', {
+  initialFilters: {
+    listingType: listingTypeFilter,
+    budgetMin,
+    budgetMax,
+    // ...
+  }
+});
+```
+
+---
+
+## Final Chip Order
+
+```
+Best Match  |  Under $2k  |  Private Room  |  Entire Unit  |  Pet Friendly  |  Available Now
+```
+
+No "Near Transit" — clean, logical, every chip does exactly what it says.
+
+---
+
+## Summary
+
+| # | Change | Why |
+|---|---|---|
+| 1 | Remove "Near Transit" chip | No backend data to support it; filtering would be meaningless without `transit_score` on listings |
+| 2 | Add "Entire Unit" chip next to "Private Room" | Users searching for full apartments had no quick filter — both type chips are now mutually exclusive |
+| 3 | Split `activeFilter` into `quickFilter` + `listingTypeFilter` | Prevents type chips from conflicting with other filters (Best Match etc.) |
+| 4 | Update `filteredListings` memo | Applies both filter states correctly |
+| 5 | Sync with Filters modal | `listingTypeFilter` stays in sync when filters are applied from the full modal |

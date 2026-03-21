@@ -179,16 +179,20 @@ const FeedbackThumbs = ({ id, onFeedback }: { id: string; onFeedback?: (id: stri
   );
 };
 
-function getInsightBorderColor(insightType: string, value?: number): string {
-  if (insightType === 'pool-impact') return URGENCY_RED;
-  if (insightType === 'match-rate' && value !== undefined && value < 0) return URGENCY_RED;
-  if (insightType === 'response-rate' && value !== undefined && value < 70) return URGENCY_RED;
-  if (insightType === 'move-in-timeline') return URGENCY_RED;
-  if (insightType === 'safety-briefing') return URGENCY_RED;
-  if (insightType === 'profile-completion' && value !== undefined && value >= 90) return URGENCY_GREEN;
-  if (insightType === 'match-rate' && value !== undefined && value > 0) return URGENCY_GREEN;
-  if (insightType === 'response-rate' && value !== undefined && value >= 70) return URGENCY_GREEN;
-  return URGENCY_GREY;
+const INSIGHT_COLORS = {
+  warning:  { color: '#f39c12', bg: 'rgba(243,156,18,0.1)',  border: 'rgba(243,156,18,0.2)',  icon: 'alert-triangle' as const },
+  tip:      { color: '#ff6b5b', bg: 'rgba(255,107,91,0.08)', border: 'rgba(255,107,91,0.15)', icon: 'zap' as const },
+  positive: { color: '#2ecc71', bg: 'rgba(46,204,113,0.08)', border: 'rgba(46,204,113,0.15)', icon: 'trending-up' as const },
+};
+
+function getInsightType(insightId: string, value?: number): 'warning' | 'tip' | 'positive' {
+  if (insightId === 'pool-impact') return 'warning';
+  if (insightId === 'match-rate' && value !== undefined && value < 0) return 'warning';
+  if (insightId === 'response-rate' && value !== undefined && value < 70) return 'tip';
+  if (insightId === 'profile-completion' && value !== undefined && value >= 90) return 'positive';
+  if (insightId === 'match-rate' && value !== undefined && value > 0) return 'positive';
+  if (insightId === 'response-rate' && value !== undefined && value >= 70) return 'positive';
+  return 'tip';
 }
 
 const InsightCard = ({ icon, title, body, id, onFeedback, actionChip, urgencyValue, onTap, isRecalculating }: {
@@ -226,44 +230,50 @@ const InsightCard = ({ icon, title, body, id, onFeedback, actionChip, urgencyVal
 
   if (removed) return null;
 
-  const borderColor = getInsightBorderColor(id, urgencyValue);
+  const insightType = getInsightType(id, urgencyValue);
+  const config = INSIGHT_COLORS[insightType];
 
   return (
     <Pressable onPress={handleCardTap} disabled={!onTap}>
       <RNAnimated.View style={[
         styles.insightCard,
-        { borderLeftWidth: 3, borderLeftColor: borderColor },
+        { borderColor: config.border, backgroundColor: config.bg },
         { opacity: RNAnimated.multiply(
             slideAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
             tapOpacity
           ),
           transform: [{ translateY: slideAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 40] }) }] },
       ]}>
-        <View style={styles.insightHeader}>
-          <View style={styles.insightIconBox}>
-            <Feather name={icon} size={14} color={ACCENT} />
-          </View>
-          <Text style={[styles.insightTitle, { flex: 1 }]}>{title}</Text>
+        <View style={[styles.insightIconWrap, { backgroundColor: `${config.color}20` }]}>
+          <Feather name={icon} size={16} color={config.color} />
+        </View>
+        <View style={styles.insightBody}>
+          <Text style={styles.insightTitle}>{title}</Text>
           {isRecalculating ? (
             <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>updating...</Text>
-          ) : onTap ? (
-            <Feather name="chevron-right" size={14} color="#888888" />
+          ) : (
+            <Text style={styles.insightDesc}>{body}</Text>
+          )}
+          {actionChip ? (
+            <Pressable style={styles.actionChip} onPress={actionChip.onPress}>
+              <Text style={styles.actionChipText}>{actionChip.label}</Text>
+              <Feather name="arrow-right" size={12} color={ACCENT} />
+            </Pressable>
           ) : null}
         </View>
-        <Text style={styles.insightBody}>{body}</Text>
-        {actionChip ? (
-          <Pressable style={styles.actionChip} onPress={actionChip.onPress}>
-            <Text style={styles.actionChipText}>{actionChip.label}</Text>
-            <Feather name="arrow-right" size={12} color={ACCENT} />
-          </Pressable>
-        ) : null}
-        <FeedbackThumbs id={id} onFeedback={(thumbId, positive) => {
-          if (positive) {
-            onFeedback?.(thumbId, true);
-          } else {
-            handleDown();
-          }
-        }} />
+        <View style={styles.insightRight}>
+          {onTap ? (
+            <Feather name="chevron-right" size={14} color="rgba(255,255,255,0.2)" />
+          ) : null}
+          <View style={styles.insightFeedback}>
+            <Pressable onPress={() => onFeedback?.(id, true)}>
+              <Feather name="thumbs-up" size={12} color="rgba(255,255,255,0.25)" />
+            </Pressable>
+            <Pressable onPress={() => handleDown()}>
+              <Feather name="thumbs-down" size={12} color="rgba(255,255,255,0.25)" />
+            </Pressable>
+          </View>
+        </View>
       </RNAnimated.View>
     </Pressable>
   );
@@ -719,55 +729,67 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData, 
     if (!contextData?.explore) return null;
     const { budget, city, totalListings, filteredCount, savedCount, onApplyFilters } = contextData.explore;
 
-    const filterChips: { label: string; filters: Record<string, any> }[] = [];
+    const suggestions: { label: string; icon: string; filters: Record<string, any> }[] = [];
     if (budget && budget < 2000) {
-      filterChips.push({ label: `Expand budget to $${budget + 500}/mo`, filters: { maxPrice: budget + 500 } });
+      suggestions.push({ label: `Expand budget to $${budget + 500}/mo`, icon: 'dollar-sign', filters: { maxPrice: budget + 500 } });
     }
-    filterChips.push({ label: 'Show Pet Friendly only', filters: { petFriendly: true } });
+    suggestions.push({ label: 'Show Pet Friendly only', icon: 'heart', filters: { petFriendly: true } });
+    if (savedCount && savedCount > 0) {
+      suggestions.push({ label: `Compare your ${savedCount} saved listing${savedCount !== 1 ? 's' : ''}`, icon: 'bookmark', filters: { __navigate: 'SavedListings' } });
+    }
+
+    const contextLine = budget && totalListings && filteredCount !== undefined
+      ? (filteredCount < totalListings * 0.3
+          ? `Your filters are very strict — only ${filteredCount} of ${totalListings} listings${city ? ` in ${city}` : ''} match. Try relaxing some filters.`
+          : `You're seeing ${filteredCount} of ${totalListings} listings${city ? ` in ${city}` : ''}. Your preferences are well-balanced.`)
+      : 'Use the filters to narrow down listings that match your lifestyle and budget.';
 
     return (
-      <View style={styles.contextCard}>
-        <View style={styles.contextHeader}>
-          <Feather name="search" size={14} color={ACCENT} />
-          <Text style={styles.contextTitle}>Smart Filter Guide</Text>
+      <View style={styles.aiSectionWrap}>
+        <View style={styles.sectionLabelRow}>
+          <Feather name="sliders" size={13} color={ACCENT} />
+          <Text style={styles.sectionLabel}>Smart Filter Guide</Text>
         </View>
-        {budget && totalListings && filteredCount !== undefined ? (
-          <Text style={styles.contextBody}>
-            {filteredCount < totalListings * 0.3
-              ? `Your filters are very strict — only ${filteredCount} of ${totalListings} listings${city ? ` in ${city}` : ''} match. Try relaxing some filters.`
-              : `You're seeing ${filteredCount} of ${totalListings} listings${city ? ` in ${city}` : ''}. Your preferences are well-balanced.`
-            }
-          </Text>
-        ) : (
-          <Text style={styles.contextBody}>Use the filters to narrow down listings that match your lifestyle and budget.</Text>
-        )}
 
-        {savedCount && savedCount > 0 ? (
-          <View style={styles.savedNote}>
-            <Feather name="bookmark" size={12} color={ACCENT} />
-            <Text style={styles.savedNoteText}>You've saved {savedCount} listing{savedCount !== 1 ? 's' : ''}. Want me to compare them?</Text>
-          </View>
-        ) : null}
+        <Text style={styles.aiSectionSubtext}>{contextLine}</Text>
 
-        {onApplyFilters && filterChips.length > 0 ? (
-          <View style={styles.filterChipsRow}>
-            {filterChips.map((fc, i) => (
+        {onApplyFilters && suggestions.length > 0 ? (
+          <View style={styles.aiSuggestionList}>
+            {suggestions.map((s, i) => (
               <Pressable
                 key={i}
-                style={styles.filterChip}
+                style={styles.aiSuggestionCard}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  onApplyFilters(fc.filters);
-                  onDismiss();
+                  if (s.filters.__navigate) {
+                    safeNavigate(s.filters.__navigate);
+                  } else if (Object.keys(s.filters).length > 0) {
+                    onApplyFilters(s.filters);
+                    onDismiss();
+                  } else {
+                    onDismiss();
+                  }
                 }}
               >
-                <Feather name="sliders" size={11} color={ACCENT} />
-                <Text style={styles.filterChipText}>{fc.label}</Text>
+                <View style={styles.aiSuggestionIcon}>
+                  <Feather name={s.icon as any} size={14} color={ACCENT} />
+                </View>
+                <Text style={styles.aiSuggestionText}>{s.label}</Text>
+                <Feather name="chevron-right" size={14} color="rgba(255,255,255,0.3)" />
               </Pressable>
             ))}
           </View>
         ) : null}
-        <FeedbackThumbs id="explore-guide" onFeedback={handleFeedback} />
+
+        <View style={styles.aiFeedbackRow}>
+          <Text style={styles.aiFeedbackLabel}>Was this helpful?</Text>
+          <Pressable style={styles.aiFeedbackBtn} onPress={() => handleFeedback('explore-guide', true)}>
+            <Feather name="thumbs-up" size={14} color="rgba(255,255,255,0.4)" />
+          </Pressable>
+          <Pressable style={styles.aiFeedbackBtn} onPress={() => handleFeedback('explore-guide', false)}>
+            <Feather name="thumbs-down" size={14} color="rgba(255,255,255,0.4)" />
+          </Pressable>
+        </View>
       </View>
     );
   };
@@ -1221,8 +1243,8 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData, 
 
           <View style={styles.header}>
             <View style={styles.headerLeft}>
-              <LinearGradient colors={[ACCENT, '#e83a2a']} style={styles.headerIcon}>
-                <Feather name="cpu" size={14} color="#fff" />
+              <LinearGradient colors={[ACCENT, '#ff8c7a']} style={styles.headerIcon}>
+                <Feather name="cpu" size={18} color="#fff" />
               </LinearGradient>
               <View>
                 <Text style={styles.headerTitle}>Roomdr AI</Text>
@@ -1240,6 +1262,7 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData, 
           <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
             {screenContext !== 'profile_reminder' && screenContext !== 'refinement' ? (
               <View style={styles.greetingCard}>
+                <View style={styles.greetingAccent} />
                 <Text style={styles.greetingText}>{getGreeting()}</Text>
               </View>
             ) : null}
@@ -1249,7 +1272,10 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData, 
             {screenContext !== 'profile_reminder' && screenContext !== 'refinement' && insightsReady ? (
               insights.length > 0 ? (
                 <>
-                  <Text style={styles.sectionLabel}>YOUR INSIGHTS</Text>
+                  <View style={styles.sectionLabelRow}>
+                    <Feather name="bar-chart-2" size={13} color={ACCENT} />
+                    <Text style={styles.sectionLabel}>Your Insights</Text>
+                  </View>
                   {insights.map(insight => (
                     <InsightCard
                       key={insight.id}
@@ -1312,35 +1338,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: 18,
     paddingVertical: Spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
   },
   headerIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
     color: '#fff',
     fontSize: 17,
-    fontWeight: '700',
+    fontWeight: '800',
+    letterSpacing: -0.3,
   },
   contextPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(255,107,91,0.15)',
-    borderRadius: 8,
-    paddingHorizontal: 6,
+    backgroundColor: 'rgba(255,107,91,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.25)',
+    borderRadius: 10,
+    paddingHorizontal: 8,
     paddingVertical: 2,
     marginTop: 2,
     alignSelf: 'flex-start',
@@ -1351,8 +1378,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   closeBtn: {
-    width: 32,
-    height: 32,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255,255,255,0.07)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1362,23 +1391,41 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.md,
   },
   greetingCard: {
-    backgroundColor: CARD_BG,
-    borderRadius: 16,
-    padding: Spacing.md,
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,107,91,0.07)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.15)',
     marginBottom: Spacing.md,
+    overflow: 'hidden',
+  },
+  greetingAccent: {
+    width: 3,
+    backgroundColor: ACCENT,
+    borderRadius: 2,
+    flexShrink: 0,
   },
   greetingText: {
-    color: 'rgba(255,255,255,0.85)',
+    flex: 1,
+    color: 'rgba(255,255,255,0.8)',
     fontSize: 14,
-    lineHeight: 20,
+    lineHeight: 21,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
   },
-  sectionLabel: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1,
+  sectionLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     marginTop: Spacing.lg,
     marginBottom: Spacing.sm,
+  },
+  sectionLabel: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
   contextCard: {
     backgroundColor: CARD_BG,
@@ -1484,19 +1531,64 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  savedNote: {
+  aiSectionWrap: {
+    marginTop: 4,
+  },
+  aiSectionSubtext: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.45)',
+    lineHeight: 19,
+    marginBottom: 12,
+    marginTop: 4,
+  },
+  aiSuggestionList: {
+    gap: 8,
+  },
+  aiSuggestionCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginTop: 8,
-    backgroundColor: 'rgba(255,107,91,0.08)',
-    borderRadius: 8,
-    padding: 8,
+    gap: 12,
+    backgroundColor: '#1e1e1e',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
-  savedNoteText: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 12,
+  aiSuggestionIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,107,91,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  aiSuggestionText: {
     flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  aiFeedbackRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 12,
+    justifyContent: 'flex-end',
+  },
+  aiFeedbackLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.25)',
+    marginRight: 2,
+  },
+  aiFeedbackBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   statRow: {
     flexDirection: 'row',
@@ -1595,34 +1687,46 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   insightCard: {
-    backgroundColor: CARD_BG,
-    borderRadius: 14,
-    padding: Spacing.md,
-    marginBottom: Spacing.sm,
-  },
-  insightHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 6,
+    alignItems: 'flex-start',
+    gap: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 10,
   },
-  insightIconBox: {
-    width: 26,
-    height: 26,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,107,91,0.15)',
+  insightIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
+    marginTop: 1,
+  },
+  insightBody: {
+    flex: 1,
+    gap: 4,
   },
   insightTitle: {
     color: '#fff',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
   },
-  insightBody: {
-    color: 'rgba(255,255,255,0.7)',
+  insightDesc: {
+    color: 'rgba(255,255,255,0.5)',
     fontSize: 13,
-    lineHeight: 18,
+    lineHeight: 19,
+  },
+  insightRight: {
+    alignItems: 'center',
+    gap: 10,
+    paddingTop: 2,
+    flexShrink: 0,
+  },
+  insightFeedback: {
+    gap: 8,
+    alignItems: 'center',
   },
   breakdownContainer: {
     marginTop: 10,
