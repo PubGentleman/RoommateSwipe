@@ -12,6 +12,7 @@ import { Image } from 'expo-image';
 import { ReportBlockModal } from '../../components/ReportBlockModal';
 import { PlanBadge } from '../../components/PlanBadge';
 import { RoomdrAISheet, ScreenContext } from '../../components/RoomdrAISheet';
+import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { getMessages as getSupabaseMessages, sendMessage as sendSupabaseMessage, markMessagesAsRead as markSupabaseMessagesAsRead, subscribeToMessages } from '../../services/messageService';
 import { recordMessageActivity } from '../../utils/aiMemory';
@@ -893,11 +894,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
               </View>
             )}
           </View>
-          <Pressable onPress={() => setShowAISheet(true)} style={styles.aiNavBtn}>
-            <View style={styles.aiNavBtnInner}>
-              <Feather name="cpu" size={16} color="#FFFFFF" />
-            </View>
-          </Pressable>
+          <AIFloatingButton onPress={() => setShowAISheet(true)} position="inline" size="sm" />
           {conversationId.startsWith('group-') ? (
             <Pressable
               onPress={() => {

@@ -33,6 +33,7 @@ import { RoommateFilterSheet, MatchFilters, DEFAULT_FILTERS, getActiveFilterCoun
 import { PlanBadge } from '../../components/PlanBadge';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
+import { AIFloatingButton } from '../../components/AIFloatingButton';
 import type { ScreenContext } from '../../components/RoomdrAISheet';
 import { trackSwipe, startSession, shouldShowRefinementQuestion, getQuestionsAsked } from '../../utils/refinementEngine';
 import { getNextRefinementQuestion, REFINEMENT_QUESTIONS } from '../../utils/refinementQuestions';
@@ -949,11 +950,7 @@ export const RoommatesScreen = () => {
     return (
       <View style={[styles.container, { backgroundColor: '#141414' }]}>
         <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-          <Pressable onPress={handleOpenAIAssistant} style={styles.navIconBtn}>
-            <View style={[styles.navIconBtnInner, { backgroundColor: '#ff4d4d' }]}>
-              <Feather name="cpu" size={18} color="#FFFFFF" />
-            </View>
-          </Pressable>
+          <AIFloatingButton onPress={handleOpenAIAssistant} position="inline" />
           <RoomdrLogo variant="horizontal" size="sm" />
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <Pressable onPress={() => (navigation as any).navigate('Notifications')} style={styles.navIconBtn}>
@@ -1168,11 +1165,7 @@ export const RoommatesScreen = () => {
   return (
     <View style={[styles.container, { backgroundColor: '#141414' }]}>
       <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-        <Pressable onPress={handleOpenAIAssistant} style={styles.navIconBtn}>
-          <View style={[styles.navIconBtnInner, { backgroundColor: '#ff4d4d' }]}>
-            <Feather name="cpu" size={18} color="#FFFFFF" />
-          </View>
-        </Pressable>
+        <AIFloatingButton onPress={handleOpenAIAssistant} position="inline" />
         <RoomdrLogo variant="horizontal" size="sm" />
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <Pressable onPress={() => {

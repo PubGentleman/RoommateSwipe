@@ -12,6 +12,7 @@ import { Property, InterestCard, HostSubscriptionData } from '../../types/models
 import { getMyListings, mapListingToProperty, updateListing, deleteListing as deleteListingSupa } from '../../services/listingService';
 import { getReceivedInterestCards } from '../../services/discoverService';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
+import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { isListingBoosted, canAddListingCheck, isFreePlan } from '../../utils/hostPricing';
 import { ListingLimitModal, OverageModal } from '../../components/ListingLimitModal';
 
@@ -521,14 +522,7 @@ export const MyListingsScreen = () => {
           </Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <Pressable onPress={() => setShowAISheet(true)}>
-            <LinearGradient
-              colors={[ACCENT, '#e83a2a']}
-              style={styles.aiGradientBtn}
-            >
-              <Feather name="cpu" size={18} color="#fff" />
-            </LinearGradient>
-          </Pressable>
+          <AIFloatingButton onPress={() => setShowAISheet(true)} position="inline" />
         <Pressable onPress={() => {
           if (hostSub) {
             const updatedSub = { ...hostSub, activeListingCount: activeCount };

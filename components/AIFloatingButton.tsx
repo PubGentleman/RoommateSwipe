@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { Pressable, Text, StyleSheet, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from './VectorIcons';
 import * as Haptics from 'expo-haptics';
@@ -7,12 +7,21 @@ import * as Haptics from 'expo-haptics';
 interface AIFloatingButtonProps {
   onPress: () => void;
   top?: number;
+  position?: 'floating' | 'inline';
+  size?: 'sm' | 'md';
+  style?: ViewStyle;
 }
 
-export const AIFloatingButton = ({ onPress, top = 16 }: AIFloatingButtonProps) => {
+export const AIFloatingButton = ({ onPress, top = 16, position = 'floating', size = 'md', style }: AIFloatingButtonProps) => {
+  const iconSize = size === 'sm' ? 14 : 16;
+
+  const containerStyle = position === 'floating'
+    ? [styles.floatingContainer, { top }, style]
+    : [styles.inlineContainer, style];
+
   return (
     <Pressable
-      style={[styles.container, { top }]}
+      style={containerStyle}
       onPress={() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         onPress();
@@ -24,27 +33,37 @@ export const AIFloatingButton = ({ onPress, top = 16 }: AIFloatingButtonProps) =
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       >
-        <Feather name="cpu" size={20} color="#fff" />
+        <Feather name="cpu" size={iconSize} color="#fff" />
+        <Text style={styles.label}>AI</Text>
       </LinearGradient>
     </Pressable>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  floatingContainer: {
     position: 'absolute',
     left: 16,
     zIndex: 100,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    boxShadow: '0 0 12px rgba(255,107,91,0.5)',
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  inlineContainer: {
+    borderRadius: 20,
+    overflow: 'hidden',
   },
   gradient: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 20,
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#fff',
+    letterSpacing: 0.5,
   },
 });

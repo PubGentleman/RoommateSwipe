@@ -21,6 +21,7 @@ import { getVerificationLevel } from '../../components/VerificationBadge';
 import { getZodiacSymbol } from '../../utils/zodiacUtils';
 import { AdBanner } from '../../components/AdBanner';
 import { LinearGradient } from 'expo-linear-gradient';
+import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { useCityContext } from '../../contexts/CityContext';
 import { CityPickerModal, CityPillButton } from '../../components/CityPickerModal';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
@@ -1662,17 +1663,7 @@ export const GroupsScreen = () => {
   return (
     <View style={[styles.container, { backgroundColor: '#111111', paddingTop: insets.top, paddingBottom: insets.bottom + 80 }]}>
       <View style={styles.groupsTopNav}>
-        <Pressable onPress={() => setShowAISheet(true)} style={styles.groupsAiBtn}>
-          <LinearGradient
-            colors={['#ff6b5b', '#e83a2a']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.groupsAiBtnInner}
-          >
-            <Feather name="cpu" size={16} color="#FFFFFF" />
-            <Text style={styles.groupsAiBtnLabel}>AI</Text>
-          </LinearGradient>
-        </Pressable>
+        <AIFloatingButton onPress={() => setShowAISheet(true)} position="inline" />
       </View>
 
       <View style={styles.tabBar}>

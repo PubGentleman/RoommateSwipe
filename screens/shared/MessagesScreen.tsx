@@ -18,6 +18,7 @@ import { calculateCompatibility } from '../../utils/matchingAlgorithm';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PlanBadge } from '../../components/PlanBadge';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
+import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { User } from '../../types/models';
 import { getConversations as getSupabaseConversations, subscribeToAllMessages } from '../../services/messageService';
 import { getMyInquiryGroups } from '../../services/groupService';
@@ -791,11 +792,7 @@ export const MessagesScreen = () => {
   return (
     <View style={[styles.container, { backgroundColor: '#111' }]}>
       <View style={[styles.topNav, { paddingTop: insets.top + 14 }]}>
-        <Pressable onPress={() => setShowAISheet(true)} style={styles.aiNavBtn}>
-          <View style={styles.aiNavBtnInner}>
-            <Feather name="cpu" size={18} color="#FFFFFF" />
-          </View>
-        </Pressable>
+        <AIFloatingButton onPress={() => setShowAISheet(true)} position="inline" />
         <ThemedText style={styles.topNavTitle}>
           {isHostMode ? 'Renter Chats' : 'Messages'}
         </ThemedText>

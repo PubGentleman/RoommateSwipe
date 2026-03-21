@@ -16,6 +16,7 @@ import { useNotificationContext } from '../../contexts/NotificationContext';
 import { getReceivedInterestCards, acceptInterestCard, rejectInterestCard } from '../../services/discoverService';
 import { updateGroup } from '../../services/groupService';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
+import { AIFloatingButton } from '../../components/AIFloatingButton';
 
 type FilterStatus = 'all' | 'pending' | 'accepted' | 'passed';
 
@@ -463,14 +464,7 @@ export const HostInquiriesScreen = () => {
                 </ThemedText>
               </View>
             ) : null}
-            <Pressable onPress={() => setShowAISheet(true)}>
-              <LinearGradient
-                colors={['#ff6b5b', '#e83a2a']}
-                style={styles.aiGradientBtn}
-              >
-                <Feather name="cpu" size={18} color="#FFFFFF" />
-              </LinearGradient>
-            </Pressable>
+            <AIFloatingButton onPress={() => setShowAISheet(true)} position="inline" />
           </View>
         </View>
 

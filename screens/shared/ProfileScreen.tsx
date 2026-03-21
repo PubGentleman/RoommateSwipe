@@ -14,6 +14,7 @@ import { ProfileCompletionCard } from '../../components/ProfileCompletionCard';
 import { getVerificationLevel } from '../../components/VerificationBadge';
 import { StorageService } from '../../utils/storage';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
+import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { getBoostTimeRemaining, getBoostDuration, isBoostExpired, RENTER_BOOST_OPTIONS, RenterBoostOptionId } from '../../utils/boostUtils';
 import { isDev } from '../../utils/envUtils';
 import { isHostTypeEditable, daysRemainingInGracePeriod, getHostBadgeLabel, getHostBadgeColor, getHostBadgeIcon } from '../../utils/hostTypeUtils';
@@ -156,11 +157,7 @@ export const ProfileScreen = () => {
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <View style={styles.topNav}>
-        <Pressable onPress={() => setShowAISheet(true)} style={styles.profileAiBtn}>
-          <View style={styles.profileAiBtnInner}>
-            <Feather name="cpu" size={18} color="#FFFFFF" />
-          </View>
-        </Pressable>
+        <AIFloatingButton onPress={() => setShowAISheet(true)} position="inline" />
         <Pressable onPress={handleDevTap}>
           <Text style={styles.topNavTitle}>My Profile</Text>
         </Pressable>

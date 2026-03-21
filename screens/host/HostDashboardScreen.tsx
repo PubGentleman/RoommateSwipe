@@ -13,6 +13,7 @@ import { useNotificationContext } from '../../contexts/NotificationContext';
 import { getMyListings, mapListingToProperty } from '../../services/listingService';
 import { getReceivedInterestCards } from '../../services/discoverService';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
+import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { HostPlanBadge } from '../../components/HostPlanBadge';
 import { canAddListingCheck, isFreePlan } from '../../utils/hostPricing';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -316,14 +317,7 @@ export const HostDashboardScreen = () => {
           <Text style={styles.greetingTitle}>Host Dashboard</Text>
         </View>
         <View style={styles.navActions}>
-          <Pressable style={styles.iconBtn} onPress={() => setShowAISheet(true)}>
-            <LinearGradient
-              colors={['#ff6b5b', '#e83a2a']}
-              style={styles.aiGradientBtn}
-            >
-              <Feather name="cpu" size={18} color="#FFFFFF" />
-            </LinearGradient>
-          </Pressable>
+          <AIFloatingButton onPress={() => setShowAISheet(true)} position="inline" />
           <Pressable style={styles.iconBtn} onPress={() => {
             navigation.navigate('Notifications');
           }}>

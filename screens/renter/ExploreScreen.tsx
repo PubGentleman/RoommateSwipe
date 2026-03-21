@@ -28,6 +28,7 @@ import { shouldShowMatchScore, getHostBadgeLabel, getHostBadgeColor, getHostBadg
 import type { HostType } from '../../utils/hostTypeUtils';
 import { PropertyMapView } from '../../components/PropertyMapView';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
+import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 
 const COMMON_AMENITIES = [
@@ -936,11 +937,7 @@ export const ExploreScreen = () => {
   return (
     <View style={[styles.container, { backgroundColor: BG }]}>
       <View style={[styles.searchBarRow, { paddingTop: insets.top + 12 }]}>
-        <Pressable onPress={() => setShowAISheet(true)} style={styles.aiNavBtn}>
-          <View style={styles.aiNavBtnInner}>
-            <Feather name="cpu" size={18} color="#FFFFFF" />
-          </View>
-        </Pressable>
+        <AIFloatingButton onPress={() => setShowAISheet(true)} position="inline" />
         <View style={styles.searchInput}>
           <Feather name="search" size={15} color="rgba(255,255,255,0.3)" />
           <TextInput

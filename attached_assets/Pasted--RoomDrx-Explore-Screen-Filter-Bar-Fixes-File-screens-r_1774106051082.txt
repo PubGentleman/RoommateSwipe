@@ -1,0 +1,259 @@
+# RoomDrx — Explore Screen Filter Bar Fixes
+
+## File: `screens/renter/ExploreScreen.tsx`
+
+---
+
+## Issues Being Fixed
+
+1. **Filter chips get cut off** — "Best Match", "Under $2k", "Private Room", "Pet Friendly" chips are clipped at both edges because the parent container forces `overflow: hidden`
+2. **"Best Match" active chip is wrong color** — uses a dark maroon/burgundy instead of the app-wide coral `#ff6b5b`
+3. **All other active filter chips** — same wrong color issue; every active chip should use coral, not dark red
+4. **"FEATURED" badge** — outlined gold pill while "LEASE" and "ENTIRE UNIT" are solid filled pills; inconsistent treatment on the same card
+5. **"Saved (0)" count** — inline `(0)` in the button label looks cluttered; replace with a badge bubble
+
+---
+
+## Change 1 — Fix Filter Chip ScrollView Clipping
+
+Find the horizontal `ScrollView` that renders the filter chips (Best Match, Under $2k, Private Room, Pet Friendly, etc.) and apply these changes:
+
+```tsx
+// BEFORE (likely something like):
+<View style={styles.filterContainer}>
+  <ScrollView
+    horizontal
+    showsHorizontalScrollIndicator={false}
+    contentContainerStyle={styles.filterScroll}
+  >
+    {filters.map(...)}
+  </ScrollView>
+</View>
+
+// AFTER:
+<View style={styles.filterContainer}>
+  <ScrollView
+    horizontal
+    showsHorizontalScrollIndicator={false}
+    style={{ overflow: 'visible' }}         {/* ← KEY: prevents clipping */}
+    contentContainerStyle={styles.filterScroll}
+  >
+    {filters.map(...)}
+  </ScrollView>
+</View>
+```
+
+**Update `filterContainer` and `filterScroll` styles:**
+
+```ts
+filterContainer: {
+  // Remove any: overflow: 'hidden', borderRadius clipping the scroll
+  // If borderRadius exists here, move it to a different wrapper that doesn't contain the ScrollView
+  paddingTop: 4,
+  paddingBottom: 2,
+},
+filterScroll: {
+  paddingHorizontal: 20,  // ← breathing room so first/last chip aren't edge-clipped
+  paddingVertical: 4,     // ← prevents shadow/glow from clipping vertically
+  gap: 8,
+  flexDirection: 'row',
+  alignItems: 'center',
+},
+```
+
+> **Android note:** On Android, `borderRadius` on a parent View automatically forces `overflow: 'hidden'`. If the parent `filterContainer` has a `borderRadius`, either remove it or move the `ScrollView` outside of that rounded container.
+
+---
+
+## Change 2 — Fix Active Filter Chip Color
+
+The active filter chip (e.g. "Best Match") currently uses a dark maroon/burgundy. Replace with the app-wide coral accent.
+
+```tsx
+// Find the filter chip render — likely something like:
+const FilterChip = ({ label, icon, isActive, onPress }) => (
+  <Pressable
+    style={[styles.filterChip, isActive && styles.filterChipActive]}
+    onPress={onPress}
+  >
+    {icon && <Feather name={icon} size={13} color={isActive ? '#fff' : 'rgba(255,255,255,0.45)'} />}
+    <Text style={[styles.filterChipText, isActive && styles.filterChipTextActive]}>
+      {label}
+    </Text>
+  </Pressable>
+);
+```
+
+**Fix the active styles:**
+
+```ts
+filterChip: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 5,
+  paddingHorizontal: 14,
+  paddingVertical: 8,
+  borderRadius: 20,
+  backgroundColor: 'rgba(255,255,255,0.07)',
+  borderWidth: 1,
+  borderColor: 'rgba(255,255,255,0.1)',
+},
+
+// BEFORE (wrong — dark maroon):
+filterChipActive: {
+  backgroundColor: 'rgba(180, 30, 20, 0.4)',  // ← DELETE this
+  borderColor: 'rgba(180, 30, 20, 0.5)',       // ← DELETE this
+},
+
+// AFTER (correct — coral):
+filterChipActive: {
+  backgroundColor: '#ff6b5b',
+  borderColor: 'transparent',
+},
+
+filterChipText: {
+  fontSize: 13,
+  fontWeight: '600',
+  color: 'rgba(255,255,255,0.45)',
+},
+filterChipTextActive: {
+  color: '#fff',
+  fontWeight: '700',
+},
+```
+
+> **Search for the wrong color:** Run a find in your editor for `rgba(180` or `#8B` or `maroon` or `#7` within the filter chip styles and replace with the coral values above. The hex may vary depending on how it was set.
+
+---
+
+## Change 3 — Fix "FEATURED" Badge on Listing Cards
+
+The FEATURED badge uses an outlined gold pill while LEASE and ENTIRE UNIT are solid. Make FEATURED a solid gold fill to match the pill treatment of the other badges — but keep the gold color as premium signaling.
+
+```tsx
+// Find the listing card badge row — likely:
+{item.isFeatured && (
+  <View style={styles.featuredBadge}>
+    <Feather name="star" size={10} color="#f5c518" />
+    <Text style={styles.featuredBadgeText}>FEATURED</Text>
+  </View>
+)}
+
+// AFTER — solid gold fill with dark text:
+{item.isFeatured && (
+  <View style={styles.featuredBadge}>
+    <Feather name="star" size={10} color="#1a1200" />
+    <Text style={styles.featuredBadgeText}>FEATURED</Text>
+  </View>
+)}
+```
+
+**Fix the style:**
+
+```ts
+// BEFORE (outlined):
+featuredBadge: {
+  borderWidth: 1,
+  borderColor: '#f5c518',
+  borderRadius: 20,
+  paddingHorizontal: 10,
+  paddingVertical: 4,
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 4,
+},
+featuredBadgeText: {
+  fontSize: 10,
+  fontWeight: '800',
+  color: '#f5c518',
+  letterSpacing: 0.5,
+},
+
+// AFTER (solid fill — matches LEASE and ENTIRE UNIT pill treatment):
+featuredBadge: {
+  backgroundColor: '#f5c518',
+  borderRadius: 20,
+  paddingHorizontal: 10,
+  paddingVertical: 4,
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 4,
+},
+featuredBadgeText: {
+  fontSize: 10,
+  fontWeight: '800',
+  color: '#1a1200',   // dark brown-black for legibility on gold
+  letterSpacing: 0.5,
+},
+```
+
+---
+
+## Change 4 — Fix "Saved (0)" Tab Button
+
+Replace the inline `(0)` count with a cleaner badge bubble. When saved count is 0, hide the badge entirely.
+
+```tsx
+// BEFORE:
+<Pressable style={[styles.listingTab, activeTab === 'saved' && styles.listingTabActive]}>
+  <Feather name="heart" size={16} color={...} />
+  <Text style={styles.listingTabText}>Saved ({savedCount})</Text>
+</Pressable>
+
+// AFTER:
+<Pressable
+  style={[styles.listingTab, activeTab === 'saved' && styles.listingTabActive]}
+  onPress={() => setActiveTab('saved')}
+>
+  <View style={styles.tabLabelRow}>
+    <Feather
+      name="heart"
+      size={16}
+      color={activeTab === 'saved' ? '#fff' : 'rgba(255,255,255,0.45)'}
+    />
+    <Text style={[styles.listingTabText, activeTab === 'saved' && styles.listingTabTextActive]}>
+      Saved
+    </Text>
+    {savedCount > 0 && (
+      <View style={styles.savedBadge}>
+        <Text style={styles.savedBadgeText}>{savedCount}</Text>
+      </View>
+    )}
+  </View>
+</Pressable>
+```
+
+**Add styles:**
+
+```ts
+tabLabelRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 5,
+},
+savedBadge: {
+  backgroundColor: '#ff6b5b',
+  borderRadius: 10,
+  minWidth: 18,
+  height: 18,
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingHorizontal: 5,
+},
+savedBadgeText: {
+  fontSize: 10,
+  fontWeight: '800',
+  color: '#fff',
+},
+```
+
+---
+
+## Summary of Changes
+
+| # | What changes | Where |
+|---|---|---|
+| 1 | Filter chip ScrollView no longer clips — `overflow: 'visible'` + proper `paddingHorizontal: 20` | `filterContainer` + `filterScroll` styles |
+| 2 | Active filter chip color: dark maroon → coral `#ff6b5b` | `filterChipActive` + `filterChipTextActive` styles |
+| 3 | FEATURED badge: outlined gold → solid gold fill with dark text (matches LEASE/ENTIRE UNIT pill style) | `featuredBadge` + `featuredBadgeText` styles |
+| 4 | "Saved (0)" label: inline count → hidden-when-zero badge bubble | Tab button JSX + `savedBadge` styles |
