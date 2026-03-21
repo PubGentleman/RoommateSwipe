@@ -1,0 +1,503 @@
+# RoomDrx — Renter Profile Detail Modal Redesign
+
+## File: `screens/renter/RoommatesScreen.tsx` or `screens/host/BrowseRenterGroupsScreen.tsx`
+Look for the modal triggered by tapping a renter card — likely a `<Modal>` or bottom sheet with `showProfileDetail` state. The internal component may be named `ProfileDetailModal`, `RenterProfileModal`, or similar.
+
+---
+
+## Issues Being Fixed
+
+1. **"Profile Details" header wastes space** — plain centered text + X; photo should be full-bleed with info overlaid
+2. **Left/right arrow buttons on photo** — dated, should be swipeable with dot indicators
+3. **Match score buried at bottom** — 85% match should be a badge near the name, not a bar at the very bottom
+4. **Preference rows are clinical** — plain icon/label/value list reads like a spreadsheet
+5. **Lifestyle values are plain text** — "Very Clean", "Very Social" should be visual pills
+6. **"Fully Verified" badge is teal/blue** — should use the coral/green accent system
+7. **No action buttons** — no way to message or pass from the modal; only the match score bar exists
+8. **Zodiac shown as a colored square** — needs to be a styled text pill with the sign name
+
+---
+
+## Change 1 — Full-Bleed Photo Header with Overlaid Info
+
+Remove the plain "Profile Details" title bar. Let the photo take the full top of the modal with name, age, match score, and verified status overlaid via a gradient.
+
+```tsx
+// Add state for photo index:
+const [photoIdx, setPhotoIdx] = useState(0);
+
+// Reset when opening new profile:
+useEffect(() => { setPhotoIdx(0); }, [selectedProfile?.id]);
+
+// Replace the header + photo section with:
+<View style={styles.pdPhotoWrap}>
+  {/* Swipeable photo */}
+  <ScrollView
+    horizontal
+    pagingEnabled
+    showsHorizontalScrollIndicator={false}
+    onMomentumScrollEnd={(e) => {
+      const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+      setPhotoIdx(idx);
+    }}
+  >
+    {(profile.photos ?? [profile.photo]).map((uri, i) => (
+      <Image
+        key={i}
+        source={{ uri }}
+        style={styles.pdPhoto}
+        resizeMode="cover"
+      />
+    ))}
+  </ScrollView>
+
+  {/* Gradient overlay — bottom of photo */}
+  <LinearGradient
+    colors={['transparent', 'rgba(0,0,0,0.85)']}
+    style={styles.pdPhotoGradient}
+  >
+    {/* Match score badge */}
+    <View style={[
+      styles.pdMatchBadge,
+      { backgroundColor: profile.matchScore >= 70 ? '#2ecc71' : profile.matchScore >= 40 ? '#f39c12' : '#e74c3c' }
+    ]}>
+      <Feather name="heart" size={11} color="#fff" />
+      <Text style={styles.pdMatchText}>{profile.matchScore}% Match</Text>
+    </View>
+
+    {/* Name + age */}
+    <Text style={styles.pdName}>{profile.name}, {profile.age}</Text>
+
+    {/* Occupation + verified */}
+    <View style={styles.pdSubRow}>
+      <Text style={styles.pdOccupation}>{profile.occupation}</Text>
+      {profile.isVerified && (
+        <View style={styles.pdVerifiedBadge}>
+          <Feather name="check-circle" size={11} color="#2ecc71" />
+          <Text style={styles.pdVerifiedText}>Verified</Text>
+        </View>
+      )}
+      {profile.zodiacSign && (
+        <View style={styles.pdZodiacPill}>
+          <Text style={styles.pdZodiacText}>{profile.zodiacSign}</Text>
+        </View>
+      )}
+    </View>
+  </LinearGradient>
+
+  {/* Dot indicators */}
+  {(profile.photos ?? []).length > 1 && (
+    <View style={styles.pdDots}>
+      {(profile.photos ?? [profile.photo]).map((_, i) => (
+        <View key={i} style={[styles.pdDot, i === photoIdx && styles.pdDotActive]} />
+      ))}
+    </View>
+  )}
+
+  {/* Close button */}
+  <Pressable style={styles.pdCloseBtn} onPress={onClose}>
+    <Feather name="x" size={18} color="#fff" />
+  </Pressable>
+</View>
+```
+
+**Styles:**
+
+```ts
+pdPhotoWrap: {
+  position: 'relative',
+  width: '100%',
+  height: 320,
+},
+pdPhoto: {
+  width: SCREEN_WIDTH,    // import { Dimensions } from 'react-native'; const SCREEN_WIDTH = Dimensions.get('window').width;
+  height: 320,
+},
+pdPhotoGradient: {
+  position: 'absolute',
+  bottom: 0,
+  left: 0,
+  right: 0,
+  paddingHorizontal: 18,
+  paddingBottom: 18,
+  paddingTop: 80,
+  gap: 6,
+},
+pdMatchBadge: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 5,
+  alignSelf: 'flex-start',
+  borderRadius: 20,
+  paddingHorizontal: 12,
+  paddingVertical: 5,
+  marginBottom: 4,
+},
+pdMatchText: {
+  fontSize: 12,
+  fontWeight: '800',
+  color: '#fff',
+},
+pdName: {
+  fontSize: 26,
+  fontWeight: '800',
+  color: '#fff',
+  letterSpacing: -0.5,
+},
+pdSubRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 8,
+  flexWrap: 'wrap',
+},
+pdOccupation: {
+  fontSize: 14,
+  color: 'rgba(255,255,255,0.75)',
+  fontWeight: '500',
+},
+pdVerifiedBadge: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 4,
+  backgroundColor: 'rgba(46,204,113,0.15)',
+  borderWidth: 1,
+  borderColor: 'rgba(46,204,113,0.3)',
+  borderRadius: 10,
+  paddingHorizontal: 8,
+  paddingVertical: 3,
+},
+pdVerifiedText: {
+  fontSize: 11,
+  fontWeight: '700',
+  color: '#2ecc71',
+},
+pdZodiacPill: {
+  backgroundColor: 'rgba(168,85,247,0.2)',
+  borderWidth: 1,
+  borderColor: 'rgba(168,85,247,0.35)',
+  borderRadius: 10,
+  paddingHorizontal: 8,
+  paddingVertical: 3,
+},
+pdZodiacText: {
+  fontSize: 11,
+  fontWeight: '700',
+  color: '#c084fc',
+},
+pdDots: {
+  position: 'absolute',
+  bottom: 70,
+  left: 0,
+  right: 0,
+  flexDirection: 'row',
+  justifyContent: 'center',
+  gap: 5,
+},
+pdDot: {
+  width: 6,
+  height: 6,
+  borderRadius: 3,
+  backgroundColor: 'rgba(255,255,255,0.35)',
+},
+pdDotActive: {
+  backgroundColor: '#fff',
+  width: 18,
+},
+pdCloseBtn: {
+  position: 'absolute',
+  top: 14,
+  right: 14,
+  width: 34,
+  height: 34,
+  borderRadius: 17,
+  backgroundColor: 'rgba(0,0,0,0.45)',
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+```
+
+---
+
+## Change 2 — Key Stats Strip (Replace top preference rows)
+
+Replace the first 4 preference rows (Budget, Location, Move-in, Bedrooms) with a compact 4-column stat strip, matching the Property Detail redesign style.
+
+```tsx
+<View style={styles.pdStatStrip}>
+  {[
+    { icon: 'dollar-sign', label: 'Budget',   value: `$${profile.budgetMax}/mo` },
+    { icon: 'map-pin',     label: 'Location', value: profile.preferredLocation ?? 'Flexible' },
+    { icon: 'calendar',    label: 'Move-in',  value: profile.moveInDate ?? 'ASAP' },
+    { icon: 'home',        label: 'Rooms',    value: `${profile.bedroomsNeeded ?? 1} bd` },
+  ].map((stat, i) => (
+    <View key={i} style={[styles.pdStat, i < 3 && styles.pdStatBorder]}>
+      <Feather name={stat.icon} size={16} color="#ff6b5b" />
+      <Text style={styles.pdStatValue}>{stat.value}</Text>
+      <Text style={styles.pdStatLabel}>{stat.label}</Text>
+    </View>
+  ))}
+</View>
+```
+
+**Styles:**
+
+```ts
+pdStatStrip: {
+  flexDirection: 'row',
+  backgroundColor: '#1a1a1a',
+  marginHorizontal: 18,
+  marginTop: 16,
+  borderRadius: 16,
+  borderWidth: 1,
+  borderColor: 'rgba(255,255,255,0.07)',
+  overflow: 'hidden',
+},
+pdStat: {
+  flex: 1,
+  alignItems: 'center',
+  paddingVertical: 14,
+  gap: 4,
+},
+pdStatBorder: {
+  borderRightWidth: 1,
+  borderRightColor: 'rgba(255,255,255,0.07)',
+},
+pdStatValue: {
+  fontSize: 13,
+  fontWeight: '700',
+  color: '#fff',
+  textAlign: 'center',
+},
+pdStatLabel: {
+  fontSize: 10,
+  color: 'rgba(255,255,255,0.35)',
+  fontWeight: '500',
+  textTransform: 'uppercase',
+  letterSpacing: 0.3,
+},
+```
+
+---
+
+## Change 3 — About Section
+
+Keep the bio but wrap it in a card with a section label.
+
+```tsx
+<View style={styles.pdSection}>
+  <Text style={styles.pdSectionLabel}>About</Text>
+  <View style={styles.pdCard}>
+    <Text style={styles.pdBioText}>{profile.bio}</Text>
+  </View>
+</View>
+```
+
+**Styles:**
+
+```ts
+pdSection: {
+  paddingHorizontal: 18,
+  marginTop: 20,
+  gap: 10,
+},
+pdSectionLabel: {
+  fontSize: 11,
+  fontWeight: '700',
+  color: 'rgba(255,255,255,0.3)',
+  textTransform: 'uppercase',
+  letterSpacing: 1,
+},
+pdCard: {
+  backgroundColor: '#1a1a1a',
+  borderRadius: 16,
+  padding: 14,
+  borderWidth: 1,
+  borderColor: 'rgba(255,255,255,0.07)',
+},
+pdBioText: {
+  fontSize: 14,
+  color: 'rgba(255,255,255,0.75)',
+  lineHeight: 22,
+},
+```
+
+---
+
+## Change 4 — Lifestyle: Visual Pill Tags (Replace plain text rows)
+
+Replace the plain icon + label + value rows with pill tags grouped in a wrapping row.
+
+```tsx
+<View style={styles.pdSection}>
+  <Text style={styles.pdSectionLabel}>Lifestyle</Text>
+  <View style={styles.pdPillWrap}>
+    {[
+      { icon: 'star',       value: profile.cleanliness,   color: '#ff6b5b' },
+      { icon: 'users',      value: profile.socialLevel,   color: '#ff6b5b' },
+      { icon: 'briefcase',  value: profile.workSchedule,  color: '#ff6b5b' },
+      profile.hasPets     ? { icon: 'heart',  value: 'Has Pets',        color: '#f39c12' } : null,
+      profile.smokingOk   ? { icon: 'wind',   value: 'Smoking OK',      color: 'rgba(255,255,255,0.35)' } : null,
+      !profile.smokingOk  ? { icon: 'x',      value: 'No Smoking',      color: 'rgba(255,255,255,0.35)' } : null,
+      profile.privateBath ? { icon: 'droplet',value: 'Private Bath',    color: '#ff6b5b' } : null,
+    ].filter(Boolean).map((tag, i) => (
+      <View key={i} style={styles.pdLifestylePill}>
+        <Feather name={tag!.icon} size={12} color={tag!.color} />
+        <Text style={styles.pdLifestylePillText}>{tag!.value}</Text>
+      </View>
+    ))}
+  </View>
+</View>
+```
+
+**Styles:**
+
+```ts
+pdPillWrap: {
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  gap: 8,
+},
+pdLifestylePill: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 6,
+  backgroundColor: '#1a1a1a',
+  borderWidth: 1,
+  borderColor: 'rgba(255,255,255,0.1)',
+  borderRadius: 20,
+  paddingHorizontal: 12,
+  paddingVertical: 7,
+},
+pdLifestylePillText: {
+  fontSize: 13,
+  fontWeight: '600',
+  color: 'rgba(255,255,255,0.75)',
+},
+```
+
+---
+
+## Change 5 — Fixed Action Bar (Replace the match score bar)
+
+Replace the lone "85% Match" bar at the bottom with a 3-button action bar: Pass, Message, Interested.
+
+```tsx
+// Fixed bottom bar — outside the ScrollView:
+<View style={styles.pdActionBar}>
+  {/* Pass */}
+  <Pressable style={styles.pdActionPass} onPress={() => { onPass(profile.id); onClose(); }}>
+    <Feather name="x" size={22} color="rgba(255,255,255,0.6)" />
+  </Pressable>
+
+  {/* Interested — primary CTA */}
+  <Pressable style={styles.pdActionInterested} onPress={() => handleInterested(profile.id)}>
+    <Feather name="heart" size={18} color="#fff" />
+    <Text style={styles.pdActionInterestedText}>I'm Interested</Text>
+  </Pressable>
+
+  {/* Message */}
+  <Pressable style={styles.pdActionMessage} onPress={() => handleMessage(profile)}>
+    <Feather name="message-circle" size={22} color="rgba(255,255,255,0.6)" />
+  </Pressable>
+</View>
+```
+
+**Styles:**
+
+```ts
+pdActionBar: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  paddingHorizontal: 24,
+  paddingVertical: 14,
+  borderTopWidth: 1,
+  borderTopColor: 'rgba(255,255,255,0.07)',
+  backgroundColor: '#111',
+  gap: 14,
+},
+pdActionPass: {
+  width: 52,
+  height: 52,
+  borderRadius: 26,
+  backgroundColor: 'rgba(255,255,255,0.08)',
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderWidth: 1,
+  borderColor: 'rgba(255,255,255,0.1)',
+},
+pdActionInterested: {
+  flex: 1,
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 8,
+  backgroundColor: '#ff6b5b',
+  borderRadius: 16,
+  paddingVertical: 15,
+},
+pdActionInterestedText: {
+  fontSize: 16,
+  fontWeight: '800',
+  color: '#fff',
+  letterSpacing: 0.2,
+},
+pdActionMessage: {
+  width: 52,
+  height: 52,
+  borderRadius: 26,
+  backgroundColor: 'rgba(255,255,255,0.08)',
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderWidth: 1,
+  borderColor: 'rgba(255,255,255,0.1)',
+},
+```
+
+---
+
+## Full Screen Structure
+
+```tsx
+<Modal visible={showProfileDetail} animationType="slide">
+  <View style={{ flex: 1, backgroundColor: '#111' }}>
+
+    {/* Change 1: Full-bleed photo with overlaid info */}
+    <View style={styles.pdPhotoWrap}>
+      {/* swipeable photos, gradient overlay, name/match/verified/zodiac, dots, X */}
+    </View>
+
+    {/* Scrollable content */}
+    <ScrollView
+      style={{ flex: 1 }}
+      contentContainerStyle={{ paddingBottom: 20 }}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Change 2: Key stats strip */}
+      <View style={styles.pdStatStrip}>...</View>
+
+      {/* Change 3: About */}
+      <View style={styles.pdSection}>...</View>
+
+      {/* Change 4: Lifestyle pills */}
+      <View style={styles.pdSection}>...</View>
+    </ScrollView>
+
+    {/* Change 5: Fixed action bar */}
+    <View style={styles.pdActionBar}>...</View>
+
+  </View>
+</Modal>
+```
+
+---
+
+## Summary of Changes
+
+| # | What changes | Where |
+|---|---|---|
+| 1 | Full-bleed swipeable photo header with gradient overlay — name, match badge, verified, zodiac pill overlaid; X button top-right; dot indicators | Photo + header area |
+| 2 | 4-column stat strip: Budget / Location / Move-in / Rooms — replaces top 4 preference rows | Below photo |
+| 3 | Bio wrapped in a dark card with section label | About section |
+| 4 | Lifestyle as wrapping pill tags (icon + value) instead of plain icon/label/value rows | Lifestyle section |
+| 5 | Fixed 3-button action bar: Pass (X circle) + "I'm Interested" (coral CTA) + Message (chat circle) — replaces the lone match score bar | Bottom of modal |

@@ -1,11 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Pressable, FlatList, ScrollView, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, Pressable, FlatList, ScrollView, TextInput, Alert } from 'react-native';
 import Animated, { useSharedValue, useAnimatedScrollHandler, useAnimatedStyle, interpolate, Extrapolation } from 'react-native-reanimated';
 import { Feather } from '../../components/VectorIcons';
-import { ThemedText } from '../../components/ThemedText';
-import { useTheme } from '../../hooks/useTheme';
-import { Spacing, BorderRadius, Typography } from '../../constants/theme';
-import { Conversation, Match, RoommateProfile, Message } from '../../types/models';
+import { Conversation, Match, RoommateProfile } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StorageService } from '../../utils/storage';
 import { useAuth } from '../../contexts/AuthContext';
@@ -13,12 +10,8 @@ import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/nativ
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MessagesStackParamList } from '../../navigation/MessagesStackNavigator';
 import { Image } from 'expo-image';
-import { getVerificationLevel } from '../../components/VerificationBadge';
 import { calculateCompatibility } from '../../utils/matchingAlgorithm';
 import { LinearGradient } from 'expo-linear-gradient';
-import { PlanBadge } from '../../components/PlanBadge';
-import { RoomdrAISheet } from '../../components/RoomdrAISheet';
-import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { User } from '../../types/models';
 import { getConversations as getSupabaseConversations, subscribeToAllMessages } from '../../services/messageService';
 import { getMyInquiryGroups } from '../../services/groupService';
@@ -42,24 +35,25 @@ const ICE_BREAKERS = [
   { icon: 'home' as const, text: 'Ask about their place' },
 ];
 
+type ChatFilterKey = 'all' | 'matches' | 'groups' | 'direct';
+
 export const MessagesScreen = () => {
   const navigation = useNavigation<MessagesScreenNavigationProp>();
   const route = useRoute<any>();
   const role: 'host' | 'renter' = route.params?.role || 'renter';
   const isHostMode = role === 'host';
-  const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [profilesMap, setProfilesMap] = useState<Map<string, RoommateProfile>>(new Map());
-  const [usersMap, setUsersMap] = useState<Map<string, User>>(new Map());
+  const [usersMap, setUsersMap] = useState<Map<string, User>>(new Map()); // populated for future profile lookups
   const [newMatches, setNewMatches] = useState<{ profile: RoommateProfile; match: Match; compatibility: number }[]>([]);
   const [matchesMap, setMatchesMap] = useState<Map<string, Match>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
-  const [showAISheet, setShowAISheet] = useState(false);
   const [inquiryGroups, setInquiryGroups] = useState<Group[]>([]);
+  const [chatFilter, setChatFilter] = useState<ChatFilterKey>('all');
 
   const MSG_COLLAPSE_H = 50;
   const msgScrollY = useSharedValue(0);
@@ -108,7 +102,7 @@ export const MessagesScreen = () => {
 
   const loadConversations = async () => {
     if (!user) return;
-    
+
     try {
       setIsLoading(true);
 
@@ -277,7 +271,7 @@ export const MessagesScreen = () => {
     const diff = now.getTime() - date.getTime();
     const mins = Math.floor(diff / (1000 * 60));
     const hours = Math.floor(diff / (1000 * 60 * 60));
-    
+
     if (mins < 1) return 'Just now';
     if (mins < 60) return `${mins}m ago`;
     if (hours < 24) return `${hours}h ago`;
@@ -379,18 +373,18 @@ export const MessagesScreen = () => {
                 hasNewRing ? styles.matchAvatarNewRing : null,
               ]}
             >
-              <ThemedText style={styles.matchAvatarText}>
+              <Text style={styles.matchAvatarText}>
                 {item.profile.name.charAt(0).toUpperCase()}
-              </ThemedText>
+              </Text>
             </LinearGradient>
           )}
           <View style={styles.matchScoreDot}>
-            <ThemedText style={styles.matchScoreText}>{item.compatibility}%</ThemedText>
+            <Text style={styles.matchScoreText}>{item.compatibility}%</Text>
           </View>
         </View>
-        <ThemedText style={styles.matchName} numberOfLines={1}>
+        <Text style={styles.matchName} numberOfLines={1}>
           {item.profile.name.split(' ')[0]}
-        </ThemedText>
+        </Text>
       </Pressable>
     );
   };
@@ -451,21 +445,21 @@ export const MessagesScreen = () => {
         )}
         <View style={styles.inquiryConvInfo}>
           <View style={styles.inquiryConvTop}>
-            <ThemedText style={styles.inquiryConvTitle} numberOfLines={1}>
+            <Text style={styles.inquiryConvTitle} numberOfLines={1}>
               {item.listingTitle || 'Listing Inquiry'}
-            </ThemedText>
+            </Text>
             <View style={[styles.inquiryStatusBadge, { backgroundColor: statusColor + '22', borderColor: statusColor + '55' }]}>
               <View style={[styles.inquiryStatusDot, { backgroundColor: statusColor }]} />
-              <ThemedText style={[styles.inquiryStatusLabel, { color: statusColor }]}>{statusLabel}</ThemedText>
+              <Text style={[styles.inquiryStatusLabel, { color: statusColor }]}>{statusLabel}</Text>
             </View>
           </View>
-          <ThemedText style={styles.inquiryConvPrice}>
+          <Text style={styles.inquiryConvPrice}>
             {item.listingPrice ? `$${item.listingPrice.toLocaleString()}/mo` : ''}
             {item.hostName ? `  ·  ${item.hostName}` : ''}
-          </ThemedText>
-          <ThemedText style={styles.inquiryConvLastMsg} numberOfLines={1}>
+          </Text>
+          <Text style={styles.inquiryConvLastMsg} numberOfLines={1}>
             {item.lastMessage}
-          </ThemedText>
+          </Text>
         </View>
       </Pressable>
     );
@@ -497,28 +491,39 @@ export const MessagesScreen = () => {
         )}
         <View style={styles.inquiryConvInfo}>
           <View style={styles.inquiryConvTop}>
-            <ThemedText style={styles.inquiryConvTitle} numberOfLines={1}>
+            <Text style={styles.inquiryConvTitle} numberOfLines={1}>
               {item.listingTitle || 'Super Interest'}
-            </ThemedText>
+            </Text>
             <View style={styles.superInterestConvBadge}>
               <Feather name="star" size={10} color="#FFD700" />
-              <ThemedText style={styles.superInterestConvBadgeText}>Super Interest</ThemedText>
+              <Text style={styles.superInterestConvBadgeText}>Super Interest</Text>
             </View>
           </View>
-          <ThemedText style={styles.inquiryConvPrice}>
+          <Text style={styles.inquiryConvPrice}>
             {item.listingPrice ? `$${item.listingPrice.toLocaleString()}/mo` : ''}
             {item.hostName ? `  ·  ${item.hostName}` : ''}
-          </ThemedText>
+          </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
             <View style={[styles.inquiryStatusBadge, { backgroundColor: statusColor + '22', borderColor: statusColor + '55' }]}>
               <View style={[styles.inquiryStatusDot, { backgroundColor: statusColor }]} />
-              <ThemedText style={[styles.inquiryStatusLabel, { color: statusColor }]}>{statusLabel}</ThemedText>
+              <Text style={[styles.inquiryStatusLabel, { color: statusColor }]}>{statusLabel}</Text>
             </View>
           </View>
         </View>
       </Pressable>
     );
   };
+
+  const getConvType = (conv: Conversation): 'matches' | 'groups' | 'direct' => {
+    if (conv.isInquiryThread) return 'groups';
+    if (conv.matchType === 'cold') return 'direct';
+    return 'matches';
+  };
+
+  const totalUnread = conversations.reduce((sum, c) => sum + (c.unread || 0), 0);
+  const matchUnread = conversations.filter(c => getConvType(c) === 'matches').reduce((sum, c) => sum + (c.unread || 0), 0);
+  const groupUnread = conversations.filter(c => getConvType(c) === 'groups').reduce((sum, c) => sum + (c.unread || 0), 0);
+  const directUnread = conversations.filter(c => getConvType(c) === 'direct').reduce((sum, c) => sum + (c.unread || 0), 0);
 
   const renderConversation = ({ item, index }: { item: Conversation; index: number }) => {
     if (item.isInquiryThread && item.matchType !== 'cold' && item.matchType !== 'mutual') {
@@ -529,102 +534,75 @@ export const MessagesScreen = () => {
     const isNew = isNewMatch(item);
     const compatibility = getCompatibilityForConversation(item.participant.id);
     const profile = profilesMap.get(item.participant.id);
-    const participantUser = usersMap.get(item.participant.id);
-    const participantPlan = participantUser?.subscription?.plan;
-    const isVerified = profile ? getVerificationLevel(profile.verification) >= 2 : false;
     const match = matchesMap.get(item.participant.id);
     const convMatchType = item.matchType || match?.matchType || 'mutual';
+    const isUnmatched = convMatchType === 'cold';
 
     return (
       <Pressable
-        style={styles.convItem}
+        style={[styles.convRow, isUnmatched && styles.convRowUnmatched]}
         onPress={() => navigateToChat(item)}
       >
         <View style={styles.convAvatarWrap}>
           {item.participant.photo ? (
-            <Image source={{ uri: item.participant.photo }} style={styles.convAvatar} />
+            <Image source={{ uri: item.participant.photo }} style={[styles.convAvatar, isUnmatched && { opacity: 0.4 }]} />
           ) : (
             <LinearGradient
               colors={getAvatarGradient(item.participant.id)}
-              style={styles.convAvatar}
+              style={[styles.convAvatar, isUnmatched && { opacity: 0.4 }]}
             >
-              <ThemedText style={styles.convAvatarText}>
+              <Text style={styles.convAvatarLetter}>
                 {item.participant.name.charAt(0).toUpperCase()}
-              </ThemedText>
+              </Text>
             </LinearGradient>
           )}
-          {canSeeOnlineStatus() && item.participant.online ? (
+          {canSeeOnlineStatus() && item.participant.online && !isUnmatched ? (
             <View style={styles.onlineDot} />
           ) : null}
         </View>
 
-        <View style={styles.convBody}>
-          <View style={styles.convTop}>
-            <View style={styles.convNameRow}>
-              <ThemedText style={[styles.convName, !hasUnread && !isNew ? styles.convNameRead : null]} numberOfLines={1}>
-                {item.participant.name}
-              </ThemedText>
-              <PlanBadge plan={participantPlan} size={13} />
-              {convMatchType === 'cold' ? (
-                <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 6, alignSelf: 'center', backgroundColor: theme.primary + '22' }}>
-                  <ThemedText style={{ fontSize: 10, fontWeight: '600', color: theme.primary }}>
-                    Unmatched
-                  </ThemedText>
-                </View>
-              ) : null}
-              {isVerified ? (
-                <Feather name="check-circle" size={14} color="#5b8cff" style={{ marginLeft: 4 }} />
-              ) : null}
-            </View>
-            <ThemedText style={[styles.convTime, hasUnread ? styles.convTimeUnread : null]}>
+        <View style={styles.convContent}>
+          <View style={styles.convTopRow}>
+            <Text style={[styles.convName, isUnmatched && styles.convNameMuted]} numberOfLines={1}>
+              {item.participant.name}
+            </Text>
+            <Text style={[styles.convTime, hasUnread && styles.convTimeUnread]}>
               {formatTime(item.timestamp)}
-            </ThemedText>
+            </Text>
           </View>
 
-          <View style={styles.convBottom}>
-            <ThemedText
-              style={[
-                styles.convPreview,
-                hasUnread ? styles.convPreviewUnread : null,
-                isNew ? styles.convPreviewMatch : null,
-              ]}
+          <View style={styles.convMidRow}>
+            <Text
+              style={[styles.convPreview, isUnmatched && styles.convPreviewMuted]}
               numberOfLines={1}
             >
               {isNew ? 'You matched! Say hello' : item.lastMessage}
-            </ThemedText>
-            {hasUnread ? (
+            </Text>
+            {hasUnread && !isUnmatched ? (
               <View style={styles.unreadBadge}>
-                <ThemedText style={styles.unreadBadgeText}>{item.unread}</ThemedText>
+                <Text style={styles.unreadBadgeText}>{item.unread}</Text>
               </View>
             ) : null}
           </View>
 
-          <View style={styles.convMetaRow}>
-            {convMatchType === 'super_interest' ? (
-              <View style={[styles.convMatchTag, { backgroundColor: 'rgba(255,215,0,0.15)' }]}>
-                <Feather name="zap" size={10} color="#FFD700" />
-                <ThemedText style={[styles.convMatchTagText, { color: '#FFD700' }]}>Super Interest</ThemedText>
-              </View>
-            ) : convMatchType === 'cold' ? (
-              <View style={[styles.convMatchTag, { backgroundColor: 'rgba(147,112,219,0.15)' }]}>
-                <Feather name="send" size={10} color="#9370DB" />
-                <ThemedText style={[styles.convMatchTagText, { color: '#9370DB' }]}>Direct</ThemedText>
-              </View>
-            ) : (
-              <View style={styles.convMatchTag}>
-                <Feather name="refresh-cw" size={10} color="rgba(255,107,91,0.7)" />
-                <ThemedText style={styles.convMatchTagText}>Matched</ThemedText>
-              </View>
-            )}
-            {compatibility !== null ? (
-              <View style={[styles.convMatchTag, { marginLeft: 6 }]}>
-                <Feather name="heart" size={10} color="rgba(255,107,91,0.7)" />
-                <ThemedText style={styles.convMatchTagText}>{compatibility}% match</ThemedText>
-              </View>
-            ) : null}
-          </View>
+          {!isUnmatched ? (
+            <View style={styles.convTagRow}>
+              {compatibility !== null ? (
+                <View style={styles.matchTag}>
+                  <Feather name="heart" size={9} color="#ff6b5b" />
+                  <Text style={styles.matchTagText}>{compatibility}% match</Text>
+                </View>
+              ) : null}
+              {convMatchType === 'super_interest' ? (
+                <View style={[styles.matchTag, { backgroundColor: 'rgba(255,215,0,0.12)' }]}>
+                  <Feather name="zap" size={9} color="#FFD700" />
+                  <Text style={[styles.matchTagText, { color: '#FFD700' }]}>Super Interest</Text>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
 
-          {isNew ? (
+          {isNew && !isUnmatched ? (
             <View style={styles.iceRow}>
               {ICE_BREAKERS.map((ib, i) => (
                 <Pressable
@@ -633,7 +611,7 @@ export const MessagesScreen = () => {
                   onPress={() => sendIceBreaker(item, ib.text)}
                 >
                   <Feather name={ib.icon} size={12} color="rgba(255,255,255,0.45)" />
-                  <ThemedText style={styles.iceChipText}>{ib.text}</ThemedText>
+                  <Text style={styles.iceChipText}>{ib.text}</Text>
                 </Pressable>
               ))}
             </View>
@@ -667,11 +645,11 @@ export const MessagesScreen = () => {
           </View>
         )}
         <View style={{ flex: 1 }}>
-          <ThemedText style={{ fontSize: 14, fontWeight: '600', color: '#fff' }} numberOfLines={1}>
+          <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }} numberOfLines={1}>
             {group.addressRevealed
               ? (group.name || group.listingAddress || 'Listing Inquiry')
               : (group.listingAddress?.split(',').slice(-2).join(',').trim() || group.name || 'Listing Inquiry')}
-          </ThemedText>
+          </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
             <Feather
               name={group.addressRevealed ? 'unlock' : 'lock'}
@@ -679,27 +657,27 @@ export const MessagesScreen = () => {
               color={group.addressRevealed ? '#ff6b5b' : 'rgba(255,255,255,0.35)'}
               style={{ marginRight: 4 }}
             />
-            <ThemedText style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }} numberOfLines={1}>
+            <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }} numberOfLines={1}>
               {group.addressRevealed
                 ? (group.listingAddress || 'No address')
                 : (group.listingAddress?.split(',').slice(-2).join(',').trim() || 'No address')}
-            </ThemedText>
+            </Text>
           </View>
         </View>
         {group.inquiryStatus === 'accepted' ? (
           <View style={[styles.inquiryStatusPill, { backgroundColor: 'rgba(255,107,91,0.15)' }]}>
-            <ThemedText style={{ fontSize: 10, color: '#ff6b5b', fontWeight: '600' }}>Accepted</ThemedText>
+            <Text style={{ fontSize: 10, color: '#ff6b5b', fontWeight: '600' }}>Accepted</Text>
           </View>
         ) : group.inquiryStatus === 'declined' ? (
           <View style={[styles.inquiryStatusPill, { backgroundColor: 'rgba(239,68,68,0.15)' }]}>
-            <ThemedText style={{ fontSize: 10, color: '#ef4444', fontWeight: '600' }}>Declined</ThemedText>
+            <Text style={{ fontSize: 10, color: '#ef4444', fontWeight: '600' }}>Declined</Text>
           </View>
         ) : (
           <View style={styles.inquiryMembersBadge}>
             <Feather name="users" size={12} color="rgba(255,255,255,0.5)" />
-            <ThemedText style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginLeft: 4 }}>
+            <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginLeft: 4 }}>
               {count}
-            </ThemedText>
+            </Text>
           </View>
         )}
         <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.3)" style={{ marginLeft: 8 }} />
@@ -707,31 +685,62 @@ export const MessagesScreen = () => {
     );
   };
 
-  const renderHeader = () => (
-    <View>
-      {inquiryGroups.length > 0 ? (
-        <>
-          <ThemedText style={styles.sectionLabel}>Listing Inquiries</ThemedText>
-          {inquiryGroups.map(g => renderInquiryItem(g))}
-          <View style={styles.divider} />
-        </>
-      ) : null}
-      {!isHostMode && newMatches.length > 0 ? (
-        <>
-          <ThemedText style={styles.sectionLabel}>New Matches</ThemedText>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.matchesRow}
+  const renderHeader = () => {
+    const showAI = chatFilter === 'all';
+    const showInquiries = (chatFilter === 'all' || chatFilter === 'groups') && inquiryGroups.length > 0;
+    const showMatches = (chatFilter === 'all' || chatFilter === 'matches') && !isHostMode && newMatches.length > 0;
+
+    return (
+      <View>
+        {showAI ? (
+          <Pressable
+            style={styles.aiConvRow}
+            onPress={() => (navigation as any).navigate('AIMatchAssistant')}
           >
-            {newMatches.map((m, i) => renderMatchBubble(m, i))}
-          </ScrollView>
-          <View style={styles.divider} />
-        </>
-      ) : null}
-      <ThemedText style={[styles.sectionLabel, { paddingBottom: 8 }]}>Conversations</ThemedText>
-    </View>
-  );
+            <LinearGradient colors={['#ff6b5b', '#ff8c7a']} style={styles.aiConvAvatar}>
+              <Feather name="cpu" size={22} color="#fff" />
+            </LinearGradient>
+            <View style={styles.aiConvContent}>
+              <View style={styles.convTopRow}>
+                <Text style={styles.aiConvName}>AI Match Assistant</Text>
+                <View style={styles.proBadge}>
+                  <Text style={styles.proBadgeText}>PRO</Text>
+                </View>
+              </View>
+              <Text style={styles.aiConvSubtitle}>Find roommates, neighborhoods, zodiac tips...</Text>
+            </View>
+            <Feather name="chevron-right" size={18} color="rgba(255,255,255,0.25)" />
+          </Pressable>
+        ) : null}
+
+        {showInquiries ? (
+          <>
+            <View style={styles.sectionLabelWrap}>
+              <Text style={styles.sectionLabelText}>LISTING INQUIRIES</Text>
+            </View>
+            {inquiryGroups.map(g => renderInquiryItem(g))}
+          </>
+        ) : null}
+        {showMatches ? (
+          <>
+            <View style={styles.sectionLabelWrap}>
+              <Text style={styles.sectionLabelText}>NEW MATCHES</Text>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.matchesRow}
+            >
+              {newMatches.map((m, i) => renderMatchBubble(m, i))}
+            </ScrollView>
+          </>
+        ) : null}
+        <View style={styles.sectionLabelWrap}>
+          <Text style={styles.sectionLabelText}>CONVERSATIONS</Text>
+        </View>
+      </View>
+    );
+  };
 
   const renderFooterNudge = () => {
     if (conversations.length === 0 || newMatches.length === 0) return null;
@@ -746,25 +755,35 @@ export const MessagesScreen = () => {
         <View style={styles.nudgeIcon}>
           <Feather name="message-square" size={26} color="#ff6b5b" />
         </View>
-        <ThemedText style={styles.nudgeTitle}>Keep the momentum going</ThemedText>
-        <ThemedText style={styles.nudgeSubtitle}>
+        <Text style={styles.nudgeTitle}>Keep the momentum going</Text>
+        <Text style={styles.nudgeSubtitle}>
           You have {unmessaged.length} new match{unmessaged.length !== 1 ? 'es' : ''} waiting.{'\n'}Don't let them go cold!
-        </ThemedText>
+        </Text>
       </View>
     );
   };
 
   const renderEmptyState = () => (
-    <View style={styles.emptyState}>
-      <View style={styles.emptyIcon}>
-        <Feather name="message-square" size={26} color="#ff6b5b" />
+    <View style={styles.chatEmptyWrap}>
+      <View style={styles.chatEmptyIcon}>
+        <Feather name="message-circle" size={30} color="rgba(255,107,91,0.5)" />
       </View>
-      <ThemedText style={styles.emptyTitle}>No Messages Yet</ThemedText>
-      <ThemedText style={styles.emptySubtitle}>
-        {isHostMode
-          ? `Accept renters' inquiries to\nstart a conversation`
-          : `Match with roommates on the\nMatch tab to start chatting`}
-      </ThemedText>
+      <Text style={styles.chatEmptyTitle}>No conversations yet</Text>
+      <Text style={styles.chatEmptySubtitle}>
+        {chatFilter === 'matches'
+          ? 'Match with someone to start chatting'
+          : chatFilter === 'groups'
+          ? 'Join or create a group to start a group chat'
+          : chatFilter === 'direct'
+          ? 'Send a direct message from a profile'
+          : isHostMode
+          ? "Accept renters' inquiries to start a conversation"
+          : 'Start a conversation from a listing or profile'}
+      </Text>
+      <Pressable style={styles.chatEmptyCta} onPress={() => (navigation as any).navigate('Explore')}>
+        <Text style={styles.chatEmptyCtaText}>Browse Listings</Text>
+        <Feather name="arrow-right" size={14} color="#ff6b5b" />
+      </Pressable>
     </View>
   );
 
@@ -782,27 +801,47 @@ export const MessagesScreen = () => {
     }
   };
 
-  const filteredConversations = searchQuery.trim()
-    ? conversations.filter(c =>
+  const filteredConversations = (() => {
+    let convs = conversations;
+    if (searchQuery.trim()) {
+      convs = convs.filter(c =>
         c.participant.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (c.lastMessage && c.lastMessage.toLowerCase().includes(searchQuery.toLowerCase()))
-      )
-    : conversations;
+      );
+    }
+    if (chatFilter !== 'all') {
+      convs = convs.filter(c => getConvType(c) === chatFilter);
+    }
+    return convs;
+  })();
+
+  const FILTER_TABS: { key: ChatFilterKey; label: string; count: number }[] = [
+    { key: 'all', label: 'All', count: totalUnread },
+    { key: 'matches', label: 'Matches', count: matchUnread },
+    { key: 'groups', label: 'Groups', count: groupUnread },
+    { key: 'direct', label: 'Direct', count: directUnread },
+  ];
 
   return (
     <View style={[styles.container, { backgroundColor: '#111' }]}>
-      <View style={[styles.topNav, { paddingTop: insets.top + 14 }]}>
-        <AIFloatingButton onPress={() => setShowAISheet(true)} position="inline" />
-        <ThemedText style={styles.topNavTitle}>
-          {isHostMode ? 'Renter Chats' : 'Messages'}
-        </ThemedText>
-        <View style={styles.navActions}>
-          <Pressable style={styles.iconBtn} onPress={handleSearchToggle}>
-            <Feather name={isSearchVisible ? 'x' : 'search'} size={16} color="rgba(255,255,255,0.7)" />
+      <View style={[styles.chatHeader, { paddingTop: insets.top + 12 }]}>
+        <View style={styles.chatHeaderLeft}>
+          <Text style={styles.chatHeaderTitle}>
+            {isHostMode ? 'Renter Chats' : 'Messages'}
+          </Text>
+          {totalUnread > 0 ? (
+            <View style={styles.chatHeaderBadge}>
+              <Text style={styles.chatHeaderBadgeText}>{totalUnread}</Text>
+            </View>
+          ) : null}
+        </View>
+        <View style={styles.chatHeaderActions}>
+          <Pressable style={styles.chatHeaderBtn} onPress={handleSearchToggle}>
+            <Feather name={isSearchVisible ? 'x' : 'search'} size={18} color="rgba(255,255,255,0.6)" />
           </Pressable>
           {!isHostMode ? (
-            <Pressable style={styles.iconBtn} onPress={handleCompose}>
-              <Feather name="edit" size={16} color="rgba(255,255,255,0.7)" />
+            <Pressable style={styles.chatHeaderBtn} onPress={handleCompose}>
+              <Feather name="edit-2" size={18} color="rgba(255,255,255,0.6)" />
             </Pressable>
           ) : null}
         </View>
@@ -829,6 +868,33 @@ export const MessagesScreen = () => {
         </Animated.View>
       ) : null}
 
+      <View style={styles.chatFilterWrap}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chatFilterScroll}
+        >
+          {FILTER_TABS.map((tab) => (
+            <Pressable
+              key={tab.key}
+              style={[styles.chatFilterTab, chatFilter === tab.key && styles.chatFilterTabActive]}
+              onPress={() => setChatFilter(tab.key)}
+            >
+              <Text style={[styles.chatFilterText, chatFilter === tab.key && styles.chatFilterTextActive]}>
+                {tab.label}
+              </Text>
+              {tab.count > 0 ? (
+                <View style={[styles.chatFilterBadge, chatFilter === tab.key && styles.chatFilterBadgeActive]}>
+                  <Text style={[styles.chatFilterBadgeText, chatFilter === tab.key && styles.chatFilterBadgeTextActive]}>
+                    {tab.count}
+                  </Text>
+                </View>
+              ) : null}
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
+
       <AnimatedFlatList
         data={filteredConversations}
         renderItem={renderConversation}
@@ -845,24 +911,6 @@ export const MessagesScreen = () => {
         scrollEventThrottle={16}
       />
 
-      <RoomdrAISheet
-        visible={showAISheet}
-        onDismiss={() => setShowAISheet(false)}
-        screenContext="messages"
-        contextData={{
-          messages: {
-            conversations,
-            unmessagedMatchCount: newMatches.filter(m => {
-              const conv = conversations.find(c => c.participant.id === m.profile.id);
-              return !conv || conv.messages.length === 0;
-            }).length,
-            staleConversationCount: conversations.filter(c => {
-              const hoursSince = (Date.now() - c.timestamp.getTime()) / (1000 * 60 * 60);
-              return hoursSince > 48 && c.messages.length > 0;
-            }).length,
-          },
-        }}
-      />
     </View>
   );
 };
@@ -871,44 +919,47 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  topNav: {
+  chatHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 22,
+    paddingHorizontal: 20,
     paddingBottom: 12,
   },
-  aiNavBtn: {
-    width: 42,
-    height: 42,
-    justifyContent: 'center',
+  chatHeaderLeft: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
   },
-  aiNavBtnInner: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#ff4d4d',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  topNavTitle: {
-    fontSize: 22,
+  chatHeaderTitle: {
+    fontSize: 28,
     fontWeight: '800',
     color: '#fff',
-    letterSpacing: -0.4,
+    letterSpacing: -0.5,
   },
-  navActions: {
+  chatHeaderBadge: {
+    backgroundColor: '#ff6b5b',
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 7,
+  },
+  chatHeaderBadgeText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  chatHeaderActions: {
     flexDirection: 'row',
     gap: 8,
   },
-  iconBtn: {
+  chatHeaderBtn: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -917,7 +968,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.07)',
     borderRadius: 12,
-    marginHorizontal: 22,
+    marginHorizontal: 20,
     marginBottom: 10,
     paddingHorizontal: 12,
     height: 40,
@@ -929,14 +980,113 @@ const styles = StyleSheet.create({
     fontSize: 14,
     height: 40,
   },
-  sectionLabel: {
+  chatFilterWrap: {
+    paddingBottom: 8,
+  },
+  chatFilterScroll: {
+    paddingHorizontal: 20,
+    paddingVertical: 4,
+    gap: 8,
+    flexDirection: 'row',
+  },
+  chatFilterTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  chatFilterTabActive: {
+    backgroundColor: '#ff6b5b',
+    borderColor: 'transparent',
+  },
+  chatFilterText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.45)',
+  },
+  chatFilterTextActive: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  chatFilterBadge: {
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    minWidth: 20,
+    alignItems: 'center',
+  },
+  chatFilterBadgeActive: {
+    backgroundColor: 'rgba(255,255,255,0.25)',
+  },
+  chatFilterBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: 'rgba(255,255,255,0.5)',
+  },
+  chatFilterBadgeTextActive: {
+    color: '#fff',
+  },
+  aiConvRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    gap: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  aiConvAvatar: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  aiConvContent: {
+    flex: 1,
+    gap: 4,
+  },
+  aiConvName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  aiConvSubtitle: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.35)',
+  },
+  proBadge: {
+    backgroundColor: 'rgba(168,85,247,0.2)',
+    borderRadius: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(168,85,247,0.35)',
+  },
+  proBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#a855f7',
+    letterSpacing: 0.5,
+  },
+  sectionLabelWrap: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  sectionLabelText: {
     fontSize: 11,
     fontWeight: '700',
-    color: 'rgba(255,255,255,0.3)',
+    color: 'rgba(255,255,255,0.25)',
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    paddingHorizontal: 22,
-    paddingBottom: 10,
   },
   matchesRow: {
     paddingHorizontal: 22,
@@ -994,139 +1144,139 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     maxWidth: 58,
   },
-  divider: {
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    marginHorizontal: 22,
-    marginBottom: 16,
-  },
   list: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 0,
   },
-  convItem: {
+  convRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
     gap: 14,
-    paddingVertical: 11,
-    paddingHorizontal: 6,
-    borderRadius: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  convRowUnmatched: {
+    opacity: 0.55,
   },
   convAvatarWrap: {
     position: 'relative',
     flexShrink: 0,
   },
   convAvatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  convAvatarText: {
-    fontSize: 18,
-    fontWeight: '800',
+  convAvatarLetter: {
+    fontSize: 22,
+    fontWeight: '700',
     color: '#fff',
   },
   onlineDot: {
     position: 'absolute',
     bottom: 1,
     right: 1,
-    width: 12,
-    height: 12,
+    width: 13,
+    height: 13,
+    borderRadius: 7,
     backgroundColor: '#2ecc71',
-    borderWidth: 2.5,
+    borderWidth: 2,
     borderColor: '#111',
-    borderRadius: 6,
   },
-  convBody: {
+  convContent: {
     flex: 1,
-    minWidth: 0,
+    gap: 4,
   },
-  convTop: {
+  convTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 3,
-  },
-  convNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 5,
   },
   convName: {
-    fontSize: 14.5,
+    fontSize: 15,
     fontWeight: '700',
     color: '#fff',
+    flex: 1,
+    marginRight: 8,
   },
-  convNameRead: {
-    color: 'rgba(255,255,255,0.75)',
-    fontWeight: '600',
+  convNameMuted: {
+    color: 'rgba(255,255,255,0.4)',
   },
   convTime: {
-    fontSize: 11,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.3)',
     fontWeight: '500',
-    color: 'rgba(255,255,255,0.28)',
     flexShrink: 0,
   },
   convTimeUnread: {
     color: '#ff6b5b',
     fontWeight: '700',
   },
-  convBottom: {
+  convMidRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 6,
   },
   convPreview: {
-    fontSize: 12.5,
-    color: 'rgba(255,255,255,0.35)',
-    fontWeight: '400',
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.45)',
     flex: 1,
+    marginRight: 8,
   },
-  convPreviewUnread: {
-    color: 'rgba(255,255,255,0.7)',
-    fontWeight: '500',
-  },
-  convPreviewMatch: {
-    color: '#ff8070',
-    fontWeight: '600',
+  convPreviewMuted: {
+    color: 'rgba(255,255,255,0.25)',
+    fontStyle: 'italic',
   },
   unreadBadge: {
     backgroundColor: '#ff6b5b',
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
+    borderRadius: 12,
+    minWidth: 22,
+    height: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 5,
+    paddingHorizontal: 6,
     flexShrink: 0,
   },
   unreadBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
     color: '#fff',
-    fontSize: 10,
-    fontWeight: '700',
   },
-  convMetaRow: {
+  convTagRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     gap: 6,
-    marginTop: 5,
+    marginTop: 2,
   },
-  convMatchTag: {
+  matchTag: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     backgroundColor: 'rgba(255,107,91,0.1)',
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
   },
-  convMatchTagText: {
+  matchTagText: {
     fontSize: 10,
     fontWeight: '700',
-    color: 'rgba(255,107,91,0.7)',
+    color: '#ff6b5b',
+  },
+  directTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  directTagText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.35)',
   },
   iceRow: {
     flexDirection: 'row',
@@ -1179,34 +1329,51 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     textAlign: 'center',
   },
-  emptyState: {
+  chatEmptyWrap: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
-    paddingHorizontal: 32,
+    paddingHorizontal: 40,
+    paddingTop: 60,
   },
-  emptyIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 18,
+  chatEmptyIcon: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
     backgroundColor: 'rgba(255,107,91,0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,107,91,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 4,
+    marginBottom: 20,
   },
-  emptyTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.6)',
+  chatEmptyTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#fff',
+    marginBottom: 10,
+    letterSpacing: -0.3,
   },
-  emptySubtitle: {
-    fontSize: 12.5,
-    color: 'rgba(255,255,255,0.25)',
-    lineHeight: 18,
+  chatEmptySubtitle: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.35)',
     textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  chatEmptyCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(255,107,91,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.25)',
+    borderRadius: 14,
+  },
+  chatEmptyCtaText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#ff6b5b',
   },
   inquiryItem: {
     flexDirection: 'row',
