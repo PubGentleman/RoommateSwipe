@@ -57,7 +57,7 @@ export function HostTypeSelectScreen() {
       } else {
         await updateUser({ hostTypeLockedAt: new Date().toISOString() });
         if (isFromSettings) {
-          navigation.goBack();
+          navigation.replace('HostSubscription');
         } else {
           await completeOnboardingStep('plan');
         }

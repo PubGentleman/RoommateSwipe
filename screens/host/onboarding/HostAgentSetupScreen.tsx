@@ -36,7 +36,7 @@ export function HostAgentSetupScreen() {
         hostTypeLockedAt: new Date().toISOString(),
       });
       if (isFromSettings) {
-        navigation.goBack();
+        navigation.replace('HostSubscription');
       } else {
         await completeOnboardingStep('plan');
       }
