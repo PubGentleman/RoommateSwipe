@@ -238,6 +238,35 @@ export const RoommateFilterSheet: React.FC<Props> = ({ visible, onClose, onApply
                 </ScrollView>
               </View>
             </View>
+            <View style={s.sliderRow}>
+              <ThemedText style={s.sliderLabel}>Max</ThemedText>
+              <View style={s.sliderTrack}>
+                <View style={[s.sliderFill, {
+                  left: `${((filters.budgetMin - BUDGET_MIN) / (BUDGET_MAX - BUDGET_MIN)) * 100}%`,
+                  right: `${100 - ((filters.budgetMax - BUDGET_MIN) / (BUDGET_MAX - BUDGET_MIN)) * 100}%`,
+                }]} />
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={s.sliderTicks}
+                  scrollEnabled={false}
+                >
+                  {Array.from({ length: budgetSteps + 1 }, (_, i) => {
+                    const val = BUDGET_MIN + i * BUDGET_STEP;
+                    const isInRange = val >= filters.budgetMin && val <= filters.budgetMax;
+                    return (
+                      <Pressable
+                        key={val}
+                        style={[s.sliderTick, isInRange ? s.sliderTickActive : null]}
+                        onPress={() => {
+                          if (val >= filters.budgetMin) setFilters(f => ({ ...f, budgetMax: val }));
+                        }}
+                      />
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            </View>
             <View style={s.budgetPresets}>
               {[
                 { label: '$500-$1,000', min: 500, max: 1000 },
