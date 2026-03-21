@@ -365,7 +365,7 @@ export const GroupsScreen = () => {
 
     setLikedGroupName(group.name);
     setShowLikedNotification(true);
-    setTimeout(() => { setShowLikedNotification(false); }, 400);
+    setTimeout(() => { setShowLikedNotification(false); }, 1800);
   };
 
   const handleRequestToJoin = async (group: Group) => {
@@ -1709,14 +1709,11 @@ export const GroupsScreen = () => {
       </View>
 
       {showLikedNotification ? (
-        <View style={[styles.matchOverlay, { backgroundColor: theme.primary }]}>
-          <Feather name="heart" size={64} color="#FFFFFF" />
-          <ThemedText style={[Typography.hero, { color: '#FFFFFF', fontSize: 36, marginTop: Spacing.lg }]}>
-            Interest Sent!
-          </ThemedText>
-          <ThemedText style={[Typography.body, { color: '#FFFFFF', marginTop: Spacing.md, textAlign: 'center' }]}>
-            {likedGroupName} admin will be notified
-          </ThemedText>
+        <View style={styles.likedToast}>
+          <Feather name="heart" size={16} color="#fff" />
+          <Text style={styles.likedToastText}>
+            Interest sent to {likedGroupName}
+          </Text>
         </View>
       ) : null}
 
@@ -2719,6 +2716,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: Spacing.xl,
+  },
+  likedToast: {
+    position: 'absolute',
+    top: 100,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(46,204,113,0.92)',
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  likedToastText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
   },
   modalOverlay: {
     flex: 1,
