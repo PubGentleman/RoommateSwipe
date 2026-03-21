@@ -1,0 +1,531 @@
+# RoomDrx — Host Inquiries Screen Redesign
+
+## File: `screens/host/HostInquiriesScreen.tsx`
+
+---
+
+## Issues Being Fixed
+
+1. **Massive dead space** — filter tabs sit at the top then nothing; bottom 80% of the screen is empty even before scrolling
+2. **No summary stats** — host has no idea at a glance how many pending/accepted/passed inquiries exist; must tap each filter to find out
+3. **Filter tabs are plain text** — no count badges, no visual state difference beyond the coral pill
+4. **AI button floats awkwardly** — coral robot icon sits in the top-right corner with no context label, looks like a stray FAB
+5. **Empty state is cold** — generic heart icon with grey text; no action offered; user is stuck
+6. **No inquiry card design** — when inquiries exist, cards need to feel premium (photo, match score, action buttons)
+
+---
+
+## Change 1 — Header: Add Summary Stats Row
+
+Below the title, add three stat cards giving the host an instant overview.
+
+```tsx
+// Add below the <Text style={styles.headerTitle}>Inquiries</Text> row:
+
+{/* Stats summary row */}
+<View style={styles.statsRow}>
+  <View style={styles.statCard}>
+    <Text style={styles.statNum}>{allCount}</Text>
+    <Text style={styles.statLabel}>Total</Text>
+  </View>
+  <View style={[styles.statCard, styles.statCardAccent]}>
+    <Text style={[styles.statNum, { color: '#ff6b5b' }]}>{pendingCount}</Text>
+    <Text style={styles.statLabel}>Pending</Text>
+  </View>
+  <View style={styles.statCard}>
+    <Text style={[styles.statNum, { color: '#2ecc71' }]}>{acceptedCount}</Text>
+    <Text style={styles.statLabel}>Accepted</Text>
+  </View>
+  <View style={styles.statCard}>
+    <Text style={[styles.statNum, { color: 'rgba(255,255,255,0.35)' }]}>{passedCount}</Text>
+    <Text style={styles.statLabel}>Passed</Text>
+  </View>
+</View>
+```
+
+**Styles:**
+
+```ts
+statsRow: {
+  flexDirection: 'row',
+  gap: 10,
+  marginTop: 20,
+  marginBottom: 6,
+  paddingHorizontal: 20,
+},
+statCard: {
+  flex: 1,
+  backgroundColor: '#1a1a1a',
+  borderRadius: 14,
+  paddingVertical: 12,
+  alignItems: 'center',
+  borderWidth: 1,
+  borderColor: 'rgba(255,255,255,0.07)',
+},
+statCardAccent: {
+  borderColor: 'rgba(255,107,91,0.2)',
+  backgroundColor: 'rgba(255,107,91,0.07)',
+},
+statNum: {
+  fontSize: 22,
+  fontWeight: '800',
+  color: '#fff',
+  letterSpacing: -0.5,
+},
+statLabel: {
+  fontSize: 10,
+  fontWeight: '600',
+  color: 'rgba(255,255,255,0.35)',
+  marginTop: 2,
+  textTransform: 'uppercase',
+  letterSpacing: 0.5,
+},
+```
+
+---
+
+## Change 2 — Filter Tabs: Segmented Control with Count Badges
+
+Replace the plain text tabs with a proper segmented pill control that shows live counts.
+
+```tsx
+// Replace the existing filter tab row with:
+<View style={styles.filterWrap}>
+  <ScrollView
+    horizontal
+    showsHorizontalScrollIndicator={false}
+    contentContainerStyle={styles.filterScroll}
+  >
+    {(['all', 'pending', 'accepted', 'passed'] as const).map((tab) => {
+      const label = tab.charAt(0).toUpperCase() + tab.slice(1);
+      const count = tab === 'all' ? allCount : tab === 'pending' ? pendingCount : tab === 'accepted' ? acceptedCount : passedCount;
+      const isActive = activeFilter === tab;
+      return (
+        <Pressable
+          key={tab}
+          style={[styles.filterTab, isActive && styles.filterTabActive]}
+          onPress={() => setActiveFilter(tab)}
+        >
+          <Text style={[styles.filterTabText, isActive && styles.filterTabTextActive]}>
+            {label}
+          </Text>
+          {count > 0 && (
+            <View style={[styles.filterBadge, isActive && styles.filterBadgeActive]}>
+              <Text style={[styles.filterBadgeText, isActive && styles.filterBadgeTextActive]}>
+                {count}
+              </Text>
+            </View>
+          )}
+        </Pressable>
+      );
+    })}
+  </ScrollView>
+</View>
+```
+
+**Styles:**
+
+```ts
+filterWrap: {
+  paddingTop: 8,
+  paddingBottom: 4,
+},
+filterScroll: {
+  paddingHorizontal: 20,
+  gap: 8,
+  flexDirection: 'row',
+},
+filterTab: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 6,
+  paddingHorizontal: 16,
+  paddingVertical: 9,
+  borderRadius: 20,
+  backgroundColor: 'rgba(255,255,255,0.06)',
+  borderWidth: 1,
+  borderColor: 'rgba(255,255,255,0.08)',
+},
+filterTabActive: {
+  backgroundColor: '#ff6b5b',
+  borderColor: 'transparent',
+},
+filterTabText: {
+  fontSize: 13,
+  fontWeight: '600',
+  color: 'rgba(255,255,255,0.45)',
+},
+filterTabTextActive: {
+  color: '#fff',
+},
+filterBadge: {
+  backgroundColor: 'rgba(255,255,255,0.12)',
+  borderRadius: 10,
+  paddingHorizontal: 6,
+  paddingVertical: 1,
+  minWidth: 20,
+  alignItems: 'center',
+},
+filterBadgeActive: {
+  backgroundColor: 'rgba(255,255,255,0.25)',
+},
+filterBadgeText: {
+  fontSize: 10,
+  fontWeight: '800',
+  color: 'rgba(255,255,255,0.5)',
+},
+filterBadgeTextActive: {
+  color: '#fff',
+},
+```
+
+---
+
+## Change 3 — AI Button: Move to Header Row as Labelled Button
+
+Replace the floating coral robot FAB with an inline header button that has a label.
+
+```tsx
+// Replace the floating <Pressable> chip with this inside the header row:
+<View style={styles.headerRow}>
+  <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
+    <Feather name="chevron-left" size={26} color="#fff" />
+  </Pressable>
+  <Text style={styles.headerTitle}>Inquiries</Text>
+  <Pressable style={styles.aiBtn} onPress={handleOpenAIFilter}>
+    <LinearGradient
+      colors={['#ff6b5b', '#ff8c7a']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 0 }}
+      style={styles.aiBtnInner}
+    >
+      <Feather name="cpu" size={13} color="#fff" />
+      <Text style={styles.aiBtnText}>AI Sort</Text>
+    </LinearGradient>
+  </Pressable>
+</View>
+```
+
+**Styles:**
+
+```ts
+headerRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingHorizontal: 20,
+  paddingTop: 16,
+  paddingBottom: 4,
+},
+backBtn: {
+  marginRight: 8,
+  padding: 4,
+},
+headerTitle: {
+  flex: 1,
+  fontSize: 26,
+  fontWeight: '800',
+  color: '#fff',
+  letterSpacing: -0.5,
+},
+aiBtn: {
+  borderRadius: 20,
+  overflow: 'hidden',
+},
+aiBtnInner: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 5,
+  paddingHorizontal: 12,
+  paddingVertical: 7,
+  borderRadius: 20,
+},
+aiBtnText: {
+  fontSize: 12,
+  fontWeight: '700',
+  color: '#fff',
+},
+```
+
+---
+
+## Change 4 — Empty State: Warm + Actionable
+
+Replace the lone heart icon with a more purposeful empty state that varies by filter tab.
+
+```tsx
+// Replace the existing empty state View with:
+const emptyConfig = {
+  all: {
+    icon: 'inbox' as const,
+    title: 'No inquiries yet',
+    subtitle: 'Renters who tap "I\'m Interested" on your listing will appear here.',
+    ctaLabel: 'Browse Renter Groups',
+    ctaAction: () => navigation.navigate('BrowseRenterGroups'),
+  },
+  pending: {
+    icon: 'clock' as const,
+    title: 'No pending inquiries',
+    subtitle: 'New inquiries will land here for you to accept or pass.',
+    ctaLabel: 'Browse Renter Groups',
+    ctaAction: () => navigation.navigate('BrowseRenterGroups'),
+  },
+  accepted: {
+    icon: 'check-circle' as const,
+    title: 'No accepted inquiries',
+    subtitle: 'Inquiries you accept move here so you can track active conversations.',
+    ctaLabel: null,
+    ctaAction: null,
+  },
+  passed: {
+    icon: 'x-circle' as const,
+    title: 'No passed inquiries',
+    subtitle: 'Renters you pass on will be archived here.',
+    ctaLabel: null,
+    ctaAction: null,
+  },
+};
+
+const empty = emptyConfig[activeFilter];
+
+// JSX:
+<View style={styles.emptyWrap}>
+  <View style={styles.emptyIconWrap}>
+    <LinearGradient
+      colors={['rgba(255,107,91,0.15)', 'rgba(255,107,91,0.05)']}
+      style={styles.emptyIconCircle}
+    >
+      <Feather name={empty.icon} size={32} color="rgba(255,107,91,0.6)" />
+    </LinearGradient>
+  </View>
+  <Text style={styles.emptyTitle}>{empty.title}</Text>
+  <Text style={styles.emptySubtitle}>{empty.subtitle}</Text>
+  {empty.ctaLabel && (
+    <Pressable style={styles.emptyCta} onPress={empty.ctaAction}>
+      <Text style={styles.emptyCtaText}>{empty.ctaLabel}</Text>
+      <Feather name="arrow-right" size={14} color="#ff6b5b" />
+    </Pressable>
+  )}
+</View>
+```
+
+**Styles:**
+
+```ts
+emptyWrap: {
+  flex: 1,
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingHorizontal: 40,
+  paddingBottom: 60,
+},
+emptyIconWrap: {
+  marginBottom: 20,
+},
+emptyIconCircle: {
+  width: 80,
+  height: 80,
+  borderRadius: 40,
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+emptyTitle: {
+  fontSize: 20,
+  fontWeight: '800',
+  color: '#fff',
+  textAlign: 'center',
+  marginBottom: 10,
+  letterSpacing: -0.3,
+},
+emptySubtitle: {
+  fontSize: 14,
+  color: 'rgba(255,255,255,0.4)',
+  textAlign: 'center',
+  lineHeight: 20,
+  marginBottom: 24,
+},
+emptyCta: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 6,
+  paddingHorizontal: 20,
+  paddingVertical: 12,
+  backgroundColor: 'rgba(255,107,91,0.1)',
+  borderWidth: 1,
+  borderColor: 'rgba(255,107,91,0.25)',
+  borderRadius: 14,
+},
+emptyCtaText: {
+  fontSize: 14,
+  fontWeight: '700',
+  color: '#ff6b5b',
+},
+```
+
+---
+
+## Change 5 — Inquiry Card Design (for when data exists)
+
+When inquiries are present, each card should show the renter's photo, name, match score, listing name, and two action buttons.
+
+```tsx
+// Inquiry card component (inside FlatList renderItem):
+const renderInquiry = ({ item }: { item: Inquiry }) => (
+  <View style={styles.inquiryCard}>
+    {/* Left: Avatar + Match Badge */}
+    <View style={styles.inquiryAvatarWrap}>
+      {item.renter.photo ? (
+        <Image source={{ uri: item.renter.photo }} style={styles.inquiryAvatar} />
+      ) : (
+        <LinearGradient colors={['#667eea', '#764ba2']} style={styles.inquiryAvatar}>
+          <Text style={styles.inquiryAvatarLetter}>{item.renter.name[0]}</Text>
+        </LinearGradient>
+      )}
+      <View style={[
+        styles.matchBadge,
+        { backgroundColor: item.matchScore >= 70 ? '#2ecc71' : item.matchScore >= 40 ? '#f39c12' : '#e74c3c' }
+      ]}>
+        <Text style={styles.matchBadgeText}>{item.matchScore}%</Text>
+      </View>
+    </View>
+
+    {/* Center: Info */}
+    <View style={styles.inquiryInfo}>
+      <Text style={styles.inquiryName} numberOfLines={1}>{item.renter.name}</Text>
+      <Text style={styles.inquiryListing} numberOfLines={1}>
+        <Feather name="home" size={11} color="rgba(255,255,255,0.3)" />
+        {' '}{item.listingTitle}
+      </Text>
+      <Text style={styles.inquiryTime}>{formatTimeAgo(item.createdAt)}</Text>
+    </View>
+
+    {/* Right: Actions */}
+    <View style={styles.inquiryActions}>
+      {item.status === 'pending' ? (
+        <>
+          <Pressable style={styles.actionPass} onPress={() => handlePass(item.id)}>
+            <Feather name="x" size={16} color="rgba(255,255,255,0.4)" />
+          </Pressable>
+          <Pressable style={styles.actionAccept} onPress={() => handleAccept(item.id)}>
+            <Feather name="check" size={16} color="#fff" />
+          </Pressable>
+        </>
+      ) : (
+        <Pressable style={styles.actionMessage} onPress={() => handleMessage(item)}>
+          <Feather name="message-circle" size={16} color="#fff" />
+        </Pressable>
+      )}
+    </View>
+  </View>
+);
+```
+
+**Styles:**
+
+```ts
+inquiryCard: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: '#1a1a1a',
+  borderRadius: 16,
+  padding: 14,
+  marginHorizontal: 20,
+  marginBottom: 10,
+  borderWidth: 1,
+  borderColor: 'rgba(255,255,255,0.07)',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.25,
+  shadowRadius: 6,
+  elevation: 4,
+},
+inquiryAvatarWrap: {
+  position: 'relative',
+  marginRight: 12,
+},
+inquiryAvatar: {
+  width: 52,
+  height: 52,
+  borderRadius: 26,
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+inquiryAvatarLetter: {
+  fontSize: 20,
+  fontWeight: '700',
+  color: '#fff',
+},
+matchBadge: {
+  position: 'absolute',
+  bottom: -2,
+  right: -4,
+  borderRadius: 10,
+  paddingHorizontal: 5,
+  paddingVertical: 1,
+  borderWidth: 1.5,
+  borderColor: '#111',
+},
+matchBadgeText: {
+  fontSize: 9,
+  fontWeight: '800',
+  color: '#fff',
+},
+inquiryInfo: {
+  flex: 1,
+  gap: 3,
+},
+inquiryName: {
+  fontSize: 15,
+  fontWeight: '700',
+  color: '#fff',
+},
+inquiryListing: {
+  fontSize: 12,
+  color: 'rgba(255,255,255,0.4)',
+},
+inquiryTime: {
+  fontSize: 11,
+  color: 'rgba(255,255,255,0.25)',
+  marginTop: 1,
+},
+inquiryActions: {
+  flexDirection: 'row',
+  gap: 8,
+  marginLeft: 8,
+},
+actionPass: {
+  width: 36,
+  height: 36,
+  borderRadius: 18,
+  backgroundColor: 'rgba(255,255,255,0.08)',
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+actionAccept: {
+  width: 36,
+  height: 36,
+  borderRadius: 18,
+  backgroundColor: '#2ecc71',
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+actionMessage: {
+  width: 36,
+  height: 36,
+  borderRadius: 18,
+  backgroundColor: '#ff6b5b',
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+```
+
+---
+
+## Summary of Changes
+
+| # | What changes | Where |
+|---|---|---|
+| 1 | Summary stats row (Total / Pending / Accepted / Passed) with coral accent card | Below header title |
+| 2 | Filter tabs upgraded with count badges and proper active state | Filter row |
+| 3 | AI button moved to header row as labeled "AI Sort" pill (no more floating FAB) | Header |
+| 4 | Empty state: icon-in-gradient-circle, warm copy per filter tab, CTA to Browse Renter Groups | Empty state |
+| 5 | Inquiry cards: avatar + match badge + listing name + pass/accept or message actions | FlatList renderItem |
