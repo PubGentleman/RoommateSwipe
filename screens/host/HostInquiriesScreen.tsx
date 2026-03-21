@@ -1,11 +1,9 @@
 import React, { useState, useCallback } from 'react';
-import { View, StyleSheet, Pressable, Image, Alert } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Image, Alert, ScrollView } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { ScreenScrollView } from '../../components/ScreenScrollView';
-import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
-import { Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { StorageService } from '../../utils/storage';
 import { InterestCard, Conversation, Message } from '../../types/models';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
@@ -16,7 +14,6 @@ import { useNotificationContext } from '../../contexts/NotificationContext';
 import { getReceivedInterestCards, acceptInterestCard, rejectInterestCard } from '../../services/discoverService';
 import { updateGroup } from '../../services/groupService';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
-import { AIFloatingButton } from '../../components/AIFloatingButton';
 
 type FilterStatus = 'all' | 'pending' | 'accepted' | 'passed';
 
@@ -28,12 +25,12 @@ export const HostInquiriesScreen = () => {
   const route = useRoute<any>();
   const insets = useSafeAreaInsets();
   const [interestCards, setInterestCards] = useState<InterestCard[]>([]);
-  const [filter, setFilter] = useState<FilterStatus>(route.params?.filter || 'all');
+  const [activeFilter, setActiveFilter] = useState<FilterStatus>(route.params?.filter || 'all');
   const [showAISheet, setShowAISheet] = useState(false);
 
   React.useEffect(() => {
     if (route.params?.filter) {
-      setFilter(route.params.filter);
+      setActiveFilter(route.params.filter);
     }
   }, [route.params?.filter]);
 
@@ -84,10 +81,15 @@ export const HostInquiriesScreen = () => {
     }, [loadInterestCards])
   );
 
+  const allCount = interestCards.length;
+  const pendingCount = interestCards.filter(c => c.status === 'pending').length;
+  const acceptedCount = interestCards.filter(c => c.status === 'accepted').length;
+  const passedCount = interestCards.filter(c => c.status === 'passed').length;
+
   const filtered = interestCards
     .filter(card => {
-      if (filter === 'all') return true;
-      return card.status === filter;
+      if (activeFilter === 'all') return true;
+      return card.status === activeFilter;
     })
     .sort((a, b) => {
       if (a.isSuperInterest && !b.isSuperInterest) return -1;
@@ -307,203 +309,210 @@ export const HostInquiriesScreen = () => {
     );
   };
 
-  const formatDateString = (dateStr: string) => {
+  const formatTimeAgo = (dateStr: string) => {
     const date = new Date(dateStr);
     if (isNaN(date.getTime())) return 'Unknown';
     const days = Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
     if (days === 0) return 'Today';
     if (days === 1) return 'Yesterday';
-    return `${days} days ago`;
+    return `${days}d ago`;
   };
 
-  const getStatusColor = (status: string) => {
-    if (status === 'accepted') return theme.success;
-    if (status === 'passed') return '#999';
-    if (status === 'expired') return '#666';
-    return theme.warning;
+  const emptyConfig = {
+    all: {
+      icon: 'inbox' as const,
+      title: 'No inquiries yet',
+      subtitle: 'Renters who tap "I\'m Interested" on your listing will appear here.',
+      ctaLabel: 'Browse Renter Groups',
+      ctaAction: () => navigation.navigate('BrowseRenterGroups'),
+    },
+    pending: {
+      icon: 'clock' as const,
+      title: 'No pending inquiries',
+      subtitle: 'New inquiries will land here for you to accept or pass.',
+      ctaLabel: 'Browse Renter Groups',
+      ctaAction: () => navigation.navigate('BrowseRenterGroups'),
+    },
+    accepted: {
+      icon: 'check-circle' as const,
+      title: 'No accepted inquiries',
+      subtitle: 'Inquiries you accept move here so you can track active conversations.',
+      ctaLabel: null as string | null,
+      ctaAction: null as (() => void) | null,
+    },
+    passed: {
+      icon: 'x-circle' as const,
+      title: 'No passed inquiries',
+      subtitle: 'Renters you pass on will be archived here.',
+      ctaLabel: null as string | null,
+      ctaAction: null as (() => void) | null,
+    },
   };
 
-  const filterTabs: { key: FilterStatus; label: string }[] = [
-    { key: 'all', label: 'All' },
-    { key: 'pending', label: 'Pending' },
-    { key: 'accepted', label: 'Accepted' },
-    { key: 'passed', label: 'Passed' },
-  ];
-
-  const pendingCount = interestCards.filter(c => c.status === 'pending').length;
-
-  const renderCard = (card: InterestCard) => (
+  const renderInquiryCard = (card: InterestCard) => (
     <View
       key={card.id}
       style={[
-        styles.card,
-        { backgroundColor: theme.backgroundDefault },
-        card.isSuperInterest ? { borderWidth: 2, borderColor: '#FFD700' } : null,
+        styles.inquiryCard,
+        card.isSuperInterest ? { borderColor: 'rgba(255,215,0,0.35)' } : null,
       ]}
     >
       {card.isSuperInterest ? (
-        <View style={styles.superInterestBanner}>
-          <Feather name="star" size={14} color="#FFD700" />
-          <ThemedText style={styles.superInterestBannerText}>
-            Super Interest — This renter is highly motivated
-          </ThemedText>
+        <View style={styles.superBanner}>
+          <Feather name="star" size={12} color="#FFD700" />
+          <Text style={styles.superBannerText}>Super Interest</Text>
         </View>
       ) : null}
-      <View style={styles.header}>
-        {card.renterPhoto ? (
-          <Image source={{ uri: card.renterPhoto }} style={styles.avatar} />
-        ) : (
-          <View style={[styles.avatar, { backgroundColor: theme.backgroundSecondary, justifyContent: 'center', alignItems: 'center' }]}>
-            <Feather name="user" size={24} color={theme.textSecondary} />
+
+      <View style={styles.inquiryRow}>
+        <View style={styles.inquiryAvatarWrap}>
+          {card.renterPhoto ? (
+            <Image source={{ uri: card.renterPhoto }} style={styles.inquiryAvatar} />
+          ) : (
+            <LinearGradient colors={['#667eea', '#764ba2']} style={styles.inquiryAvatar}>
+              <Text style={styles.inquiryAvatarLetter}>{card.renterName[0]}</Text>
+            </LinearGradient>
+          )}
+          <View style={[
+            styles.matchBadge,
+            { backgroundColor: card.compatibilityScore >= 70 ? '#2ecc71' : card.compatibilityScore >= 40 ? '#f39c12' : '#e74c3c' }
+          ]}>
+            <Text style={styles.matchBadgeText}>{card.compatibilityScore}%</Text>
           </View>
-        )}
-        <View style={styles.info}>
-          <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{card.renterName}</ThemedText>
-          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
-            {card.propertyTitle}
-          </ThemedText>
-          <ThemedText style={[Typography.small, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
-            Sent {formatDateString(card.createdAt)}
-          </ThemedText>
         </View>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(card.status) }]}>
-          <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '600' }]}>
-            {card.status.charAt(0).toUpperCase() + card.status.slice(1)}
-          </ThemedText>
+
+        <View style={styles.inquiryInfo}>
+          <Text style={styles.inquiryName} numberOfLines={1}>{card.renterName}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Feather name="home" size={11} color="rgba(255,255,255,0.3)" />
+            <Text style={styles.inquiryListing} numberOfLines={1}>{card.propertyTitle}</Text>
+          </View>
+          <Text style={styles.inquiryTime}>{formatTimeAgo(card.createdAt)}</Text>
+        </View>
+
+        <View style={styles.inquiryActions}>
+          {card.status === 'pending' ? (
+            <>
+              <Pressable style={styles.actionPass} onPress={() => handlePassInterest(card)}>
+                <Feather name="x" size={16} color="rgba(255,255,255,0.4)" />
+              </Pressable>
+              <Pressable style={styles.actionAccept} onPress={() => handleAcceptInterest(card)}>
+                <Feather name="check" size={16} color="#fff" />
+              </Pressable>
+            </>
+          ) : (
+            <Pressable
+              style={styles.actionMessage}
+              onPress={() => {
+                const convId = `conv-interest-${card.id}`;
+                navigation.navigate('Chat', { conversationId: convId });
+              }}
+            >
+              <Feather name="message-circle" size={16} color="#fff" />
+            </Pressable>
+          )}
         </View>
       </View>
-
-      <View style={styles.details}>
-        <View style={styles.detailRow}>
-          <View style={[styles.compatBadge, { backgroundColor: '#ff6b5b' }]}>
-            <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '700' }]}>
-              {card.compatibilityScore}% Match
-            </ThemedText>
-          </View>
-          <View style={styles.detailItem}>
-            <Feather name="dollar-sign" size={14} color={theme.textSecondary} />
-            <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: 4 }]}>
-              {card.budgetRange}
-            </ThemedText>
-          </View>
-          <View style={styles.detailItem}>
-            <Feather name="calendar" size={14} color={theme.textSecondary} />
-            <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: 4 }]}>
-              {card.moveInDate}
-            </ThemedText>
-          </View>
-        </View>
-
-        {card.lifestyleTags.length > 0 ? (
-          <View style={styles.tagsRow}>
-            {card.lifestyleTags.map((tag, idx) => (
-              <View key={idx} style={[styles.tag, { backgroundColor: theme.backgroundSecondary }]}>
-                <ThemedText style={[Typography.small, { color: theme.text }]}>{tag}</ThemedText>
-              </View>
-            ))}
-          </View>
-        ) : null}
-      </View>
-
-      {card.personalNote ? (
-        <View style={[styles.noteBox, { backgroundColor: theme.backgroundSecondary }]}>
-          <Feather name="message-square" size={14} color={theme.textSecondary} />
-          <ThemedText style={[Typography.caption, { color: theme.text, marginLeft: Spacing.sm, flex: 1 }]}>
-            "{card.personalNote}"
-          </ThemedText>
-        </View>
-      ) : null}
-
-      {card.status === 'pending' ? (
-        <View style={styles.actions}>
-          <Pressable
-            style={[styles.actionBtn, { backgroundColor: theme.success, flex: 1 }]}
-            onPress={() => handleAcceptInterest(card)}
-          >
-            <Feather name="check" size={20} color="#FFFFFF" />
-            <ThemedText style={[Typography.body, { color: '#FFFFFF', marginLeft: Spacing.sm, fontWeight: '600' }]}>
-              Accept
-            </ThemedText>
-          </Pressable>
-          <Pressable
-            style={[styles.actionBtn, { backgroundColor: theme.backgroundSecondary, flex: 1 }]}
-            onPress={() => handlePassInterest(card)}
-          >
-            <Feather name="x" size={20} color={theme.text} />
-            <ThemedText style={[Typography.body, { marginLeft: Spacing.sm, fontWeight: '600' }]}>
-              Pass
-            </ThemedText>
-          </Pressable>
-        </View>
-      ) : null}
     </View>
   );
+
+  const empty = emptyConfig[activeFilter];
 
   return (
     <ScreenScrollView>
       <View style={styles.container}>
-        <View style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingTop: insets.top + 8,
-          paddingHorizontal: 16,
-          paddingBottom: 12,
-        }}>
-          <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
-            <Feather name="chevron-left" size={28} color={theme.text} />
-          </Pressable>
-          <ThemedText style={[Typography.h2, { marginLeft: 8 }]}>Inquiries</ThemedText>
-        </View>
         <View style={styles.headerRow}>
-          <View />
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            {pendingCount > 0 ? (
-              <View style={styles.pendingBadge}>
-                <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '700' }]}>
-                  {pendingCount} pending
-                </ThemedText>
-              </View>
-            ) : null}
-            <AIFloatingButton onPress={() => setShowAISheet(true)} position="inline" />
+          <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <Feather name="chevron-left" size={26} color="#fff" />
+          </Pressable>
+          <Text style={styles.headerTitle}>Inquiries</Text>
+          <Pressable style={styles.aiBtn} onPress={() => setShowAISheet(true)}>
+            <LinearGradient
+              colors={['#ff6b5b', '#ff8c7a']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.aiBtnInner}
+            >
+              <Feather name="cpu" size={13} color="#fff" />
+              <Text style={styles.aiBtnText}>AI Sort</Text>
+            </LinearGradient>
+          </Pressable>
+        </View>
+
+        <View style={styles.statsRow}>
+          <View style={styles.statCard}>
+            <Text style={styles.statNum}>{allCount}</Text>
+            <Text style={styles.statLabel}>Total</Text>
+          </View>
+          <View style={[styles.statCard, styles.statCardAccent]}>
+            <Text style={[styles.statNum, { color: '#ff6b5b' }]}>{pendingCount}</Text>
+            <Text style={styles.statLabel}>Pending</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={[styles.statNum, { color: '#2ecc71' }]}>{acceptedCount}</Text>
+            <Text style={styles.statLabel}>Accepted</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={[styles.statNum, { color: 'rgba(255,255,255,0.35)' }]}>{passedCount}</Text>
+            <Text style={styles.statLabel}>Passed</Text>
           </View>
         </View>
 
-        <View style={styles.filterRow}>
-          {filterTabs.map(tab => (
-            <Pressable
-              key={tab.key}
-              style={[
-                styles.filterPill,
-                {
-                  backgroundColor: filter === tab.key ? theme.primary : theme.backgroundSecondary,
-                },
-              ]}
-              onPress={() => setFilter(tab.key)}
-            >
-              <ThemedText
-                style={[
-                  Typography.caption,
-                  { color: filter === tab.key ? '#FFFFFF' : theme.text, fontWeight: filter === tab.key ? '600' : '400' },
-                ]}
-              >
-                {tab.label}
-              </ThemedText>
-            </Pressable>
-          ))}
+        <View style={styles.filterWrap}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterScroll}
+          >
+            {(['all', 'pending', 'accepted', 'passed'] as const).map((tab) => {
+              const label = tab.charAt(0).toUpperCase() + tab.slice(1);
+              const count = tab === 'all' ? allCount : tab === 'pending' ? pendingCount : tab === 'accepted' ? acceptedCount : passedCount;
+              const isActive = activeFilter === tab;
+              return (
+                <Pressable
+                  key={tab}
+                  style={[styles.filterTab, isActive && styles.filterTabActive]}
+                  onPress={() => setActiveFilter(tab)}
+                >
+                  <Text style={[styles.filterTabText, isActive && styles.filterTabTextActive]}>
+                    {label}
+                  </Text>
+                  {count > 0 ? (
+                    <View style={[styles.filterBadge, isActive && styles.filterBadgeActive]}>
+                      <Text style={[styles.filterBadgeText, isActive && styles.filterBadgeTextActive]}>
+                        {count}
+                      </Text>
+                    </View>
+                  ) : null}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
         </View>
 
         {filtered.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Feather name="heart" size={48} color={theme.textSecondary} />
-            <ThemedText style={[Typography.h3, { color: theme.textSecondary, marginTop: Spacing.lg, textAlign: 'center' }]}>
-              No inquiries
-            </ThemedText>
-            <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.sm, textAlign: 'center' }]}>
-              {filter === 'all' ? 'No interest requests received yet' : `No ${filter} inquiries`}
-            </ThemedText>
+          <View style={styles.emptyWrap}>
+            <View style={styles.emptyIconWrap}>
+              <LinearGradient
+                colors={['rgba(255,107,91,0.15)', 'rgba(255,107,91,0.05)']}
+                style={styles.emptyIconCircle}
+              >
+                <Feather name={empty.icon} size={32} color="rgba(255,107,91,0.6)" />
+              </LinearGradient>
+            </View>
+            <Text style={styles.emptyTitle}>{empty.title}</Text>
+            <Text style={styles.emptySubtitle}>{empty.subtitle}</Text>
+            {empty.ctaLabel ? (
+              <Pressable style={styles.emptyCta} onPress={empty.ctaAction ?? undefined}>
+                <Text style={styles.emptyCtaText}>{empty.ctaLabel}</Text>
+                <Feather name="arrow-right" size={14} color="#ff6b5b" />
+              </Pressable>
+            ) : null}
           </View>
         ) : (
-          filtered.map(card => renderCard(card))
+          <View style={{ marginTop: 8 }}>
+            {filtered.map(card => renderInquiryCard(card))}
+          </View>
         )}
       </View>
       <RoomdrAISheet
@@ -513,7 +522,7 @@ export const HostInquiriesScreen = () => {
         contextData={{
           host: {
             totalInquiries: interestCards.length,
-            pendingInquiries: interestCards.filter(c => c.status === 'pending').length,
+            pendingInquiries: pendingCount,
             responseRate: interestCards.length > 0
               ? Math.round((interestCards.filter(c => c.status !== 'pending').length / interestCards.length) * 100)
               : 0,
@@ -530,129 +539,288 @@ export const HostInquiriesScreen = () => {
 
 const styles = StyleSheet.create({
   container: {
-    padding: Spacing.lg,
+    paddingBottom: 40,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.lg,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 4,
   },
-  aiGradientBtn: {
-    width: 38, height: 38, borderRadius: 19,
-    alignItems: 'center', justifyContent: 'center',
+  backBtn: {
+    marginRight: 8,
+    padding: 4,
   },
-  pendingBadge: {
-    backgroundColor: '#ff6b5b',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+  headerTitle: {
+    flex: 1,
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#fff',
+    letterSpacing: -0.5,
   },
-  filterRow: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    marginBottom: Spacing.lg,
+  aiBtn: {
+    borderRadius: 20,
+    overflow: 'hidden',
   },
-  filterPill: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.full,
-  },
-  card: {
-    borderRadius: BorderRadius.medium,
-    padding: Spacing.lg,
-    marginBottom: Spacing.lg,
-  },
-  superBadge: {
+  aiBtnInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.sm,
-  },
-  superInterestBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,215,0,0.12)',
+    gap: 5,
     paddingHorizontal: 12,
     paddingVertical: 7,
-    borderRadius: 8,
-    marginBottom: 12,
-    gap: 7,
+    borderRadius: 20,
   },
-  superInterestBannerText: {
-    color: '#FFD700',
+  aiBtnText: {
     fontSize: 12,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 20,
+    marginBottom: 6,
+    paddingHorizontal: 20,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 14,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+  },
+  statCardAccent: {
+    borderColor: 'rgba(255,107,91,0.2)',
+    backgroundColor: 'rgba(255,107,91,0.07)',
+  },
+  statNum: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#fff',
+    letterSpacing: -0.5,
+  },
+  statLabel: {
+    fontSize: 10,
     fontWeight: '600',
-    flex: 1,
+    color: 'rgba(255,255,255,0.35)',
+    marginTop: 2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  header: {
+  filterWrap: {
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  filterScroll: {
+    paddingHorizontal: 20,
+    gap: 8,
     flexDirection: 'row',
-    alignItems: 'flex-start',
   },
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    marginRight: Spacing.md,
-  },
-  info: {
-    flex: 1,
-  },
-  statusBadge: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.small,
-  },
-  details: {
-    marginTop: Spacing.md,
-  },
-  detailRow: {
+  filterTab: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
-  compatBadge: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 4,
-    borderRadius: BorderRadius.small,
+  filterTabActive: {
+    backgroundColor: '#ff6b5b',
+    borderColor: 'transparent',
   },
-  detailItem: {
-    flexDirection: 'row',
+  filterTabText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.45)',
+  },
+  filterTabTextActive: {
+    color: '#fff',
+  },
+  filterBadge: {
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    minWidth: 20,
     alignItems: 'center',
   },
-  tagsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.xs,
-    marginTop: Spacing.sm,
+  filterBadgeActive: {
+    backgroundColor: 'rgba(255,255,255,0.25)',
   },
-  tag: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 4,
-    borderRadius: BorderRadius.full,
+  filterBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: 'rgba(255,255,255,0.5)',
   },
-  noteBox: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    padding: Spacing.md,
-    borderRadius: BorderRadius.small,
-    marginTop: Spacing.md,
+  filterBadgeTextActive: {
+    color: '#fff',
   },
-  actions: {
-    flexDirection: 'row',
-    gap: Spacing.md,
-    marginTop: Spacing.lg,
-  },
-  actionBtn: {
-    flexDirection: 'row',
+  emptyWrap: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.medium,
+    paddingHorizontal: 40,
+    paddingTop: 80,
+    paddingBottom: 60,
   },
-  emptyState: {
+  emptyIconWrap: {
+    marginBottom: 20,
+  },
+  emptyIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: Spacing.xxl * 2,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 10,
+    letterSpacing: -0.3,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.4)',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  emptyCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(255,107,91,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.25)',
+    borderRadius: 14,
+  },
+  emptyCtaText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#ff6b5b',
+  },
+  inquiryCard: {
+    flexDirection: 'column',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    padding: 14,
+    marginHorizontal: 20,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  superBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,215,0,0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  superBannerText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFD700',
+  },
+  inquiryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  inquiryAvatarWrap: {
+    position: 'relative',
+    marginRight: 12,
+  },
+  inquiryAvatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inquiryAvatarLetter: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  matchBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -4,
+    borderRadius: 10,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderWidth: 1.5,
+    borderColor: '#111',
+  },
+  matchBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  inquiryInfo: {
+    flex: 1,
+    gap: 3,
+  },
+  inquiryName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  inquiryListing: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.4)',
+    flex: 1,
+  },
+  inquiryTime: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.25)',
+    marginTop: 1,
+  },
+  inquiryActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginLeft: 8,
+  },
+  actionPass: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionAccept: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#2ecc71',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionMessage: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#ff6b5b',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
