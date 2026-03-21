@@ -11,6 +11,7 @@ import {
   Platform,
   ActivityIndicator,
   KeyboardAvoidingView,
+  Keyboard,
   Text,
 } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
@@ -169,6 +170,13 @@ export const ProfileQuestionnaireScreen = () => {
     : currentFilteredIndex;
   const [direction, setDirection] = useState<'forward' | 'back'>('forward');
   const [isSaving, setIsSaving] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () => setKeyboardVisible(false));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
 
   const [photos, setPhotos] = useState<string[]>(user?.photos || (user?.profilePicture ? [user.profilePicture] : []));
   const [name, setName] = useState(user?.name || '');
@@ -924,7 +932,7 @@ export const ProfileQuestionnaireScreen = () => {
         </Animated.View>
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) + 80 }]}>
+      <View style={[styles.footer, { paddingBottom: keyboardVisible ? 8 : Math.max(insets.bottom, 16) + 80 }]}>
         {isLastStep ? (
           <Pressable
             style={[styles.nextButton, { opacity: isSaving ? 0.7 : 1 }]}
