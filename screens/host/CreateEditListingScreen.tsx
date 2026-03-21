@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, TextInput, StyleSheet, Pressable, Alert, Image, ScrollView, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Pressable, Alert, Image, ScrollView, Platform, ActivityIndicator } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { ScreenKeyboardAwareScrollView } from '../../components/ScreenKeyboardAwareScrollView';
@@ -427,10 +427,15 @@ export const CreateEditListingScreen = () => {
   const completionCount = completionFields.filter(Boolean).length;
   const completionPct = completionCount / completionFields.length;
 
-  const renderSectionTitle = (sectionName: string) => (
+  const renderSectionTitle = (sectionName: string, subtitle?: string) => (
     <View style={styles.sectionTitleRow}>
-      <Feather name={(SECTION_ICONS[sectionName] || 'info') as any} size={16} color="#ff6b5b" style={{ marginRight: 8 }} />
-      <ThemedText style={styles.sectionTitle}>{sectionName}</ThemedText>
+      <View style={styles.sectionIconWrap}>
+        <Feather name={(SECTION_ICONS[sectionName] || 'info') as any} size={15} color="#ff6b5b" />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.sectionTitle}>{sectionName}</Text>
+        {subtitle ? <Text style={styles.sectionSubtitle}>{subtitle}</Text> : null}
+      </View>
     </View>
   );
 
@@ -441,8 +446,8 @@ export const CreateEditListingScreen = () => {
     onChange: (n: number) => void,
   ) => (
     <View style={styles.fieldContainer}>
-      <ThemedText style={styles.label}>{label}</ThemedText>
-      <View style={styles.chipRow}>
+      <Text style={styles.label}>{label}</Text>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
         {options.map(n => {
           const selected = n === value;
           return (
@@ -451,12 +456,13 @@ export const CreateEditListingScreen = () => {
               style={[
                 styles.chip,
                 selected ? styles.chipSelected : styles.chipUnselected,
+                { width: 44, height: 44 },
               ]}
               onPress={() => onChange(n)}
             >
-              <ThemedText style={[styles.chipText, { color: selected ? '#fff' : '#aaa' }]}>
+              <Text style={[styles.chipText, { color: selected ? '#fff' : 'rgba(255,255,255,0.45)' }]}>
                 {n}
-              </ThemedText>
+              </Text>
             </Pressable>
           );
         })}
@@ -466,13 +472,13 @@ export const CreateEditListingScreen = () => {
 
   const renderToggle = (
     label: string,
-    optionA: { label: string; value: string },
-    optionB: { label: string; value: string },
+    optionA: { label: string; value: string; icon: string },
+    optionB: { label: string; value: string; icon: string },
     currentValue: string,
     onChange: (v: any) => void,
   ) => (
     <View style={styles.fieldContainer}>
-      <ThemedText style={styles.label}>{label}</ThemedText>
+      <Text style={styles.label}>{label}</Text>
       <View style={styles.toggleRow}>
         {[optionA, optionB].map(opt => {
           const selected = opt.value === currentValue;
@@ -485,9 +491,15 @@ export const CreateEditListingScreen = () => {
               ]}
               onPress={() => onChange(opt.value)}
             >
-              <ThemedText style={[styles.toggleText, { color: selected ? '#fff' : '#666', fontWeight: selected ? '700' : '500' }]}>
+              <Feather
+                name={opt.icon as any}
+                size={14}
+                color={selected ? '#fff' : 'rgba(255,255,255,0.35)'}
+                style={{ marginRight: 5 }}
+              />
+              <Text style={[styles.toggleText, { color: selected ? '#fff' : 'rgba(255,255,255,0.45)', fontWeight: selected ? '700' : '500' }]}>
                 {opt.label}
-              </ThemedText>
+              </Text>
             </Pressable>
           );
         })}
@@ -496,22 +508,32 @@ export const CreateEditListingScreen = () => {
   );
 
   return (
-    <ScreenKeyboardAwareScrollView>
+    <ScreenKeyboardAwareScrollView style={{ backgroundColor: '#0d0d0d' }}>
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Feather name="arrow-left" size={24} color={theme.text} />
+          <Feather name="arrow-left" size={22} color="rgba(255,255,255,0.8)" />
         </Pressable>
-        <ThemedText type="h2">{isEditing ? 'Edit Listing' : 'New Listing'}</ThemedText>
+        <View style={{ alignItems: 'center' }}>
+          <Text style={styles.headerTitle}>
+            {isEditing ? 'Edit Listing' : 'New Listing'}
+          </Text>
+          {!isEditing ? (
+            <Text style={styles.headerSubtitle}>Fill in your listing details</Text>
+          ) : null}
+        </View>
         <View style={{ width: 40 }} />
       </View>
 
       <View style={styles.progressContainer}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+          <Text style={styles.progressLabel}>Progress</Text>
+          <Text style={[styles.progressLabel, { color: '#ff6b5b', fontWeight: '600' }]}>
+            {Math.round(completionPct * 100)}%
+          </Text>
+        </View>
         <View style={styles.progressBar}>
           <View style={[styles.progressFill, { width: `${completionPct * 100}%` }]} />
         </View>
-        <ThemedText style={styles.progressLabel}>
-          {Math.round(completionPct * 100)}% complete
-        </ThemedText>
       </View>
 
       <View style={styles.card}>
@@ -596,23 +618,23 @@ export const CreateEditListingScreen = () => {
 
         {renderToggle(
           'Property Type',
-          { label: 'Lease', value: 'lease' },
-          { label: 'Sublet', value: 'sublet' },
+          { label: 'Lease', value: 'lease', icon: 'file-text' },
+          { label: 'Sublet', value: 'sublet', icon: 'clock' },
           propertyType,
           setPropertyType,
         )}
 
         {renderToggle(
           'Room Type',
-          { label: 'Entire Place', value: 'entire' },
-          { label: 'Private Room', value: 'room' },
+          { label: 'Entire Place', value: 'entire', icon: 'home' },
+          { label: 'Private Room', value: 'room', icon: 'user' },
           roomType,
           setRoomType,
         )}
       </View>
 
       <View style={styles.card}>
-        {renderSectionTitle('Location')}
+        {renderSectionTitle('Location', 'Used to match nearby renters')}
 
         <View style={styles.fieldContainer}>
           <ThemedText style={styles.label}>City</ThemedText>
@@ -711,9 +733,9 @@ export const CreateEditListingScreen = () => {
                 container: { flex: 0 },
                 textInput: {
                   height: 50,
-                  backgroundColor: '#1c1c1c',
+                  backgroundColor: '#141414',
                   borderWidth: 1,
-                  borderColor: '#333',
+                  borderColor: 'rgba(255,255,255,0.1)',
                   borderRadius: 12,
                   paddingHorizontal: 16,
                   fontSize: 15,
@@ -722,7 +744,7 @@ export const CreateEditListingScreen = () => {
                 listView: {
                   backgroundColor: '#1a1a1a',
                   borderWidth: 1,
-                  borderColor: '#333',
+                  borderColor: 'rgba(255,255,255,0.1)',
                   borderRadius: 12,
                   marginTop: 4,
                   zIndex: 1000,
@@ -825,7 +847,7 @@ export const CreateEditListingScreen = () => {
       </View>
 
       <View style={styles.card}>
-        {renderSectionTitle('House Rules')}
+        {renderSectionTitle('House Rules', 'Optional — helps set renter expectations')}
 
         <View style={styles.fieldContainer}>
           <ThemedText style={styles.hintText}>e.g. No smoking indoors, quiet hours after 10pm, guests allowed with notice</ThemedText>
@@ -843,7 +865,7 @@ export const CreateEditListingScreen = () => {
       </View>
 
       <View style={styles.card}>
-        {renderSectionTitle('Photos')}
+        {renderSectionTitle('Photos', 'First photo becomes your cover image')}
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photosRow}>
           {photos.map((photo, index) => (
@@ -895,8 +917,8 @@ export const CreateEditListingScreen = () => {
 
       {isEditing ? (
         <Pressable style={styles.deleteButton} onPress={handleDelete}>
-          <Feather name="trash-2" size={20} color="#ff4757" />
-          <ThemedText style={styles.deleteButtonText}>Delete Listing</ThemedText>
+          <Feather name="trash-2" size={14} color="rgba(255,255,255,0.25)" />
+          <Text style={styles.deleteButtonText}>Delete listing</Text>
         </Pressable>
       ) : null}
 
@@ -938,7 +960,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: Spacing.md,
+    marginBottom: 18,
     paddingTop: Spacing.md,
   },
   backButton: {
@@ -947,55 +969,83 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#fff',
+    letterSpacing: -0.2,
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.4)',
+    marginTop: 2,
+  },
   progressContainer: {
-    marginBottom: 20,
+    marginBottom: 18,
+    paddingHorizontal: 2,
   },
   progressBar: {
-    height: 4,
-    backgroundColor: '#1c1c1c',
-    borderRadius: 2,
+    height: 6,
+    backgroundColor: '#222',
+    borderRadius: 3,
     overflow: 'hidden',
-    marginBottom: 6,
   },
   progressFill: {
     height: '100%',
     backgroundColor: '#ff6b5b',
-    borderRadius: 2,
+    borderRadius: 3,
   },
   progressLabel: {
     fontSize: 12,
-    color: '#666',
-    textAlign: 'right',
+    color: 'rgba(255,255,255,0.35)',
+    fontWeight: '500',
   },
   card: {
-    backgroundColor: '#111',
-    borderRadius: 16,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#2a2a2a',
+    borderColor: 'rgba(255,255,255,0.07)',
     padding: 20,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   sectionTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#2a2a2a',
+    borderBottomColor: 'rgba(255,255,255,0.05)',
     paddingBottom: 14,
-    marginBottom: 16,
+    marginBottom: 18,
+  },
+  sectionIconWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 9,
+    backgroundColor: 'rgba(255,107,91,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.18)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
     color: '#fff',
+    letterSpacing: -0.1,
+  },
+  sectionSubtitle: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.35)',
+    marginTop: 1,
   },
   fieldContainer: {
     marginBottom: Spacing.lg,
   },
   label: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#aaa',
-    marginBottom: Spacing.xs,
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.55)',
+    marginBottom: 7,
   },
   input: {
     height: 50,
@@ -1003,8 +1053,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 16,
     fontSize: 15,
-    backgroundColor: '#1c1c1c',
-    borderColor: '#333',
+    backgroundColor: '#141414',
+    borderColor: 'rgba(255,255,255,0.1)',
     color: '#fff',
   },
   multilineInput: {
@@ -1021,9 +1071,9 @@ const styles = StyleSheet.create({
   inputWithPrefix: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1c1c1c',
+    backgroundColor: '#141414',
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: 'rgba(255,255,255,0.1)',
     borderRadius: 12,
     height: 50,
     paddingHorizontal: 16,
@@ -1047,8 +1097,8 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   chip: {
-    width: 48,
-    height: 48,
+    width: 44,
+    height: 44,
     borderRadius: 12,
     borderWidth: 1,
     alignItems: 'center',
@@ -1058,16 +1108,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#ff6b5b',
     borderColor: '#ff6b5b',
     shadowColor: '#ff6b5b',
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4,
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 5,
   },
   chipUnselected: {
-    backgroundColor: '#1c1c1c',
-    borderColor: '#333',
+    backgroundColor: '#141414',
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   chipText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
   },
   cityChip: {
@@ -1082,8 +1132,8 @@ const styles = StyleSheet.create({
     borderColor: '#ff6b5b',
   },
   cityChipUnselected: {
-    backgroundColor: '#1c1c1c',
-    borderColor: '#333',
+    backgroundColor: '#141414',
+    borderColor: 'rgba(255,255,255,0.12)',
   },
   cityChipText: {
     fontSize: 13,
@@ -1103,23 +1153,27 @@ const styles = StyleSheet.create({
     borderColor: '#ff6b5b',
   },
   amenityChipUnselected: {
-    backgroundColor: '#1c1c1c',
-    borderColor: '#333',
+    backgroundColor: '#141414',
+    borderColor: 'rgba(255,255,255,0.12)',
   },
   amenityChipText: {
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   toggleRow: {
     flexDirection: 'row',
-    backgroundColor: '#1c1c1c',
+    backgroundColor: '#141414',
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
     padding: 4,
+    gap: 4,
   },
   toggleButton: {
     flex: 1,
     height: 44,
-    borderRadius: 10,
+    borderRadius: 9,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1129,9 +1183,9 @@ const styles = StyleSheet.create({
   datePickerButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1c1c1c',
+    backgroundColor: '#141414',
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: 'rgba(255,255,255,0.1)',
     borderRadius: 12,
     height: 50,
     paddingHorizontal: 16,
@@ -1153,7 +1207,7 @@ const styles = StyleSheet.create({
   },
   photoContainer: {
     marginRight: 10,
-    borderRadius: 12,
+    borderRadius: 14,
     overflow: 'hidden',
     position: 'relative' as const,
   },
@@ -1170,38 +1224,39 @@ const styles = StyleSheet.create({
   },
   coverBadge: {
     position: 'absolute' as const,
-    bottom: 6,
-    left: 6,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    bottom: 7,
+    left: 7,
+    backgroundColor: 'rgba(255,107,91,0.85)',
     paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
+    paddingVertical: 3,
+    borderRadius: 7,
   },
   coverBadgeText: {
     color: '#fff',
     fontSize: 10,
-    fontWeight: '600' as const,
+    fontWeight: '700' as const,
   },
   photoThumb: {
-    width: 110,
-    height: 110,
-    borderRadius: 12,
+    width: 120,
+    height: 120,
+    borderRadius: 14,
   },
   addPhotoButton: {
-    width: 110,
-    height: 110,
-    borderRadius: 12,
+    width: 120,
+    height: 120,
+    borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: '#333',
-    borderStyle: 'dashed',
-    backgroundColor: '#1c1c1c',
+    borderColor: 'rgba(255,255,255,0.12)',
+    borderStyle: 'dashed' as const,
+    backgroundColor: '#141414',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 6,
   },
   addPhotoText: {
     fontSize: 12,
-    marginTop: 6,
-    color: '#555',
+    color: 'rgba(255,255,255,0.3)',
+    fontWeight: '500',
   },
   photoHint: {
     fontSize: 12,
@@ -1214,34 +1269,31 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#ff6b5b',
     height: 56,
-    borderRadius: 14,
-    marginTop: Spacing.xl,
-    gap: Spacing.sm,
+    borderRadius: 16,
+    marginTop: 24,
+    gap: 8,
     shadowColor: '#ff6b5b',
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 6,
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    elevation: 8,
   },
   saveButtonText: {
     color: '#fff',
     fontSize: 17,
     fontWeight: '700',
+    letterSpacing: -0.2,
   },
   deleteButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 52,
-    borderRadius: 14,
-    marginTop: Spacing.md,
-    borderWidth: 1.5,
-    borderColor: '#ff4757',
-    backgroundColor: 'transparent',
-    gap: Spacing.sm,
+    gap: 6,
+    paddingVertical: 16,
+    marginTop: 8,
   },
   deleteButtonText: {
-    color: '#ff4757',
-    fontSize: 16,
-    fontWeight: '600',
+    color: 'rgba(255,255,255,0.25)',
+    fontSize: 13,
+    fontWeight: '500',
   },
 });
