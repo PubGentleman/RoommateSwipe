@@ -279,12 +279,12 @@ export const HostDashboardScreen = () => {
   };
 
   const getStatArrowText = (label: string, value: number): { text: string; color: string } => {
-    if (label === 'Inquiries') {
+    if (label === 'Active') {
       return value > 0
-        ? { text: `+${value} this week`, color: GREEN }
-        : { text: 'No inquiries yet', color: 'rgba(255,255,255,0.2)' };
+        ? { text: `${value} listed`, color: '#3b82f6' }
+        : { text: 'No active listings', color: 'rgba(255,255,255,0.2)' };
     }
-    if (label === 'Pending') {
+    if (label === 'Inquiries') {
       return value > 0
         ? { text: 'Awaiting review', color: GOLD }
         : { text: 'All reviewed', color: 'rgba(255,255,255,0.2)' };
@@ -303,8 +303,8 @@ export const HostDashboardScreen = () => {
   };
 
   const statCards = [
-    { icon: 'heart' as const, value: inquiries.length, label: 'Inquiries', color: ACCENT, iconBg: 'rgba(255,107,91,0.15)', iconBorder: 'rgba(255,107,91,0.2)', onPress: () => navigation.navigate('Inquiries') },
-    { icon: 'clock' as const, value: pendingInquiries, label: 'Pending', color: GOLD, iconBg: 'rgba(255,215,0,0.1)', iconBorder: 'rgba(255,215,0,0.18)', onPress: () => navigation.navigate('Inquiries') },
+    { icon: 'home' as const, value: activeCount, label: 'Active', color: '#3b82f6', iconBg: 'rgba(59,130,246,0.12)', iconBorder: 'rgba(59,130,246,0.2)', onPress: () => navigateToTab('Listings') },
+    { icon: 'heart' as const, value: pendingInquiries, label: 'Inquiries', color: ACCENT, iconBg: 'rgba(255,107,91,0.15)', iconBorder: 'rgba(255,107,91,0.2)', onPress: () => navigation.navigate('Inquiries') },
     { icon: 'check' as const, value: rentedCount, label: 'Rented', color: GREEN, iconBg: 'rgba(46,204,113,0.12)', iconBorder: 'rgba(46,204,113,0.18)', onPress: () => navigateToTab('Listings') },
     { icon: 'message-square' as const, value: messageCount, label: 'Messages', color: 'rgba(255,255,255,0.5)', iconBg: 'rgba(255,255,255,0.06)', iconBorder: 'rgba(255,255,255,0.08)', onPress: () => navigateToTab('Messages') },
   ];
