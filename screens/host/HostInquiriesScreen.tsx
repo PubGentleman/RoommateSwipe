@@ -8,7 +8,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { StorageService } from '../../utils/storage';
 import { InterestCard, Conversation, Message } from '../../types/models';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -24,10 +24,17 @@ export const HostInquiriesScreen = () => {
   const { user, canRespondToInquiry, useInquiryResponse, getHostPlan } = useAuth();
   const { refreshUnreadCount } = useNotificationContext();
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const insets = useSafeAreaInsets();
   const [interestCards, setInterestCards] = useState<InterestCard[]>([]);
-  const [filter, setFilter] = useState<FilterStatus>('all');
+  const [filter, setFilter] = useState<FilterStatus>(route.params?.filter || 'all');
   const [showAISheet, setShowAISheet] = useState(false);
+
+  React.useEffect(() => {
+    if (route.params?.filter) {
+      setFilter(route.params.filter);
+    }
+  }, [route.params?.filter]);
 
   const loadInterestCards = useCallback(async () => {
     if (!user) return;

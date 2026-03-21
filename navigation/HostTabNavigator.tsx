@@ -34,7 +34,7 @@ export type HostDashboardStackParamList = {
   DashboardMain: undefined;
   CreateEditListing: { propertyId?: string };
   Analytics: undefined;
-  Inquiries: undefined;
+  Inquiries: { filter?: 'all' | 'pending' | 'accepted' | 'passed' } | undefined;
   Notifications: undefined;
   HostPricing: undefined;
   HostSubscription: undefined;
