@@ -751,8 +751,8 @@ export const ExploreScreen = () => {
             </View>
             {item.featured ? (
               <View style={styles.tagFeatured}>
-                <Feather name="star" size={9} color="#ffd700" />
-                <Text style={[styles.tagText, { color: '#ffd700', marginLeft: 3 }]}>FEATURED</Text>
+                <Feather name="star" size={9} color="#1a1200" />
+                <Text style={[styles.tagText, { color: '#1a1200', marginLeft: 3 }]}>FEATURED</Text>
               </View>
             ) : null}
             {!item.featured &&
@@ -760,8 +760,8 @@ export const ExploreScreen = () => {
              item.listingBoost?.includesFeaturedBadge &&
              new Date(item.listingBoost.expiresAt) > new Date() ? (
               <View style={styles.boostFeaturedBadge}>
-                <Feather name="star" size={9} color="#ffd700" />
-                <Text style={[styles.tagText, { color: '#ffd700', marginLeft: 3 }]}>FEATURED</Text>
+                <Feather name="star" size={9} color="#1a1200" />
+                <Text style={[styles.tagText, { color: '#1a1200', marginLeft: 3 }]}>FEATURED</Text>
               </View>
             ) : null}
           </View>
@@ -999,25 +999,37 @@ export const ExploreScreen = () => {
           >
             {viewMode === 'saved' ? (
               <LinearGradient colors={[ACCENT, '#e83a2a']} style={styles.tabGradient}>
-                <Feather name="heart" size={13} color="#fff" />
-                <Text style={styles.tabActiveText}>Saved ({saved.size})</Text>
+                <View style={styles.tabLabelRow}>
+                  <Feather name="heart" size={13} color="#fff" />
+                  <Text style={styles.tabActiveText}>Saved</Text>
+                  {saved.size > 0 ? (
+                    <View style={styles.savedBadge}>
+                      <Text style={styles.savedBadgeText}>{saved.size}</Text>
+                    </View>
+                  ) : null}
+                </View>
               </LinearGradient>
             ) : (
-              <>
+              <View style={styles.tabLabelRow}>
                 <Feather name="heart" size={13} color="rgba(255,255,255,0.4)" />
-                <Text style={styles.tabInactiveText}>Saved ({saved.size})</Text>
-              </>
+                <Text style={styles.tabInactiveText}>Saved</Text>
+                {saved.size > 0 ? (
+                  <View style={styles.savedBadge}>
+                    <Text style={styles.savedBadgeText}>{saved.size}</Text>
+                  </View>
+                ) : null}
+              </View>
             )}
           </Pressable>
         </View>
 
         <View style={styles.chipScrollWrapper}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipScrollContent}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ overflow: 'visible' }} contentContainerStyle={styles.chipScrollContent}>
             {QUICK_FILTERS.map(f => {
               const active = activeQuickFilters.has(f.key);
               return (
                 <Pressable key={f.key} style={active ? styles.chipSelected : styles.chipUnselected} onPress={() => toggleQuickFilter(f.key)}>
-                  {f.icon ? <Feather name={f.icon} size={10} color={active ? '#ff8070' : 'rgba(255,255,255,0.4)'} /> : null}
+                  {f.icon ? <Feather name={f.icon} size={10} color={active ? '#fff' : 'rgba(255,255,255,0.45)'} /> : null}
                   <Text style={active ? styles.chipSelectedText : styles.chipUnselectedText}>{f.label}</Text>
                 </Pressable>
               );
@@ -1097,7 +1109,7 @@ export const ExploreScreen = () => {
                         <Text style={styles.featuredPrice}>${item.price?.toLocaleString()}/mo</Text>
                         <Text style={styles.featuredName} numberOfLines={1}>{item.title}</Text>
                         <View style={styles.featuredBadge}>
-                          <Feather name="star" size={8} color="#ffd700" />
+                          <Feather name="star" size={8} color="#1a1200" />
                           <Text style={styles.featuredBadgeText}>FEATURED</Text>
                         </View>
                       </LinearGradient>
@@ -2070,14 +2082,35 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  tabLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  savedBadge: {
+    backgroundColor: '#ff6b5b',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+  },
+  savedBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#fff',
+  },
   chipScrollWrapper: {
-    height: 42,
+    paddingTop: 4,
+    paddingBottom: 2,
     marginBottom: 6,
-    overflow: 'visible',
   },
   chipScrollContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 4,
     gap: 8,
+    flexDirection: 'row',
     alignItems: 'center',
   },
   chipSelected: {
@@ -2086,9 +2119,9 @@ const styles = StyleSheet.create({
     height: 30,
     paddingHorizontal: 14,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,107,91,0.15)',
+    backgroundColor: '#ff6b5b',
     borderWidth: 1,
-    borderColor: 'rgba(255,107,91,0.35)',
+    borderColor: 'transparent',
     gap: 5,
   },
   chipUnselected: {
@@ -2097,18 +2130,18 @@ const styles = StyleSheet.create({
     height: 30,
     paddingHorizontal: 14,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: 'rgba(255,255,255,0.07)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: 'rgba(255,255,255,0.1)',
     gap: 5,
   },
   chipSelectedText: {
-    color: '#ff8070',
+    color: '#fff',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   chipUnselectedText: {
-    color: 'rgba(255,255,255,0.4)',
+    color: 'rgba(255,255,255,0.45)',
     fontSize: 12,
     fontWeight: '600',
   },
@@ -2180,9 +2213,7 @@ const styles = StyleSheet.create({
   boostFeaturedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,215,0,0.18)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,215,0,0.35)',
+    backgroundColor: '#f5c518',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
@@ -2190,9 +2221,7 @@ const styles = StyleSheet.create({
   tagFeatured: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,215,0,0.18)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,215,0,0.35)',
+    backgroundColor: '#f5c518',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
@@ -2462,9 +2491,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 3,
     marginTop: 4,
+    backgroundColor: '#f5c518',
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    alignSelf: 'flex-start',
   },
   featuredBadgeText: {
-    color: '#ffd700',
+    color: '#1a1200',
     fontSize: 9,
     fontWeight: '700',
     letterSpacing: 0.5,
