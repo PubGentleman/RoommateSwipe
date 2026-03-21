@@ -326,7 +326,7 @@ export const ProfileQuestionnaireScreen = () => {
         if (isNaN(parseInt(bedrooms)) || parseInt(bedrooms) <= 0) { Alert.alert('Error', 'Please enter a valid number of bedrooms'); return false; }
         if (!bathrooms.trim()) { Alert.alert('Required', 'Please enter the number of bathrooms'); return false; }
         if (isNaN(parseInt(bathrooms)) || parseInt(bathrooms) <= 0) { Alert.alert('Error', 'Please enter a valid number of bathrooms'); return false; }
-        if (privateBathroom === undefined) { Alert.alert('Required', 'Please select your bathroom preference'); return false; }
+        if (privateBathroom === undefined) { Alert.alert('Required', 'Please select whether you need a private or shared bathroom'); return false; }
         return true;
       case 'interests': {
         const tagIdsByCategory: Record<string, string[]> = {};
@@ -354,50 +354,16 @@ export const ProfileQuestionnaireScreen = () => {
     }
   };
 
-  const goNext = () => {
-    if (!validateCurrentStep()) return;
-    if (currentFilteredIndex < stepsToShow.length - 1) {
-      setDirection('forward');
-      setCurrentFilteredIndex(currentFilteredIndex + 1);
-      try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
-    }
-  };
-
-  const goBack = () => {
-    console.log('[ProfileQuestionnaire] goBack pressed, currentFilteredIndex:', currentFilteredIndex, 'onboardingStep:', user?.onboardingStep);
-    if (currentFilteredIndex > 0) {
-      setDirection('back');
-      setCurrentFilteredIndex(currentFilteredIndex - 1);
-    } else {
-      if (user?.onboardingStep === 'profile') {
-        Alert.alert(
-          'Go Back',
-          'This will return you to the login screen. Any progress will not be saved.',
-          [
-            { text: 'Stay', style: 'cancel' },
-            { text: 'Go Back', style: 'destructive', onPress: () => abandonSignup() },
-          ]
-        );
-      } else {
-        navigation.goBack();
-      }
-    }
-  };
-
-  const handleSave = async () => {
-    if (!validateCurrentStep()) return;
-    setIsSaving(true);
-
+  const buildProfileData = () => {
     const birthdayStorageFormat = birthday.trim() || user?.birthday;
     const zodiacSign = birthdayStorageFormat ? calculateZodiacFromBirthday(birthdayStorageFormat) : undefined;
-
-    await updateUser({
-      name: name.trim(),
-      email: email.trim(),
+    return {
+      name: name.trim() || user?.name,
+      email: email.trim() || user?.email,
       birthday: birthdayStorageFormat,
       zodiacSign,
-      photos,
-      profilePicture: photos[0] || undefined,
+      photos: photos.length > 0 ? photos : user?.photos,
+      profilePicture: photos[0] || user?.profilePicture,
       profileData: {
         bio: bio.trim() || undefined,
         budget: budget.trim() ? parseInt(budget) : undefined,
@@ -432,7 +398,45 @@ export const ProfileQuestionnaireScreen = () => {
           },
         },
       },
-    });
+    };
+  };
+
+  const goNext = () => {
+    if (!validateCurrentStep()) return;
+    if (currentFilteredIndex < stepsToShow.length - 1) {
+      setDirection('forward');
+      setCurrentFilteredIndex(currentFilteredIndex + 1);
+      try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+      updateUser(buildProfileData()).catch(() => {});
+    }
+  };
+
+  const goBack = () => {
+    console.log('[ProfileQuestionnaire] goBack pressed, currentFilteredIndex:', currentFilteredIndex, 'onboardingStep:', user?.onboardingStep);
+    if (currentFilteredIndex > 0) {
+      setDirection('back');
+      setCurrentFilteredIndex(currentFilteredIndex - 1);
+    } else {
+      if (user?.onboardingStep === 'profile') {
+        Alert.alert(
+          'Go Back',
+          'This will return you to the login screen. Any progress will not be saved.',
+          [
+            { text: 'Stay', style: 'cancel' },
+            { text: 'Go Back', style: 'destructive', onPress: () => abandonSignup() },
+          ]
+        );
+      } else {
+        navigation.goBack();
+      }
+    }
+  };
+
+  const handleSave = async () => {
+    if (!validateCurrentStep()) return;
+    setIsSaving(true);
+
+    await updateUser(buildProfileData());
 
     try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
     setIsSaving(false);
