@@ -1864,175 +1864,282 @@ export const GroupsScreen = () => {
         transparent={true}
         onRequestClose={() => setShowGroupDetail(false)}
       >
-        <View style={styles.detailModalOverlay}>
-          <View style={[styles.detailModalContainer, { backgroundColor: theme.backgroundSecondary }]}>
-            <View style={styles.detailHeader}>
-              <ThemedText style={[Typography.h2]}>Group Details</ThemedText>
-              <Pressable onPress={() => setShowGroupDetail(false)}>
-                <Feather name="x" size={24} color={theme.text} />
+        <View style={styles.gdOverlay}>
+          <View style={styles.gdSheet}>
+
+            <View style={styles.gdHandle} />
+
+            <View style={styles.gdHeader}>
+              <View style={{ flex: 1 }} />
+              <Pressable onPress={() => setShowGroupDetail(false)} style={styles.gdCloseBtn} hitSlop={8}>
+                <Feather name="x" size={20} color="rgba(255,255,255,0.6)" />
               </Pressable>
             </View>
-            <ScrollView style={styles.detailContent} showsVerticalScrollIndicator={false}>
-              {currentGroup ? (
-                <>
-                  <View style={[styles.detailSection, { alignItems: 'center' }]}>
-                    {(() => {
-                      const memberPhotos = currentGroup.members
-                        .map((mid: string) => {
-                          const p = profileCache.find(pr => pr.id === mid);
-                          return { photo: p?.photos?.[0] || p?.profilePicture, initial: p?.name?.charAt(0)?.toUpperCase() || '?' };
-                        })
-                        .slice(0, 4);
-                      if (memberPhotos.length === 0) {
-                        return (
-                          <View style={[styles.groupIconLarge, { backgroundColor: theme.primary }]}>
-                            <Feather name="users" size={32} color="#FFFFFF" />
+
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={styles.gdScrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {currentGroup ? (() => {
+                const compatibility = calculateGroupCompatibility(currentGroup);
+                const spotsLeft = currentGroup.maxMembers - currentGroup.members.length;
+                const memberProfiles = currentGroup.members
+                  .map(id => profileCache.find(p => p.id === id))
+                  .filter((p): p is NonNullable<typeof p> => !!p);
+
+                return (
+                  <>
+                    <View style={styles.gdHero}>
+
+                      <View style={styles.gdAvatarStack}>
+                        {memberProfiles.length === 0 ? (
+                          <View style={styles.gdAvatarEmpty}>
+                            <Feather name="users" size={28} color="rgba(255,255,255,0.4)" />
                           </View>
-                        );
-                      }
-                      const size = memberPhotos.length === 1 ? 64 : 44;
-                      const overlap = memberPhotos.length <= 2 ? 14 : 10;
-                      const totalWidth = size + (memberPhotos.length - 1) * (size - overlap);
-                      return (
-                        <View style={{ width: totalWidth, height: size, flexDirection: 'row', marginBottom: 4 }}>
-                          {memberPhotos.map((m: { photo?: string; initial: string }, i: number) => (
-                            m.photo ? (
+                        ) : (
+                          memberProfiles.slice(0, 4).map((profile, i) => {
+                            const gradients: [string, string][] = [
+                              ['#667eea', '#764ba2'],
+                              ['#f093fb', '#f5576c'],
+                              ['#11998e', '#38ef7d'],
+                              ['#f7971e', '#ffd200'],
+                            ];
+                            const size = 56;
+                            const overlap = 16;
+                            return profile.photos?.[0] ? (
                               <Image
-                                key={i}
-                                source={{ uri: m.photo }}
-                                style={{
-                                  width: size,
-                                  height: size,
-                                  borderRadius: size / 2,
-                                  borderWidth: 2,
-                                  borderColor: '#1a1a1a',
-                                  position: 'absolute',
-                                  left: i * (size - overlap),
-                                  zIndex: memberPhotos.length - i,
-                                }}
+                                key={profile.id}
+                                source={{ uri: profile.photos[0] }}
+                                style={[
+                                  styles.gdAvatarImg,
+                                  {
+                                    position: 'absolute',
+                                    left: i * (size - overlap),
+                                    zIndex: 10 - i,
+                                  },
+                                ]}
                               />
                             ) : (
-                              <View
-                                key={i}
-                                style={{
-                                  width: size,
-                                  height: size,
-                                  borderRadius: size / 2,
-                                  borderWidth: 2,
-                                  borderColor: '#1a1a1a',
-                                  backgroundColor: '#444',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  position: 'absolute',
-                                  left: i * (size - overlap),
-                                  zIndex: memberPhotos.length - i,
-                                }}
+                              <LinearGradient
+                                key={profile.id}
+                                colors={gradients[i % 4]}
+                                style={[
+                                  styles.gdAvatarImg,
+                                  {
+                                    position: 'absolute',
+                                    left: i * (size - overlap),
+                                    zIndex: 10 - i,
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                  },
+                                ]}
                               >
-                                <Text style={{ color: '#fff', fontWeight: '700', fontSize: size * 0.38 }}>{m.initial}</Text>
-                              </View>
-                            )
-                          ))}
-                        </View>
-                      );
-                    })()}
-                    <ThemedText style={[Typography.h2, { marginTop: Spacing.md }]}>{currentGroup.name}</ThemedText>
-                    <View style={styles.membersInfo}>
-                      <Feather name="users" size={16} color={theme.textSecondary} />
-                      <ThemedText style={[Typography.body, { color: theme.textSecondary, marginLeft: Spacing.xs }]}>
-                        {currentGroup.members.length}/{currentGroup.maxMembers} members • {currentGroup.maxMembers - currentGroup.members.length} spots left
-                      </ThemedText>
-                    </View>
-                  </View>
-
-                  {currentGroup.description ? (
-                    <View style={styles.detailSection}>
-                      <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>About</ThemedText>
-                      <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
-                        {currentGroup.description}
-                      </ThemedText>
-                    </View>
-                  ) : null}
-
-                  <View style={styles.detailSection}>
-                    <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Group Details</ThemedText>
-                    <View style={styles.detailRow}>
-                      <Feather name="dollar-sign" size={20} color={theme.primary} />
-                      <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                        <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Minimum Budget (per person)</ThemedText>
-                        <ThemedText style={[Typography.body, { fontWeight: '600' }]}>${currentGroup.budget}/month</ThemedText>
-                      </View>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Feather name="map-pin" size={20} color={theme.primary} />
-                      <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                        <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Preferred Location</ThemedText>
-                        <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{currentGroup.preferredLocation}</ThemedText>
-                      </View>
-                    </View>
-                    {currentGroup.apartmentPrice ? (
-                      <View style={styles.detailRow}>
-                        <Feather name="home" size={20} color={theme.primary} />
-                        <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Total Apartment Price</ThemedText>
-                          <ThemedText style={[Typography.body, { fontWeight: '600' }]}>${currentGroup.apartmentPrice}</ThemedText>
-                        </View>
-                      </View>
-                    ) : null}
-                    {currentGroup.bedrooms ? (
-                      <View style={styles.detailRow}>
-                        <Feather name="grid" size={20} color={theme.primary} />
-                        <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Bedrooms</ThemedText>
-                          <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{currentGroup.bedrooms}</ThemedText>
-                        </View>
-                      </View>
-                    ) : null}
-                  </View>
-
-                  <View style={[styles.detailSection, { paddingBottom: Spacing.xxl }]}>
-                    <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Members</ThemedText>
-                    {currentGroup.members.map((memberId) => {
-                      const profile = profileCache.find(p => p.id === memberId);
-                      const memberPhoto = profile?.photos?.[0] || profile?.profilePicture;
-                      return profile ? (
-                        <View key={memberId} style={styles.memberRow}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            {memberPhoto ? (
-                              <Image source={{ uri: memberPhoto }} style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10 }} />
-                            ) : (
-                              <View style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10, backgroundColor: '#333', alignItems: 'center', justifyContent: 'center' }}>
-                                <ThemedText style={{ fontSize: 14, fontWeight: '600' }}>{profile.name.charAt(0).toUpperCase()}</ThemedText>
-                              </View>
-                            )}
-                            <ThemedText style={Typography.body}>
-                              {profile.name}{profile.age ? `, ${profile.age}` : ''}{profile.zodiacSign ? ` ${getZodiacSymbol(profile.zodiacSign)}` : ''} {getGenderSymbol(profile.gender)}
-                            </ThemedText>
-                            {getVerificationLevel(profile.verification) >= 2 ? (
-                              <Feather name="check-circle" size={14} color="#2563EB" style={{ marginLeft: 4 }} />
-                            ) : null}
+                                <Text style={styles.gdAvatarLetter}>
+                                  {profile.name[0].toUpperCase()}
+                                </Text>
+                              </LinearGradient>
+                            );
+                          })
+                        )}
+                        {spotsLeft > 0 && memberProfiles.length > 0 ? (
+                          <View
+                            style={[
+                              styles.gdAvatarImg,
+                              styles.gdAvatarOpenSlot,
+                              {
+                                position: 'absolute',
+                                left: Math.min(memberProfiles.length, 4) * (56 - 16),
+                                zIndex: 0,
+                              },
+                            ]}
+                          >
+                            <Text style={styles.gdAvatarPlus}>+{spotsLeft}</Text>
                           </View>
-                        </View>
-                      ) : null;
-                    })}
-                  </View>
+                        ) : null}
+                      </View>
 
-                  <View style={[styles.detailSection, { paddingBottom: Spacing.xxl }]}>
-                    <Pressable
-                      style={[styles.detailActionButton, { backgroundColor: theme.primary }]}
-                      onPress={() => {
-                        setShowGroupDetail(false);
-                        handleMessageGroup(currentGroup);
-                      }}
-                    >
-                      <Feather name="message-circle" size={20} color="#FFFFFF" />
-                      <ThemedText style={[Typography.h3, { color: '#FFFFFF', marginLeft: Spacing.md }]}>
-                        Message Group
-                      </ThemedText>
-                    </Pressable>
-                  </View>
-                </>
-              ) : null}
+                      <View style={{
+                        height: 56,
+                        width: Math.min(memberProfiles.length, 4) * (56 - 16) + 56 + (spotsLeft > 0 ? 40 : 0),
+                        marginBottom: 16,
+                      }} />
+
+                      <View style={[
+                        styles.gdMatchBadge,
+                        {
+                          backgroundColor: compatibility >= 80
+                            ? 'rgba(46,204,113,0.15)'
+                            : 'rgba(255,107,91,0.15)',
+                          borderColor: compatibility >= 80
+                            ? 'rgba(46,204,113,0.3)'
+                            : 'rgba(255,107,91,0.3)',
+                        }
+                      ]}>
+                        <Feather
+                          name="heart"
+                          size={11}
+                          color={compatibility >= 80 ? '#2ecc71' : '#ff8070'}
+                        />
+                        <Text style={[
+                          styles.gdMatchBadgeText,
+                          { color: compatibility >= 80 ? '#2ecc71' : '#ff8070' }
+                        ]}>
+                          {compatibility}% Match
+                        </Text>
+                      </View>
+
+                      <Text style={styles.gdGroupName}>{currentGroup.name}</Text>
+
+                      <View style={styles.gdMembersRow}>
+                        <Feather name="users" size={12} color="rgba(255,255,255,0.35)" />
+                        <Text style={styles.gdMembersText}>
+                          {currentGroup.members.length} of {currentGroup.maxMembers} members
+                        </Text>
+                        <View style={[
+                          styles.gdSpotPill,
+                          spotsLeft === 0 && { backgroundColor: 'rgba(255,107,91,0.1)', borderColor: 'rgba(255,107,91,0.2)' }
+                        ]}>
+                          <Text style={[
+                            styles.gdSpotPillText,
+                            spotsLeft === 0 && { color: '#ff6b5b' }
+                          ]}>
+                            {spotsLeft > 0 ? `${spotsLeft} spot${spotsLeft > 1 ? 's' : ''} left` : 'Full'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {currentGroup.description ? (
+                        <Text style={styles.gdDescription}>{currentGroup.description}</Text>
+                      ) : null}
+                    </View>
+
+                    <View style={styles.gdInfoRow}>
+                      <View style={styles.gdInfoCard}>
+                        <View style={styles.gdInfoIconWrap}>
+                          <Feather name="dollar-sign" size={15} color="#ff6b5b" />
+                        </View>
+                        <Text style={styles.gdInfoLabel}>BUDGET</Text>
+                        <Text style={styles.gdInfoValue}>${currentGroup.budget?.toLocaleString()}/mo</Text>
+                      </View>
+                      <View style={styles.gdInfoCard}>
+                        <View style={styles.gdInfoIconWrap}>
+                          <Feather name="map-pin" size={15} color="#ff6b5b" />
+                        </View>
+                        <Text style={styles.gdInfoLabel}>LOCATION</Text>
+                        <Text style={styles.gdInfoValue} numberOfLines={1}>{currentGroup.preferredLocation}</Text>
+                      </View>
+                    </View>
+
+                    {(currentGroup.apartmentPrice || currentGroup.bedrooms) ? (
+                      <View style={styles.gdInfoRow}>
+                        {currentGroup.bedrooms ? (
+                          <View style={styles.gdInfoCard}>
+                            <View style={styles.gdInfoIconWrap}>
+                              <Feather name="grid" size={15} color="#ff6b5b" />
+                            </View>
+                            <Text style={styles.gdInfoLabel}>BEDROOMS</Text>
+                            <Text style={styles.gdInfoValue}>{currentGroup.bedrooms} bed</Text>
+                          </View>
+                        ) : null}
+                        {currentGroup.apartmentPrice ? (
+                          <View style={styles.gdInfoCard}>
+                            <View style={styles.gdInfoIconWrap}>
+                              <Feather name="home" size={15} color="#ff6b5b" />
+                            </View>
+                            <Text style={styles.gdInfoLabel}>TOTAL RENT</Text>
+                            <Text style={styles.gdInfoValue}>${currentGroup.apartmentPrice?.toLocaleString()}/mo</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                    ) : null}
+
+                    {memberProfiles.length > 0 ? (
+                      <View style={styles.gdMembersSection}>
+                        <Text style={styles.gdSectionLabel}>MEMBERS</Text>
+                        {memberProfiles.map((profile, i) => {
+                          const gradients: [string, string][] = [
+                            ['#667eea', '#764ba2'],
+                            ['#f093fb', '#f5576c'],
+                            ['#11998e', '#38ef7d'],
+                          ];
+                          const memberPhoto = profile.photos?.[0] || profile.profilePicture;
+                          const zodiacText = profile.zodiacSign
+                            ? profile.zodiacSign.charAt(0).toUpperCase() + profile.zodiacSign.slice(1).toLowerCase()
+                            : null;
+
+                          return (
+                            <View key={profile.id} style={styles.gdMemberCard}>
+                              {memberPhoto ? (
+                                <Image source={{ uri: memberPhoto }} style={styles.gdMemberPhoto} />
+                              ) : (
+                                <LinearGradient colors={gradients[i % 3]} style={[styles.gdMemberPhoto, { justifyContent: 'center', alignItems: 'center' }]}>
+                                  <Text style={{ fontSize: 18, fontWeight: '700', color: '#fff' }}>
+                                    {profile.name[0].toUpperCase()}
+                                  </Text>
+                                </LinearGradient>
+                              )}
+                              <View style={{ flex: 1 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                  <Text style={styles.gdMemberName}>
+                                    {profile.name}{profile.age ? `, ${profile.age}` : ''}
+                                  </Text>
+                                  {getVerificationLevel(profile.verification) >= 2 ? (
+                                    <Feather name="check-circle" size={13} color="#3b82f6" />
+                                  ) : null}
+                                </View>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                                  {profile.occupation ? (
+                                    <View style={styles.gdMemberTag}>
+                                      <Text style={styles.gdMemberTagText}>
+                                        {profile.occupation.split(' ').slice(0, 2).join(' ')}
+                                      </Text>
+                                    </View>
+                                  ) : null}
+                                  {zodiacText ? (
+                                    <View style={[styles.gdMemberTag, { backgroundColor: 'rgba(168,85,247,0.12)', borderColor: 'rgba(168,85,247,0.2)' }]}>
+                                      <Text style={[styles.gdMemberTagText, { color: '#a855f7' }]}>
+                                        {zodiacText}
+                                      </Text>
+                                    </View>
+                                  ) : null}
+                                </View>
+                              </View>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    ) : null}
+
+                    <View style={{ height: 100 }} />
+                  </>
+                );
+              })() : null}
             </ScrollView>
+
+            <View style={styles.gdActionBar}>
+              <Pressable
+                style={styles.gdActionLike}
+                onPress={() => {
+                  setShowGroupDetail(false);
+                  if (currentGroup) handleSwipeAction('like');
+                }}
+              >
+                <Feather name="heart" size={20} color="#2ecc71" />
+                <Text style={styles.gdActionLikeText}>Interested</Text>
+              </Pressable>
+              <Pressable
+                style={styles.gdActionMessage}
+                onPress={() => {
+                  setShowGroupDetail(false);
+                  if (currentGroup) handleMessageGroup(currentGroup);
+                }}
+              >
+                <Feather name="message-circle" size={20} color="#fff" />
+                <Text style={styles.gdActionMessageText}>Message</Text>
+              </Pressable>
+            </View>
+
           </View>
         </View>
       </Modal>
@@ -2788,49 +2895,269 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
   },
-  detailModalOverlay: {
+  gdOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'flex-end',
   },
-  detailModalContainer: {
+  gdSheet: {
     height: '90%',
-    borderTopLeftRadius: BorderRadius.large,
-    borderTopRightRadius: BorderRadius.large,
+    backgroundColor: '#1a1a1a',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     overflow: 'hidden',
   },
-  detailHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: Spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+  gdHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignSelf: 'center',
+    marginTop: 10,
+    marginBottom: 4,
   },
-  detailContent: {
+  gdHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+  },
+  gdCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  gdScrollContent: {
+    paddingBottom: 20,
+  },
+  gdHero: {
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingTop: 8,
+    paddingBottom: 24,
+  },
+  gdAvatarStack: {
+    flexDirection: 'row',
+    position: 'relative',
+    marginBottom: 0,
+  },
+  gdAvatarImg: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 3,
+    borderColor: '#1a1a1a',
+  },
+  gdAvatarEmpty: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  gdAvatarOpenSlot: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 2,
+    borderStyle: 'dashed' as const,
+    borderColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 40,
+    height: 56,
+    borderRadius: 20,
+  },
+  gdAvatarPlus: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.5)',
+  },
+  gdAvatarLetter: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  gdMatchBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    marginBottom: 10,
+  },
+  gdMatchBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  gdGroupName: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#fff',
+    letterSpacing: -0.4,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  gdMembersRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 12,
+  },
+  gdMembersText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.4)',
+    fontWeight: '500',
+  },
+  gdSpotPill: {
+    backgroundColor: 'rgba(46,204,113,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(46,204,113,0.25)',
+    borderRadius: 10,
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+  },
+  gdSpotPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#2ecc71',
+  },
+  gdDescription: {
+    fontSize: 13.5,
+    color: 'rgba(255,255,255,0.45)',
+    textAlign: 'center',
+    lineHeight: 21,
+    maxWidth: 300,
+  },
+  gdInfoRow: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 16,
+    marginBottom: 10,
+  },
+  gdInfoCard: {
     flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 16,
+    padding: 14,
+    gap: 4,
   },
-  detailSection: {
-    padding: Spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
+  gdInfoIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 9,
+    backgroundColor: 'rgba(255,107,91,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.18)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
   },
-  detailRow: {
+  gdInfoLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.3)',
+    letterSpacing: 0.6,
+  },
+  gdInfoValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  gdMembersSection: {
+    paddingHorizontal: 16,
+    marginTop: 6,
+  },
+  gdSectionLabel: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.25)',
+    letterSpacing: 0.8,
+    marginBottom: 12,
+    paddingLeft: 2,
+  },
+  gdMemberCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.md,
+    gap: 12,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 8,
   },
-  detailActionButton: {
+  gdMemberPhoto: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+  },
+  gdMemberName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  gdMemberTag: {
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  gdMemberTagText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.5)',
+  },
+  gdActionBar: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: '#1a1a1a',
+  },
+  gdActionLike: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: Spacing.lg,
-    borderRadius: BorderRadius.medium,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 16,
+    backgroundColor: 'rgba(46,204,113,0.1)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(46,204,113,0.3)',
+  },
+  gdActionLikeText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#2ecc71',
+  },
+  gdActionMessage: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 16,
+    backgroundColor: '#ff6b5b',
+  },
+  gdActionMessageText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
   },
   avatarStackContainer: {
     height: 105,
