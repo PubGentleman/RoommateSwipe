@@ -537,13 +537,28 @@ export const ExploreScreen = () => {
     }
 
     if (activeQuickFilters.has('under2k')) {
-      filtered = filtered.filter(p => p.price < 2000);
+      filtered = filtered.filter(p => {
+        const price = p.price ?? (p as any).rent ?? (p as any).monthly_price ?? 0;
+        return price <= 2000;
+      });
     }
     if (activeQuickFilters.has('petFriendly')) {
-      filtered = filtered.filter(p => p.amenities?.some(a => a.toLowerCase().includes('pet')));
+      filtered = filtered.filter(p =>
+        p.amenities?.some(a => a.toLowerCase().includes('pet')) ||
+        (p as any).petFriendly === true ||
+        (p as any).pet_friendly === true ||
+        (p as any).pets_allowed === true
+      );
     }
     if (activeQuickFilters.has('availableNow')) {
-      filtered = filtered.filter(p => p.available);
+      const today = new Date().toISOString().split('T')[0];
+      filtered = filtered.filter(p =>
+        p.available === true ||
+        (p as any).available_now === true ||
+        (p as any).status === 'available' ||
+        (p as any).status === 'active' ||
+        ((p as any).move_in_date && (p as any).move_in_date <= today)
+      );
     }
 
     const getHostPlanPriority = (property: Property) => {
@@ -604,14 +619,19 @@ export const ExploreScreen = () => {
       const planB = getHostPlanPriority(b);
       if (planA !== planB) return planB - planA;
 
-      if (activeQuickFilters.has('bestMatch') && user) {
-        const hostA = a.hostProfileId ? hostProfiles.get(a.hostProfileId) : null;
-        const hostB = b.hostProfileId ? hostProfiles.get(b.hostProfileId) : null;
-        const profileA = hostA ? getUserAsRoommateProfile(hostA) : null;
-        const profileB = hostB ? getUserAsRoommateProfile(hostB) : null;
-        const compA = profileA ? calculateCompatibility(user, profileA) : 0;
-        const compB = profileB ? calculateCompatibility(user, profileB) : 0;
-        return compB - compA;
+      if (activeQuickFilters.has('bestMatch')) {
+        if (user) {
+          const hostA = a.hostProfileId ? hostProfiles.get(a.hostProfileId) : null;
+          const hostB = b.hostProfileId ? hostProfiles.get(b.hostProfileId) : null;
+          const profileA = hostA ? getUserAsRoommateProfile(hostA) : null;
+          const profileB = hostB ? getUserAsRoommateProfile(hostB) : null;
+          const compA = profileA ? calculateCompatibility(user, profileA) : 0;
+          const compB = profileB ? calculateCompatibility(user, profileB) : 0;
+          return compB - compA;
+        }
+        const scoreA = (a as any).matchScore ?? (a as any).match_score ?? (a as any).score ?? 0;
+        const scoreB = (b as any).matchScore ?? (b as any).match_score ?? (b as any).score ?? 0;
+        return scoreB - scoreA;
       }
       return 0;
     });
@@ -2825,13 +2845,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#ff6b5b',
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
-  },
-  chipDivider: {
-    width: 1,
-    height: 20,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    marginHorizontal: 4,
-    alignSelf: 'center' as const,
   },
   budgetInputs: {
     flexDirection: 'row',
