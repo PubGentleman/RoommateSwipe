@@ -1997,327 +1997,263 @@ export const RoommatesScreen = () => {
       <Modal
         visible={showProfileDetail}
         animationType="slide"
-        transparent={true}
+        transparent={false}
         onRequestClose={() => setShowProfileDetail(false)}
       >
-        <View style={styles.detailModalOverlay}>
-          <View style={[styles.detailModalContainer, { backgroundColor: theme.backgroundSecondary }]}>
-            <ScrollView 
-              style={{ flex: 1 }} 
-              showsVerticalScrollIndicator={false}
-              bounces={true}
-            >
-              <View style={styles.detailHeader}>
-                <ThemedText style={[Typography.h2]}>Profile Details</ThemedText>
-              </View>
-              
-              {/* Photo gallery */}
-            {(() => {
-              const photosArray = Array.isArray(currentProfile.photos) 
-                ? currentProfile.photos 
-                : currentProfile.photos 
-                  ? [currentProfile.photos]
-                  : [];
-              
-              const handlePrevPhoto = () => {
-                setCurrentPhotoIndex(prev => (prev > 0 ? prev - 1 : photosArray.length - 1));
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              };
-              
-              const handleNextPhoto = () => {
-                setCurrentPhotoIndex(prev => (prev < photosArray.length - 1 ? prev + 1 : 0));
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              };
-              
-              return (
-                <>
-                  <View style={styles.photoGalleryContainer}>
-                    <Image 
-                      source={{ uri: photosArray[currentPhotoIndex] || photosArray[0] }} 
-                      style={styles.detailImage}
-                      resizeMode="cover"
-                    />
-                    {photosArray.length > 1 ? (
-                      <>
-                        <Pressable 
-                          style={[styles.photoNavButton, styles.photoNavLeft]} 
-                          onPress={handlePrevPhoto}
-                        >
-                          <Feather name="chevron-left" size={28} color="#FFFFFF" />
-                        </Pressable>
-                        <Pressable 
-                          style={[styles.photoNavButton, styles.photoNavRight]} 
-                          onPress={handleNextPhoto}
-                        >
-                          <Feather name="chevron-right" size={28} color="#FFFFFF" />
-                        </Pressable>
-                        <View style={styles.photoDotsContainer}>
-                          {photosArray.map((_, index) => (
-                            <View 
-                              key={`dot-${index}`}
-                              style={[
-                                styles.photoDot,
-                                currentPhotoIndex === index && styles.photoDotActive
-                              ]}
-                            />
-                          ))}
+        <View style={{ flex: 1, backgroundColor: '#111' }}>
+          {(() => {
+            const photosArray = Array.isArray(currentProfile.photos)
+              ? currentProfile.photos
+              : currentProfile.photos
+                ? [currentProfile.photos]
+                : [];
+            const matchScore = currentProfile.compatibility || 50;
+            const verifyLevel = getVerificationLevel(currentProfile.verification);
+
+            return (
+              <>
+                <View style={styles.pdPhotoWrap}>
+                  <ScrollView
+                    horizontal
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    onMomentumScrollEnd={(e) => {
+                      const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+                      setCurrentPhotoIndex(idx);
+                    }}
+                  >
+                    {photosArray.length > 0 ? photosArray.map((uri, i) => (
+                      <Image
+                        key={i}
+                        source={{ uri }}
+                        style={styles.pdPhoto}
+                        resizeMode="cover"
+                      />
+                    )) : (
+                      <View style={[styles.pdPhoto, { backgroundColor: '#1a1a1a', alignItems: 'center', justifyContent: 'center' }]}>
+                        <Feather name="user" size={64} color="rgba(255,255,255,0.15)" />
+                      </View>
+                    )}
+                  </ScrollView>
+
+                  <LinearGradient
+                    colors={['transparent', 'rgba(0,0,0,0.85)']}
+                    style={styles.pdPhotoGradient}
+                  >
+                    <View style={[
+                      styles.pdMatchBadge,
+                      { backgroundColor: matchScore >= 70 ? '#2ecc71' : matchScore >= 40 ? '#f39c12' : '#e74c3c' }
+                    ]}>
+                      <Feather name="heart" size={11} color="#fff" />
+                      <Text style={styles.pdMatchText}>{matchScore}% Match</Text>
+                    </View>
+
+                    <Text style={styles.pdName}>{currentProfile.name}, {currentProfile.age}</Text>
+
+                    <View style={styles.pdSubRow}>
+                      <Text style={styles.pdOccupation}>
+                        {getTagLabel(currentProfile.occupation) || currentProfile.occupation}
+                      </Text>
+                      {verifyLevel > 0 ? (
+                        <View style={styles.pdVerifiedBadge}>
+                          <Feather name="check-circle" size={11} color="#2ecc71" />
+                          <Text style={styles.pdVerifiedText}>
+                            {verifyLevel >= 3 ? 'Fully Verified' : verifyLevel >= 2 ? 'Verified' : 'Partial'}
+                          </Text>
                         </View>
-                      </>
-                    ) : null}
-                  </View>
-                  <View style={styles.photoIndicatorContainer}>
-                    <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
-                      {photosArray.length} {photosArray.length === 1 ? 'photo' : 'photos'}
-                    </ThemedText>
-                  </View>
-                </>
-              );
-            })()}
-              
-              <View style={styles.detailSection}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <ThemedText style={[Typography.h2]}>{currentProfile.name}, {currentProfile.age}{currentProfile.zodiacSign ? ` ${getZodiacSymbol(currentProfile.zodiacSign)}` : ''}</ThemedText>
-                  {getVerificationLevel(currentProfile.verification) > 0 ? (
-                    <View style={{ marginLeft: Spacing.sm, flexDirection: 'row', alignItems: 'center', backgroundColor: '#2563EB20', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 }}>
-                      <Feather name="check-circle" size={14} color="#2563EB" />
-                      <ThemedText style={[Typography.small, { color: '#2563EB', fontWeight: '600', marginLeft: 4 }]}>
-                        {getVerificationLevel(currentProfile.verification) >= 3 ? 'Fully Verified' : getVerificationLevel(currentProfile.verification) >= 2 ? 'Verified' : 'Partially Verified'}
-                      </ThemedText>
+                      ) : null}
+                      {currentProfile.zodiacSign ? (
+                        <View style={styles.pdZodiacPill}>
+                          <Text style={styles.pdZodiacText}>{currentProfile.zodiacSign}</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </LinearGradient>
+
+                  {photosArray.length > 1 ? (
+                    <View style={styles.pdDots}>
+                      {photosArray.map((_, i) => (
+                        <View key={i} style={[styles.pdDot, i === currentPhotoIndex && styles.pdDotActive]} />
+                      ))}
                     </View>
                   ) : null}
-                </View>
-                <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
-                  {getTagLabel(currentProfile.occupation) || currentProfile.occupation}
-                </ThemedText>
-              </View>
 
-              <View style={styles.detailSection}>
-                <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>About</ThemedText>
-                <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
-                  {currentProfile.bio}
-                </ThemedText>
-              </View>
+                  <Pressable style={[styles.pdCloseBtn, { top: Math.max(14, insets.top + 6) }]} onPress={() => setShowProfileDetail(false)}>
+                    <Feather name="x" size={18} color="#fff" />
+                  </Pressable>
+                </View>
 
-              <View style={styles.detailSection}>
-                <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Preferences</ThemedText>
-                <View style={styles.detailRow}>
-                  <Feather name="dollar-sign" size={20} color={theme.primary} />
-                  <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                    <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Budget</ThemedText>
-                    <ThemedText style={[Typography.body, { fontWeight: '600' }]}>${currentProfile.budget}/month</ThemedText>
-                  </View>
-                </View>
-                {currentProfile.lookingFor ? (
-                  <View style={styles.detailRow}>
-                    <Feather name={currentProfile.lookingFor === 'room' ? 'home' : 'key'} size={20} color={theme.primary} />
-                    <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                      <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Looking For</ThemedText>
-                      <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{currentProfile.lookingFor === 'room' ? 'Room' : 'Entire Apartment'}</ThemedText>
-                    </View>
-                  </View>
-                ) : null}
-                <View style={styles.detailRow}>
-                  <Feather name="map-pin" size={20} color={theme.primary} />
-                  <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                    <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Preferred Location</ThemedText>
-                    <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{currentProfile.preferences.location}</ThemedText>
-                  </View>
-                </View>
-                <View style={styles.detailRow}>
-                  <Feather name="calendar" size={20} color={theme.primary} />
-                  <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                    <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Move-in Date</ThemedText>
-                    <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{formatMoveInDate(currentProfile.preferences.moveInDate)}</ThemedText>
-                  </View>
-                </View>
-                <View style={styles.detailRow}>
-                  <Feather name="home" size={20} color={theme.primary} />
-                  <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                    <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Bedrooms Needed</ThemedText>
-                    <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{currentProfile.preferences.bedrooms}</ThemedText>
-                  </View>
-                </View>
-                {currentProfile.preferences.privateBathroom != null ? (
-                  <View style={styles.detailRow}>
-                    <Feather name="droplet" size={20} color={theme.primary} />
-                    <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                      <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Private Bathroom</ThemedText>
-                      <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{currentProfile.preferences.privateBathroom ? 'Yes' : 'No'}</ThemedText>
-                    </View>
-                  </View>
-                ) : null}
-                {currentProfile.preferences.bathrooms ? (
-                  <View style={styles.detailRow}>
-                    <Feather name="layout" size={20} color={theme.primary} />
-                    <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                      <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Bathrooms in Apartment</ThemedText>
-                      <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{currentProfile.preferences.bathrooms}</ThemedText>
-                    </View>
-                  </View>
-                ) : null}
-              </View>
-
-              <View style={styles.detailSection}>
-                <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Lifestyle</ThemedText>
-                <View style={styles.detailRow}>
-                  <Feather name="droplet" size={20} color={theme.primary} />
-                  <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                    <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Cleanliness</ThemedText>
-                    <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{getCleanlinessLabel(currentProfile.lifestyle.cleanliness)}</ThemedText>
-                  </View>
-                </View>
-                <View style={styles.detailRow}>
-                  <Feather name="users" size={20} color={theme.primary} />
-                  <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                    <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Social Level</ThemedText>
-                    <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{getSocialLevelLabel(currentProfile.lifestyle.socialLevel)}</ThemedText>
-                  </View>
-                </View>
-                <View style={styles.detailRow}>
-                  <Feather name="briefcase" size={20} color={theme.primary} />
-                  <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                    <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Work Schedule</ThemedText>
-                    <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{getWorkScheduleLabel(currentProfile.lifestyle.workSchedule)}</ThemedText>
-                  </View>
-                </View>
-                <View style={styles.detailRow}>
-                  <Feather name={currentProfile.lifestyle.pets ? 'check-circle' : 'x-circle'} size={20} color={currentProfile.lifestyle.pets ? theme.success : theme.error} />
-                  <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                    <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Pets</ThemedText>
-                    <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{currentProfile.lifestyle.pets ? 'Yes' : 'No'}</ThemedText>
-                  </View>
-                </View>
-                <View style={styles.detailRow}>
-                  <Feather name={currentProfile.lifestyle.smoking ? 'check-circle' : 'x-circle'} size={20} color={currentProfile.lifestyle.smoking ? theme.error : theme.success} />
-                  <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                    <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Smoking</ThemedText>
-                    <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{currentProfile.lifestyle.smoking ? 'Yes' : 'No'}</ThemedText>
-                  </View>
-                </View>
-              </View>
-
-              {(() => {
-                const rawProfileTags = (currentProfile.profileData?.interests) || (currentProfile as any).interests;
-                const profileTags: string[] = Array.isArray(rawProfileTags) ? rawProfileTags : [];
-                const rawMyTags2 = user?.profileData?.interests;
-                const myTags: string[] = Array.isArray(rawMyTags2) ? rawMyTags2 : [];
-                const myTagSet = new Set(myTags);
-                if (profileTags.length === 0) return null;
-                return (
-                  <View style={styles.detailSection}>
-                    <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Interests</ThemedText>
-                    {Object.entries(INTEREST_TAGS).map(([catKey, cat]) => {
-                      const catTags = cat.tags.filter(t => profileTags.includes(t.id));
-                      if (catTags.length === 0) return null;
-                      return (
-                        <View key={catKey} style={{ marginBottom: Spacing.md }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                            <Feather name={cat.icon as any} size={14} color={theme.textSecondary} />
-                            <ThemedText style={{ fontSize: 12, color: theme.textSecondary, fontWeight: '600' }}>{cat.label}</ThemedText>
-                          </View>
-                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                            {catTags.map(tag => {
-                              const isShared = myTagSet.has(tag.id);
-                              return (
-                                <View key={tag.id} style={{
-                                  paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12,
-                                  backgroundColor: isShared ? 'rgba(255,107,91,0.15)' : 'rgba(255,255,255,0.08)',
-                                  borderWidth: isShared ? 0 : 1,
-                                  borderColor: 'rgba(255,255,255,0.15)',
-                                }}>
-                                  <ThemedText style={{ fontSize: 12, fontWeight: '500', color: isShared ? '#ff6b5b' : '#FFFFFF' }}>
-                                    {tag.label}
-                                  </ThemedText>
-                                </View>
-                              );
-                            })}
-                          </View>
-                        </View>
-                      );
-                    })}
-                  </View>
-                );
-              })()}
-
-              <View style={[styles.detailSection, { paddingBottom: Spacing.xxl }]}>
-                <View style={[styles.matchBadge, { backgroundColor: getMatchQualityColor(currentProfile.compatibility || 50) + '20' }]}>
-                  <Feather name="heart" size={24} color={getMatchQualityColor(currentProfile.compatibility || 50)} />
-                  <ThemedText style={[Typography.h1, { color: getMatchQualityColor(currentProfile.compatibility || 50), marginLeft: Spacing.md }]}>
-                    {currentProfile.compatibility || 50}% Match
-                  </ThemedText>
-                </View>
-              </View>
-
-              {/* Premium Zodiac Compatibility Insight - Only for Plus/Elite users when both have zodiac signs */}
-              {user && currentProfile.zodiacSign && user.zodiacSign && (user.subscription?.plan === 'plus' || user.subscription?.plan === 'elite') ? (
-                <View style={styles.detailSection}>
-                  <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Zodiac Compatibility</ThemedText>
-                  <View style={[styles.zodiacInsightCard, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.sm }}>
-                      <ThemedText style={[Typography.h2, { marginRight: Spacing.sm }]}>
-                        {getZodiacSymbol(user.zodiacSign)}
-                      </ThemedText>
-                      <Feather name="heart" size={16} color={theme.primary} />
-                      <ThemedText style={[Typography.h2, { marginLeft: Spacing.sm }]}>
-                        {getZodiacSymbol(currentProfile.zodiacSign)}
-                      </ThemedText>
-                    </View>
-                    <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
-                      {getZodiacCompatibilityLevel(user.zodiacSign, currentProfile.zodiacSign)}
-                    </ThemedText>
-                  </View>
-                </View>
-              ) : null}
-
-              <View style={[styles.detailSection, { paddingBottom: Spacing.xxl, gap: Spacing.md }]}>
-                <Pressable
-                  style={[styles.detailActionButton, { backgroundColor: theme.primary }]}
-                  onPress={async () => {
-                    if (!currentProfile || !user) return;
-                    const matches = await StorageService.getMatches();
-                    const hasMatch = matches.some(m =>
-                      (m.userId1 === user.id && m.userId2 === currentProfile.id) ||
-                      (m.userId2 === user.id && m.userId1 === currentProfile.id)
-                    );
-                    if (hasMatch) {
-                      setShowProfileDetail(false);
-                      setTimeout(() => handleSendDirectMessage(false), 200);
-                    } else {
-                      const coldCheck = await canSendColdMessage();
-                      if (!coldCheck.canSend) {
-                        Alert.alert(
-                          'Daily Limit Reached',
-                          coldCheck.reason || "You've used all your messages for today. Resets at midnight.",
-                          [
-                            { text: 'Upgrade for More', onPress: () => (navigation as any).navigate('Plans') },
-                            { text: 'OK', style: 'cancel' },
-                          ]
-                        );
-                        return;
-                      }
-                      setShowProfileDetail(false);
-                      setTimeout(() => handleSendDirectMessage(true), 200);
-                    }
-                  }}
+                <ScrollView
+                  style={{ flex: 1 }}
+                  contentContainerStyle={{ paddingBottom: 20 }}
+                  showsVerticalScrollIndicator={false}
                 >
-                  <Feather name="message-circle" size={20} color="#FFFFFF" />
-                  <ThemedText style={[Typography.h3, { color: '#FFFFFF', marginLeft: Spacing.md }]}>
-                    Send Message
-                  </ThemedText>
-                </Pressable>
-              </View>
-            </ScrollView>
-            
-            {/* Floating close button */}
-            <Pressable 
-              onPress={() => setShowProfileDetail(false)}
-              style={styles.detailCloseButton}
-            >
-              <View style={[styles.detailCloseButtonInner, { backgroundColor: theme.backgroundSecondary }]}>
-                <Feather name="x" size={24} color={theme.text} />
-              </View>
-            </Pressable>
-          </View>
+                  <View style={styles.pdStatStrip}>
+                    {[
+                      { icon: 'dollar-sign' as const, label: 'Budget', value: `$${currentProfile.budget}/mo` },
+                      { icon: 'map-pin' as const, label: 'Location', value: currentProfile.preferences?.location ?? 'Flexible' },
+                      { icon: 'calendar' as const, label: 'Move-in', value: currentProfile.preferences?.moveInDate ? formatMoveInDate(currentProfile.preferences.moveInDate) : 'ASAP' },
+                      { icon: 'home' as const, label: 'Rooms', value: `${currentProfile.preferences?.bedrooms ?? 1} bd` },
+                    ].map((stat, i) => (
+                      <View key={i} style={[styles.pdStat, i < 3 && styles.pdStatBorder]}>
+                        <Feather name={stat.icon} size={16} color="#ff6b5b" />
+                        <Text style={styles.pdStatValue}>{stat.value}</Text>
+                        <Text style={styles.pdStatLabel}>{stat.label}</Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  {currentProfile.bio ? (
+                    <View style={styles.pdSection}>
+                      <Text style={styles.pdSectionLabel}>About</Text>
+                      <View style={styles.pdCard}>
+                        <Text style={styles.pdBioText}>{currentProfile.bio}</Text>
+                      </View>
+                    </View>
+                  ) : null}
+
+                  <View style={styles.pdSection}>
+                    <Text style={styles.pdSectionLabel}>Lifestyle</Text>
+                    <View style={styles.pdPillWrap}>
+                      {([
+                        { icon: 'star' as const, value: getCleanlinessLabel(currentProfile.lifestyle?.cleanliness), color: '#ff6b5b' },
+                        { icon: 'users' as const, value: getSocialLevelLabel(currentProfile.lifestyle?.socialLevel), color: '#ff6b5b' },
+                        { icon: 'briefcase' as const, value: getWorkScheduleLabel(currentProfile.lifestyle?.workSchedule), color: '#ff6b5b' },
+                        currentProfile.lifestyle?.pets ? { icon: 'heart' as const, value: 'Has Pets', color: '#f39c12' } : null,
+                        currentProfile.lifestyle?.smoking ? { icon: 'wind' as const, value: 'Smoking OK', color: 'rgba(255,255,255,0.35)' } : null,
+                        !currentProfile.lifestyle?.smoking ? { icon: 'x' as const, value: 'No Smoking', color: 'rgba(255,255,255,0.35)' } : null,
+                        currentProfile.preferences?.privateBathroom ? { icon: 'droplet' as const, value: 'Private Bath', color: '#ff6b5b' } : null,
+                      ] as (null | { icon: any; value: string; color: string })[]).filter(Boolean).map((tag, i) => (
+                        <View key={i} style={styles.pdLifestylePill}>
+                          <Feather name={tag!.icon} size={12} color={tag!.color} />
+                          <Text style={styles.pdLifestylePillText}>{tag!.value}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+
+                  {(() => {
+                    const rawProfileTags = (currentProfile.profileData?.interests) || (currentProfile as any).interests;
+                    const profileTags: string[] = Array.isArray(rawProfileTags) ? rawProfileTags : [];
+                    const rawMyTags2 = user?.profileData?.interests;
+                    const myTags: string[] = Array.isArray(rawMyTags2) ? rawMyTags2 : [];
+                    const myTagSet = new Set(myTags);
+                    if (profileTags.length === 0) return null;
+                    return (
+                      <View style={styles.pdSection}>
+                        <Text style={styles.pdSectionLabel}>Interests</Text>
+                        {Object.entries(INTEREST_TAGS).map(([catKey, cat]) => {
+                          const catTags = cat.tags.filter(t => profileTags.includes(t.id));
+                          if (catTags.length === 0) return null;
+                          return (
+                            <View key={catKey} style={{ marginBottom: 12 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                                <Feather name={cat.icon as any} size={14} color="rgba(255,255,255,0.4)" />
+                                <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: '600' }}>{cat.label}</Text>
+                              </View>
+                              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                                {catTags.map(tag => {
+                                  const isShared = myTagSet.has(tag.id);
+                                  return (
+                                    <View key={tag.id} style={{
+                                      paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12,
+                                      backgroundColor: isShared ? 'rgba(255,107,91,0.15)' : 'rgba(255,255,255,0.08)',
+                                      borderWidth: isShared ? 0 : 1,
+                                      borderColor: 'rgba(255,255,255,0.15)',
+                                    }}>
+                                      <Text style={{ fontSize: 12, fontWeight: '500', color: isShared ? '#ff6b5b' : '#FFFFFF' }}>
+                                        {tag.label}
+                                      </Text>
+                                    </View>
+                                  );
+                                })}
+                              </View>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    );
+                  })()}
+
+                  {user && currentProfile.zodiacSign && user.zodiacSign && (user.subscription?.plan === 'plus' || user.subscription?.plan === 'elite') ? (
+                    <View style={styles.pdSection}>
+                      <Text style={styles.pdSectionLabel}>Zodiac Compatibility</Text>
+                      <View style={styles.pdCard}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                          <Text style={{ fontSize: 22, marginRight: 8 }}>
+                            {getZodiacSymbol(user.zodiacSign)}
+                          </Text>
+                          <Feather name="heart" size={16} color="#ff6b5b" />
+                          <Text style={{ fontSize: 22, marginLeft: 8 }}>
+                            {getZodiacSymbol(currentProfile.zodiacSign)}
+                          </Text>
+                        </View>
+                        <Text style={styles.pdBioText}>
+                          {getZodiacCompatibilityLevel(user.zodiacSign, currentProfile.zodiacSign)}
+                        </Text>
+                      </View>
+                    </View>
+                  ) : null}
+                </ScrollView>
+
+                <View style={[styles.pdActionBar, { paddingBottom: Math.max(14, insets.bottom + 6) }]}>
+                  <Pressable
+                    style={styles.pdActionPass}
+                    onPress={() => {
+                      setShowProfileDetail(false);
+                      handleSwipeAction('nope');
+                    }}
+                  >
+                    <Feather name="x" size={22} color="rgba(255,255,255,0.6)" />
+                  </Pressable>
+
+                  <Pressable
+                    style={styles.pdActionInterested}
+                    onPress={() => {
+                      setShowProfileDetail(false);
+                      handleSwipeAction('like');
+                    }}
+                  >
+                    <Feather name="heart" size={18} color="#fff" />
+                    <Text style={styles.pdActionInterestedText}>I'm Interested</Text>
+                  </Pressable>
+
+                  <Pressable
+                    style={styles.pdActionMessage}
+                    onPress={async () => {
+                      if (!currentProfile || !user) return;
+                      const matches = await StorageService.getMatches();
+                      const hasMatch = matches.some(m =>
+                        (m.userId1 === user.id && m.userId2 === currentProfile.id) ||
+                        (m.userId2 === user.id && m.userId1 === currentProfile.id)
+                      );
+                      if (hasMatch) {
+                        setShowProfileDetail(false);
+                        setTimeout(() => handleSendDirectMessage(false), 200);
+                      } else {
+                        const coldCheck = await canSendColdMessage();
+                        if (!coldCheck.canSend) {
+                          Alert.alert(
+                            'Daily Limit Reached',
+                            coldCheck.reason || "You've used all your messages for today. Resets at midnight.",
+                            [
+                              { text: 'Upgrade for More', onPress: () => (navigation as any).navigate('Plans') },
+                              { text: 'OK', style: 'cancel' },
+                            ]
+                          );
+                          return;
+                        }
+                        setShowProfileDetail(false);
+                        setTimeout(() => handleSendDirectMessage(true), 200);
+                      }
+                    }}
+                  >
+                    <Feather name="message-circle" size={22} color="rgba(255,255,255,0.6)" />
+                  </Pressable>
+                </View>
+              </>
+            );
+          })()}
         </View>
       </Modal>
 
@@ -2920,122 +2856,240 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xl,
     borderWidth: 1,
   },
-  detailModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  detailModalContainer: {
-    height: '90%',
-    borderTopLeftRadius: BorderRadius.large,
-    borderTopRightRadius: BorderRadius.large,
-    overflow: 'hidden',
-  },
-  detailHeader: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.lg,
-    paddingTop: Spacing.xl,
-  },
-  detailContent: {
-    flex: 1,
-  },
-  photoGalleryContainer: {
-    width: '100%',
-    height: 400,
+  pdPhotoWrap: {
     position: 'relative',
-    backgroundColor: '#000',
-  },
-  detailImage: {
     width: '100%',
-    height: 400,
+    height: 320,
   },
-  photoNavButton: {
+  pdPhoto: {
+    width: SCREEN_WIDTH,
+    height: 320,
+  },
+  pdPhotoGradient: {
     position: 'absolute',
-    top: '50%',
-    marginTop: -24,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 18,
+    paddingBottom: 18,
+    paddingTop: 80,
+    gap: 6,
+  },
+  pdMatchBadge: {
+    flexDirection: 'row',
     alignItems: 'center',
-    zIndex: 10,
+    gap: 5,
+    alignSelf: 'flex-start',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    marginBottom: 4,
   },
-  photoNavLeft: {
-    left: 16,
+  pdMatchText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#fff',
   },
-  photoNavRight: {
-    right: 16,
+  pdName: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#fff',
+    letterSpacing: -0.5,
   },
-  photoDotsContainer: {
+  pdSubRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  pdOccupation: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.75)',
+    fontWeight: '500',
+  },
+  pdVerifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(46,204,113,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(46,204,113,0.3)',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  pdVerifiedText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#2ecc71',
+  },
+  pdZodiacPill: {
+    backgroundColor: 'rgba(168,85,247,0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(168,85,247,0.35)',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  pdZodiacText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#c084fc',
+  },
+  pdDots: {
     position: 'absolute',
-    bottom: 16,
+    bottom: 70,
     left: 0,
     right: 0,
     flexDirection: 'row',
     justifyContent: 'center',
+    gap: 5,
+  },
+  pdDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.35)',
+  },
+  pdDotActive: {
+    backgroundColor: '#fff',
+    width: 18,
+  },
+  pdCloseBtn: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(0,0,0,0.45)',
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pdStatStrip: {
+    flexDirection: 'row',
+    backgroundColor: '#1a1a1a',
+    marginHorizontal: 18,
+    marginTop: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+    overflow: 'hidden',
+  },
+  pdStat: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 14,
+    gap: 4,
+  },
+  pdStatBorder: {
+    borderRightWidth: 1,
+    borderRightColor: 'rgba(255,255,255,0.07)',
+  },
+  pdStatValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#fff',
+    textAlign: 'center',
+  },
+  pdStatLabel: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.35)',
+    fontWeight: '500',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  pdSection: {
+    paddingHorizontal: 18,
+    marginTop: 20,
+    gap: 10,
+  },
+  pdSectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.3)',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  pdCard: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+  },
+  pdBioText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.75)',
+    lineHeight: 22,
+  },
+  pdPillWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
   },
-  photoDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
-  },
-  photoDotActive: {
-    backgroundColor: '#FFFFFF',
-    width: 24,
-  },
-  photoIndicatorContainer: {
-    padding: Spacing.md,
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
-  },
-  detailSection: {
-    padding: Spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
-  },
-  detailRow: {
+  pdLifestylePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.md,
-  },
-  matchBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.medium,
-  },
-  zodiacInsightCard: {
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.medium,
+    gap: 6,
+    backgroundColor: '#1a1a1a',
     borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
   },
-  detailActionButton: {
+  pdLifestylePillText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.75)',
+  },
+  pdActionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.07)',
+    backgroundColor: '#111',
+    gap: 14,
+  },
+  pdActionPass: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  pdActionInterested: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: Spacing.lg,
-    borderRadius: BorderRadius.medium,
+    gap: 8,
+    backgroundColor: '#ff6b5b',
+    borderRadius: 16,
+    paddingVertical: 15,
   },
-  detailCloseButton: {
-    position: 'absolute',
-    top: Spacing.lg,
-    right: Spacing.lg,
-    zIndex: 100,
+  pdActionInterestedText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#fff',
+    letterSpacing: 0.2,
   },
-  detailCloseButtonInner: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  pdActionMessage: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(255,255,255,0.08)',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   boostSheet: {
     backgroundColor: '#1a1a1a',

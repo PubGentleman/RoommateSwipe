@@ -1,0 +1,409 @@
+# RoomDrx — Remove Search Bar + Upgrade Location Picker
+
+## File: `screens/renter/ExploreScreen.tsx`
+
+---
+
+## What's Changing
+
+| Before | After |
+|---|---|
+| AI button + search bar + map icon + filter icon (4 items, cramped) | AI button + location picker + map icon + filter icon (cleaner, same width) |
+| Location picker only changes city | Location picker shows city AND lets user drill into a neighborhood |
+| Search bar does generic keyword search nobody uses | Neighborhood picker replaces it with something users actually need |
+
+---
+
+## Change 1 — Remove the Search Bar
+
+Find the `TextInput` or search `Pressable` in the header row and delete it entirely.
+
+```tsx
+// BEFORE — remove this whole search bar element:
+<Pressable style={styles.searchBar} onPress={handleSearch}>
+  <Feather name="search" size={16} color="rgba(255,255,255,0.35)" />
+  <Text style={styles.searchPlaceholder}>Search in {city}...</Text>
+</Pressable>
+
+// The header row becomes just:
+<View style={styles.exploreHeaderRow}>
+  <Pressable style={styles.aiBtnWrap} onPress={handleOpenAI}>
+    <LinearGradient colors={['#ff6b5b', '#ff8c7a']} style={styles.aiBtn}>
+      <Feather name="cpu" size={15} color="#fff" />
+      <Text style={styles.aiBtnText}>AI</Text>
+    </LinearGradient>
+  </Pressable>
+
+  {/* Location picker now takes the space the search bar used */}
+  <Pressable style={styles.locationPickerBtn} onPress={() => setShowLocationSheet(true)}>
+    <Feather name="map-pin" size={14} color="#ff6b5b" />
+    <View style={styles.locationPickerText}>
+      <Text style={styles.locationCity}>{selectedCity}</Text>
+      {selectedNeighborhood && (
+        <Text style={styles.locationNeighborhood}>{selectedNeighborhood}</Text>
+      )}
+    </View>
+    <Feather name="chevron-down" size={14} color="rgba(255,255,255,0.4)" />
+  </Pressable>
+
+  <Pressable style={styles.headerIconBtn} onPress={handleOpenMap}>
+    <Feather name="map" size={18} color="rgba(255,255,255,0.6)" />
+  </Pressable>
+  <Pressable style={[styles.headerIconBtn, styles.headerIconBtnActive]} onPress={handleOpenFilters}>
+    <Feather name="sliders" size={18} color="#ff6b5b" />
+  </Pressable>
+</View>
+```
+
+**Updated header styles:**
+
+```ts
+exploreHeaderRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingHorizontal: 16,
+  paddingVertical: 10,
+  gap: 10,
+},
+aiBtnWrap: {
+  borderRadius: 20,
+  overflow: 'hidden',
+  flexShrink: 0,
+},
+aiBtn: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 6,
+  paddingHorizontal: 14,
+  paddingVertical: 9,
+  borderRadius: 20,
+},
+aiBtnText: {
+  fontSize: 13,
+  fontWeight: '800',
+  color: '#fff',
+},
+locationPickerBtn: {
+  flex: 1,                              // ← takes all the space the search bar had
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 8,
+  backgroundColor: 'rgba(255,255,255,0.07)',
+  borderRadius: 14,
+  paddingHorizontal: 14,
+  paddingVertical: 10,
+  borderWidth: 1,
+  borderColor: 'rgba(255,255,255,0.1)',
+},
+locationPickerText: {
+  flex: 1,
+},
+locationCity: {
+  fontSize: 14,
+  fontWeight: '700',
+  color: '#fff',
+  lineHeight: 18,
+},
+locationNeighborhood: {
+  fontSize: 11,
+  color: 'rgba(255,255,255,0.4)',
+  fontWeight: '500',
+},
+headerIconBtn: {
+  width: 40,
+  height: 40,
+  borderRadius: 12,
+  backgroundColor: 'rgba(255,255,255,0.07)',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexShrink: 0,
+},
+headerIconBtnActive: {
+  backgroundColor: 'rgba(255,107,91,0.15)',
+  borderWidth: 1,
+  borderColor: 'rgba(255,107,91,0.3)',
+},
+// Delete searchBar and searchPlaceholder styles entirely
+```
+
+---
+
+## Change 2 — Remove the Redundant Second Location Row
+
+The screen currently has **two** location indicators:
+1. The one in the header row (being upgraded above)
+2. A second `"📍 New York  ▾  19 listings"` row beneath the header
+
+The second row is now redundant — the upgraded location picker in the header shows city + neighborhood. **Delete the second location row entirely.**
+
+```tsx
+// REMOVE this entire View:
+<View style={styles.locationRow}>
+  <Feather name="map-pin" size={14} color="#ff6b5b" />
+  <Text style={styles.locationText}>{selectedCity}</Text>
+  <Feather name="chevron-down" size={14} color="rgba(255,255,255,0.4)" />
+  <Text style={styles.listingCount}>{listingCount} listings</Text>
+</View>
+
+// Move the listing count into the location picker button instead:
+<Pressable style={styles.locationPickerBtn} onPress={() => setShowLocationSheet(true)}>
+  <Feather name="map-pin" size={14} color="#ff6b5b" />
+  <View style={styles.locationPickerText}>
+    <Text style={styles.locationCity}>{selectedCity}</Text>
+    {selectedNeighborhood
+      ? <Text style={styles.locationNeighborhood}>{selectedNeighborhood}</Text>
+      : <Text style={styles.locationNeighborhood}>{listingCount} listings</Text>
+    }
+  </View>
+  <Feather name="chevron-down" size={14} color="rgba(255,255,255,0.4)" />
+</Pressable>
+```
+
+---
+
+## Change 3 — Neighborhood Location Picker Bottom Sheet
+
+Add a new bottom sheet that opens when the location picker is tapped. It shows city selection at the top and neighborhood chips below.
+
+```tsx
+// Add state:
+const [showLocationSheet, setShowLocationSheet] = useState(false);
+const [selectedCity, setSelectedCity] = useState('New York');
+const [selectedNeighborhood, setSelectedNeighborhood] = useState<string | null>(null);
+
+// Neighborhood data per city (expand as needed):
+const NEIGHBORHOODS: Record<string, string[]> = {
+  'New York': [
+    'All Neighborhoods',
+    'Upper East Side', 'Upper West Side', 'Midtown',
+    'Chelsea', 'Hell\'s Kitchen', 'Greenwich Village',
+    'East Village', 'Lower East Side', 'SoHo', 'Tribeca',
+    'Financial District', 'Brooklyn Heights', 'Williamsburg',
+    'Bushwick', 'Astoria', 'Long Island City', 'Harlem',
+    'Washington Heights', 'Bronx',
+  ],
+  'Los Angeles': [
+    'All Neighborhoods',
+    'Downtown LA', 'Hollywood', 'Silver Lake', 'Echo Park',
+    'Los Feliz', 'Koreatown', 'Mid-City', 'Culver City',
+    'Santa Monica', 'Venice', 'West Hollywood', 'Brentwood',
+  ],
+  // add more cities...
+};
+
+// Bottom sheet JSX:
+<Modal
+  visible={showLocationSheet}
+  animationType="slide"
+  transparent
+  onRequestClose={() => setShowLocationSheet(false)}
+>
+  <Pressable style={styles.locSheetOverlay} onPress={() => setShowLocationSheet(false)} />
+  <View style={styles.locSheet}>
+    {/* Handle */}
+    <View style={styles.locSheetHandle} />
+
+    {/* Title */}
+    <Text style={styles.locSheetTitle}>Choose Location</Text>
+
+    {/* City selector */}
+    <Text style={styles.locSheetSectionLabel}>City</Text>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={{ overflow: 'visible' }}
+      contentContainerStyle={styles.locCityScroll}
+    >
+      {Object.keys(NEIGHBORHOODS).map((city) => (
+        <Pressable
+          key={city}
+          style={[styles.locCityChip, selectedCity === city && styles.locCityChipActive]}
+          onPress={() => { setSelectedCity(city); setSelectedNeighborhood(null); }}
+        >
+          <Text style={[styles.locCityText, selectedCity === city && styles.locCityTextActive]}>
+            {city}
+          </Text>
+        </Pressable>
+      ))}
+    </ScrollView>
+
+    {/* Neighborhood grid */}
+    <Text style={styles.locSheetSectionLabel}>Neighborhood</Text>
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={styles.locNeighborhoodGrid}
+    >
+      {(NEIGHBORHOODS[selectedCity] ?? []).map((hood) => {
+        const isAll = hood === 'All Neighborhoods';
+        const isActive = isAll
+          ? selectedNeighborhood === null
+          : selectedNeighborhood === hood;
+        return (
+          <Pressable
+            key={hood}
+            style={[
+              styles.locHoodChip,
+              isActive && styles.locHoodChipActive,
+              isAll && styles.locHoodChipAll,
+            ]}
+            onPress={() => {
+              setSelectedNeighborhood(isAll ? null : hood);
+              setShowLocationSheet(false);
+            }}
+          >
+            <Text style={[styles.locHoodText, isActive && styles.locHoodTextActive]}>
+              {hood}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  </View>
+</Modal>
+```
+
+**Styles:**
+
+```ts
+locSheetOverlay: {
+  flex: 1,
+  backgroundColor: 'rgba(0,0,0,0.6)',
+},
+locSheet: {
+  backgroundColor: '#161616',
+  borderTopLeftRadius: 24,
+  borderTopRightRadius: 24,
+  paddingBottom: 40,
+  maxHeight: '75%',
+},
+locSheetHandle: {
+  width: 36,
+  height: 4,
+  borderRadius: 2,
+  backgroundColor: 'rgba(255,255,255,0.15)',
+  alignSelf: 'center',
+  marginTop: 12,
+  marginBottom: 16,
+},
+locSheetTitle: {
+  fontSize: 18,
+  fontWeight: '800',
+  color: '#fff',
+  paddingHorizontal: 20,
+  marginBottom: 20,
+  letterSpacing: -0.3,
+},
+locSheetSectionLabel: {
+  fontSize: 11,
+  fontWeight: '700',
+  color: 'rgba(255,255,255,0.3)',
+  textTransform: 'uppercase',
+  letterSpacing: 1,
+  paddingHorizontal: 20,
+  marginBottom: 10,
+},
+locCityScroll: {
+  paddingHorizontal: 20,
+  paddingVertical: 4,
+  gap: 8,
+  marginBottom: 20,
+},
+locCityChip: {
+  paddingHorizontal: 18,
+  paddingVertical: 9,
+  borderRadius: 20,
+  backgroundColor: 'rgba(255,255,255,0.07)',
+  borderWidth: 1,
+  borderColor: 'rgba(255,255,255,0.1)',
+},
+locCityChipActive: {
+  backgroundColor: '#ff6b5b',
+  borderColor: 'transparent',
+},
+locCityText: {
+  fontSize: 14,
+  fontWeight: '600',
+  color: 'rgba(255,255,255,0.5)',
+},
+locCityTextActive: {
+  color: '#fff',
+  fontWeight: '700',
+},
+locNeighborhoodGrid: {
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  paddingHorizontal: 16,
+  gap: 8,
+  paddingBottom: 10,
+},
+locHoodChip: {
+  paddingHorizontal: 14,
+  paddingVertical: 8,
+  borderRadius: 20,
+  backgroundColor: 'rgba(255,255,255,0.06)',
+  borderWidth: 1,
+  borderColor: 'rgba(255,255,255,0.08)',
+},
+locHoodChipActive: {
+  backgroundColor: '#ff6b5b',
+  borderColor: 'transparent',
+},
+locHoodChipAll: {
+  borderColor: 'rgba(255,255,255,0.15)',
+},
+locHoodText: {
+  fontSize: 13,
+  fontWeight: '600',
+  color: 'rgba(255,255,255,0.5)',
+},
+locHoodTextActive: {
+  color: '#fff',
+  fontWeight: '700',
+},
+```
+
+---
+
+## Change 4 — Wire Neighborhood Filter into Listings
+
+After the user picks a neighborhood, filter the listings list:
+
+```ts
+// In your listings fetch / filter logic:
+const filteredListings = useMemo(() => {
+  let results = allListings;
+
+  // City filter (already existing)
+  results = results.filter(l => l.city === selectedCity);
+
+  // Neighborhood filter — NEW
+  if (selectedNeighborhood) {
+    results = results.filter(l =>
+      l.neighborhood?.toLowerCase().includes(selectedNeighborhood.toLowerCase())
+    );
+  }
+
+  // ...existing filters (price, type, etc.)
+  return results;
+}, [allListings, selectedCity, selectedNeighborhood, /* other filters */]);
+```
+
+Also update the listing count display to reflect neighborhood filtering:
+
+```ts
+// Dynamic count label:
+const locationLabel = selectedNeighborhood ?? selectedCity;
+const countLabel = `${filteredListings.length} listing${filteredListings.length !== 1 ? 's' : ''}`;
+// Shows as subtitle in the location picker: "19 listings" or "Financial District"
+```
+
+---
+
+## Summary of Changes
+
+| # | What changes | Where |
+|---|---|---|
+| 1 | Search bar removed entirely; location picker expands to fill that space in the header | Header row |
+| 2 | Redundant second location row ("New York ▾ 19 listings") removed; listing count moves into the location picker subtitle | Below header |
+| 3 | Location picker opens a bottom sheet with city chips + neighborhood grid; selecting a neighborhood closes the sheet and updates the picker label | New `LocationSheet` modal |
+| 4 | Listings list filtered by `selectedNeighborhood` when set; count updates to reflect filtered results | `filteredListings` memo |
