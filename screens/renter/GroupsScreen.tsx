@@ -354,11 +354,9 @@ export const GroupsScreen = () => {
 
     setLikedGroupIds(prev => new Set([...prev, group.id]));
 
-    setTimeout(() => {
-      setLikedGroupName(group.name);
-      setShowLikedNotification(true);
-      setTimeout(() => { setShowLikedNotification(false); }, 800);
-    }, 300);
+    setLikedGroupName(group.name);
+    setShowLikedNotification(true);
+    setTimeout(() => { setShowLikedNotification(false); }, 400);
   };
 
   const handleRequestToJoin = async (group: Group) => {
@@ -577,7 +575,7 @@ export const GroupsScreen = () => {
       rotation.value = event.translationX / 20;
     })
     .onEnd((event) => {
-      if (Math.abs(event.translationX) > 120) {
+      if (Math.abs(event.translationX) > 80) {
         const action = event.translationX > 0 ? 'like' : 'skip';
         runOnJS(handleSwipeAction)(action);
       } else {
