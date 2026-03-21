@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, FlatList, Modal, TextInput, ScrollView, Switch, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, Image, Pressable, FlatList, Modal, TextInput, ScrollView, Switch, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Dimensions } from 'react-native';
 import Animated, { useSharedValue, useAnimatedScrollHandler, useAnimatedStyle, interpolate, Extrapolation } from 'react-native-reanimated';
 import { Feather } from '../../components/VectorIcons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -86,6 +86,7 @@ export const ExploreScreen = () => {
   const [tempFilters, setTempFilters] = useState<PropertyFilter>({});
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [showPropertyDetail, setShowPropertyDetail] = useState(false);
+  const [photoIndex, setPhotoIndex] = useState(0);
   const [showMatchBreakdown, setShowMatchBreakdown] = useState(false);
   const [viewMode, setViewMode] = useState<'all' | 'saved'>('all');
   const [displayMode, setDisplayMode] = useState<'list' | 'map'>('list');
@@ -270,6 +271,7 @@ export const ExploreScreen = () => {
       const listing = properties.find(p => p.id === viewListingId);
       if (listing) {
         setSelectedProperty(listing);
+        setPhotoIndex(0);
         setShowPropertyDetail(true);
       }
       navigation.setParams({ viewListingId: undefined } as any);
@@ -725,6 +727,7 @@ export const ExploreScreen = () => {
           }
           useListingView();
           setSelectedProperty(item);
+          setPhotoIndex(0);
           setShowPropertyDetail(true);
         }}
       >
@@ -1042,6 +1045,7 @@ export const ExploreScreen = () => {
             }
             useListingView();
             setSelectedProperty(property);
+            setPhotoIndex(0);
             setShowPropertyDetail(true);
           }}
           onToggleSave={toggleSave}
@@ -1087,6 +1091,7 @@ export const ExploreScreen = () => {
                         }
                         useListingView();
                         setSelectedProperty(item);
+                        setPhotoIndex(0);
                         setShowPropertyDetail(true);
                       }}
                     >
@@ -1378,468 +1383,381 @@ export const ExploreScreen = () => {
         transparent={true}
         onRequestClose={() => setShowPropertyDetail(false)}
       >
-        <View style={styles.detailModalOverlay}>
-          <View style={[styles.detailModalContainer, { backgroundColor: theme.backgroundSecondary }]}>
-            <View style={styles.detailHeader}>
-              <ThemedText style={[Typography.h2]}>Property Details</ThemedText>
-              <Pressable onPress={() => setShowPropertyDetail(false)}>
-                <Feather name="x" size={24} color={theme.text} />
-              </Pressable>
-            </View>
-            <ScrollView style={styles.detailContent} showsVerticalScrollIndicator={false}>
-              {selectedProperty ? (
-                <>
-                  <Image source={{ uri: selectedProperty.photos[0] }} style={styles.detailImage} />
-                  
-                  <View style={styles.detailSection}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <ThemedText style={[Typography.h1]}>${selectedProperty.price}/mo</ThemedText>
-                      {selectedProperty.featured ? (
-                        <View style={[styles.featuredBadge, { backgroundColor: theme.primary }]}>
-                          <Feather name="star" size={12} color="#FFFFFF" />
-                          <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '700', marginLeft: 4 }]}>
-                            FEATURED
-                          </ThemedText>
+        <View style={styles.pdOverlay}>
+          <View style={styles.pdSheet}>
+
+            {selectedProperty ? (() => {
+              const photos = selectedProperty.photos?.length > 0
+                ? selectedProperty.photos
+                : ['https://via.placeholder.com/400x260'];
+
+              return (
+                <View style={styles.pdPhotoContainer}>
+                  <ScrollView
+                    horizontal
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    onScroll={(e) => {
+                      const index = Math.round(e.nativeEvent.contentOffset.x / e.nativeEvent.layoutMeasurement.width);
+                      setPhotoIndex(index);
+                    }}
+                    scrollEventThrottle={16}
+                  >
+                    {photos.map((photo: string, i: number) => (
+                      <Image
+                        key={i}
+                        source={{ uri: photo }}
+                        style={styles.pdPhoto}
+                        resizeMode="cover"
+                      />
+                    ))}
+                  </ScrollView>
+
+                  <LinearGradient
+                    colors={['transparent', 'rgba(0,0,0,0.85)']}
+                    style={styles.pdPhotoGradient}
+                  >
+                    <View style={styles.pdPhotoInfo}>
+                      <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+                        <Text style={styles.pdPrice}>${selectedProperty.price?.toLocaleString()}/mo</Text>
+                        {selectedProperty.featured ? (
+                          <View style={styles.pdFeaturedBadge}>
+                            <Feather name="star" size={10} color="#FFD700" />
+                            <Text style={styles.pdFeaturedText}>FEATURED</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                      <Text style={styles.pdTitle} numberOfLines={2}>{selectedProperty.title}</Text>
+                      <Text style={styles.pdLocation}>
+                        <Feather name="map-pin" size={11} color="rgba(255,255,255,0.6)" /> {formatLocation(selectedProperty)}
+                      </Text>
+                    </View>
+                  </LinearGradient>
+
+                  {photos.length > 1 ? (
+                    <View style={styles.pdDots}>
+                      {photos.map((_: string, i: number) => (
+                        <View
+                          key={i}
+                          style={[styles.pdDot, i === photoIndex && styles.pdDotActive]}
+                        />
+                      ))}
+                    </View>
+                  ) : null}
+
+                  <Pressable
+                    style={styles.pdCloseBtn}
+                    onPress={() => setShowPropertyDetail(false)}
+                    hitSlop={8}
+                  >
+                    <Feather name="x" size={18} color="#fff" />
+                  </Pressable>
+                </View>
+              );
+            })() : null}
+
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={styles.pdScrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {selectedProperty ? (() => {
+
+                const detailHostUser = selectedProperty.hostProfileId
+                  ? hostProfiles.get(selectedProperty.hostProfileId)
+                  : null;
+                const detailHostPhoto = detailHostUser?.profilePicture;
+                const detailHostType: HostType = (selectedProperty.hostType || detailHostUser?.hostType || 'individual') as HostType;
+                const detailShowMatch = shouldShowMatchScore(detailHostType);
+                const detailHostProfile = detailHostUser ? getUserAsRoommateProfile(detailHostUser) : null;
+                const detailCompatibility = detailHostProfile && user ? calculateCompatibility(user, detailHostProfile) : null;
+
+                return (
+                  <>
+                    <View style={styles.pdStatStrip}>
+                      <View style={styles.pdStat}>
+                        <Feather name="home" size={15} color="#ff6b5b" />
+                        <Text style={styles.pdStatValue}>{selectedProperty.bedrooms}</Text>
+                        <Text style={styles.pdStatLabel}>Bed{selectedProperty.bedrooms !== 1 ? 's' : ''}</Text>
+                      </View>
+                      <View style={styles.pdStatDivider} />
+                      <View style={styles.pdStat}>
+                        <Feather name="droplet" size={15} color="#ff6b5b" />
+                        <Text style={styles.pdStatValue}>{selectedProperty.bathrooms}</Text>
+                        <Text style={styles.pdStatLabel}>Bath{selectedProperty.bathrooms !== 1 ? 's' : ''}</Text>
+                      </View>
+                      <View style={styles.pdStatDivider} />
+                      <View style={styles.pdStat}>
+                        <Feather name="maximize" size={15} color="#ff6b5b" />
+                        <Text style={styles.pdStatValue}>{selectedProperty.sqft?.toLocaleString()}</Text>
+                        <Text style={styles.pdStatLabel}>sqft</Text>
+                      </View>
+                      <View style={styles.pdStatDivider} />
+                      <View style={styles.pdStat}>
+                        <Feather name={selectedProperty.roomType === 'entire' ? 'key' : 'user'} size={15} color="#ff6b5b" />
+                        <Text style={[styles.pdStatValue, { fontSize: 11 }]} numberOfLines={1}>
+                          {selectedProperty.roomType === 'entire' ? 'Entire' : 'Room'}
+                        </Text>
+                        <Text style={styles.pdStatLabel}>Type</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.pdHostCard}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                        {detailHostPhoto ? (
+                          <Image source={{ uri: detailHostPhoto }} style={styles.pdHostAvatar} />
+                        ) : (
+                          <View style={[styles.pdHostAvatar, styles.pdHostAvatarFallback]}>
+                            <Feather
+                              name={detailHostType === 'company' ? 'briefcase' : detailHostType === 'agent' ? 'award' : 'user'}
+                              size={20}
+                              color="rgba(255,255,255,0.4)"
+                            />
+                          </View>
+                        )}
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.pdHostLabel}>
+                            {detailHostType === 'company' ? 'Property Management' : detailHostType === 'agent' ? 'Licensed Agent' : 'Host'}
+                          </Text>
+                          <Text style={styles.pdHostName}>
+                            {detailHostType === 'company' && detailHostUser?.companyName
+                              ? detailHostUser.companyName
+                              : selectedProperty.hostName}
+                          </Text>
+                          {detailHostType === 'company' && detailHostUser?.unitsManaged ? (
+                            <Text style={styles.pdHostMeta}>{detailHostUser.unitsManaged} units managed</Text>
+                          ) : detailHostType === 'agent' && detailHostUser?.agencyName ? (
+                            <Text style={styles.pdHostMeta}>{detailHostUser.agencyName}</Text>
+                          ) : null}
+                        </View>
+                        {detailHostType !== 'individual' ? (
+                          <View style={[styles.pdHostBadge, { backgroundColor: getHostBadgeColor(detailHostType) + '20', borderColor: getHostBadgeColor(detailHostType) + '40' }]}>
+                            <Feather name={getHostBadgeIcon(detailHostType)} size={10} color={getHostBadgeColor(detailHostType)} />
+                            <Text style={[styles.pdHostBadgeText, { color: getHostBadgeColor(detailHostType) }]}>
+                              {getHostBadgeLabel(detailHostType)}
+                            </Text>
+                          </View>
+                        ) : null}
+                      </View>
+
+                      {detailShowMatch && detailCompatibility !== null ? (
+                        <Pressable
+                          style={styles.pdMatchPill}
+                          onPress={() => setShowMatchBreakdown(true)}
+                        >
+                          <Feather name="heart" size={13} color="#ff6b5b" />
+                          <Text style={styles.pdMatchPillText}>{detailCompatibility}% Match</Text>
+                          <Feather name="chevron-right" size={14} color="#ff6b5b" />
+                        </Pressable>
+                      ) : null}
+
+                      {detailHostUser?.verifiedBusiness || detailHostUser?.purchases?.hostVerificationBadge ? (
+                        <View style={styles.pdChipRow}>
+                          <View style={styles.pdVerifiedChip}>
+                            <Feather name="check-circle" size={11} color="#22C55E" />
+                            <Text style={styles.pdVerifiedChipText}>Verified Business</Text>
+                          </View>
+                          {detailHostUser?.avgResponseHours !== undefined ? (
+                            <View style={styles.pdResponseChip}>
+                              <Feather name="clock" size={11} color="rgba(255,255,255,0.4)" />
+                              <Text style={styles.pdResponseChipText}>
+                                Responds in {detailHostUser.avgResponseHours < 1 ? '< 1hr' : `${Math.round(detailHostUser.avgResponseHours)}hrs`}
+                              </Text>
+                            </View>
+                          ) : null}
                         </View>
                       ) : null}
                     </View>
-                    <ThemedText style={[Typography.h3, { marginTop: Spacing.sm }]}>
-                      {selectedProperty.title}
-                    </ThemedText>
-                  </View>
 
-                  <View style={styles.detailSection}>
-                    {(() => {
-                      const detailHostUser = selectedProperty.hostProfileId ? hostProfiles.get(selectedProperty.hostProfileId) : null;
-                      const detailHostPhoto = detailHostUser?.profilePicture;
-                      const detailHostType: HostType = (selectedProperty.hostType || detailHostUser?.hostType || 'individual') as HostType;
-                      const detailShowMatch = shouldShowMatchScore(detailHostType);
-                      const detailHostProfile = detailHostUser ? getUserAsRoommateProfile(detailHostUser) : null;
-                      const detailCompatibility = detailHostProfile && user ? calculateCompatibility(user, detailHostProfile) : null;
-                      return (
-                        <>
-                          <View style={styles.detailRow}>
-                            {detailHostPhoto ? (
-                              <Image 
-                                source={{ uri: detailHostPhoto }} 
-                                style={{ width: 48, height: 48, borderRadius: 24 }} 
-                              />
-                            ) : (
-                              <View style={{ 
-                                width: 48, 
-                                height: 48, 
-                                borderRadius: 24, 
-                                backgroundColor: theme.backgroundSecondary, 
-                                justifyContent: 'center', 
-                                alignItems: 'center' 
-                              }}>
-                                <Feather name={detailHostType === 'company' ? 'briefcase' : detailHostType === 'agent' ? 'award' : 'user'} size={24} color={theme.textSecondary} />
-                              </View>
-                            )}
-                            <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                              <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
-                                {detailHostType === 'company' ? 'Property Management' : detailHostType === 'agent' ? 'Licensed Agent' : 'Host'}
-                              </ThemedText>
-                              <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
-                                {detailHostType === 'company' && detailHostUser?.companyName
-                                  ? detailHostUser.companyName
-                                  : (() => {
-                                      const age = detailHostUser?.age;
-                                      const zodiacSign = detailHostUser?.zodiacSign;
-                                      const ageText = age ? `, ${age}` : '';
-                                      const zodiacText = zodiacSign && detailHostType === 'individual' ? ` ${getZodiacSymbol(zodiacSign)}` : '';
-                                      return `${selectedProperty.hostName}${ageText}${zodiacText}`;
-                                    })()}
-                              </ThemedText>
-                              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginTop: 2 }]}>
-                                {detailHostType === 'company' && detailHostUser?.unitsManaged
-                                  ? `${detailHostUser.unitsManaged} units managed`
-                                  : detailHostType === 'agent' && detailHostUser?.agencyName
-                                    ? detailHostUser.agencyName
-                                    : detailHostUser?.profileData?.gender ? getGenderSymbol(detailHostUser.profileData.gender) : ''}
-                              </ThemedText>
-                            </View>
-                            {detailHostType !== 'individual' ? (
-                              <View style={[styles.verifiedHostBadge, { backgroundColor: getHostBadgeColor(detailHostType) + '20', borderColor: getHostBadgeColor(detailHostType) + '40' }]}>
-                                <Feather name={getHostBadgeIcon(detailHostType)} size={10} color={getHostBadgeColor(detailHostType)} />
-                                <Text style={[styles.verifiedHostText, { color: getHostBadgeColor(detailHostType) }]}>
-                                  {getHostBadgeLabel(detailHostType)}
-                                </Text>
-                              </View>
-                            ) : null}
-                          </View>
-                          {detailShowMatch && detailCompatibility !== null ? (
-                            <Pressable
-                              style={[styles.matchBreakdownPill, { backgroundColor: theme.primary + '12', borderColor: theme.primary + '25' }]}
-                              onPress={() => setShowMatchBreakdown(true)}
-                            >
-                              <Feather name="heart" size={14} color={theme.primary} />
-                              <ThemedText style={[Typography.body, { color: theme.primary, fontWeight: '800', marginLeft: 6 }]}>
-                                {detailCompatibility}% Match
-                              </ThemedText>
-                              <Feather name="chevron-right" size={16} color={theme.primary} />
-                            </Pressable>
-                          ) : null}
-                          {detailHostUser?.verifiedBusiness || detailHostUser?.purchases?.hostVerificationBadge ? (
-                            <View style={[styles.statChipRow, { marginTop: Spacing.sm }]}>
-                              <View style={[styles.detailStatChip, { backgroundColor: '#22C55E15', borderColor: '#22C55E30' }]}>
-                                <Feather name="check-circle" size={11} color="#22C55E" />
-                                <Text style={{ fontSize: 11, fontWeight: '600', color: '#22C55E' }}>Verified Business</Text>
-                              </View>
-                              {detailHostUser?.avgResponseHours !== undefined ? (
-                                <View style={[styles.detailStatChip, { backgroundColor: theme.border + '60', borderColor: theme.border }]}>
-                                  <Feather name="clock" size={11} color={theme.textSecondary} />
-                                  <Text style={{ fontSize: 11, fontWeight: '600', color: theme.textSecondary }}>
-                                    Responds in {detailHostUser.avgResponseHours < 1 ? '< 1hr' : `${Math.round(detailHostUser.avgResponseHours)}hrs`}
-                                  </Text>
-                                </View>
-                              ) : null}
-                            </View>
-                          ) : null}
-                        </>
-                      );
-                    })()}
-                  </View>
+                    {selectedProperty.description ? (
+                      <View style={styles.pdSection}>
+                        <Text style={styles.pdSectionTitle}>About</Text>
+                        <Text style={styles.pdDescriptionText}>{selectedProperty.description}</Text>
+                      </View>
+                    ) : null}
 
-                  <View style={styles.detailSection}>
-                    <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Description</ThemedText>
-                    <ThemedText style={[Typography.body, { color: theme.textSecondary }]}>
-                      {selectedProperty.description}
-                    </ThemedText>
-                  </View>
-
-                  <View style={styles.detailSection}>
-                    <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Details</ThemedText>
-                    {selectedProperty.propertyType ? (
-                      <View style={styles.detailRow}>
-                        <Feather name="file-text" size={20} color={theme.primary} />
-                        <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Property Type</ThemedText>
-                          <ThemedText style={[Typography.body, { fontWeight: '600', textTransform: 'capitalize' }]}>
-                            {selectedProperty.propertyType}
-                          </ThemedText>
-                        </View>
-                      </View>
-                    ) : null}
-                    <View style={styles.detailRow}>
-                      <Feather name="grid" size={20} color={theme.primary} />
-                      <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                        <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Room Type</ThemedText>
-                        <ThemedText style={[Typography.body, { fontWeight: '600', textTransform: 'capitalize' }]}>
-                          {selectedProperty.roomType === 'room' ? 'Room' : 'Entire Apartment'}
-                        </ThemedText>
-                      </View>
-                    </View>
-                    {selectedProperty.roomType === 'room' && selectedProperty.existingRoommates && selectedProperty.existingRoommates.filter(rm => rm.onApp && rm.userId).length > 0 ? (
-                      <View style={styles.detailRow}>
-                        <Feather name="users" size={20} color={theme.primary} />
-                        <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Roommates on App</ThemedText>
-                          {selectedProperty.existingRoommates.filter(rm => rm.onApp && rm.userId).map((rm, idx) => {
-                            const roommateUser = hostProfiles.get(rm.userId!);
-                            return (
-                              <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginTop: idx > 0 ? Spacing.md : Spacing.sm }}>
-                                {roommateUser?.profilePicture ? (
-                                  <Image 
-                                    source={{ uri: roommateUser.profilePicture }} 
-                                    style={styles.roommateProfilePicture} 
-                                  />
-                                ) : (
-                                  <View style={[styles.roommateProfilePicture, { backgroundColor: theme.border, justifyContent: 'center', alignItems: 'center' }]}>
-                                    <Feather name="user" size={20} color={theme.textSecondary} />
-                                  </View>
-                                )}
-                                <View style={{ marginLeft: Spacing.md }}>
-                                  <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
-                                    {roommateUser?.name || 'User'}
-                                  </ThemedText>
-                                  <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
-                                    {getGenderSymbol(rm.gender)}
-                                  </ThemedText>
-                                </View>
-                              </View>
-                            );
-                          })}
-                        </View>
-                      </View>
-                    ) : null}
-                    {selectedProperty.roomType === 'room' && selectedProperty.existingRoommates && selectedProperty.existingRoommates.filter(rm => !rm.onApp).length > 0 ? (
-                      <View style={styles.detailRow}>
-                        <Feather name="user-x" size={20} color={theme.primary} />
-                        <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Other Roommates</ThemedText>
-                          <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
-                            {selectedProperty.existingRoommates.filter(rm => !rm.onApp).map((rm) => getGenderSymbol(rm.gender)).join('')}
-                          </ThemedText>
-                        </View>
-                      </View>
-                    ) : null}
-                    {selectedProperty.roomType === 'room' && selectedProperty.hostProfileId && hostProfiles.get(selectedProperty.hostProfileId) ? (
-                      <View style={styles.detailRow}>
-                        <Feather name="target" size={20} color={theme.primary} />
-                        <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Compatibility</ThemedText>
-                          <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
-                            {(() => {
-                              const hostUser = hostProfiles.get(selectedProperty.hostProfileId!);
-                              const hostProfile = hostUser ? getUserAsRoommateProfile(hostUser) : null;
-                              return hostProfile && user ? calculateCompatibility(user, hostProfile) : 0;
-                            })()}% Match
-                          </ThemedText>
-                        </View>
-                      </View>
-                    ) : null}
-                    <View style={styles.detailRow}>
-                      <Feather name={selectedProperty.roomType === 'entire' ? 'home' : 'key'} size={20} color={selectedProperty.roomType === 'entire' ? '#a78bfa' : '#60a5fa'} />
-                      <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                        <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Listing Type</ThemedText>
-                        <ThemedText style={[Typography.body, { fontWeight: '600', color: selectedProperty.roomType === 'entire' ? '#a78bfa' : '#60a5fa' }]}>
-                          {selectedProperty.roomType === 'entire' ? 'Entire Place' : 'Private Room'}
-                        </ThemedText>
-                      </View>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Feather name="home" size={20} color={theme.primary} />
-                      <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                        <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Bedrooms</ThemedText>
-                        <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{selectedProperty.bedrooms}</ThemedText>
-                      </View>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Feather name="droplet" size={20} color={theme.primary} />
-                      <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                        <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Bathrooms</ThemedText>
-                        <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{selectedProperty.bathrooms}</ThemedText>
-                      </View>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Feather name="maximize" size={20} color={theme.primary} />
-                      <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                        <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Square Feet</ThemedText>
-                        <ThemedText style={[Typography.body, { fontWeight: '600' }]}>{selectedProperty.sqft} sqft</ThemedText>
-                      </View>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Feather name="map-pin" size={20} color={theme.primary} />
-                      <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                        <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Location</ThemedText>
-                        <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
-                          {formatLocation(selectedProperty)}
-                        </ThemedText>
-                      </View>
-                    </View>
-                    {selectedProperty.walkScore ? (
-                      (() => {
-                        const userPlan = user?.subscription?.plan || 'basic';
-                        const hasWalkScoreAccess = userPlan === 'plus' || userPlan === 'elite';
-                        
-                        return hasWalkScoreAccess ? (
-                          <View style={styles.detailRow}>
-                            <WalkScoreBadge score={selectedProperty.walkScore} size="large" />
-                            <View style={{ flex: 1, marginLeft: Spacing.lg }}>
-                              <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
-                                {
-                                  selectedProperty.walkScore >= 90 ? "Walker's Paradise" :
-                                  selectedProperty.walkScore >= 70 ? "Very Walkable" :
-                                  selectedProperty.walkScore >= 50 ? "Somewhat Walkable" :
-                                  "Car-Dependent"
-                                }
-                              </ThemedText>
-                              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
-                                Daily errands do not require a car
-                              </ThemedText>
-                            </View>
-                          </View>
-                        ) : (
-                          <Pressable
-                            style={styles.detailRow}
-                            onPress={() => {
-                              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                              setShowPropertyDetail(false);
-                              setPaywallFeature('Walk Score');
-                              setPaywallPlan('plus');
-                              setShowPaywall(true);
-                            }}
-                          >
-                            <View style={{
-                              width: 80,
-                              height: 80,
-                              borderRadius: 40,
-                              borderWidth: 4,
-                              borderColor: theme.textSecondary + '40',
-                              justifyContent: 'center',
-                              alignItems: 'center',
-                            }}>
-                              <Feather name="lock" size={32} color={theme.textSecondary} />
-                            </View>
-                            <View style={{ flex: 1, marginLeft: Spacing.lg }}>
-                              <ThemedText style={[Typography.body, { fontWeight: '600' }]}>Walk Score</ThemedText>
-                              <ThemedText style={[Typography.caption, { color: theme.primary, marginTop: Spacing.xs }]}>
-                                Upgrade to Plus to see walkability ratings
-                              </ThemedText>
-                            </View>
-                          </Pressable>
-                        );
-                      })()
-                    ) : null}
-                    {selectedProperty.transitInfo ? (
-                      <View style={styles.transitSection}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.sm }}>
-                          <Feather name="navigation" size={16} color={theme.primary} />
-                          <ThemedText style={[Typography.body, { fontWeight: '600', marginLeft: Spacing.sm }]}>Nearby Transit</ThemedText>
-                        </View>
-                        {selectedProperty.transitInfo.manualOverride ? (
-                          <ThemedText style={[Typography.body, { color: theme.textSecondary, fontStyle: 'italic', lineHeight: 20 }]}>
-                            {selectedProperty.transitInfo.manualOverride}
-                          </ThemedText>
-                        ) : selectedProperty.transitInfo.stops.length > 0 ? (
-                          selectedProperty.transitInfo.stops.slice(0, 3).map((stop, index) => (
-                            <View key={index} style={styles.transitItem}>
-                              <ThemedText style={{ fontSize: 16, width: 24 }}>
-                                {stop.type === 'subway' ? '\u{1F687}' : stop.type === 'bus' ? '\u{1F68C}' : stop.type === 'train' ? '\u{1F686}' : stop.type === 'tram' ? '\u{1F68A}' : stop.type === 'ferry' ? '\u{26F4}' : '\u{1F68F}'}
-                              </ThemedText>
-                              <ThemedText style={[Typography.body, { flex: 1 }]} numberOfLines={1}>{stop.name}</ThemedText>
-                              <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.sm }]}>
-                                {stop.distanceMiles} mi
-                              </ThemedText>
-                            </View>
-                          ))
-                        ) : (
-                          <View style={styles.transitItem}>
-                            <Feather name="info" size={14} color={theme.textSecondary} />
-                            <ThemedText style={[Typography.caption, { color: theme.textSecondary, fontStyle: 'italic', marginLeft: Spacing.sm }]}>
-                              No public transit nearby
-                            </ThemedText>
-                          </View>
-                        )}
-                      </View>
-                    ) : null}
                     {selectedProperty.availableDate ? (
-                      <View style={styles.detailRow}>
-                        <Feather name="calendar" size={20} color={theme.primary} />
-                        <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Available Date</ThemedText>
-                          <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
-                            {formatMoveInDate(selectedProperty.availableDate.toString())}
-                          </ThemedText>
+                      <View style={styles.pdAvailRow}>
+                        <Feather name="calendar" size={14} color="#22C55E" />
+                        <Text style={styles.pdAvailText}>
+                          Available {formatMoveInDate(selectedProperty.availableDate.toString())}
+                        </Text>
+                      </View>
+                    ) : null}
+
+                    {selectedProperty.walkScore ? (
+                      <View style={styles.pdSection}>
+                        {(() => {
+                          const userPlan = user?.subscription?.plan || 'basic';
+                          const hasWalkScoreAccess = userPlan === 'plus' || userPlan === 'elite';
+                          return hasWalkScoreAccess ? (
+                            <View style={styles.pdWalkRow}>
+                              <WalkScoreBadge score={selectedProperty.walkScore} size="large" />
+                              <View style={{ flex: 1, marginLeft: 14 }}>
+                                <Text style={styles.pdWalkLabel}>
+                                  {selectedProperty.walkScore >= 90 ? "Walker's Paradise" :
+                                   selectedProperty.walkScore >= 70 ? "Very Walkable" :
+                                   selectedProperty.walkScore >= 50 ? "Somewhat Walkable" : "Car-Dependent"}
+                                </Text>
+                                <Text style={styles.pdWalkSub}>Daily errands do not require a car</Text>
+                              </View>
+                            </View>
+                          ) : (
+                            <Pressable
+                              style={styles.pdWalkLock}
+                              onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                setShowPropertyDetail(false);
+                                setPaywallFeature('Walk Score');
+                                setPaywallPlan('plus');
+                                setShowPaywall(true);
+                              }}
+                            >
+                              <Feather name="lock" size={16} color="rgba(255,255,255,0.3)" />
+                              <View style={{ flex: 1, marginLeft: 10 }}>
+                                <Text style={styles.pdWalkLabel}>Walk Score</Text>
+                                <Text style={[styles.pdWalkSub, { color: '#ff6b5b' }]}>Upgrade to Plus to unlock</Text>
+                              </View>
+                            </Pressable>
+                          );
+                        })()}
+
+                        {selectedProperty.transitInfo?.stops?.length > 0 ? (
+                          <View style={styles.pdTransitSection}>
+                            <Text style={styles.pdTransitTitle}>Nearby Transit</Text>
+                            {selectedProperty.transitInfo.stops.slice(0, 3).map((stop: any, index: number) => (
+                              <View key={index} style={styles.pdTransitRow}>
+                                <Text style={{ fontSize: 15, width: 22 }}>
+                                  {stop.type === 'subway' ? '\u{1F687}' : stop.type === 'bus' ? '\u{1F68C}' : stop.type === 'train' ? '\u{1F686}' : '\u{1F68F}'}
+                                </Text>
+                                <Text style={styles.pdTransitName} numberOfLines={1}>{stop.name}</Text>
+                                <Text style={styles.pdTransitDist}>{stop.distanceMiles} mi</Text>
+                              </View>
+                            ))}
+                          </View>
+                        ) : null}
+                      </View>
+                    ) : null}
+
+                    {selectedProperty.amenities?.length > 0 ? (
+                      <View style={styles.pdSection}>
+                        <Text style={styles.pdSectionTitle}>Amenities</Text>
+                        <View style={styles.pdAmenitiesWrap}>
+                          {selectedProperty.amenities.map((amenity: string, index: number) => (
+                            <View key={index} style={styles.pdAmenityChip}>
+                              <Text style={styles.pdAmenityChipText}>{amenity}</Text>
+                            </View>
+                          ))}
                         </View>
                       </View>
                     ) : null}
-                  </View>
 
-                  <View style={styles.detailSection}>
-                    <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Amenities</ThemedText>
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm }}>
-                      {selectedProperty.amenities.map((amenity, index) => (
-                        <View
-                          key={index}
-                          style={[styles.amenityChip, { backgroundColor: theme.primary + '20', borderColor: theme.primary }]}
-                        >
-                          <ThemedText style={[Typography.small, { color: theme.primary }]}>{amenity}</ThemedText>
-                        </View>
-                      ))}
+                    {selectedProperty.roomType === 'room' &&
+                     selectedProperty.existingRoommates?.filter((rm: any) => rm.onApp && rm.userId).length > 0 ? (
+                      <View style={styles.pdSection}>
+                        <Text style={styles.pdSectionTitle}>Roommates on App</Text>
+                        {selectedProperty.existingRoommates.filter((rm: any) => rm.onApp && rm.userId).map((rm: any, idx: number) => {
+                          const roommateUser = hostProfiles.get(rm.userId!);
+                          return (
+                            <View key={idx} style={styles.pdRoommateRow}>
+                              {roommateUser?.profilePicture ? (
+                                <Image source={{ uri: roommateUser.profilePicture }} style={styles.pdRoommateAvatar} />
+                              ) : (
+                                <View style={[styles.pdRoommateAvatar, { backgroundColor: '#333', justifyContent: 'center', alignItems: 'center' }]}>
+                                  <Feather name="user" size={16} color="rgba(255,255,255,0.4)" />
+                                </View>
+                              )}
+                              <Text style={styles.pdRoommateName}>{roommateUser?.name || 'User'}</Text>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    ) : null}
+
+                    <View style={{ height: 100 }} />
+                  </>
+                );
+              })() : null}
+            </ScrollView>
+
+            {selectedProperty ? (() => {
+              const interest = interestMap.get(selectedProperty.id);
+
+              if (interest?.status === 'pending') {
+                return (
+                  <View style={styles.pdActionBar}>
+                    <View style={[styles.pdActionStatusBadge, { borderColor: '#FFA500', backgroundColor: 'rgba(255,165,0,0.08)' }]}>
+                      <Feather name="clock" size={16} color="#FFA500" />
+                      <Text style={[styles.pdActionStatusText, { color: '#FFA500' }]}>Pending Response</Text>
                     </View>
                   </View>
-
-                  <View style={[styles.detailSection, { paddingBottom: Spacing.xl }]}>
-                    {(() => {
-                      const interest = interestMap.get(selectedProperty.id);
-                      if (interest?.status === 'pending') {
-                        return (
-                          <View style={[styles.interestStatusBadge, { backgroundColor: '#FFA50020', borderColor: '#FFA500' }]}>
-                            <Feather name="clock" size={18} color="#FFA500" />
-                            <ThemedText style={{ color: '#FFA500', fontWeight: '700', marginLeft: Spacing.sm, fontSize: 15 }}>
-                              Pending Response
-                            </ThemedText>
-                          </View>
-                        );
-                      }
-                      if (interest?.status === 'accepted') {
-                        return (
-                          <Pressable
-                            style={[styles.interestButton, { backgroundColor: '#22c55e' }]}
-                            onPress={() => {
-                              setShowPropertyDetail(false);
-                              navigation.navigate('Messages' as never);
-                            }}
-                          >
-                            <Feather name="message-circle" size={18} color="#fff" />
-                            <ThemedText style={{ color: '#fff', fontWeight: '700', marginLeft: Spacing.sm, fontSize: 15 }}>
-                              Accepted — Chat Now
-                            </ThemedText>
-                          </Pressable>
-                        );
-                      }
-                      if (interest?.status === 'passed') {
-                        return (
-                          <View style={[styles.interestStatusBadge, { backgroundColor: '#66666620', borderColor: '#666' }]}>
-                            <Feather name="x-circle" size={18} color="#666" />
-                            <ThemedText style={{ color: '#666', fontWeight: '700', marginLeft: Spacing.sm, fontSize: 15 }}>
-                              Passed
-                            </ThemedText>
-                          </View>
-                        );
-                      }
-                      return (
-                        <View>
-                          <Pressable
-                            style={[styles.interestButton, { backgroundColor: isSuperInterest ? '#FFD700' : '#ff6b5b' }]}
-                            onPress={handleInterestPress}
-                          >
-                            <Feather name={isSuperInterest ? 'star' : 'heart'} size={18} color={isSuperInterest ? '#000' : '#fff'} />
-                            <ThemedText style={{ color: isSuperInterest ? '#000' : '#fff', fontWeight: '700', marginLeft: Spacing.sm, fontSize: 15 }}>
-                              {isSuperInterest ? 'Super Interest' : "I'm Interested"}
-                            </ThemedText>
-                            {canSendSuperInterest().canSend ? (
-                              <Pressable
-                                onPress={(e) => {
-                                  e.stopPropagation();
-                                  setIsSuperInterest(!isSuperInterest);
-                                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                }}
-                                style={[styles.superInterestToggle, isSuperInterest ? { backgroundColor: 'rgba(0,0,0,0.2)' } : { backgroundColor: 'rgba(255,255,255,0.2)' }]}
-                              >
-                                <Feather name="star" size={14} color={isSuperInterest ? '#000' : '#fff'} />
-                              </Pressable>
-                            ) : null}
-                          </Pressable>
-                          {canSendSuperInterest().canSend ? (
-                            <ThemedText style={{ color: isSuperInterest ? '#FFD700' : 'rgba(255,255,255,0.4)', fontSize: 11, textAlign: 'center', marginTop: 6 }}>
-                              {isSuperInterest ? 'Super Interest — Bumped to top!' : 'Tap the star for Super Interest'}
-                            </ThemedText>
-                          ) : null}
-                        </View>
-                      );
-                    })()}
+                );
+              }
+              if (interest?.status === 'accepted') {
+                return (
+                  <View style={styles.pdActionBar}>
+                    <Pressable
+                      style={[styles.pdActionPrimary, { backgroundColor: '#22c55e' }]}
+                      onPress={() => { setShowPropertyDetail(false); navigation.navigate('Messages' as never); }}
+                    >
+                      <Feather name="message-circle" size={18} color="#fff" />
+                      <Text style={styles.pdActionPrimaryText}>Accepted — Chat Now</Text>
+                    </Pressable>
                   </View>
+                );
+              }
+              if (interest?.status === 'passed') {
+                return (
+                  <View style={styles.pdActionBar}>
+                    <View style={[styles.pdActionStatusBadge, { borderColor: '#555', backgroundColor: 'rgba(100,100,100,0.08)' }]}>
+                      <Feather name="x-circle" size={16} color="#666" />
+                      <Text style={[styles.pdActionStatusText, { color: '#666' }]}>Passed</Text>
+                    </View>
+                  </View>
+                );
+              }
+
+              return (
+                <View style={styles.pdActionBar}>
+                  <Pressable
+                    style={[styles.pdActionPrimary, { backgroundColor: isSuperInterest ? '#FFD700' : '#ff6b5b', flex: eligibleGroups.length > 0 ? 1.4 : 1 }]}
+                    onPress={handleInterestPress}
+                  >
+                    <Feather name={isSuperInterest ? 'star' : 'heart'} size={18} color={isSuperInterest ? '#000' : '#fff'} />
+                    <Text style={[styles.pdActionPrimaryText, { color: isSuperInterest ? '#000' : '#fff' }]}>
+                      {isSuperInterest ? 'Super Interest' : "I'm Interested"}
+                    </Text>
+                    {canSendSuperInterest().canSend ? (
+                      <Pressable
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          setIsSuperInterest(!isSuperInterest);
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        }}
+                        style={[styles.pdSuperToggle, isSuperInterest ? { backgroundColor: 'rgba(0,0,0,0.15)' } : { backgroundColor: 'rgba(255,255,255,0.2)' }]}
+                      >
+                        <Feather name="star" size={13} color={isSuperInterest ? '#000' : '#fff'} />
+                      </Pressable>
+                    ) : null}
+                  </Pressable>
 
                   {eligibleGroups.length > 0 ? (
-                    <>
-                      <Pressable
-                        style={[styles.inquireTogetherDetailBtn, { borderColor: theme.primary }]}
-                        onPress={() => {
-                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                          if (eligibleGroups.length === 1) {
-                            handleInquireAsGroup(eligibleGroups[0]);
-                          } else {
-                            setShowGroupPickerModal(true);
-                          }
-                        }}
-                      >
-                        <Feather name="users" size={16} color={theme.primary} />
-                        <ThemedText style={{ color: theme.primary, fontWeight: '700', marginLeft: 8, fontSize: 15 }}>
-                          Group Inquiry
-                        </ThemedText>
-                      </Pressable>
-                      <ThemedText style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, textAlign: 'center', marginTop: 4, marginBottom: 10 }}>
-                        Send a group inquiry with your roommates
-                      </ThemedText>
-                    </>
+                    <Pressable
+                      style={styles.pdActionSecondary}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        if (eligibleGroups.length === 1) handleInquireAsGroup(eligibleGroups[0]);
+                        else setShowGroupPickerModal(true);
+                      }}
+                    >
+                      <Feather name="users" size={17} color="#ff6b5b" />
+                      <Text style={styles.pdActionSecondaryText}>Group</Text>
+                    </Pressable>
                   ) : null}
+                </View>
+              );
+            })() : null}
 
-                </>
-              ) : null}
-            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -2483,13 +2401,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     flex: 1,
   },
-  featuredBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.small,
-  },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
@@ -2636,29 +2547,6 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.full,
     borderWidth: 1,
   },
-  interestButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 14,
-  },
-  interestStatusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-  },
-  superInterestToggle: {
-    marginLeft: 10,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   modalFooter: {
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.lg,
@@ -2706,62 +2594,415 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: Spacing.xl,
   },
-  detailModalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  pdOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
     justifyContent: 'flex-end',
   },
-  detailModalContainer: {
-    height: '90%',
-    borderTopLeftRadius: BorderRadius.large,
-    borderTopRightRadius: BorderRadius.large,
+  pdSheet: {
+    height: '93%',
+    backgroundColor: '#111',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     overflow: 'hidden',
   },
-  detailHeader: {
+  pdPhotoContainer: {
+    height: 260,
+    position: 'relative',
+  },
+  pdPhoto: {
+    width: Dimensions.get('window').width,
+    height: 260,
+  },
+  pdPhotoGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 160,
+    justifyContent: 'flex-end',
+    paddingHorizontal: 18,
+    paddingBottom: 14,
+  },
+  pdPhotoInfo: {
+    gap: 3,
+  },
+  pdPrice: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#fff',
+    letterSpacing: -0.5,
+  },
+  pdFeaturedBadge: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: Spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
-  },
-  detailContent: {
-    flex: 1,
-  },
-  detailImage: {
-    width: '100%',
-    height: 300,
-  },
-  detailSection: {
-    padding: Spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
-  },
-  transitSection: {
-    marginTop: Spacing.sm,
-    marginBottom: Spacing.md,
-    paddingTop: Spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.08)',
-  },
-  transitItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,215,0,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,215,0,0.4)',
+    borderRadius: 8,
+    paddingHorizontal: 8,
     paddingVertical: 4,
   },
-  detailRow: {
+  pdFeaturedText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FFD700',
+    letterSpacing: 0.5,
+  },
+  pdTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  pdLocation: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.55)',
+    fontWeight: '500',
+  },
+  pdDots: {
+    position: 'absolute',
+    bottom: 10,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 5,
+  },
+  pdDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: 'rgba(255,255,255,0.35)',
+  },
+  pdDotActive: {
+    backgroundColor: '#fff',
+    width: 14,
+    borderRadius: 3,
+  },
+  pdCloseBtn: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pdScrollContent: {
+    paddingBottom: 20,
+  },
+  pdStatStrip: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.md,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+    paddingVertical: 14,
   },
-  roommateProfilePicture: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  pdStat: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 3,
+  },
+  pdStatValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  pdStatLabel: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.35)',
+    fontWeight: '500',
+  },
+  pdStatDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  pdHostCard: {
+    margin: 16,
+    marginBottom: 8,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 18,
+    padding: 14,
+    gap: 10,
+  },
+  pdHostAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+  },
+  pdHostAvatarFallback: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pdHostLabel: {
+    fontSize: 10.5,
+    color: 'rgba(255,255,255,0.35)',
+    fontWeight: '500',
+    marginBottom: 1,
+  },
+  pdHostName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  pdHostMeta: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.4)',
+    marginTop: 1,
+  },
+  pdHostBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  pdHostBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  pdMatchPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,107,91,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.2)',
+    borderRadius: 20,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+  },
+  pdMatchPillText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#ff6b5b',
+    flex: 1,
+  },
+  pdChipRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  pdVerifiedChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(34,197,94,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(34,197,94,0.2)',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  pdVerifiedChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#22C55E',
+  },
+  pdResponseChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  pdResponseChipText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.45)',
+  },
+  pdSection: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.05)',
+  },
+  pdSectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.5)',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginBottom: 10,
+  },
+  pdDescriptionText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.6)',
+    lineHeight: 22,
+  },
+  pdAvailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginHorizontal: 16,
+    marginBottom: 4,
+    backgroundColor: 'rgba(34,197,94,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(34,197,94,0.15)',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  pdAvailText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#22C55E',
+  },
+  pdWalkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  pdWalkLock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  pdWalkLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  pdWalkSub: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.4)',
+    marginTop: 2,
+  },
+  pdTransitSection: {
+    marginTop: 8,
+  },
+  pdTransitTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.35)',
+    letterSpacing: 0.4,
+    marginBottom: 8,
+  },
+  pdTransitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 5,
+  },
+  pdTransitName: {
+    flex: 1,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.7)',
+    fontWeight: '500',
+  },
+  pdTransitDist: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.3)',
+  },
+  pdAmenitiesWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  pdAmenityChip: {
+    backgroundColor: 'rgba(255,107,91,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.25)',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  pdAmenityChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#ff8070',
+  },
+  pdRoommateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 8,
+  },
+  pdRoommateAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
+  pdRoommateName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  pdActionBar: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: '#111',
+  },
+  pdActionPrimary: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 15,
+    borderRadius: 16,
+  },
+  pdActionPrimaryText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  pdSuperToggle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 4,
+  },
+  pdActionSecondary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 15,
+    paddingHorizontal: 18,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,107,91,0.1)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,107,91,0.3)',
+  },
+  pdActionSecondaryText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#ff6b5b',
+  },
+  pdActionStatusBadge: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 15,
+    borderRadius: 16,
+    borderWidth: 1.5,
+  },
+  pdActionStatusText: {
+    fontSize: 15,
+    fontWeight: '700',
   },
   groupDiscoveryBadge: {
     flexDirection: 'row',
@@ -2797,17 +3038,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600' as const,
     color: '#ff6b5b',
-  },
-  inquireTogetherDetailBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    backgroundColor: 'rgba(255,107,91,0.06)',
-    marginTop: 12,
-    marginHorizontal: Spacing.lg,
   },
   groupPickerOverlay: {
     flex: 1,
