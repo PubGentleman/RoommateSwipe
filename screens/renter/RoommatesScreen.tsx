@@ -28,13 +28,13 @@ import { MatchCelebrationModal } from '../../components/MatchCelebrationModal';
 import { PaywallSheet } from '../../components/PaywallSheet';
 import { VerificationBadgeInline, getVerificationLevel } from '../../components/VerificationBadge';
 import { LinearGradient } from 'expo-linear-gradient';
-import { RoomdrLogo } from '../../components/RoomdrLogo';
+import { RhomeLogo } from '../../components/RhomeLogo';
 import { RoommateFilterSheet, MatchFilters, DEFAULT_FILTERS, getActiveFilterCount, getActiveFilterChips, removeFilterChip, loadSavedFilters, saveFilters, applyFiltersToProfiles } from '../../components/RoommateFilterSheet';
 import { PlanBadge } from '../../components/PlanBadge';
 import { useNotificationContext } from '../../contexts/NotificationContext';
-import { RoomdrAISheet } from '../../components/RoomdrAISheet';
+import { RhomeAISheet } from '../../components/RhomeAISheet';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
-import type { ScreenContext } from '../../components/RoomdrAISheet';
+import type { ScreenContext } from '../../components/RhomeAISheet';
 import { trackSwipe, startSession, shouldShowRefinementQuestion, getQuestionsAsked } from '../../utils/refinementEngine';
 import { getNextRefinementQuestion, REFINEMENT_QUESTIONS } from '../../utils/refinementQuestions';
 import type { RefinementQuestion } from '../../utils/refinementQuestions';
@@ -882,7 +882,7 @@ export const RoommatesScreen = () => {
       <View style={[styles.container, { backgroundColor: '#141414' }]}>
         <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
           <View style={{ width: 42 }} />
-          <RoomdrLogo variant="horizontal" size="sm" />
+          <RhomeLogo variant="horizontal" size="sm" />
           <View style={{ width: 42 }} />
         </View>
         <View style={styles.emptyState}>
@@ -921,7 +921,7 @@ export const RoommatesScreen = () => {
       <View style={[styles.container, { backgroundColor: '#141414' }]}>
         <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
           <View style={{ width: 42 }} />
-          <RoomdrLogo variant="horizontal" size="sm" />
+          <RhomeLogo variant="horizontal" size="sm" />
           <View style={{ width: 42 }} />
         </View>
         {renderCitySelector()}
@@ -949,7 +949,7 @@ export const RoommatesScreen = () => {
       <View style={[styles.container, { backgroundColor: '#141414' }]}>
         <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
           <AIFloatingButton onPress={handleOpenAIAssistant} position="inline" />
-          <RoomdrLogo variant="horizontal" size="sm" />
+          <RhomeLogo variant="horizontal" size="sm" />
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <Pressable onPress={() => (navigation as any).navigate('Notifications')} style={styles.navIconBtn}>
               <View style={[styles.navIconBtnInner, { backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }]}>
@@ -1164,7 +1164,7 @@ export const RoommatesScreen = () => {
     <View style={[styles.container, { backgroundColor: '#141414' }]}>
       <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
         <AIFloatingButton onPress={handleOpenAIAssistant} position="inline" />
-        <RoomdrLogo variant="horizontal" size="sm" />
+        <RhomeLogo variant="horizontal" size="sm" />
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <Pressable onPress={() => {
             if (user?.boostData?.isBoosted && user?.boostData?.boostExpiresAt && !isBoostExpired(String(user.boostData.boostExpiresAt))) {
@@ -2280,7 +2280,7 @@ export const RoommatesScreen = () => {
         </RNAnimated.View>
       ) : null}
 
-      <RoomdrAISheet
+      <RhomeAISheet
         visible={showAISheet}
         onDismiss={() => {
           setShowAISheet(false);

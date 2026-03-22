@@ -92,7 +92,7 @@ export const DiagnosticScreen = () => {
       { name: 'GroupsScreen', ok: safeRequire(() => require('../../screens/renter/GroupsScreen')) },
       { name: 'MessagesScreen', ok: safeRequire(() => require('../../screens/shared/MessagesScreen')) },
       { name: 'ProfileScreen', ok: safeRequire(() => require('../../screens/shared/ProfileScreen')) },
-      { name: 'RoomdrAISheet', ok: safeRequire(() => require('../../components/RoomdrAISheet')) },
+      { name: 'RhomeAISheet', ok: safeRequire(() => require('../../components/RhomeAISheet')) },
     ];
     const issues = checks.filter(c => !c.ok).map(c => c.name);
     if (issues.length === 0) {

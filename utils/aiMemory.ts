@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isDev } from './envUtils';
 
-const MEMORY_KEY = 'roomdr_ai_memory';
+const MEMORY_KEY = 'rhome_ai_memory';
 
 export interface AIMemory {
   totalSwipes: number;

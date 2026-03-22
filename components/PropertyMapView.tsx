@@ -179,7 +179,7 @@ export const PropertyMapView = ({
       isDark
     );
 
-    const messageToken = React.useRef(`roomdr_map_${Date.now()}_${Math.random().toString(36).slice(2)}`).current;
+    const messageToken = React.useRef(`rhome_map_${Date.now()}_${Math.random().toString(36).slice(2)}`).current;
     const htmlWithToken = htmlContent.replace('__MSG_TOKEN__', messageToken);
 
     React.useEffect(() => {

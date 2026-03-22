@@ -13,7 +13,7 @@ import { Property, InterestCard, Message, Conversation, HostSubscriptionData } f
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { getMyListings, mapListingToProperty } from '../../services/listingService';
 import { getReceivedInterestCards } from '../../services/discoverService';
-import { RoomdrAISheet } from '../../components/RoomdrAISheet';
+import { RhomeAISheet } from '../../components/RhomeAISheet';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { HostPlanBadge } from '../../components/HostPlanBadge';
 import { canAddListingCheck, isFreePlan } from '../../utils/hostPricing';
@@ -550,7 +550,7 @@ export const HostDashboardScreen = () => {
             <Pressable style={styles.qaSecondary} onPress={() => {
               showAlert({
                 title: 'Dedicated Support',
-                message: 'As a Business host, you have access to priority support.\n\nEmail: support@roomdr.com\nResponse time: Within 2 hours\n\nOur dedicated team is here to help you with any questions or issues.',
+                message: 'As a Business host, you have access to priority support.\n\nEmail: support@rhome.com\nResponse time: Within 2 hours\n\nOur dedicated team is here to help you with any questions or issues.',
                 variant: 'info',
               });
             }}>
@@ -560,7 +560,7 @@ export const HostDashboardScreen = () => {
           ) : null}
         </View>
       </AnimatedScrollView>
-      <RoomdrAISheet
+      <RhomeAISheet
         visible={showAISheet}
         onDismiss={() => setShowAISheet(false)}
         screenContext="host_dashboard"

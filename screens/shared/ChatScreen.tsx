@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { ReportBlockModal } from '../../components/ReportBlockModal';
 import { PlanBadge } from '../../components/PlanBadge';
-import { RoomdrAISheet, ScreenContext } from '../../components/RoomdrAISheet';
+import { RhomeAISheet, ScreenContext } from '../../components/RhomeAISheet';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { getMessages as getSupabaseMessages, sendMessage as sendSupabaseMessage, markMessagesAsRead as markSupabaseMessagesAsRead, subscribeToMessages } from '../../services/messageService';
@@ -1201,7 +1201,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         </View>
       )}
 
-      <RoomdrAISheet
+      <RhomeAISheet
         visible={showAISheet}
         onDismiss={() => { setShowAISheet(false); setAiSheetContext('chat'); }}
         screenContext={aiSheetContext}

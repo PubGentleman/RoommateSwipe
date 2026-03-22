@@ -1,22 +1,22 @@
 {
   "expo": {
-    "name": "Roomdr",
-    "slug": "roomdr",
+    "name": "Rhome",
+    "slug": "rhome",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "roomdr",
+    "scheme": "rhome",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.roomdr.app",
+      "bundleIdentifier": "com.rhome.app",
       "config": {
         "googleMapsApiKey": "${EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}"
       }
     },
     "android": {
-      "package": "com.roomdr.app",
+      "package": "com.rhome.app",
       "config": {
         "googleMaps": {
           "apiKey": "${EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}"

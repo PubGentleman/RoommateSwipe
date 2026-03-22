@@ -7,7 +7,7 @@ import { Spacing, BorderRadius } from '../constants/theme';
 import { dispatchInsightTrigger } from '../utils/insightRefresh';
 
 const ACCENT = '#ff6b5b';
-const FILTERS_KEY = 'roomdr_match_filters';
+const FILTERS_KEY = 'rhome_match_filters';
 
 export interface MatchFilters {
   budgetMin: number;

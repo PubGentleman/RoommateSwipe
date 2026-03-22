@@ -237,7 +237,7 @@ export const HostAnalyticsScreen = () => {
         new Date(i.createdAt).toLocaleDateString(),
       ].join(',')
     ).join('\n');
-    await Share.share({ title: 'Roomdr Analytics Export', message: header + rows });
+    await Share.share({ title: 'Rhome Analytics Export', message: header + rows });
   };
 
   const handleCompanyExport = async () => {
@@ -253,7 +253,7 @@ export const HostAnalyticsScreen = () => {
         viewCount, inquiryCount, `${rate}%`, daysListed,
       ].join(',');
     }).join('\n');
-    await Share.share({ title: 'Roomdr Portfolio Report', message: header + rows });
+    await Share.share({ title: 'Rhome Portfolio Report', message: header + rows });
   };
 
   const handleAgentExport = async () => {
@@ -270,7 +270,7 @@ export const HostAnalyticsScreen = () => {
         viewCount, inquiryCount, accepted, `${rate}%`, score, getStatusLabel(property),
       ].join(',');
     }).join('\n');
-    await Share.share({ title: 'Roomdr Client Report', message: header + rows });
+    await Share.share({ title: 'Rhome Client Report', message: header + rows });
   };
 
   const getStatusLabel = (p: Property) => p.rentedDate ? 'Rented' : !p.available ? 'Paused' : 'Active';

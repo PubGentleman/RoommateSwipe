@@ -176,7 +176,7 @@ export const DownloadDataScreen = () => {
           Download Your Data
         </ThemedText>
         <ThemedText style={[Typography.body, { textAlign: 'center', color: theme.textSecondary, marginTop: Spacing.sm }]}>
-          Get a copy of all your Roomdr data in JSON format
+          Get a copy of all your Rhome data in JSON format
         </ThemedText>
       </View>
 
@@ -282,7 +282,7 @@ export const DownloadDataScreen = () => {
       </Pressable>
 
       <ThemedText style={[Typography.small, { textAlign: 'center', color: theme.textSecondary, marginTop: Spacing.md }]}>
-        Questions about your data? Contact support@roomdr.app
+        Questions about your data? Contact support@rhome.app
       </ThemedText>
     </ScreenScrollView>
   );

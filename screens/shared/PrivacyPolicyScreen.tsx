@@ -23,11 +23,11 @@ export default function PrivacyPolicyScreen() {
         </ThemedText>
 
         <ThemedText style={[Typography.body, { marginBottom: Spacing.lg }]}>
-          Roomdr provides a roommate-matching, housing-connection, and profile-based discovery platform. This Privacy Policy explains how we collect, use, disclose, and protect your information when you use our website, mobile app, and services.
+          Rhome provides a roommate-matching, housing-connection, and profile-based discovery platform. This Privacy Policy explains how we collect, use, disclose, and protect your information when you use our website, mobile app, and services.
         </ThemedText>
 
         <ThemedText style={[Typography.body, { marginBottom: Spacing.xxl }]}>
-          By creating an account or using Roomdr, you agree to the practices described here.
+          By creating an account or using Rhome, you agree to the practices described here.
         </ThemedText>
 
         <Section title="1. Information We Collect">
@@ -49,7 +49,7 @@ export default function PrivacyPolicyScreen() {
 
           <SubSection title="B. Automatically Collected Information">
             <ThemedText style={[Typography.body, { marginBottom: Spacing.md }]}>
-              When you use Roomdr, we automatically collect:
+              When you use Rhome, we automatically collect:
             </ThemedText>
             <BulletPoint>IP address</BulletPoint>
             <BulletPoint>Device information</BulletPoint>
@@ -78,7 +78,7 @@ export default function PrivacyPolicyScreen() {
           <ThemedText style={[Typography.body, { marginBottom: Spacing.md }]}>
             We use the information we collect to:
           </ThemedText>
-          <BulletPoint>Create and manage your Roomdr account</BulletPoint>
+          <BulletPoint>Create and manage your Rhome account</BulletPoint>
           <BulletPoint>Match you with compatible roommates, hosts, groups, and properties</BulletPoint>
           <BulletPoint>Determine which profiles to show you based on city and neighborhood</BulletPoint>
           <BulletPoint>Improve our matching algorithm over time</BulletPoint>
@@ -100,7 +100,7 @@ export default function PrivacyPolicyScreen() {
 
           <SubSection title="A. With Other Users">
             <ThemedText style={[Typography.body, { marginBottom: Spacing.md }]}>
-              When you interact on Roomdr, certain profile details become visible:
+              When you interact on Rhome, certain profile details become visible:
             </ThemedText>
             <BulletPoint>Name (or username)</BulletPoint>
             <BulletPoint>Photos</BulletPoint>
@@ -115,7 +115,7 @@ export default function PrivacyPolicyScreen() {
 
           <SubSection title="B. Service Providers">
             <ThemedText style={[Typography.body, { marginBottom: Spacing.md }]}>
-              We share data with trusted vendors who help us provide Roomdr, such as:
+              We share data with trusted vendors who help us provide Rhome, such as:
             </ThemedText>
             <BulletPoint>Hosting and cloud storage providers</BulletPoint>
             <BulletPoint>Payment processors</BulletPoint>
@@ -126,13 +126,13 @@ export default function PrivacyPolicyScreen() {
 
           <SubSection title="C. Legal Compliance">
             <ThemedText style={Typography.body}>
-              We may disclose information if required by law, legal process, or to protect Roomdr and its users.
+              We may disclose information if required by law, legal process, or to protect Rhome and its users.
             </ThemedText>
           </SubSection>
 
           <SubSection title="D. Business Transfers">
             <ThemedText style={Typography.body}>
-              If Roomdr is involved in a merger, acquisition, or sale of assets, your information may be transferred to the new entity.
+              If Rhome is involved in a merger, acquisition, or sale of assets, your information may be transferred to the new entity.
             </ThemedText>
           </SubSection>
 
@@ -152,7 +152,7 @@ export default function PrivacyPolicyScreen() {
           <BulletPoint>Request deletion of your account</BulletPoint>
           <BulletPoint>Opt out of marketing emails or notifications</BulletPoint>
           <ThemedText style={[Typography.body, { marginTop: Spacing.md }]}>
-            To delete your data entirely, contact: support@roomdr.app
+            To delete your data entirely, contact: support@rhome.app
           </ThemedText>
         </Section>
 
@@ -180,13 +180,13 @@ export default function PrivacyPolicyScreen() {
 
         <Section title="7. Children's Privacy">
           <ThemedText style={[Typography.body, { marginBottom: Spacing.md }]}>
-            Roomdr is not intended for individuals under the age of 18. We do not knowingly collect or store data from minors.
+            Rhome is not intended for individuals under the age of 18. We do not knowingly collect or store data from minors.
           </ThemedText>
         </Section>
 
         <Section title="8. International Users">
           <ThemedText style={Typography.body}>
-            If you access Roomdr outside the United States, you consent to your data being transferred and processed in the U.S.
+            If you access Rhome outside the United States, you consent to your data being transferred and processed in the U.S.
           </ThemedText>
         </Section>
 
@@ -204,10 +204,10 @@ export default function PrivacyPolicyScreen() {
             If you have questions or concerns about this Privacy Policy, contact:
           </ThemedText>
           <ThemedText style={[Typography.body, { fontWeight: '600', marginBottom: Spacing.xs }]}>
-            Roomdr Support
+            Rhome Support
           </ThemedText>
           <ThemedText style={Typography.body}>
-            Email: support@roomdr.app
+            Email: support@rhome.app
           </ThemedText>
         </Section>
 

@@ -258,7 +258,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
     const deepLink = Linking.createURL('join-group', { queryParams: { code: inviteCode, group: group?.name || '' } });
     try {
       await Share.share({
-        message: `Join my group "${group?.name}" on Roomdr!\n\nTap to join: ${deepLink}\n\nOr enter code: ${inviteCode}`,
+        message: `Join my group "${group?.name}" on Rhome!\n\nTap to join: ${deepLink}\n\nOr enter code: ${inviteCode}`,
       });
     } catch {}
   }
@@ -524,7 +524,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
 
   async function handleInviteViaText() {
     const name = group?.name || routeGroupName || 'my group';
-    const inviteMsg = `Join my group "${name}" on Roomdr!\n\nDownload the app at roomdr.com`;
+    const inviteMsg = `Join my group "${name}" on Rhome!\n\nDownload the app at rhome.com`;
     if (Platform.OS === 'web') {
       try { await Share.share({ message: inviteMsg }); } catch {}
     } else {

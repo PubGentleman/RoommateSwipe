@@ -6,7 +6,7 @@ import { useAuth, UserRole } from '../../contexts/AuthContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { Feather } from '../../components/VectorIcons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { RoomdrLogo } from '../../components/RoomdrLogo';
+import { RhomeLogo } from '../../components/RhomeLogo';
 
 export const LoginScreen = () => {
   const { login, register, resetPassword } = useAuth();
@@ -28,7 +28,7 @@ export const LoginScreen = () => {
     setIsLoading(true);
     try {
       if (!email.trim() && !password) {
-        await login('demo@roomdr.com', 'demo123', selectedRole);
+        await login('demo@rhome.com', 'demo123', selectedRole);
       } else if (isSignUp) {
         if (!name.trim()) { setError('Please enter your name'); setIsLoading(false); return; }
         if (!email.trim()) { setError('Please enter your email address'); setIsLoading(false); return; }
@@ -63,7 +63,7 @@ export const LoginScreen = () => {
     >
         <View style={styles.header}>
           <View style={styles.logoWrap}>
-            <RoomdrLogo variant="horizontal" size="md" />
+            <RhomeLogo variant="horizontal" size="md" />
           </View>
           <View style={styles.heading}>
             <Text style={styles.headingTitle}>

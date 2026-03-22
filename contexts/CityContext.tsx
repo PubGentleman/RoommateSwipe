@@ -2,9 +2,9 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from './AuthContext';
 
-const SELECTED_CITY_KEY = 'roomdr_selected_city';
-const SELECTED_SUB_AREA_KEY = 'roomdr_selected_sub_area';
-const RECENT_CITIES_KEY = 'roomdr_recent_cities';
+const SELECTED_CITY_KEY = 'rhome_selected_city';
+const SELECTED_SUB_AREA_KEY = 'rhome_selected_sub_area';
+const RECENT_CITIES_KEY = 'rhome_recent_cities';
 const MAX_RECENT_CITIES = 3;
 
 interface CityContextType {

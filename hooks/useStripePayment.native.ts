@@ -30,7 +30,7 @@ export function useStripePayment() {
 
       const { error: initError } = await initPaymentSheet({
         paymentIntentClientSecret: data.clientSecret,
-        merchantDisplayName: 'Roomdr',
+        merchantDisplayName: 'Rhome',
         allowsDelayedPaymentMethods: false,
       });
 

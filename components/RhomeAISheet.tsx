@@ -95,7 +95,7 @@ export interface AISheetContextData {
   host?: HostContextData;
 }
 
-interface RoomdrAISheetProps {
+interface RhomeAISheetProps {
   visible: boolean;
   onDismiss: () => void;
   screenContext: ScreenContext;
@@ -279,7 +279,7 @@ const InsightCard = ({ icon, title, body, id, onFeedback, actionChip, urgencyVal
   );
 };
 
-export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData, onNavigate, refinementQuestion, onRefinementAnswered }: RoomdrAISheetProps) => {
+export const RhomeAISheet = ({ visible, onDismiss, screenContext, contextData, onNavigate, refinementQuestion, onRefinementAnswered }: RhomeAISheetProps) => {
   const insets = useSafeAreaInsets();
   const { user, updateUser } = useAuth();
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
@@ -1247,7 +1247,7 @@ export const RoomdrAISheet = ({ visible, onDismiss, screenContext, contextData, 
                 <Feather name="cpu" size={18} color="#fff" />
               </LinearGradient>
               <View>
-                <Text style={styles.headerTitle}>Roomdr AI</Text>
+                <Text style={styles.headerTitle}>Rhome AI</Text>
                 <View style={styles.contextPill}>
                   <Feather name={contextInfo.icon} size={10} color={ACCENT} />
                   <Text style={styles.contextPillText}>{contextInfo.label}</Text>

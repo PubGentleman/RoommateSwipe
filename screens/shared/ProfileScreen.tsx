@@ -13,7 +13,7 @@ import { useNotificationContext } from '../../contexts/NotificationContext';
 import { ProfileCompletionCard } from '../../components/ProfileCompletionCard';
 import { getVerificationLevel } from '../../components/VerificationBadge';
 import { StorageService } from '../../utils/storage';
-import { RoomdrAISheet } from '../../components/RoomdrAISheet';
+import { RhomeAISheet } from '../../components/RhomeAISheet';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { getBoostTimeRemaining, getBoostDuration, isBoostExpired, RENTER_BOOST_OPTIONS, RenterBoostOptionId } from '../../utils/boostUtils';
 import { isDev } from '../../utils/envUtils';
@@ -463,12 +463,12 @@ export const ProfileScreen = () => {
                       updateUser({ hostTypeChangeRequested: true });
                       const subject = encodeURIComponent('Host Type Change Request');
                       const body = encodeURIComponent(
-                        `Hi Roomdr Support,\n\nI'd like to change my host type.\n\nAccount email: ${user?.email}\nCurrent type: ${hostType}\nRequested type: [FILL IN]\n\nReason: [FILL IN]`
+                        `Hi Rhome Support,\n\nI'd like to change my host type.\n\nAccount email: ${user?.email}\nCurrent type: ${hostType}\nRequested type: [FILL IN]\n\nReason: [FILL IN]`
                       );
                       if (Platform.OS === 'web') {
-                        window.open(`mailto:support@roomdr.com?subject=${subject}&body=${body}`);
+                        window.open(`mailto:support@rhome.com?subject=${subject}&body=${body}`);
                       } else {
-                        Linking.openURL(`mailto:support@roomdr.com?subject=${subject}&body=${body}`);
+                        Linking.openURL(`mailto:support@rhome.com?subject=${subject}&body=${body}`);
                       }
                     }
                   }}
@@ -565,7 +565,7 @@ export const ProfileScreen = () => {
                 onPress={async () => {
                   await alert({
                     title: 'Dedicated Support',
-                    message: 'As a Business host, you have access to priority support.\n\nEmail: support@roomdr.com\nResponse time: Within 2 hours\n\nOur dedicated team is here to help you with any questions or issues.',
+                    message: 'As a Business host, you have access to priority support.\n\nEmail: support@rhome.com\nResponse time: Within 2 hours\n\nOur dedicated team is here to help you with any questions or issues.',
                     variant: 'info',
                   });
                 }}
@@ -597,7 +597,7 @@ export const ProfileScreen = () => {
               iconColor="rgba(255,255,255,0.5)"
               iconBgColor="rgba(255,255,255,0.06)"
               iconBorderColor="rgba(255,255,255,0.08)"
-              title="About Roomdr"
+              title="About Rhome"
               subtitle="Version and info"
               onPress={() => navigation.navigate('About')}
               isLast
@@ -812,7 +812,7 @@ export const ProfileScreen = () => {
       </Modal>
 
 
-      <RoomdrAISheet
+      <RhomeAISheet
         visible={showAISheet}
         onDismiss={() => { setShowAISheet(false); setAiSheetContext('profile'); }}
         screenContext={aiSheetContext}

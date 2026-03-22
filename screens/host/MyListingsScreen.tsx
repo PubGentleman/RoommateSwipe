@@ -12,7 +12,7 @@ import { StorageService } from '../../utils/storage';
 import { Property, InterestCard, HostSubscriptionData } from '../../types/models';
 import { getMyListings, mapListingToProperty, updateListing, deleteListing as deleteListingSupa } from '../../services/listingService';
 import { getReceivedInterestCards } from '../../services/discoverService';
-import { RoomdrAISheet } from '../../components/RoomdrAISheet';
+import { RhomeAISheet } from '../../components/RhomeAISheet';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { isListingBoosted, canAddListingCheck, isFreePlan } from '../../utils/hostPricing';
 import { ListingLimitModal, OverageModal } from '../../components/ListingLimitModal';
@@ -572,7 +572,7 @@ export const MyListingsScreen = () => {
         )}
       </ScrollView>
 
-      <RoomdrAISheet
+      <RhomeAISheet
         visible={showAISheet}
         onDismiss={() => setShowAISheet(false)}
         screenContext="host_listings"

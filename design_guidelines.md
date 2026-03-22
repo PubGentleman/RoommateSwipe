@@ -1,4 +1,4 @@
-# Roomdr - Mobile Design Guidelines
+# Rhome - Mobile Design Guidelines
 
 ## Architecture & Navigation
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { useProfileReminder } from '../contexts/ProfileReminderContext';
-import { RoomdrAISheet } from './RoomdrAISheet';
+import { RhomeAISheet } from './RhomeAISheet';
 
 export const ProfileReminderOverlay = () => {
   const { showReminder, reminderStage, dismissReminder } = useProfileReminder();
@@ -15,7 +15,7 @@ export const ProfileReminderOverlay = () => {
   };
 
   return (
-    <RoomdrAISheet
+    <RhomeAISheet
       visible={showReminder}
       onDismiss={dismissReminder}
       screenContext="profile_reminder"

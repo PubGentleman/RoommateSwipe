@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const CACHE_KEY = 'roomdr_ai_insight_cache';
+const CACHE_KEY = 'rhome_ai_insight_cache';
 
 export const INSIGHT_TRIGGERS: Record<string, { trigger: string; staleAfterHours: number | null }> = {
   'profile-completion': {
@@ -118,7 +118,7 @@ export function dispatchInsightTrigger(triggerType: TriggerType): void {
   }
 }
 
-const DAILY_CHECK_KEY = 'roomdr_ai_daily_last_check';
+const DAILY_CHECK_KEY = 'rhome_ai_daily_last_check';
 
 export async function checkDailyTrigger(): Promise<void> {
   const last = await AsyncStorage.getItem(DAILY_CHECK_KEY);

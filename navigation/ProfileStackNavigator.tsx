@@ -217,7 +217,7 @@ export const ProfileStackNavigator = () => {
         options={({ navigation }) => ({
           headerShown: true,
           ...darkHeaderOptions,
-          headerTitle: 'About Roomdr',
+          headerTitle: 'About Rhome',
           headerBackVisible: false,
           headerLeft: () => (
             <Pressable onPress={() => navigation.goBack()} hitSlop={8}>

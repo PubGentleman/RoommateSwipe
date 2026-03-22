@@ -195,7 +195,7 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
               <Text style={styles.premiumBadgeText}>PRO</Text>
             </View>
           </View>
-          <Text style={styles.aiSubtitle}>Powered by RoomDrx AI</Text>
+          <Text style={styles.aiSubtitle}>Powered by Rhome AI</Text>
         </View>
       </View>
 

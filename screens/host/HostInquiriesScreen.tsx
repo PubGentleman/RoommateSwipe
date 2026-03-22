@@ -14,7 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { getReceivedInterestCards, acceptInterestCard, rejectInterestCard } from '../../services/discoverService';
 import { updateGroup } from '../../services/groupService';
-import { RoomdrAISheet } from '../../components/RoomdrAISheet';
+import { RhomeAISheet } from '../../components/RhomeAISheet';
 
 type FilterStatus = 'all' | 'pending' | 'accepted' | 'passed';
 
@@ -517,7 +517,7 @@ export const HostInquiriesScreen = () => {
           </View>
         )}
       </View>
-      <RoomdrAISheet
+      <RhomeAISheet
         visible={showAISheet}
         onDismiss={() => setShowAISheet(false)}
         screenContext="host_inquiries"

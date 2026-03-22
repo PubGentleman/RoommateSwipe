@@ -1,6 +1,6 @@
 # Overview
 
-Roomdr is a React Native mobile application designed to simplify the housing and roommate search. It connects renters and hosts, offering features like role-based navigation, swipe-based matching, property listings, group functionalities, and secure messaging. The platform aims to provide an intuitive and comprehensive solution for finding compatible roommates and suitable properties, acting as an "Airbnb for roommates."
+Rhome is a React Native mobile application designed to simplify the housing and roommate search. It connects renters and hosts, offering features like role-based navigation, swipe-based matching, property listings, group functionalities, and secure messaging. The platform aims to provide an intuitive and comprehensive solution for finding compatible roommates and suitable properties, acting as an "Airbnb for roommates."
 
 # User Preferences
 
@@ -24,7 +24,7 @@ Preferred communication style: Simple, everyday language.
 
 ## Core Functionality
 
-Roomdr features a compatibility algorithm (0-100+ score) based on 16 weighted criteria and a robust interest tag system for refined matching and profile display.
+Rhome features a compatibility algorithm (0-100+ score) based on 16 weighted criteria and a robust interest tag system for refined matching and profile display.
 
 ## Frontend Architecture
 
@@ -33,7 +33,7 @@ The application is built with React Native and Expo using TypeScript, leveraging
 **Key Features:**
 - **Renter:** Swipe-based matching, 1-on-1 messaging, group management (Roommate Groups, Listing Inquiry Groups), property exploration with advanced filters and map/list views, saved properties, AI Match Assistant, notification feed, and daily cold messaging limits.
 - **Host:** Host dashboard with statistics, listing management (create, edit, delete, pause, mark rented, boost), an Inquiries screen, inquiry analytics, and host subscription management.
-- **AI-Powered Enhancements:** AI Profile Completion Reminders, Roomdr AI Assistant (context-aware floating button), AI Memory Layer for refined suggestions, and AI Match Assistant powered by Claude (claude-sonnet-4-5) via Supabase Edge Function (`supabase/functions/ai-assistant/`) with conversation history, plan-based rate limiting (Free: 5/day, Plus: 50/day, Elite: 200/day), and a warm human-sounding system prompt using user profile + matches + listings context. Requires `ANTHROPIC_API_KEY` secret on Supabase. Client helper at `utils/aiService.ts`. Shows connection error when API unavailable (no fake fallback data). AI screen opens as fullScreenModal (no tab bar overlap). Edge Function queries both `users` and `profiles` tables correctly to build user context.
+- **AI-Powered Enhancements:** AI Profile Completion Reminders, Rhome AI Assistant (context-aware floating button), AI Memory Layer for refined suggestions, and AI Match Assistant powered by Claude (claude-sonnet-4-5) via Supabase Edge Function (`supabase/functions/ai-assistant/`) with conversation history, plan-based rate limiting (Free: 5/day, Plus: 50/day, Elite: 200/day), and a warm human-sounding system prompt using user profile + matches + listings context. Requires `ANTHROPIC_API_KEY` secret on Supabase. Client helper at `utils/aiService.ts`. Shows connection error when API unavailable (no fake fallback data). AI screen opens as fullScreenModal (no tab bar overlap). Edge Function queries both `users` and `profiles` tables correctly to build user context.
 - **User Profiling:** A 14-step Profile Questionnaire and a 5-question Personality Quiz integrated into matching.
 - **Boost System:** Tier-based listing and profile boosting options for increased visibility, managed by `utils/boostRotation.ts`, `utils/boostUtils.ts`, and `utils/hostPricing.ts`.
 - **Identity & Verification:** Supports phone, government ID (Stripe Identity SDK), social media verification, and optional background/income checks. Also includes a References System.
@@ -66,7 +66,7 @@ The data layer uses Supabase PostgreSQL and local AsyncStorage for caching. Type
 
 ## UI/UX and Branding
 
-A consistent dark theme with a specific color palette is used, featuring a `RoomdrLogo` rendered with `react-native-svg` and `expo-linear-gradient`.
+A consistent dark theme with a specific color palette is used, featuring a `RhomeLogo` rendered with `react-native-svg` and `expo-linear-gradient`.
 
 ## Location System
 

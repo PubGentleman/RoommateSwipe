@@ -13,8 +13,8 @@ function getOutreachLimits(plan: HostPlan) {
   };
 }
 
-const OUTREACH_LOG_KEY = '@roomdr_host_outreach_log';
-const OUTREACH_QUOTA_KEY = '@roomdr_host_outreach_quota';
+const OUTREACH_LOG_KEY = '@rhome_host_outreach_log';
+const OUTREACH_QUOTA_KEY = '@rhome_host_outreach_quota';
 
 export interface OutreachQuotaStatus {
   canSend: boolean;

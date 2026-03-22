@@ -81,7 +81,7 @@ export default function TermsOfServiceScreen() {
           <Text style={s.heroLabelText}>LEGAL</Text>
         </View>
         <Text style={s.heroTitle}>Terms of Service</Text>
-        <Text style={s.heroSub}>Please read these terms carefully. By using Roomdr, you agree to be bound by these Terms of Service.</Text>
+        <Text style={s.heroSub}>Please read these terms carefully. By using Rhome, you agree to be bound by these Terms of Service.</Text>
       </View>
 
       <View style={s.tocWrapper}>
@@ -99,18 +99,18 @@ export default function TermsOfServiceScreen() {
       </View>
 
       <View style={s.main}>
-        <HighlightBox>Welcome to Roomdr ("Roomdr," "we," "us," or "our"). These Terms of Service ("Terms") govern your access to and use of the Roomdr mobile application, website, and related services (collectively, the "Services"). By creating an account or using the Services, you agree to be bound by these Terms. If you do not agree, do not use Roomdr.</HighlightBox>
+        <HighlightBox>Welcome to Rhome ("Rhome," "we," "us," or "our"). These Terms of Service ("Terms") govern your access to and use of the Rhome mobile application, website, and related services (collectively, the "Services"). By creating an account or using the Services, you agree to be bound by these Terms. If you do not agree, do not use Rhome.</HighlightBox>
 
         <Section num="01" title="Eligibility">
-          <P>To use Roomdr, you must:</P>
+          <P>To use Rhome, you must:</P>
           <BulletItem>Be at least 18 years old</BulletItem>
           <BulletItem>Have the legal capacity to enter into a binding agreement</BulletItem>
           <BulletItem>Use the Services in compliance with these Terms and all applicable laws</BulletItem>
-          <P>Roomdr is not intended for minors under any circumstances.</P>
+          <P>Rhome is not intended for minors under any circumstances.</P>
         </Section>
 
         <Section num="02" title="Account Registration">
-          <P>When creating a Roomdr account, you must provide accurate and current information. You are responsible for:</P>
+          <P>When creating a Rhome account, you must provide accurate and current information. You are responsible for:</P>
           <BulletItem>Maintaining the confidentiality of your login credentials</BulletItem>
           <BulletItem>All activity that occurs under your account</BulletItem>
           <BulletItem>Updating your profile information as needed</BulletItem>
@@ -118,13 +118,13 @@ export default function TermsOfServiceScreen() {
         </Section>
 
         <Section num="03" title="Use of the Services">
-          <P>You agree to use Roomdr only for lawful purposes, including:</P>
+          <P>You agree to use Rhome only for lawful purposes, including:</P>
           <BulletItem>Creating a housing profile</BulletItem>
           <BulletItem>Matching with potential roommates</BulletItem>
           <BulletItem>Searching for rooms, sublets, or leases</BulletItem>
           <BulletItem>Messaging with users you match with</BulletItem>
           <BulletItem>Interacting in a respectful and non-abusive manner</BulletItem>
-          <SubLabel>You may not use Roomdr to:</SubLabel>
+          <SubLabel>You may not use Rhome to:</SubLabel>
           <BulletItem>Harass, intimidate, or harm other users</BulletItem>
           <BulletItem>Post discriminatory, hateful, or explicit content</BulletItem>
           <BulletItem>Spam, solicit, or advertise unauthorized products</BulletItem>
@@ -135,16 +135,16 @@ export default function TermsOfServiceScreen() {
         </Section>
 
         <Section num="04" title="Messaging and Interactions">
-          <P>Roomdr allows messaging between users who have matched. By sending or receiving messages, you agree to:</P>
+          <P>Rhome allows messaging between users who have matched. By sending or receiving messages, you agree to:</P>
           <BulletItem>Communicate respectfully</BulletItem>
           <BulletItem>Not share harmful, explicit, or abusive content</BulletItem>
           <BulletItem>Understand that we do not screen messages</BulletItem>
           <BulletItem>Use caution when interacting with others, both online and offline</BulletItem>
-          <P>Roomdr is not responsible for user conduct or offline interactions.</P>
+          <P>Rhome is not responsible for user conduct or offline interactions.</P>
         </Section>
 
         <Section num="05" title="Location-Based Features">
-          <P>Roomdr uses location data to match users by neighborhood and city. By using Roomdr, you consent to:</P>
+          <P>Rhome uses location data to match users by neighborhood and city. By using Rhome, you consent to:</P>
           <BulletItem>Sharing your chosen neighborhood</BulletItem>
           <BulletItem>Allowing the app to infer your city</BulletItem>
           <BulletItem>Optional GPS-based location if you enable it</BulletItem>
@@ -154,7 +154,7 @@ export default function TermsOfServiceScreen() {
         </Section>
 
         <Section num="06" title="Paid Features & Subscriptions">
-          <P>Roomdr may offer premium features such as:</P>
+          <P>Rhome may offer premium features such as:</P>
           <BulletItem>Unlimited rewinds</BulletItem>
           <BulletItem>Viewing who liked your profile</BulletItem>
           <BulletItem>Boosted visibility</BulletItem>
@@ -164,7 +164,7 @@ export default function TermsOfServiceScreen() {
           <BulletItem>Authorize the payment method on file</BulletItem>
           <BulletItem>Understand that all purchases are final and non-refundable, except where required by law</BulletItem>
           <BulletItem>Manage your subscription through your Apple, Google, or relevant platform account</BulletItem>
-          <P>Roomdr reserves the right to modify prices or features at any time.</P>
+          <P>Rhome reserves the right to modify prices or features at any time.</P>
         </Section>
 
         <Section num="07" title="User Content">
@@ -173,8 +173,8 @@ export default function TermsOfServiceScreen() {
           <BulletItem>Profile descriptions</BulletItem>
           <BulletItem>Messages</BulletItem>
           <BulletItem>Matching answers</BulletItem>
-          <P>However, by posting content, you grant Roomdr a non-exclusive, worldwide, royalty-free license to host, display, modify, and distribute your content solely to operate the Services.</P>
-          <SubLabel>Roomdr may remove any content that:</SubLabel>
+          <P>However, by posting content, you grant Rhome a non-exclusive, worldwide, royalty-free license to host, display, modify, and distribute your content solely to operate the Services.</P>
+          <SubLabel>Rhome may remove any content that:</SubLabel>
           <BulletItem>Violates these Terms</BulletItem>
           <BulletItem>Is harmful or misleading</BulletItem>
           <BulletItem>Is reported by another user</BulletItem>
@@ -182,22 +182,22 @@ export default function TermsOfServiceScreen() {
         </Section>
 
         <Section num="08" title="No Guarantees or Housing Liability">
-          <P>Roomdr is not a real estate broker, housing agency, or property manager. We do not verify:</P>
+          <P>Rhome is not a real estate broker, housing agency, or property manager. We do not verify:</P>
           <BulletItem>The accuracy of user profiles</BulletItem>
           <BulletItem>The safety of potential roommates</BulletItem>
           <BulletItem>The condition of housing listings</BulletItem>
           <BulletItem>The background, intentions, or reliability of any user</BulletItem>
-          <HighlightBox>Roomdr is a platform only. All housing decisions and interactions are made at your own risk.</HighlightBox>
+          <HighlightBox>Rhome is a platform only. All housing decisions and interactions are made at your own risk.</HighlightBox>
           <SubLabel>We strongly recommend:</SubLabel>
           <BulletItem>Background checks</BulletItem>
           <BulletItem>Meeting in public places</BulletItem>
           <BulletItem>Conducting due diligence before signing any agreement</BulletItem>
-          <P>Roomdr is not responsible for disputes between users.</P>
+          <P>Rhome is not responsible for disputes between users.</P>
         </Section>
 
         <Section num="09" title="Third-Party Services">
-          <P>Roomdr may integrate with third-party tools (e.g., analytics, payment processors, location services). Your use of such services is subject to their terms and privacy policies.</P>
-          <P>Roomdr is not responsible for third-party actions or data handling.</P>
+          <P>Rhome may integrate with third-party tools (e.g., analytics, payment processors, location services). Your use of such services is subject to their terms and privacy policies.</P>
+          <P>Rhome is not responsible for third-party actions or data handling.</P>
         </Section>
 
         <Section num="10" title="Termination">
@@ -212,29 +212,29 @@ export default function TermsOfServiceScreen() {
 
         <Section num="11" title="Disclaimers">
           <P>The Services are provided "as is" and "as available," without warranties of any kind.</P>
-          <P>Roomdr does not guarantee:</P>
+          <P>Rhome does not guarantee:</P>
           <BulletItem>Matches</BulletItem>
           <BulletItem>Housing outcomes</BulletItem>
           <BulletItem>Message delivery</BulletItem>
           <BulletItem>App availability or uptime</BulletItem>
           <BulletItem>Accuracy of content or information</BulletItem>
           <BulletItem>Safety or compatibility of users</BulletItem>
-          <P>Use Roomdr at your own risk.</P>
+          <P>Use Rhome at your own risk.</P>
         </Section>
 
         <Section num="12" title="Limitation of Liability">
-          <P>To the maximum extent permitted by law, Roomdr and its owners, employees, and affiliates are not liable for:</P>
+          <P>To the maximum extent permitted by law, Rhome and its owners, employees, and affiliates are not liable for:</P>
           <BulletItem>Damages resulting from user interactions</BulletItem>
           <BulletItem>Housing disputes</BulletItem>
           <BulletItem>Lost data or unauthorized access</BulletItem>
           <BulletItem>Personal injury or property loss</BulletItem>
           <BulletItem>Financial losses related to rentals or agreements</BulletItem>
           <BulletItem>Any indirect, incidental, or consequential damages</BulletItem>
-          <HighlightBox>Our total liability to you will not exceed $100 or the amount you paid to Roomdr in the past 12 months, whichever is lower.</HighlightBox>
+          <HighlightBox>Our total liability to you will not exceed $100 or the amount you paid to Rhome in the past 12 months, whichever is lower.</HighlightBox>
         </Section>
 
         <Section num="13" title="Indemnification">
-          <P>You agree to indemnify and hold Roomdr harmless from any claims, losses, damages, liabilities, or expenses arising from:</P>
+          <P>You agree to indemnify and hold Rhome harmless from any claims, losses, damages, liabilities, or expenses arising from:</P>
           <BulletItem>Your use of the Services</BulletItem>
           <BulletItem>Your interactions with other users</BulletItem>
           <BulletItem>Your violation of these Terms</BulletItem>
@@ -247,18 +247,18 @@ export default function TermsOfServiceScreen() {
 
         <Section num="15" title="Changes to These Terms">
           <P>We may update these Terms occasionally. If material changes occur, we will notify you via the app or email.</P>
-          <P>Continued use of Roomdr means you accept the updated Terms.</P>
+          <P>Continued use of Rhome means you accept the updated Terms.</P>
         </Section>
 
         <Section num="16" title="Contact Us">
           <P>For questions about these Terms, contact:</P>
-          <Pressable style={s.contactCard} onPress={() => Linking.openURL('mailto:support@roomdr.app')}>
+          <Pressable style={s.contactCard} onPress={() => Linking.openURL('mailto:support@rhome.app')}>
             <LinearGradient colors={[ACCENT, ACCENT_DARK]} style={s.contactIcon}>
               <Feather name="mail" size={22} color="#fff" />
             </LinearGradient>
             <View style={s.contactInfo}>
-              <Text style={s.contactName}>Roomdr Support</Text>
-              <Text style={s.contactEmail}>support@roomdr.app</Text>
+              <Text style={s.contactName}>Rhome Support</Text>
+              <Text style={s.contactEmail}>support@rhome.app</Text>
             </View>
           </Pressable>
         </Section>
@@ -268,7 +268,7 @@ export default function TermsOfServiceScreen() {
 
       <View style={s.footer}>
         <Text style={s.footerText}>
-          2025 Roomdr. All rights reserved.
+          2025 Rhome. All rights reserved.
         </Text>
       </View>
     </ScreenScrollView>

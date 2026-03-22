@@ -59,8 +59,8 @@ export default function AboutScreen() {
           <Text style={s.heroLabelText}>ABOUT ROOMDR</Text>
         </View>
         <Text style={s.heroTitle}>Finding home{'\n'}shouldn't feel like{'\n'}a gamble</Text>
-        <Text style={s.heroSub}>Roomdr was built to solve one of the biggest problems in city living -- finding a roommate you actually get along with.</Text>
-        <Pressable onPress={() => Linking.openURL('mailto:support@roomdr.app')}>
+        <Text style={s.heroSub}>Rhome was built to solve one of the biggest problems in city living -- finding a roommate you actually get along with.</Text>
+        <Pressable onPress={() => Linking.openURL('mailto:support@rhome.app')}>
           <LinearGradient colors={[ACCENT, ACCENT_DARK]} style={s.heroCta}>
             <Text style={s.heroCtaText}>Get in Touch</Text>
             <Feather name="arrow-right" size={15} color="#fff" />
@@ -82,16 +82,16 @@ export default function AboutScreen() {
       <View style={s.main}>
         <View style={s.introBlock}>
           <Text style={s.introText}>
-            Traditional listing sites only show <Text style={s.highlight}>photos and prices</Text>. Roomdr goes deeper -- matching people by lifestyle, habits, budget, neighborhood preference, and personality fit.
+            Traditional listing sites only show <Text style={s.highlight}>photos and prices</Text>. Rhome goes deeper -- matching people by lifestyle, habits, budget, neighborhood preference, and personality fit.
           </Text>
           <Text style={s.introText}>
             Our platform uses <Text style={s.highlight}>smart algorithms</Text>, user profiles, and neighborhood-based location matching to help renters and hosts connect with the right people faster. No scams. No endless scrolling. No mismatches.
           </Text>
           <Text style={s.introText}>
-            Roomdr isn't just another housing app. It's a <Text style={s.highlight}>smarter, safer, more human</Text> way to find where -- and who -- you call home.
+            Rhome isn't just another housing app. It's a <Text style={s.highlight}>smarter, safer, more human</Text> way to find where -- and who -- you call home.
           </Text>
           <View style={s.quote}>
-            <Text style={s.quoteText}>"Finding a roommate or a place to live shouldn't feel like gambling with your peace, safety, or money. Roomdr was created to fix that."</Text>
+            <Text style={s.quoteText}>"Finding a roommate or a place to live shouldn't feel like gambling with your peace, safety, or money. Rhome was created to fix that."</Text>
           </View>
         </View>
 
@@ -99,12 +99,12 @@ export default function AboutScreen() {
           <SectionHeader icon="target" title="Our Mission" />
           <View style={s.missionCard}>
             <Text style={s.missionMain}>Build a safer, smarter, more human housing experience -- one compatible match at a time.</Text>
-            <Text style={s.missionSub}>Whether you're moving across the city or across the country, Roomdr helps you find the right room, the right people, and the right fit.</Text>
+            <Text style={s.missionSub}>Whether you're moving across the city or across the country, Rhome helps you find the right room, the right people, and the right fit.</Text>
           </View>
         </View>
 
         <View style={s.section}>
-          <SectionHeader icon="zap" title="What Makes Roomdr Different" />
+          <SectionHeader icon="zap" title="What Makes Rhome Different" />
           <View style={s.featuresGrid}>
             {FEATURES.map((f, i) => (
               <View key={i} style={s.featureCard}>
@@ -114,11 +114,11 @@ export default function AboutScreen() {
               </View>
             ))}
           </View>
-          <Text style={s.featuresCaption}>We also designed Roomdr to reflect the reality of modern housing. Cities move fast, neighborhoods shift constantly, and people need tools that understand their pace of life. Roomdr automatically sorts profiles by location, shows you people who want to live where you want to live, and keeps your matches relevant based on your preferences.</Text>
+          <Text style={s.featuresCaption}>We also designed Rhome to reflect the reality of modern housing. Cities move fast, neighborhoods shift constantly, and people need tools that understand their pace of life. Rhome automatically sorts profiles by location, shows you people who want to live where you want to live, and keeps your matches relevant based on your preferences.</Text>
         </View>
 
         <View style={s.section}>
-          <SectionHeader icon="users" title="Who Roomdr Is For" />
+          <SectionHeader icon="users" title="Who Rhome Is For" />
           <View style={s.audienceGrid}>
             {AUDIENCES.map((a, i) => (
               <View key={i} style={s.audienceCard}>
@@ -128,12 +128,12 @@ export default function AboutScreen() {
               </View>
             ))}
           </View>
-          <Text style={s.featuresCaption}>Whether you're looking for a roommate, a room, a sublet, or tenants for your listing -- Roomdr brings clarity, connection, and community to the housing search.</Text>
+          <Text style={s.featuresCaption}>Whether you're looking for a roommate, a room, a sublet, or tenants for your listing -- Rhome brings clarity, connection, and community to the housing search.</Text>
         </View>
 
-        <Pressable style={s.contactCard} onPress={() => Linking.openURL('mailto:support@roomdr.app')}>
+        <Pressable style={s.contactCard} onPress={() => Linking.openURL('mailto:support@rhome.app')}>
           <View style={s.contactText}>
-            <Text style={s.contactTitle}>Have questions about Roomdr?</Text>
+            <Text style={s.contactTitle}>Have questions about Rhome?</Text>
             <Text style={s.contactSub}>Our team is here to help. Reach out any time.</Text>
           </View>
           <LinearGradient colors={[ACCENT, ACCENT_DARK]} style={s.contactBtn}>
@@ -144,7 +144,7 @@ export default function AboutScreen() {
       </View>
 
       <View style={s.footer}>
-        <Text style={s.footerText}>2025 Roomdr. All rights reserved.</Text>
+        <Text style={s.footerText}>2025 Rhome. All rights reserved.</Text>
       </View>
     </ScreenScrollView>
   );

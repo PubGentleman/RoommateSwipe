@@ -186,7 +186,7 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
     }
 
     if (mode === 'birthday' && !isAtLeast18(dateStr)) {
-      setAgeError('You must be at least 18 to use Roomdr');
+      setAgeError('You must be at least 18 to use Rhome');
       setSelectedDate(dateStr);
       return;
     }

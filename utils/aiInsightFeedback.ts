@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isDev } from './envUtils';
 
-const FEEDBACK_KEY = 'roomdr_ai_insight_feedback';
+const FEEDBACK_KEY = 'rhome_ai_insight_feedback';
 
 interface InsightFeedback {
   helpfulCounts: Record<string, number>;

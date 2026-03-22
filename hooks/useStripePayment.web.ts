@@ -9,7 +9,7 @@ export function useStripePayment() {
     _plan: string,
     _billingCycle: 'monthly' | '3month' | 'annual'
   ): Promise<{ success: boolean; subscriptionId?: string }> => {
-    await showAlert({ title: 'Payment Unavailable', message: 'Payment is available on the Roomdr mobile app. Please use the iOS or Android app to subscribe.', variant: 'info' });
+    await showAlert({ title: 'Payment Unavailable', message: 'Payment is available on the Rhome mobile app. Please use the iOS or Android app to subscribe.', variant: 'info' });
     return { success: false };
   };
 

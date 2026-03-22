@@ -398,7 +398,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const login = async (email: string, password: string, role: UserRole) => {
-    if (email === 'demo@roomdr.com') {
+    if (email === 'demo@rhome.com') {
       await StorageService.initializeWithMockData();
       let currentUser = await StorageService.getCurrentUser();
       if (!currentUser) {
@@ -480,7 +480,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         id: `notif-ai-weekly-${Date.now()}`,
         userId: loginUser.id,
         type: 'system',
-        title: 'Your Roomdr Weekly',
+        title: 'Your Rhome Weekly',
         body: `${likesCount} new likes, ${responseRate}% response rate. Tap to see your AI insights.`,
         isRead: false,
         createdAt: now,

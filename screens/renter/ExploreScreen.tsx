@@ -27,7 +27,7 @@ import { getBoostRotationIndex } from '../../utils/boostRotation';
 import { shouldShowMatchScore, getHostBadgeLabel, getHostBadgeColor, getHostBadgeIcon } from '../../utils/hostTypeUtils';
 import type { HostType } from '../../utils/hostTypeUtils';
 import { PropertyMapView } from '../../components/PropertyMapView';
-import { RoomdrAISheet } from '../../components/RoomdrAISheet';
+import { RhomeAISheet } from '../../components/RhomeAISheet';
 
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
@@ -2032,7 +2032,7 @@ export const ExploreScreen = () => {
         onClose={() => setShowInterestConfirmation(false)}
         isSuperInterest={confirmationWasSuper}
       />
-      <RoomdrAISheet
+      <RhomeAISheet
         visible={showAISheet}
         onDismiss={() => setShowAISheet(false)}
         screenContext="explore"

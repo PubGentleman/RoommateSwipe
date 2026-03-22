@@ -16,7 +16,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Feather } from '../../components/VectorIcons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { RoomdrLogo } from '../../components/RoomdrLogo';
+import { RhomeLogo } from '../../components/RhomeLogo';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -46,7 +46,7 @@ const PAGES: OnboardingPage[] = [
     accentColor: ACCENT,
     accentBg: 'rgba(255, 107, 91, 0.15)',
     gradient: ['#ff6b5b', '#ff4040'],
-    title: 'Welcome to Roomdr',
+    title: 'Welcome to Rhome',
     subtitle: 'Find your perfect roommate match\nwith smart compatibility scoring',
     features: [
       { icon: 'users', title: 'AI-powered roommate matching', subtitle: 'Smart compatibility scores based on your lifestyle' },
@@ -154,7 +154,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
       <View style={styles.pageContent}>
         {item.id === 'welcome' ? (
           <Animated.View entering={FadeIn.delay(150).duration(350)}>
-            <RoomdrLogo variant="stacked" size="lg" showTagline />
+            <RhomeLogo variant="stacked" size="lg" showTagline />
           </Animated.View>
         ) : (
           <Animated.View

@@ -143,7 +143,7 @@ export function GroupInviteScreen({ navigation, route }: any) {
     const deepLink = getDeepLink();
     try {
       await Share.share({
-        message: `Join my group "${groupName}" on Roomdr!\n\nTap the link to join instantly:\n${deepLink}\n\nOr enter invite code: ${inviteCode}`,
+        message: `Join my group "${groupName}" on Rhome!\n\nTap the link to join instantly:\n${deepLink}\n\nOr enter invite code: ${inviteCode}`,
         url: deepLink,
       });
     } catch {}

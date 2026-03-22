@@ -1,0 +1,475 @@
+# Rhome: New Logo (Pin Design) + Full App Rename Prompt
+
+Rebrand the app from "Roomdr / RoomDrx" to **"Rhome"** across the entire codebase.
+The wordmark is styled as `r` + `home` — with "home" in coral — to make the word inside the name visible.
+
+Two parts:
+1. Replace the logo component with the new **Pin design** (map pin with house inside)
+2. Rename every "Roomdr / RoomDrx" reference to "Rhome" across the codebase
+
+---
+
+## PART 1 — New Logo Component
+
+### Delete old file, create new file
+
+Delete `components/RoomdrLogo.tsx` and create `components/RhomeLogo.tsx` with the following content:
+
+```tsx
+// components/RhomeLogo.tsx
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Path } from 'react-native-svg';
+
+interface RhomeLogoProps {
+  variant?: 'horizontal' | 'stacked' | 'icon-only';
+  size?: 'sm' | 'md' | 'lg';
+  darkBackground?: boolean;
+}
+
+const SIZES = {
+  sm: { icon: 32, wordmarkFontSize: 18, spacing: 8 },
+  md: { icon: 48, wordmarkFontSize: 26, spacing: 12 },
+  lg: { icon: 64, wordmarkFontSize: 34, spacing: 16 },
+};
+
+export const RhomeLogo: React.FC<RhomeLogoProps> = ({
+  variant = 'horizontal',
+  size = 'md',
+  darkBackground = true,
+}) => {
+  const { icon: iconSize, wordmarkFontSize, spacing } = SIZES[size];
+  const accentColor = '#FF6B6B';
+  const wordmarkColor = darkBackground ? '#FFFFFF' : '#1A1A2E';
+
+  const PinIcon = () => (
+    <LinearGradient
+      colors={['#FF8E53', '#FF6B6B']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={{
+        width: iconSize,
+        height: iconSize,
+        borderRadius: iconSize * 0.22,
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}
+    >
+      {/*
+        Map pin: white teardrop shape with coral house icon inside.
+        viewBox 0 0 26 30 — pin head is a circle, tapers to a point at bottom.
+      */}
+      <Svg
+        width={iconSize * 0.62}
+        height={iconSize * 0.72}
+        viewBox="0 0 26 30"
+      >
+        {/* Pin teardrop body */}
+        <Path
+          d="M13 1 C7.477 1 3 5.477 3 11 C3 16.523 8.5 22.5 13 28 C17.5 22.5 23 16.523 23 11 C23 5.477 18.523 1 13 1 Z"
+          fill="white"
+          opacity={0.95}
+        />
+        {/* House roof — coral triangle */}
+        <Path
+          d="M8.5 11.2 L13 7 L17.5 11.2"
+          stroke="#FF6B6B"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        {/* House walls */}
+        <Path
+          d="M9.5 11.2 L9.5 15.5 L16.5 15.5 L16.5 11.2"
+          stroke="#FF6B6B"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        {/* Door */}
+        <Path
+          d="M11.5 13.5 L11.5 15.5 L14.5 15.5 L14.5 13.5 C14.5 12.67 13.83 12 13 12 C12.17 12 11.5 12.67 11.5 13.5 Z"
+          fill="#FF6B6B"
+        />
+      </Svg>
+    </LinearGradient>
+  );
+
+  // Wordmark: "r" in base color + "home" in coral accent
+  const Wordmark = () => (
+    <Text
+      style={[
+        styles.wordmark,
+        { fontSize: wordmarkFontSize, color: wordmarkColor },
+      ]}
+    >
+      r<Text style={{ color: accentColor }}>home</Text>
+    </Text>
+  );
+
+  if (variant === 'icon-only') {
+    return <PinIcon />;
+  }
+
+  if (variant === 'stacked') {
+    return (
+      <View style={[styles.stackedContainer, { gap: spacing * 0.6 }]}>
+        <PinIcon />
+        <Wordmark />
+      </View>
+    );
+  }
+
+  // horizontal (default)
+  return (
+    <View style={[styles.horizontalContainer, { gap: spacing }]}>
+      <PinIcon />
+      <Wordmark />
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  horizontalContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  stackedContainer: {
+    flexDirection: 'column',
+    alignItems: 'center',
+  },
+  wordmark: {
+    fontWeight: '700',
+    letterSpacing: -0.5,
+  },
+});
+
+export default RhomeLogo;
+```
+
+---
+
+### Update all imports from RoomdrLogo → RhomeLogo
+
+In every file that currently imports `RoomdrLogo`, change:
+
+```ts
+// OLD
+import { RoomdrLogo } from '../../components/RoomdrLogo';
+import RoomdrLogo from '../../components/RoomdrLogo';
+
+// NEW
+import { RhomeLogo } from '../../components/RhomeLogo';
+import RhomeLogo from '../../components/RhomeLogo';
+```
+
+Also replace all JSX usage:
+```tsx
+// OLD
+<RoomdrLogo variant="horizontal" size="md" />
+
+// NEW
+<RhomeLogo variant="horizontal" size="md" />
+```
+
+Files to update:
+- `components/ProfileReminderOverlay.tsx`
+- `screens/auth/LoginScreen.tsx`
+- `screens/host/HostDashboardScreen.tsx`
+- `screens/host/HostInquiriesScreen.tsx`
+- `screens/host/MyListingsScreen.tsx`
+- `screens/renter/ExploreScreen.tsx`
+- `screens/renter/GroupsScreen.tsx`
+- `screens/renter/RoommatesScreen.tsx`
+- `screens/shared/ChatScreen.tsx`
+- `screens/shared/ProfileScreen.tsx`
+- `screens/shared/DiagnosticScreen.tsx`
+
+---
+
+## PART 2 — Full App Rename: Roomdr → Rhome
+
+### 2a. `app.json` — App Config
+
+```json
+{
+  "expo": {
+    "name": "Rhome",
+    "slug": "rhome",
+    "scheme": "rhome",
+    "ios": {
+      "bundleIdentifier": "com.rhome.app"
+    },
+    "android": {
+      "package": "com.rhome.app"
+    }
+  }
+}
+```
+
+---
+
+### 2b. Rename AI Sheet component file
+
+Rename `components/RoomdrAISheet.tsx` → `components/RhomeAISheet.tsx`
+
+Inside the file, rename:
+- `RoomdrAISheet` → `RhomeAISheet`
+- `RoomdrAISheetProps` → `RhomeAISheetProps`
+
+Update all imports in:
+- `screens/renter/ExploreScreen.tsx`
+- `screens/renter/RoommatesScreen.tsx`
+- `screens/renter/GroupsScreen.tsx`
+- `screens/host/HostInquiriesScreen.tsx`
+- `screens/shared/ChatScreen.tsx`
+
+```ts
+// OLD
+import { RoomdrAISheet } from '../../components/RoomdrAISheet';
+
+// NEW
+import { RhomeAISheet } from '../../components/RhomeAISheet';
+```
+
+Also replace all JSX usage: `<RoomdrAISheet` → `<RhomeAISheet`
+
+---
+
+### 2c. User-Facing Text Strings
+
+**`screens/shared/OnboardingScreen.tsx`**
+```ts
+'Welcome to Roomdr' → 'Welcome to Rhome'
+```
+
+**`screens/renter/AIAssistantScreen.tsx`**
+```ts
+'Powered by RoomDrx AI' → 'Powered by Rhome AI'
+```
+
+**`components/RhomeAISheet.tsx`** (after rename)
+```ts
+'Roomdr AI' → 'Rhome AI'
+```
+
+**`screens/shared/AboutScreen.tsx`** — Replace all occurrences:
+```
+"Roomdr was built to solve..." → "Rhome was built to solve..."
+"What Makes Roomdr..." → "What Makes Rhome..."
+"Who Roomdr Is For" → "Who Rhome Is For"
+"2025 Roomdr. All rights reserved." → "2025 Rhome. All rights reserved."
+support@roomdr.app → support@rhome.app
+mailto:support@roomdr.app → mailto:support@rhome.app
+```
+
+**`screens/shared/TermsOfServiceScreen.tsx`** — 40+ occurrences:
+```
+All "Roomdr" → "Rhome"
+support@roomdr.app → support@rhome.app
+"2025 Roomdr. All rights reserved." → "2025 Rhome. All rights reserved."
+```
+
+**`screens/shared/PrivacyPolicyScreen.tsx`** — 10+ occurrences:
+```
+All "Roomdr" → "Rhome"
+support@roomdr.app → support@rhome.app
+```
+
+**`screens/shared/DownloadDataScreen.tsx`**
+```ts
+'all your Roomdr data' → 'all your Rhome data'
+'Contact support@roomdr.app' → 'Contact support@rhome.app'
+```
+
+**`screens/shared/GroupInfoScreen.tsx` + `GroupInviteScreen.tsx`**
+```ts
+`Join my group "${group?.name}" on Roomdr` → `Join my group "${group?.name}" on Rhome`
+```
+
+**`screens/shared/ProfileScreen.tsx`**
+```ts
+title="About Roomdr" → title="About Rhome"
+'Hi Roomdr Support,\n\nI\'d like to...' → 'Hi Rhome Support,\n\nI\'d like to...'
+`mailto:support@roomdr.app` → `mailto:support@rhome.app`
+```
+
+**`screens/host/HostAnalyticsScreen.tsx`**
+```ts
+'Roomdr Analytics Export' → 'Rhome Analytics Export'
+'Roomdr Portfolio Report' → 'Rhome Portfolio Report'
+'Roomdr Client Report' → 'Rhome Client Report'
+```
+
+**`navigation/ProfileStackNavigator.tsx`**
+```ts
+headerTitle: 'About Roomdr' → headerTitle: 'About Rhome'
+```
+
+**`components/DatePickerModal.tsx`**
+```ts
+'You must be at least 18 to use Roomdr' → 'You must be at least 18 to use Rhome'
+```
+
+---
+
+### 2d. Payment / Merchant Display Names
+
+**`hooks/useStripePayment.native.ts`**
+```ts
+merchantDisplayName: 'Roomdr' → merchantDisplayName: 'Rhome'
+```
+
+**`hooks/useOutreachPayment.native.ts`**
+```ts
+merchantDisplayName: 'Roomdr' → merchantDisplayName: 'Rhome'
+```
+
+---
+
+### 2e. Demo Account Email
+
+**`contexts/AuthContext.tsx`**
+```ts
+if (email === 'demo@roomdr.com') → if (email === 'demo@rhome.com')
+title: 'Your Roomdr Weekly' → title: 'Your Rhome Weekly'
+```
+
+**`screens/auth/LoginScreen.tsx`**
+```ts
+await login('demo@roomdr.com', 'demo123', selectedRole)
+→ await login('demo@rhome.com', 'demo123', selectedRole)
+```
+
+---
+
+### 2f. AsyncStorage Keys
+
+> Note: Since the app is pre-launch, rename all keys now. Existing local data will reset — expected and acceptable in development.
+
+**`utils/storage.ts`** — Replace all `@roomdr/` prefix with `@rhome/`:
+```ts
+'@roomdr/current_user'         → '@rhome/current_user'
+'@roomdr/users'                → '@rhome/users'
+'@roomdr/roommate_profiles'    → '@rhome/roommate_profiles'
+'@roomdr/properties'           → '@rhome/properties'
+'@roomdr/groups'               → '@rhome/groups'
+'@roomdr/conversations'        → '@rhome/conversations'
+'@roomdr/matches'              → '@rhome/matches'
+'@roomdr/applications'         → '@rhome/applications'
+'@roomdr/swipe_history'        → '@rhome/swipe_history'
+'@roomdr/likes'                → '@rhome/likes'
+'@roomdr/saved_properties'     → '@rhome/saved_properties'
+'@roomdr/notifications'        → '@rhome/notifications'
+'@roomdr/mock_data_version'    → '@rhome/mock_data_version'
+'@roomdr/onboarding_completed' → '@rhome/onboarding_completed'
+'@roomdr/interestCards'        → '@rhome/interestCards'
+'@roomdr/group_likes'          → '@rhome/group_likes'
+'@roomdr/host_subscriptions'   → '@rhome/host_subscriptions'
+'@roomdr/group_invites'        → '@rhome/group_invites'
+```
+
+Also in `utils/storage.ts`:
+```ts
+title: 'Welcome to Roomdr!' → title: 'Welcome to Rhome!'
+```
+
+**Other files with `roomdr_` prefixed keys:**
+
+| File | Old Key | New Key |
+|---|---|---|
+| `utils/aiMemory.ts` | `roomdr_ai_memory` | `rhome_ai_memory` |
+| `utils/aiInsightFeedback.ts` | `roomdr_ai_insight_feedback` | `rhome_ai_insight_feedback` |
+| `utils/insightRefresh.ts` | `roomdr_ai_insight_cache` | `rhome_ai_insight_cache` |
+| `utils/insightRefresh.ts` | `roomdr_ai_daily_last_check` | `rhome_ai_daily_last_check` |
+| `components/RoommateFilterSheet.tsx` | `roomdr_match_filters` | `rhome_match_filters` |
+| `services/hostOutreachService.ts` | `@roomdr_host_outreach_log` | `@rhome_host_outreach_log` |
+| `services/hostOutreachService.ts` | `@roomdr_host_outreach_quota` | `@rhome_host_outreach_quota` |
+| `contexts/CityContext.tsx` | `roomdr_selected_city` | `rhome_selected_city` |
+| `contexts/CityContext.tsx` | `roomdr_selected_sub_area` | `rhome_selected_sub_area` |
+| `contexts/CityContext.tsx` | `roomdr_recent_cities` | `rhome_recent_cities` |
+| `components/PropertyMapView.tsx` | `` `roomdr_map_${...}` `` | `` `rhome_map_${...}` `` |
+
+---
+
+### 2g. AI Edge Function System Prompt
+
+**`supabase/functions/ai-assistant/index.ts`**
+```ts
+// OLD
+return `You are the AI assistant inside RoomDrx, a roommate matching app. Your name is Roomdr AI.`
+
+// NEW
+return `You are the AI assistant inside Rhome, a roommate matching app. Your name is Rhome AI.`
+```
+
+---
+
+### 2h. Logger + Diagnostic Utils
+
+**`utils/logger.ts`**
+```ts
+console.log('[Roomdr]', ...args)   → console.log('[Rhome]', ...args)
+console.warn('[Roomdr]', ...args)  → console.warn('[Rhome]', ...args)
+console.error('[Roomdr]', ...args) → console.error('[Rhome]', ...args)
+```
+
+**`screens/shared/DiagnosticScreen.tsx`**
+```ts
+{ name: 'RoomdrAISheet', ok: safeRequire(() => ...) }
+→ { name: 'RhomeAISheet', ok: safeRequire(() => ...) }
+```
+
+---
+
+### 2i. Documentation Files
+
+Replace all "Roomdr" → "Rhome" in:
+- `design_guidelines.md`
+- `replit.md`
+
+---
+
+## PART 3 — Final Verification
+
+After applying all changes, run this grep to confirm nothing is missed:
+
+```bash
+grep -rn "Roomdr\|roomdr\|RoomDrx\|roomdrx\|Roomly\|roomly" \
+  --include="*.ts" --include="*.tsx" --include="*.json" --include="*.md" \
+  . | grep -v node_modules | grep -v .git | grep -v .expo
+```
+
+**Expected result: zero matches** in source files.
+
+---
+
+## What Does NOT Need Changing
+
+- `assets/` image filenames (icon.png, splash-icon.png) — no old brand name in filenames
+- `package.json` `name` field — npm package name, optional to change to `rhome`
+- Git history — no need to rewrite
+- Supabase project URL / API keys — tied to the project, not the brand
+- Any `.env` variable names (e.g. `SUPABASE_URL`) — infrastructure, not brand
+
+---
+
+## Summary of Changes
+
+| Category | Files Touched | Action |
+|---|---|---|
+| Logo component | `components/RoomdrLogo.tsx` → `RhomeLogo.tsx` | New Pin design, `r` + `home` wordmark |
+| AI sheet component | `components/RoomdrAISheet.tsx` → `RhomeAISheet.tsx` | Renamed |
+| Logo/AI sheet imports | 11 screens + components | Updated import paths + JSX |
+| App config | `app.json` | name, slug, scheme, bundle ID → rhome |
+| UI text strings | 12 screens | All "Roomdr/RoomDrx" → "Rhome" |
+| Support emails | 5 screens | `@roomdr.app` → `@rhome.app` |
+| Payment merchant | 2 hooks | `'Roomdr'` → `'Rhome'` |
+| Demo account | `AuthContext`, `LoginScreen` | `demo@roomdr.com` → `demo@rhome.com` |
+| AsyncStorage keys | `utils/storage.ts` + 8 other files | `@roomdr/` → `@rhome/`, `roomdr_` → `rhome_` |
+| AI Edge Function | `supabase/functions/ai-assistant/index.ts` | System prompt brand name |
+| Logger | `utils/logger.ts` | Log tags `[Roomdr]` → `[Rhome]` |
+| Docs | `design_guidelines.md`, `replit.md` | All occurrences |

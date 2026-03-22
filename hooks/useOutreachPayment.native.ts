@@ -11,7 +11,7 @@ export function useOutreachPayment() {
     try {
       const { error: initError } = await initPaymentSheet({
         paymentIntentClientSecret: clientSecret,
-        merchantDisplayName: 'Roomdr',
+        merchantDisplayName: 'Rhome',
         allowsDelayedPaymentMethods: false,
       });
 

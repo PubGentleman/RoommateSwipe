@@ -24,7 +24,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { useCityContext } from '../../contexts/CityContext';
 import { CityPickerModal, CityPillButton } from '../../components/CityPickerModal';
-import { RoomdrAISheet } from '../../components/RoomdrAISheet';
+import { RhomeAISheet } from '../../components/RhomeAISheet';
 import { GroupPropertySearchModal } from '../../components/GroupPropertySearchModal';
 import { useConfirm } from '../../contexts/ConfirmContext';
 
@@ -2265,7 +2265,7 @@ export const GroupsScreen = () => {
         onClose={() => setShowCreatePropertySearch(false)}
       />
 
-      <RoomdrAISheet
+      <RhomeAISheet
         visible={showAISheet}
         onDismiss={() => setShowAISheet(false)}
         screenContext="groups"
