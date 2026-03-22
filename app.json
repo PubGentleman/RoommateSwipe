@@ -51,13 +51,21 @@
       [
         "expo-font",
         {
-          "fonts": ["./assets/fonts/Feather.ttf"]
+          "fonts": [
+            "./assets/fonts/Feather.ttf"
+          ]
         }
       ],
       "expo-web-browser"
     ],
     "experiments": {
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "0c68666d-6abb-46e3-b540-7725b6e6c977"
+      }
+    },
+    "owner": "alwaysrhome"
   }
 }
