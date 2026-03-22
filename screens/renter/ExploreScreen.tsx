@@ -1199,167 +1199,143 @@ export const ExploreScreen = () => {
         presentationStyle="pageSheet"
         onRequestClose={() => setShowFilterModal(false)}
       >
-        <View style={[styles.modalContainer, { backgroundColor: theme.backgroundRoot }]}>
-          <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
-            <Pressable onPress={() => setShowFilterModal(false)}>
-              <Feather name="x" size={24} color={theme.text} />
+        <View style={styles.fmContainer}>
+          <View style={styles.fmHeader}>
+            <Pressable onPress={() => setShowFilterModal(false)} hitSlop={12}>
+              <Feather name="x" size={22} color="#fff" />
             </Pressable>
-            <ThemedText style={Typography.h2}>Filters</ThemedText>
-            <Pressable onPress={handleClearFilters}>
-              <ThemedText style={[Typography.body, { color: theme.primary, fontWeight: '600' }]}>Clear</ThemedText>
+            <View style={{ flex: 1 }} />
+            <Pressable onPress={handleClearFilters} hitSlop={12}>
+              <Text style={styles.fmClearText}>Clear</Text>
             </Pressable>
           </View>
 
-          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
-            <View style={styles.filterSection}>
-              <Text style={styles.filterSectionTitle}>Listing Type</Text>
-              <View style={styles.listingTypeGrid}>
-                {LISTING_TYPE_OPTIONS.map((opt) => {
-                  const isActive = (tempFilters.listingType || 'any') === opt.key;
-                  return (
-                    <Pressable
-                      key={opt.key}
-                      style={[styles.listingTypeCard, isActive && styles.listingTypeCardActive]}
-                      onPress={() => setTempFilters({ ...tempFilters, listingType: opt.key })}
-                    >
-                      <View style={[styles.listingTypeIcon, isActive && styles.listingTypeIconActive]}>
-                        <Feather
-                          name={opt.icon as any}
-                          size={18}
-                          color={isActive ? '#fff' : 'rgba(255,255,255,0.4)'}
-                        />
+          <ScrollView style={styles.fmScroll} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+            <Text style={styles.fmSectionTitle}>Listing Type</Text>
+            <View style={styles.fmTypeGrid}>
+              {LISTING_TYPE_OPTIONS.map((opt) => {
+                const isActive = (tempFilters.listingType || 'any') === opt.key;
+                return (
+                  <Pressable
+                    key={opt.key}
+                    style={[styles.fmTypeCard, isActive && styles.fmTypeCardActive]}
+                    onPress={() => setTempFilters({ ...tempFilters, listingType: opt.key })}
+                  >
+                    <View style={[styles.fmTypeIcon, isActive && styles.fmTypeIconActive]}>
+                      <Feather
+                        name={opt.icon as any}
+                        size={20}
+                        color={isActive ? '#fff' : 'rgba(255,255,255,0.4)'}
+                      />
+                    </View>
+                    <Text style={[styles.fmTypeLabel, isActive && styles.fmTypeLabelActive]}>
+                      {opt.label}
+                    </Text>
+                    {isActive ? (
+                      <View style={styles.fmTypeCheck}>
+                        <Feather name="check" size={10} color="#fff" />
                       </View>
-                      <Text style={[styles.listingTypeLabel, isActive && styles.listingTypeLabelActive]}>
-                        {opt.label}
-                      </Text>
-                      {isActive ? (
-                        <View style={styles.listingTypeCheck}>
-                          <Feather name="check" size={10} color="#fff" />
-                        </View>
-                      ) : null}
-                    </Pressable>
-                  );
-                })}
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <Text style={styles.fmSectionTitle}>Budget Range</Text>
+            <View style={styles.fmBudgetRow}>
+              <View style={styles.fmBudgetBox}>
+                <Text style={styles.fmBudgetLabel}>Min</Text>
+                <TextInput
+                  style={styles.fmBudgetValue}
+                  placeholder="$0"
+                  placeholderTextColor="rgba(255,255,255,0.3)"
+                  keyboardType="numeric"
+                  value={tempFilters.minPrice ? `$${tempFilters.minPrice}` : ''}
+                  onChangeText={text => {
+                    const num = text.replace(/[^0-9]/g, '');
+                    setTempFilters({ ...tempFilters, minPrice: num ? parseInt(num) : undefined });
+                  }}
+                />
+              </View>
+              <Text style={styles.fmBudgetDash}>—</Text>
+              <View style={styles.fmBudgetBox}>
+                <Text style={styles.fmBudgetLabel}>Max</Text>
+                <TextInput
+                  style={styles.fmBudgetValue}
+                  placeholder="$5000"
+                  placeholderTextColor="rgba(255,255,255,0.3)"
+                  keyboardType="numeric"
+                  value={tempFilters.maxPrice ? `$${tempFilters.maxPrice}` : ''}
+                  onChangeText={text => {
+                    const num = text.replace(/[^0-9]/g, '');
+                    setTempFilters({ ...tempFilters, maxPrice: num ? parseInt(num) : undefined });
+                  }}
+                />
               </View>
             </View>
 
-            <View style={styles.filterDivider} />
-
-            <View style={styles.filterSection}>
-              <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Budget Range</ThemedText>
-              <View style={styles.budgetInputs}>
-                <View style={[styles.budgetInput, { backgroundColor: theme.backgroundDefault }]}>
-                  <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Min</ThemedText>
-                  <TextInput
-                    style={[styles.input, { color: theme.text }]}
-                    placeholder="$0"
-                    placeholderTextColor={theme.textSecondary}
-                    keyboardType="numeric"
-                    value={tempFilters.minPrice?.toString() || ''}
-                    onChangeText={text => setTempFilters({ ...tempFilters, minPrice: text ? parseInt(text) : undefined })}
-                  />
-                </View>
-                <ThemedText style={{ color: theme.textSecondary }}>—</ThemedText>
-                <View style={[styles.budgetInput, { backgroundColor: theme.backgroundDefault }]}>
-                  <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Max</ThemedText>
-                  <TextInput
-                    style={[styles.input, { color: theme.text }]}
-                    placeholder="$5000"
-                    placeholderTextColor={theme.textSecondary}
-                    keyboardType="numeric"
-                    value={tempFilters.maxPrice?.toString() || ''}
-                    onChangeText={text => setTempFilters({ ...tempFilters, maxPrice: text ? parseInt(text) : undefined })}
-                  />
+            <Text style={styles.fmSectionTitle}>Rooms</Text>
+            <View style={styles.fmRoomsRow}>
+              <View style={styles.fmRoomCol}>
+                <Text style={styles.fmRoomLabel}>Bedrooms</Text>
+                <View style={styles.fmCounterRow}>
+                  <Pressable
+                    style={styles.fmCounterBtn}
+                    onPress={() => setTempFilters({ ...tempFilters, minBedrooms: Math.max(0, (tempFilters.minBedrooms || 0) - 1) })}
+                  >
+                    <Feather name="minus" size={18} color="rgba(255,255,255,0.6)" />
+                  </Pressable>
+                  <Text style={styles.fmCounterValue}>{tempFilters.minBedrooms || 0}+</Text>
+                  <Pressable
+                    style={styles.fmCounterBtn}
+                    onPress={() => setTempFilters({ ...tempFilters, minBedrooms: (tempFilters.minBedrooms || 0) + 1 })}
+                  >
+                    <Feather name="plus" size={18} color="rgba(255,255,255,0.6)" />
+                  </Pressable>
                 </View>
               </View>
-            </View>
-
-            <View style={styles.filterSection}>
-              <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Rooms</ThemedText>
-              <View style={styles.roomsRow}>
-                <View style={styles.roomInput}>
-                  <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>Bedrooms</ThemedText>
-                  <View style={styles.counterRow}>
-                    <Pressable
-                      style={[styles.counterButton, { backgroundColor: theme.backgroundDefault }]}
-                      onPress={() => setTempFilters({ ...tempFilters, minBedrooms: Math.max(0, (tempFilters.minBedrooms || 0) - 1) })}
-                    >
-                      <Feather name="minus" size={20} color={theme.text} />
-                    </Pressable>
-                    <ThemedText style={[Typography.h3, { marginHorizontal: Spacing.lg }]}>
-                      {tempFilters.minBedrooms || 0}+
-                    </ThemedText>
-                    <Pressable
-                      style={[styles.counterButton, { backgroundColor: theme.backgroundDefault }]}
-                      onPress={() => setTempFilters({ ...tempFilters, minBedrooms: (tempFilters.minBedrooms || 0) + 1 })}
-                    >
-                      <Feather name="plus" size={20} color={theme.text} />
-                    </Pressable>
-                  </View>
-                </View>
-                <View style={styles.roomInput}>
-                  <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>Bathrooms</ThemedText>
-                  <View style={styles.counterRow}>
-                    <Pressable
-                      style={[styles.counterButton, { backgroundColor: theme.backgroundDefault }]}
-                      onPress={() => setTempFilters({ ...tempFilters, minBathrooms: Math.max(0, (tempFilters.minBathrooms || 0) - 0.5) })}
-                    >
-                      <Feather name="minus" size={20} color={theme.text} />
-                    </Pressable>
-                    <ThemedText style={[Typography.h3, { marginHorizontal: Spacing.lg }]}>
-                      {tempFilters.minBathrooms || 0}+
-                    </ThemedText>
-                    <Pressable
-                      style={[styles.counterButton, { backgroundColor: theme.backgroundDefault }]}
-                      onPress={() => setTempFilters({ ...tempFilters, minBathrooms: (tempFilters.minBathrooms || 0) + 0.5 })}
-                    >
-                      <Feather name="plus" size={20} color={theme.text} />
-                    </Pressable>
-                  </View>
+              <View style={styles.fmRoomCol}>
+                <Text style={styles.fmRoomLabel}>Bathrooms</Text>
+                <View style={styles.fmCounterRow}>
+                  <Pressable
+                    style={styles.fmCounterBtn}
+                    onPress={() => setTempFilters({ ...tempFilters, minBathrooms: Math.max(0, (tempFilters.minBathrooms || 0) - 0.5) })}
+                  >
+                    <Feather name="minus" size={18} color="rgba(255,255,255,0.6)" />
+                  </Pressable>
+                  <Text style={styles.fmCounterValue}>{tempFilters.minBathrooms || 0}+</Text>
+                  <Pressable
+                    style={styles.fmCounterBtn}
+                    onPress={() => setTempFilters({ ...tempFilters, minBathrooms: (tempFilters.minBathrooms || 0) + 0.5 })}
+                  >
+                    <Feather name="plus" size={18} color="rgba(255,255,255,0.6)" />
+                  </Pressable>
                 </View>
               </View>
             </View>
 
-            <View style={styles.filterSection}>
-              <ThemedText style={[Typography.h3, { marginBottom: Spacing.md }]}>Amenities</ThemedText>
-              <View style={styles.amenitiesGrid}>
-                {COMMON_AMENITIES.map(amenity => {
-                  const isSelected = tempFilters.amenities?.includes(amenity) || false;
-                  return (
-                    <Pressable
-                      key={amenity}
-                      style={[
-                        styles.amenityChip,
-                        { 
-                          backgroundColor: isSelected ? theme.primary : theme.backgroundDefault,
-                          borderColor: isSelected ? theme.primary : theme.border,
-                        }
-                      ]}
-                      onPress={() => toggleAmenity(amenity)}
-                    >
-                      <ThemedText
-                        style={[
-                          Typography.small,
-                          { color: isSelected ? '#FFFFFF' : theme.text }
-                        ]}
-                      >
-                        {amenity}
-                      </ThemedText>
-                    </Pressable>
-                  );
-                })}
-              </View>
+            <Text style={styles.fmSectionTitle}>Amenities</Text>
+            <View style={styles.fmAmenitiesWrap}>
+              {COMMON_AMENITIES.map(amenity => {
+                const isSelected = tempFilters.amenities?.includes(amenity) || false;
+                return (
+                  <Pressable
+                    key={amenity}
+                    style={[styles.fmAmenityChip, isSelected && styles.fmAmenityChipActive]}
+                    onPress={() => toggleAmenity(amenity)}
+                  >
+                    <Text style={[styles.fmAmenityText, isSelected && styles.fmAmenityTextActive]}>
+                      {amenity}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
           </ScrollView>
 
-          <View style={[styles.modalFooter, { borderTopColor: theme.border, paddingBottom: insets.bottom + Spacing.lg }]}>
-            <Pressable
-              style={[styles.applyButton, { backgroundColor: theme.primary }]}
-              onPress={handleApplyFilters}
-            >
-              <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>
-                Apply Filters
-              </ThemedText>
+          <View style={[styles.fmFooter, { paddingBottom: insets.bottom + 16 }]}>
+            <Pressable style={styles.fmApplyBtn} onPress={handleApplyFilters}>
+              <Text style={styles.fmApplyText}>Apply Filters</Text>
             </Pressable>
           </View>
         </View>
@@ -2766,145 +2742,183 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
     borderRadius: BorderRadius.full,
   },
-  modalContainer: {
+  fmContainer: {
     flex: 1,
+    backgroundColor: '#111',
   },
-  modalHeader: {
+  fmHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.lg,
-    borderBottomWidth: 1,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 10,
   },
-  modalContent: {
+  fmClearText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#ff6b5b',
+  },
+  fmScroll: {
     flex: 1,
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: 20,
   },
-  filterSection: {
-    paddingVertical: Spacing.lg,
-  },
-  filterSectionTitle: {
-    fontSize: 17,
+  fmSectionTitle: {
+    fontSize: 18,
     fontWeight: '800',
     color: '#fff',
-    marginBottom: 16,
-    letterSpacing: -0.2,
+    marginTop: 24,
+    marginBottom: 14,
+    letterSpacing: -0.3,
   },
-  filterDivider: {
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    marginHorizontal: 0,
-  },
-  listingTypeGrid: {
+  fmTypeGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
   },
-  listingTypeCard: {
+  fmTypeCard: {
     width: '47%' as any,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 16,
+    backgroundColor: '#1e1e1e',
+    borderRadius: 14,
     padding: 14,
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.08)',
     gap: 10,
     position: 'relative' as const,
   },
-  listingTypeCardActive: {
+  fmTypeCardActive: {
     borderColor: '#ff6b5b',
-    backgroundColor: 'rgba(255,107,91,0.08)',
+    backgroundColor: 'rgba(255,107,91,0.1)',
   },
-  listingTypeIcon: {
-    width: 40,
-    height: 40,
+  fmTypeIcon: {
+    width: 42,
+    height: 42,
     borderRadius: 12,
     backgroundColor: 'rgba(255,255,255,0.07)',
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
   },
-  listingTypeIconActive: {
+  fmTypeIconActive: {
     backgroundColor: '#ff6b5b',
   },
-  listingTypeLabel: {
+  fmTypeLabel: {
     fontSize: 13,
     fontWeight: '600',
     color: 'rgba(255,255,255,0.5)',
   },
-  listingTypeLabelActive: {
+  fmTypeLabelActive: {
     color: '#fff',
     fontWeight: '700',
   },
-  listingTypeCheck: {
+  fmTypeCheck: {
     position: 'absolute' as const,
     top: 10,
     right: 10,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     backgroundColor: '#ff6b5b',
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
   },
-  budgetInputs: {
+  fmBudgetRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.md,
+    gap: 12,
   },
-  budgetInput: {
+  fmBudgetBox: {
     flex: 1,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.medium,
+    backgroundColor: '#1e1e1e',
+    borderRadius: 12,
+    padding: 14,
   },
-  input: {
+  fmBudgetLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.4)',
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  fmBudgetValue: {
     fontSize: 16,
-    fontWeight: '600',
-    marginTop: Spacing.xs,
+    fontWeight: '700',
+    color: '#fff',
   },
-  locationInput: {
-    padding: Spacing.md,
-    borderRadius: BorderRadius.medium,
+  fmBudgetDash: {
     fontSize: 16,
+    color: 'rgba(255,255,255,0.3)',
   },
-  roomsRow: {
+  fmRoomsRow: {
     flexDirection: 'row',
-    gap: Spacing.lg,
+    gap: 20,
   },
-  roomInput: {
+  fmRoomCol: {
     flex: 1,
   },
-  counterRow: {
+  fmRoomLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.7)',
+    marginBottom: 10,
+  },
+  fmCounterRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 6,
   },
-  counterButton: {
+  fmCounterBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: '#1e1e1e',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
   },
-  amenitiesGrid: {
+  fmCounterValue: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#fff',
+    minWidth: 36,
+    textAlign: 'center' as const,
+  },
+  fmAmenitiesWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: Spacing.sm,
+    gap: 8,
   },
-  amenityChip: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.full,
+  fmAmenityChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 20,
+    backgroundColor: '#1e1e1e',
     borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
-  modalFooter: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.lg,
-    borderTopWidth: 1,
+  fmAmenityChipActive: {
+    backgroundColor: '#ff6b5b',
+    borderColor: '#ff6b5b',
   },
-  applyButton: {
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.full,
-    alignItems: 'center',
+  fmAmenityText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.6)',
+  },
+  fmAmenityTextActive: {
+    color: '#fff',
+  },
+  fmFooter: {
+    paddingHorizontal: 20,
+    paddingTop: 14,
+  },
+  fmApplyBtn: {
+    backgroundColor: '#ff6b5b',
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: 'center' as const,
+  },
+  fmApplyText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
   },
   upgradeOverlay: {
     flex: 1,

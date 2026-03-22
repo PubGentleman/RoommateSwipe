@@ -1113,8 +1113,8 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   chipUnselected: {
-    backgroundColor: '#141414',
-    borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: '#1e1e1e',
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   chipText: {
     fontSize: 15,
@@ -1145,7 +1145,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 9,
     borderRadius: 20,
-    borderWidth: 1.5,
+    borderWidth: 1,
     marginBottom: 4,
   },
   amenityChipSelected: {
@@ -1153,8 +1153,8 @@ const styles = StyleSheet.create({
     borderColor: '#ff6b5b',
   },
   amenityChipUnselected: {
-    backgroundColor: '#141414',
-    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: '#1e1e1e',
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   amenityChipText: {
     fontSize: 13,
