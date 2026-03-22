@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Pressable, Text, ScrollView, Alert, Platform } from 'react-native';
+import { View, StyleSheet, Pressable, Text, ScrollView } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { StorageService } from '../../utils/storage';
 import { HostPlanType, HostSubscriptionData } from '../../types/models';
 import { HOST_PLANS, AGENT_VERIFICATION_FEE, subscriptionFromPlan, calculateHostMonthlyCost, isFreePlan } from '../../utils/hostPricing';
@@ -91,6 +92,7 @@ export const HostSubscriptionScreen = () => {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { user, updateUser, cancelHostSubscriptionAtPeriodEnd, reactivateHostSubscription } = useAuth();
+  const { confirm, alert: showAlert } = useConfirm();
   const [hostSub, setHostSub] = useState<HostSubscriptionData | null>(null);
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
@@ -128,7 +130,7 @@ export const HostSubscriptionScreen = () => {
     const expiryDate = user?.hostSubscription?.expiresAt
       ? new Date(user.hostSubscription.expiresAt)
       : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-    Alert.alert('Subscription Cancelled', `You'll keep your features until ${expiryDate.toLocaleDateString()}. After that, your plan will switch to Free.`);
+    await showAlert({ title: 'Subscription Cancelled', message: `You'll keep your features until ${expiryDate.toLocaleDateString()}. After that, your plan will switch to Free.`, variant: 'info' });
   };
 
   const handleReactivateHostSub = async () => {
@@ -193,7 +195,8 @@ export const HostSubscriptionScreen = () => {
         data: { plan },
       });
       const successMsg = `You're now on the ${planData.label} plan at $${price}/mo!`;
-      Alert.alert('Plan Updated', successMsg, [{ text: 'OK', onPress: () => navigation.goBack() }]);
+      await showAlert({ title: 'Plan Updated', message: successMsg, variant: 'success' });
+      navigation.goBack();
     } catch (e) {
       console.error(e);
     } finally {
@@ -204,23 +207,19 @@ export const HostSubscriptionScreen = () => {
   const handleAgentVerification = async () => {
     if (!user || !hostSub) return;
     if (isDev) {
-      Alert.alert(
-        'Agent Verification',
-        `One-time fee of $${AGENT_VERIFICATION_FEE}. Required to list properties on behalf of other owners.`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Verify (Mock)',
-            onPress: async () => {
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              const newSub = { ...hostSub, agentVerificationPaid: true, isVerifiedAgent: true };
-              await StorageService.updateHostSubscription(user.id, newSub);
-              setHostSub(newSub);
-              Alert.alert('Verified', 'You are now a verified agent.');
-            },
-          },
-        ]
-      );
+      const confirmed = await confirm({
+        title: 'Agent Verification',
+        message: `One-time fee of $${AGENT_VERIFICATION_FEE}. Required to list properties on behalf of other owners.`,
+        confirmText: 'Verify (Mock)',
+        variant: 'info',
+      });
+      if (confirmed) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        const newSub = { ...hostSub, agentVerificationPaid: true, isVerifiedAgent: true };
+        await StorageService.updateHostSubscription(user.id, newSub);
+        setHostSub(newSub);
+        await showAlert({ title: 'Verified', message: 'You are now a verified agent.', variant: 'success' });
+      }
     }
   };
 

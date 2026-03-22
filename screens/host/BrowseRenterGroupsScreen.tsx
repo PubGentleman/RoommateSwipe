@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, FlatList, StyleSheet, Pressable, Modal, ActivityIndicator, Alert, TextInput, Platform, Image } from 'react-native';
+import { View, Text, FlatList, StyleSheet, Pressable, Modal, ActivityIndicator, TextInput, Image } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { StorageService } from '../../utils/storage';
 import { isFreePlan } from '../../utils/hostPricing';
 import { HostSubscriptionData } from '../../types/models';
@@ -50,6 +51,7 @@ export const BrowseRenterGroupsScreen = () => {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { alert: showAlert } = useConfirm();
   const [groups, setGroups] = useState<RenterGroupCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [sentGroupIds, setSentGroupIds] = useState<Set<string>>(new Set());
@@ -187,9 +189,7 @@ export const BrowseRenterGroupsScreen = () => {
     if (!composeTarget || !user) return;
 
     if (message.trim().length < MIN_MSG_LENGTH) {
-      const msg = `Your message must be at least ${MIN_MSG_LENGTH} characters to prevent spam.`;
-      if (Platform.OS === 'web') window.alert(msg);
-      else Alert.alert('Too Short', msg);
+      await showAlert({ title: 'Too Short', message: `Your message must be at least ${MIN_MSG_LENGTH} characters to prevent spam.`, variant: 'warning' });
       return;
     }
 
@@ -219,34 +219,22 @@ export const BrowseRenterGroupsScreen = () => {
       const newQuota = await getOutreachQuotaStatus(user.id, plan);
       setQuota(newQuota);
 
-      const msg = 'Your message was delivered to the group.';
-      if (Platform.OS === 'web') window.alert(msg);
-      else Alert.alert('Message Sent', msg);
+      await showAlert({ title: 'Message Sent', message: 'Your message was delivered to the group.', variant: 'success' });
     } catch (e: any) {
       const errMsg = e.message || '';
       if (errMsg === 'DAILY_LIMIT_REACHED') {
         setComposeTarget(null);
         setShowUnlock(true);
       } else if (errMsg === 'HOURLY_LIMIT_REACHED') {
-        const msg = 'You can only send a few messages per hour. Try again shortly.';
-        if (Platform.OS === 'web') window.alert(msg);
-        else Alert.alert('Slow Down', msg);
+        await showAlert({ title: 'Slow Down', message: 'You can only send a few messages per hour. Try again shortly.', variant: 'warning' });
       } else if (errMsg === 'GROUP_COOLDOWN') {
-        const msg = 'You messaged this group recently. Wait 30 days before reaching out again.';
-        if (Platform.OS === 'web') window.alert(msg);
-        else Alert.alert('Already Contacted', msg);
+        await showAlert({ title: 'Already Contacted', message: 'You messaged this group recently. Wait 30 days before reaching out again.', variant: 'warning' });
       } else if (errMsg === 'MESSAGE_TOO_SHORT') {
-        const msg = `Write at least ${MIN_MSG_LENGTH} characters.`;
-        if (Platform.OS === 'web') window.alert(msg);
-        else Alert.alert('Too Short', msg);
+        await showAlert({ title: 'Too Short', message: `Write at least ${MIN_MSG_LENGTH} characters.`, variant: 'warning' });
       } else if (errMsg === 'SUSPENDED') {
-        const msg = 'Your outreach privileges have been suspended due to reports. Contact support to appeal.';
-        if (Platform.OS === 'web') window.alert(msg);
-        else Alert.alert('Outreach Suspended', msg);
+        await showAlert({ title: 'Outreach Suspended', message: 'Your outreach privileges have been suspended due to reports. Contact support to appeal.', variant: 'danger' });
       } else {
-        const msg = 'Could not send message. Please try again.';
-        if (Platform.OS === 'web') window.alert(msg);
-        else Alert.alert('Error', msg);
+        await showAlert({ title: 'Error', message: 'Could not send message. Please try again.', variant: 'warning' });
       }
     } finally {
       setSending(false);
@@ -267,13 +255,9 @@ export const BrowseRenterGroupsScreen = () => {
       const newQuota = await getOutreachQuotaStatus(user.id, plan);
       setQuota(newQuota);
       setUnlockPackage(null);
-      const msg = `${credits} additional messages added for today.`;
-      if (Platform.OS === 'web') window.alert(msg);
-      else Alert.alert('Unlocked!', msg);
+      await showAlert({ title: 'Unlocked!', message: `${credits} additional messages added for today.`, variant: 'success' });
     } catch (e: any) {
-      const msg = e.message || 'Payment failed.';
-      if (Platform.OS === 'web') window.alert(msg);
-      else Alert.alert('Error', msg);
+      await showAlert({ title: 'Error', message: e.message || 'Payment failed.', variant: 'warning' });
     } finally {
       setUnlocking(false);
     }

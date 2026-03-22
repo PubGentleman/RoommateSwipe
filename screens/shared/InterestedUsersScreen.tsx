@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, FlatList, Pressable, ActivityIndicator, Alert, StyleSheet, Platform, Image } from 'react-native';
+import { View, FlatList, Pressable, ActivityIndicator, StyleSheet, Image } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { Spacing } from '../../constants/theme';
 import { StorageService } from '../../utils/storage';
 import {
@@ -33,6 +34,7 @@ interface Liker {
 export const InterestedUsersScreen = ({ route }: any) => {
   const { groupId, groupName } = route.params;
   const { theme } = useTheme();
+  const { confirm, alert: showAlert } = useConfirm();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const [likers, setLikers] = useState<Liker[]>([]);
@@ -67,40 +69,25 @@ export const InterestedUsersScreen = ({ route }: any) => {
       prev.map(l => l.userId === userId ? { ...l, adminLikedBack: true } : l)
     );
     setActingOn(null);
-    const msg = `${userName} will be notified they can now request to join.`;
-    if (Platform.OS === 'web') {
-      window.alert(msg);
-    } else {
-      Alert.alert('Mutual Interest!', msg);
-    }
+    await showAlert({ title: 'Mutual Interest!', message: `${userName} will be notified they can now request to join.`, variant: 'success' });
   }, [groupId]);
 
   const handleDismiss = useCallback(async (userId: string, userName: string) => {
-    const doDismiss = async () => {
-      setActingOn(userId);
-      try {
-        await dismissGroupLikerSupabase(groupId, userId);
-      } catch {
-        await StorageService.dismissGroupLikerLocal(groupId, userId);
-      }
-      setLikers(prev => prev.filter(l => l.userId !== userId));
-      setActingOn(null);
-    };
-
-    if (Platform.OS === 'web') {
-      if (window.confirm(`Dismiss ${userName}? They will be removed from your interested list.`)) {
-        await doDismiss();
-      }
-    } else {
-      Alert.alert(
-        `Dismiss ${userName}?`,
-        'They will be removed from your interested list.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Dismiss', style: 'destructive', onPress: doDismiss },
-        ]
-      );
+    const confirmed = await confirm({
+      title: `Dismiss ${userName}?`,
+      message: 'They will be removed from your interested list.',
+      confirmText: 'Dismiss',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
+    setActingOn(userId);
+    try {
+      await dismissGroupLikerSupabase(groupId, userId);
+    } catch {
+      await StorageService.dismissGroupLikerLocal(groupId, userId);
     }
+    setLikers(prev => prev.filter(l => l.userId !== userId));
+    setActingOn(null);
   }, [groupId]);
 
   const GRADIENTS: [string, string][] = [['#667eea', '#764ba2'], ['#f093fb', '#f5576c'], ['#11998e', '#38ef7d']];

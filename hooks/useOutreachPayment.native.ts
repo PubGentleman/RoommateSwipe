@@ -1,8 +1,9 @@
-import { Alert } from 'react-native';
 import { useStripe } from '@stripe/stripe-react-native';
+import { useConfirm } from '../contexts/ConfirmContext';
 
 export function useOutreachPayment() {
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
+  const { alert: showAlert } = useConfirm();
 
   const presentOutreachPayment = async (
     clientSecret: string
@@ -20,14 +21,14 @@ export function useOutreachPayment() {
 
       if (paymentError) {
         if (paymentError.code !== 'Canceled') {
-          Alert.alert('Payment Failed', paymentError.message);
+          await showAlert({ title: 'Payment Failed', message: paymentError.message, variant: 'warning' });
         }
         return { success: false };
       }
 
       return { success: true };
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Something went wrong. Please try again.');
+      await showAlert({ title: 'Error', message: err.message || 'Something went wrong. Please try again.', variant: 'warning' });
       return { success: false };
     }
   };

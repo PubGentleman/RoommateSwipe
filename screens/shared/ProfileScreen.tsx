@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Pressable, Image, Alert, Modal, ScrollView, Text, TouchableOpacity, Platform } from 'react-native';
+import { View, StyleSheet, Pressable, Image, Modal, ScrollView, Text, TouchableOpacity, Platform } from 'react-native';
 import Animated, { useSharedValue, useAnimatedScrollHandler, useAnimatedStyle, interpolate, Extrapolation } from 'react-native-reanimated';
 import { Feather } from '../../components/VectorIcons';
 import * as Haptics from 'expo-haptics';
@@ -19,6 +19,7 @@ import { getBoostTimeRemaining, getBoostDuration, isBoostExpired, RENTER_BOOST_O
 import { isDev } from '../../utils/envUtils';
 import { isHostTypeEditable, daysRemainingInGracePeriod, getHostBadgeLabel, getHostBadgeColor, getHostBadgeIcon } from '../../utils/hostTypeUtils';
 import * as Linking from 'expo-linking';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 type ProfileScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'ProfileMain'>;
 
@@ -27,6 +28,7 @@ export const ProfileScreen = () => {
   const { unreadCount } = useNotificationContext();
   const navigation = useNavigation<ProfileScreenNavigationProp>();
   const insets = useSafeAreaInsets();
+  const { confirm, alert } = useConfirm();
   const [showPurchaseBoostModal, setShowPurchaseBoostModal] = useState(false);
   const [processingBoost, setProcessingBoost] = useState(false);
   const [selectedBoostTierId, setSelectedBoostTierId] = useState<RenterBoostOptionId>('standard');
@@ -153,7 +155,7 @@ export const ProfileScreen = () => {
       setShowPurchaseBoostModal(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } else {
-      Alert.alert('Cannot Boost', result.message);
+      await alert({ title: 'Cannot Boost', message: result.message, variant: 'warning' });
     }
   };
 
@@ -333,20 +335,16 @@ export const ProfileScreen = () => {
               {user?.background_check_status !== 'clear' && user?.background_check_status !== 'pending' ? (
                 <Pressable
                   style={styles.bgCheckBtn}
-                  onPress={() => {
+                  onPress={async () => {
                     if (isDev) {
-                      if (Platform.OS === 'web') {
-                        const confirmed = window.confirm('Dev Mode: Mark background check as cleared?');
-                        if (confirmed && user) {
-                          updateUser({ ...user, background_check_status: 'clear', background_check_completed_at: new Date().toISOString() });
-                        }
-                      } else {
-                        Alert.alert('Dev Mode', 'Background check marked as cleared', [
-                          { text: 'Cancel', style: 'cancel' },
-                          { text: 'Mark Cleared', onPress: () => {
-                            if (user) updateUser({ ...user, background_check_status: 'clear', background_check_completed_at: new Date().toISOString() });
-                          }},
-                        ]);
+                      const confirmed = await confirm({
+                        title: 'Dev Mode',
+                        message: 'Mark background check as cleared?',
+                        confirmText: 'Mark Cleared',
+                        variant: 'info',
+                      });
+                      if (confirmed && user) {
+                        updateUser({ ...user, background_check_status: 'clear', background_check_completed_at: new Date().toISOString() });
                       }
                     } else {
                       navigation.navigate('Payment', { type: 'background_check', amount: 999 } as any);
@@ -564,12 +562,12 @@ export const ProfileScreen = () => {
                 iconBorderColor="rgba(102,126,234,0.2)"
                 title="Dedicated Support"
                 subtitle="Priority support for Business hosts"
-                onPress={() => {
-                  Alert.alert(
-                    'Dedicated Support',
-                    'As a Business host, you have access to priority support.\n\nEmail: support@roomdr.com\nResponse time: Within 2 hours\n\nOur dedicated team is here to help you with any questions or issues.',
-                    [{ text: 'OK' }]
-                  );
+                onPress={async () => {
+                  await alert({
+                    title: 'Dedicated Support',
+                    message: 'As a Business host, you have access to priority support.\n\nEmail: support@roomdr.com\nResponse time: Within 2 hours\n\nOur dedicated team is here to help you with any questions or issues.',
+                    variant: 'info',
+                  });
                 }}
                 isLast
               />

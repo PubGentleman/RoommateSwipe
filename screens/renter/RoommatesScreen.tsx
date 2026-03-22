@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { View, StyleSheet, Image, Pressable, Dimensions, Modal, ScrollView, Alert, Text, Animated as RNAnimated } from 'react-native';
+import { View, StyleSheet, Image, Pressable, Dimensions, Modal, ScrollView, Text, Animated as RNAnimated } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, withSequence, runOnJS, interpolate } from 'react-native-reanimated';
 import { Feather } from '../../components/VectorIcons';
@@ -42,6 +42,7 @@ import { getSwipeDeck, sendLike, sendPass, undoLastAction } from '../../services
 import { getMyGroups as getMyGroupsFromSupabase } from '../../services/groupService';
 import { recordSwipe, getAIMemory } from '../../utils/aiMemory';
 import { getNextMicroQuestion } from '../../utils/aiMicroQuestions';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Limit card size for web/desktop viewing
@@ -54,6 +55,7 @@ export const RoommatesScreen = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { refreshUnreadCount } = useNotificationContext();
+  const { confirm, alert: showAlert } = useConfirm();
   const [profiles, setProfiles] = useState<RoommateProfile[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showMatch, setShowMatch] = useState(false);
@@ -424,13 +426,9 @@ export const RoommatesScreen = () => {
       });
       setShowMatch(false);
       setMatchedProfileData(null);
-      Alert.alert(
-        'Invite Sent!',
-        `${matchedProfileData.profile.name} has been invited to join your group.`,
-        [{ text: 'OK' }]
-      );
+      await showAlert({ title: 'Invite Sent!', message: `${matchedProfileData.profile.name} has been invited to join your group.`, variant: 'success' });
     } catch {
-      Alert.alert('Error', 'Could not send invite. Try again.');
+      await showAlert({ title: 'Error', message: 'Could not send invite. Try again.', variant: 'warning' });
     }
   };
 
@@ -1053,14 +1051,14 @@ export const RoommatesScreen = () => {
     } else {
       const coldCheck = await canSendColdMessage();
       if (!coldCheck.canSend) {
-        Alert.alert(
-          'Daily Limit Reached',
-          coldCheck.reason || "You've used all your messages for today. Resets at midnight.",
-          [
-            { text: 'Upgrade for More', onPress: () => (navigation as any).navigate('Plans') },
-            { text: 'OK', style: 'cancel' },
-          ]
-        );
+        const wantsUpgrade = await confirm({
+          title: 'Daily Limit Reached',
+          message: coldCheck.reason || "You've used all your messages for today. Resets at midnight.",
+          confirmText: 'Upgrade for More',
+          cancelText: 'OK',
+          variant: 'warning',
+        });
+        if (wantsUpgrade) (navigation as any).navigate('Plans');
         return;
       }
       handleSendDirectMessage(true);
@@ -1543,7 +1541,7 @@ export const RoommatesScreen = () => {
                   setShowBoostModal(false);
                   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 } else {
-                  Alert.alert('Cannot Boost', result.message);
+                  showAlert({ title: 'Cannot Boost', message: result.message, variant: 'warning' });
                 }
               };
 
@@ -2233,14 +2231,14 @@ export const RoommatesScreen = () => {
                       } else {
                         const coldCheck = await canSendColdMessage();
                         if (!coldCheck.canSend) {
-                          Alert.alert(
-                            'Daily Limit Reached',
-                            coldCheck.reason || "You've used all your messages for today. Resets at midnight.",
-                            [
-                              { text: 'Upgrade for More', onPress: () => (navigation as any).navigate('Plans') },
-                              { text: 'OK', style: 'cancel' },
-                            ]
-                          );
+                          const wantsUpgrade = await confirm({
+                            title: 'Daily Limit Reached',
+                            message: coldCheck.reason || "You've used all your messages for today. Resets at midnight.",
+                            confirmText: 'Upgrade for More',
+                            cancelText: 'OK',
+                            variant: 'warning',
+                          });
+                          if (wantsUpgrade) (navigation as any).navigate('Plans');
                           return;
                         }
                         setShowProfileDetail(false);

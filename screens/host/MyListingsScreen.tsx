@@ -1,11 +1,12 @@
 import React, { useState, useCallback } from 'react';
-import { View, StyleSheet, Pressable, Text, ScrollView, Image, Alert, Platform } from 'react-native';
+import { View, StyleSheet, Pressable, Text, ScrollView, Image } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { PaywallSheet } from '../../components/PaywallSheet';
 import { StorageService } from '../../utils/storage';
 import { Property, InterestCard, HostSubscriptionData } from '../../types/models';
@@ -69,6 +70,7 @@ function formatListedAgo(listing: Property): string {
 
 export const MyListingsScreen = () => {
   const { user, getHostPlan } = useAuth();
+  const { confirm, alert: showAlert } = useConfirm();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const [listings, setListings] = useState<Property[]>([]);
@@ -176,23 +178,12 @@ export const MyListingsScreen = () => {
 
   const markAsRented = async (propertyId: string) => {
     if (!user) return;
-    const confirmRent = () => {
-      return new Promise<boolean>((resolve) => {
-        if (Platform.OS === 'web') {
-          resolve(window.confirm('Mark this listing as rented? A 48-hour cooldown will begin before you can message interested groups.'));
-        } else {
-          Alert.alert(
-            'Mark as Rented',
-            'A 48-hour cooldown will begin before you can message interested groups.',
-            [
-              { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
-              { text: 'Mark Rented', style: 'destructive', onPress: () => resolve(true) },
-            ]
-          );
-        }
-      });
-    };
-    const confirmed = await confirmRent();
+    const confirmed = await confirm({
+      title: 'Mark as Rented',
+      message: 'Mark this listing as rented? A 48-hour cooldown will begin before you can message interested groups.',
+      confirmText: 'Mark Rented',
+      variant: 'warning',
+    });
     if (!confirmed) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
@@ -234,37 +225,27 @@ export const MyListingsScreen = () => {
     await loadData();
   };
 
-  const deleteListingHandler = (propertyId: string) => {
-    if (Platform.OS === 'web') {
-      const confirmed = window.confirm('Are you sure you want to delete this listing? This action cannot be undone.');
-      if (confirmed) {
-        executeDeleteListing(propertyId);
-      }
-      return;
+  const deleteListingHandler = async (propertyId: string) => {
+    const confirmed = await confirm({
+      title: 'Delete Listing',
+      message: 'Are you sure you want to delete this listing? This action cannot be undone.',
+      confirmText: 'Delete',
+      variant: 'danger',
+    });
+    if (confirmed) {
+      executeDeleteListing(propertyId);
     }
-    Alert.alert(
-      'Delete Listing',
-      'Are you sure you want to delete this listing? This action cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => executeDeleteListing(propertyId),
-        },
-      ]
-    );
   };
 
   const toggleFeatured = async (propertyId: string) => {
     if (!user) return;
     const hostPlan = (user as any).hostPlan || 'starter';
     if (hostPlan !== 'business') {
-      Alert.alert(
-        'Business Plan Required',
-        'Featured listings are available exclusively for Business hosts. Upgrade your plan to feature your listings.',
-        [{ text: 'OK' }]
-      );
+      await showAlert({
+        title: 'Business Plan Required',
+        message: 'Featured listings are available exclusively for Business hosts. Upgrade your plan to feature your listings.',
+        variant: 'info',
+      });
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);

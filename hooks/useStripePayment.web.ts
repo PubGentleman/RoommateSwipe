@@ -1,19 +1,15 @@
-import { Alert, Platform } from 'react-native';
+import { useConfirm } from '../contexts/ConfirmContext';
 
 export function useStripePayment() {
+  const { alert: showAlert } = useConfirm();
+
   const processPayment = async (
     _userId: string,
     _email: string,
     _plan: string,
     _billingCycle: 'monthly' | '3month' | 'annual'
   ): Promise<{ success: boolean; subscriptionId?: string }> => {
-    if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined') {
-        window.alert('Payment is available on the Roomdr mobile app. Please use the iOS or Android app to subscribe.');
-      }
-    } else {
-      Alert.alert('Payment Unavailable', 'Please use the Roomdr mobile app to subscribe.');
-    }
+    await showAlert({ title: 'Payment Unavailable', message: 'Payment is available on the Roomdr mobile app. Please use the iOS or Android app to subscribe.', variant: 'info' });
     return { success: false };
   };
 

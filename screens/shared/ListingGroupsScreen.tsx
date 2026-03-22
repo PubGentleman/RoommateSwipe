@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, StyleSheet, Pressable, FlatList, Alert, ActivityIndicator,
+  View, StyleSheet, Pressable, FlatList, ActivityIndicator,
 } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { Typography, Spacing } from '../../constants/theme';
 import {
   getDiscoverableGroupsForListing,
@@ -14,6 +15,7 @@ import {
 export function ListingGroupsScreen({ navigation, route }: any) {
   const { listingId } = route.params;
   const { theme } = useTheme();
+  const { alert: showAlert } = useConfirm();
   const [groups, setGroups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [requestingId, setRequestingId] = useState<string | null>(null);
@@ -39,9 +41,9 @@ export function ListingGroupsScreen({ navigation, route }: any) {
     try {
       await requestToJoinGroup(groupId);
       setRequestedIds(prev => new Set(prev).add(groupId));
-      Alert.alert('Request Sent', 'The group admin will review your request.');
+      await showAlert({ title: 'Request Sent', message: 'The group admin will review your request.', variant: 'success' });
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      await showAlert({ title: 'Error', message: err.message, variant: 'warning' });
     } finally {
       setRequestingId(null);
     }

@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { View, StyleSheet, Pressable, Alert, Platform } from 'react-native';
+import { View, StyleSheet, Pressable } from 'react-native';
 import { Feather } from './VectorIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
@@ -13,6 +13,7 @@ import { useTheme } from '../hooks/useTheme';
 import { ThemedText } from './ThemedText';
 import { Spacing, BorderRadius } from '../constants/theme';
 import { INTEREST_TAGS, MIN_TAGS, MAX_TAGS } from '../constants/interestTags';
+import { useConfirm } from '../contexts/ConfirmContext';
 
 type TagMap = Record<string, { label: string; icon: string; tags: { id: string; label: string }[] }>;
 
@@ -85,6 +86,7 @@ export const TagSelector: React.FC<TagSelectorProps> = ({
   singleSelect = false,
 }) => {
   const { theme } = useTheme();
+  const { alert: showAlert } = useConfirm();
   const counterShake = useSharedValue(0);
 
   const counterAnimatedStyle = useAnimatedStyle(() => ({
@@ -107,16 +109,12 @@ export const TagSelector: React.FC<TagSelectorProps> = ({
           withTiming(4, { duration: 50 }),
           withTiming(0, { duration: 50 })
         );
-        if (Platform.OS === 'web') {
-          alert(`Max ${maxTags} tags selected — remove one to add another`);
-        } else {
-          Alert.alert('Limit Reached', `Max ${maxTags} tags selected — remove one to add another`);
-        }
+        showAlert({ title: 'Limit Reached', message: `Max ${maxTags} tags selected — remove one to add another`, variant: 'warning' });
         return;
       }
       onChange([...selectedTags, tagId]);
     }
-  }, [selectedTags, onChange, maxTags, counterShake, singleSelect]);
+  }, [selectedTags, onChange, maxTags, counterShake, singleSelect, showAlert]);
 
   const count = selectedTags.length;
   const progress = count / maxTags;

@@ -1,9 +1,10 @@
 import React, { useState, useCallback } from 'react';
-import { View, StyleSheet, Pressable, FlatList, Text, Alert, Image } from 'react-native';
+import { View, StyleSheet, Pressable, FlatList, Text, Image } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../contexts/AuthContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { StorageService } from '../../utils/storage';
 import { InterestCard } from '../../types/models';
 import { PaywallSheet } from '../../components/PaywallSheet';
@@ -14,6 +15,7 @@ type TabType = 'sent' | 'received';
 
 export const MyInterestsScreen = () => {
   const { user, canSendInterest } = useAuth();
+  const { alert: showAlert } = useConfirm();
   const { refreshUnreadCount } = useNotificationContext();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
@@ -191,7 +193,7 @@ export const MyInterestsScreen = () => {
     if (!user) return;
     const limitCheck = await canSendInterest();
     if (!limitCheck.canSend) {
-      Alert.alert('Daily Limit Reached', limitCheck.reason || 'Upgrade to send more interest cards.', [{ text: 'OK' }]);
+      await showAlert({ title: 'Daily Limit Reached', message: limitCheck.reason || 'Upgrade to send more interest cards.', variant: 'warning' });
       return;
     }
     try {

@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Pressable, TextInput, Alert, Modal, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, Pressable, TextInput, Modal, ActivityIndicator } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { WebView } from 'react-native-webview';
 import { ScreenKeyboardAwareScrollView } from '../../components/ScreenKeyboardAwareScrollView';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { Typography, Spacing } from '../../constants/theme';
 import { getVerificationLevel, getVerificationLabel } from '../../components/VerificationBadge';
 import { isDev } from '../../utils/envUtils';
@@ -19,6 +20,7 @@ type Props = NativeStackScreenProps<ProfileStackParamList, 'Verification'>;
 export function VerificationScreen({ navigation, route }: Props) {
   const { theme } = useTheme();
   const { user, updateUser } = useAuth();
+  const { confirm, alert: showAlert } = useConfirm();
   const verification = user?.verification;
   const level = getVerificationLevel(verification);
   const userPlan = user?.subscription?.plan || 'basic';
@@ -46,7 +48,7 @@ export function VerificationScreen({ navigation, route }: Props) {
 
   const handleCompleteHostVerification = async () => {
     if (!govIdVerified) {
-      Alert.alert('ID Required', 'You must complete Government ID verification before activating your Host Verification Badge.');
+      await showAlert({ title: 'ID Required', message: 'You must complete Government ID verification before activating your Host Verification Badge.', variant: 'warning' });
       return;
     }
     setHostIdUploading(true);
@@ -58,36 +60,36 @@ export function VerificationScreen({ navigation, route }: Props) {
         },
       });
       setHostIdUploading(false);
-      Alert.alert('Host Verified', 'Your Host Verification Badge is now active! Renters will see you as a verified host.');
+      await showAlert({ title: 'Host Verified', message: 'Your Host Verification Badge is now active! Renters will see you as a verified host.', variant: 'success' });
     }, 1500);
   };
 
   const handleSendPhoneCode = async () => {
     if (phoneNumber.length < 10) {
-      Alert.alert('Invalid Number', 'Please enter a valid phone number.');
+      await showAlert({ title: 'Invalid Number', message: 'Please enter a valid phone number.', variant: 'warning' });
       return;
     }
     if (isDev) {
       setTimeout(() => { setPhoneSent(true); }, 500);
-      Alert.alert('Code Sent', 'A verification code has been sent to your phone number.');
+      await showAlert({ title: 'Code Sent', message: 'A verification code has been sent to your phone number.', variant: 'success' });
       return;
     }
     try {
       const { error } = await supabase.auth.signInWithOtp({ phone: phoneNumber });
       if (error) {
-        Alert.alert('Error', error.message || 'Failed to send verification code.');
+        await showAlert({ title: 'Error', message: error.message || 'Failed to send verification code.', variant: 'warning' });
         return;
       }
       setPhoneSent(true);
-      Alert.alert('Code Sent', 'A verification code has been sent to your phone number.');
+      await showAlert({ title: 'Code Sent', message: 'A verification code has been sent to your phone number.', variant: 'success' });
     } catch (err) {
-      Alert.alert('Error', 'Failed to send verification code. Please try again.');
+      await showAlert({ title: 'Error', message: 'Failed to send verification code. Please try again.', variant: 'warning' });
     }
   };
 
   const handleVerifyPhone = async () => {
     if (phoneCode.length < 4) {
-      Alert.alert('Invalid Code', 'Please enter the verification code.');
+      await showAlert({ title: 'Invalid Code', message: 'Please enter the verification code.', variant: 'warning' });
       return;
     }
     if (isDev) {
@@ -100,7 +102,7 @@ export function VerificationScreen({ navigation, route }: Props) {
       setPhoneSent(false);
       setPhoneNumber('');
       setPhoneCode('');
-      Alert.alert('Phone Verified', 'Your phone number has been verified successfully.');
+      await showAlert({ title: 'Phone Verified', message: 'Your phone number has been verified successfully.', variant: 'success' });
       return;
     }
     try {
@@ -108,7 +110,7 @@ export function VerificationScreen({ navigation, route }: Props) {
         phone: phoneNumber, token: phoneCode, type: 'sms',
       });
       if (error) {
-        Alert.alert('Error', error.message || 'Invalid verification code.');
+        await showAlert({ title: 'Error', message: error.message || 'Invalid verification code.', variant: 'warning' });
         return;
       }
       const newVerification = {
@@ -120,9 +122,9 @@ export function VerificationScreen({ navigation, route }: Props) {
       setPhoneSent(false);
       setPhoneNumber('');
       setPhoneCode('');
-      Alert.alert('Phone Verified', 'Your phone number has been verified successfully.');
+      await showAlert({ title: 'Phone Verified', message: 'Your phone number has been verified successfully.', variant: 'success' });
     } catch (err) {
-      Alert.alert('Error', 'Failed to verify code. Please try again.');
+      await showAlert({ title: 'Error', message: 'Failed to verify code. Please try again.', variant: 'warning' });
     }
   };
 
@@ -154,7 +156,7 @@ export function VerificationScreen({ navigation, route }: Props) {
           };
           await updateUser({ verification: newVerification });
           await syncVerificationToSupabase(newVerification);
-          Alert.alert('ID Verified', 'Your government ID has been verified successfully by Stripe Identity.');
+          await showAlert({ title: 'ID Verified', message: 'Your government ID has been verified successfully by Stripe Identity.', variant: 'success' });
           return;
         }
       } catch (_e) {}
@@ -163,10 +165,7 @@ export function VerificationScreen({ navigation, route }: Props) {
         await new Promise(res => setTimeout(res, interval));
         return check();
       } else {
-        Alert.alert(
-          'Verification Pending',
-          'Your ID is being reviewed. This usually takes a few minutes. We\'ll notify you when it\'s complete.'
-        );
+        await showAlert({ title: 'Verification Pending', message: 'Your ID is being reviewed. This usually takes a few minutes. We\'ll notify you when it\'s complete.', variant: 'info' });
       }
     };
 
@@ -186,7 +185,7 @@ export function VerificationScreen({ navigation, route }: Props) {
         await updateUser({ verification: newVerification });
         await syncVerificationToSupabase(newVerification);
         setIdUploading(false);
-        Alert.alert('ID Verified (Dev)', 'Simulated verification complete.');
+        await showAlert({ title: 'ID Verified (Dev)', message: 'Simulated verification complete.', variant: 'success' });
       }, 1500);
       return;
     }
@@ -203,11 +202,11 @@ export function VerificationScreen({ navigation, route }: Props) {
         setShowStripeWebView(true);
         setIdUploading(false);
       } else {
-        Alert.alert('Error', 'Could not start identity verification. Please try again.');
+        await showAlert({ title: 'Error', message: 'Could not start identity verification. Please try again.', variant: 'warning' });
         setIdUploading(false);
       }
     } catch (err: any) {
-      Alert.alert('Verification Error', err?.message || 'Failed to start identity verification. Please try again later.');
+      await showAlert({ title: 'Verification Error', message: err?.message || 'Failed to start identity verification. Please try again later.', variant: 'warning' });
       setIdUploading(false);
     }
   };
@@ -230,95 +229,82 @@ export function VerificationScreen({ navigation, route }: Props) {
       });
       await syncVerificationToSupabase(newVerification);
       setSocialPlatform(null);
-      Alert.alert('Social Media Verified', `Your ${platform.charAt(0).toUpperCase() + platform.slice(1)} account has been linked and verified.`);
+      await showAlert({ title: 'Social Media Verified', message: `Your ${platform.charAt(0).toUpperCase() + platform.slice(1)} account has been linked and verified.`, variant: 'success' });
     }, 1200);
   };
 
-  const handleVerifyBackground = () => {
+  const handleVerifyBackground = async () => {
     if (!isElite || !user) return;
-    Alert.alert(
-      'Background Check',
-      'This initiates a background check via Checkr. Results are typically ready within 24-48 hours. A link will be sent to your email to complete the process.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Start Check',
-          onPress: async () => {
-            setBackgroundChecking(true);
-            try {
-              if (isDev) {
-                setTimeout(async () => {
-                  const newVerification = {
-                    ...verification,
-                    background_check: { status: 'pending', initiatedAt: new Date() },
-                  };
-                  await updateUser({ verification: newVerification });
-                  await syncVerificationToSupabase(newVerification);
-                  setBackgroundChecking(false);
-                  Alert.alert('Check Initiated (Dev)', 'Background check simulated as pending.');
-                }, 1500);
-                return;
-              }
+    const confirmed = await confirm({
+      title: 'Background Check',
+      message: 'This initiates a background check via Checkr. Results are typically ready within 24-48 hours. A link will be sent to your email to complete the process.',
+      confirmText: 'Start Check',
+      variant: 'warning',
+    });
+    if (!confirmed) return;
+    setBackgroundChecking(true);
+    try {
+      if (isDev) {
+        setTimeout(async () => {
+          const newVerification = {
+            ...verification,
+            background_check: { status: 'pending', initiatedAt: new Date() },
+          };
+          await updateUser({ verification: newVerification });
+          await syncVerificationToSupabase(newVerification);
+          setBackgroundChecking(false);
+          await showAlert({ title: 'Check Initiated (Dev)', message: 'Background check simulated as pending.', variant: 'info' });
+        }, 1500);
+        return;
+      }
 
-              const { data, error } = await supabase.functions.invoke('initiate-background-check', {
-                body: { userId: user.id, email: user.email },
-              });
+      const { data, error } = await supabase.functions.invoke('initiate-background-check', {
+        body: { userId: user.id, email: user.email },
+      });
 
-              if (error) throw error;
+      if (error) throw error;
 
-              const newVerification = {
-                ...verification,
-                background_check: {
-                  status: 'pending',
-                  initiatedAt: new Date(),
-                  checkrInvitationUrl: data?.invitationUrl,
-                },
-              };
-              await updateUser({ verification: newVerification });
-              await syncVerificationToSupabase(newVerification);
-
-              Alert.alert(
-                'Check Initiated',
-                'A link has been sent to your email to complete the background check. Results are typically ready in 24-48 hours.'
-              );
-            } catch (e: any) {
-              Alert.alert('Error', e.message || 'Failed to initiate background check. Please try again.');
-            } finally {
-              setBackgroundChecking(false);
-            }
-          },
+      const newVerification = {
+        ...verification,
+        background_check: {
+          status: 'pending',
+          initiatedAt: new Date(),
+          checkrInvitationUrl: data?.invitationUrl,
         },
-      ]
-    );
+      };
+      await updateUser({ verification: newVerification });
+      await syncVerificationToSupabase(newVerification);
+
+      await showAlert({ title: 'Check Initiated', message: 'A link has been sent to your email to complete the background check. Results are typically ready in 24-48 hours.', variant: 'success' });
+    } catch (e: any) {
+      await showAlert({ title: 'Error', message: e.message || 'Failed to initiate background check. Please try again.', variant: 'warning' });
+    } finally {
+      setBackgroundChecking(false);
+    }
   };
 
-  const handleVerifyIncome = () => {
+  const handleVerifyIncome = async () => {
     if (!isElite) return;
-    Alert.alert(
-      'Income Verification',
-      'This will verify your income through secure document review. Do you want to proceed?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Start Verification',
-          onPress: async () => {
-            setIncomeVerifying(true);
-            setTimeout(async () => {
-              const newVerification = {
-                ...verification,
-                income_verification: { verified: true, verifiedAt: new Date() },
-              };
-              await updateUser({
-                verification: newVerification,
-              });
-              await syncVerificationToSupabase(newVerification);
-              setIncomeVerifying(false);
-              Alert.alert('Income Verified', 'Your income has been verified successfully.');
-            }, 2000);
-          },
-        },
-      ]
-    );
+    const confirmed = await confirm({
+      title: 'Income Verification',
+      message: 'This will verify your income through secure document review. Do you want to proceed?',
+      confirmText: 'Start Verification',
+      variant: 'info',
+    });
+    if (!confirmed) return;
+    setIncomeVerifying(true);
+    setTimeout(async () => {
+      const newVerification = {
+        ...verification,
+        income_verification: { verified: true, verifiedAt: new Date() },
+      };
+      await updateUser({
+        verification: newVerification,
+      });
+      await syncVerificationToSupabase(newVerification);
+      setIncomeVerifying(false);
+      await showAlert({ title: 'Income Verified', message: 'Your income has been verified successfully.', variant: 'success' });
+    }, 2000);
   };
 
   const progressPercent = Math.round((level / 3) * 100);
@@ -369,7 +355,7 @@ export function VerificationScreen({ navigation, route }: Props) {
                     social_media: { verified: true, verifiedAt: new Date(), platform: 'instagram' },
                   };
                   await updateUser({ verification: newVerification });
-                  Alert.alert('Dev Mode', 'All verifications marked as complete');
+                  await showAlert({ title: 'Dev Mode', message: 'All verifications marked as complete', variant: 'info' });
                 }}
               >
                 <Feather name="check-circle" size={14} color="#fff" style={{ marginRight: 4 }} />
@@ -383,7 +369,7 @@ export function VerificationScreen({ navigation, route }: Props) {
                     background_check: { verified: true, verifiedAt: new Date() },
                   };
                   await updateUser({ verification: newVerification });
-                  Alert.alert('Dev Mode', 'Background check marked as cleared');
+                  await showAlert({ title: 'Dev Mode', message: 'Background check marked as cleared', variant: 'info' });
                 }}
               >
                 <Feather name="shield" size={14} color="#fff" style={{ marginRight: 4 }} />
@@ -735,22 +721,18 @@ export function VerificationScreen({ navigation, route }: Props) {
           <View style={styles.stripeWebViewHeader}>
             <ThemedText style={[Typography.h3, { flex: 1 }]}>Identity Verification</ThemedText>
             <Pressable
-              onPress={() => {
-                Alert.alert(
-                  'Cancel Verification?',
-                  'Your verification progress will be lost if you close now.',
-                  [
-                    { text: 'Continue', style: 'cancel' },
-                    {
-                      text: 'Cancel',
-                      style: 'destructive',
-                      onPress: () => {
-                        setShowStripeWebView(false);
-                        setStripeVerificationUrl(null);
-                      },
-                    },
-                  ]
-                );
+              onPress={async () => {
+                const confirmed = await confirm({
+                  title: 'Cancel Verification?',
+                  message: 'Your verification progress will be lost if you close now.',
+                  confirmText: 'Cancel',
+                  cancelText: 'Continue',
+                  variant: 'danger',
+                });
+                if (confirmed) {
+                  setShowStripeWebView(false);
+                  setStripeVerificationUrl(null);
+                }
               }}
               hitSlop={12}
             >

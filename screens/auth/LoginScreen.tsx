@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, Pressable, Alert } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenKeyboardAwareScrollView } from '../../components/ScreenKeyboardAwareScrollView';
 import { useAuth, UserRole } from '../../contexts/AuthContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { Feather } from '../../components/VectorIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RoomdrLogo } from '../../components/RoomdrLogo';
 
 export const LoginScreen = () => {
   const { login, register, resetPassword } = useAuth();
+  const { alert: showAlert } = useConfirm();
   const insets = useSafeAreaInsets();
   const [isSignUp, setIsSignUp] = useState(false);
   const [name, setName] = useState('');
@@ -189,14 +191,14 @@ export const LoginScreen = () => {
             <View style={styles.forgotRow}>
               <Pressable hitSlop={8} onPress={async () => {
                 if (!email.trim()) {
-                  Alert.alert('Enter Email', 'Please enter your email address first, then tap Forgot Password.');
+                  await showAlert({ title: 'Enter Email', message: 'Please enter your email address first, then tap Forgot Password.', variant: 'info' });
                   return;
                 }
                 try {
                   await resetPassword(email.trim());
-                  Alert.alert('Check Your Email', 'A password reset link has been sent to your email address.');
+                  await showAlert({ title: 'Check Your Email', message: 'A password reset link has been sent to your email address.', variant: 'success' });
                 } catch (err: any) {
-                  Alert.alert('Error', err.message || 'Failed to send reset email. Please try again.');
+                  await showAlert({ title: 'Error', message: err.message || 'Failed to send reset email. Please try again.', variant: 'warning' });
                 }
               }}>
                 <Text style={styles.forgotText}>Forgot password?</Text>
@@ -236,11 +238,11 @@ export const LoginScreen = () => {
           </View>
 
           <View style={styles.socialRow}>
-            <Pressable style={styles.socialBtn} onPress={() => Alert.alert('Google Sign In', 'Google authentication will be available in a future update.', [{ text: 'OK' }])}>
+            <Pressable style={styles.socialBtn} onPress={async () => await showAlert({ title: 'Google Sign In', message: 'Google authentication will be available in a future update.', variant: 'info' })}>
               <Feather name="globe" size={16} color="rgba(255,255,255,0.75)" />
               <Text style={styles.socialBtnText}>Google</Text>
             </Pressable>
-            <Pressable style={styles.socialBtn} onPress={() => Alert.alert('Apple Sign In', 'Apple authentication will be available in a future update.', [{ text: 'OK' }])}>
+            <Pressable style={styles.socialBtn} onPress={async () => await showAlert({ title: 'Apple Sign In', message: 'Apple authentication will be available in a future update.', variant: 'info' })}>
               <Feather name="smartphone" size={16} color="rgba(255,255,255,0.75)" />
               <Text style={styles.socialBtnText}>Apple</Text>
             </Pressable>

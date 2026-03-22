@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, StyleSheet, Pressable, FlatList, Alert, ActivityIndicator,
+  View, StyleSheet, Pressable, FlatList, ActivityIndicator,
 } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { Typography, Spacing } from '../../constants/theme';
 import { Image } from 'expo-image';
 import { supabase } from '../../lib/supabase';
@@ -15,6 +16,7 @@ export function PromoteAdminScreen({ navigation, route }: any) {
   const { groupId, groupName } = route.params;
   const { theme } = useTheme();
   const { user } = useAuth();
+  const { alert } = useConfirm();
   const [members, setMembers] = useState<any[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -38,10 +40,10 @@ export function PromoteAdminScreen({ navigation, route }: any) {
     try {
       await promoteMember(groupId, selected);
       await leaveGroup(groupId);
-      Alert.alert('Done', 'You have left the group.');
+      await alert({ title: 'Done', message: 'You have left the group.', variant: 'success' });
       navigation.popToTop();
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      await alert({ title: 'Error', message: err.message, variant: 'warning' });
     } finally {
       setLoading(false);
     }

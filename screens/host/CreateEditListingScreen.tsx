@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TextInput, StyleSheet, Pressable, Alert, Image, ScrollView, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Pressable, Image, ScrollView, ActivityIndicator } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { ScreenKeyboardAwareScrollView } from '../../components/ScreenKeyboardAwareScrollView';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { StorageService } from '../../utils/storage';
 import { Property, HostSubscriptionData } from '../../types/models';
 import { canAddListingCheck } from '../../utils/hostPricing';
@@ -50,6 +51,7 @@ export const CreateEditListingScreen = () => {
   const route = useRoute<RouteProp<RouteParams, 'CreateEditListing'>>();
   const { theme } = useTheme();
   const { user, getHostPlan } = useAuth();
+  const { confirm, alert: showAlert } = useConfirm();
 
   const propertyId = route.params?.propertyId;
   const isEditing = !!propertyId;
@@ -168,11 +170,7 @@ export const CreateEditListingScreen = () => {
   const handleAddPhoto = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert(
-        'Permission Required',
-        'Please allow access to your photo library to upload listing photos.',
-        [{ text: 'OK' }]
-      );
+      await showAlert({ title: 'Permission Required', message: 'Please allow access to your photo library to upload listing photos.', variant: 'warning' });
       return;
     }
 
@@ -206,21 +204,21 @@ export const CreateEditListingScreen = () => {
 
   const handleSave = async () => {
     if (!title.trim()) {
-      Alert.alert('Required', 'Please enter a title');
+      await showAlert({ title: 'Required', message: 'Please enter a title', variant: 'warning' });
       return;
     }
     if (!price.trim() || isNaN(Number(price))) {
-      Alert.alert('Required', 'Please enter a valid price');
+      await showAlert({ title: 'Required', message: 'Please enter a valid price', variant: 'warning' });
       return;
     }
     if (!city.trim()) {
-      Alert.alert('Required', 'Please select a city');
+      await showAlert({ title: 'Required', message: 'Please select a city', variant: 'warning' });
       return;
     }
 
     if (!isEditing) {
       if (!hostSub) {
-        Alert.alert('Unable to verify plan', 'Please try again in a moment.');
+        await showAlert({ title: 'Unable to verify plan', message: 'Please try again in a moment.', variant: 'warning' });
         return;
       }
       const capResult = canAddListingCheck(hostSub);
@@ -339,23 +337,13 @@ export const CreateEditListingScreen = () => {
         await StorageService.addOrUpdateProperty(property);
       }
       if (!isEditing) {
-        Alert.alert(
-          'Listing Posted!',
-          'Your listing is now live. You can manage it from the Listings tab.',
-          [
-            {
-              text: 'View My Listings',
-              onPress: () => {
-                const parentNav = navigation.getParent();
-                if (parentNav) {
-                  parentNav.navigate('Listings');
-                } else {
-                  navigation.goBack();
-                }
-              },
-            },
-          ]
-        );
+        await showAlert({ title: 'Listing Posted!', message: 'Your listing is now live. You can manage it from the Listings tab.', variant: 'success' });
+        const parentNav = navigation.getParent();
+        if (parentNav) {
+          parentNav.navigate('Listings');
+        } else {
+          navigation.goBack();
+        }
       } else {
         if (propertyId) {
           await StorageService.notifyPropertyEvent(
@@ -365,12 +353,11 @@ export const CreateEditListingScreen = () => {
             `${title.trim()} has been updated with new details`,
           );
         }
-        Alert.alert('Saved', 'Your listing has been updated.', [
-          { text: 'OK', onPress: () => navigation.goBack() },
-        ]);
+        await showAlert({ title: 'Saved', message: 'Your listing has been updated.', variant: 'success' });
+        navigation.goBack();
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to save listing');
+      await showAlert({ title: 'Error', message: 'Failed to save listing', variant: 'warning' });
     } finally {
       setSaving(false);
     }
@@ -392,26 +379,16 @@ export const CreateEditListingScreen = () => {
     navigation.goBack();
   };
 
-  const handleDelete = () => {
-    if (Platform.OS === 'web') {
-      const confirmed = window.confirm('Are you sure you want to delete this listing? This cannot be undone.');
-      if (confirmed) {
-        executeDelete();
-      }
-      return;
+  const handleDelete = async () => {
+    const confirmed = await confirm({
+      title: 'Delete Listing',
+      message: 'Are you sure you want to delete this listing? This cannot be undone.',
+      confirmText: 'Delete',
+      variant: 'danger',
+    });
+    if (confirmed) {
+      executeDelete();
     }
-    Alert.alert(
-      'Delete Listing',
-      'Are you sure you want to delete this listing? This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: executeDelete,
-        },
-      ]
-    );
   };
 
   const completionFields = [

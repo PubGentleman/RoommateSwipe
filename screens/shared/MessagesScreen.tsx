@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, FlatList, ScrollView, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, Pressable, FlatList, ScrollView, TextInput } from 'react-native';
 import Animated, { useSharedValue, useAnimatedScrollHandler, useAnimatedStyle, interpolate, Extrapolation } from 'react-native-reanimated';
 import { Feather } from '../../components/VectorIcons';
 import { Conversation, Match, RoommateProfile } from '../../types/models';
@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { User } from '../../types/models';
 import { getConversations as getSupabaseConversations, subscribeToAllMessages } from '../../services/messageService';
 import { getMyInquiryGroups } from '../../services/groupService';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { Group } from '../../types/models';
 
 type MessagesScreenNavigationProp = NativeStackNavigationProp<MessagesStackParamList, 'MessagesList'>;
@@ -44,6 +45,7 @@ export const MessagesScreen = () => {
   const isHostMode = role === 'host';
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { alert } = useConfirm();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [profilesMap, setProfilesMap] = useState<Map<string, RoommateProfile>>(new Map());
   const [usersMap, setUsersMap] = useState<Map<string, User>>(new Map()); // populated for future profile lookups
@@ -797,7 +799,7 @@ export const MessagesScreen = () => {
       const firstMatch = newMatches[0];
       navigateToMatchChat(firstMatch.profile, firstMatch.match);
     } else {
-      Alert.alert('No New Matches', 'Match with roommates on the Match tab to start a new conversation.');
+      alert({ title: 'No New Matches', message: 'Match with roommates on the Match tab to start a new conversation.', variant: 'info' });
     }
   };
 

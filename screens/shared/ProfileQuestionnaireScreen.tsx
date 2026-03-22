@@ -4,7 +4,6 @@ import {
   StyleSheet,
   Pressable,
   TouchableOpacity,
-  Alert,
   TextInput,
   ScrollView,
   Dimensions,
@@ -40,6 +39,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { calculateZodiacFromBirthday } from '../../utils/zodiacUtils';
 import { ProgressBar } from '../../components/questionnaire/ProgressBar';
@@ -150,6 +150,7 @@ const STEP_ICONS: Record<StepId, keyof typeof Feather.glyphMap> = {
 export const ProfileQuestionnaireScreen = () => {
   const { theme } = useTheme();
   const { user, updateUser, completeOnboardingStep, logout, abandonSignup } = useAuth();
+  const { confirm, alert: showAlert } = useConfirm();
   const navigation = useNavigation();
   const route = useRoute();
   const insets = useSafeAreaInsets();
@@ -235,7 +236,7 @@ export const ProfileQuestionnaireScreen = () => {
 
   const pickImage = async () => {
     if (photos.length >= 6) {
-      Alert.alert('Maximum Reached', 'You can upload up to 6 photos');
+      await showAlert({ title: 'Maximum Reached', message: 'You can upload up to 6 photos', variant: 'warning' });
       return;
     }
     if (Platform.OS === 'web') {
@@ -246,7 +247,7 @@ export const ProfileQuestionnaireScreen = () => {
         const file = e.target.files?.[0];
         if (file) {
           if (file.size > 10 * 1024 * 1024) {
-            Alert.alert('File Too Large', 'Please select an image smaller than 10MB');
+            showAlert({ title: 'File Too Large', message: 'Please select an image smaller than 10MB', variant: 'warning' });
             return;
           }
           const reader = new FileReader();
@@ -262,7 +263,7 @@ export const ProfileQuestionnaireScreen = () => {
     }
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permissionResult.granted) {
-      Alert.alert('Permission Required', 'Photo library access is required to add photos.');
+      await showAlert({ title: 'Permission Required', message: 'Photo library access is required to add photos.', variant: 'warning' });
       return;
     }
     try {
@@ -276,65 +277,65 @@ export const ProfileQuestionnaireScreen = () => {
         setPhotos(prev => [...prev, result.assets[0].uri]);
       }
     } catch {
-      Alert.alert('Error', 'Failed to pick image.');
+      await showAlert({ title: 'Error', message: 'Failed to pick image.', variant: 'warning' });
     }
   };
 
 
-  const validateCurrentStep = (): boolean => {
+  const validateCurrentStep = async (): Promise<boolean> => {
     const stepId = STEP_ORDER[currentStep];
     switch (stepId) {
       case 'photos':
-        if (photos.length === 0) { Alert.alert('Required', 'Please add at least one photo'); return false; }
+        if (photos.length === 0) { await showAlert({ title: 'Required', message: 'Please add at least one photo', variant: 'warning' }); return false; }
         return true;
       case 'basicInfo':
-        if (!name.trim()) { Alert.alert('Required', 'Please enter your name'); return false; }
-        if (!email.trim()) { Alert.alert('Required', 'Please enter your email'); return false; }
+        if (!name.trim()) { await showAlert({ title: 'Required', message: 'Please enter your name', variant: 'warning' }); return false; }
+        if (!email.trim()) { await showAlert({ title: 'Required', message: 'Please enter your email', variant: 'warning' }); return false; }
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) { Alert.alert('Error', 'Please enter a valid email'); return false; }
-        if (!birthday.trim()) { Alert.alert('Required', 'Please enter your date of birth'); return false; }
+        if (!emailRegex.test(email)) { await showAlert({ title: 'Error', message: 'Please enter a valid email', variant: 'warning' }); return false; }
+        if (!birthday.trim()) { await showAlert({ title: 'Required', message: 'Please enter your date of birth', variant: 'warning' }); return false; }
         const v = validateBirthday(birthday);
-        if (!v.valid) { setBirthdayError(v.error); Alert.alert('Error', v.error); return false; }
+        if (!v.valid) { setBirthdayError(v.error); await showAlert({ title: 'Error', message: v.error, variant: 'warning' }); return false; }
         return true;
       case 'gender':
-        if (!gender) { Alert.alert('Required', 'Please select your gender'); return false; }
+        if (!gender) { await showAlert({ title: 'Required', message: 'Please select your gender', variant: 'warning' }); return false; }
         return true;
       case 'locationOccupation':
-        if (!selectedCity && !location.trim()) { Alert.alert('Required', 'Please select a location'); return false; }
+        if (!selectedCity && !location.trim()) { await showAlert({ title: 'Required', message: 'Please select a location', variant: 'warning' }); return false; }
         return true;
       case 'bio':
-        if (!bio.trim()) { Alert.alert('Required', 'Please write a short bio'); return false; }
+        if (!bio.trim()) { await showAlert({ title: 'Required', message: 'Please write a short bio', variant: 'warning' }); return false; }
         return true;
       case 'sleepSchedule':
-        if (!sleepSchedule) { Alert.alert('Required', 'Please select your sleep schedule'); return false; }
+        if (!sleepSchedule) { await showAlert({ title: 'Required', message: 'Please select your sleep schedule', variant: 'warning' }); return false; }
         return true;
       case 'cleanliness':
-        if (!cleanliness) { Alert.alert('Required', 'Please select your cleanliness level'); return false; }
+        if (!cleanliness) { await showAlert({ title: 'Required', message: 'Please select your cleanliness level', variant: 'warning' }); return false; }
         return true;
       case 'smoking':
-        if (!smoking) { Alert.alert('Required', 'Please select your smoking preference'); return false; }
+        if (!smoking) { await showAlert({ title: 'Required', message: 'Please select your smoking preference', variant: 'warning' }); return false; }
         return true;
       case 'social':
-        if (!guestPolicy) { Alert.alert('Required', 'Please select your guest policy'); return false; }
-        if (!roommateRelationship) { Alert.alert('Required', 'Please select your roommate relationship preference'); return false; }
+        if (!guestPolicy) { await showAlert({ title: 'Required', message: 'Please select your guest policy', variant: 'warning' }); return false; }
+        if (!roommateRelationship) { await showAlert({ title: 'Required', message: 'Please select your roommate relationship preference', variant: 'warning' }); return false; }
         return true;
       case 'noiseTolerance':
-        if (!noiseTolerance) { Alert.alert('Required', 'Please select your noise tolerance'); return false; }
+        if (!noiseTolerance) { await showAlert({ title: 'Required', message: 'Please select your noise tolerance', variant: 'warning' }); return false; }
         return true;
       case 'workPets':
-        if (!workLocation) { Alert.alert('Required', 'Please select your work location'); return false; }
-        if (!pets) { Alert.alert('Required', 'Please select your pet preference'); return false; }
+        if (!workLocation) { await showAlert({ title: 'Required', message: 'Please select your work location', variant: 'warning' }); return false; }
+        if (!pets) { await showAlert({ title: 'Required', message: 'Please select your pet preference', variant: 'warning' }); return false; }
         return true;
       case 'housing':
-        if (!budget.trim()) { Alert.alert('Required', 'Please enter your monthly budget'); return false; }
-        if (isNaN(parseInt(budget)) || parseInt(budget) <= 0) { Alert.alert('Error', 'Please enter a valid budget amount'); return false; }
-        if (!lookingFor) { Alert.alert('Required', 'Please select what you are looking for'); return false; }
-        if (!moveInDate.trim()) { Alert.alert('Required', 'Please select your move-in date'); return false; }
-        if (!bedrooms.trim()) { Alert.alert('Required', 'Please enter the number of bedrooms'); return false; }
-        if (isNaN(parseInt(bedrooms)) || parseInt(bedrooms) <= 0) { Alert.alert('Error', 'Please enter a valid number of bedrooms'); return false; }
-        if (!bathrooms.trim()) { Alert.alert('Required', 'Please enter the number of bathrooms'); return false; }
-        if (isNaN(parseInt(bathrooms)) || parseInt(bathrooms) <= 0) { Alert.alert('Error', 'Please enter a valid number of bathrooms'); return false; }
-        if (lookingFor !== 'entire_apartment' && privateBathroom === undefined) { Alert.alert('Required', 'Please select whether you need a private or shared bathroom'); return false; }
+        if (!budget.trim()) { await showAlert({ title: 'Required', message: 'Please enter your monthly budget', variant: 'warning' }); return false; }
+        if (isNaN(parseInt(budget)) || parseInt(budget) <= 0) { await showAlert({ title: 'Error', message: 'Please enter a valid budget amount', variant: 'warning' }); return false; }
+        if (!lookingFor) { await showAlert({ title: 'Required', message: 'Please select what you are looking for', variant: 'warning' }); return false; }
+        if (!moveInDate.trim()) { await showAlert({ title: 'Required', message: 'Please select your move-in date', variant: 'warning' }); return false; }
+        if (!bedrooms.trim()) { await showAlert({ title: 'Required', message: 'Please enter the number of bedrooms', variant: 'warning' }); return false; }
+        if (isNaN(parseInt(bedrooms)) || parseInt(bedrooms) <= 0) { await showAlert({ title: 'Error', message: 'Please enter a valid number of bedrooms', variant: 'warning' }); return false; }
+        if (!bathrooms.trim()) { await showAlert({ title: 'Required', message: 'Please enter the number of bathrooms', variant: 'warning' }); return false; }
+        if (isNaN(parseInt(bathrooms)) || parseInt(bathrooms) <= 0) { await showAlert({ title: 'Error', message: 'Please enter a valid number of bathrooms', variant: 'warning' }); return false; }
+        if (lookingFor !== 'entire_apartment' && privateBathroom === undefined) { await showAlert({ title: 'Required', message: 'Please select whether you need a private or shared bathroom', variant: 'warning' }); return false; }
         return true;
       case 'interests': {
         const tagIdsByCategory: Record<string, string[]> = {};
@@ -342,18 +343,18 @@ export const ProfileQuestionnaireScreen = () => {
           tagIdsByCategory[key] = cat.tags.map(t => t.id);
         }
         const result = validateInterestTags(interests, tagIdsByCategory);
-        if (!result.valid) { Alert.alert('Required', result.message); return false; }
+        if (!result.valid) { await showAlert({ title: 'Required', message: result.message, variant: 'warning' }); return false; }
         return true;
       }
       case 'expenses':
-        if (!expenseUtilities) { Alert.alert('Required', 'Please select how to split utilities'); return false; }
-        if (!expenseGroceries) { Alert.alert('Required', 'Please select how to handle groceries'); return false; }
-        if (!expenseInternet) { Alert.alert('Required', 'Please select how to handle internet'); return false; }
-        if (!expenseCleaning) { Alert.alert('Required', 'Please select how to handle cleaning'); return false; }
+        if (!expenseUtilities) { await showAlert({ title: 'Required', message: 'Please select how to split utilities', variant: 'warning' }); return false; }
+        if (!expenseGroceries) { await showAlert({ title: 'Required', message: 'Please select how to handle groceries', variant: 'warning' }); return false; }
+        if (!expenseInternet) { await showAlert({ title: 'Required', message: 'Please select how to handle internet', variant: 'warning' }); return false; }
+        if (!expenseCleaning) { await showAlert({ title: 'Required', message: 'Please select how to handle cleaning', variant: 'warning' }); return false; }
         return true;
       case 'personality':
         if (Object.keys(personalityAnswers).length < 5) {
-          Alert.alert('Required', 'Please answer all 5 questions');
+          await showAlert({ title: 'Required', message: 'Please answer all 5 questions', variant: 'warning' });
           return false;
         }
         return true;
@@ -409,8 +410,8 @@ export const ProfileQuestionnaireScreen = () => {
     };
   };
 
-  const goNext = () => {
-    if (!validateCurrentStep()) return;
+  const goNext = async () => {
+    if (!(await validateCurrentStep())) return;
     if (currentFilteredIndex < stepsToShow.length - 1) {
       setDirection('forward');
       setCurrentFilteredIndex(currentFilteredIndex + 1);
@@ -419,21 +420,21 @@ export const ProfileQuestionnaireScreen = () => {
     }
   };
 
-  const goBack = () => {
+  const goBack = async () => {
     console.log('[ProfileQuestionnaire] goBack pressed, currentFilteredIndex:', currentFilteredIndex, 'onboardingStep:', user?.onboardingStep);
     if (currentFilteredIndex > 0) {
       setDirection('back');
       setCurrentFilteredIndex(currentFilteredIndex - 1);
     } else {
       if (user?.onboardingStep === 'profile') {
-        Alert.alert(
-          'Go Back',
-          'This will return you to the login screen. Any progress will not be saved.',
-          [
-            { text: 'Stay', style: 'cancel' },
-            { text: 'Go Back', style: 'destructive', onPress: () => abandonSignup() },
-          ]
-        );
+        const confirmed = await confirm({
+          title: 'Go Back',
+          message: 'This will return you to the login screen. Any progress will not be saved.',
+          confirmText: 'Go Back',
+          cancelText: 'Stay',
+          variant: 'danger',
+        });
+        if (confirmed) abandonSignup();
       } else {
         navigation.goBack();
       }
@@ -441,7 +442,7 @@ export const ProfileQuestionnaireScreen = () => {
   };
 
   const handleSave = async () => {
-    if (!validateCurrentStep()) return;
+    if (!(await validateCurrentStep())) return;
     setIsSaving(true);
 
     await updateUser(buildProfileData());

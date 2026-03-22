@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Image, ActivityIndicator, Platform, Alert, Modal, TextInput } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Image, ActivityIndicator, Modal, TextInput } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { StorageService } from '../../utils/storage';
 import {
   getOutreachQuotaStatus,
@@ -46,6 +47,7 @@ export const HostRenterGroupDetailScreen = () => {
   const route = useRoute<any>();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { alert: showAlert } = useConfirm();
   const group = route.params?.group;
 
   const [members, setMembers] = useState<MemberDetail[]>([]);
@@ -163,9 +165,7 @@ export const HostRenterGroupDetailScreen = () => {
   const handleSend = async () => {
     if (!user || !group) return;
     if (message.trim().length < MIN_MSG_LENGTH) {
-      const msg = `Your message must be at least ${MIN_MSG_LENGTH} characters.`;
-      if (Platform.OS === 'web') window.alert(msg);
-      else Alert.alert('Too Short', msg);
+      await showAlert({ title: 'Too Short', message: `Your message must be at least ${MIN_MSG_LENGTH} characters.`, variant: 'warning' });
       return;
     }
     setSending(true);
@@ -188,21 +188,16 @@ export const HostRenterGroupDetailScreen = () => {
       setMessage('');
       const newQuota = await getOutreachQuotaStatus(user.id, plan);
       setQuota(newQuota);
-      const msg = 'Your message was delivered to the group.';
-      if (Platform.OS === 'web') window.alert(msg);
-      else Alert.alert('Message Sent', msg);
+      await showAlert({ title: 'Message Sent', message: 'Your message was delivered to the group.', variant: 'success' });
     } catch (e: any) {
       const err = e.message || '';
       if (err === 'DAILY_LIMIT_REACHED') { setShowCompose(false); setShowUnlock(true); }
       else if (err === 'HOURLY_LIMIT_REACHED') {
-        const m = 'Slow down — try again shortly.';
-        Platform.OS === 'web' ? window.alert(m) : Alert.alert('Rate Limit', m);
+        await showAlert({ title: 'Rate Limit', message: 'Slow down — try again shortly.', variant: 'warning' });
       } else if (err === 'GROUP_COOLDOWN') {
-        const m = 'You messaged this group recently. Wait 30 days.';
-        Platform.OS === 'web' ? window.alert(m) : Alert.alert('Already Contacted', m);
+        await showAlert({ title: 'Already Contacted', message: 'You messaged this group recently. Wait 30 days.', variant: 'warning' });
       } else {
-        const m = 'Could not send. Please try again.';
-        Platform.OS === 'web' ? window.alert(m) : Alert.alert('Error', m);
+        await showAlert({ title: 'Error', message: 'Could not send. Please try again.', variant: 'warning' });
       }
     } finally {
       setSending(false);
@@ -217,11 +212,9 @@ export const HostRenterGroupDetailScreen = () => {
       const newQuota = await getOutreachQuotaStatus(user!.id, plan);
       setQuota(newQuota);
       setShowUnlock(false);
-      const msg = `${pkg.credits} additional messages added for today.`;
-      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Unlocked!', msg);
+      await showAlert({ title: 'Unlocked!', message: `${pkg.credits} additional messages added for today.`, variant: 'success' });
     } catch {
-      const msg = 'Payment failed.';
-      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Error', msg);
+      await showAlert({ title: 'Error', message: 'Payment failed.', variant: 'warning' });
     } finally {
       setPurchasing(null);
     }

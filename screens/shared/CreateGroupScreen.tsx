@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import {
-  View, StyleSheet, Pressable, TextInput, Alert, ActivityIndicator,
+  View, StyleSheet, Pressable, TextInput, ActivityIndicator,
 } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { Spacing, Typography } from '../../constants/theme';
 import { createGroup as createGroupSupabase, getGroupLimit, getMemberLimit } from '../../services/groupService';
 import { StorageService } from '../../utils/storage';
@@ -17,6 +18,7 @@ import { GroupPropertySearchModal } from '../../components/GroupPropertySearchMo
 export const CreateGroupScreen = ({ navigation, route }: any) => {
   const { theme } = useTheme();
   const { user } = useAuth();
+  const { confirm, alert } = useConfirm();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [selectedListingId, setSelectedListingId] = useState<string | null>(
@@ -33,7 +35,7 @@ export const CreateGroupScreen = ({ navigation, route }: any) => {
     if (!user) return;
 
     if (!name.trim()) {
-      Alert.alert('Name Required', 'Please enter a name for your group.');
+      await alert({ title: 'Name Required', message: 'Please enter a name for your group.', variant: 'warning' });
       return;
     }
 
@@ -50,14 +52,13 @@ export const CreateGroupScreen = ({ navigation, route }: any) => {
 
         if (!countError && count !== null && count >= groupLimit) {
           const planLabel = userPlan.charAt(0).toUpperCase() + userPlan.slice(1);
-          Alert.alert(
-            'Group Limit Reached',
-            `Your ${planLabel} plan allows up to ${groupLimit} group${groupLimit === 1 ? '' : 's'}. Upgrade to create more.`,
-            [
-              { text: 'Upgrade', onPress: () => (navigation as any).navigate('Plans') },
-              { text: 'Cancel', style: 'cancel' },
-            ]
-          );
+          const shouldUpgrade = await confirm({
+            title: 'Group Limit Reached',
+            message: `Your ${planLabel} plan allows up to ${groupLimit} group${groupLimit === 1 ? '' : 's'}. Upgrade to create more.`,
+            confirmText: 'Upgrade',
+            variant: 'warning',
+          });
+          if (shouldUpgrade) (navigation as any).navigate('Plans');
           setCreating(false);
           return;
         }
@@ -105,15 +106,17 @@ export const CreateGroupScreen = ({ navigation, route }: any) => {
         };
         await StorageService.addOrUpdateGroup(localGroup as any);
 
-        Alert.alert(
-          'Group Created!',
-          `${name.trim()} has been created.`,
-          [{ text: 'View Groups', onPress: () => navigation.navigate('Groups') }]
-        );
+        await alert({
+          title: 'Group Created!',
+          message: `${name.trim()} has been created.`,
+          confirmText: 'View Groups',
+          variant: 'success',
+        });
+        navigation.navigate('Groups');
       }
     } catch (error) {
       console.error('Error creating group:', error);
-      Alert.alert('Error', 'Failed to create group. Please try again.');
+      await alert({ title: 'Error', message: 'Failed to create group. Please try again.', variant: 'warning' });
     } finally {
       setCreating(false);
     }

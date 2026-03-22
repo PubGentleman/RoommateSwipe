@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Pressable, Text, ScrollView, Alert } from 'react-native';
+import { View, StyleSheet, Pressable, Text, ScrollView } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { useStripePayment } from '../../hooks/useStripePayment';
 
 const BG = '#111';
@@ -154,6 +155,7 @@ export const HostPricingScreen = () => {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { user, getHostPlan, upgradeHostPlan, downgradeHostPlan, purchaseListingBoost, purchaseHostVerification, purchaseSuperInterest } = useAuth();
+  const { confirm, alert: showAlert } = useConfirm();
   const { processPayment } = useStripePayment();
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
   const [selectedTier, setSelectedTier] = useState<HostPlan>('pro');
@@ -185,24 +187,23 @@ export const HostPricingScreen = () => {
     return 'Billed Monthly';
   };
 
-  const handleSelectPlan = (plan: PlanTier) => {
+  const handleSelectPlan = async (plan: PlanTier) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (plan.id === currentPlan) {
-      Alert.alert('Current Plan', `You are already on the ${plan.name} plan.`);
+      await showAlert({ title: 'Current Plan', message: `You are already on the ${plan.name} plan.`, variant: 'info' });
       return;
     }
     if (plan.id === 'free' && currentPlan !== 'free') {
-      Alert.alert(
-        'Downgrade to Free',
-        'Your current plan benefits will continue until the end of your billing period.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Downgrade', style: 'destructive', onPress: async () => {
-            await downgradeHostPlan('free');
-            Alert.alert('Scheduled', 'You will be moved to the Free plan at the end of your billing period.');
-          }},
-        ]
-      );
+      const confirmed = await confirm({
+        title: 'Downgrade to Free',
+        message: 'Your current plan benefits will continue until the end of your billing period.',
+        confirmText: 'Downgrade',
+        variant: 'danger',
+      });
+      if (confirmed) {
+        await downgradeHostPlan('free');
+        await showAlert({ title: 'Scheduled', message: 'You will be moved to the Free plan at the end of your billing period.', variant: 'info' });
+      }
       return;
     }
     const isUpgrade = planOrder[plan.id] > planOrder[currentPlan];
@@ -211,50 +212,53 @@ export const HostPricingScreen = () => {
     else price = `$${plan.monthlyPrice.toFixed(2)}/month`;
     const title = isUpgrade ? `Upgrade to ${plan.name}` : `Switch to ${plan.name}`;
     const actionText = isUpgrade ? 'Subscribe' : 'Switch';
-    Alert.alert(title, `${actionText} to ${plan.name} for ${price}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: actionText, onPress: async () => {
-        if (isUpgrade) {
-          if (user) {
-            const { success } = await processPayment(user.id, user.email || '', `host_${plan.id}`, billingCycle);
-            if (!success) return;
-          }
-          await upgradeHostPlan(plan.id as 'starter' | 'pro' | 'business', billingCycle);
-        } else {
-          await downgradeHostPlan(plan.id as 'free' | 'starter' | 'pro');
+    const confirmed = await confirm({
+      title,
+      message: `${actionText} to ${plan.name} for ${price}?`,
+      confirmText: actionText,
+      variant: 'info',
+    });
+    if (confirmed) {
+      if (isUpgrade) {
+        if (user) {
+          const { success } = await processPayment(user.id, user.email || '', `host_${plan.id}`, billingCycle);
+          if (!success) return;
         }
-        Alert.alert('Success', `You are now on the ${plan.name} plan!`);
-      }},
-    ]);
+        await upgradeHostPlan(plan.id as 'starter' | 'pro' | 'business', billingCycle);
+      } else {
+        await downgradeHostPlan(plan.id as 'free' | 'starter' | 'pro');
+      }
+      await showAlert({ title: 'Success', message: `You are now on the ${plan.name} plan!`, variant: 'success' });
+    }
   };
 
-  const handlePurchase = (id: string) => {
+  const handlePurchase = async (id: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (id === 'boost') {
-      Alert.alert('Listing Boost', 'Boost a listing for $4.99 (7 days)?', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Purchase', onPress: () => { purchaseListingBoost(''); Alert.alert('Purchased', 'Listing Boost activated for 7 days!'); }},
-      ]);
+      const confirmed = await confirm({ title: 'Listing Boost', message: 'Boost a listing for $4.99 (7 days)?', confirmText: 'Purchase', variant: 'info' });
+      if (confirmed) {
+        purchaseListingBoost('');
+        await showAlert({ title: 'Purchased', message: 'Listing Boost activated for 7 days!', variant: 'success' });
+      }
     } else if (id === 'verify') {
-      Alert.alert('Host Verification', 'Get verified for $9.99 (one-time)? You will need to complete ID verification to activate your badge.', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Purchase', onPress: async () => {
-          const result = await purchaseHostVerification();
-          if (result.success) {
-            Alert.alert('Payment Successful', 'Complete your ID verification to activate the Host Verification Badge.', [
-              { text: 'Verify Now', onPress: () => navigation.navigate('Profile', { screen: 'Verification', params: { fromHostPurchase: true } }) },
-              { text: 'Later', style: 'cancel' },
-            ]);
-          } else {
-            Alert.alert('Notice', result.message);
+      const confirmed = await confirm({ title: 'Host Verification', message: 'Get verified for $9.99 (one-time)? You will need to complete ID verification to activate your badge.', confirmText: 'Purchase', variant: 'info' });
+      if (confirmed) {
+        const result = await purchaseHostVerification();
+        if (result.success) {
+          const goVerify = await confirm({ title: 'Payment Successful', message: 'Complete your ID verification to activate the Host Verification Badge.', confirmText: 'Verify Now', cancelText: 'Later', variant: 'success' });
+          if (goVerify) {
+            navigation.navigate('Profile', { screen: 'Verification', params: { fromHostPurchase: true } });
           }
-        }},
-      ]);
+        } else {
+          await showAlert({ title: 'Notice', message: result.message, variant: 'info' });
+        }
+      }
     } else if (id === 'super') {
-      Alert.alert('Super Interest', 'Purchase Super Interest for $0.99?', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Purchase', onPress: () => { purchaseSuperInterest(); Alert.alert('Purchased', 'Super Interest ready to use!'); }},
-      ]);
+      const confirmed = await confirm({ title: 'Super Interest', message: 'Purchase Super Interest for $0.99?', confirmText: 'Purchase', variant: 'info' });
+      if (confirmed) {
+        purchaseSuperInterest();
+        await showAlert({ title: 'Purchased', message: 'Super Interest ready to use!', variant: 'success' });
+      }
     }
   };
 

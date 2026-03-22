@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Pressable, Alert } from 'react-native';
+import { View, StyleSheet, Pressable } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { ScreenScrollView } from '../../components/ScreenScrollView';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { StorageService } from '../../utils/storage';
 import type { Conversation, Message, Match, Group, Property, Notification } from '../../types/models';
@@ -13,6 +14,7 @@ import { supabase } from '../../lib/supabase';
 export const DownloadDataScreen = () => {
   const { theme } = useTheme();
   const { user } = useAuth();
+  const { alert: showAlert } = useConfirm();
   const [isGenerating, setIsGenerating] = useState(false);
 
   const fetchFromSupabase = async () => {
@@ -129,16 +131,11 @@ export const DownloadDataScreen = () => {
         notifications: exportData.notifications?.length || 0,
       };
       
-      Alert.alert(
-        'Data Export Ready',
-        `Your data has been prepared (${Math.round(dataString.length / 1024)}KB). In a production app, this would be downloaded as a JSON file.\n\nIncludes:\n• Profile information\n• Matches (${itemCounts.matches})\n• Groups (${itemCounts.groups})\n• Properties (${itemCounts.properties})\n• Notifications (${itemCounts.notifications})`,
-        [
-          {
-            text: 'OK',
-            style: 'default',
-          }
-        ]
-      );
+      await showAlert({
+        title: 'Data Export Ready',
+        message: `Your data has been prepared (${Math.round(dataString.length / 1024)}KB). In a production app, this would be downloaded as a JSON file.\n\nIncludes:\n• Profile information\n• Matches (${itemCounts.matches})\n• Groups (${itemCounts.groups})\n• Properties (${itemCounts.properties})\n• Notifications (${itemCounts.notifications})`,
+        variant: 'success',
+      });
       
       console.log('[DownloadData] Export prepared:', {
         size: dataString.length,
@@ -147,7 +144,7 @@ export const DownloadDataScreen = () => {
       
     } catch (error) {
       console.error('[DownloadData] Error:', error);
-      Alert.alert('Error', 'Failed to generate data export. Please try again.');
+      await showAlert({ title: 'Error', message: 'Failed to generate data export. Please try again.', variant: 'warning' });
     } finally {
       setIsGenerating(false);
     }

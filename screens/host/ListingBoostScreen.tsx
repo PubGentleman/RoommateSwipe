@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Pressable, Text, ScrollView, Alert } from 'react-native';
+import { View, StyleSheet, Pressable, Text, ScrollView } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { StorageService } from '../../utils/storage';
 import { Property, HostSubscriptionData, ListingBoost } from '../../types/models';
 import { BOOST_OPTIONS, calculateBoostExpiry, isListingBoosted, getBoostTimeRemaining, isFreePlan, createBoostRecord } from '../../utils/hostPricing';
@@ -24,6 +25,7 @@ export const ListingBoostScreen = () => {
   const route = useRoute<any>();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { confirm, alert: showAlert } = useConfirm();
   const listingId = route.params?.listingId;
 
   const [listing, setListing] = useState<Property | null>(null);
@@ -112,7 +114,7 @@ export const ListingBoostScreen = () => {
     if (!user || !listing || !hostSub) return;
 
     if (hasActiveBoostElsewhere) {
-      Alert.alert('Boost Active', 'You already have an active boost on another listing. Only one boost at a time is allowed.');
+      await showAlert({ title: 'Boost Active', message: 'You already have an active boost on another listing. Only one boost at a time is allowed.', variant: 'warning' });
       return;
     }
 
@@ -136,29 +138,26 @@ export const ListingBoostScreen = () => {
       const resultLabel = option.includesFeaturedBadge
         ? `Your listing is now featured for ${durationLabel} with a Featured badge!`
         : `Your listing has been boosted to the top of search for ${durationLabel}.`;
-      Alert.alert('Boost Applied!', resultLabel, [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
+      await showAlert({ title: 'Boost Applied!', message: resultLabel, variant: 'success' });
+      navigation.goBack();
     };
 
     if (useFree) {
-      Alert.alert(
-        'Use Free Boost',
-        `Apply your free ${hostSub.freeBoostDuration} boost to "${listing.title}"?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Apply', onPress: doApply },
-        ]
-      );
+      const confirmed = await confirm({
+        title: 'Use Free Boost',
+        message: `Apply your free ${hostSub.freeBoostDuration} boost to "${listing.title}"?`,
+        confirmText: 'Apply',
+        variant: 'info',
+      });
+      if (confirmed) await doApply();
     } else if (isDev) {
-      Alert.alert(
-        'Dev Mode',
-        `Payment would process via Stripe: $${option.price} for ${option.label}.${option.includesFeaturedBadge ? ' Includes Featured badge.' : ''}`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Confirm (Mock)', onPress: doApply },
-        ]
-      );
+      const confirmed = await confirm({
+        title: 'Dev Mode',
+        message: `Payment would process via Stripe: $${option.price} for ${option.label}.${option.includesFeaturedBadge ? ' Includes Featured badge.' : ''}`,
+        confirmText: 'Confirm (Mock)',
+        variant: 'info',
+      });
+      if (confirmed) await doApply();
     } else {
       doApply();
     }

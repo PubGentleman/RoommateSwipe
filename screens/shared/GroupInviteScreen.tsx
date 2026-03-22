@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, StyleSheet, Pressable, FlatList, TextInput,
-  Alert, Share, ActivityIndicator, Switch, Platform,
+  Share, ActivityIndicator, Switch, Platform,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as Linking from 'expo-linking';
@@ -9,6 +9,7 @@ import { Feather } from '../../components/VectorIcons';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { Typography, Spacing } from '../../constants/theme';
 import { Image } from 'expo-image';
 import {
@@ -26,6 +27,7 @@ export function GroupInviteScreen({ navigation, route }: any) {
   const { groupId, groupName, listingId } = route.params;
   const { theme } = useTheme();
   const { user } = useAuth();
+  const { confirm, alert } = useConfirm();
   const isHost = user?.role === 'host';
 
   const [tab, setTab] = useState<Tab>('matches');
@@ -86,7 +88,7 @@ export function GroupInviteScreen({ navigation, route }: any) {
       const updated = await getJoinRequests(groupId);
       setJoinRequests(updated);
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      await alert({ title: 'Error', message: err.message, variant: 'warning' });
     } finally {
       setRespondingTo(null);
     }
@@ -98,7 +100,7 @@ export function GroupInviteScreen({ navigation, route }: any) {
       await setGroupDiscoverable(groupId, val);
     } catch (err: any) {
       setDiscoverable(!val);
-      Alert.alert('Error', err.message);
+      await alert({ title: 'Error', message: err.message, variant: 'warning' });
     }
   };
 
@@ -111,7 +113,7 @@ export function GroupInviteScreen({ navigation, route }: any) {
         setMates(updated);
       }
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      await alert({ title: 'Error', message: err.message, variant: 'warning' });
     } finally {
       setSendingTo(null);
     }
@@ -157,21 +159,16 @@ export function GroupInviteScreen({ navigation, route }: any) {
   };
 
   const handleRegenerateCode = async () => {
-    Alert.alert(
-      'Regenerate Code?',
-      'The old code will stop working immediately.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Regenerate',
-          style: 'destructive',
-          onPress: async () => {
-            const newCode = await regenerateInviteCode(groupId);
-            setInviteCode(newCode);
-          },
-        },
-      ]
-    );
+    const confirmed = await confirm({
+      title: 'Regenerate Code?',
+      message: 'The old code will stop working immediately.',
+      confirmText: 'Regenerate',
+      variant: 'warning',
+    });
+    if (confirmed) {
+      const newCode = await regenerateInviteCode(groupId);
+      setInviteCode(newCode);
+    }
   };
 
   const filteredMates = mates.filter(m =>

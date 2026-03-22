@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Modal, Pressable, Alert } from 'react-native';
+import { View, StyleSheet, Modal, Pressable } from 'react-native';
 import { Feather } from './VectorIcons';
 import { ThemedText } from './ThemedText';
 import { useTheme } from '../hooks/useTheme';
 import { Spacing, BorderRadius, Typography } from '../constants/theme';
+import { useConfirm } from '../contexts/ConfirmContext';
 
 type ReportReason = 'Inappropriate content' | 'Fake profile' | 'Harassment' | 'Spam' | 'Other';
 
@@ -25,40 +26,36 @@ interface ReportBlockModalProps {
 
 export const ReportBlockModal = ({ visible, onClose, userName, onReport, onBlock }: ReportBlockModalProps) => {
   const { theme } = useTheme();
+  const { confirm, alert: showAlert } = useConfirm();
   const [selectedReason, setSelectedReason] = useState<ReportReason | null>(null);
   const [showReportSection, setShowReportSection] = useState(false);
 
-  const handleReport = () => {
+  const handleReport = async () => {
     if (!selectedReason) {
-      Alert.alert('Select a Reason', 'Please select a reason for reporting this user.');
+      await showAlert({ title: 'Select a Reason', message: 'Please select a reason for reporting this user.', variant: 'warning' });
       return;
     }
     onReport(selectedReason);
     setSelectedReason(null);
     setShowReportSection(false);
     onClose();
-    Alert.alert('Report Submitted', `Thank you for reporting. We'll review ${userName}'s profile.`);
+    await showAlert({ title: 'Report Submitted', message: `Thank you for reporting. We'll review ${userName}'s profile.`, variant: 'success' });
   };
 
-  const handleBlock = () => {
-    Alert.alert(
-      `Block ${userName}?`,
-      `${userName} will no longer be able to see your profile or contact you. You won't see them in your feed.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Block',
-          style: 'destructive',
-          onPress: () => {
-            onBlock();
-            setSelectedReason(null);
-            setShowReportSection(false);
-            onClose();
-            Alert.alert('User Blocked', `${userName} has been blocked.`);
-          },
-        },
-      ]
-    );
+  const handleBlock = async () => {
+    const confirmed = await confirm({
+      title: `Block ${userName}?`,
+      message: `${userName} will no longer be able to see your profile or contact you. You won't see them in your feed.`,
+      confirmText: 'Block',
+      variant: 'danger',
+    });
+    if (confirmed) {
+      onBlock();
+      setSelectedReason(null);
+      setShowReportSection(false);
+      onClose();
+      await showAlert({ title: 'User Blocked', message: `${userName} has been blocked.`, variant: 'success' });
+    }
   };
 
   const handleClose = () => {

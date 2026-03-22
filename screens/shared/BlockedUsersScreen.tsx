@@ -1,10 +1,11 @@
 import React, { useState, useCallback } from 'react';
-import { View, StyleSheet, Pressable, FlatList, Alert } from 'react-native';
+import { View, StyleSheet, Pressable, FlatList } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useFocusEffect } from '@react-navigation/native';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { StorageService } from '../../utils/storage';
 import { Image } from 'expo-image';
@@ -20,6 +21,7 @@ interface BlockedUserInfo {
 export const BlockedUsersScreen = () => {
   const { theme } = useTheme();
   const { user, updateUser } = useAuth();
+  const { confirm } = useConfirm();
   const insets = useSafeAreaInsets();
   const [blockedUsers, setBlockedUsers] = useState<BlockedUserInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -69,29 +71,24 @@ export const BlockedUsersScreen = () => {
     }
   };
 
-  const handleUnblock = (blockedUser: BlockedUserInfo) => {
-    Alert.alert(
-      `Unblock ${blockedUser.name}?`,
-      `${blockedUser.name} will be able to see your profile and contact you again.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Unblock',
-          onPress: async () => {
-            if (!user) return;
-            try {
-              await supabaseUnblockUser(blockedUser.id);
-            } catch (supabaseError) {
-              console.warn('[BlockedUsersScreen] Supabase unblock failed, falling back to StorageService:', supabaseError);
-            }
-            await StorageService.unblockUser(user.id, blockedUser.id);
-            const updatedBlockedUsers = (user.blockedUsers || []).filter(id => id !== blockedUser.id);
-            await updateUser({ blockedUsers: updatedBlockedUsers });
-            setBlockedUsers(prev => prev.filter(u => u.id !== blockedUser.id));
-          },
-        },
-      ]
-    );
+  const handleUnblock = async (blockedUser: BlockedUserInfo) => {
+    const confirmed = await confirm({
+      title: `Unblock ${blockedUser.name}?`,
+      message: `${blockedUser.name} will be able to see your profile and contact you again.`,
+      confirmText: 'Unblock',
+      variant: 'warning',
+    });
+    if (!confirmed) return;
+    if (!user) return;
+    try {
+      await supabaseUnblockUser(blockedUser.id);
+    } catch (supabaseError) {
+      console.warn('[BlockedUsersScreen] Supabase unblock failed, falling back to StorageService:', supabaseError);
+    }
+    await StorageService.unblockUser(user.id, blockedUser.id);
+    const updatedBlockedUsers = (user.blockedUsers || []).filter(id => id !== blockedUser.id);
+    await updateUser({ blockedUsers: updatedBlockedUsers });
+    setBlockedUsers(prev => prev.filter(u => u.id !== blockedUser.id));
   };
 
   const renderItem = ({ item }: { item: BlockedUserInfo }) => (

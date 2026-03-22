@@ -13,6 +13,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import { CityProvider } from "./contexts/CityContext";
 import { ProfileReminderProvider } from "./contexts/ProfileReminderContext";
+import { ConfirmProvider } from "./contexts/ConfirmContext";
 import { StripeWrapper } from "./components/StripeWrapper";
 import { StorageService } from "./utils/storage";
 import { isDev } from "./utils/dataUtils";
@@ -30,7 +31,7 @@ export default function App() {
       if (isDev) {
         (window as any).reloadMockData = async () => {
           await StorageService.forceReloadMockData();
-          alert('Mock data reloaded! Please refresh the page to see changes.');
+          console.log('Mock data reloaded! Please refresh the page to see changes.');
         };
         console.log('[App] Dev mode — mock data enabled. Run: window.reloadMockData()');
       } else {
@@ -38,7 +39,7 @@ export default function App() {
       }
       (window as any).resetApp = async () => {
         await StorageService.clearAllData();
-        alert('All app data cleared! Refreshing...');
+        console.log('All app data cleared! Refreshing...');
         window.location.reload();
       };
     }
@@ -55,10 +56,12 @@ export default function App() {
                 <CityProvider>
                   <ProfileReminderProvider>
                     <NotificationProvider>
-                      <NavigationContainer>
-                        <RootNavigator />
-                      </NavigationContainer>
-                      <StatusBar style="light" />
+                      <ConfirmProvider>
+                        <NavigationContainer>
+                          <RootNavigator />
+                        </NavigationContainer>
+                        <StatusBar style="light" />
+                      </ConfirmProvider>
                     </NotificationProvider>
                   </ProfileReminderProvider>
                 </CityProvider>

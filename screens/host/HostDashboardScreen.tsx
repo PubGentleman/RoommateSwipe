@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { View, StyleSheet, Pressable, Text, ScrollView, Alert } from 'react-native';
+import { View, StyleSheet, Pressable, Text, ScrollView } from 'react-native';
 import Animated, { useSharedValue, useAnimatedScrollHandler, useAnimatedStyle, interpolate, Extrapolation } from 'react-native-reanimated';
 import { Feather } from '../../components/VectorIcons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { StorageService } from '../../utils/storage';
 import { Property, InterestCard, Message, Conversation, HostSubscriptionData } from '../../types/models';
 import { useNotificationContext } from '../../contexts/NotificationContext';
@@ -72,6 +73,7 @@ function formatBudget(range?: string): string {
 
 export const HostDashboardScreen = () => {
   const { user, getHostPlan } = useAuth();
+  const { confirm, alert: showAlert } = useConfirm();
   const { refreshUnreadCount } = useNotificationContext();
   const hostPlan = getHostPlan();
   const navigation = useNavigation<any>();
@@ -504,10 +506,14 @@ export const HostDashboardScreen = () => {
               const result = canAddListingCheck({ ...hostSub, activeListingCount: activeCount });
               if (!result.allowed) {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-                Alert.alert('Listing Limit Reached', result.message, [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Upgrade Plan', onPress: () => navigation.navigate('HostSubscription') },
-                ]);
+                confirm({
+                  title: 'Listing Limit Reached',
+                  message: result.message,
+                  confirmText: 'Upgrade Plan',
+                  variant: 'warning',
+                }).then(confirmed => {
+                  if (confirmed) navigation.navigate('HostSubscription');
+                });
                 return;
               }
             }
@@ -542,11 +548,11 @@ export const HostDashboardScreen = () => {
           </Pressable>
           {user?.hostPlan === 'business' ? (
             <Pressable style={styles.qaSecondary} onPress={() => {
-              Alert.alert(
-                'Dedicated Support',
-                'As a Business host, you have access to priority support.\n\nEmail: support@roomdr.com\nResponse time: Within 2 hours\n\nOur dedicated team is here to help you with any questions or issues.',
-                [{ text: 'OK' }]
-              );
+              showAlert({
+                title: 'Dedicated Support',
+                message: 'As a Business host, you have access to priority support.\n\nEmail: support@roomdr.com\nResponse time: Within 2 hours\n\nOur dedicated team is here to help you with any questions or issues.',
+                variant: 'info',
+              });
             }}>
               <Feather name="headphones" size={15} color="#667eea" />
               <Text style={styles.qaSecondaryText}>Support</Text>

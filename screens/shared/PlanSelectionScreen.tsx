@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Modal, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Modal, ActivityIndicator } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { useStripePayment } from '../../hooks/useStripePayment';
 
 const BG = '#111111';
@@ -160,6 +161,7 @@ export const PlanSelectionScreen = () => {
   const insets = useSafeAreaInsets();
   const { user, upgradeToPlus, upgradeToElite, upgradeHostPlan, completeOnboardingStep } = useAuth();
   const { processPayment } = useStripePayment();
+  const { alert } = useConfirm();
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -221,7 +223,7 @@ export const PlanSelectionScreen = () => {
       try {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } catch {}
-      Alert.alert('Welcome!', `You're now on the ${planId.charAt(0).toUpperCase() + planId.slice(1)} plan.`);
+      await alert({ title: 'Welcome!', message: `You're now on the ${planId.charAt(0).toUpperCase() + planId.slice(1)} plan.`, variant: 'success' });
     } catch {
       setProcessing(false);
     }

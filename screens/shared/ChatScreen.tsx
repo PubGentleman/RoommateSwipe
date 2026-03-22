@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Pressable, FlatList, TextInput, KeyboardAvoidingView, Platform, Alert, Modal, Linking } from 'react-native';
+import { View, StyleSheet, Pressable, FlatList, TextInput, KeyboardAvoidingView, Platform, Modal, Linking } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
@@ -23,6 +23,7 @@ import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence } 
 import { AdBanner } from '../../components/AdBanner';
 import { getDailyMessageCount, MESSAGING_LIMITS, getTimeUntilMidnight, incrementDailyColdMessageCount } from '../../utils/messagingUtils';
 import { dispatchInsightTrigger } from '../../utils/insightRefresh';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 type ChatScreenProps = {
   route: {
@@ -41,6 +42,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const { theme } = useTheme();
   const { user, incrementMessageCount, canSendMessage, canStartNewChat, incrementActiveChatCount, watchAdForCredit, isBasicUser, blockUser, reportUser, canSendColdMessage, useColdMessage } = useAuth();
   const insets = useSafeAreaInsets();
+  const { confirm, alert } = useConfirm();
   const { refreshUnreadCount } = useNotificationContext();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
@@ -62,6 +64,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [myGroupRole, setMyGroupRole] = useState<'admin' | 'member' | null>(null);
   const [groupName, setGroupName] = useState<string>('Group Chat');
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+  const [showInquiryOptionsMenu, setShowInquiryOptionsMenu] = useState(false);
   const [groupMembers, setGroupMembers] = useState<any[]>([]);
   const [showMembersOverlay, setShowMembersOverlay] = useState(false);
 
@@ -105,7 +108,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       setMessages(prev => [...prev, systemMsg]);
     } catch (err) {
       console.error('Failed to accept inquiry:', err);
-      Alert.alert('Error', 'Failed to accept inquiry. Please try again.');
+      await alert({ title: 'Error', message: 'Failed to accept inquiry. Please try again.', variant: 'warning' });
     } finally {
       setIsAccepting(false);
     }
@@ -113,32 +116,33 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
 
   const handleDeclineInquiry = async () => {
     if (!inquiryGroup?.id) return;
-    Alert.alert('Decline Inquiry', 'Are you sure you want to decline this inquiry?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Decline', style: 'destructive', onPress: async () => {
-          setIsDeclining(true);
-          try {
-            await declineInquiry(inquiryGroup.id, user?.id || '');
-            setInquiryStatus('declined');
-            const systemMsg: Message = {
-              id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-              senderId: 'system',
-              text: 'The host has declined this inquiry.',
-              content: 'The host has declined this inquiry.',
-              timestamp: new Date(),
-              read: true,
-            };
-            setMessages(prev => [...prev, systemMsg]);
-          } catch (err) {
-            console.error('Failed to decline inquiry:', err);
-            Alert.alert('Error', 'Failed to decline inquiry. Please try again.');
-          } finally {
-            setIsDeclining(false);
-          }
-        }
-      },
-    ]);
+    const confirmed = await confirm({
+      title: 'Decline Inquiry',
+      message: 'Are you sure you want to decline this inquiry?',
+      confirmText: 'Decline',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
+
+    setIsDeclining(true);
+    try {
+      await declineInquiry(inquiryGroup.id, user?.id || '');
+      setInquiryStatus('declined');
+      const systemMsg: Message = {
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+        senderId: 'system',
+        text: 'The host has declined this inquiry.',
+        content: 'The host has declined this inquiry.',
+        timestamp: new Date(),
+        read: true,
+      };
+      setMessages(prev => [...prev, systemMsg]);
+    } catch (err) {
+      console.error('Failed to decline inquiry:', err);
+      await alert({ title: 'Error', message: 'Failed to decline inquiry. Please try again.', variant: 'warning' });
+    } finally {
+      setIsDeclining(false);
+    }
   };
 
   const openDirections = () => {
@@ -431,14 +435,16 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     if (isColdMessage && !coldMessageResponded) {
       const coldCheck = await canSendColdMessage();
       if (!coldCheck.canSend) {
-        Alert.alert(
-          'Daily Limit Reached',
-          coldCheck.reason || "You've used all your messages for today. Resets at midnight.",
-          [
-            { text: 'Upgrade for More', onPress: () => (navigation as any).navigate('Plans') },
-            { text: 'OK', style: 'cancel' },
-          ]
-        );
+        const shouldUpgrade = await confirm({
+          title: 'Daily Limit Reached',
+          message: coldCheck.reason || "You've used all your messages for today. Resets at midnight.",
+          confirmText: 'Upgrade for More',
+          cancelText: 'OK',
+          variant: 'warning',
+        });
+        if (shouldUpgrade) {
+          (navigation as any).navigate('Plans');
+        }
         return;
       }
     }
@@ -702,19 +708,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
                 </ThemedText>
               </View>
             </View>
-            <Pressable onPress={() => {
-              const options: any[] = [
-                { text: 'Leave Inquiry', style: 'destructive', onPress: () => {
-                  Alert.alert('Leave Inquiry', 'Are you sure? If all renters leave, this inquiry will be archived.', [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Leave', style: 'destructive', onPress: () => navigation.goBack() },
-                  ]);
-                }},
-                { text: 'Report Host', onPress: () => setShowReportBlockModal(true) },
-                { text: 'Cancel', style: 'cancel' },
-              ];
-              Alert.alert('Options', undefined, options);
-            }} style={styles.moreButton}>
+            <Pressable onPress={() => setShowInquiryOptionsMenu(true)} style={styles.moreButton}>
               <Feather name="more-vertical" size={24} color={theme.text} />
             </Pressable>
           </View>
@@ -964,6 +958,65 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         </Pressable>
       </Modal>
 
+      <Modal
+        visible={showInquiryOptionsMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowInquiryOptionsMenu(false)}
+      >
+        <Pressable
+          style={styles.menuOverlay}
+          onPress={() => setShowInquiryOptionsMenu(false)}
+        >
+          <View style={[styles.menuSheet, { backgroundColor: theme.card }]}>
+            <View style={[styles.menuHandle, { backgroundColor: theme.border }]} />
+            <ThemedText style={[Typography.h3, { textAlign: 'center', marginBottom: Spacing.lg }]}>
+              Options
+            </ThemedText>
+
+            <Pressable
+              style={[styles.menuItem, { borderBottomColor: theme.border }]}
+              onPress={async () => {
+                setShowInquiryOptionsMenu(false);
+                const leaveConfirmed = await confirm({
+                  title: 'Leave Inquiry',
+                  message: 'Are you sure? If all renters leave, this inquiry will be archived.',
+                  confirmText: 'Leave',
+                  variant: 'danger',
+                });
+                if (leaveConfirmed) {
+                  navigation.goBack();
+                }
+              }}
+            >
+              <View style={[styles.menuIconCircle, { backgroundColor: '#EF444415' }]}>
+                <Feather name="log-out" size={18} color="#EF4444" />
+              </View>
+              <ThemedText style={[Typography.body, { flex: 1 }]}>Leave Inquiry</ThemedText>
+              <Feather name="chevron-right" size={18} color={theme.textSecondary} />
+            </Pressable>
+
+            <Pressable
+              style={[styles.menuItem, { borderBottomWidth: 0 }]}
+              onPress={() => { setShowInquiryOptionsMenu(false); setShowReportBlockModal(true); }}
+            >
+              <View style={[styles.menuIconCircle, { backgroundColor: '#EF444415' }]}>
+                <Feather name="alert-triangle" size={18} color="#EF4444" />
+              </View>
+              <ThemedText style={[Typography.body, { flex: 1 }]}>Report / Block</ThemedText>
+              <Feather name="chevron-right" size={18} color={theme.textSecondary} />
+            </Pressable>
+
+            <Pressable
+              style={[styles.menuCancelBtn, { backgroundColor: theme.background }]}
+              onPress={() => setShowInquiryOptionsMenu(false)}
+            >
+              <ThemedText style={[Typography.body, { fontWeight: '600', textAlign: 'center' }]}>Cancel</ThemedText>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
       {!isInquiryChat && !canSeeOnlineStatus() ? (
         <Pressable
           style={[styles.premiumBanner, { backgroundColor: theme.backgroundSecondary }]}
@@ -1063,7 +1116,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             await linkListingToGroup(groupId, listing?.id || null);
             reloadGroupListing();
           } catch (err: any) {
-            Alert.alert('Error', err.message || 'Failed to update property.');
+            await alert({ title: 'Error', message: err.message || 'Failed to update property.', variant: 'warning' });
           }
         }}
         onClose={() => setShowPropertySearch(false)}

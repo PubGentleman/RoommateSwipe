@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Pressable, Alert, Text, ScrollView, Platform } from 'react-native';
+import { View, StyleSheet, Pressable, Text, ScrollView } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -7,6 +7,7 @@ import type { ProfileStackParamList } from '../../navigation/ProfileStackNavigat
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../contexts/AuthContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { StorageService } from '../../utils/storage';
 import * as Haptics from 'expo-haptics';
 import { useStripePayment } from '../../hooks/useStripePayment';
@@ -120,6 +121,7 @@ export const PlansScreen = () => {
   const insets = useSafeAreaInsets();
   const { user, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscriptionAtPeriodEnd, reactivateSubscription } = useAuth();
   const { processPayment } = useStripePayment();
+  const { alert } = useConfirm();
   const navigation = useNavigation<PlansScreenNavigationProp>();
 
   const [processing, setProcessing] = useState(false);
@@ -203,9 +205,9 @@ export const PlansScreen = () => {
         data: { plan: selectedPlan },
       });
       setSelectedPlan(null);
-      Alert.alert('Success!', `Welcome to ${planName}! You now have access to all ${planName} features.`);
+      await alert({ title: 'Success!', message: `Welcome to ${planName}! You now have access to all ${planName} features.`, variant: 'success' });
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Something went wrong.');
+      await alert({ title: 'Error', message: err.message || 'Something went wrong.', variant: 'warning' });
     } finally {
       setSubscribing(false);
     }
@@ -272,14 +274,14 @@ export const PlansScreen = () => {
         const expiryDate = user?.subscription?.expiresAt
           ? new Date(user.subscription.expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
           : 'the end of your billing period';
-        Alert.alert('Subscription Cancelled', `You'll keep your features until ${expiryDate}.`);
+        await alert({ title: 'Subscription Cancelled', message: `You'll keep your features until ${expiryDate}.`, variant: 'info' });
       } else {
         await downgradeToPlan(pendingAction.target);
         const planLabel = pendingAction.target === 'basic' ? 'Free' : 'Plus';
-        Alert.alert('Downgrade Scheduled', `Your plan will change to ${planLabel} at the end of your billing period.`);
+        await alert({ title: 'Downgrade Scheduled', message: `Your plan will change to ${planLabel} at the end of your billing period.`, variant: 'info' });
       }
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Something went wrong.');
+      await alert({ title: 'Error', message: err.message || 'Something went wrong.', variant: 'warning' });
     } finally {
       setProcessing(false);
       setPendingAction(null);
@@ -460,7 +462,7 @@ export const PlansScreen = () => {
               </Text>
               <Pressable style={styles.reactivateBtn} onPress={async () => {
                 await reactivateSubscription();
-                Alert.alert('Subscription Reactivated', 'Your subscription will continue on the current plan.');
+                await alert({ title: 'Subscription Reactivated', message: 'Your subscription will continue on the current plan.', variant: 'success' });
               }}>
                 <Text style={styles.reactivateBtnText}>{subscriptionStatus === 'cancelled' ? 'Reactivate' : 'Cancel Change'}</Text>
               </Pressable>

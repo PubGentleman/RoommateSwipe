@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Pressable, Alert, TextInput } from 'react-native';
+import { View, StyleSheet, Pressable, TextInput } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useNavigation } from '@react-navigation/native';
 import { ScreenKeyboardAwareScrollView } from '../../components/ScreenKeyboardAwareScrollView';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { isDev } from '../../utils/envUtils';
 
 export const PaymentScreen = () => {
   const { theme } = useTheme();
   const { user, updateUser } = useAuth();
+  const { alert } = useConfirm();
   const navigation = useNavigation();
   
   const [showAddCard, setShowAddCard] = useState(false);
@@ -22,23 +24,23 @@ export const PaymentScreen = () => {
 
   const handleAddPaymentMethod = async () => {
     if (!cardNumber || !expiryDate || !cvv) {
-      Alert.alert('Error', 'Please fill in all card details');
+      await alert({ title: 'Error', message: 'Please fill in all card details', variant: 'warning' });
       return;
     }
 
     if (cardNumber.replace(/\s/g, '').length !== 16) {
-      Alert.alert('Error', 'Please enter a valid 16-digit card number');
+      await alert({ title: 'Error', message: 'Please enter a valid 16-digit card number', variant: 'warning' });
       return;
     }
 
     if (cvv.length !== 3) {
-      Alert.alert('Error', 'Please enter a valid 3-digit CVV');
+      await alert({ title: 'Error', message: 'Please enter a valid 3-digit CVV', variant: 'warning' });
       return;
     }
 
     const expiryParts = expiryDate.split('/');
     if (expiryParts.length !== 2) {
-      Alert.alert('Error', 'Please enter a valid expiry date (MM/YY)');
+      await alert({ title: 'Error', message: 'Please enter a valid expiry date (MM/YY)', variant: 'warning' });
       return;
     }
 
@@ -46,14 +48,14 @@ export const PaymentScreen = () => {
     const year = parseInt(expiryParts[1]);
 
     if (isNaN(month) || isNaN(year) || month < 1 || month > 12) {
-      Alert.alert('Error', 'Please enter a valid expiry date');
+      await alert({ title: 'Error', message: 'Please enter a valid expiry date', variant: 'warning' });
       return;
     }
 
     const currentYear = new Date().getFullYear() % 100;
     const currentMonth = new Date().getMonth() + 1;
     if (year < currentYear || (year === currentYear && month < currentMonth)) {
-      Alert.alert('Error', 'Card has expired. Please enter a valid expiry date');
+      await alert({ title: 'Error', message: 'Card has expired. Please enter a valid expiry date', variant: 'warning' });
       return;
     }
 
@@ -83,7 +85,7 @@ export const PaymentScreen = () => {
     setShowAddCard(false);
     setProcessing(false);
 
-    Alert.alert('Success', 'Payment method added successfully');
+    await alert({ title: 'Success', message: 'Payment method added successfully', variant: 'success' });
   };
 
   const formatCardNumber = (text: string) => {

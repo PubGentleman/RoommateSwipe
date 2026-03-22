@@ -1,9 +1,10 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, Pressable, Image, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Image, ScrollView } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { ScreenScrollView } from '../../components/ScreenScrollView';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { StorageService } from '../../utils/storage';
 import { InterestCard, Conversation, Message } from '../../types/models';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
@@ -20,6 +21,7 @@ type FilterStatus = 'all' | 'pending' | 'accepted' | 'passed';
 export const HostInquiriesScreen = () => {
   const { theme } = useTheme();
   const { user, canRespondToInquiry, useInquiryResponse, getHostPlan } = useAuth();
+  const { alert: showAlert } = useConfirm();
   const { refreshUnreadCount } = useNotificationContext();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
@@ -103,11 +105,11 @@ export const HostInquiriesScreen = () => {
 
     const responseCheck = await canRespondToInquiry();
     if (!responseCheck.allowed) {
-      Alert.alert(
-        'Response Limit Reached',
-        responseCheck.reason || `You've used all ${responseCheck.limit} inquiry responses this month. Upgrade to Pro for unlimited responses.`,
-        [{ text: 'OK' }]
-      );
+      await showAlert({
+        title: 'Response Limit Reached',
+        message: responseCheck.reason || `You've used all ${responseCheck.limit} inquiry responses this month. Upgrade to Pro for unlimited responses.`,
+        variant: 'warning',
+      });
       return;
     }
     await useInquiryResponse();
@@ -238,11 +240,11 @@ export const HostInquiriesScreen = () => {
 
     const responseCheck = await canRespondToInquiry();
     if (!responseCheck.allowed) {
-      Alert.alert(
-        'Response Limit Reached',
-        responseCheck.reason || `You've used all ${responseCheck.limit} inquiry responses this month. Upgrade to Pro for unlimited responses.`,
-        [{ text: 'OK' }]
-      );
+      await showAlert({
+        title: 'Response Limit Reached',
+        message: responseCheck.reason || `You've used all ${responseCheck.limit} inquiry responses this month. Upgrade to Pro for unlimited responses.`,
+        variant: 'warning',
+      });
       return;
     }
     await useInquiryResponse();

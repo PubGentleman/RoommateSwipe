@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, FlatList, Modal, TextInput, ScrollView, Switch, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Image, Pressable, FlatList, Modal, TextInput, ScrollView, Switch, ActivityIndicator, KeyboardAvoidingView, Platform, Dimensions } from 'react-native';
 import Animated, { useSharedValue, useAnimatedScrollHandler, useAnimatedStyle, interpolate, Extrapolation } from 'react-native-reanimated';
 import { Feather } from '../../components/VectorIcons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -30,6 +30,7 @@ import { PropertyMapView } from '../../components/PropertyMapView';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
 
 import { useNotificationContext } from '../../contexts/NotificationContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 const COMMON_AMENITIES = [
   'Parking', 'Gym', 'Pool', 'Laundry', 'Pet Friendly',
@@ -87,6 +88,7 @@ export const ExploreScreen = () => {
   const route = useRoute<any>();
   const insets = useSafeAreaInsets();
   const { refreshUnreadCount } = useNotificationContext();
+  const { alert: showAlert } = useConfirm();
   const [properties, setProperties] = useState<Property[]>([]);
   const [filteredProperties, setFilteredProperties] = useState<Property[]>([]);
   const [saved, setSaved] = useState<Set<string>>(new Set());
@@ -418,7 +420,7 @@ export const ExploreScreen = () => {
       setShowInterestConfirmation(true);
       await loadInterestCards();
     } catch (err) {
-      Alert.alert('Error', 'Failed to send. Please try again.');
+      await showAlert({ title: 'Error', message: 'Failed to send. Please try again.', variant: 'warning' });
     } finally {
       setSendingInterest(false);
       setIsSuperInterest(false);

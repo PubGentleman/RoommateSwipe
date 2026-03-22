@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Pressable, Alert, TextInput, ScrollView, Platform } from 'react-native';
+import { View, StyleSheet, Pressable, TextInput, ScrollView, Platform } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
@@ -19,6 +19,7 @@ import { formatDate, isAtLeast18, getTierLimit } from '../../utils/dateUtils';
 import { OccupationBarSelector } from '../../components/OccupationBarSelector';
 import { dispatchInsightTrigger } from '../../utils/insightRefresh';
 import { InterestCategoryBars } from '../../components/InterestCategoryBars';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 const DraggablePhoto = ({ photo, index, photos, theme, onRemove, onReorder }: any) => {
   const translateX = useSharedValue(0);
@@ -106,6 +107,7 @@ export const EditProfileScreen = () => {
   const { theme } = useTheme();
   const { user, updateUser } = useAuth();
   const navigation = useNavigation();
+  const { alert } = useConfirm();
   
   const [photos, setPhotos] = useState<string[]>(user?.photos || [user?.profilePicture].filter(Boolean) as string[] || []);
   const [name, setName] = useState(user?.name || '');
@@ -159,7 +161,7 @@ export const EditProfileScreen = () => {
 
   const pickImage = async () => {
     if (photos.length >= 6) {
-      Alert.alert('Maximum Reached', 'You can upload up to 6 photos');
+      await alert({ title: 'Maximum Reached', message: 'You can upload up to 6 photos', variant: 'info' });
       return;
     }
 
@@ -171,7 +173,7 @@ export const EditProfileScreen = () => {
         const file = e.target.files?.[0];
         if (file) {
           if (file.size > 10 * 1024 * 1024) {
-            Alert.alert('File Too Large', 'Please select an image smaller than 10MB');
+            alert({ title: 'File Too Large', message: 'Please select an image smaller than 10MB', variant: 'warning' });
             return;
           }
           const reader = new FileReader();
@@ -192,21 +194,17 @@ export const EditProfileScreen = () => {
     
     if (permissionResult.granted === false) {
       if (permissionResult.canAskAgain === false) {
-        Alert.alert(
-          'Permission Required',
-          'Photo library access is disabled. Please enable it in your device settings to add photos.',
-          [
-            { text: 'OK' },
-          ]
-        );
+        await alert({
+          title: 'Permission Required',
+          message: 'Photo library access is disabled. Please enable it in your device settings to add photos.',
+          variant: 'warning',
+        });
       } else {
-        Alert.alert(
-          'Permission Required',
-          'Permission to access photo library is required to add photos.',
-          [
-            { text: 'OK' },
-          ]
-        );
+        await alert({
+          title: 'Permission Required',
+          message: 'Permission to access photo library is required to add photos.',
+          variant: 'warning',
+        });
       }
       return;
     }
@@ -223,7 +221,7 @@ export const EditProfileScreen = () => {
         setPhotos([...photos, result.assets[0].uri]);
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to pick image. Please try again.');
+      await alert({ title: 'Error', message: 'Failed to pick image. Please try again.', variant: 'warning' });
       console.error('Image picker error:', error);
     }
   };
@@ -241,25 +239,25 @@ export const EditProfileScreen = () => {
 
   const handleSave = async () => {
     if (!name.trim()) {
-      Alert.alert('Error', 'Please enter your name');
+      await alert({ title: 'Error', message: 'Please enter your name', variant: 'warning' });
       return;
     }
 
     if (!email.trim()) {
-      Alert.alert('Error', 'Please enter your email');
+      await alert({ title: 'Error', message: 'Please enter your email', variant: 'warning' });
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      Alert.alert('Error', 'Please enter a valid email address');
+      await alert({ title: 'Error', message: 'Please enter a valid email address', variant: 'warning' });
       return;
     }
 
     const birthdayValidation = validateBirthday(birthday);
     if (!birthdayValidation.valid) {
       setBirthdayError(birthdayValidation.error);
-      Alert.alert('Error', birthdayValidation.error);
+      await alert({ title: 'Error', message: birthdayValidation.error, variant: 'warning' });
       return;
     }
 
@@ -359,7 +357,7 @@ export const EditProfileScreen = () => {
     dispatchInsightTrigger('profile_change');
 
     setIsSaving(false);
-    Alert.alert('Success', 'Profile updated successfully');
+    await alert({ title: 'Success', message: 'Profile updated successfully', variant: 'success' });
     navigation.goBack();
   };
 

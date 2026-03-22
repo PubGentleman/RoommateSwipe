@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, Dimensions, ActivityIndicator, TextInput, ScrollView, Alert, Modal, Image, Platform } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Dimensions, ActivityIndicator, TextInput, ScrollView, Modal, Image } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, useAnimatedScrollHandler, withSpring, withTiming, runOnJS, interpolate, Extrapolation } from 'react-native-reanimated';
 import { Feather } from '../../components/VectorIcons';
@@ -26,6 +26,7 @@ import { useCityContext } from '../../contexts/CityContext';
 import { CityPickerModal, CityPillButton } from '../../components/CityPickerModal';
 import { RoomdrAISheet } from '../../components/RoomdrAISheet';
 import { GroupPropertySearchModal } from '../../components/GroupPropertySearchModal';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - Spacing.xxl;
@@ -35,6 +36,7 @@ type Tab = 'my-groups' | 'discover' | 'create';
 export const GroupsScreen = () => {
   const { theme } = useTheme();
   const { user, purchaseUndoPass, hasActiveUndoPass } = useAuth();
+  const { confirm, alert: showAlert } = useConfirm();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const [activeTab, setActiveTab] = useState<Tab>('discover');
@@ -373,9 +375,7 @@ export const GroupsScreen = () => {
     if (!user) return;
     const isMutual = mutualGroupIds.has(group.id);
     if (!isMutual) {
-      const msg = 'Like this group first. If the admin likes you back, you can request to join.';
-      if (Platform.OS === 'web') { window.alert(msg); }
-      else { Alert.alert('Not Yet', msg); }
+      await showAlert({ title: 'Not Yet', message: 'Like this group first. If the admin likes you back, you can request to join.', variant: 'info' });
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -385,9 +385,7 @@ export const GroupsScreen = () => {
     } catch {
       await StorageService.likeGroup(group.id, user.id);
     }
-    const msg = 'Join request sent! The admin will review it.';
-    if (Platform.OS === 'web') { window.alert(msg); }
-    else { Alert.alert('Request Sent', msg); }
+    await showAlert({ title: 'Request Sent', message: 'Join request sent! The admin will review it.', variant: 'success' });
   };
 
   const handleSwipeAction = async (action: 'like' | 'skip') => {
@@ -610,11 +608,11 @@ export const GroupsScreen = () => {
     try {
       await respondToInvite(invite.id, 'accepted');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Joined!', `You have joined "${invite.groupName}".`);
+      await showAlert({ title: 'Joined!', message: `You have joined "${invite.groupName}".`, variant: 'success' });
       setPendingInvites(prev => prev.filter(i => i.id !== invite.id));
       await loadGroups();
     } catch {
-      Alert.alert('Error', 'Could not accept invite. Try again.');
+      await showAlert({ title: 'Error', message: 'Could not accept invite. Try again.', variant: 'warning' });
     }
   };
 
@@ -623,25 +621,25 @@ export const GroupsScreen = () => {
       await respondToInvite(invite.id, 'declined');
       setPendingInvites(prev => prev.filter(i => i.id !== invite.id));
     } catch {
-      Alert.alert('Error', 'Could not decline invite. Try again.');
+      await showAlert({ title: 'Error', message: 'Could not decline invite. Try again.', variant: 'warning' });
     }
   };
 
   const handleJoinByCode = async () => {
     if (codeInput.trim().length < 6) {
-      Alert.alert('Invalid Code', 'Please enter a 6-character invite code.');
+      await showAlert({ title: 'Invalid Code', message: 'Please enter a 6-character invite code.', variant: 'warning' });
       return;
     }
     setJoiningByCode(true);
     try {
       const { groupId, groupName: joinedName } = await joinGroupByCode(codeInput.trim());
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Joined!', `You have joined "${joinedName}".`);
+      await showAlert({ title: 'Joined!', message: `You have joined "${joinedName}".`, variant: 'success' });
       setCodeInput('');
       await loadGroups();
       setActiveTab('my-groups');
     } catch (err: any) {
-      Alert.alert('Could Not Join', err.message);
+      await showAlert({ title: 'Could Not Join', message: err.message, variant: 'warning' });
     } finally {
       setJoiningByCode(false);
     }
@@ -651,7 +649,7 @@ export const GroupsScreen = () => {
     if (!user) return;
 
     if (!groupName.trim()) {
-      Alert.alert('Name Required', 'Please enter a name for your group.');
+      await showAlert({ title: 'Name Required', message: 'Please enter a name for your group.', variant: 'warning' });
       return;
     }
 
@@ -675,14 +673,13 @@ export const GroupsScreen = () => {
 
       if (createdCount >= groupLimit) {
         const planLabel = userPlan.charAt(0).toUpperCase() + userPlan.slice(1);
-        Alert.alert(
-          'Group Limit Reached',
-          `Your ${planLabel} plan allows up to ${groupLimit} group${groupLimit === 1 ? '' : 's'}. Upgrade to create more.`,
-          [
-            { text: 'Upgrade', onPress: () => (navigation as any).navigate('Payment') },
-            { text: 'Cancel', style: 'cancel' },
-          ]
-        );
+        const wantsUpgrade = await confirm({
+          title: 'Group Limit Reached',
+          message: `Your ${planLabel} plan allows up to ${groupLimit} group${groupLimit === 1 ? '' : 's'}. Upgrade to create more.`,
+          confirmText: 'Upgrade',
+          variant: 'warning',
+        });
+        if (wantsUpgrade) (navigation as any).navigate('Payment');
         return;
       }
     } catch (error) {
@@ -722,7 +719,7 @@ export const GroupsScreen = () => {
     await loadGroups();
     setActiveTab('my-groups');
 
-    Alert.alert('Success', 'Your group has been created!');
+    await showAlert({ title: 'Success', message: 'Your group has been created!', variant: 'success' });
   };
 
   const handleLeaveGroup = async (group: Group) => {
@@ -731,64 +728,51 @@ export const GroupsScreen = () => {
     const hasOtherMembers = group.members.length > 1;
 
     if (isGroupAdmin && hasOtherMembers) {
-      Alert.alert(
-        'Promote Someone First',
-        'You are the admin. Open group settings to promote another member before leaving.',
-        [{ text: 'OK' }]
-      );
+      await showAlert({ title: 'Promote Someone First', message: 'You are the admin. Open group settings to promote another member before leaving.', variant: 'warning' });
       return;
     }
 
     const isLast = group.members.length <= 1;
-    Alert.alert(
-      isLast ? 'Delete Group?' : 'Leave Group?',
-      isLast
+    const confirmed = await confirm({
+      title: isLast ? 'Delete Group?' : 'Leave Group?',
+      message: isLast
         ? `You are the last member of "${group.name}". Leaving will permanently delete this group.`
         : `Are you sure you want to leave "${group.name}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: isLast ? 'Delete' : 'Leave',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await leaveGroupSupabase(group.id);
-            } catch (supabaseError) {
-              console.warn('[GroupsScreen] Supabase leaveGroup failed, falling back:', supabaseError);
-              await StorageService.leaveGroup(group.id, user.id);
-            }
-            loadGroups();
-          },
-        },
-      ]
-    );
+      confirmText: isLast ? 'Delete' : 'Leave',
+      variant: 'danger',
+    });
+    if (confirmed) {
+      try {
+        await leaveGroupSupabase(group.id);
+      } catch (supabaseError) {
+        console.warn('[GroupsScreen] Supabase leaveGroup failed, falling back:', supabaseError);
+        await StorageService.leaveGroup(group.id, user.id);
+      }
+      loadGroups();
+    }
   };
 
   const handleRemoveMember = async (groupId: string, memberId: string, memberName: string) => {
-    Alert.alert(
-      'Remove Member',
-      `Are you sure you want to remove ${memberName} from the group?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            await StorageService.removeMemberFromGroup(groupId, memberId);
-            loadGroups();
-          },
-        },
-      ]
-    );
+    const confirmed = await confirm({
+      title: 'Remove Member',
+      message: `Are you sure you want to remove ${memberName} from the group?`,
+      confirmText: 'Remove',
+      variant: 'danger',
+    });
+    if (confirmed) {
+      await StorageService.removeMemberFromGroup(groupId, memberId);
+      loadGroups();
+    }
   };
 
   const handleAcceptMember = async (groupId: string, userId: string, userName: string) => {
     const success = await StorageService.acceptGroupMember(groupId, userId);
     if (!success) {
-      Alert.alert(
-        'Cannot Accept',
-        `${userName} has already joined another group. They must leave that group first before joining this one.`
-      );
+      await showAlert({
+        title: 'Cannot Accept',
+        message: `${userName} has already joined another group. They must leave that group first before joining this one.`,
+        variant: 'warning',
+      });
     }
     loadGroups();
   };
@@ -799,27 +783,22 @@ export const GroupsScreen = () => {
   };
 
   const handleArchiveInquiry = async (group: any) => {
-    Alert.alert(
-      'Archive Inquiry',
-      `Archive the inquiry for "${group.listingAddress || group.name}"? The chat will become read-only.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Archive',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await archiveGroupSupabase(group.id);
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              loadGroups();
-            } catch (err) {
-              console.error('Failed to archive inquiry:', err);
-              Alert.alert('Error', 'Failed to archive inquiry');
-            }
-          },
-        },
-      ]
-    );
+    const confirmed = await confirm({
+      title: 'Archive Inquiry',
+      message: `Archive the inquiry for "${group.listingAddress || group.name}"? The chat will become read-only.`,
+      confirmText: 'Archive',
+      variant: 'danger',
+    });
+    if (confirmed) {
+      try {
+        await archiveGroupSupabase(group.id);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        loadGroups();
+      } catch (err) {
+        console.error('Failed to archive inquiry:', err);
+        await showAlert({ title: 'Error', message: 'Failed to archive inquiry', variant: 'warning' });
+      }
+    }
   };
 
   const handleOpenGroupChat = (group: Group) => {

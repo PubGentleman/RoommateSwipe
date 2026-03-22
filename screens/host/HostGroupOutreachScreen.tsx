@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, ScrollView, TextInput, Pressable,
-  ActivityIndicator, Alert, StyleSheet, Platform,
+  ActivityIndicator, StyleSheet,
 } from 'react-native';
 import { ThemedText } from '../../components/ThemedText';
 import { Feather } from '../../components/VectorIcons';
 import { useTheme } from '../../hooks/useTheme';
 import { Typography, Spacing } from '../../constants/theme';
 import { useAuth } from '../../contexts/AuthContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import {
   getGroupsForListing,
   createOutreachPayment,
@@ -27,6 +28,7 @@ export function HostGroupOutreachScreen({ route, navigation }: Props) {
   const { listingId, listingTitle } = route.params;
   const { theme } = useTheme();
   const { user } = useAuth();
+  const { alert: showAlert } = useConfirm();
   const { presentOutreachPayment } = useOutreachPayment();
 
   const [groups, setGroups] = useState<any[]>([]);
@@ -80,19 +82,11 @@ export function HostGroupOutreachScreen({ route, navigation }: Props) {
   async function handlePayAndSend() {
     if (!selectedPackage) return;
     if (!message.trim()) {
-      if (Platform.OS === 'web') {
-        window.alert('Write your message first');
-      } else {
-        Alert.alert('Write your message first');
-      }
+      await showAlert({ title: 'Missing Message', message: 'Write your message first', variant: 'warning' });
       return;
     }
     if (selectedGroupIds.size === 0) {
-      if (Platform.OS === 'web') {
-        window.alert('Select at least one group');
-      } else {
-        Alert.alert('Select at least one group');
-      }
+      await showAlert({ title: 'No Groups Selected', message: 'Select at least one group', variant: 'warning' });
       return;
     }
 
@@ -109,22 +103,19 @@ export function HostGroupOutreachScreen({ route, navigation }: Props) {
       const { success } = await presentOutreachPayment(clientSecret);
       if (!success) return;
 
-      Alert.alert(
-        'Messages Sent!',
-        `Your message is on its way to ${groupIds.length} group${groupIds.length > 1 ? 's' : ''}.`,
-        [{ text: 'Done', onPress: () => navigation.goBack() }]
-      );
+      await showAlert({
+        title: 'Messages Sent!',
+        message: `Your message is on its way to ${groupIds.length} group${groupIds.length > 1 ? 's' : ''}.`,
+        variant: 'success',
+      });
+      navigation.goBack();
 
       setContactedIds(prev => new Set([...prev, ...groupIds]));
       setSelectedGroupIds(new Set());
       setMessage('');
     } catch (e: any) {
       console.error(e);
-      if (Platform.OS === 'web') {
-        window.alert(e.message || 'Something went wrong. Please try again.');
-      } else {
-        Alert.alert('Error', e.message || 'Something went wrong. Please try again.');
-      }
+      await showAlert({ title: 'Error', message: e.message || 'Something went wrong. Please try again.', variant: 'warning' });
     } finally {
       setPaying(false);
     }
