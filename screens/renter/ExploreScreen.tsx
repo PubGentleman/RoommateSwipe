@@ -249,14 +249,12 @@ export const ExploreScreen = () => {
     setShowGroupPickerModal(false);
     setShowPropertyDetail(false);
     if (selectedProperty) {
-      navigation.navigate('CreateGroup' as never, {
-        listingId: selectedProperty.id,
-        listingTitle: selectedProperty.title,
-        listingBedrooms: selectedProperty.bedrooms || null,
-        groupType: 'listing_inquiry',
-        existingGroupId: group.id,
-        existingGroupName: group.name,
-      } as never);
+      (navigation as any).navigate('Messages', {
+        screen: 'CreateGroup',
+        params: {
+          preselectedListingId: selectedProperty.id,
+        },
+      });
     }
   };
 
@@ -369,7 +367,7 @@ export const ExploreScreen = () => {
         participant: {
           id: selectedProperty.hostId,
           name: selectedProperty.hostName || 'Host',
-          photo: selectedProperty.hostProfilePhoto || '',
+          photo: (selectedProperty.hostProfileId ? hostProfiles.get(selectedProperty.hostProfileId)?.profilePicture : undefined) || '',
           online: false,
         },
         lastMessage: isSuperInterest ? 'Super Interest sent' : 'Interest sent — awaiting response',
@@ -553,14 +551,14 @@ export const ExploreScreen = () => {
       );
     }
     if (activeQuickFilters.has('availableNow')) {
-      const today = new Date().toISOString().split('T')[0];
-      filtered = filtered.filter(p =>
-        p.available === true ||
-        (p as any).available_now === true ||
-        (p as any).status === 'available' ||
-        (p as any).status === 'active' ||
-        ((p as any).move_in_date && (p as any).move_in_date <= today)
-      );
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      filtered = filtered.filter(p => {
+        if (!p.availableDate) return p.available === true;
+        const availDate = new Date(p.availableDate);
+        availDate.setHours(0, 0, 0, 0);
+        return availDate <= today;
+      });
     }
 
     const getHostPlanPriority = (property: Property) => {

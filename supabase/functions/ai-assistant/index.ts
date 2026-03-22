@@ -48,7 +48,7 @@ serve(async (req) => {
     }
 
     const profile = await getUserProfile(supabase, user.id);
-    const topMatches = await getTopMatches(supabase, user.id, profile.city);
+    const topMatches = await getTopMatches(supabase, user.id);
     const nearbyListings = await getNearbyListings(supabase, profile);
     const history = await getConversationHistory(supabase, user.id, sessionId);
     const systemPrompt = buildSystemPrompt(profile, topMatches, nearbyListings, plan);
@@ -97,32 +97,74 @@ async function getUsageCount(supabase: any, userId: string): Promise<number> {
 }
 
 async function getUserProfile(supabase: any, userId: string) {
-  const { data } = await supabase
-    .from('profiles')
-    .select(`
-      name, age, occupation, bio,
-      city, neighborhoods,
-      budget_min, budget_max,
-      move_in_date, lease_length,
-      lifestyle_tags, dealbreakers,
-      zodiac_sign, has_pets, pet_types,
-      cleanliness, noise_level, sleep_schedule,
-      smoking, drinking
-    `)
+  const { data: userData } = await supabase
+    .from('users')
+    .select('full_name, age, occupation, bio, city, neighborhood, zodiac_sign')
     .eq('id', userId)
     .single();
-  return data ?? {};
+
+  const { data: profileData } = await supabase
+    .from('profiles')
+    .select(`
+      budget_min, budget_max,
+      move_in_date, lease_duration,
+      cleanliness, noise_tolerance, sleep_schedule,
+      smoking, drinking, pets, interests
+    `)
+    .eq('user_id', userId)
+    .single();
+
+  return {
+    name: userData?.full_name,
+    age: userData?.age,
+    occupation: userData?.occupation,
+    bio: userData?.bio,
+    city: userData?.city,
+    neighborhood: userData?.neighborhood,
+    zodiac_sign: userData?.zodiac_sign,
+    budget_min: profileData?.budget_min,
+    budget_max: profileData?.budget_max,
+    move_in_date: profileData?.move_in_date,
+    lease_duration: profileData?.lease_duration,
+    cleanliness: profileData?.cleanliness,
+    noise_tolerance: profileData?.noise_tolerance,
+    sleep_schedule: profileData?.sleep_schedule,
+    smoking: profileData?.smoking,
+    drinking: profileData?.drinking,
+    pets: profileData?.pets,
+    interests: profileData?.interests,
+  };
 }
 
-async function getTopMatches(supabase: any, userId: string, city: string) {
-  const { data } = await supabase
+async function getTopMatches(supabase: any, userId: string) {
+  const { data: scores } = await supabase
     .from('match_scores')
-    .select('target_id, score, profiles!target_id(name, occupation, budget_min, budget_max, zodiac_sign)')
+    .select('target_id, score')
     .eq('user_id', userId)
     .gte('score', 60)
     .order('score', { ascending: false })
     .limit(5);
-  return data ?? [];
+
+  if (!scores || scores.length === 0) return [];
+
+  const targetIds = scores.map((s: any) => s.target_id);
+  const { data: users } = await supabase
+    .from('users')
+    .select('id, full_name, occupation, zodiac_sign')
+    .in('id', targetIds);
+
+  const userMap = new Map((users ?? []).map((u: any) => [u.id, u]));
+
+  return scores.map((s: any) => {
+    const u = userMap.get(s.target_id);
+    return {
+      target_id: s.target_id,
+      score: s.score,
+      name: u?.full_name,
+      occupation: u?.occupation,
+      zodiac_sign: u?.zodiac_sign,
+    };
+  });
 }
 
 async function getNearbyListings(supabase: any, profile: any) {
@@ -153,7 +195,7 @@ async function getConversationHistory(supabase: any, userId: string, sessionId: 
 function buildSystemPrompt(profile: any, topMatches: any[], listings: any[], plan: string): string {
   const matchSummary = topMatches.length > 0
     ? topMatches.map((m: any) =>
-        `${m.profiles?.name} (${m.score}% match, ${m.profiles?.occupation ?? 'unknown occupation'}, $${m.profiles?.budget_min}–$${m.profiles?.budget_max}/mo, ${m.profiles?.zodiac_sign ?? 'unknown sign'})`
+        `${m.name ?? 'Unknown'} (${m.score}% match, ${m.occupation ?? 'unknown occupation'}, ${m.zodiac_sign ?? 'unknown sign'})`
       ).join('; ')
     : 'no top matches yet';
 
@@ -182,13 +224,12 @@ WHAT YOU KNOW ABOUT THIS USER:
 Name: ${profile.name ?? 'the user'}
 Age: ${profile.age ?? 'unknown'}, ${profile.occupation ?? 'unknown occupation'}
 Budget: $${profile.budget_min ?? '?'}–$${profile.budget_max ?? '?'}/mo
-Looking in: ${profile.neighborhoods?.join(', ') ?? profile.city ?? 'New York'}
+Looking in: ${profile.neighborhood ?? profile.city ?? 'New York'}
 Move-in: ${profile.move_in_date ?? 'flexible'}
 Zodiac: ${profile.zodiac_sign ?? 'unknown'}
-Lifestyle: ${profile.lifestyle_tags?.join(', ') ?? 'not set'}
-Dealbreakers: ${profile.dealbreakers?.join(', ') ?? 'none listed'}
-Pets: ${profile.has_pets ? `yes (${profile.pet_types?.join(', ')})` : 'no'}
-Cleanliness: ${profile.cleanliness ?? '?'}/5, Sleep: ${profile.sleep_schedule ?? '?'}, Noise: ${profile.noise_level ?? '?'}
+Interests: ${profile.interests?.join(', ') ?? 'not set'}
+Pets: ${profile.pets ?? 'none'}
+Cleanliness: ${profile.cleanliness ?? '?'}/5, Sleep: ${profile.sleep_schedule ?? '?'}, Noise tolerance: ${profile.noise_tolerance ?? '?'}/5
 
 THEIR TOP MATCHES RIGHT NOW: ${matchSummary}
 

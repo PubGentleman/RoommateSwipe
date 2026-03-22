@@ -1,0 +1,399 @@
+# RoomDrx — Full Codebase Audit
+**Date:** March 2026
+**Files reviewed:** 130+ source files across screens, services, navigation, hooks, utils, migrations, and Edge Functions
+
+---
+
+## 🔴 CRITICAL BUGS — Things That Are Actively Broken
+
+---
+
+### 1. AI Edge Function Queries Profiles With Wrong Column
+**File:** `supabase/functions/ai-assistant/index.ts` — `getUserProfile()`
+**Severity:** Critical — AI never has user context
+
+```ts
+// WRONG — profiles.id is a random UUID, not the auth user's ID
+const { data } = await supabase
+  .from('profiles')
+  .select(...)
+  .eq('id', userId)   // ← WRONG COLUMN
+```
+
+In `migrations/001_schema.sql`, the `profiles` table has its own `id uuid primary key default gen_random_uuid()` and a separate `user_id uuid references public.users(id)`. Querying `.eq('id', userId)` will never find the profile. Should be `.eq('user_id', userId)`.
+
+**Fix:**
+```ts
+.eq('user_id', userId)
+```
+
+---
+
+### 2. `match_scores` Table Does Not Exist in Any Migration
+**File:** `supabase/functions/ai-assistant/index.ts` — `getTopMatches()`
+**Severity:** Critical — AI always tells users "no top matches yet"
+
+```ts
+const { data } = await supabase
+  .from('match_scores')   // ← Table does not exist
+  .select('target_id, score, profiles!target_id(...)')
+  ...
+```
+
+None of the 15 migration files (`001_schema.sql` through `015_ai_conversations.sql`) create a `match_scores` table. The query fails silently and returns `[]`, so the AI system prompt always says **"no top matches yet"** for every user, even if they have matches. This is one of the biggest missing pieces.
+
+**Fix:** Need to create this table and a background job or trigger that populates it when matches are created.
+
+```sql
+CREATE TABLE IF NOT EXISTS public.match_scores (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  target_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  score INTEGER NOT NULL DEFAULT 0,
+  calculated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(user_id, target_id)
+);
+CREATE INDEX idx_match_scores_user ON match_scores(user_id, score DESC);
+```
+
+---
+
+### 3. AI Chat Input Buried Under Tab Bar
+**File:** `screens/renter/AIAssistantScreen.tsx` + `navigation/RoommatesStackNavigator.tsx`
+**Severity:** Critical — chat input not usable
+
+The `AIAssistantScreen` lives inside `RoommatesStackNavigator` as a plain stack screen. The tab bar (`position: absolute, bottom: 0`) sits on top of it. The screen tries to compensate with `keyboardVerticalOffset={TAB_BAR_HEIGHT}` and `paddingBottom: Math.max(insets.bottom, 12) + TAB_BAR_HEIGHT`, but this is a hack that breaks on Android and different inset sizes.
+
+**Fix:** Promote to `fullScreenModal` in `RoommatesStackNavigator.tsx`:
+```tsx
+<Stack.Screen
+  name="AIAssistant"
+  component={AIAssistantScreen}
+  options={{ presentation: 'fullScreenModal', headerShown: false }}
+/>
+```
+Then remove the manual `TAB_BAR_HEIGHT` padding from the screen itself and use only `insets.bottom`.
+
+---
+
+### 4. All Stripe Price IDs Are Placeholder Strings
+**File:** `constants/stripePrices.ts`
+**Severity:** Critical — all payments broken
+
+```ts
+export const STRIPE_PRICES: Record<string, string> = {
+  'plus_monthly':  'price_plus_monthly',   // ← FAKE ID
+  'elite_annual':  'price_elite_annual',   // ← FAKE ID
+  ...
+};
+
+export const BOOST_PRICE_IDS = {
+  renter_boost_6h: 'price_REPLACE_WITH_REAL_ID',  // ← explicitly labeled fake
+  ...
+};
+```
+
+Every subscription and boost payment will fail with Stripe because these aren't real price IDs. This means the Plans screen, Payment screen, Boost screen, and Outreach payment are all non-functional.
+
+**Fix:** Log into Stripe dashboard → Products → copy the real `price_xxx` IDs.
+
+---
+
+### 5. `selectedProperty.hostProfilePhoto` Doesn't Exist on `Property` Type
+**File:** `screens/renter/ExploreScreen.tsx` ~line 372
+**Severity:** High — host photo always missing in conversations
+
+```ts
+photo: selectedProperty.hostProfilePhoto || '',  // ← not in Property type
+```
+
+The `Property` interface in `types/models.ts` has no `hostProfilePhoto` field. This will always be `undefined`, so every inquiry conversation thread will have no host photo. TypeScript would have caught this if strict mode was running.
+
+---
+
+### 6. `availableNow` Quick Filter Matches Everything
+**File:** `screens/renter/ExploreScreen.tsx` — `applyFilters()`
+**Severity:** High — filter chip does nothing useful
+
+```ts
+if (activeQuickFilters.has('availableNow')) {
+  filtered = filtered.filter(p =>
+    p.available === true ||
+    (p as any).status === 'active' ||   // ← ALL Supabase listings already pass this
+    ...
+  );
+}
+```
+
+Since `getListings()` already filters with `.eq('is_active', true)` and `.eq('is_rented', false)`, every listing already has `status === 'active'`. The "Available Now" chip never filters anything out. It should filter by `available_date <= today` (units that are actually move-in ready today, not future-dated).
+
+**Fix:**
+```ts
+if (activeQuickFilters.has('availableNow')) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  filtered = filtered.filter(p =>
+    !p.availableDate || p.availableDate <= today
+  );
+}
+```
+
+---
+
+### 7. `bestMatch` Chip Has No Filter or Sort Logic
+**File:** `screens/renter/ExploreScreen.tsx` — `applyFilters()`
+**Severity:** High — the default active chip does nothing
+
+`QUICK_FILTERS` includes `{ key: 'bestMatch', label: 'Best Match' }` and it's in the default active set. But `applyFilters()` has no code that checks `activeQuickFilters.has('bestMatch')`. The sort order runs the same regardless: featured → featured+boosted → boosted → host plan priority.
+
+"Best Match" should sort by compatibility score between the renter and the host. This logic exists (`getPropertyCompatibility()` is defined) but is never used in the sort.
+
+**Fix:** When `bestMatch` is active, add a compatibility-based sort step.
+
+---
+
+### 8. Cross-Navigator `CreateGroup` Navigation From ExploreScreen
+**File:** `screens/renter/ExploreScreen.tsx` — `handleInquireAsGroup()`
+**Severity:** High — may crash or silently fail
+
+```ts
+navigation.navigate('CreateGroup' as never, {
+  listingId: ...,
+  existingGroupId: ...,
+} as never);
+```
+
+`ExploreScreen` is in `RenterTabNavigator`. `CreateGroup` is a screen inside `MessagesStackNavigator`, which is under the `Messages` tab. Navigating directly to `CreateGroup` from a different tab stack using `as never` casts is a pattern that often fails silently or throws a runtime error.
+
+**Fix:** Navigate to the Messages tab first, then to CreateGroup:
+```ts
+navigation.navigate('Messages' as never, {
+  screen: 'CreateGroup',
+  params: { listingId: ..., existingGroupId: ... }
+} as never);
+```
+
+---
+
+## 🟡 LOGIC ISSUES — Things That Work Incorrectly
+
+---
+
+### 9. AI Screen Has Two Completely Different Response Systems
+**File:** `screens/renter/AIAssistantScreen.tsx`
+
+The screen has:
+1. **Real path**: `sendAIMessage()` → Supabase Edge Function → Claude API → real contextual response
+2. **Fallback path**: `handleSendFallback()` → `generateAIResponse()` → hardcoded keyword-matching → made-up data
+
+The fallback generates things like:
+- "Harvest Kitchen - Farm-to-table, $$$"
+- "The Velvet Room - Upscale cocktail lounge"
+- "Downtown District — Avg rent $1,800–2,500/mo"
+
+These are completely fabricated, city-generic, and misleading. Users have no idea which system responded. If the Edge Function is down or the user isn't authenticated, they get fake responses that look real.
+
+**Fix:** Remove `generateAIResponse()` entirely. If the API fails, show an error state instead of fabricated data.
+
+---
+
+### 10. `loadHostProfiles` in ExploreScreen Reads Mock Data, Not Supabase
+**File:** `screens/renter/ExploreScreen.tsx` — `loadHostProfiles()`
+
+```ts
+const users = await StorageService.getUsers();  // ← mock local storage
+```
+
+Host profiles for compatibility scoring are loaded from `StorageService` (mock data), not from Supabase. So the compatibility percentage shown on listing cards is always calculated against fake mock profiles, never real host data.
+
+---
+
+### 11. `Group.members` Is a Union Type That Causes Fragile Code
+**File:** `types/models.ts`
+
+```ts
+members: string[] | GroupMember[];
+```
+
+This forces defensive code like `typeof m === 'string' ? m : m.userId || m.id` in every place that reads group members. It means the data shape is inconsistent depending on where/how groups are loaded, and it's easy to get a runtime error if the wrong branch is taken.
+
+---
+
+### 12. `subscriptions` Table Default Plan Is `'basic'` But AI Limits Use `'free'`
+**File:** `migrations/001_schema.sql` + `supabase/functions/ai-assistant/index.ts`
+
+The subscriptions table defaults new users to plan `'basic'`. The AI Edge Function's `DAILY_LIMITS` has `basic: 5` which works, but the UI and the admin panel treat `'basic'` and `'free'` as the same thing. Inconsistency causes confusion. Recommended: run `UPDATE subscriptions SET plan = 'free' WHERE plan = 'basic'` and remove `'basic'` from the allowed values.
+
+---
+
+### 13. `profilePicture` vs `avatar_url` Data Mismatch
+**File:** Throughout codebase
+
+The `User` type uses `profilePicture?: string` but the Supabase `users` table uses `avatar_url text`. The auth context maps between these but inconsistently. In `ExploreScreen`, `user.profilePicture` is used; in the message service, `avatar_url` is read from Supabase. This means profile photos often don't load in certain contexts.
+
+---
+
+### 14. `getConversations()` N+1 Query Problem
+**File:** `services/messageService.ts`
+
+```ts
+const conversations = await Promise.all(
+  matches.map(async (match) => {
+    const { data: otherUser } = await supabase.from('users')...   // 1 query per match
+    const { data: messages } = await supabase.from('messages')... // 1 query per match
+    const { count } = await supabase.from('messages')...           // 1 query per match
+  })
+);
+```
+
+For a user with 20 matches, this fires 60+ Supabase queries. This will be slow and will hit rate limits as the user base grows. Should use a single JOIN query or the `conversations` view defined in the schema.
+
+---
+
+## 🟠 MISSING FEATURES — Things That Need to Be Built
+
+---
+
+### Feature Priority Table
+
+| Feature | Impact | Effort | Status |
+|---|---|---|---|
+| Real Stripe price IDs | 🔴 Critical | Low | ❌ Not done |
+| `match_scores` table + population | 🔴 Critical | Medium | ❌ Not done |
+| Fix `profiles` query in AI Edge Function | 🔴 Critical | Low | ❌ Not done |
+| Fix AI screen as fullScreenModal | 🔴 Critical | Low | ❌ Not done |
+| Push notification delivery (Expo tokens) | High | Medium | ❌ Not done |
+| Deep linking | Medium | Medium | ❌ Not done |
+| SSO (Google, Apple) | Medium | Medium | ❌ Not done |
+| `user_events` table for ML training | Medium | Low | ❌ Not done |
+| Real host profiles in ExploreScreen | High | Medium | ❌ Partial |
+| Background check flow (Checkr) | Low | High | ❌ Partial |
+
+---
+
+### Push Notifications
+`hooks/useNotifications.ts` exists and there's a notification context, but actual Expo push token registration and server-side delivery is not implemented. Notifications are created in local storage but never sent to a user's device.
+
+---
+
+### Deep Linking
+No deep link configuration in `app.json` or `App.tsx`. Users can't tap a link and open a specific listing or conversation.
+
+---
+
+### SSO / Social Login
+`LoginScreen` only supports email/password. No Google Sign-In or Apple Sign-In is implemented.
+
+---
+
+### `user_events` Table
+No migration exists for event tracking. Implementing this now would let you collect match interactions for ML later.
+
+```sql
+CREATE TABLE public.user_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  event_type TEXT NOT NULL,
+  target_id TEXT,
+  metadata JSONB,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+---
+
+## 🎨 SCREENS NOT YET REDESIGNED
+
+Based on the design prompts already written, these screens still need to be updated to match the dark design system:
+
+| Screen | Status |
+|---|---|
+| BrowseRenterGroups | ✅ Prompt written, needs implementation |
+| HostInquiries | ✅ Prompt written, needs implementation |
+| Explore filter chips (clipping fix) | ✅ Prompt written, needs implementation |
+| Chat/Messages Screen | ✅ Prompt written, needs implementation |
+| Renter Profile Detail | ✅ Prompt written, needs implementation |
+| AI Match Assistant | ✅ Prompt written, needs implementation |
+| AI Explore Panel | ✅ Prompt written, needs implementation |
+| Roommate Filter Sheet | ✅ Prompt written, needs implementation |
+| **Host Dashboard** | ❌ Not reviewed |
+| **My Listings Screen** | ❌ Not reviewed |
+| **Plans / Subscription Screen** | ❌ Not reviewed |
+| **Edit Profile Screen** | ❌ Not reviewed |
+| **Onboarding Screen** | ❌ Not reviewed |
+| **Login Screen** | ❌ Not reviewed |
+| **Roommates / Match tab** | ❌ Not reviewed |
+| **Groups Screen** | ❌ Not reviewed |
+
+---
+
+## 🗄️ DATABASE GAPS
+
+### Missing Tables
+| Table | Referenced In | Migration Exists? |
+|---|---|---|
+| `match_scores` | `ai-assistant` Edge Function | ❌ Missing |
+| `user_events` | (recommended) | ❌ Missing |
+| `reports` | (recommended for flags) | ❌ Missing |
+
+### Missing SQL Functions
+| Function | Referenced In | Migration Exists? |
+|---|---|---|
+| `increment_ai_usage` | `ai-assistant` Edge Function | ✅ Migration 015 |
+
+### Schema Inconsistencies
+- `subscriptions.plan` allows `'basic'` but should be changed to `'free'`
+- `profiles` table has `user_id` FK but AI Edge Function queries by `.eq('id', userId)` — wrong column
+- `listings.room_type` has no check constraint — any string can be stored; filter logic maps many possible values
+
+---
+
+## ✅ WHAT'S WORKING WELL
+
+| Area | Notes |
+|---|---|
+| Auth flow | Clean, well-structured, handles all onboarding steps |
+| Navigation architecture | Solid separation: renter tabs, host tabs, root stack |
+| ExploreScreen filter logic | Under $2k, Pet Friendly, listing type filter, neighborhood — all correct |
+| AI Edge Function structure | Claude integration is correct; system prompt is good |
+| `listing_views` tracking | Implemented and correct (migration 014 + service) |
+| `ai_conversations` + `ai_usage` | Both tables exist with correct RLS + atomic increment RPC |
+| `ConfirmContext` (custom modals) | Correctly replaces `window.confirm()` |
+| Boost rotation logic | Fair rotation system using hash-based determinism |
+| Plan gating (host) | `canAddListing`, `canUseProactiveOutreach` properly enforced |
+| Supabase Realtime subscriptions | `subscribeToMessages`, `subscribeToGroupMessages` both implemented |
+| Error boundary | `ErrorBoundary` wraps the whole app |
+| Haptics | Used thoughtfully on key interactions |
+| `useSafeAreaInsets` | Consistently used across screens |
+
+---
+
+## 📋 PRIORITY FIX ORDER
+
+### Fix This Week (Critical — Broken Core Functionality)
+1. Fix `profiles` query: `.eq('id', userId)` → `.eq('user_id', userId)` in AI Edge Function
+2. Create `match_scores` table migration
+3. Promote `AIAssistantScreen` to `fullScreenModal` in RoommatesStackNavigator
+4. Add real Stripe price IDs (requires Stripe dashboard access)
+5. Fix `hostProfilePhoto` → use `hostProfiles.get()` to get photo in ExploreScreen
+
+### Fix This Month (High — Significant UX Issues)
+6. Remove `generateAIResponse()` hardcoded fallback, replace with error state
+7. Fix `availableNow` filter to use actual available_date comparison
+8. Fix `bestMatch` chip to actually sort by compatibility score
+9. Fix `CreateGroup` cross-tab navigation from ExploreScreen
+10. Load host profiles from Supabase, not mock storage
+
+### Build Next (Important — Missing Features)
+11. Push notification delivery (Expo token registration + server send)
+12. `user_events` table for ML training data
+13. Consolidate `profilePicture` vs `avatar_url` — pick one everywhere
+14. Fix `getConversations()` N+1 query (use the `conversations` view)
+15. Implement remaining screen redesigns (Host Dashboard, My Listings, Plans, Edit Profile)
+
+### Build Later (Nice to Have)
+16. Deep linking
+17. SSO (Google/Apple)
+18. `reports` table + report flow
+19. Admin panel (Next.js — prompt already written)
+20. pgvector at 500+ users
