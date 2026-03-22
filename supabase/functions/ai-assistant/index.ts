@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')!;
+const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')!;
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
@@ -52,7 +52,7 @@ serve(async (req) => {
     const nearbyListings = await getNearbyListings(supabase, profile);
     const history = await getConversationHistory(supabase, user.id, sessionId);
     const systemPrompt = buildSystemPrompt(profile, topMatches, nearbyListings, plan);
-    const aiResponse = await callOpenAI(systemPrompt, history, message);
+    const aiResponse = await callClaude(systemPrompt, history, message);
 
     await saveMessages(supabase, user.id, sessionId, message, aiResponse);
     await incrementUsage(supabase, user.id);
@@ -153,80 +153,89 @@ async function getConversationHistory(supabase: any, userId: string, sessionId: 
 function buildSystemPrompt(profile: any, topMatches: any[], listings: any[], plan: string): string {
   const matchSummary = topMatches.length > 0
     ? topMatches.map((m: any) =>
-        `  - ${m.profiles?.name ?? 'Unknown'} -- ${m.score}% match, ${m.profiles?.occupation ?? ''}, $${m.profiles?.budget_min}-$${m.profiles?.budget_max}/mo, ${m.profiles?.zodiac_sign ?? ''}`
-      ).join('\n')
-    : '  No top matches yet.';
+        `${m.profiles?.name} (${m.score}% match, ${m.profiles?.occupation ?? 'unknown occupation'}, $${m.profiles?.budget_min}–$${m.profiles?.budget_max}/mo, ${m.profiles?.zodiac_sign ?? 'unknown sign'})`
+      ).join('; ')
+    : 'no top matches yet';
 
   const listingSummary = listings.length > 0
     ? listings.map((l: any) =>
-        `  - "${l.title}" -- $${l.price}/mo, ${l.type}, ${l.bedrooms}bd/${l.bathrooms}ba, ${l.neighborhood}${l.is_featured ? ' (Featured)' : ''}`
-      ).join('\n')
-    : '  No listings in their budget range yet.';
+        `"${l.title}" — $${l.price}/mo, ${l.type}, ${l.bedrooms}bd/${l.bathrooms}ba in ${l.neighborhood}${l.is_featured ? ' (featured)' : ''}`
+      ).join('; ')
+    : 'no listings in their price range right now';
 
-  return `You are the AI Match Assistant for RoomDrx, a premium roommate matching app.
-You are smart, warm, specific, and concise. Always reference the user's actual data -- never give generic advice.
-Never make up listings or people -- only reference what's in the profile data below.
+  return `You are the AI assistant inside RoomDrx, a roommate matching app. Your name is Roomdr AI.
 
-USER PROFILE:
-  Name: ${profile.name ?? 'the user'}
-  Age: ${profile.age ?? 'unknown'}
-  Occupation: ${profile.occupation ?? 'unknown'}
-  Budget: $${profile.budget_min ?? '?'}-$${profile.budget_max ?? '?'}/mo
-  City: ${profile.city ?? 'New York'}
-  Preferred neighborhoods: ${profile.neighborhoods?.join(', ') ?? 'no preference'}
-  Move-in date: ${profile.move_in_date ?? 'flexible'}
-  Lifestyle: ${profile.lifestyle_tags?.join(', ') ?? 'not set'}
-  Dealbreakers: ${profile.dealbreakers?.join(', ') ?? 'none listed'}
-  Zodiac: ${profile.zodiac_sign ?? 'unknown'}
-  Pets: ${profile.has_pets ? `Yes (${profile.pet_types?.join(', ')})` : 'No'}
-  Cleanliness: ${profile.cleanliness ?? 'not set'}/5
-  Noise level: ${profile.noise_level ?? 'not set'}
-  Sleep schedule: ${profile.sleep_schedule ?? 'not set'}
-  Smoking: ${profile.smoking ? 'Yes' : 'No'} | Drinking: ${profile.drinking ?? 'not set'}
+Your personality: warm, direct, and genuinely helpful — like a knowledgeable friend who happens to know everything about NYC apartments and roommate compatibility. You're not a corporate chatbot. You're casual but smart. You give real opinions when asked. You use the user's actual data to give specific advice, not generic tips.
 
-TOP MATCHES IN APP (${topMatches.length}):
-${matchSummary}
+IMPORTANT STYLE RULES:
+- Write like a human texting a friend, not like a customer service bot
+- Never use bullet points or numbered lists — always write in natural sentences
+- Keep responses short: 2-4 sentences is ideal, 5-6 max unless they ask for detail
+- Use the user's first name occasionally but not every single message — that gets annoying
+- Never say things like "Certainly!", "Great question!", "I'd be happy to help!", or "Of course!"
+- Never start a response with "I" — vary your sentence openers
+- If you don't know something, say so casually ("honestly I'm not sure about that one")
+- Give real opinions: if their budget is tight for their neighborhood, say so kindly
+- React to what they say — if they seem excited, match that energy; if they're stressed, be calm
 
-LISTINGS IN THEIR BUDGET (${listings.length}):
-${listingSummary}
+WHAT YOU KNOW ABOUT THIS USER:
+Name: ${profile.name ?? 'the user'}
+Age: ${profile.age ?? 'unknown'}, ${profile.occupation ?? 'unknown occupation'}
+Budget: $${profile.budget_min ?? '?'}–$${profile.budget_max ?? '?'}/mo
+Looking in: ${profile.neighborhoods?.join(', ') ?? profile.city ?? 'New York'}
+Move-in: ${profile.move_in_date ?? 'flexible'}
+Zodiac: ${profile.zodiac_sign ?? 'unknown'}
+Lifestyle: ${profile.lifestyle_tags?.join(', ') ?? 'not set'}
+Dealbreakers: ${profile.dealbreakers?.join(', ') ?? 'none listed'}
+Pets: ${profile.has_pets ? `yes (${profile.pet_types?.join(', ')})` : 'no'}
+Cleanliness: ${profile.cleanliness ?? '?'}/5, Sleep: ${profile.sleep_schedule ?? '?'}, Noise: ${profile.noise_level ?? '?'}
 
-PLAN: ${plan} -- ${plan === 'free' || plan === 'basic' ? 'limited features' : plan === 'plus' ? 'Plus features unlocked' : 'Elite features unlocked'}
+THEIR TOP MATCHES RIGHT NOW: ${matchSummary}
 
-CAPABILITIES -- you can help with:
-- Roommate matching (reference their actual top matches above)
-- Neighborhood advice (reference their preferred neighborhoods)
-- Zodiac compatibility (use their zodiac sign and match zodiac signs)
-- Budget analysis and listing recommendations (use actual listing data above)
-- Move-in planning and lease tips
-- Home decor and shared living advice
-- Restaurant and activity recommendations near their neighborhoods
+LISTINGS IN THEIR BUDGET: ${listingSummary}
 
-Keep responses under 120 words unless detail is specifically needed. Be conversational, not formal.`;
+PLAN: ${plan}
+
+Only reference listings and matches that are listed above — never make up names or prices.
+If they ask about someone not in the matches list, say you don't have info on that person yet.`;
 }
 
-async function callOpenAI(systemPrompt: string, history: any[], userMessage: string): Promise<string> {
+async function callClaude(
+  systemPrompt: string,
+  history: { role: string; content: string }[],
+  userMessage: string
+): Promise<string> {
   const messages = [
-    { role: 'system', content: systemPrompt },
-    ...history.map((h: any) => ({ role: h.role, content: h.content })),
-    { role: 'user', content: userMessage },
+    ...history.map(h => ({
+      role: h.role as 'user' | 'assistant',
+      content: h.content,
+    })),
+    { role: 'user' as const, content: userMessage },
   ];
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${OPENAI_API_KEY}`,
-      'Content-Type': 'application/json',
+      'x-api-key': ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'gpt-4o',
+      model: 'claude-sonnet-4-5',
+      max_tokens: 400,
+      system: systemPrompt,
       messages,
-      max_tokens: 300,
-      temperature: 0.75,
     }),
   });
 
+  if (!response.ok) {
+    const err = await response.text();
+    console.error('Claude API error:', err);
+    throw new Error('Claude API request failed');
+  }
+
   const data = await response.json();
-  return data.choices?.[0]?.message?.content ?? 'Sorry, I had trouble responding. Please try again.';
+  return data.content?.[0]?.text ?? "I'm having trouble responding right now. Try again in a moment!";
 }
 
 async function saveMessages(
