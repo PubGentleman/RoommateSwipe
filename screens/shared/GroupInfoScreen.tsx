@@ -291,125 +291,218 @@ export function GroupInfoScreen({ route, navigation }: Props) {
     }
   }
 
+  function filterMemberFromStorage(members: any[], targetId: string): any[] {
+    return (members || []).filter((m: any) => {
+      const mid = typeof m === 'string' ? m : (m.id || m.user_id);
+      return mid !== targetId;
+    });
+  }
+
   function handleRemoveMember(memberId: string, memberName: string) {
-    Alert.alert(
-      `Remove ${memberName}?`,
-      `${memberName} will be removed from the group.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            setRemovingId(memberId);
-            try {
-              await removeMember(groupId, memberId);
-              setGroup((prev: any) => ({
-                ...prev,
-                members: prev.members.filter((m: any) => m.id !== memberId),
-              }));
-            } catch {
-              Alert.alert('Error', 'Could not remove member.');
-            } finally {
-              setRemovingId(null);
-            }
-          },
-        },
-      ]
-    );
+    const doRemove = async () => {
+      setRemovingId(memberId);
+      let success = false;
+      try {
+        await removeMember(groupId, memberId);
+        success = true;
+      } catch {
+        try {
+          const groups = await StorageService.getGroups();
+          const idx = groups.findIndex((g: any) => g.id === groupId);
+          if (idx >= 0) {
+            const g = groups[idx] as any;
+            g.members = filterMemberFromStorage(g.members, memberId);
+            await StorageService.setGroups(groups);
+            success = true;
+          }
+        } catch {}
+      }
+      if (success) {
+        setGroup((prev: any) => ({
+          ...prev,
+          members: prev.members.filter((m: any) => m.id !== memberId),
+        }));
+      } else {
+        const msg = 'Could not remove member.';
+        if (Platform.OS === 'web') { window.alert(msg); } else { Alert.alert('Error', msg); }
+      }
+      setRemovingId(null);
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Remove ${memberName} from the group?`)) {
+        doRemove();
+      }
+    } else {
+      Alert.alert(
+        `Remove ${memberName}?`,
+        `${memberName} will be removed from the group.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Remove', style: 'destructive', onPress: doRemove },
+        ]
+      );
+    }
   }
 
   function handlePromoteMember(memberId: string, memberName: string) {
-    Alert.alert(
-      `Promote ${memberName}?`,
-      `${memberName} will become the new admin. You will become a regular member.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Promote',
-          onPress: async () => {
-            try {
-              await promoteMember(groupId, memberId);
-              setGroup((prev: any) => ({ ...prev, adminId: memberId }));
-            } catch {
-              Alert.alert('Error', 'Could not promote member.');
-            }
-          },
-        },
-      ]
-    );
+    const doPromote = async () => {
+      let success = false;
+      try {
+        await promoteMember(groupId, memberId);
+        success = true;
+      } catch {
+        try {
+          const groups = await StorageService.getGroups();
+          const idx = groups.findIndex((g: any) => g.id === groupId);
+          if (idx >= 0) {
+            (groups[idx] as any).createdBy = memberId;
+            await StorageService.setGroups(groups);
+            success = true;
+          }
+        } catch {}
+      }
+      if (success) {
+        setGroup((prev: any) => ({ ...prev, adminId: memberId }));
+      } else {
+        const msg = 'Could not promote member.';
+        if (Platform.OS === 'web') { window.alert(msg); } else { Alert.alert('Error', msg); }
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Promote ${memberName} to admin? You will become a regular member.`)) {
+        doPromote();
+      }
+    } else {
+      Alert.alert(
+        `Promote ${memberName}?`,
+        `${memberName} will become the new admin. You will become a regular member.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Promote', onPress: doPromote },
+        ]
+      );
+    }
   }
 
   async function handleLeaveGroup() {
     if (isAdmin && memberCount > 1) {
-      Alert.alert(
-        'Promote Someone First',
-        'You are the admin. Promote another member before leaving.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Go to Promote',
-            onPress: () => navigation.navigate('PromoteAdmin', {
-              groupId,
-              groupName: group?.name || routeGroupName || 'Group',
-            }),
-          },
-        ]
-      );
+      if (Platform.OS === 'web') {
+        if (window.confirm('You are the admin. Promote another member before leaving. Go to promote screen?')) {
+          navigation.navigate('PromoteAdmin', {
+            groupId,
+            groupName: group?.name || routeGroupName || 'Group',
+          });
+        }
+      } else {
+        Alert.alert(
+          'Promote Someone First',
+          'You are the admin. Promote another member before leaving.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Go to Promote',
+              onPress: () => navigation.navigate('PromoteAdmin', {
+                groupId,
+                groupName: group?.name || routeGroupName || 'Group',
+              }),
+            },
+          ]
+        );
+      }
       return;
     }
 
     const isLastMember = memberCount <= 1;
-    Alert.alert(
-      isLastMember ? 'Delete Group?' : 'Leave Group?',
-      isLastMember
-        ? 'You are the last member. Leaving will permanently delete this group.'
-        : 'Are you sure you want to leave this group?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: isLastMember ? 'Delete' : 'Leave',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await leaveGroup(groupId);
-              navigation.popToTop();
-            } catch (err: any) {
-              if (err.message === 'PROMOTE_REQUIRED') {
-                navigation.navigate('PromoteAdmin', {
-                  groupId,
-                  groupName: group?.name || routeGroupName || 'Group',
-                });
-              } else {
-                Alert.alert('Error', err.message || 'Could not leave group.');
-              }
+    const doLeave = async () => {
+      let success = false;
+      try {
+        await leaveGroup(groupId);
+        success = true;
+      } catch (err: any) {
+        if (err.message === 'PROMOTE_REQUIRED') {
+          navigation.navigate('PromoteAdmin', {
+            groupId,
+            groupName: group?.name || routeGroupName || 'Group',
+          });
+          return;
+        }
+        try {
+          const groups = await StorageService.getGroups();
+          if (isLastMember) {
+            await StorageService.setGroups(groups.filter((g: any) => g.id !== groupId));
+          } else {
+            const idx = groups.findIndex((g: any) => g.id === groupId);
+            if (idx >= 0) {
+              const g = groups[idx] as any;
+              g.members = filterMemberFromStorage(g.members, user?.id || '');
+              await StorageService.setGroups(groups);
             }
-          },
-        },
-      ]
-    );
+          }
+          success = true;
+        } catch {}
+      }
+      if (success) {
+        navigation.popToTop();
+      } else {
+        const msg = 'Could not leave group.';
+        if (Platform.OS === 'web') { window.alert(msg); } else { Alert.alert('Error', msg); }
+      }
+    };
+
+    const title = isLastMember ? 'Delete Group?' : 'Leave Group?';
+    const msg = isLastMember
+      ? 'You are the last member. Leaving will permanently delete this group.'
+      : 'Are you sure you want to leave this group?';
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`${title}\n${msg}`)) {
+        doLeave();
+      }
+    } else {
+      Alert.alert(title, msg, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: isLastMember ? 'Delete' : 'Leave', style: 'destructive', onPress: doLeave },
+      ]);
+    }
   }
 
   async function handleDeleteGroup() {
-    Alert.alert(
-      'Delete Group?',
-      'This will permanently delete the group and all its messages. This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete Group',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await leaveGroup(groupId);
-              navigation.popToTop();
-            } catch {
-              Alert.alert('Error', 'Could not delete group.');
-            }
-          },
-        },
-      ]
-    );
+    const doDelete = async () => {
+      let success = false;
+      try {
+        await leaveGroup(groupId);
+        success = true;
+      } catch {
+        try {
+          const groups = await StorageService.getGroups();
+          await StorageService.setGroups(groups.filter((g: any) => g.id !== groupId));
+          success = true;
+        } catch {}
+      }
+      if (success) {
+        navigation.popToTop();
+      } else {
+        const msg = 'Could not delete group.';
+        if (Platform.OS === 'web') { window.alert(msg); } else { Alert.alert('Error', msg); }
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('Delete Group?\nThis will permanently delete the group and all its messages. This cannot be undone.')) {
+        doDelete();
+      }
+    } else {
+      Alert.alert(
+        'Delete Group?',
+        'This will permanently delete the group and all its messages. This cannot be undone.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Delete Group', style: 'destructive', onPress: doDelete },
+        ]
+      );
+    }
   }
 
   function handleDiscoverableToggle(value: boolean) {
@@ -455,25 +548,45 @@ export function GroupInfoScreen({ route, navigation }: Props) {
   }
 
   async function handleRemoveProperty() {
-    Alert.alert(
-      'Remove Property?',
-      'The group will no longer be linked to this listing.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await linkListingToGroup(groupId, null);
-              setGroup((p: any) => ({ ...p, linkedListing: null }));
-            } catch {
-              Alert.alert('Error', 'Could not remove property.');
-            }
-          },
-        },
-      ]
-    );
+    const doRemove = async () => {
+      let success = false;
+      try {
+        await linkListingToGroup(groupId, null);
+        success = true;
+      } catch {
+        try {
+          const groups = await StorageService.getGroups();
+          const idx = groups.findIndex((g: any) => g.id === groupId);
+          if (idx >= 0) {
+            (groups[idx] as any).linkedListing = null;
+            (groups[idx] as any).listing_id = null;
+            await StorageService.setGroups(groups);
+            success = true;
+          }
+        } catch {}
+      }
+      if (success) {
+        setGroup((p: any) => ({ ...p, linkedListing: null }));
+      } else {
+        const msg = 'Could not remove property.';
+        if (Platform.OS === 'web') { window.alert(msg); } else { Alert.alert('Error', msg); }
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('Remove Property?\nThe group will no longer be linked to this listing.')) {
+        doRemove();
+      }
+    } else {
+      Alert.alert(
+        'Remove Property?',
+        'The group will no longer be linked to this listing.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Remove', style: 'destructive', onPress: doRemove },
+        ]
+      );
+    }
   }
 
   async function handleInviteViaText() {
@@ -879,7 +992,13 @@ export function GroupInfoScreen({ route, navigation }: Props) {
           </Pressable>
 
           {!isAdmin ? (
-            <Pressable style={styles.reportBtn} onPress={() => Alert.alert('Report', 'This group has been reported.')}>
+            <Pressable style={styles.reportBtn} onPress={() => {
+              if (Platform.OS === 'web') {
+                window.alert('This group has been reported.');
+              } else {
+                Alert.alert('Report', 'This group has been reported.');
+              }
+            }}>
               <Feather name="flag" size={13} color={theme.textSecondary} />
               <ThemedText style={[Typography.small, { color: theme.textSecondary, marginLeft: 6 }]}>
                 Report this group
@@ -895,11 +1014,27 @@ export function GroupInfoScreen({ route, navigation }: Props) {
         onClose={() => setShowPropertySearch(false)}
         onSelect={async (listing: any) => {
           setShowPropertySearch(false);
+          let success = false;
           try {
             await linkListingToGroup(groupId, listing.id);
-            setGroup((p: any) => ({ ...p, linkedListing: listing }));
+            success = true;
           } catch {
-            Alert.alert('Error', 'Could not link property.');
+            try {
+              const groups = await StorageService.getGroups();
+              const idx = groups.findIndex((g: any) => g.id === groupId);
+              if (idx >= 0) {
+                (groups[idx] as any).linkedListing = listing;
+                (groups[idx] as any).listing_id = listing.id;
+                await StorageService.setGroups(groups);
+                success = true;
+              }
+            } catch {}
+          }
+          if (success) {
+            setGroup((p: any) => ({ ...p, linkedListing: listing }));
+          } else {
+            const msg = 'Could not link property.';
+            if (Platform.OS === 'web') { window.alert(msg); } else { Alert.alert('Error', msg); }
           }
         }}
       />
