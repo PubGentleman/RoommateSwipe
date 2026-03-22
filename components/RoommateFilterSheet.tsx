@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, Modal, Pressable, ScrollView, Platform } from 'react-native';
+import { View, StyleSheet, Modal, Pressable, ScrollView, Platform, Text } from 'react-native';
 import { Feather } from './VectorIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemedText } from './ThemedText';
@@ -25,7 +25,7 @@ export const DEFAULT_FILTERS: MatchFilters = {
   moveInDate: null,
   roomTypes: [],
   lifestyle: [],
-  searchRadius: null,
+  searchRadius: 5,
   minCompatibility: 0,
 };
 
@@ -39,13 +39,28 @@ const MOVE_IN_OPTIONS = [
   { label: 'Within 3 months', value: '3months' },
 ];
 
-const ROOM_TYPES = ['Private Room', 'Shared Room', 'Entire Place', 'Studio'];
+const ROOM_TYPE_OPTIONS = [
+  { key: 'Private Room', label: 'Private Room', icon: 'user' as const },
+  { key: 'Shared Room', label: 'Shared Room', icon: 'users' as const },
+  { key: 'Entire Unit', label: 'Entire Unit', icon: 'home' as const },
+  { key: 'Studio', label: 'Studio', icon: 'square' as const },
+];
 
 const LIFESTYLE_OPTIONS = ['Pet Friendly', 'Non-Smoker', 'Remote Worker', 'Students OK', 'Night Owl', 'Early Bird'];
 
-const RADIUS_OPTIONS = [5, 10, 25, 50];
+const RADIUS_OPTIONS = [
+  { label: 'Nearby', value: 2 },
+  { label: '5 mi', value: 5 },
+  { label: '10 mi', value: 10 },
+  { label: '25 mi', value: 25 },
+];
 
-const COMPATIBILITY_OPTIONS = [0, 50, 60, 70, 80, 90];
+const COMPATIBILITY_OPTIONS = [
+  { label: 'Any', value: 0 },
+  { label: '60%+', value: 60 },
+  { label: '75%+', value: 75 },
+  { label: '90%+', value: 90 },
+];
 
 export const getActiveFilterCount = (filters: MatchFilters): number => {
   let count = 0;
@@ -53,7 +68,7 @@ export const getActiveFilterCount = (filters: MatchFilters): number => {
   if (filters.moveInDate) count++;
   if (filters.roomTypes.length > 0) count += filters.roomTypes.length;
   if (filters.lifestyle.length > 0) count += filters.lifestyle.length;
-  if (filters.searchRadius) count++;
+  if (filters.searchRadius && filters.searchRadius !== 5) count++;
   if (filters.minCompatibility > 0) count++;
   return count;
 };
@@ -69,8 +84,9 @@ export const getActiveFilterChips = (filters: MatchFilters): { label: string; ke
   }
   filters.roomTypes.forEach(rt => chips.push({ label: rt, key: `room-${rt}` }));
   filters.lifestyle.forEach(ls => chips.push({ label: ls, key: `life-${ls}` }));
-  if (filters.searchRadius) {
-    chips.push({ label: `${filters.searchRadius}mi`, key: 'radius' });
+  if (filters.searchRadius && filters.searchRadius !== 5) {
+    const opt = RADIUS_OPTIONS.find(o => o.value === filters.searchRadius);
+    chips.push({ label: opt?.label || `${filters.searchRadius}mi`, key: 'radius' });
   }
   if (filters.minCompatibility > 0) {
     chips.push({ label: `${filters.minCompatibility}%+ match`, key: 'compat' });
@@ -90,7 +106,7 @@ export const removeFilterChip = (filters: MatchFilters, key: string): MatchFilte
   } else if (key.startsWith('life-')) {
     updated.lifestyle = filters.lifestyle.filter(l => `life-${l}` !== key);
   } else if (key === 'radius') {
-    updated.searchRadius = null;
+    updated.searchRadius = 5;
   } else if (key === 'compat') {
     updated.minCompatibility = 0;
   }
@@ -133,7 +149,7 @@ export const applyFiltersToProfiles = (profiles: any[], filters: MatchFilters): 
     }
     if (filters.roomTypes.length > 0) {
       let profileType = 'Private Room';
-      if (p.lookingFor === 'entire_apartment') profileType = 'Entire Place';
+      if (p.lookingFor === 'entire_apartment') profileType = 'Entire Unit';
       else if (p.preferences?.bedrooms === 1) profileType = 'Studio';
       else if (p.preferences?.bedrooms && p.preferences.bedrooms >= 3) profileType = 'Shared Room';
       if (!filters.roomTypes.includes(profileType)) return false;
@@ -151,6 +167,13 @@ export const applyFiltersToProfiles = (profiles: any[], filters: MatchFilters): 
     return true;
   });
 };
+
+const SectionLabel = ({ icon, title }: { icon: string; title: string }) => (
+  <View style={s.sectionLabelRow}>
+    <Feather name={icon as any} size={13} color={ACCENT} />
+    <ThemedText style={s.sectionLabel}>{title}</ThemedText>
+  </View>
+);
 
 interface Props {
   visible: boolean;
@@ -197,15 +220,15 @@ export const RoommateFilterSheet: React.FC<Props> = ({ visible, onClose, onApply
         <ScrollView showsVerticalScrollIndicator={false} style={s.scrollContent}>
           <ThemedText style={s.title}>Filters</ThemedText>
 
-          <View style={s.matchCountRow}>
+          <View style={s.filterCountBar}>
             <Feather name="users" size={14} color={ACCENT} />
-            <ThemedText style={s.matchCountText}>
-              Showing {liveMatchCount} roommate{liveMatchCount !== 1 ? 's' : ''}
+            <ThemedText style={s.filterCountText}>
+              Showing <ThemedText style={s.filterCountNum}>{liveMatchCount}</ThemedText> roommate{liveMatchCount !== 1 ? 's' : ''}
             </ThemedText>
           </View>
 
           <View style={s.section}>
-            <ThemedText style={s.sectionLabel}>Budget Range</ThemedText>
+            <SectionLabel icon="dollar-sign" title="Budget Range" />
             <ThemedText style={s.budgetDisplay}>
               ${filters.budgetMin.toLocaleString()} — ${filters.budgetMax.toLocaleString()}/mo
             </ThemedText>
@@ -278,10 +301,10 @@ export const RoommateFilterSheet: React.FC<Props> = ({ visible, onClose, onApply
                 return (
                   <Pressable
                     key={preset.label}
-                    style={[s.chip, isActive ? s.chipActive : null]}
+                    style={[s.filterChip, isActive ? s.filterChipActive : null]}
                     onPress={() => setFilters(f => ({ ...f, budgetMin: preset.min, budgetMax: preset.max }))}
                   >
-                    <ThemedText style={[s.chipText, isActive ? s.chipTextActive : null]}>{preset.label}</ThemedText>
+                    <ThemedText style={[s.filterChipText, isActive ? s.filterChipTextActive : null]}>{preset.label}</ThemedText>
                   </Pressable>
                 );
               })}
@@ -289,17 +312,17 @@ export const RoommateFilterSheet: React.FC<Props> = ({ visible, onClose, onApply
           </View>
 
           <View style={s.section}>
-            <ThemedText style={s.sectionLabel}>Move-in Date</ThemedText>
+            <SectionLabel icon="calendar" title="Move-in Date" />
             <View style={s.chipRow}>
               {MOVE_IN_OPTIONS.map(opt => {
                 const isActive = filters.moveInDate === opt.value;
                 return (
                   <Pressable
                     key={opt.value}
-                    style={[s.chip, isActive ? s.chipActive : null]}
+                    style={[s.filterChip, isActive ? s.filterChipActive : null]}
                     onPress={() => setFilters(f => ({ ...f, moveInDate: isActive ? null : opt.value }))}
                   >
-                    <ThemedText style={[s.chipText, isActive ? s.chipTextActive : null]}>{opt.label}</ThemedText>
+                    <ThemedText style={[s.filterChipText, isActive ? s.filterChipTextActive : null]}>{opt.label}</ThemedText>
                   </Pressable>
                 );
               })}
@@ -307,17 +330,23 @@ export const RoommateFilterSheet: React.FC<Props> = ({ visible, onClose, onApply
           </View>
 
           <View style={s.section}>
-            <ThemedText style={s.sectionLabel}>Room Type</ThemedText>
+            <SectionLabel icon="home" title="Room Type" />
             <View style={s.chipRow}>
-              {ROOM_TYPES.map(rt => {
-                const isActive = filters.roomTypes.includes(rt);
+              {ROOM_TYPE_OPTIONS.map(opt => {
+                const isActive = filters.roomTypes.includes(opt.key);
                 return (
                   <Pressable
-                    key={rt}
-                    style={[s.chip, isActive ? s.chipActive : null]}
-                    onPress={() => setFilters(f => ({ ...f, roomTypes: toggleArrayItem(f.roomTypes, rt) }))}
+                    key={opt.key}
+                    style={[s.filterChip, isActive ? s.filterChipActive : null]}
+                    onPress={() => setFilters(f => ({ ...f, roomTypes: toggleArrayItem(f.roomTypes, opt.key) }))}
                   >
-                    <ThemedText style={[s.chipText, isActive ? s.chipTextActive : null]}>{rt}</ThemedText>
+                    <Feather
+                      name={opt.icon}
+                      size={12}
+                      color={isActive ? '#fff' : 'rgba(255,255,255,0.45)'}
+                      style={{ marginRight: 5 }}
+                    />
+                    <ThemedText style={[s.filterChipText, isActive ? s.filterChipTextActive : null]}>{opt.label}</ThemedText>
                   </Pressable>
                 );
               })}
@@ -326,7 +355,7 @@ export const RoommateFilterSheet: React.FC<Props> = ({ visible, onClose, onApply
 
           <View style={s.section}>
             <View style={s.sectionHeaderRow}>
-              <ThemedText style={[s.sectionLabel, { marginBottom: 0 }]}>Lifestyle</ThemedText>
+              <SectionLabel icon="sun" title="Lifestyle" />
               {isLifestyleLocked ? (
                 <View style={s.lockBadge}>
                   <Feather name="lock" size={10} color="#FFFFFF" />
@@ -338,8 +367,8 @@ export const RoommateFilterSheet: React.FC<Props> = ({ visible, onClose, onApply
               <View style={s.lockedOverlay}>
                 <View style={s.lockedChipRow}>
                   {LIFESTYLE_OPTIONS.map(ls => (
-                    <View key={ls} style={[s.chip, { opacity: 0.35 }]}>
-                      <ThemedText style={[s.chipText, { opacity: 0.5 }]}>{ls}</ThemedText>
+                    <View key={ls} style={[s.filterChip, { opacity: 0.35 }]}>
+                      <ThemedText style={[s.filterChipText, { opacity: 0.5 }]}>{ls}</ThemedText>
                     </View>
                   ))}
                 </View>
@@ -355,10 +384,10 @@ export const RoommateFilterSheet: React.FC<Props> = ({ visible, onClose, onApply
                   return (
                     <Pressable
                       key={ls}
-                      style={[s.chip, isActive ? s.chipActive : null]}
+                      style={[s.filterChip, isActive ? s.filterChipActive : null]}
                       onPress={() => setFilters(f => ({ ...f, lifestyle: toggleArrayItem(f.lifestyle, ls) }))}
                     >
-                      <ThemedText style={[s.chipText, isActive ? s.chipTextActive : null]}>{ls}</ThemedText>
+                      <ThemedText style={[s.filterChipText, isActive ? s.filterChipTextActive : null]}>{ls}</ThemedText>
                     </Pressable>
                   );
                 })}
@@ -367,17 +396,17 @@ export const RoommateFilterSheet: React.FC<Props> = ({ visible, onClose, onApply
           </View>
 
           <View style={s.section}>
-            <ThemedText style={s.sectionLabel}>Search Radius</ThemedText>
-            <View style={s.segmentedRow}>
-              {RADIUS_OPTIONS.map(r => {
-                const isActive = filters.searchRadius === r;
+            <SectionLabel icon="map-pin" title="Search Radius" />
+            <View style={s.chipRow}>
+              {RADIUS_OPTIONS.map(opt => {
+                const isActive = filters.searchRadius === opt.value;
                 return (
                   <Pressable
-                    key={r}
-                    style={[s.segment, isActive ? s.segmentActive : null]}
-                    onPress={() => setFilters(f => ({ ...f, searchRadius: isActive ? null : r }))}
+                    key={opt.value}
+                    style={[s.filterChip, isActive ? s.filterChipActive : null]}
+                    onPress={() => setFilters(f => ({ ...f, searchRadius: isActive ? null : opt.value }))}
                   >
-                    <ThemedText style={[s.segmentText, isActive ? s.segmentTextActive : null]}>{r}mi</ThemedText>
+                    <ThemedText style={[s.filterChipText, isActive ? s.filterChipTextActive : null]}>{opt.label}</ThemedText>
                   </Pressable>
                 );
               })}
@@ -385,18 +414,17 @@ export const RoommateFilterSheet: React.FC<Props> = ({ visible, onClose, onApply
           </View>
 
           <View style={s.section}>
-            <ThemedText style={s.sectionLabel}>Minimum Compatibility</ThemedText>
-            <View style={s.segmentedRow}>
-              {COMPATIBILITY_OPTIONS.map(c => {
-                const isActive = filters.minCompatibility === c;
-                const label = c === 0 ? 'Any' : `${c}%+`;
+            <SectionLabel icon="heart" title="Minimum Compatibility" />
+            <View style={s.compatRow}>
+              {COMPATIBILITY_OPTIONS.map(opt => {
+                const isActive = filters.minCompatibility === opt.value;
                 return (
                   <Pressable
-                    key={c}
-                    style={[s.segment, isActive ? s.segmentActive : null]}
-                    onPress={() => setFilters(f => ({ ...f, minCompatibility: c }))}
+                    key={opt.value}
+                    style={[s.compatChip, isActive ? s.filterChipActive : null]}
+                    onPress={() => setFilters(f => ({ ...f, minCompatibility: opt.value }))}
                   >
-                    <ThemedText style={[s.segmentText, isActive ? s.segmentTextActive : null]}>{label}</ThemedText>
+                    <ThemedText style={[s.filterChipText, isActive ? s.filterChipTextActive : null]}>{opt.label}</ThemedText>
                   </Pressable>
                 );
               })}
@@ -451,31 +479,49 @@ const s = StyleSheet.create({
     color: '#FFFFFF',
     marginBottom: 4,
   },
-  matchCountRow: {
+  filterCountBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: BorderRadius.lg,
+    gap: 8,
     backgroundColor: 'rgba(255,107,91,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.2)',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginTop: 6,
+    marginBottom: 20,
   },
-  matchCountText: {
+  filterCountText: {
     fontSize: 14,
-    color: ACCENT,
+    color: 'rgba(255,255,255,0.6)',
     fontWeight: '500',
+  },
+  filterCountNum: {
+    color: ACCENT,
+    fontWeight: '800',
   },
   section: {
     marginBottom: 24,
   },
+  sectionLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 12,
+  },
   sectionLabel: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '700',
-    color: 'rgba(255,255,255,0.5)',
+    color: 'rgba(255,255,255,0.4)',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
-    marginBottom: 12,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 0,
   },
   budgetDisplay: {
     fontSize: 18,
@@ -534,32 +580,41 @@ const s = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
-  chip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: BorderRadius.full,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-  },
-  chipActive: {
-    backgroundColor: ACCENT,
-    borderColor: ACCENT,
-  },
-  chipText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: 'rgba(255,255,255,0.75)',
-  },
-  chipTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  sectionHeaderRow: {
+  filterChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  filterChipActive: {
+    backgroundColor: ACCENT,
+    borderColor: 'transparent',
+  },
+  filterChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.55)',
+  },
+  filterChipTextActive: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  compatRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  compatChip: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 11,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   lockBadge: {
     flexDirection: 'row',
@@ -581,6 +636,7 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
     padding: 12,
+    marginTop: 12,
   },
   lockedChipRow: {
     flexDirection: 'row',
@@ -600,29 +656,6 @@ const s = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: ACCENT,
-  },
-  segmentedRow: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: BorderRadius.lg,
-    padding: 3,
-  },
-  segment: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: BorderRadius.md,
-  },
-  segmentActive: {
-    backgroundColor: ACCENT,
-  },
-  segmentText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.5)',
-  },
-  segmentTextActive: {
-    color: '#FFFFFF',
   },
   footer: {
     flexDirection: 'row',

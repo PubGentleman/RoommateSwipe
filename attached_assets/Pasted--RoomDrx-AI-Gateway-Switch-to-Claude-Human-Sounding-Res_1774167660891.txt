@@ -1,0 +1,232 @@
+# RoomDrx — AI Gateway: Switch to Claude + Human-Sounding Responses
+
+## File: `supabase/functions/ai-assistant/index.ts`
+
+This updates the existing Edge Function from the previous prompt.
+Two changes: (1) replace OpenAI with Anthropic Claude API, (2) rewrite the system prompt so responses feel warm and human, not robotic.
+
+---
+
+## Change 1 — Replace OpenAI with Anthropic Claude
+
+```ts
+// REMOVE:
+const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')!;
+
+// ADD:
+const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')!;
+```
+
+Replace the entire `callOpenAI` function with `callClaude`:
+
+```ts
+async function callClaude(
+  systemPrompt: string,
+  history: { role: string; content: string }[],
+  userMessage: string
+): Promise<string> {
+
+  // Claude uses 'user' and 'assistant' roles — same as OpenAI, no mapping needed
+  const messages = [
+    ...history.map(h => ({
+      role: h.role as 'user' | 'assistant',
+      content: h.content,
+    })),
+    { role: 'user' as const, content: userMessage },
+  ];
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-5',         // fast, smart, cost-effective
+      max_tokens: 400,
+      system: systemPrompt,               // Claude takes system prompt separately
+      messages,
+    }),
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    console.error('Claude API error:', err);
+    throw new Error('Claude API request failed');
+  }
+
+  const data = await response.json();
+  return data.content?.[0]?.text ?? "I'm having trouble responding right now. Try again in a moment!";
+}
+```
+
+Update the call site inside `serve()`:
+
+```ts
+// BEFORE:
+const aiResponse = await callOpenAI(systemPrompt, history, message);
+
+// AFTER:
+const aiResponse = await callClaude(systemPrompt, history, message);
+```
+
+---
+
+## Change 2 — Deploy Secret
+
+```bash
+# Remove old OpenAI secret (if set):
+supabase secrets unset OPENAI_API_KEY
+
+# Add your Anthropic API key:
+supabase secrets set ANTHROPIC_API_KEY=sk-ant-your-key-here
+
+# Get your key from: https://console.anthropic.com
+```
+
+---
+
+## Change 3 — Rewrite System Prompt to Sound Human
+
+The previous system prompt was functional but produced robotic, list-heavy responses. Claude already writes naturally — this system prompt leans into that and gives it a real personality.
+
+Replace the `buildSystemPrompt` function's return string with:
+
+```ts
+function buildSystemPrompt(profile: any, topMatches: any[], listings: any[], plan: string): string {
+  const matchSummary = topMatches.length > 0
+    ? topMatches.map(m =>
+        `${m.profiles?.name} (${m.score}% match, ${m.profiles?.occupation ?? 'unknown occupation'}, $${m.profiles?.budget_min}–$${m.profiles?.budget_max}/mo, ${m.profiles?.zodiac_sign ?? 'unknown sign'})`
+      ).join('; ')
+    : 'no top matches yet';
+
+  const listingSummary = listings.length > 0
+    ? listings.map(l =>
+        `"${l.title}" — $${l.price}/mo, ${l.type}, ${l.bedrooms}bd/${l.bathrooms}ba in ${l.neighborhood}${l.is_featured ? ' (featured)' : ''}`
+      ).join('; ')
+    : 'no listings in their price range right now';
+
+  return `You are the AI assistant inside RoomDrx, a roommate matching app. Your name is Roomdr AI.
+
+Your personality: warm, direct, and genuinely helpful — like a knowledgeable friend who happens to know everything about NYC apartments and roommate compatibility. You're not a corporate chatbot. You're casual but smart. You give real opinions when asked. You use the user's actual data to give specific advice, not generic tips.
+
+IMPORTANT STYLE RULES:
+- Write like a human texting a friend, not like a customer service bot
+- Never use bullet points or numbered lists — always write in natural sentences
+- Keep responses short: 2-4 sentences is ideal, 5-6 max unless they ask for detail
+- Use the user's first name occasionally but not every single message — that gets annoying
+- Never say things like "Certainly!", "Great question!", "I'd be happy to help!", or "Of course!"
+- Never start a response with "I" — vary your sentence openers
+- If you don't know something, say so casually ("honestly I'm not sure about that one")
+- Give real opinions: if their budget is tight for their neighborhood, say so kindly
+- React to what they say — if they seem excited, match that energy; if they're stressed, be calm
+
+WHAT YOU KNOW ABOUT THIS USER:
+Name: ${profile.name ?? 'the user'}
+Age: ${profile.age ?? 'unknown'}, ${profile.occupation ?? 'unknown occupation'}
+Budget: $${profile.budget_min ?? '?'}–$${profile.budget_max ?? '?'}/mo
+Looking in: ${profile.neighborhoods?.join(', ') ?? profile.city ?? 'New York'}
+Move-in: ${profile.move_in_date ?? 'flexible'}
+Zodiac: ${profile.zodiac_sign ?? 'unknown'}
+Lifestyle: ${profile.lifestyle_tags?.join(', ') ?? 'not set'}
+Dealbreakers: ${profile.dealbreakers?.join(', ') ?? 'none listed'}
+Pets: ${profile.has_pets ? `yes (${profile.pet_types?.join(', ')})` : 'no'}
+Cleanliness: ${profile.cleanliness ?? '?'}/5, Sleep: ${profile.sleep_schedule ?? '?'}, Noise: ${profile.noise_level ?? '?'}
+
+THEIR TOP MATCHES RIGHT NOW: ${matchSummary}
+
+LISTINGS IN THEIR BUDGET: ${listingSummary}
+
+PLAN: ${plan}
+
+Only reference listings and matches that are listed above — never make up names or prices.
+If they ask about someone not in the matches list, say you don't have info on that person yet.`;
+}
+```
+
+---
+
+## What Changes With This Prompt
+
+**Before (robotic):**
+> "Here are some recommendations based on your profile:
+> 1. Your budget of $800/mo is below average for Upper East Side
+> 2. Consider expanding your search radius
+> 3. Your match rate could be improved by completing your profile"
+
+**After (human):**
+> "Honestly, $800 is going to be tough for Upper East Side — most 1-beds there run $1,200+. Your matches are looking at similar budgets though, so you'd probably vibe better with someone in Bushwick or Astoria where the math actually works out."
+
+---
+
+## Change 4 — Typing Delay (Optional but makes it feel real)
+
+Add a small streaming effect by using Claude's streaming API so words appear as they're typed rather than all at once. This makes the AI feel alive:
+
+```ts
+async function callClaudeStreaming(
+  systemPrompt: string,
+  history: { role: string; content: string }[],
+  userMessage: string,
+  onChunk: (text: string) => void
+): Promise<string> {
+
+  const messages = [
+    ...history.map(h => ({ role: h.role as 'user' | 'assistant', content: h.content })),
+    { role: 'user' as const, content: userMessage },
+  ];
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-5',
+      max_tokens: 400,
+      system: systemPrompt,
+      messages,
+      stream: true,            // ← enable streaming
+    }),
+  });
+
+  let fullText = '';
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const chunk = decoder.decode(value);
+    const lines = chunk.split('\n').filter(l => l.startsWith('data: '));
+    for (const line of lines) {
+      try {
+        const json = JSON.parse(line.replace('data: ', ''));
+        if (json.type === 'content_block_delta') {
+          const text = json.delta?.text ?? '';
+          fullText += text;
+          onChunk(text);          // send chunk to client in real time
+        }
+      } catch { /* skip malformed chunks */ }
+    }
+  }
+
+  return fullText;
+}
+```
+
+On the React Native side, update `aiService.ts` to handle streaming chunks and append them to the current message bubble character by character.
+
+---
+
+## Summary
+
+| Change | What it does |
+|---|---|
+| Replace OpenAI → Claude API | Uses `claude-sonnet-4-5`, takes system prompt separately via `system:` field |
+| New secret | `ANTHROPIC_API_KEY` replaces `OPENAI_API_KEY` |
+| New system prompt | Casual, warm, direct tone — no bullets, no corporate phrases, real opinions, reacts to user energy |
+| Optional streaming | Words appear as typed instead of all at once — makes the AI feel alive |
