@@ -1,0 +1,393 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View, Text, StyleSheet, ScrollView, Pressable, Image, TextInput, ActivityIndicator,
+} from 'react-native';
+import { Feather } from '../../components/VectorIcons';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
+import { useAuth } from '../../contexts/AuthContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
+import { StorageService } from '../../utils/storage';
+import { Property, RoommateProfile } from '../../types/models';
+import {
+  AgentRenter,
+  AgentGroup,
+  getShortlistedRenterIds,
+  getAgentGroups,
+  createAgentGroup,
+  sendAgentInvites,
+  calculatePairMatrix,
+} from '../../services/agentMatchmakerService';
+import { canAgentCreateGroup, getAgentPlanLimits, type AgentPlan } from '../../constants/planLimits';
+
+const BG = '#111';
+const CARD_BG = '#1a1a1a';
+const ACCENT = '#ff6b5b';
+const GREEN = '#2ecc71';
+const YELLOW = '#f39c12';
+
+export const AgentGroupBuilderScreen = () => {
+  const navigation = useNavigation<any>();
+  const route = useRoute<any>();
+  const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const { alert: showAlert, confirm } = useConfirm();
+
+  const preselectedIds: string[] = route.params?.preselectedIds ?? [];
+  const preselectedListingId: string | undefined = route.params?.listingId;
+
+  const [allRenters, setAllRenters] = useState<AgentRenter[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(preselectedIds));
+  const [listings, setListings] = useState<Property[]>([]);
+  const [selectedListing, setSelectedListing] = useState<Property | null>(null);
+  const [agentMessage, setAgentMessage] = useState('');
+  const [sending, setSending] = useState(false);
+  const [step, setStep] = useState<'select' | 'review'>('select');
+
+  const agentPlan: AgentPlan = (user?.agentPlan as AgentPlan) || 'pay_per_use';
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    if (!user) return;
+    const profiles: RoommateProfile[] = await StorageService.getRoommateProfiles();
+    const shortlistedIds = await getShortlistedRenterIds(user.id);
+    const mapped: AgentRenter[] = profiles
+      .filter(p => shortlistedIds.includes(p.id))
+      .map(p => ({
+        id: p.id,
+        name: p.name,
+        age: p.age,
+        occupation: p.occupation,
+        photos: p.photos || [],
+        budgetMin: p.budget ? p.budget * 0.8 : undefined,
+        budgetMax: p.budget,
+        moveInDate: p.preferences?.moveInDate,
+        cleanliness: p.lifestyle?.cleanliness,
+        sleepSchedule: p.lifestyle?.workSchedule,
+        smoking: p.lifestyle?.smoking,
+        pets: p.lifestyle?.pets,
+        interests: p.profileData?.interests || [],
+        roomType: p.lookingFor,
+        bio: p.bio,
+        gender: p.gender,
+      }));
+    setAllRenters(mapped);
+
+    const props = await StorageService.getProperties();
+    const myListings = props.filter(p => p.hostId === user.id && p.available);
+    setListings(myListings);
+
+    if (preselectedListingId) {
+      const found = myListings.find(l => l.id === preselectedListingId);
+      if (found) setSelectedListing(found);
+    }
+  };
+
+  const selectedRenters = allRenters.filter(r => selectedIds.has(r.id));
+
+  const matrix = calculatePairMatrix(selectedRenters);
+  const avgCompatibility = matrix.length > 0
+    ? Math.round(matrix.reduce((sum, p) => sum + p.score, 0) / matrix.length)
+    : 0;
+
+  const combinedBudgetMin = selectedRenters.reduce((sum, r) => sum + (r.budgetMin ?? 0), 0);
+  const combinedBudgetMax = selectedRenters.reduce((sum, r) => sum + (r.budgetMax ?? 0), 0);
+  const coversRent = selectedListing ? combinedBudgetMax >= selectedListing.price : false;
+
+  const toggleRenter = (id: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSendInvites = async () => {
+    if (!user || !selectedListing || selectedRenters.length < 2) return;
+
+    const existingGroups = await getAgentGroups(user.id);
+    const activeGroupCount = existingGroups.filter(
+      g => g.groupStatus !== 'dissolved' && g.groupStatus !== 'placed'
+    ).length;
+    if (!canAgentCreateGroup(agentPlan, activeGroupCount)) {
+      showAlert({ title: 'Group Limit', message: 'Upgrade your plan to create more groups.' });
+      return;
+    }
+
+    setSending(true);
+    try {
+      const group: AgentGroup = {
+        id: `ag_${Date.now()}`,
+        name: `${selectedListing.title} - Agent Group`,
+        agentId: user.id,
+        targetListingId: selectedListing.id,
+        targetListing: selectedListing,
+        members: selectedRenters,
+        memberIds: selectedRenters.map(r => r.id),
+        groupStatus: 'invited',
+        avgCompatibility,
+        combinedBudgetMin,
+        combinedBudgetMax,
+        coversRent,
+        invites: [],
+        createdAt: new Date().toISOString(),
+        agentMessage,
+      };
+
+      await createAgentGroup(group);
+      await sendAgentInvites(
+        user.id,
+        user.name,
+        group.id,
+        selectedRenters.map(r => r.id),
+        selectedListing,
+        agentMessage,
+        selectedRenters.map(r => ({ id: r.id, name: r.name, photo: r.photos?.[0] }))
+      );
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showAlert({ title: 'Invites Sent', message: `Group invites sent to ${selectedRenters.length} renters.` });
+      navigation.goBack();
+    } catch (e) {
+      showAlert({ title: 'Error', message: 'Failed to send invites. Please try again.' });
+    }
+    setSending(false);
+  };
+
+  if (step === 'review') {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={styles.header}>
+          <Pressable onPress={() => setStep('select')} style={styles.backBtn}>
+            <Feather name="arrow-left" size={24} color="#fff" />
+          </Pressable>
+          <Text style={styles.title}>Review Group</Text>
+          <View style={{ width: 40 }} />
+        </View>
+
+        <ScrollView contentContainerStyle={{ paddingBottom: 120, paddingHorizontal: 16 }}>
+          {selectedListing ? (
+            <View style={styles.listingCard}>
+              <Text style={styles.listingLabel}>Group for:</Text>
+              <Text style={styles.listingName}>"{selectedListing.title}"</Text>
+              <Text style={styles.listingMeta}>
+                ${selectedListing.price.toLocaleString()}/mo - {selectedListing.bedrooms}BR
+              </Text>
+            </View>
+          ) : null}
+
+          <Text style={styles.sectionTitle}>Members ({selectedRenters.length})</Text>
+          {selectedRenters.map(r => (
+            <View key={r.id} style={styles.memberRow}>
+              {r.photos?.[0] ? (
+                <Image source={{ uri: r.photos[0] }} style={styles.memberAvatar} />
+              ) : (
+                <View style={[styles.memberAvatar, styles.avatarPlaceholder]}>
+                  <Feather name="user" size={18} color="#666" />
+                </View>
+              )}
+              <View style={{ flex: 1 }}>
+                <Text style={styles.memberName}>{r.name}</Text>
+                <Text style={styles.memberMeta}>
+                  ${r.budgetMin?.toLocaleString()}-${r.budgetMax?.toLocaleString()}/mo
+                  {r.moveInDate ? ` | ${new Date(r.moveInDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}
+                </Text>
+              </View>
+            </View>
+          ))}
+
+          <View style={styles.summaryCard}>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Group compatibility:</Text>
+              <Text style={[styles.summaryValue, { color: avgCompatibility >= 70 ? GREEN : YELLOW }]}>
+                {avgCompatibility}%
+              </Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Combined budget:</Text>
+              <Text style={styles.summaryValue}>
+                ${combinedBudgetMin.toLocaleString()}-${combinedBudgetMax.toLocaleString()}/mo
+              </Text>
+            </View>
+            {selectedListing ? (
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Covers rent:</Text>
+                <Text style={[styles.summaryValue, { color: coversRent ? GREEN : ACCENT }]}>
+                  {coversRent ? 'Yes' : 'May not cover'}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+
+          <Text style={styles.sectionTitle}>Your Message (optional)</Text>
+          <TextInput
+            style={styles.messageInput}
+            placeholder="Add a personal note to your invites..."
+            placeholderTextColor="#555"
+            multiline
+            value={agentMessage}
+            onChangeText={setAgentMessage}
+          />
+        </ScrollView>
+
+        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
+          <Pressable
+            style={[styles.sendBtn, sending ? styles.sendBtnDisabled : null]}
+            onPress={handleSendInvites}
+            disabled={sending}
+          >
+            {sending ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Feather name="send" size={18} color="#fff" />
+                <Text style={styles.sendBtnText}>Send Invites to All</Text>
+              </>
+            )}
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <View style={styles.header}>
+        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Feather name="arrow-left" size={24} color="#fff" />
+        </Pressable>
+        <Text style={styles.title}>Build Group</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
+      <ScrollView contentContainerStyle={{ paddingBottom: 120, paddingHorizontal: 16 }}>
+        <Text style={styles.sectionTitle}>Select Target Listing</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+          {listings.map(l => (
+            <Pressable
+              key={l.id}
+              style={[styles.listingChip, selectedListing?.id === l.id ? styles.listingChipActive : null]}
+              onPress={() => setSelectedListing(l)}
+            >
+              <Text style={[styles.listingChipText, selectedListing?.id === l.id ? { color: '#fff' } : null]}>
+                {l.title} ({l.bedrooms}BR)
+              </Text>
+            </Pressable>
+          ))}
+          {listings.length === 0 ? (
+            <Text style={styles.emptyText}>No active listings</Text>
+          ) : null}
+        </ScrollView>
+
+        <View style={styles.statsBar}>
+          <Text style={styles.statsText}>
+            Selected: {selectedIds.size} renters
+          </Text>
+          {selectedIds.size >= 2 ? (
+            <Text style={[styles.statsText, { color: avgCompatibility >= 70 ? GREEN : YELLOW }]}>
+              Avg compatibility: {avgCompatibility}%
+            </Text>
+          ) : null}
+        </View>
+
+        <Text style={styles.sectionTitle}>Select Renters from Shortlist</Text>
+        {allRenters.map(r => {
+          const isSelected = selectedIds.has(r.id);
+          return (
+            <Pressable
+              key={r.id}
+              style={[styles.renterSelectCard, isSelected ? styles.renterSelectCardActive : null]}
+              onPress={() => toggleRenter(r.id)}
+            >
+              <View style={[styles.checkCircle, isSelected ? styles.checkCircleActive : null]}>
+                {isSelected ? <Feather name="check" size={14} color="#fff" /> : null}
+              </View>
+              {r.photos?.[0] ? (
+                <Image source={{ uri: r.photos[0] }} style={styles.selectAvatar} />
+              ) : (
+                <View style={[styles.selectAvatar, styles.avatarPlaceholder]}>
+                  <Feather name="user" size={16} color="#666" />
+                </View>
+              )}
+              <View style={{ flex: 1 }}>
+                <Text style={styles.selectName}>{r.name}, {r.age}</Text>
+                <Text style={styles.selectMeta}>{r.occupation}</Text>
+                {r.budgetMax ? (
+                  <Text style={styles.selectBudget}>${r.budgetMax.toLocaleString()}/mo max</Text>
+                ) : null}
+              </View>
+            </Pressable>
+          );
+        })}
+
+        {allRenters.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Feather name="users" size={40} color="#555" />
+            <Text style={styles.emptyTitle}>No Shortlisted Renters</Text>
+            <Text style={styles.emptyDesc}>Browse renters and shortlist some first.</Text>
+          </View>
+        ) : null}
+      </ScrollView>
+
+      {selectedIds.size >= 2 && selectedListing ? (
+        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
+          <Pressable style={styles.reviewBtn} onPress={() => setStep('review')}>
+            <Text style={styles.reviewBtnText}>Review Group ({selectedIds.size} members)</Text>
+            <Feather name="arrow-right" size={18} color="#fff" />
+          </Pressable>
+        </View>
+      ) : null}
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: BG },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
+  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  title: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  sectionTitle: { color: '#fff', fontSize: 16, fontWeight: '700', marginBottom: 12, marginTop: 8 },
+  listingChip: { backgroundColor: CARD_BG, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10, marginRight: 8, borderWidth: 1, borderColor: '#333' },
+  listingChipActive: { borderColor: ACCENT, backgroundColor: 'rgba(255,107,91,0.15)' },
+  listingChipText: { color: '#aaa', fontSize: 13, fontWeight: '600' },
+  emptyText: { color: '#666', fontSize: 14 },
+  statsBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  statsText: { color: '#999', fontSize: 13, fontWeight: '600' },
+  renterSelectCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: CARD_BG, borderRadius: 12, padding: 12, marginBottom: 8, gap: 10, borderWidth: 1, borderColor: 'transparent' },
+  renterSelectCardActive: { borderColor: ACCENT, backgroundColor: 'rgba(255,107,91,0.08)' },
+  checkCircle: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: '#555', alignItems: 'center', justifyContent: 'center' },
+  checkCircleActive: { borderColor: ACCENT, backgroundColor: ACCENT },
+  selectAvatar: { width: 44, height: 44, borderRadius: 22 },
+  avatarPlaceholder: { backgroundColor: '#333', alignItems: 'center', justifyContent: 'center' },
+  selectName: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  selectMeta: { color: '#888', fontSize: 12, marginTop: 2 },
+  selectBudget: { color: '#2ecc71', fontSize: 12, marginTop: 2 },
+  bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 16, paddingTop: 12, backgroundColor: BG, borderTopWidth: 1, borderTopColor: '#222' },
+  reviewBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: ACCENT, borderRadius: 14, paddingVertical: 14 },
+  reviewBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  listingCard: { backgroundColor: CARD_BG, borderRadius: 14, padding: 16, marginBottom: 16 },
+  listingLabel: { color: '#888', fontSize: 12 },
+  listingName: { color: '#fff', fontSize: 18, fontWeight: '700', marginTop: 4 },
+  listingMeta: { color: '#aaa', fontSize: 14, marginTop: 4 },
+  memberRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: CARD_BG, borderRadius: 12, padding: 12, marginBottom: 8 },
+  memberAvatar: { width: 44, height: 44, borderRadius: 22 },
+  memberName: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  memberMeta: { color: '#888', fontSize: 12, marginTop: 2 },
+  summaryCard: { backgroundColor: CARD_BG, borderRadius: 14, padding: 16, marginTop: 16 },
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+  summaryLabel: { color: '#aaa', fontSize: 14 },
+  summaryValue: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  messageInput: { backgroundColor: CARD_BG, borderRadius: 12, padding: 14, color: '#fff', fontSize: 14, minHeight: 100, textAlignVertical: 'top' },
+  sendBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: ACCENT, borderRadius: 14, paddingVertical: 14 },
+  sendBtnDisabled: { opacity: 0.5 },
+  sendBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  emptyState: { alignItems: 'center', paddingVertical: 40 },
+  emptyTitle: { color: '#fff', fontSize: 18, fontWeight: '700', marginTop: 12 },
+  emptyDesc: { color: '#888', fontSize: 14, marginTop: 4 },
+});

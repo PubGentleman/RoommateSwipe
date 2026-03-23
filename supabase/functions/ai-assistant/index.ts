@@ -10,6 +10,10 @@ const DAILY_LIMITS: Record<string, number> = {
   basic: 5,
   plus: 50,
   elite: 200,
+  agent_pay_per_use: 5,
+  agent_starter: 20,
+  agent_pro: 100,
+  agent_business: 500,
 };
 
 serve(async (req) => {
@@ -48,10 +52,13 @@ serve(async (req) => {
     }
 
     const profile = await getUserProfile(supabase, user.id);
-    const topMatches = await getTopMatches(supabase, user.id);
+    const isAgent = plan.startsWith('agent_');
+    const topMatches = isAgent ? [] : await getTopMatches(supabase, user.id);
     const nearbyListings = await getNearbyListings(supabase, profile);
     const history = await getConversationHistory(supabase, user.id, sessionId);
-    const systemPrompt = buildSystemPrompt(profile, topMatches, nearbyListings, plan);
+    const systemPrompt = isAgent
+      ? buildAgentSystemPrompt(profile, nearbyListings, plan)
+      : buildSystemPrompt(profile, topMatches, nearbyListings, plan);
     const aiResponse = await callClaude(systemPrompt, history, message);
 
     await saveMessages(supabase, user.id, sessionId, message, aiResponse);
@@ -77,6 +84,16 @@ serve(async (req) => {
 });
 
 async function getUserPlan(supabase: any, userId: string): Promise<string> {
+  const { data: userData } = await supabase
+    .from('users')
+    .select('host_type, agent_plan')
+    .eq('id', userId)
+    .single();
+
+  if (userData?.host_type === 'agent' && userData?.agent_plan) {
+    return `agent_${userData.agent_plan}`;
+  }
+
   const { data } = await supabase
     .from('subscriptions')
     .select('plan')
@@ -239,6 +256,44 @@ PLAN: ${plan}
 
 Only reference listings and matches that are listed above — never make up names or prices.
 If they ask about someone not in the matches list, say you don't have info on that person yet.`;
+}
+
+function buildAgentSystemPrompt(profile: any, listings: any[], plan: string): string {
+  const listingSummary = listings.length > 0
+    ? listings.map((l: any) =>
+        `"${l.title}" — $${l.price}/mo, ${l.type}, ${l.bedrooms}bd/${l.bathrooms}ba in ${l.neighborhood}${l.is_featured ? ' (featured)' : ''}`
+      ).join('; ')
+    : 'no active listings found';
+
+  return `You are the AI assistant inside Rhome, a roommate matching app. You are speaking to a REAL ESTATE AGENT or LANDLORD who uses the Agent Matchmaker feature. Your name is Rhome AI.
+
+Your personality: professional but approachable — like a sharp analyst who happens to know everything about roommate group dynamics and compatibility. You're not a corporate chatbot. You're direct and data-driven. You give actionable advice.
+
+IMPORTANT STYLE RULES:
+- Write like a professional colleague, not a customer service bot
+- Keep responses concise: 2-5 sentences unless they ask for detail
+- Never use bullet points or numbered lists — write in natural sentences
+- Never say things like "Certainly!", "Great question!", "I'd be happy to help!"
+- Give real opinions: if a group pairing seems weak, say so
+- Suggest concrete next steps when appropriate
+
+WHAT YOU KNOW ABOUT THIS AGENT:
+Name: ${profile.name ?? 'the agent'}
+City: ${profile.city ?? 'unknown'}
+Plan: ${plan.replace('agent_', '')}
+
+THEIR ACTIVE LISTINGS: ${listingSummary}
+
+WHAT YOU CAN HELP WITH:
+- Evaluating renter compatibility for group formation
+- Suggesting optimal group compositions based on lifestyle and budget
+- Advising on pricing and rent-share calculations
+- Tips for writing compelling group invite messages
+- Market insights for their city
+- Best practices for the placement pipeline
+
+Only reference listings that are listed above — never make up data.
+Focus on actionable advice that helps the agent close placements faster.`;
 }
 
 async function callClaude(

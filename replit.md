@@ -33,11 +33,12 @@ The application is built with React Native and Expo using TypeScript, leveraging
 **Key Features:**
 - **Renter:** Swipe-based matching, 1-on-1 messaging, group management (Roommate Groups, Listing Inquiry Groups), property exploration with advanced filters and map/list views, saved properties, AI Match Assistant, notification feed, and daily cold messaging limits.
 - **Host:** Host dashboard with statistics, listing management (create, edit, delete, pause, mark rented, boost), an Inquiries screen, inquiry analytics, and host subscription management.
-- **AI-Powered Enhancements:** AI Profile Completion Reminders, Rhome AI Assistant (context-aware floating button), AI Memory Layer for refined suggestions, and AI Match Assistant powered by Claude (claude-sonnet-4-5) via Supabase Edge Function (`supabase/functions/ai-assistant/`) with conversation history, plan-based rate limiting (Free: 5/day, Plus: 50/day, Elite: 200/day), and a warm human-sounding system prompt using user profile + matches + listings context. Requires `ANTHROPIC_API_KEY` secret on Supabase. Client helper at `utils/aiService.ts`. Shows connection error when API unavailable (no fake fallback data). AI screen opens as fullScreenModal (no tab bar overlap). Edge Function queries both `users` and `profiles` tables correctly to build user context.
+- **AI-Powered Enhancements:** AI Profile Completion Reminders, Rhome AI Assistant (context-aware floating button), AI Memory Layer for refined suggestions, and AI Match Assistant powered by Claude (claude-sonnet-4-5) via Supabase Edge Function (`supabase/functions/ai-assistant/`) with conversation history, plan-based rate limiting (Free: 5/day, Plus: 50/day, Elite: 200/day, Agent Pro: 100/day, Agent Business: 500/day), and role-specific system prompts (renter vs agent). Requires `ANTHROPIC_API_KEY` secret on Supabase. Client helper at `utils/aiService.ts`. Shows connection error when API unavailable (no fake fallback data). AI screen opens as fullScreenModal (no tab bar overlap). Edge Function queries both `users` and `profiles` tables correctly to build user context.
 - **User Profiling:** A 14-step Profile Questionnaire and a 5-question Personality Quiz integrated into matching.
 - **Boost System:** Tier-based listing and profile boosting options for increased visibility, managed by `utils/boostRotation.ts`, `utils/boostUtils.ts`, and `utils/hostPricing.ts`.
 - **Identity & Verification:** Supports phone, government ID (Stripe Identity SDK), social media verification, and optional background/income checks. Also includes a References System.
 - **Host Type Differentiation:** Hosts select type (Individual, Company, Agent) affecting profile cards, listing badges, and contact labels.
+- **Agent Matchmaker:** Agents get a dedicated tab layout (Listings, Browse Renters, My Groups, Messages, Profile) with: renter browsing/shortlisting, AI-powered renter suggestions and group composition, compatibility matrix visualization, group builder with invite flow, placement pipeline with status tracking (assembling → invited → active → placed → dissolved), and Stripe-powered placement fees. Agent plans: Pay Per Use ($149/placement), Starter ($49.99/mo), Pro ($99.99/mo), Business ($199.99/mo). Service layer at `services/agentMatchmakerService.ts`, plan config in `constants/planLimits.ts` (AGENT_PLAN_LIMITS), migration at `supabase/migrations/017_agent_matchmaker.sql`, placement fee edge function at `supabase/functions/charge-placement-fee/`.
 - **Account Management:** Soft-delete account with a 30-day recovery window.
 - **Activity-Based Ranking:** Users inactive for >14 days are sorted lower in the swipe deck.
 - **Subscription Management:** Host subscription cancellation flow with re-activation option and a universal `PurchaseConfirmModal` for all payment types (subscriptions, one-time, credits).
@@ -50,11 +51,11 @@ Supabase provides the entire backend infrastructure:
 - **Database**: PostgreSQL with Row Level Security (RLS).
 - **Realtime**: Subscriptions for messages and notifications.
 - **Storage**: For profile and listing photos.
-- **Supabase Edge Functions**: For webhook handling, verification sessions, background checks, payments, and references.
+- **Supabase Edge Functions**: For webhook handling, verification sessions, background checks, payments, references, and agent placement fees.
 
 ## Subscription & Paywall System
 
-The application features tiered subscription plans for renters (Basic, Plus, Elite) and hosts (Free, Starter, Pro, Business), and one-time purchases. Stripe handles all payment processing via platform-specific hooks and Supabase Edge Functions. Plan limits are centralized in `constants/planLimits.ts` and `constants/renterPlanLimits.ts` with gate helpers in `utils/planGates.ts` and `utils/renterPlanGates.ts`.
+The application features tiered subscription plans for renters (Basic, Plus, Elite), hosts (Free, Starter, Pro, Business), and agents (Pay Per Use, Starter, Pro, Business), plus one-time purchases. Stripe handles all payment processing via platform-specific hooks and Supabase Edge Functions. Plan limits are centralized in `constants/planLimits.ts` and `constants/renterPlanLimits.ts` with gate helpers in `utils/planGates.ts` and `utils/renterPlanGates.ts`.
 
 ## Data Layer
 
@@ -74,7 +75,7 @@ The application supports over 10 US cities with a centralized location data syst
 
 ## Technical Decisions
 
-Key technical decisions include Babel module resolver, platform-specific UI adaptations, performance optimizations via React Native's New Architecture, React Compiler, and Reanimated, and robust error handling. Navigation uses separate stack navigators for each major tab (`GroupsStackNavigator.tsx`, `MessagesStackNavigator.tsx`, `HostMessagesStackNavigator.tsx`, `RoommatesStackNavigator.tsx`, `ProfileStackNavigator.tsx`) with `backBehavior="history"`.
+Key technical decisions include Babel module resolver, platform-specific UI adaptations, performance optimizations via React Native's New Architecture, React Compiler, and Reanimated, and robust error handling. Navigation uses separate stack navigators for each major tab (`GroupsStackNavigator.tsx`, `MessagesStackNavigator.tsx`, `HostMessagesStackNavigator.tsx`, `RoommatesStackNavigator.tsx`, `ProfileStackNavigator.tsx`) with `backBehavior="history"`. `HostTabNavigator.tsx` conditionally renders agent-specific tabs when `user.hostType === 'agent'`.
 
 # External Dependencies
 

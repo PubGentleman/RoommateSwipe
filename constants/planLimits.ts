@@ -114,6 +114,114 @@ export function canUseProactiveOutreach(plan: HostPlan): boolean {
   return getPlanLimits(plan).proactiveOutreachPerDay > 0;
 }
 
+export type AgentPlan = 'pay_per_use' | 'starter' | 'pro' | 'business';
+
+export interface AgentPlanLimits {
+  plan: AgentPlan;
+  label: string;
+  monthlyPrice: string;
+  placementFeeCents: number;
+  shortlistLimit: number;
+  activeGroupsLimit: number;
+  monthlyPlacementLimit: number;
+  hasAISuggestions: boolean;
+  hasAIGroupSuggestions: boolean;
+  hasCompatibilityMatrix: boolean;
+  hasAIChat: boolean;
+  hasPriorityVisibility: boolean;
+  hasAdvancedAnalytics: boolean;
+  teamSeats: number;
+}
+
+export const AGENT_PLAN_LIMITS: Record<AgentPlan, AgentPlanLimits> = {
+  pay_per_use: {
+    plan: 'pay_per_use',
+    label: 'Pay Per Use',
+    monthlyPrice: '$0',
+    placementFeeCents: 14900,
+    shortlistLimit: 5,
+    activeGroupsLimit: 1,
+    monthlyPlacementLimit: -1,
+    hasAISuggestions: false,
+    hasAIGroupSuggestions: false,
+    hasCompatibilityMatrix: false,
+    hasAIChat: false,
+    hasPriorityVisibility: false,
+    hasAdvancedAnalytics: false,
+    teamSeats: 1,
+  },
+  starter: {
+    plan: 'starter',
+    label: 'Agent Starter',
+    monthlyPrice: '$49.99',
+    placementFeeCents: 9900,
+    shortlistLimit: 10,
+    activeGroupsLimit: 1,
+    monthlyPlacementLimit: 2,
+    hasAISuggestions: false,
+    hasAIGroupSuggestions: false,
+    hasCompatibilityMatrix: false,
+    hasAIChat: false,
+    hasPriorityVisibility: false,
+    hasAdvancedAnalytics: false,
+    teamSeats: 1,
+  },
+  pro: {
+    plan: 'pro',
+    label: 'Agent Pro',
+    monthlyPrice: '$99.99',
+    placementFeeCents: 4900,
+    shortlistLimit: 50,
+    activeGroupsLimit: 5,
+    monthlyPlacementLimit: 10,
+    hasAISuggestions: true,
+    hasAIGroupSuggestions: true,
+    hasCompatibilityMatrix: true,
+    hasAIChat: true,
+    hasPriorityVisibility: false,
+    hasAdvancedAnalytics: false,
+    teamSeats: 1,
+  },
+  business: {
+    plan: 'business',
+    label: 'Agent Business',
+    monthlyPrice: '$199.99',
+    placementFeeCents: 2500,
+    shortlistLimit: -1,
+    activeGroupsLimit: -1,
+    monthlyPlacementLimit: -1,
+    hasAISuggestions: true,
+    hasAIGroupSuggestions: true,
+    hasCompatibilityMatrix: true,
+    hasAIChat: true,
+    hasPriorityVisibility: true,
+    hasAdvancedAnalytics: true,
+    teamSeats: 5,
+  },
+};
+
+export function getAgentPlanLimits(plan: AgentPlan): AgentPlanLimits {
+  return AGENT_PLAN_LIMITS[plan] ?? AGENT_PLAN_LIMITS.pay_per_use;
+}
+
+export function canAgentShortlist(plan: AgentPlan, currentCount: number): boolean {
+  const { shortlistLimit } = getAgentPlanLimits(plan);
+  if (shortlistLimit === -1) return true;
+  return currentCount < shortlistLimit;
+}
+
+export function canAgentCreateGroup(plan: AgentPlan, activeGroupCount: number): boolean {
+  const { activeGroupsLimit } = getAgentPlanLimits(plan);
+  if (activeGroupsLimit === -1) return true;
+  return activeGroupCount < activeGroupsLimit;
+}
+
+export function canAgentPlace(plan: AgentPlan, monthlyPlacementCount: number): boolean {
+  const { monthlyPlacementLimit } = getAgentPlanLimits(plan);
+  if (monthlyPlacementLimit === -1) return true;
+  return monthlyPlacementCount < monthlyPlacementLimit;
+}
+
 export const UNLOCK_PACKAGES = [
   { id: 'small', label: '+3 messages today',  credits: 3,  priceCents: 499  },
   { id: 'large', label: '+10 messages today', credits: 10, priceCents: 1299 },

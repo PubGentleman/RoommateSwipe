@@ -39,6 +39,8 @@ export interface RoommateProfile {
 }
 
 export type HostPlanType = 'free' | 'none' | 'starter' | 'pro' | 'business';
+export type AgentPlanType = 'pay_per_use' | 'starter' | 'pro' | 'business';
+export type AgentGroupStatus = 'assembling' | 'invited' | 'active' | 'placed' | 'dissolved';
 
 export interface HostSubscriptionData {
   plan: HostPlanType;
@@ -178,6 +180,49 @@ export interface Group {
   inquiryStatus?: 'pending' | 'accepted' | 'declined';
   addressRevealed?: boolean;
   listingPhoto?: string;
+  createdByAgent?: string;
+  agentAssembled?: boolean;
+  targetListingId?: string;
+  groupStatus?: AgentGroupStatus;
+}
+
+export interface AgentShortlist {
+  id: string;
+  agentId: string;
+  renterId: string;
+  listingId?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface AgentGroupInvite {
+  id: string;
+  agentId: string;
+  renterId: string;
+  groupId: string;
+  listingId?: string;
+  status: 'pending' | 'accepted' | 'declined' | 'expired';
+  message?: string;
+  sentAt: string;
+  respondedAt?: string;
+  agentName?: string;
+  listingTitle?: string;
+  listingRent?: number;
+  listingBedrooms?: number;
+  listingNeighborhood?: string;
+  listingAvailableDate?: string;
+  groupMembers?: Array<{ id: string; name: string; photo?: string; compatibility?: number }>;
+}
+
+export interface AgentPlacement {
+  id: string;
+  agentId: string;
+  groupId: string;
+  listingId: string;
+  placementFeeCents: number;
+  stripePaymentIntentId?: string;
+  placedAt: string;
+  billingStatus: 'pending' | 'charged' | 'failed' | 'waived';
 }
 
 export interface Message {
@@ -331,6 +376,7 @@ export interface User {
     lastInquiryResetDate?: string;
     billingHistory?: Array<{ date: string; amount: number; description: string }>;
   };
+  agentPlan?: AgentPlanType;
   purchases?: {
     listingBoosts?: Array<{ propertyId: string; expiresAt: string }>;
     hostVerificationBadge?: boolean;
@@ -526,7 +572,7 @@ export interface InterestCard {
 export interface Notification {
   id: string;
   userId: string;
-  type: 'match' | 'message' | 'group_invite' | 'group_accepted' | 'property_update' | 'property_rented' | 'application_status' | 'system' | 'super_like' | 'interest_received' | 'interest_accepted' | 'interest_passed' | 'interest_expired';
+  type: 'match' | 'message' | 'group_invite' | 'group_accepted' | 'property_update' | 'property_rented' | 'application_status' | 'system' | 'super_like' | 'interest_received' | 'interest_accepted' | 'interest_passed' | 'interest_expired' | 'agent_invite';
   title: string;
   body: string;
   isRead: boolean;
@@ -541,6 +587,11 @@ export interface Notification {
     fromUserId?: string;
     fromUserName?: string;
     fromUserPhoto?: string;
+    agentInviteId?: string;
+    agentName?: string;
+    listingTitle?: string;
+    listingRent?: number;
+    groupMembers?: Array<{ id: string; name: string; photo?: string; compatibility?: number }>;
   };
 }
 

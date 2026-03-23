@@ -17,10 +17,16 @@ import { ListingBoostScreen } from '../screens/host/ListingBoostScreen';
 import { HostGroupOutreachScreen } from '../screens/host/HostGroupOutreachScreen';
 import { BrowseRenterGroupsScreen } from '../screens/host/BrowseRenterGroupsScreen';
 import { HostRenterGroupDetailScreen } from '../screens/host/HostRenterGroupDetailScreen';
+import { BrowseRentersScreen } from '../screens/host/BrowseRentersScreen';
+import { RenterProfileDetailScreen } from '../screens/host/RenterProfileDetailScreen';
+import { RenterCompatibilityScreen } from '../screens/host/RenterCompatibilityScreen';
+import { AgentGroupBuilderScreen } from '../screens/host/AgentGroupBuilderScreen';
+import { AgentGroupsScreen } from '../screens/host/AgentGroupsScreen';
 import { HostMessagesStackNavigator } from './HostMessagesStackNavigator';
 import { NotificationsScreen } from '../screens/shared/NotificationsScreen';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
 import { useTheme } from '../hooks/useTheme';
+import { useAuth } from '../contexts/AuthContext';
 import { useNotificationContext } from '../contexts/NotificationContext';
 
 export type HostListingsStackParamList = {
@@ -46,11 +52,25 @@ export type HostGroupsStackParamList = {
   RenterGroupDetail: { group: any };
 };
 
+export type AgentBrowseStackParamList = {
+  BrowseRenters: undefined;
+  RenterProfileDetail: { renter: any };
+  RenterCompatibility: { renters: any[] };
+  AgentGroupBuilder: { preselectedIds?: string[]; listingId?: string };
+};
+
+export type AgentGroupsStackParamList = {
+  AgentGroupsList: undefined;
+  AgentGroupBuilder: { preselectedIds?: string[]; listingId?: string };
+};
+
 export type HostTabParamList = {
   Dashboard: undefined;
   Listings: undefined;
   Groups: undefined;
   Roommates: undefined;
+  BrowseRenters: undefined;
+  AgentGroups: undefined;
   Messages: undefined;
   Profile: undefined;
 };
@@ -59,6 +79,8 @@ const Tab = createBottomTabNavigator<HostTabParamList>();
 const ListingsStack = createNativeStackNavigator<HostListingsStackParamList>();
 const DashboardStack = createNativeStackNavigator<HostDashboardStackParamList>();
 const GroupsStack = createNativeStackNavigator<HostGroupsStackParamList>();
+const AgentBrowseStack = createNativeStackNavigator<AgentBrowseStackParamList>();
+const AgentGroupsStack = createNativeStackNavigator<AgentGroupsStackParamList>();
 
 function DashboardStackNavigator() {
   return (
@@ -95,11 +117,33 @@ function HostGroupsStackNavigator() {
   );
 }
 
+function AgentBrowseStackNavigator() {
+  return (
+    <AgentBrowseStack.Navigator screenOptions={{ headerShown: false }}>
+      <AgentBrowseStack.Screen name="BrowseRenters" component={BrowseRentersScreen} />
+      <AgentBrowseStack.Screen name="RenterProfileDetail" component={RenterProfileDetailScreen} />
+      <AgentBrowseStack.Screen name="RenterCompatibility" component={RenterCompatibilityScreen} />
+      <AgentBrowseStack.Screen name="AgentGroupBuilder" component={AgentGroupBuilderScreen} />
+    </AgentBrowseStack.Navigator>
+  );
+}
+
+function AgentGroupsStackNavigator() {
+  return (
+    <AgentGroupsStack.Navigator screenOptions={{ headerShown: false }}>
+      <AgentGroupsStack.Screen name="AgentGroupsList" component={AgentGroupsScreen} />
+      <AgentGroupsStack.Screen name="AgentGroupBuilder" component={AgentGroupBuilderScreen} />
+    </AgentGroupsStack.Navigator>
+  );
+}
+
 const HOST_TAB_CONFIG: Record<string, { icon: string; label: string }> = {
   Dashboard: { icon: 'grid', label: 'Dashboard' },
   Listings: { icon: 'home', label: 'Listings' },
   Groups: { icon: 'users', label: 'Groups' },
   Roommates: { icon: 'heart', label: 'Match' },
+  BrowseRenters: { icon: 'search', label: 'Renters' },
+  AgentGroups: { icon: 'users', label: 'My Groups' },
   Messages: { icon: 'message-circle', label: 'Messages' },
   Profile: { icon: 'user', label: 'Profile' },
 };
@@ -206,6 +250,30 @@ const hostTabStyles = StyleSheet.create({
 });
 
 export const HostTabNavigator = () => {
+  const { user } = useAuth();
+  const hostType = user?.hostType;
+
+  if (hostType === 'agent') {
+    return (
+      <Tab.Navigator
+        initialRouteName="Listings"
+        tabBar={(props) => <HostCustomTabBar {...props} />}
+        backBehavior="history"
+        screenOptions={{
+          headerShown: false,
+          lazy: true,
+          freezeOnBlur: true,
+        }}
+      >
+        <Tab.Screen name="Listings" component={ListingsStackNavigator} />
+        <Tab.Screen name="BrowseRenters" component={AgentBrowseStackNavigator} />
+        <Tab.Screen name="AgentGroups" component={AgentGroupsStackNavigator} />
+        <Tab.Screen name="Messages" component={HostMessagesStackNavigator} />
+        <Tab.Screen name="Profile" component={ProfileStackNavigator} />
+      </Tab.Navigator>
+    );
+  }
+
   return (
     <Tab.Navigator
       initialRouteName="Dashboard"

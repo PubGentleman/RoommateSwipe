@@ -12,6 +12,9 @@ import { Notification } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { getNotifications, markNotificationRead, markAllNotificationsRead, subscribeToNotifications } from '../../services/notificationService';
+import { respondToInvite, getAgentInvitesForRenter } from '../../services/agentMatchmakerService';
+import { AgentGroupInvite } from '../../types/models';
+import * as Haptics from 'expo-haptics';
 
 const mapSupabaseNotification = (row: any): Notification => ({
   id: row.id,
@@ -130,6 +133,8 @@ export const NotificationsScreen = () => {
           });
         }
         break;
+      case 'agent_invite':
+        break;
       case 'group_invite':
       case 'group_accepted':
         (navigation as any).navigate('Groups');
@@ -173,6 +178,8 @@ export const NotificationsScreen = () => {
         return 'star';
       case 'message':
         return 'message-circle';
+      case 'agent_invite':
+        return 'briefcase';
       case 'group_invite':
       case 'group_accepted':
         return 'users';
@@ -203,51 +210,135 @@ export const NotificationsScreen = () => {
     return `${mm}/${dd}/${yyyy}`;
   };
 
-  const renderNotification = ({ item }: { item: Notification }) => (
-    <Pressable
-      style={[
-        styles.notificationCard,
-        {
-          backgroundColor: item.isRead ? '#1a1a1a' : '#222222',
-          borderColor: theme.border,
-        },
-      ]}
-      onPress={() => handleNotificationPress(item)}
-    >
-      <View style={styles.notificationContent}>
-        <View style={[styles.iconContainer, { backgroundColor: theme.primary + '20' }]}>
-          <Feather name={getNotificationIcon(item.type)} size={20} color={theme.primary} />
-        </View>
-        
-        <View style={styles.textContainer}>
-          <ThemedText style={[Typography.body, { fontWeight: item.isRead ? '400' : '600' }]}>
-            {item.title}
-          </ThemedText>
-          <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginTop: 4 }]}>
-            {item.body}
-          </ThemedText>
-          <ThemedText style={[Typography.small, { color: theme.textSecondary, marginTop: 4, opacity: 0.7 }]}>
-            {getTimeSince(item.createdAt)}
-          </ThemedText>
+  const handleAgentInviteResponse = async (notification: Notification, accept: boolean) => {
+    const inviteId = notification.data?.agentInviteId;
+    if (!inviteId) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    await respondToInvite(inviteId, accept);
+    setNotifications(prev =>
+      prev.map(n =>
+        n.id === notification.id
+          ? { ...n, isRead: true, body: accept ? 'You accepted this group invite' : 'You declined this group invite' }
+          : n
+      )
+    );
+    await refreshUnreadCount();
+  };
+
+  const renderAgentInviteCard = (item: Notification) => {
+    const members = item.data?.groupMembers ?? [];
+    const alreadyResponded = item.body?.includes('accepted') || item.body?.includes('declined');
+
+    return (
+      <View
+        style={[styles.notificationCard, { backgroundColor: '#1a1a2e', borderColor: 'rgba(255,107,91,0.2)', borderWidth: 1 }]}
+      >
+        <View style={styles.notificationContent}>
+          <View style={[styles.iconContainer, { backgroundColor: 'rgba(255,107,91,0.2)' }]}>
+            <Feather name="briefcase" size={20} color="#ff6b5b" />
+          </View>
+          <View style={styles.textContainer}>
+            <ThemedText style={[Typography.body, { fontWeight: '700' }]}>
+              {item.title}
+            </ThemedText>
+            <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginTop: 4 }]}>
+              {item.body}
+            </ThemedText>
+            {item.data?.listingTitle ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 6 }}>
+                <Feather name="home" size={14} color="#888" />
+                <ThemedText style={[Typography.caption, { color: '#ccc' }]}>
+                  {item.data.listingTitle}
+                  {item.data.listingRent ? ` - $${item.data.listingRent.toLocaleString()}/mo` : ''}
+                </ThemedText>
+              </View>
+            ) : null}
+            {members.length > 0 ? (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                {members.slice(0, 4).map(m => (
+                  <View key={m.id} style={{ backgroundColor: '#333', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3 }}>
+                    <ThemedText style={{ fontSize: 11, color: '#ccc' }}>{m.name.split(' ')[0]}</ThemedText>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+            <ThemedText style={[Typography.small, { color: theme.textSecondary, marginTop: 6, opacity: 0.7 }]}>
+              {getTimeSince(item.createdAt)}
+            </ThemedText>
+          </View>
         </View>
 
-        <View style={styles.actionContainer}>
-          <Feather name="chevron-right" size={16} color={theme.textSecondary} style={{ opacity: 0.5 }} />
-          <Pressable
-            style={styles.deleteButton}
-            onPress={() => handleDelete(item.id)}
-            hitSlop={8}
-          >
-            <Feather name="x" size={18} color={theme.textSecondary} />
-          </Pressable>
-        </View>
+        {!alreadyResponded ? (
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: 12, paddingLeft: 52 }}>
+            <Pressable
+              style={{ flex: 1, backgroundColor: '#ff6b5b', borderRadius: 10, paddingVertical: 10, alignItems: 'center' }}
+              onPress={() => handleAgentInviteResponse(item, true)}
+            >
+              <ThemedText style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Accept</ThemedText>
+            </Pressable>
+            <Pressable
+              style={{ flex: 1, backgroundColor: '#333', borderRadius: 10, paddingVertical: 10, alignItems: 'center' }}
+              onPress={() => handleAgentInviteResponse(item, false)}
+            >
+              <ThemedText style={{ color: '#aaa', fontWeight: '600', fontSize: 14 }}>Decline</ThemedText>
+            </Pressable>
+          </View>
+        ) : null}
       </View>
+    );
+  };
 
-      {!item.isRead ? (
-        <View style={[styles.unreadDot, { backgroundColor: theme.primary }]} />
-      ) : null}
-    </Pressable>
-  );
+  const renderNotification = ({ item }: { item: Notification }) => {
+    if (item.type === 'agent_invite') {
+      return renderAgentInviteCard(item);
+    }
+
+    return (
+      <Pressable
+        style={[
+          styles.notificationCard,
+          {
+            backgroundColor: item.isRead ? '#1a1a1a' : '#222222',
+            borderColor: theme.border,
+          },
+        ]}
+        onPress={() => handleNotificationPress(item)}
+      >
+        <View style={styles.notificationContent}>
+          <View style={[styles.iconContainer, { backgroundColor: theme.primary + '20' }]}>
+            <Feather name={getNotificationIcon(item.type)} size={20} color={theme.primary} />
+          </View>
+          
+          <View style={styles.textContainer}>
+            <ThemedText style={[Typography.body, { fontWeight: item.isRead ? '400' : '600' }]}>
+              {item.title}
+            </ThemedText>
+            <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginTop: 4 }]}>
+              {item.body}
+            </ThemedText>
+            <ThemedText style={[Typography.small, { color: theme.textSecondary, marginTop: 4, opacity: 0.7 }]}>
+              {getTimeSince(item.createdAt)}
+            </ThemedText>
+          </View>
+
+          <View style={styles.actionContainer}>
+            <Feather name="chevron-right" size={16} color={theme.textSecondary} style={{ opacity: 0.5 }} />
+            <Pressable
+              style={styles.deleteButton}
+              onPress={() => handleDelete(item.id)}
+              hitSlop={8}
+            >
+              <Feather name="x" size={18} color={theme.textSecondary} />
+            </Pressable>
+          </View>
+        </View>
+
+        {!item.isRead ? (
+          <View style={[styles.unreadDot, { backgroundColor: theme.primary }]} />
+        ) : null}
+      </Pressable>
+    );
+  };
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
 

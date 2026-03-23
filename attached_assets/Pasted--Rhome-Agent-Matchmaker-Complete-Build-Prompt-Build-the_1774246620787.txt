@@ -1,0 +1,952 @@
+# Rhome — Agent Matchmaker: Complete Build Prompt
+
+Build the **Agent Matchmaker** system for Rhome. This is a premium feature that lets real estate agents browse individual renters, use AI to find compatible matches, assemble groups, send invites, and place groups into their listings — all tracked through a pipeline with a placement fee model.
+
+---
+
+## Context: Why This Feature Exists
+
+A real estate agent earns 50–100% of one month's rent per placement. On a $4,000/month 4-bedroom, that's a $2,000–4,000 commission per deal. The agent needs to find 4 compatible renters, group them, and place them. Rhome AI does the matching work in seconds instead of the agent spending days on it manually.
+
+Because the earning potential is so high, this is a premium-priced feature with a subscription + per-placement fee model.
+
+---
+
+## Part 1 — Pricing Model
+
+### Remove agents from the standard host pricing tiers entirely.
+Agents get their own pricing structure separate from individual hosts and companies.
+
+### Agent Plan Tiers:
+
+```
+STARTER — $49.99/month
+- Manual renter browsing (no AI suggestions)
+- Shortlist up to 10 renters at once
+- 1 active assembled group at a time
+- Max 2 placements per month
+- $99 placement fee per successful placed group
+- No compatibility matrix
+- No AI chat for matching
+
+PRO — $99.99/month
+- Full AI renter suggestions per listing
+- Full AI group suggestions + best group recommendation
+- Shortlist up to 50 renters at once
+- 5 active assembled groups at a time
+- Max 10 placements per month
+- $49 placement fee per successful placed group
+- Compatibility matrix (color-coded grid)
+- AI chat for matching queries
+
+BUSINESS — $199.99/month
+- Everything in Pro
+- Unlimited shortlisting
+- Unlimited active groups
+- Unlimited placements per month
+- $25 placement fee per successful placed group
+- Priority renter visibility (their listings shown first to renters)
+- Team seats (up to 5 agents under one account)
+- Advanced analytics (placement rate, avg days to place, revenue tracking)
+
+PAY PER USE — No subscription
+- $149 flat fee per placement
+- Manual browsing only
+- No AI, no group building tools
+- For occasional/part-time agents
+```
+
+### How placement fee is charged:
+When an agent marks a group as "Placed" in their pipeline, Stripe automatically charges the placement fee to the payment method on file. The agent gets a receipt. This ties Rhome's revenue directly to the agent's success.
+
+---
+
+## Part 2 — Database Changes
+
+Run as `017_agent_matchmaker.sql` in Supabase SQL Editor:
+
+```sql
+-- 1. Agent shortlisted renters
+CREATE TABLE IF NOT EXISTS public.agent_shortlists (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  agent_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  renter_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  listing_id UUID REFERENCES public.listings(id) ON DELETE SET NULL,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(agent_id, renter_id)
+);
+
+-- 2. Extend groups table for agent-assembled groups
+ALTER TABLE public.groups
+  ADD COLUMN IF NOT EXISTS created_by_agent UUID REFERENCES public.users(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS agent_assembled BOOLEAN DEFAULT false,
+  ADD COLUMN IF NOT EXISTS target_listing_id UUID REFERENCES public.listings(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS group_status TEXT DEFAULT 'assembling'
+    CHECK (group_status IN ('assembling', 'invited', 'active', 'placed', 'dissolved'));
+
+-- 3. Agent group invites sent to individual renters
+CREATE TABLE IF NOT EXISTS public.agent_group_invites (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  agent_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  renter_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  group_id UUID NOT NULL REFERENCES public.groups(id) ON DELETE CASCADE,
+  listing_id UUID REFERENCES public.listings(id) ON DELETE SET NULL,
+  status TEXT DEFAULT 'pending'
+    CHECK (status IN ('pending', 'accepted', 'declined', 'expired')),
+  message TEXT,
+  sent_at TIMESTAMPTZ DEFAULT now(),
+  responded_at TIMESTAMPTZ,
+  UNIQUE(renter_id, group_id)
+);
+
+-- 4. Placement records (for billing and analytics)
+CREATE TABLE IF NOT EXISTS public.agent_placements (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  agent_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  group_id UUID NOT NULL REFERENCES public.groups(id) ON DELETE CASCADE,
+  listing_id UUID NOT NULL REFERENCES public.listings(id) ON DELETE CASCADE,
+  placement_fee_cents INTEGER NOT NULL,
+  stripe_payment_intent_id TEXT,
+  placed_at TIMESTAMPTZ DEFAULT now(),
+  billing_status TEXT DEFAULT 'pending'
+    CHECK (billing_status IN ('pending', 'charged', 'failed', 'waived'))
+);
+
+-- 5. Fix onboarding_step constraint to include hostType
+ALTER TABLE public.users
+  DROP CONSTRAINT IF EXISTS users_onboarding_step_check;
+ALTER TABLE public.users
+  ADD CONSTRAINT users_onboarding_step_check
+    CHECK (onboarding_step IN ('profile', 'hostType', 'plan', 'complete'));
+
+-- 6. Add host_type column if missing
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS host_type TEXT
+    CHECK (host_type IN ('individual', 'agent', 'company'));
+
+-- 7. RLS policies
+ALTER TABLE public.agent_shortlists ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.agent_group_invites ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.agent_placements ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Agents manage their shortlists"
+  ON public.agent_shortlists FOR ALL
+  USING (auth.uid() = agent_id);
+
+CREATE POLICY "Renters see their own invites"
+  ON public.agent_group_invites FOR SELECT
+  USING (auth.uid() = renter_id);
+
+CREATE POLICY "Agents manage invites they sent"
+  ON public.agent_group_invites FOR ALL
+  USING (auth.uid() = agent_id);
+
+CREATE POLICY "Agents see their placements"
+  ON public.agent_placements FOR SELECT
+  USING (auth.uid() = agent_id);
+```
+
+---
+
+## Part 3 — Plan Limits Config
+
+Add agent plans to `constants/planLimits.ts`:
+
+```ts
+export type AgentPlan = 'pay_per_use' | 'starter' | 'pro' | 'business';
+
+export interface AgentPlanLimits {
+  plan: AgentPlan;
+  label: string;
+  monthlyPrice: string;
+  placementFeeCents: number;
+  shortlistLimit: number;          // -1 = unlimited
+  activeGroupsLimit: number;       // -1 = unlimited
+  monthlyPlacementLimit: number;   // -1 = unlimited
+  hasAISuggestions: boolean;
+  hasAIGroupSuggestions: boolean;
+  hasCompatibilityMatrix: boolean;
+  hasAIChat: boolean;
+  hasPriorityVisibility: boolean;
+  hasAdvancedAnalytics: boolean;
+  teamSeats: number;
+}
+
+export const AGENT_PLAN_LIMITS: Record<AgentPlan, AgentPlanLimits> = {
+  pay_per_use: {
+    plan: 'pay_per_use',
+    label: 'Pay Per Use',
+    monthlyPrice: '$0',
+    placementFeeCents: 14900,       // $149 per placement
+    shortlistLimit: 5,
+    activeGroupsLimit: 1,
+    monthlyPlacementLimit: -1,
+    hasAISuggestions: false,
+    hasAIGroupSuggestions: false,
+    hasCompatibilityMatrix: false,
+    hasAIChat: false,
+    hasPriorityVisibility: false,
+    hasAdvancedAnalytics: false,
+    teamSeats: 1,
+  },
+  starter: {
+    plan: 'starter',
+    label: 'Agent Starter',
+    monthlyPrice: '$49.99',
+    placementFeeCents: 9900,        // $99 per placement
+    shortlistLimit: 10,
+    activeGroupsLimit: 1,
+    monthlyPlacementLimit: 2,
+    hasAISuggestions: false,
+    hasAIGroupSuggestions: false,
+    hasCompatibilityMatrix: false,
+    hasAIChat: false,
+    hasPriorityVisibility: false,
+    hasAdvancedAnalytics: false,
+    teamSeats: 1,
+  },
+  pro: {
+    plan: 'pro',
+    label: 'Agent Pro',
+    monthlyPrice: '$99.99',
+    placementFeeCents: 4900,        // $49 per placement
+    shortlistLimit: 50,
+    activeGroupsLimit: 5,
+    monthlyPlacementLimit: 10,
+    hasAISuggestions: true,
+    hasAIGroupSuggestions: true,
+    hasCompatibilityMatrix: true,
+    hasAIChat: true,
+    hasPriorityVisibility: false,
+    hasAdvancedAnalytics: false,
+    teamSeats: 1,
+  },
+  business: {
+    plan: 'business',
+    label: 'Agent Business',
+    monthlyPrice: '$199.99',
+    placementFeeCents: 2500,        // $25 per placement
+    shortlistLimit: -1,
+    activeGroupsLimit: -1,
+    monthlyPlacementLimit: -1,
+    hasAISuggestions: true,
+    hasAIGroupSuggestions: true,
+    hasCompatibilityMatrix: true,
+    hasAIChat: true,
+    hasPriorityVisibility: true,
+    hasAdvancedAnalytics: true,
+    teamSeats: 5,
+  },
+};
+
+export function getAgentPlanLimits(plan: AgentPlan): AgentPlanLimits {
+  return AGENT_PLAN_LIMITS[plan] ?? AGENT_PLAN_LIMITS.pay_per_use;
+}
+
+export function canAgentShortlist(plan: AgentPlan, currentCount: number): boolean {
+  const { shortlistLimit } = getAgentPlanLimits(plan);
+  if (shortlistLimit === -1) return true;
+  return currentCount < shortlistLimit;
+}
+
+export function canAgentCreateGroup(plan: AgentPlan, activeGroupCount: number): boolean {
+  const { activeGroupsLimit } = getAgentPlanLimits(plan);
+  if (activeGroupsLimit === -1) return true;
+  return activeGroupCount < activeGroupsLimit;
+}
+
+export function canAgentPlace(plan: AgentPlan, monthlyPlacementCount: number): boolean {
+  const { monthlyPlacementLimit } = getAgentPlanLimits(plan);
+  if (monthlyPlacementLimit === -1) return true;
+  return monthlyPlacementCount < monthlyPlacementLimit;
+}
+```
+
+---
+
+## Part 4 — Agent Tab Navigator
+
+Update `navigation/HostTabNavigator.tsx` to give agents their own tab set:
+
+```tsx
+import { useAuth } from '../contexts/AuthContext';
+
+export const HostTabNavigator = () => {
+  const { user } = useAuth();
+  const hostType = user?.hostType;
+
+  if (hostType === 'agent') {
+    return (
+      <Tab.Navigator>
+        <Tab.Screen name="Listings" component={MyListingsScreen} />
+        <Tab.Screen name="BrowseRenters" component={BrowseRentersScreen} />
+        <Tab.Screen name="MyGroups" component={AgentGroupsScreen} />
+        <Tab.Screen name="Messages" component={MessagesScreen} />
+        <Tab.Screen name="Profile" component={ProfileScreen} />
+      </Tab.Navigator>
+    );
+  }
+
+  if (hostType === 'individual') {
+    return (
+      <Tab.Navigator>
+        <Tab.Screen name="MyRoom" component={MyListingsScreen} />
+        <Tab.Screen name="Browse" component={RoommatesScreen} />
+        <Tab.Screen name="Messages" component={MessagesScreen} />
+        <Tab.Screen name="Profile" component={ProfileScreen} />
+      </Tab.Navigator>
+    );
+  }
+
+  // company (default host)
+  return (
+    <Tab.Navigator>
+      <Tab.Screen name="Listings" component={MyListingsScreen} />
+      <Tab.Screen name="BrowseGroups" component={BrowseRenterGroupsScreen} />
+      <Tab.Screen name="Analytics" component={HostAnalyticsScreen} />
+      <Tab.Screen name="Messages" component={MessagesScreen} />
+      <Tab.Screen name="Profile" component={ProfileScreen} />
+    </Tab.Navigator>
+  );
+};
+```
+
+---
+
+## Part 5 — Browse Renters Screen
+
+Create `screens/host/BrowseRentersScreen.tsx`
+
+### What this screen does:
+- Agent browses individual renters in their city
+- Filters by budget, move-in date, room type, neighborhood
+- AI suggestions panel at top (Pro/Business only)
+- Each renter card shows key info + shortlist button
+- Compatibility button shows how this renter scores against others already shortlisted
+
+### Data fetch:
+```ts
+const loadRenters = async () => {
+  const { data: renters } = await supabase
+    .from('users')
+    .select(`
+      id, full_name, avatar_url, occupation, age, city, neighborhood,
+      profiles (
+        budget_min, budget_max, move_in_date, lease_duration,
+        cleanliness, noise_tolerance, sleep_schedule,
+        smoking, drinking, pets, interests, room_type
+      )
+    `)
+    .eq('role', 'renter')
+    .eq('city', agentCity)
+    .eq('onboarding_step', 'complete')
+    .not('id', 'in', `(${blockedUserIds.join(',')})`)
+    .order('created_at', { ascending: false });
+
+  setRenters(renters ?? []);
+};
+```
+
+### Filter logic:
+```ts
+const applyFilters = () => {
+  let filtered = allRenters;
+
+  // Budget filter — renter's max budget must cover their share of listing rent
+  if (selectedListing) {
+    const sharePerPerson = selectedListing.rent / selectedListing.bedrooms;
+    filtered = filtered.filter(r =>
+      (r.profiles?.budget_max ?? 0) >= sharePerPerson
+    );
+  }
+
+  // Move-in date filter — within 30 days of listing available date
+  if (selectedListing?.availableDate) {
+    const availDate = new Date(selectedListing.availableDate);
+    filtered = filtered.filter(r => {
+      if (!r.profiles?.move_in_date) return true; // flexible
+      const moveIn = new Date(r.profiles.move_in_date);
+      const diffDays = Math.abs((moveIn.getTime() - availDate.getTime()) / (1000 * 60 * 60 * 24));
+      return diffDays <= 30;
+    });
+  }
+
+  // Room type filter
+  if (roomTypeFilter !== 'any') {
+    filtered = filtered.filter(r => r.profiles?.room_type === roomTypeFilter);
+  }
+
+  // Neighborhood filter
+  if (neighborhoodFilter) {
+    filtered = filtered.filter(r => r.neighborhood === neighborhoodFilter);
+  }
+
+  setFilteredRenters(filtered);
+};
+```
+
+### Renter card UI:
+Each card shows:
+- Avatar / photo
+- Name, age, occupation
+- Budget range: `$1,400 – $1,800/mo`
+- Move-in date: `April 1`
+- Tags: cleanliness score, sleep schedule, pets, smoking
+- Compatibility % against current shortlist (if 1+ already shortlisted)
+- **Shortlist button** (heart/bookmark icon)
+- **View Profile** button
+
+### Shortlist action:
+```ts
+const shortlistRenter = async (renterId: string) => {
+  const currentCount = shortlistedRenters.length;
+  if (!canAgentShortlist(agentPlan, currentCount)) {
+    showPaywall('Upgrade to shortlist more renters');
+    return;
+  }
+
+  await supabase.from('agent_shortlists').insert({
+    agent_id: user.id,
+    renter_id: renterId,
+    listing_id: selectedListing?.id ?? null,
+  });
+
+  setShortlistedRenters(prev => [...prev, renterId]);
+};
+```
+
+---
+
+## Part 6 — AI Suggestions Panel
+
+This appears at the TOP of BrowseRentersScreen for Pro and Business agents only.
+
+```tsx
+{hasAISuggestions && selectedListing && (
+  <View style={styles.aiPanel}>
+    <Text style={styles.aiPanelTitle}>
+      🤖 Rhome AI — Top picks for "{selectedListing.title}"
+    </Text>
+    {aiSuggestions.map(suggestion => (
+      <AISuggestionCard
+        key={suggestion.renterId}
+        renter={suggestion.renter}
+        fitScore={suggestion.listingFitScore}
+        reason={suggestion.reason}
+        onShortlist={() => shortlistRenter(suggestion.renterId)}
+      />
+    ))}
+    {bestGroupSuggestion && (
+      <View style={styles.bestGroupBox}>
+        <Text style={styles.bestGroupTitle}>
+          ⚡ Best group suggestion
+        </Text>
+        <Text>{bestGroupSuggestion.names.join(' + ')}</Text>
+        <Text>{bestGroupSuggestion.avgCompatibility}% avg compatibility</Text>
+        <Text>Combined budget: ${bestGroupSuggestion.combinedBudgetMin}–${bestGroupSuggestion.combinedBudgetMax}/mo</Text>
+        <Text style={bestGroupSuggestion.coversRent ? styles.green : styles.red}>
+          {bestGroupSuggestion.coversRent ? '✅ Covers rent' : '⚠️ May not cover rent'}
+        </Text>
+        <Button onPress={() => buildGroupFromSuggestion(bestGroupSuggestion)}>
+          Build This Group
+        </Button>
+      </View>
+    )}
+  </View>
+)}
+```
+
+### AI scoring logic (run client-side using existing utils):
+```ts
+const generateAISuggestions = (renters: Renter[], listing: Listing) => {
+  const sharePerPerson = listing.rent / listing.bedrooms;
+
+  return renters
+    .map(renter => {
+      const profile = renter.profiles;
+
+      // Hard filters first
+      const budgetOk = (profile?.budget_max ?? 0) >= sharePerPerson;
+      const moveInOk = isMoveInCompatible(profile?.move_in_date, listing.availableDate);
+
+      if (!budgetOk || !moveInOk) return null;
+
+      // Score remaining factors
+      const budgetScore = Math.min(100,
+        ((profile?.budget_max ?? 0) / sharePerPerson) * 100
+      );
+      const profileComplete = calculateProfileCompleteness(renter);
+      const lifestyleScore = 70; // base score — refined by compatibility matrix
+
+      const listingFitScore = Math.round(
+        (budgetScore * 0.4) +
+        (profileComplete * 0.3) +
+        (lifestyleScore * 0.3)
+      );
+
+      let reason = '';
+      if (!budgetOk) reason = 'Budget too low for this listing';
+      else if (!moveInOk) reason = 'Move-in date too far out';
+      else if (listingFitScore >= 90) reason = 'Strong profile, move-in ready';
+      else if (listingFitScore >= 75) reason = 'Good fit, verify lifestyle preferences';
+      else reason = 'Marginal fit — check budget flexibility';
+
+      return { renter, listingFitScore, reason, budgetOk, moveInOk };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b!.listingFitScore - a!.listingFitScore)
+    .slice(0, 5); // top 5 suggestions
+};
+
+const isMoveInCompatible = (renterDate: string | null, listingDate: string | null): boolean => {
+  if (!renterDate || !listingDate) return true; // flexible
+  const moveIn = new Date(renterDate);
+  const available = new Date(listingDate);
+  const diffDays = Math.abs((moveIn.getTime() - available.getTime()) / (1000 * 60 * 60 * 24));
+  return diffDays <= 30;
+};
+```
+
+### Best group suggestion:
+```ts
+const generateBestGroupSuggestion = (shortlisted: Renter[], listing: Listing) => {
+  if (shortlisted.length < 2) return null;
+
+  const needed = listing.bedrooms;
+  const combinations = getCombinations(shortlisted, needed); // all possible groups of size `needed`
+
+  const scored = combinations.map(group => {
+    // Check combined budget covers rent
+    const combinedMin = group.reduce((sum, r) => sum + (r.profiles?.budget_min ?? 0), 0);
+    const combinedMax = group.reduce((sum, r) => sum + (r.profiles?.budget_max ?? 0), 0);
+    const coversRent = combinedMax >= listing.rent;
+
+    // Average compatibility between all pairs
+    const pairs = getPairs(group);
+    const avgCompatibility = pairs.length > 0
+      ? Math.round(pairs.reduce((sum, [a, b]) =>
+          sum + calculateCompatibility(a, b), 0) / pairs.length)
+      : 0;
+
+    return {
+      group,
+      names: group.map(r => r.full_name),
+      avgCompatibility,
+      combinedBudgetMin: combinedMin,
+      combinedBudgetMax: combinedMax,
+      coversRent,
+      score: coversRent ? avgCompatibility : avgCompatibility * 0.5,
+    };
+  });
+
+  return scored.sort((a, b) => b.score - a.score)[0] ?? null;
+};
+```
+
+---
+
+## Part 7 — Compatibility Matrix Screen
+
+Create `screens/host/RenterCompatibilityScreen.tsx`
+
+Available to Pro and Business agents only. Shows how every shortlisted renter scores against every other.
+
+```tsx
+// Grid layout:
+//          Marcus   Priya   Jordan
+// Marcus     —       87%     61%
+// Priya     87%       —      74%
+// Jordan    61%      74%      —
+
+const getColor = (score: number) => {
+  if (score >= 80) return '#2ecc71'; // green
+  if (score >= 60) return '#f39c12'; // yellow
+  return '#e74c3c';                  // red
+};
+```
+
+Below the matrix show:
+- Highest scoring pair with recommendation to group them
+- Any pairs below 60% with a warning
+- If a renter scores poorly against everyone, suggest replacing them from the browse feed
+
+---
+
+## Part 8 — Agent Group Builder Screen
+
+Create `screens/host/AgentGroupBuilderScreen.tsx`
+
+### Flow:
+1. Agent selects 2–6 renters from shortlist (based on bedroom count of target listing)
+2. Sees real-time average compatibility score update as they select
+3. Selects target listing
+4. Writes optional personal message to include in invites
+5. Reviews: group members, listing, compatibility score, combined budget vs rent
+6. Taps **Send Invites**
+
+### Review panel before sending:
+```
+Group for: "2BR Williamsburg - $3,200/mo"
+
+Members:
+  Marcus Chen — $1,400–1,800/mo · April 1
+  Priya Patel — $1,500–1,700/mo · March 15
+
+Group compatibility: 87% ✅
+Combined budget: $2,900–3,500/mo ✅ covers $3,200
+Both move-in dates within 2 weeks ✅
+
+Your message:
+"Hi! I think you two would be great roommates for
+this Williamsburg apartment. Let me know if you're
+interested and I'll set up a showing."
+
+[Send Invites to Both]
+```
+
+### On send invites:
+```ts
+const sendGroupInvites = async () => {
+  // 1. Check plan limits
+  const activeGroups = await getActiveGroupCount(user.id);
+  if (!canAgentCreateGroup(agentPlan, activeGroups)) {
+    showPaywall('Upgrade to create more groups');
+    return;
+  }
+
+  // 2. Create the group
+  const { data: group } = await supabase
+    .from('groups')
+    .insert({
+      name: `${listing.title} — Agent Group`,
+      created_by: user.id,
+      created_by_agent: user.id,
+      agent_assembled: true,
+      target_listing_id: listing.id,
+      group_status: 'invited',
+      type: 'roommate',
+    })
+    .select()
+    .single();
+
+  // 3. Send invite to each renter
+  for (const renterId of selectedRenterIds) {
+    await supabase.from('agent_group_invites').insert({
+      agent_id: user.id,
+      renter_id: renterId,
+      group_id: group.id,
+      listing_id: listing.id,
+      message: agentMessage,
+    });
+
+    // 4. Send push notification
+    await sendPushNotification(renterId, {
+      title: 'An agent found you a roommate match',
+      body: `You've been invited to view ${listing.title} with a compatible group`,
+    });
+  }
+
+  navigation.navigate('AgentGroups');
+};
+```
+
+---
+
+## Part 9 — Agent Groups Pipeline Screen
+
+Create `screens/host/AgentGroupsScreen.tsx`
+
+Shows all groups the agent has assembled at every stage:
+
+```
+ASSEMBLING  → agent is building the group, invites not sent yet
+INVITED     → invites sent, waiting for renter responses
+ACTIVE      → all renters accepted, group is ready
+PLACED      → group linked to listing, application complete
+DISSOLVED   → group fell apart
+```
+
+### Group card shows:
+- Member avatars + names
+- Invite status per member: ✅ Accepted / ⏳ Pending / ❌ Declined
+- Target listing name + rent
+- Group average compatibility score
+- CTA based on status:
+  - **Assembling** → "Send Invites"
+  - **Invited** → "View Responses" (+ reminder button to nudge pending renters)
+  - **Active** → "Mark as Placed" / "Message Group"
+  - **Placed** → "View Placement" (shows billing receipt)
+
+### Mark as Placed flow:
+```ts
+const markAsPlaced = async (groupId: string, listingId: string) => {
+  const planLimits = getAgentPlanLimits(agentPlan);
+  const placementFee = planLimits.placementFeeCents;
+
+  // Check monthly placement limit
+  const thisMonthPlacements = await getMonthlyPlacementCount(user.id);
+  if (!canAgentPlace(agentPlan, thisMonthPlacements)) {
+    showAlert('Monthly placement limit reached. Upgrade to place more groups.');
+    return;
+  }
+
+  // Confirm with agent
+  showConfirm({
+    title: 'Confirm Placement',
+    message: `A placement fee of $${placementFee / 100} will be charged to your card on file.`,
+    onConfirm: async () => {
+      // 1. Update group status
+      await supabase.from('groups')
+        .update({ group_status: 'placed' })
+        .eq('id', groupId);
+
+      // 2. Record placement
+      await supabase.from('agent_placements').insert({
+        agent_id: user.id,
+        group_id: groupId,
+        listing_id: listingId,
+        placement_fee_cents: placementFee,
+        billing_status: 'pending',
+      });
+
+      // 3. Charge via Stripe (call Edge Function)
+      await chargeAgentPlacementFee(user.id, placementFee);
+    }
+  });
+};
+```
+
+---
+
+## Part 10 — Renter Receives Agent Invite
+
+Add an **Agent Invites** section to the renter's Notifications screen.
+
+### Invite card shows:
+```
+🏠 Agent Invite from David Martinez (Verified Agent)
+
+Apartment: 2BR in Williamsburg
+Rent: $3,200/mo → Your share: ~$1,600/mo
+Available: April 1
+
+Your group:
+  You + Marcus Chen
+  Compatibility: 87% ✅
+
+David's message:
+"Hi! I think you two would be great roommates..."
+
+[View Listing]  [Accept]  [Decline]
+```
+
+### On Accept:
+```ts
+const acceptAgentInvite = async (inviteId: string, groupId: string) => {
+  // 1. Update invite status
+  await supabase.from('agent_group_invites')
+    .update({ status: 'accepted', responded_at: new Date().toISOString() })
+    .eq('id', inviteId);
+
+  // 2. Add renter to group
+  await supabase.from('group_members').insert({
+    group_id: groupId,
+    user_id: user.id,
+    role: 'member',
+  });
+
+  // 3. Notify agent
+  await sendPushNotification(agentId, {
+    title: 'Renter accepted your invite',
+    body: `${user.fullName} accepted the invite to your group for ${listingTitle}`,
+  });
+
+  // 4. Check if all renters accepted → update group to 'active'
+  const { count: pendingCount } = await supabase
+    .from('agent_group_invites')
+    .select('*', { count: 'exact', head: true })
+    .eq('group_id', groupId)
+    .eq('status', 'pending');
+
+  if (pendingCount === 0) {
+    await supabase.from('groups')
+      .update({ group_status: 'active' })
+      .eq('id', groupId);
+  }
+};
+```
+
+### On Decline:
+```ts
+const declineAgentInvite = async (inviteId: string) => {
+  await supabase.from('agent_group_invites')
+    .update({ status: 'declined', responded_at: new Date().toISOString() })
+    .eq('id', inviteId);
+
+  // Notify agent so they can find a replacement
+  await sendPushNotification(agentId, {
+    title: 'Renter declined your invite',
+    body: `${user.fullName} declined. You can invite another renter from your shortlist.`,
+  });
+};
+```
+
+---
+
+## Part 11 — AI Edge Function Update
+
+Update `buildSystemPrompt()` in `supabase/functions/ai-assistant/index.ts` to handle agent role:
+
+```ts
+async function buildAgentSystemPrompt(
+  supabase: any,
+  userId: string,
+  agentPlan: string
+): Promise<string> {
+  // Get agent's listings
+  const { data: listings } = await supabase
+    .from('listings')
+    .select('id, title, rent, bedrooms, neighborhood, status')
+    .eq('host_id', userId)
+    .eq('is_active', true);
+
+  // Get shortlisted renter count
+  const { count: shortlistCount } = await supabase
+    .from('agent_shortlists')
+    .select('*', { count: 'exact', head: true })
+    .eq('agent_id', userId);
+
+  // Get active group count
+  const { count: activeGroups } = await supabase
+    .from('groups')
+    .select('*', { count: 'exact', head: true })
+    .eq('created_by_agent', userId)
+    .in('group_status', ['invited', 'active']);
+
+  const listingSummary = listings?.map((l: any) =>
+    `"${l.title}" — $${l.rent}/mo, ${l.bedrooms}BR in ${l.neighborhood}`
+  ).join('; ') ?? 'no active listings';
+
+  return `You are Rhome AI, helping a real estate agent find and match renters for their listings.
+
+AGENT PLAN: ${agentPlan}
+ACTIVE LISTINGS: ${listingSummary}
+SHORTLISTED RENTERS: ${shortlistCount ?? 0}
+ACTIVE ASSEMBLED GROUPS: ${activeGroups ?? 0}
+
+Your job is to help this agent:
+- Find renters who fit their listing requirements (right budget, right move-in date, right lifestyle)
+- Assess whether two or more renters would be compatible roommates
+- Suggest which renters from their shortlist to group together
+- Help craft compelling invite messages to send to renters
+- Manage their group pipeline efficiently
+
+KEY RULES:
+- Budget is a HARD filter. A renter's max budget must cover their share of the rent (listing rent ÷ bedrooms). Never suggest someone who can't afford their share.
+- Move-in date is a HARD filter. Renter's move-in must be within 30 days of listing availability. Flag anyone outside this window.
+- After hard filters pass, rank by: lifestyle compatibility, profile completeness, neighborhood match.
+- When asked to compare renters, give a direct recommendation — don't be vague.
+- Never suggest roommate matching content — this agent is placing tenants, not finding a roommate for themselves.
+- Keep responses conversational and direct. Agents are busy professionals.`;
+}
+```
+
+---
+
+## Part 12 — Stripe Placement Fee Edge Function
+
+Create `supabase/functions/charge-placement-fee/index.ts`:
+
+```ts
+import Stripe from 'https://esm.sh/stripe@12.0.0?target=deno';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!);
+const supabase = createClient(
+  Deno.env.get('SUPABASE_URL')!,
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+);
+
+Deno.serve(async (req) => {
+  const { agentId, placementId, amountCents } = await req.json();
+
+  // Get agent's Stripe customer ID
+  const { data: sub } = await supabase
+    .from('subscriptions')
+    .select('stripe_customer_id')
+    .eq('user_id', agentId)
+    .single();
+
+  if (!sub?.stripe_customer_id) {
+    return new Response(JSON.stringify({ error: 'No payment method on file' }), { status: 400 });
+  }
+
+  // Charge the placement fee
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount: amountCents,
+    currency: 'usd',
+    customer: sub.stripe_customer_id,
+    confirm: true,
+    off_session: true,
+    description: 'Rhome placement fee',
+    metadata: { agentId, placementId },
+  });
+
+  // Update placement billing status
+  await supabase.from('agent_placements')
+    .update({
+      stripe_payment_intent_id: paymentIntent.id,
+      billing_status: paymentIntent.status === 'succeeded' ? 'charged' : 'failed',
+    })
+    .eq('id', placementId);
+
+  return new Response(JSON.stringify({ success: true, status: paymentIntent.status }));
+});
+```
+
+---
+
+## Complete Screen Map
+
+```
+HostTabNavigator (agent)
+├── Listings Tab
+│   └── MyListingsScreen (existing)
+├── Browse Renters Tab              ← NEW
+│   ├── BrowseRentersScreen
+│   │   ├── AI Suggestions Panel (Pro/Business only)
+│   │   ├── Renter Cards with shortlist + compatibility buttons
+│   │   └── Filter bar (budget, move-in, room type, neighborhood)
+│   ├── RenterProfileDetailScreen   ← NEW
+│   └── RenterCompatibilityScreen   ← NEW (Pro/Business only)
+├── My Groups Tab                   ← NEW
+│   ├── AgentGroupsScreen (pipeline view)
+│   └── AgentGroupBuilderScreen     ← NEW
+├── Messages Tab
+│   └── MessagesScreen (existing)
+└── Profile Tab
+    └── ProfileScreen (existing)
+
+RenterTabNavigator additions:
+└── Notifications/Messages
+    └── AgentInviteCard             ← NEW (accept/decline flow)
+```
+
+---
+
+## Summary of Everything Built
+
+| Item | File | Notes |
+|---|---|---|
+| DB tables | `017_agent_matchmaker.sql` | shortlists, invites, placements, group columns |
+| Agent plan limits | `constants/planLimits.ts` | 4 tiers with placement fees |
+| Agent tab navigator | `navigation/HostTabNavigator.tsx` | Different tabs per host type |
+| Browse Renters screen | `screens/host/BrowseRentersScreen.tsx` | Renter discovery with budget+date filters |
+| AI suggestions panel | Inside BrowseRentersScreen | Top 5 AI picks + best group suggestion |
+| Compatibility matrix | `screens/host/RenterCompatibilityScreen.tsx` | Color-coded pair scoring grid |
+| Group builder | `screens/host/AgentGroupBuilderScreen.tsx` | Select renters, review, send invites |
+| Groups pipeline | `screens/host/AgentGroupsScreen.tsx` | assembling→invited→active→placed |
+| Renter invite card | In NotificationsScreen | Accept/decline with group + listing detail |
+| Agent AI context | `supabase/functions/ai-assistant/index.ts` | Role-aware prompt for agents |
+| Placement fee billing | `supabase/functions/charge-placement-fee/` | Stripe off-session charge on placement |
