@@ -1293,7 +1293,7 @@ export const RoommatesScreen = () => {
 
       <View style={styles.cardArea}>
         {nextProfile ? (
-          <View style={[styles.card, { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }]}>
+          <View style={[styles.card, { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0, opacity: 0, pointerEvents: 'none' }]}>
             <Image source={{ uri: (Array.isArray(nextProfile.photos) ? nextProfile.photos : nextProfile.photos ? [nextProfile.photos] : [])[0] }} resizeMode="cover" style={styles.cardImage} />
             <LinearGradient
               colors={['transparent', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.95)']}
