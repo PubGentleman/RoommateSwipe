@@ -13,6 +13,7 @@ import {
   getAgentGroups,
   updateAgentGroupStatus,
   recordPlacement,
+  chargeAgentPlacementFee,
   getMonthlyPlacementCount,
 } from '../../services/agentMatchmakerService';
 import { getAgentPlanLimits, canAgentPlace, type AgentPlan } from '../../constants/planLimits';
@@ -82,14 +83,27 @@ export const AgentGroupsScreen = () => {
       message: `A placement fee of ${feeDisplay} will be charged to your payment method on file.`,
     });
     if (confirmed) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await updateAgentGroupStatus(group.id, 'placed');
-      await recordPlacement(
+      const placement = await recordPlacement(
         user.id,
         group.id,
         group.targetListingId ?? '',
         planLimits.placementFeeCents
       );
+
+      const chargeResult = await chargeAgentPlacementFee(
+        user.id,
+        placement.id,
+        group.id,
+        group.targetListingId ?? ''
+      );
+
+      if (chargeResult.success) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        showAlert({ title: 'Payment Issue', message: chargeResult.error ?? 'Placement fee could not be charged. Please check your payment method.' });
+      }
       loadGroups();
     }
   };

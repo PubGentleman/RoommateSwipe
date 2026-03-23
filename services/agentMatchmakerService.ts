@@ -2,6 +2,7 @@ import { StorageService } from '../utils/storage';
 import { Property, RoommateProfile, AgentGroupInvite, AgentPlacement } from '../types/models';
 import { calculateCompatibility } from '../utils/matchingAlgorithm';
 import { AgentPlan, getAgentPlanLimits, canAgentShortlist, canAgentCreateGroup, canAgentPlace } from '../constants/planLimits';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 const SHORTLIST_KEY = '@rhome/agent_shortlists';
 const AGENT_GROUPS_KEY = '@rhome/agent_groups';
@@ -187,6 +188,38 @@ export async function recordPlacement(
   placements.push(placement);
   await StorageService.storeData(AGENT_PLACEMENTS_KEY, JSON.stringify(placements));
   return placement;
+}
+
+export async function chargeAgentPlacementFee(
+  agentId: string,
+  placementId: string,
+  groupId: string,
+  listingId: string
+): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured) {
+    const data = await StorageService.getData(AGENT_PLACEMENTS_KEY);
+    const placements: AgentPlacement[] = data ? JSON.parse(data) : [];
+    const idx = placements.findIndex(p => p.id === placementId);
+    if (idx >= 0) {
+      placements[idx].billingStatus = 'charged';
+      await StorageService.storeData(AGENT_PLACEMENTS_KEY, JSON.stringify(placements));
+    }
+    return { success: true };
+  }
+
+  try {
+    const { data, error } = await supabase.functions.invoke('charge-placement-fee', {
+      body: { placementId, groupId, listingId },
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: data?.success ?? false, error: data?.error };
+  } catch (e: any) {
+    return { success: false, error: e.message ?? 'Payment failed' };
+  }
 }
 
 export async function getMonthlyPlacementCount(agentId: string): Promise<number> {
