@@ -432,6 +432,22 @@ export const BrowseRentersScreen = () => {
             </Pressable>
           </View>
         ) : null}
+
+        {planLimits.hasAIGroupSuggestions && shortlistedIds.size >= 2 && selectedListing ? (
+          <Pressable
+            style={styles.fullAiPairButton}
+            onPress={() => navigation.navigate('AgentGroupBuilder', {
+              preselectedIds: Array.from(shortlistedIds),
+              listingId: selectedListing.id,
+              openAIPairing: true,
+            })}
+          >
+            <Feather name="zap" size={16} color="#fff" />
+            <Text style={styles.fullAiPairText}>
+              Ask Claude: Who should I group? ({shortlistedIds.size} shortlisted)
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
     );
   };
@@ -675,4 +691,6 @@ const styles = StyleSheet.create({
   transitFunnelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
   transitFunnelText: { color: 'rgba(255,255,255,0.6)', fontSize: 12 },
   transitFunnelResult: { color: '#fff', fontSize: 13, fontWeight: '700', marginTop: 8 },
+  fullAiPairButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: ACCENT, borderRadius: 12, paddingVertical: 12, marginTop: 12 },
+  fullAiPairText: { color: '#fff', fontSize: 13, fontWeight: '700', flex: 1 },
 });

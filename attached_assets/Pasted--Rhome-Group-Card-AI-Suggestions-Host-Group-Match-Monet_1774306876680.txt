@@ -1,0 +1,734 @@
+# Rhome — Group Card AI Suggestions + Host Group Match Monetization (Replit Agent Prompt)
+
+Paste this into Replit Agent. This is two connected features:
+1. Renter group cards show AI member + apartment suggestions inline
+2. Hosts get paid notifications when AI finds a compatible renter group for their listing
+
+---
+
+## PROMPT — Group Card AI + Host Group Match Unlock
+
+```
+Build two connected features:
+
+PART A: Renter group cards in GroupsScreen show quick AI stats for
+        member suggestions and apartment matches inline on each card.
+
+PART B: A background matching job finds renter groups that are a strong
+        fit for active host listings, notifies the host, and charges them
+        to unlock the full group details.
+
+---
+
+### PART A: Renter Group Card — Member + Apartment Quick Stats
+
+#### Step 1 — Add quick stats to GroupsScreen group cards
+
+File: screens/renter/GroupsScreen.tsx
+
+After the health score badge on each group card (added in the previous prompt),
+add two quick stat chips showing:
+- How many people could be suggested as new members
+- How many apartments match the group's preferences
+
+Create a new utility: utils/groupQuickStats.ts
+
+  import { supabase } from '../lib/supabase';
+  import { scoreListing } from './transitMatching';
+  import { RoommateProfile, Property } from '../types/models';
+
+  export interface GroupQuickStats {
+    suggestedMemberCount: number;   // renters compatible with the whole group
+    matchingApartmentCount: number; // listings that score > 65 for the group
+  }
+
+  export async function getGroupQuickStats(
+    groupId: string,
+    currentUserId: string
+  ): Promise<GroupQuickStats> {
+    // Fetch group members and their profiles
+    const { data: group } = await supabase
+      .from('groups')
+      .select('*, group_members(user_id)')
+      .eq('id', groupId)
+      .single();
+
+    if (!group) return { suggestedMemberCount: 0, matchingApartmentCount: 0 };
+
+    const memberIds: string[] = (group.group_members ?? []).map((m: any) => m.user_id);
+
+    // Fetch member profiles
+    const { data: members } = await supabase
+      .from('users')
+      .select('id, profile:profiles(*)')
+      .in('id', memberIds);
+
+    const memberProfiles = (members ?? []).map(m => ({
+      id: m.id,
+      name: '',
+      lifestyle: {
+        cleanliness: m.profile?.cleanliness,
+        workSchedule: m.profile?.sleep_schedule,
+        smoking: m.profile?.smoking,
+        pets: m.profile?.pets,
+      },
+      budget: m.profile?.budget_max,
+      preferences: { moveInDate: m.profile?.move_in_date },
+      apartmentPrefs: m.profile?.apartment_prefs_complete ? {
+        desiredBedrooms: m.profile.desired_bedrooms,
+        budgetPerPersonMin: m.profile.budget_per_person_min,
+        budgetPerPersonMax: m.profile.budget_per_person_max,
+        preferredTrains: m.profile.preferred_trains ?? [],
+        amenityMustHaves: m.profile.amenity_must_haves ?? [],
+        moveInDate: m.profile.move_in_date,
+        locationFlexible: m.profile.location_flexible,
+        wfh: m.profile.wfh,
+        apartmentPrefsComplete: true,
+      } : undefined,
+    }));
+
+    // Count compatible renter suggestions (not already in group, not invited)
+    const { data: invited } = await supabase
+      .from('group_invitations')
+      .select('invitee_id')
+      .eq('group_id', groupId);
+    const invitedIds = (invited ?? []).map((i: any) => i.invitee_id);
+    const excludeIds = [...memberIds, ...invitedIds, currentUserId];
+
+    // Get match scores for current user vs others
+    const { data: scoreRows } = await supabase
+      .from('match_scores')
+      .select('user_id_1, user_id_2, score')
+      .or(`user_id_1.eq.${currentUserId},user_id_2.eq.${currentUserId}`)
+      .gte('score', 65)
+      .not(currentUserId === '' ? 'user_id_1' : 'user_id_1', 'in', `(${excludeIds.join(',')})`)
+      .limit(20);
+
+    const suggestedMemberCount = Math.min(
+      (scoreRows ?? []).filter(r => {
+        const otherId = r.user_id_1 === currentUserId ? r.user_id_2 : r.user_id_1;
+        return !excludeIds.includes(otherId);
+      }).length,
+      99
+    );
+
+    // Count matching apartments
+    let matchingApartmentCount = 0;
+    if (memberProfiles.length >= 2) {
+      const { data: listings } = await supabase
+        .from('listings')
+        .select('*')
+        .eq('available', true)
+        .limit(50);
+
+      if (listings) {
+        matchingApartmentCount = listings.filter(listing => {
+          const result = scoreListing(listing as any, memberProfiles as any);
+          return result !== null && result.totalScore >= 65;
+        }).length;
+      }
+    }
+
+    return { suggestedMemberCount, matchingApartmentCount };
+  }
+
+In GroupsScreen, load quick stats for each group after the health scores load:
+
+  const [groupQuickStats, setGroupQuickStats] = useState<Record<string, GroupQuickStats>>({});
+
+  useEffect(() => {
+    if (groups.length > 0 && user) {
+      groups.forEach(async (group: any) => {
+        const stats = await getGroupQuickStats(group.id, user.id);
+        setGroupQuickStats(prev => ({ ...prev, [group.id]: stats }));
+      });
+    }
+  }, [groups]);
+
+On each group card, add the stats chips below the health badge:
+
+  {groupQuickStats[group.id] && (
+    <View style={styles.statsRow}>
+      {groupQuickStats[group.id].suggestedMemberCount > 0 && (
+        <Pressable
+          style={styles.statChip}
+          onPress={() => navigation.navigate('GroupInfo', { groupId: group.id, scrollTo: 'suggestions' })}
+        >
+          <Feather name="user-plus" size={11} color="#ff6b5b" />
+          <Text style={styles.statChipText}>
+            {groupQuickStats[group.id].suggestedMemberCount} suggested member{groupQuickStats[group.id].suggestedMemberCount !== 1 ? 's' : ''}
+          </Text>
+        </Pressable>
+      )}
+      {groupQuickStats[group.id].matchingApartmentCount > 0 && (
+        <Pressable
+          style={styles.statChip}
+          onPress={() => navigation.navigate('GroupApartmentSuggestions', { groupId: group.id })}
+        >
+          <Feather name="home" size={11} color="#3498db" />
+          <Text style={[styles.statChipText, { color: '#3498db' }]}>
+            {groupQuickStats[group.id].matchingApartmentCount} apartment{groupQuickStats[group.id].matchingApartmentCount !== 1 ? 's' : ''} match
+          </Text>
+        </Pressable>
+      )}
+    </View>
+  )}
+
+Style:
+  statsRow: { flexDirection: 'row', gap: 8, marginTop: 6, flexWrap: 'wrap' }
+  statChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: '#1a1a1a', borderRadius: 20,
+    paddingHorizontal: 10, paddingVertical: 4,
+  }
+  statChipText: { color: '#ff6b5b', fontSize: 11, fontWeight: '600' }
+
+Tapping the "X suggested members" chip navigates to GroupInfo with a scroll
+param so the screen auto-scrolls to the suggested members section.
+Tapping "X apartments match" navigates directly to GroupApartmentSuggestionsScreen.
+
+---
+
+### PART B: Host Group Match Notification + Unlock Payment
+
+This is a background matching system. When a renter group has enough data
+(apartment prefs complete, 2+ members), the system finds matching host listings,
+notifies the host, and charges them to unlock the group details.
+
+#### Step 1 — New migration: group_listing_matches table
+
+Create: supabase/migrations/020_group_listing_matches.sql
+
+  CREATE TABLE IF NOT EXISTS public.group_listing_matches (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    group_id UUID NOT NULL REFERENCES public.groups(id) ON DELETE CASCADE,
+    listing_id UUID NOT NULL REFERENCES public.listings(id) ON DELETE CASCADE,
+    match_score INTEGER NOT NULL,
+    score_breakdown JSONB,
+    host_notified_at TIMESTAMPTZ,
+    host_viewed_at TIMESTAMPTZ,
+    unlock_status TEXT DEFAULT 'locked'
+      CHECK (unlock_status IN ('locked', 'unlocked', 'expired')),
+    unlock_paid_at TIMESTAMPTZ,
+    stripe_payment_intent_id TEXT,
+    unlock_fee_cents INTEGER DEFAULT 2900,
+    expires_at TIMESTAMPTZ DEFAULT (now() + interval '7 days'),
+    created_at TIMESTAMPTZ DEFAULT now(),
+    UNIQUE(group_id, listing_id)
+  );
+
+  ALTER TABLE public.group_listing_matches ENABLE ROW LEVEL SECURITY;
+
+  -- Hosts can see matches for their listings
+  CREATE POLICY "Hosts see matches for their listings"
+    ON public.group_listing_matches FOR SELECT
+    USING (
+      auth.uid() IN (
+        SELECT host_id FROM public.listings
+        WHERE id = group_listing_matches.listing_id
+      )
+    );
+
+  -- Group members can see which listings matched their group
+  CREATE POLICY "Group members see their group matches"
+    ON public.group_listing_matches FOR SELECT
+    USING (
+      auth.uid() IN (
+        SELECT user_id FROM public.group_members
+        WHERE group_id = group_listing_matches.group_id
+      )
+    );
+
+  -- Unlock fee tiers per host plan
+  -- free/none: cannot unlock (no policy needed, handled in app)
+  -- starter: $29/unlock (2900 cents)
+  -- pro: $19/unlock (1900 cents) — 3 free/mo included
+  -- business: $0/unlock (unlimited included)
+
+#### Step 2 — New Edge Function: match-groups-to-listings
+
+Create: supabase/functions/match-groups-to-listings/index.ts
+
+This function runs the matching logic. It should be called:
+- When a renter group's apartment preferences are updated
+- When a new listing is created or updated
+- On a schedule (daily) for ongoing matching
+
+  import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
+  import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+  const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+  const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+  serve(async (req) => {
+    if (req.method === 'OPTIONS') {
+      return new Response('ok', {
+        headers: { 'Access-Control-Allow-Origin': '*',
+                   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' }
+      });
+    }
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+    const { groupId, listingId } = await req.json().catch(() => ({}));
+
+    // Fetch groups to match — either one specific group or all active groups
+    const groupQuery = supabase
+      .from('groups')
+      .select('id, group_members(user_id)')
+      .eq('status', 'active');
+
+    if (groupId) groupQuery.eq('id', groupId);
+
+    const { data: groups } = await groupQuery.limit(50);
+    if (!groups || groups.length === 0) {
+      return new Response(JSON.stringify({ matched: 0 }), { status: 200 });
+    }
+
+    // Fetch active listings to match against
+    const listingQuery = supabase
+      .from('listings')
+      .select('id, host_id, title, price, bedrooms, neighborhood, amenities, available_date')
+      .eq('available', true);
+
+    if (listingId) listingQuery.eq('id', listingId);
+
+    const { data: listings } = await listingQuery.limit(100);
+    if (!listings || listings.length === 0) {
+      return new Response(JSON.stringify({ matched: 0 }), { status: 200 });
+    }
+
+    let matchCount = 0;
+    const MATCH_THRESHOLD = 70; // minimum score to notify host
+
+    for (const group of groups) {
+      const memberIds = (group.group_members ?? []).map((m: any) => m.user_id);
+      if (memberIds.length < 2) continue;
+
+      // Fetch member profiles with apartment prefs
+      const { data: members } = await supabase
+        .from('users')
+        .select('id, profile:profiles(budget_per_person_min, budget_per_person_max, preferred_trains, desired_bedrooms, amenity_must_haves, move_in_date, location_flexible, wfh, apartment_prefs_complete)')
+        .in('id', memberIds);
+
+      // Skip groups where less than half have completed apartment prefs
+      const completeCount = (members ?? []).filter(m => m.profile?.apartment_prefs_complete).length;
+      if (completeCount < Math.ceil(memberIds.length / 2)) continue;
+
+      const memberProfiles = (members ?? []).map(m => ({
+        id: m.id,
+        name: '',
+        lifestyle: {},
+        preferences: { moveInDate: m.profile?.move_in_date },
+        apartmentPrefs: m.profile?.apartment_prefs_complete ? {
+          desiredBedrooms: m.profile.desired_bedrooms,
+          budgetPerPersonMin: m.profile.budget_per_person_min,
+          budgetPerPersonMax: m.profile.budget_per_person_max,
+          preferredTrains: m.profile.preferred_trains ?? [],
+          amenityMustHaves: m.profile.amenity_must_haves ?? [],
+          moveInDate: m.profile.move_in_date,
+          locationFlexible: m.profile.location_flexible,
+          wfh: m.profile.wfh,
+          apartmentPrefsComplete: true,
+        } : undefined,
+      }));
+
+      for (const listing of listings) {
+        // Don't match a group to a listing owned by a group member
+        const hostIsInGroup = memberIds.includes(listing.host_id);
+        if (hostIsInGroup) continue;
+
+        // Check if already matched
+        const { data: existing } = await supabase
+          .from('group_listing_matches')
+          .select('id, unlock_status')
+          .eq('group_id', group.id)
+          .eq('listing_id', listing.id)
+          .single();
+
+        if (existing?.unlock_status === 'unlocked') continue; // already paid for
+
+        // Score the listing for this group
+        const combinedBudgetMax = memberProfiles.reduce(
+          (sum, m) => sum + (m.apartmentPrefs?.budgetPerPersonMax ?? 0), 0
+        );
+        const allTrains = [...new Set(memberProfiles.flatMap(m =>
+          m.apartmentPrefs?.preferredTrains ?? []
+        ))];
+        const desiredBedrooms = memberProfiles[0]?.apartmentPrefs?.desiredBedrooms ?? 2;
+
+        // Budget check
+        if (listing.price > combinedBudgetMax * 1.1) continue; // over budget
+        if (listing.bedrooms !== desiredBedrooms) continue; // wrong size
+
+        // Transit score (simplified for server-side)
+        // Full scoreListing() would need to be imported here
+        // Use a simplified version:
+        const NEIGHBORHOOD_TRAINS: Record<string, string[]> = {
+          'Astoria': ['N', 'W'], 'Long Island City': ['7', 'E', 'M', 'G'],
+          'Williamsburg': ['L', 'J', 'M', 'Z'], 'Bushwick': ['L', 'J', 'M'],
+          'Crown Heights': ['2', '3', '4', '5'], 'Flatbush': ['B', 'Q', '2', '5'],
+          'Park Slope': ['F', 'G', 'R'], 'Sunset Park': ['D', 'N', 'R'],
+          'Bay Ridge': ['R'], 'Flushing': ['7'], 'Jamaica': ['E', 'J', 'Z'],
+          'Forest Hills': ['E', 'F', 'M', 'R'], 'Jackson Heights': ['7', 'E', 'F', 'M', 'R'],
+          'Harlem': ['2', '3', 'A', 'B', 'C', 'D'],
+          'Washington Heights': ['A', '1'],
+          'Upper West Side': ['1', '2', '3', 'B', 'C'],
+          'Upper East Side': ['4', '5', '6'],
+          'Midtown': ['1', '2', '3', 'A', 'C', 'E', 'B', 'D', 'F', 'M', 'N', 'Q', 'R', 'W', '4', '5', '6', '7'],
+          'Chelsea': ['1', 'C', 'E'], 'Greenwich Village': ['A', 'C', 'E', 'B', 'D', 'F', 'M'],
+          'East Village': ['L', '4', '5', '6'], 'Lower East Side': ['F', 'J', 'M', 'Z'],
+          'Tribeca': ['1', '2', '3', 'A', 'C', 'E'],
+          'Financial District': ['2', '3', '4', '5', 'A', 'C', 'J', 'Z'],
+        };
+
+        const nearbyTrains = NEIGHBORHOOD_TRAINS[listing.neighborhood ?? ''] ?? [];
+        const transitMatches = allTrains.filter(t => nearbyTrains.includes(t));
+        const transitScore = allTrains.length > 0
+          ? Math.round((transitMatches.length / allTrains.length) * 100)
+          : 60;
+
+        const budgetScore = combinedBudgetMax > 0
+          ? Math.min(100, Math.round((combinedBudgetMax / listing.price) * 80))
+          : 0;
+
+        const matchScore = Math.round(transitScore * 0.45 + budgetScore * 0.55);
+
+        if (matchScore < MATCH_THRESHOLD) continue;
+
+        // Determine unlock fee based on host plan
+        const { data: hostData } = await supabase
+          .from('users')
+          .select('plan, host_type')
+          .eq('id', listing.host_id)
+          .single();
+
+        const hostPlan = hostData?.plan ?? 'free';
+        let unlockFeeCents = 2900; // $29 default
+        if (hostPlan === 'pro') unlockFeeCents = 1900;     // $19 for Pro
+        if (hostPlan === 'business') unlockFeeCents = 0;   // free for Business
+
+        // Upsert match record
+        await supabase
+          .from('group_listing_matches')
+          .upsert({
+            group_id: group.id,
+            listing_id: listing.id,
+            match_score: matchScore,
+            score_breakdown: { transitScore, budgetScore },
+            unlock_fee_cents: unlockFeeCents,
+            expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          }, { onConflict: 'group_id,listing_id' });
+
+        // Send push notification to host if not already notified
+        if (!existing) {
+          await supabase
+            .from('notifications')
+            .insert({
+              user_id: listing.host_id,
+              type: 'group_match',
+              title: 'A group might be perfect for your listing',
+              body: `A group of ${memberIds.length} renters is a ${matchScore}% match for your ${listing.bedrooms}BR in ${listing.neighborhood ?? 'your area'}. Unlock their profile to connect.`,
+              data: JSON.stringify({
+                listing_id: listing.id,
+                group_id: group.id,
+                match_score: matchScore,
+                member_count: memberIds.length,
+              }),
+            });
+
+          matchCount++;
+        }
+      }
+    }
+
+    return new Response(JSON.stringify({ matched: matchCount }), {
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+    });
+  });
+
+#### Step 3 — Trigger match-groups-to-listings at the right times
+
+In the app, call supabase.functions.invoke('match-groups-to-listings', ...)
+(fire and forget — no await) in these places:
+
+1. After ApartmentPreferencesScreen saves successfully:
+   supabase.functions.invoke('match-groups-to-listings', {
+     body: { groupId: activeGroupId }
+   });
+
+2. After CreateEditListingScreen saves a new or updated listing:
+   supabase.functions.invoke('match-groups-to-listings', {
+     body: { listingId: newListingId }
+   });
+
+#### Step 4 — New Supabase Edge Function: unlock-group-match
+
+Create: supabase/functions/unlock-group-match/index.ts
+
+Handles payment and unlocking the group details for a host.
+
+  import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
+  import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+  import Stripe from 'https://esm.sh/stripe@12.0.0?target=deno';
+
+  const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!);
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  );
+
+  serve(async (req) => {
+    if (req.method === 'OPTIONS') {
+      return new Response('ok', {
+        headers: { 'Access-Control-Allow-Origin': '*',
+                   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' }
+      });
+    }
+
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) return errorResponse('Unauthorized', 401);
+
+    const { data: { user } } = await supabase.auth.getUser(
+      authHeader.replace('Bearer ', '')
+    );
+    if (!user) return errorResponse('Unauthorized', 401);
+
+    const { matchId } = await req.json();
+
+    const { data: match } = await supabase
+      .from('group_listing_matches')
+      .select('*, listing:listings(host_id, title, bedrooms, neighborhood, price)')
+      .eq('id', matchId)
+      .single();
+
+    if (!match) return errorResponse('Match not found', 404);
+    if (match.listing.host_id !== user.id) return errorResponse('Unauthorized', 403);
+    if (match.unlock_status === 'unlocked') return errorResponse('Already unlocked', 400);
+    if (new Date(match.expires_at) < new Date()) return errorResponse('Match expired', 410);
+
+    // Business plan hosts unlock for free
+    if (match.unlock_fee_cents === 0) {
+      await supabase
+        .from('group_listing_matches')
+        .update({ unlock_status: 'unlocked', unlock_paid_at: new Date().toISOString() })
+        .eq('id', matchId);
+      return new Response(JSON.stringify({ unlocked: true, free: true }), { status: 200 });
+    }
+
+    // Get or create Stripe customer for host
+    const { data: hostData } = await supabase
+      .from('users')
+      .select('stripe_customer_id, email, full_name')
+      .eq('id', user.id)
+      .single();
+
+    let customerId = hostData?.stripe_customer_id;
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: hostData?.email,
+        name: hostData?.full_name,
+        metadata: { supabase_user_id: user.id },
+      });
+      customerId = customer.id;
+      await supabase.from('users').update({ stripe_customer_id: customerId }).eq('id', user.id);
+    }
+
+    // Create PaymentIntent
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: match.unlock_fee_cents,
+      currency: 'usd',
+      customer: customerId,
+      metadata: {
+        type: 'group_unlock',
+        match_id: matchId,
+        group_id: match.group_id,
+        listing_id: match.listing_id,
+        host_id: user.id,
+      },
+      automatic_payment_methods: { enabled: true },
+    });
+
+    await supabase
+      .from('group_listing_matches')
+      .update({ stripe_payment_intent_id: paymentIntent.id })
+      .eq('id', matchId);
+
+    return new Response(
+      JSON.stringify({ clientSecret: paymentIntent.client_secret }),
+      { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } }
+    );
+  });
+
+  function errorResponse(message: string, status: number) {
+    return new Response(JSON.stringify({ error: message }), {
+      status,
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+    });
+}
+
+#### Step 5 — Handle unlock confirmation in stripe-webhook
+
+In supabase/functions/stripe-webhook/index.ts, add a handler for the
+'group_unlock' payment_intent type in the payment_intent.succeeded event:
+
+  if (metadata.type === 'group_unlock') {
+    await supabase
+      .from('group_listing_matches')
+      .update({
+        unlock_status: 'unlocked',
+        unlock_paid_at: new Date().toISOString(),
+      })
+      .eq('id', metadata.match_id);
+
+    // Notify the renter group that a host unlocked them
+    const { data: match } = await supabase
+      .from('group_listing_matches')
+      .select('group_id, listing:listings(title, neighborhood)')
+      .eq('id', metadata.match_id)
+      .single();
+
+    if (match) {
+      const { data: groupMembers } = await supabase
+        .from('group_members')
+        .select('user_id')
+        .eq('group_id', match.group_id);
+
+      for (const member of (groupMembers ?? [])) {
+        await supabase.from('notifications').insert({
+          user_id: member.user_id,
+          type: 'host_interest',
+          title: 'A host is interested in your group!',
+          body: `A host with a listing in ${match.listing?.neighborhood ?? 'your area'} wants to connect with your group.`,
+          data: JSON.stringify({
+            group_id: match.group_id,
+            listing_id: metadata.listing_id,
+          }),
+        });
+      }
+    }
+  }
+
+#### Step 6 — New screen: HostGroupMatchesScreen
+
+Create: screens/host/HostGroupMatchesScreen.tsx
+
+This screen shows the host all matched groups for their listing.
+Access it from HostDashboardScreen via a "X groups matched" card.
+
+The screen shows two states per match:
+
+LOCKED state (default):
+  - "Group of X renters" — member count only, no names or photos
+  - Compatibility score badge (e.g. "83% match")
+  - Budget range: "Combined budget: $4,200–$5,100/mo"
+  - Move-in window: "Looking to move in: March–April"
+  - Train lines: "Takes: N, W, 7 trains"
+  - Bedrooms wanted: "Looking for: 3BR"
+  - Expires in: "Offer expires in 5 days"
+  - Big "Unlock Group — $29" button (coral background)
+  - For Business hosts: "Unlock Group — Free" button
+
+UNLOCKED state:
+  - Full group member cards with photos, names, occupations, bios
+  - Full compatibility breakdown
+  - "Message Group" button that opens a chat with all group members
+  - "Invite to Apply" button that sends a formal invitation
+
+Teaser card UI (locked):
+
+  <View style={styles.matchCard}>
+    <View style={styles.matchHeader}>
+      <View style={styles.scoreBadge}>
+        <Text style={styles.scoreText}>{match.match_score}% match</Text>
+      </View>
+      <Text style={styles.expiresText}>
+        Expires in {daysUntilExpiry(match.expires_at)} days
+      </Text>
+    </View>
+
+    <Text style={styles.groupSize}>
+      👥 Group of {match.memberCount} renters
+    </Text>
+
+    <View style={styles.teaserRow}>
+      <Feather name="dollar-sign" size={13} color="#888" />
+      <Text style={styles.teaserText}>
+        Combined budget: ${match.budgetMin?.toLocaleString()}–${match.budgetMax?.toLocaleString()}/mo
+      </Text>
+    </View>
+    <View style={styles.teaserRow}>
+      <Feather name="calendar" size={13} color="#888" />
+      <Text style={styles.teaserText}>Move-in: {match.moveInWindow}</Text>
+    </View>
+    <View style={styles.teaserRow}>
+      <Feather name="map-pin" size={13} color="#888" />
+      <Text style={styles.teaserText}>
+        Trains: {match.trainLines?.join(', ') || 'Flexible'}
+      </Text>
+    </View>
+
+    <View style={styles.blurredProfiles}>
+      {[1, 2, 3].map(i => (
+        <View key={i} style={styles.blurredAvatar}>
+          <Feather name="user" size={18} color="#555" />
+        </View>
+      ))}
+      <Text style={styles.blurredLabel}>Profiles hidden until unlocked</Text>
+    </View>
+
+    <Pressable
+      style={styles.unlockButton}
+      onPress={() => handleUnlock(match.id)}
+    >
+      <Feather name="unlock" size={16} color="#fff" />
+      <Text style={styles.unlockButtonText}>
+        {match.unlock_fee_cents === 0
+          ? 'Unlock Group — Free'
+          : `Unlock Group — $${(match.unlock_fee_cents / 100).toFixed(0)}`}
+      </Text>
+    </Pressable>
+  </View>
+
+Add HostGroupMatchesScreen to HostDashboardStackParamList and register it
+in DashboardStackNavigator.
+
+Add a "Group Matches" card on HostDashboardScreen that shows the count of
+locked matches:
+
+  {groupMatchCount > 0 && (
+    <Pressable
+      style={styles.groupMatchCard}
+      onPress={() => navigation.navigate('GroupMatches', { listingId: activeListing.id })}
+    >
+      <View style={styles.groupMatchLeft}>
+        <Feather name="users" size={20} color="#ff6b5b" />
+        <View>
+          <Text style={styles.groupMatchTitle}>
+            {groupMatchCount} group{groupMatchCount !== 1 ? 's' : ''} matched your listing
+          </Text>
+          <Text style={styles.groupMatchSub}>
+            Unlock to see who's interested
+          </Text>
+        </View>
+      </View>
+      <Feather name="chevron-right" size={18} color="#888" />
+    </Pressable>
+  )}
+
+---
+
+### Pricing summary (add to HostPricingScreen copy):
+
+  Free host:      Gets notified but cannot unlock groups
+  Starter host:   $29 per group unlock
+  Pro host:       $19 per group unlock (3 free/mo included)
+  Business host:  Unlimited unlocks included in plan
+
+Add a "Pro includes 3 free group unlocks per month" callout to the Pro
+plan card on HostPricingScreen and PlansScreen.
+
+For Pro hosts, track monthly free unlock usage:
+  - Add column: free_group_unlocks_used INTEGER DEFAULT 0 to subscriptions table
+  - Reset to 0 on subscription renewal (handle in stripe-webhook billing cycle event)
+  - In unlock-group-match Edge Function, check this count before charging Pro hosts
+```

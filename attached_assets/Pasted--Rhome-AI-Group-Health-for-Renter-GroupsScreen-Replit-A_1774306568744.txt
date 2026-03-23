@@ -1,0 +1,473 @@
+# Rhome — AI Group Health for Renter GroupsScreen (Replit Agent Prompt)
+
+Paste this into Replit Agent after the other AI prompts are complete.
+
+---
+
+## Context
+
+The renter's GroupsScreen lists all the groups they belong to.
+Right now it shows basic info — group name, member count, maybe a listing.
+There is no indication of whether a group is actually compatible or likely
+to succeed in finding an apartment together.
+
+Renters need to know:
+- Which of my groups has the best shot at finding an apartment?
+- Does my group have any conflicts I should know about before we start looking?
+- Is one group stalled because budgets don't overlap?
+
+This prompt adds:
+1. A group health score on every group card in the list
+2. Conflict warning badges for groups with serious problems
+3. A pinned "Best Group" banner at the top — which group should they focus on
+4. Inside each group, a full compatibility breakdown between all members
+
+---
+
+## PROMPT — AI Group Health Scores for Renter GroupsScreen
+
+```
+Add AI-powered group health scoring to the renter's GroupsScreen and the
+group detail views. Renters should be able to see at a glance which of their
+groups is compatible and which has conflicts to resolve.
+
+---
+
+### PART 1: Group Health Score utility
+
+Create: utils/groupHealthScore.ts
+
+  import { supabase } from '../lib/supabase';
+  import { detectGroupConflicts, calculateGroupCompatibilityScore } from './transitMatching';
+
+  export type GroupHealthStatus = 'strong' | 'good' | 'at_risk' | 'conflict';
+
+  export interface GroupHealthResult {
+    score: number;                  // 0–100
+    status: GroupHealthStatus;
+    statusLabel: string;            // "Strong", "Good", "Needs Work", "Conflict"
+    statusColor: string;            // hex color
+    topConflict: string | null;     // single most important conflict to surface
+    conflicts: string[];            // all conflicts
+    suggestions: string[];          // how to fix
+    sharedNeighborhoods: string[];  // neighborhoods that work for everyone
+    memberCount: number;
+    desiredBedrooms: number | null;
+    readyToSearch: boolean;         // true if group has prefs + no hard conflicts
+  }
+
+  export async function getGroupHealth(
+    groupId: string,
+    currentUserId: string
+  ): Promise<GroupHealthResult | null> {
+    // Fetch group and members
+    const { data: group } = await supabase
+      .from('groups')
+      .select('*, group_members(user_id)')
+      .eq('id', groupId)
+      .single();
+
+    if (!group) return null;
+
+    const memberIds: string[] = (group.group_members ?? []).map((m: any) => m.user_id);
+    if (memberIds.length < 2) {
+      return {
+        score: 0,
+        status: 'at_risk',
+        statusLabel: 'Needs More Members',
+        statusColor: '#f39c12',
+        topConflict: 'Your group only has 1 member. Invite someone to get started.',
+        conflicts: [],
+        suggestions: ['Invite a roommate to join your group'],
+        sharedNeighborhoods: [],
+        memberCount: memberIds.length,
+        desiredBedrooms: null,
+        readyToSearch: false,
+      };
+    }
+
+    // Fetch member profiles with apartment prefs
+    const { data: members } = await supabase
+      .from('users')
+      .select(`
+        id,
+        full_name,
+        profile:profiles(
+          cleanliness,
+          sleep_schedule,
+          smoking,
+          pets,
+          move_in_date,
+          budget_max,
+          preferred_trains,
+          budget_per_person_min,
+          budget_per_person_max,
+          desired_bedrooms,
+          location_flexible,
+          wfh,
+          amenity_must_haves,
+          apartment_prefs_complete
+        )
+      `)
+      .in('id', memberIds);
+
+    if (!members || members.length === 0) return null;
+
+    // Map to RoommateProfile shape for compatibility functions
+    const profiles = members.map(m => ({
+      id: m.id,
+      name: m.full_name,
+      lifestyle: {
+        cleanliness: m.profile?.cleanliness,
+        workSchedule: m.profile?.sleep_schedule,
+        smoking: m.profile?.smoking,
+        pets: m.profile?.pets,
+      },
+      budget: m.profile?.budget_max,
+      preferences: { moveInDate: m.profile?.move_in_date },
+      apartmentPrefs: m.profile?.apartment_prefs_complete ? {
+        desiredBedrooms: m.profile.desired_bedrooms,
+        budgetPerPersonMin: m.profile.budget_per_person_min,
+        budgetPerPersonMax: m.profile.budget_per_person_max,
+        preferredTrains: m.profile.preferred_trains ?? [],
+        amenityMustHaves: m.profile.amenity_must_haves ?? [],
+        moveInDate: m.profile.move_in_date,
+        locationFlexible: m.profile.location_flexible,
+        wfh: m.profile.wfh,
+        apartmentPrefsComplete: true,
+      } : undefined,
+    }));
+
+    // Run conflict detection
+    const conflictResult = detectGroupConflicts(profiles as any);
+
+    // Calculate pairwise compatibility scores
+    const pairs: Array<[any, any]> = [];
+    for (let i = 0; i < profiles.length; i++) {
+      for (let j = i + 1; j < profiles.length; j++) {
+        pairs.push([profiles[i], profiles[j]]);
+      }
+    }
+
+    const pairScores = pairs.map(([a, b]) =>
+      calculateGroupCompatibilityScore(a as any, b as any).total
+    );
+    const avgScore = pairScores.length > 0
+      ? Math.round(pairScores.reduce((s, n) => s + n, 0) / pairScores.length)
+      : 50;
+
+    // How many members have completed apartment prefs?
+    const prefsComplete = profiles.filter(p => p.apartmentPrefs?.apartmentPrefsComplete).length;
+    const allPrefsComplete = prefsComplete === profiles.length;
+
+    // Desired bedrooms consensus
+    const bedroomVotes = profiles
+      .map(p => p.apartmentPrefs?.desiredBedrooms)
+      .filter(Boolean) as number[];
+    const desiredBedrooms = bedroomVotes.length > 0
+      ? Math.round(bedroomVotes.reduce((s, n) => s + n, 0) / bedroomVotes.length)
+      : null;
+
+    // Penalize score if prefs are incomplete
+    const prefsBonus = allPrefsComplete ? 0 : -15;
+    const finalScore = Math.max(0, Math.min(100, avgScore + prefsBonus));
+
+    // Status
+    let status: GroupHealthStatus;
+    let statusLabel: string;
+    let statusColor: string;
+
+    if (conflictResult.conflicts.length >= 2 || finalScore < 40) {
+      status = 'conflict';
+      statusLabel = 'Conflict';
+      statusColor = '#e74c3c';
+    } else if (conflictResult.conflicts.length === 1 || finalScore < 65) {
+      status = 'at_risk';
+      statusLabel = 'Needs Work';
+      statusColor = '#f39c12';
+    } else if (finalScore < 80) {
+      status = 'good';
+      statusLabel = 'Good';
+      statusColor = '#3498db';
+    } else {
+      status = 'strong';
+      statusLabel = 'Strong';
+      statusColor = '#2ecc71';
+    }
+
+    // Top conflict to surface
+    const topConflict = conflictResult.conflicts.length > 0
+      ? conflictResult.conflicts[0]
+      : !allPrefsComplete
+        ? `${profiles.length - prefsComplete} member(s) haven't set apartment preferences yet`
+        : null;
+
+    const readyToSearch =
+      allPrefsComplete &&
+      conflictResult.conflicts.length === 0 &&
+      finalScore >= 60;
+
+    return {
+      score: finalScore,
+      status,
+      statusLabel,
+      statusColor,
+      topConflict,
+      conflicts: conflictResult.conflicts,
+      suggestions: conflictResult.suggestions,
+      sharedNeighborhoods: conflictResult.sharedNeighborhoods,
+      memberCount: members.length,
+      desiredBedrooms,
+      readyToSearch,
+    };
+  }
+
+  // Get health for multiple groups at once
+  export async function getGroupsHealth(
+    groupIds: string[],
+    currentUserId: string
+  ): Promise<Record<string, GroupHealthResult>> {
+    const results: Record<string, GroupHealthResult> = {};
+    await Promise.all(
+      groupIds.map(async (id) => {
+        const result = await getGroupHealth(id, currentUserId);
+        if (result) results[id] = result;
+      })
+    );
+    return results;
+  }
+
+---
+
+### PART 2: Update GroupsScreen with health scores
+
+File: screens/renter/GroupsScreen.tsx
+
+  import { getGroupsHealth, GroupHealthResult } from '../../utils/groupHealthScore';
+
+  const [groupHealthScores, setGroupHealthScores] = useState<Record<string, GroupHealthResult>>({});
+  const [bestGroupId, setBestGroupId] = useState<string | null>(null);
+
+  // Load health scores after groups load
+  useEffect(() => {
+    if (groups.length > 0 && user) {
+      const ids = groups.map((g: any) => g.id);
+      getGroupsHealth(ids, user.id).then(scores => {
+        setGroupHealthScores(scores);
+
+        // Find the best group (highest score that is ready to search)
+        const ranked = Object.entries(scores)
+          .filter(([, h]) => h.score > 0)
+          .sort(([, a], [, b]) => b.score - a.score);
+        if (ranked.length > 0) setBestGroupId(ranked[0][0]);
+      });
+    }
+  }, [groups]);
+
+#### "Best Group" pinned banner — show at top of GroupsScreen list
+
+  {bestGroupId && groupHealthScores[bestGroupId] && (
+    <Pressable
+      style={styles.bestGroupBanner}
+      onPress={() => navigation.navigate('GroupInfo', { groupId: bestGroupId })}
+    >
+      <LinearGradient
+        colors={['#1a1a1a', '#222']}
+        style={styles.bestGroupGradient}
+      >
+        <View style={styles.bestGroupHeader}>
+          <Feather name="zap" size={13} color="#ff6b5b" />
+          <Text style={styles.bestGroupLabel}>BEST GROUP TO SEARCH WITH</Text>
+        </View>
+        <Text style={styles.bestGroupName}>
+          {groups.find((g: any) => g.id === bestGroupId)?.name ?? 'Your Group'}
+        </Text>
+        <View style={styles.bestGroupMeta}>
+          <Text style={[styles.bestGroupScore, { color: groupHealthScores[bestGroupId].statusColor }]}>
+            {groupHealthScores[bestGroupId].score}% compatible
+          </Text>
+          {groupHealthScores[bestGroupId].sharedNeighborhoods.length > 0 && (
+            <Text style={styles.bestGroupNeighborhoods}>
+              · {groupHealthScores[bestGroupId].sharedNeighborhoods.slice(0, 2).join(', ')}
+            </Text>
+          )}
+        </View>
+        {groupHealthScores[bestGroupId].readyToSearch && (
+          <Text style={styles.readyBadge}>✓ Ready to search</Text>
+        )}
+      </LinearGradient>
+    </Pressable>
+  )}
+
+#### Health badge on each group card in the list
+
+Find where each group card is rendered in GroupsScreen and add:
+
+  {groupHealthScores[group.id] && (
+    <View style={styles.healthRow}>
+      <View style={[
+        styles.healthDot,
+        { backgroundColor: groupHealthScores[group.id].statusColor }
+      ]} />
+      <Text style={[
+        styles.healthLabel,
+        { color: groupHealthScores[group.id].statusColor }
+      ]}>
+        {groupHealthScores[group.id].statusLabel}
+      </Text>
+      <Text style={styles.healthScore}>
+        · {groupHealthScores[group.id].score}%
+      </Text>
+      {groupHealthScores[group.id].topConflict && (
+        <Feather name="alert-circle" size={12} color="#f39c12" style={{ marginLeft: 4 }} />
+      )}
+    </View>
+  )}
+
+  {/* Show top conflict inline on card if status is 'conflict' */}
+  {groupHealthScores[group.id]?.status === 'conflict' && (
+    <Text style={styles.conflictSnippet} numberOfLines={1}>
+      ⚠️ {groupHealthScores[group.id].topConflict}
+    </Text>
+  )}
+
+---
+
+### PART 3: Full AI breakdown inside GroupInfoScreen
+
+File: screens/shared/GroupInfoScreen.tsx
+
+Already has the "Suggested Members" AI section (from the earlier prompt).
+Add a "Group Health" section ABOVE the member list and suggested members.
+
+  import { getGroupHealth, GroupHealthResult } from '../../utils/groupHealthScore';
+
+  const [health, setHealth] = useState<GroupHealthResult | null>(null);
+
+  useEffect(() => {
+    if (groupId && user) {
+      getGroupHealth(groupId, user.id).then(setHealth);
+    }
+  }, [groupId]);
+
+  {health && (
+    <View style={styles.healthSection}>
+
+      {/* Score + status */}
+      <View style={styles.healthSummary}>
+        <View style={styles.healthScoreBlock}>
+          <Text style={[styles.healthBigScore, { color: health.statusColor }]}>
+            {health.score}%
+          </Text>
+          <Text style={[styles.healthStatusLabel, { color: health.statusColor }]}>
+            {health.statusLabel}
+          </Text>
+        </View>
+        <View style={styles.healthSummaryRight}>
+          <Text style={styles.healthTitle}>Group Compatibility</Text>
+          {health.readyToSearch ? (
+            <Text style={styles.readyText}>✓ Ready to apartment search</Text>
+          ) : (
+            <Text style={styles.notReadyText}>Complete preferences to search</Text>
+          )}
+          {health.sharedNeighborhoods.length > 0 && (
+            <Text style={styles.neighborhoodsText}>
+              Works in: {health.sharedNeighborhoods.slice(0, 3).join(', ')}
+            </Text>
+          )}
+        </View>
+      </View>
+
+      {/* Conflicts */}
+      {health.conflicts.length > 0 && (
+        <View style={styles.conflictsBlock}>
+          <Text style={styles.conflictsTitle}>⚠️ Conflicts to resolve</Text>
+          {health.conflicts.map((c, i) => (
+            <View key={i} style={styles.conflictRow}>
+              <Feather name="alert-circle" size={13} color="#e74c3c" />
+              <Text style={styles.conflictText}>{c}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Suggestions */}
+      {health.suggestions.length > 0 && (
+        <View style={styles.suggestionsBlock}>
+          <Text style={styles.suggestionsTitle}>💡 Suggestions</Text>
+          {health.suggestions.map((s, i) => (
+            <Text key={i} style={styles.suggestionText}>· {s}</Text>
+          ))}
+        </View>
+      )}
+
+      {/* CTA — set apartment preferences if incomplete */}
+      {!health.readyToSearch && (
+        <Pressable
+          style={styles.prefsCTA}
+          onPress={() => navigation.navigate('ApartmentPreferences')}
+        >
+          <Text style={styles.prefsCTAText}>
+            Set your apartment preferences →
+          </Text>
+        </Pressable>
+      )}
+
+      {/* View apartment suggestions CTA — only if ready */}
+      {health.readyToSearch && (
+        <Pressable
+          style={styles.searchCTA}
+          onPress={() => navigation.navigate('GroupApartmentSuggestions', { groupId })}
+        >
+          <Feather name="search" size={15} color="#fff" />
+          <Text style={styles.searchCTAText}>See AI Apartment Suggestions</Text>
+        </Pressable>
+      )}
+
+      <Text style={styles.aiFooter}>Powered by Rhome AI</Text>
+    </View>
+  )}
+
+---
+
+### Style constants
+
+  healthRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 }
+  healthDot: { width: 8, height: 8, borderRadius: 4, marginRight: 5 }
+  healthLabel: { fontSize: 12, fontWeight: '600' }
+  healthScore: { fontSize: 12, color: '#888' }
+  conflictSnippet: { fontSize: 11, color: '#f39c12', marginTop: 2 }
+
+  bestGroupBanner: { marginHorizontal: 16, marginBottom: 12, borderRadius: 12, overflow: 'hidden' }
+  bestGroupGradient: { padding: 16 }
+  bestGroupHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }
+  bestGroupLabel: { color: '#ff6b5b', fontSize: 10, fontWeight: '700', letterSpacing: 1 }
+  bestGroupName: { color: '#fff', fontSize: 17, fontWeight: '700', marginBottom: 4 }
+  bestGroupMeta: { flexDirection: 'row', alignItems: 'center' }
+  bestGroupScore: { fontSize: 13, fontWeight: '600' }
+  bestGroupNeighborhoods: { fontSize: 13, color: '#888' }
+  readyBadge: { color: '#2ecc71', fontSize: 12, fontWeight: '600', marginTop: 6 }
+
+  healthSection: { margin: 16, backgroundColor: '#1a1a1a', borderRadius: 12, padding: 16 }
+  healthSummary: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 }
+  healthScoreBlock: { alignItems: 'center', marginRight: 16 }
+  healthBigScore: { fontSize: 36, fontWeight: '800' }
+  healthStatusLabel: { fontSize: 12, fontWeight: '700', marginTop: 2 }
+  healthSummaryRight: { flex: 1 }
+  healthTitle: { color: '#fff', fontSize: 15, fontWeight: '700', marginBottom: 4 }
+  readyText: { color: '#2ecc71', fontSize: 12 }
+  notReadyText: { color: '#888', fontSize: 12 }
+  neighborhoodsText: { color: '#aaa', fontSize: 12, marginTop: 2 }
+  conflictsBlock: { marginBottom: 12 }
+  conflictsTitle: { color: '#fff', fontSize: 13, fontWeight: '700', marginBottom: 8 }
+  conflictRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 5 }
+  conflictText: { color: '#e74c3c', fontSize: 12, flex: 1 }
+  suggestionsBlock: { marginBottom: 12 }
+  suggestionsTitle: { color: '#fff', fontSize: 13, fontWeight: '700', marginBottom: 6 }
+  suggestionText: { color: '#aaa', fontSize: 12, marginBottom: 4 }
+  prefsCTA: { backgroundColor: '#222', borderRadius: 8, padding: 12, alignItems: 'center', marginTop: 4 }
+  prefsCTAText: { color: '#ff6b5b', fontSize: 13, fontWeight: '600' }
+  searchCTA: { backgroundColor: '#ff6b5b', borderRadius: 10, padding: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 4 }
+  searchCTAText: { color: '#fff', fontSize: 14, fontWeight: '700' }
+  aiFooter: { color: '#444', fontSize: 10, textAlign: 'center', marginTop: 12 }
+```

@@ -1,0 +1,127 @@
+# Rhome — Swipe Card Stack UI Fix (Replit Agent Prompt)
+
+## Problem
+The swipe deck was recently updated to fix lag when moving to the next profile.
+The fix pre-renders the next card in the stack but it is now visually bleeding
+through behind the current card, showing the next person's name, photo, and
+sponsored content underneath the active card. This breaks the UI.
+
+## Goal
+Keep the performance improvement (pre-render the next card) but make it
+completely invisible until the current card has been swiped away.
+The card stack should look like only ONE card at a time — clean, no peeking.
+
+---
+
+## PROMPT — Fix Swipe Card Stack Visual Bleed
+
+```
+Find the swipe deck component in screens/renter/RoommatesScreen.tsx (or wherever
+the swipe card stack is rendered — it may also be in a component like SwipeDeck.tsx,
+RoommateCard.tsx, or similar).
+
+The current code pre-renders the next card for performance but it is visually
+visible behind the active card. Fix this so the next card is pre-rendered
+(keeping the performance gain) but completely hidden visually until needed.
+
+### Fix 1 — Hide the card behind using opacity and scale
+
+The card stack should render cards like this:
+- Index 0 (top/active card): fully visible, normal scale
+- Index 1 (next card): pre-rendered but opacity: 0 and slightly scaled down
+- Index 2+: not rendered at all
+
+Find where the card stack maps over profiles and apply these styles:
+
+  profiles.map((profile, index) => {
+    if (index > 1) return null; // only render top 2 cards
+
+    const isTop = index === 0;
+
+    return (
+      <View
+        key={profile.id}
+        style={[
+          styles.cardContainer,
+          {
+            zIndex: isTop ? 10 : 5,
+            opacity: isTop ? 1 : 0,           // hide card behind
+            transform: [{ scale: isTop ? 1 : 0.95 }],  // scale down slightly
+            pointerEvents: isTop ? 'auto' : 'none',     // disable touches on hidden card
+          }
+        ]}
+      >
+        <RoommateCard profile={profile} ... />
+      </View>
+    );
+  })
+
+### Fix 2 — Reveal the next card only AFTER the swipe animation completes
+
+When the top card is swiped away, briefly animate the next card in:
+
+  const animateNextCardIn = () => {
+    Animated.parallel([
+      Animated.timing(nextCardOpacity, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      Animated.spring(nextCardScale, {
+        toValue: 1,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+Call animateNextCardIn() inside the onSwipeComplete / onCardLeftScreen callback,
+after removing the swiped card from the deck array.
+
+Use Animated.Value for the next card's opacity and scale:
+  const nextCardOpacity = useRef(new Animated.Value(0)).current;
+  const nextCardScale = useRef(new Animated.Value(0.95)).current;
+
+Reset these values when a new card becomes the "next" card:
+  nextCardOpacity.setValue(0);
+  nextCardScale.setValue(0.95);
+
+### Fix 3 — Absolute positioning so cards stack correctly
+
+Make sure all cards in the stack use absolute positioning so they sit exactly
+on top of each other with no layout bleed:
+
+  cardContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  }
+
+The parent container that wraps all cards should be:
+  deckWrapper: {
+    flex: 1,
+    position: 'relative',
+  }
+
+### Fix 4 — Remove any translateY or margin offsets on the background card
+
+If the current code uses a translateY or marginTop on the background card to
+make it peek out (like { transform: [{ translateY: 8 }] } or similar) — remove it.
+The background card should have NO visual offset. It should be completely hidden
+(opacity: 0) and sit in exactly the same position as the top card.
+
+### Fix 5 — Sponsored / ad card visibility
+
+If there is a sponsored card (ad) in the deck, make sure it follows the same
+rules as regular cards. It should only be visible when it is the TOP card.
+Never allow it to peek through behind a profile card.
+
+### What NOT to change
+- Do not remove the pre-rendering of the next card — that is the performance fix
+- Do not revert to lazy loading cards one at a time — that caused the original lag
+- Keep all swipe gesture logic, spring animations, and haptic feedback unchanged
+- Keep the match percentage badge, budget chip, and location chip on the cards
+- Keep the "Upgrade to Plus to see your best match today" banner above the deck
+```

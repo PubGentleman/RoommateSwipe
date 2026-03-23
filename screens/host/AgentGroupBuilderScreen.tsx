@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Pressable, Image, TextInput, ActivityIndicator,
+  View, Text, StyleSheet, ScrollView, Pressable, Image, TextInput, ActivityIndicator, Modal,
 } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -20,6 +20,7 @@ import {
   calculatePairMatrix,
 } from '../../services/agentMatchmakerService';
 import { canAgentCreateGroup, getAgentPlanLimits, type AgentPlan } from '../../constants/planLimits';
+import { useAgentPairing } from '../../hooks/useAgentPairing';
 
 const BG = '#111';
 const CARD_BG = '#1a1a1a';
@@ -36,6 +37,7 @@ export const AgentGroupBuilderScreen = () => {
 
   const preselectedIds: string[] = route.params?.preselectedIds ?? [];
   const preselectedListingId: string | undefined = route.params?.listingId;
+  const openAIPairing: boolean = route.params?.openAIPairing ?? false;
 
   const [allRenters, setAllRenters] = useState<AgentRenter[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(preselectedIds));
@@ -44,12 +46,28 @@ export const AgentGroupBuilderScreen = () => {
   const [agentMessage, setAgentMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [step, setStep] = useState<'select' | 'review'>('select');
+  const [showPairingModal, setShowPairingModal] = useState(false);
 
   const agentPlan: AgentPlan = (user?.agentPlan as AgentPlan) || 'pay_per_use';
+  const planLimits = getAgentPlanLimits(agentPlan);
+  const { getPairing, loading: pairingLoading, result: pairingResult, error: pairingError, reset: resetPairing } = useAgentPairing();
+
+  const handleAIPairing = async () => {
+    if (!selectedListing || selectedIds.size < 2) return;
+    setShowPairingModal(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    await getPairing(Array.from(selectedIds), selectedListing.id);
+  };
 
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (openAIPairing && selectedListing && selectedIds.size >= 2) {
+      handleAIPairing();
+    }
+  }, [openAIPairing, selectedListing]);
 
   const loadData = async () => {
     if (!user) return;
@@ -285,6 +303,21 @@ export const AgentGroupBuilderScreen = () => {
           ) : null}
         </ScrollView>
 
+        {planLimits.hasAIGroupSuggestions && selectedListing && selectedIds.size >= 2 ? (
+          <Pressable style={styles.aiPairButton} onPress={handleAIPairing}>
+            <Feather name="zap" size={16} color="#fff" />
+            <Text style={styles.aiPairButtonText}>AI Pair Group</Text>
+          </Pressable>
+        ) : !planLimits.hasAIGroupSuggestions ? (
+          <Pressable
+            style={styles.aiPairButtonLocked}
+            onPress={() => navigation.navigate('Plans')}
+          >
+            <Feather name="lock" size={14} color={ACCENT} />
+            <Text style={styles.aiPairLockedText}>Upgrade to Pro for AI Pairing</Text>
+          </Pressable>
+        ) : null}
+
         <View style={styles.statsBar}>
           <Text style={styles.statsText}>
             Selected: {selectedIds.size} renters
@@ -343,6 +376,135 @@ export const AgentGroupBuilderScreen = () => {
           </Pressable>
         </View>
       ) : null}
+
+      <Modal
+        visible={showPairingModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => { setShowPairingModal(false); resetPairing(); }}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>AI Group Pairing</Text>
+            <Pressable onPress={() => { setShowPairingModal(false); resetPairing(); }}>
+              <Feather name="x" size={22} color="#fff" />
+            </Pressable>
+          </View>
+
+          {pairingLoading ? (
+            <View style={styles.loadingState}>
+              <ActivityIndicator size="large" color={ACCENT} />
+              <Text style={styles.loadingText}>Claude is analyzing your shortlist...</Text>
+              <Text style={styles.loadingSubtext}>Checking budgets, schedules, and transit</Text>
+            </View>
+          ) : null}
+
+          {!pairingLoading && pairingResult ? (
+            <ScrollView style={styles.resultScroll}>
+              <View style={styles.headlineCard}>
+                <View style={styles.confidenceRow}>
+                  <Feather name="zap" size={14} color={ACCENT} />
+                  <Text style={styles.confidenceText}>
+                    {pairingResult.confidence}% confidence
+                  </Text>
+                </View>
+                <Text style={styles.headline}>{pairingResult.headline}</Text>
+              </View>
+
+              <View style={styles.modalSection}>
+                <Text style={styles.modalSectionTitle}>Recommended Group</Text>
+                {(pairingResult.groupNames ?? []).map((name, i) => (
+                  <View key={i} style={styles.modalMemberRow}>
+                    <Feather name="user" size={14} color={ACCENT} />
+                    <Text style={styles.modalMemberName}>{name}</Text>
+                  </View>
+                ))}
+              </View>
+
+              <View style={styles.modalSection}>
+                <Text style={styles.modalSectionTitle}>Why this group works</Text>
+                {(pairingResult.reasons ?? []).map((reason, i) => (
+                  <View key={i} style={styles.reasonRow}>
+                    <Text style={styles.reasonBullet}>{'\u2022'}</Text>
+                    <Text style={styles.reasonText}>{reason}</Text>
+                  </View>
+                ))}
+              </View>
+
+              {(pairingResult.concerns ?? []).length > 0 ? (
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalSectionTitle}>Things to confirm</Text>
+                  {(pairingResult.concerns ?? []).map((concern, i) => (
+                    <View key={i} style={styles.concernRow}>
+                      <Feather name="alert-circle" size={13} color={YELLOW} />
+                      <Text style={styles.concernText}>{concern}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+
+              {pairingResult.alternativeGroup ? (
+                <View style={styles.altSection}>
+                  <Text style={styles.altTitle}>Alternative Option</Text>
+                  <Text style={styles.altReason}>{pairingResult.alternativeReason}</Text>
+                </View>
+              ) : null}
+
+              {(pairingResult.excludedRenters ?? []).length > 0 ? (
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalSectionTitle}>Not recommended for this listing</Text>
+                  {(pairingResult.excludedRenters ?? []).map((r, i) => (
+                    <View key={i} style={styles.excludedRow}>
+                      <Text style={styles.excludedName}>{r.name}</Text>
+                      <Text style={styles.excludedReason}>{r.reason}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+
+              <View style={styles.actionButtons}>
+                <Pressable
+                  style={styles.useGroupButton}
+                  onPress={() => {
+                    setSelectedIds(new Set(pairingResult.recommendedGroup));
+                    setShowPairingModal(false);
+                    resetPairing();
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  }}
+                >
+                  <Text style={styles.useGroupText}>Use This Group</Text>
+                </Pressable>
+
+                {pairingResult.alternativeGroup ? (
+                  <Pressable
+                    style={styles.useAltButton}
+                    onPress={() => {
+                      setSelectedIds(new Set(pairingResult.alternativeGroup!));
+                      setShowPairingModal(false);
+                      resetPairing();
+                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                    }}
+                  >
+                    <Text style={styles.useAltText}>Use Alternative</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+
+              <Text style={styles.aiFooter}>Powered by Claude AI</Text>
+            </ScrollView>
+          ) : null}
+
+          {!pairingLoading && pairingError ? (
+            <View style={styles.errorState}>
+              <Feather name="alert-circle" size={32} color="#e74c3c" />
+              <Text style={styles.errorText}>{pairingError}</Text>
+              <Pressable style={styles.retryButton} onPress={handleAIPairing}>
+                <Text style={styles.retryText}>Try Again</Text>
+              </Pressable>
+            </View>
+          ) : null}
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -390,4 +552,44 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', paddingVertical: 40 },
   emptyTitle: { color: '#fff', fontSize: 18, fontWeight: '700', marginTop: 12 },
   emptyDesc: { color: '#888', fontSize: 14, marginTop: 4 },
+  aiPairButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: ACCENT, borderRadius: 12, paddingVertical: 12, marginBottom: 12 },
+  aiPairButtonText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  aiPairButtonLocked: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: 'rgba(255,107,91,0.08)', borderRadius: 12, paddingVertical: 10, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(255,107,91,0.2)' },
+  aiPairLockedText: { color: '#888', fontSize: 13, fontWeight: '600' },
+  modalContainer: { flex: 1, backgroundColor: BG },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#222' },
+  modalTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  loadingState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
+  loadingText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  loadingSubtext: { color: '#888', fontSize: 13 },
+  resultScroll: { flex: 1 },
+  headlineCard: { margin: 16, padding: 16, backgroundColor: CARD_BG, borderRadius: 12 },
+  confidenceRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+  confidenceText: { color: ACCENT, fontSize: 13, fontWeight: '600' },
+  headline: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  modalSection: { marginHorizontal: 16, marginBottom: 16 },
+  modalSectionTitle: { color: '#fff', fontSize: 14, fontWeight: '700', marginBottom: 10 },
+  modalMemberRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
+  modalMemberName: { color: '#fff', fontSize: 14 },
+  reasonRow: { flexDirection: 'row', gap: 8, marginBottom: 6 },
+  reasonBullet: { color: ACCENT, fontSize: 14 },
+  reasonText: { color: '#ccc', fontSize: 13, flex: 1 },
+  concernRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 6 },
+  concernText: { color: YELLOW, fontSize: 13, flex: 1 },
+  altSection: { marginHorizontal: 16, marginBottom: 16, padding: 14, backgroundColor: CARD_BG, borderRadius: 12 },
+  altTitle: { color: '#fff', fontSize: 14, fontWeight: '600', marginBottom: 4 },
+  altReason: { color: '#aaa', fontSize: 13 },
+  excludedRow: { marginBottom: 8 },
+  excludedName: { color: '#888', fontSize: 13, fontWeight: '600' },
+  excludedReason: { color: '#555', fontSize: 12 },
+  actionButtons: { marginTop: 8 },
+  useGroupButton: { backgroundColor: ACCENT, borderRadius: 12, padding: 16, alignItems: 'center', marginHorizontal: 16, marginBottom: 12 },
+  useGroupText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  useAltButton: { borderWidth: 1, borderColor: ACCENT, borderRadius: 12, padding: 14, alignItems: 'center', marginHorizontal: 16, marginBottom: 16 },
+  useAltText: { color: ACCENT, fontSize: 15, fontWeight: '600' },
+  aiFooter: { color: '#444', fontSize: 10, textAlign: 'center', marginBottom: 32 },
+  errorState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
+  errorText: { color: '#e74c3c', fontSize: 14, textAlign: 'center', paddingHorizontal: 32 },
+  retryButton: { backgroundColor: CARD_BG, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 },
+  retryText: { color: '#fff', fontSize: 14, fontWeight: '600' },
 });
