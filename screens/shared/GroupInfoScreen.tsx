@@ -5,7 +5,9 @@ import {
   Share, Dimensions,
 } from 'react-native';
 import * as Linking from 'expo-linking';
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { ThemedText } from '../../components/ThemedText';
 import { Feather } from '../../components/VectorIcons';
@@ -13,6 +15,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { Typography, Spacing } from '../../constants/theme';
 import { useAuth } from '../../contexts/AuthContext';
 import { Image } from 'expo-image';
+import { getSuggestedGroupMembers } from '../../utils/groupSuggestions';
 import {
   getGroupDetails,
   removeMember,
@@ -102,14 +105,36 @@ export function GroupInfoScreen({ route, navigation }: Props) {
   const [inviteCode, setInviteCode] = useState('');
   const [codeCopied, setCodeCopied] = useState(false);
   const [muted, setMuted] = useState(false);
+  const [suggestions, setSuggestions] = useState<Array<{ profile: any; groupScore: number; reason: string }>>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
   const isAdmin = group?.adminId === user?.id;
   const memberCount = group?.members?.length || 0;
   const memberLimit = group?.memberLimit ?? 4;
+  const isRenter = user?.role === 'renter';
+  const canSeeAI = user?.plan === 'plus' || user?.plan === 'elite';
+  const desiredBedrooms = group?.desiredBedrooms ?? group?.memberLimit ?? 4;
+  const spotsNeeded = Math.max(0, desiredBedrooms - memberCount);
 
   useEffect(() => {
     loadGroup();
   }, [groupId]);
+
+  useEffect(() => {
+    if (!group || !user || !isRenter) return;
+    if (canSeeAI && spotsNeeded > 0) {
+      setLoadingSuggestions(true);
+      getSuggestedGroupMembers(groupId, user.id)
+        .then(results => {
+          setSuggestions(results);
+          if (results.length > 0) {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          }
+        })
+        .catch(() => {})
+        .finally(() => setLoadingSuggestions(false));
+    }
+  }, [group?.id, user?.id, canSeeAI, spotsNeeded, isRenter]);
 
   async function loadGroup() {
     setLoading(true);
@@ -901,6 +926,66 @@ export function GroupInfoScreen({ route, navigation }: Props) {
           />
         </Section>
 
+        {isRenter && spotsNeeded > 0 ? (
+          canSeeAI ? (
+            <Animated.View entering={FadeInDown.duration(400)} style={styles.suggestionsSection}>
+              <View style={styles.suggestionsSectionHeader}>
+                <Feather name="cpu" size={16} color="#ff6b5b" />
+                <ThemedText style={styles.suggestionsSectionTitle}>AI Suggestions</ThemedText>
+              </View>
+              <ThemedText style={styles.suggestionsSectionSub}>
+                Your group needs {spotsNeeded} more {spotsNeeded === 1 ? 'person' : 'people'}
+              </ThemedText>
+              {loadingSuggestions ? (
+                <ActivityIndicator color="#ff6b5b" style={{ marginVertical: 20 }} />
+              ) : suggestions.length > 0 ? (
+                <>
+                  {suggestions.map(({ profile, groupScore, reason }) => {
+                    const p = Array.isArray(profile.profile) ? profile.profile[0] : profile.profile;
+                    const photo = p?.photos?.[0] || profile.avatar_url;
+                    return (
+                      <View key={profile.id} style={[styles.suggestionCard, { borderColor: theme.border }]}>
+                        <Image source={{ uri: photo }} style={styles.suggestionAvatar} />
+                        <View style={{ flex: 1 }}>
+                          <ThemedText style={styles.suggestionName}>
+                            {profile.full_name}{profile.age ? `, ${profile.age}` : ''}
+                          </ThemedText>
+                          <ThemedText style={styles.suggestionReason}>{reason}</ThemedText>
+                          <ThemedText style={styles.suggestionScore}>{groupScore}% group match</ThemedText>
+                        </View>
+                        <Pressable
+                          style={styles.suggestionInviteBtn}
+                          onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            navigation.navigate('GroupInvite' as never, { groupId, suggestedUserId: profile.id } as never);
+                          }}
+                        >
+                          <ThemedText style={styles.suggestionInviteBtnText}>Invite</ThemedText>
+                        </Pressable>
+                      </View>
+                    );
+                  })}
+                  <ThemedText style={styles.aiFooter}>Powered by Rhome AI</ThemedText>
+                </>
+              ) : (
+                <ThemedText style={styles.noSuggestionsText}>
+                  No strong matches found yet — check back later
+                </ThemedText>
+              )}
+            </Animated.View>
+          ) : (
+            <View style={[styles.lockedSuggestions, { borderColor: theme.border }]}>
+              <Feather name="lock" size={18} color="#ff6b5b" />
+              <ThemedText style={styles.lockedText}>
+                Upgrade to Plus to see AI member suggestions
+              </ThemedText>
+              <Pressable onPress={() => navigation.navigate('Plans' as never)}>
+                <ThemedText style={styles.lockedUpgradeText}>Upgrade</ThemedText>
+              </Pressable>
+            </View>
+          )
+        ) : null}
+
         <View style={[styles.section, { marginTop: Spacing.sm }]}>
           {isAdmin ? (
             <Pressable
@@ -1197,5 +1282,104 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 16,
     paddingVertical: 8,
+  },
+  suggestionsSection: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    padding: Spacing.md,
+    marginHorizontal: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  suggestionsSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  suggestionsSectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  suggestionsSectionSub: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.5)',
+    marginBottom: Spacing.sm,
+  },
+  suggestionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+    marginBottom: 8,
+    gap: 10,
+  },
+  suggestionAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#333',
+  },
+  suggestionName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  suggestionReason: {
+    fontSize: 12,
+    color: '#aaa',
+    marginTop: 2,
+  },
+  suggestionScore: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#ff6b5b',
+    marginTop: 2,
+  },
+  suggestionInviteBtn: {
+    backgroundColor: '#ff6b5b',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  suggestionInviteBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  aiFooter: {
+    fontSize: 10,
+    color: '#555',
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  noSuggestionsText: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.4)',
+    textAlign: 'center',
+    paddingVertical: 16,
+  },
+  lockedSuggestions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: Spacing.md,
+    marginHorizontal: Spacing.md,
+    marginBottom: Spacing.md,
+    gap: 10,
+  },
+  lockedText: {
+    flex: 1,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.6)',
+  },
+  lockedUpgradeText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#ff6b5b',
   },
 });

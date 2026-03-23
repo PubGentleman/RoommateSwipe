@@ -1,0 +1,565 @@
+# Rhome — Claude AI-Powered Agent Pairing (Replit Agent Prompt)
+
+Paste this into Replit Agent after the fix prompts are complete.
+
+---
+
+## Context
+
+The current agent matchmaker flow works like this:
+1. Agent browses renters and shortlists them
+2. Agent manually picks renters to build a group in AgentGroupBuilderScreen
+3. A local algorithm (generateBestGroupSuggestion) scores combinations
+
+The problem: the agent still has to do the pairing manually. The algorithm just
+scores combinations they already picked — it doesn't proactively tell the agent
+WHO to group together or explain WHY in human terms.
+
+This prompt upgrades the pairing to use the actual Claude AI (via a new Supabase
+Edge Function) so the agent can say "I have 12 shortlisted renters and a 3BR
+apartment at $4,500/mo — who should I put together?" and get a specific,
+reasoned recommendation back.
+
+This is a Pro/Business agent plan feature only.
+
+---
+
+## PROMPT — Claude AI-Powered Agent Group Pairing
+
+```
+Build an AI-powered group pairing feature for agents using Claude AI.
+
+An agent can tap "AI Pair Group" from AgentGroupBuilderScreen or BrowseRentersScreen
+and Claude will analyze their entire shortlist against a specific listing and recommend
+the best group combination with detailed reasoning.
+
+---
+
+### PART 1: New Supabase Edge Function — agent-pair-group
+
+Create: supabase/functions/agent-pair-group/index.ts
+
+This function receives the agent's shortlisted renter profiles and a listing,
+sends them to Claude, and returns a structured group recommendation.
+
+  import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
+  import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+  const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')!;
+  const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+  const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+  serve(async (req) => {
+    if (req.method === 'OPTIONS') {
+      return new Response('ok', {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+        },
+      });
+    }
+
+    try {
+      const authHeader = req.headers.get('Authorization');
+      if (!authHeader) return errorResponse('Unauthorized', 401);
+
+      const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+      const { data: { user }, error: authError } = await supabase.auth.getUser(
+        authHeader.replace('Bearer ', '')
+      );
+      if (authError || !user) return errorResponse('Unauthorized', 401);
+
+      // Check agent plan — must be Pro or Business
+      const { data: agentData } = await supabase
+        .from('users')
+        .select('agent_plan, full_name')
+        .eq('id', user.id)
+        .single();
+
+      const plan = agentData?.agent_plan ?? 'pay_per_use';
+      if (!['pro', 'business'].includes(plan)) {
+        return errorResponse('AI pairing requires Agent Pro or Business plan', 403);
+      }
+
+      const { renterIds, listingId } = await req.json();
+      if (!renterIds || renterIds.length < 2) {
+        return errorResponse('Need at least 2 renters to suggest a group', 400);
+      }
+
+      // Fetch listing details
+      const { data: listing } = await supabase
+        .from('listings')
+        .select('title, price, bedrooms, neighborhood, amenities, available_date')
+        .eq('id', listingId)
+        .single();
+
+      if (!listing) return errorResponse('Listing not found', 404);
+
+      // Fetch all renter profiles
+      const { data: renters } = await supabase
+        .from('users')
+        .select(`
+          id,
+          full_name,
+          age,
+          occupation,
+          city,
+          profile:profiles(
+            budget_max,
+            budget_per_person_min,
+            budget_per_person_max,
+            move_in_date,
+            cleanliness,
+            sleep_schedule,
+            smoking,
+            pets,
+            drinking,
+            guests,
+            noise_tolerance,
+            interests,
+            preferred_trains,
+            desired_bedrooms,
+            location_flexible,
+            wfh,
+            bio
+          )
+        `)
+        .in('id', renterIds);
+
+      if (!renters || renters.length === 0) {
+        return errorResponse('Could not fetch renter profiles', 404);
+      }
+
+      const sharePerPerson = listing.price / listing.bedrooms;
+
+      // Build Claude prompt
+      const systemPrompt = `You are an expert real estate agent assistant specializing in NYC roommate matching.
+Your job is to analyze a group of shortlisted renters and recommend the best combination to fill a specific apartment.
+You understand NYC neighborhoods, subway lines, and what makes roommates compatible long-term.
+
+When recommending a group:
+1. Budget must work — combined max budgets must cover the rent
+2. Lifestyle must be compatible — sleep schedules, cleanliness, smoking, pets
+3. Move-in timing must align — within 30 days of each other and the listing availability
+4. Transit must work for everyone — preferred train lines vs listing neighborhood
+5. Group size must match bedrooms — exactly the right number of people
+
+Always respond in this exact JSON format:
+{
+  "recommendedGroup": ["renter_id_1", "renter_id_2"],
+  "groupNames": ["Name 1", "Name 2"],
+  "confidence": 85,
+  "headline": "Strong budget and lifestyle match for this 2BR",
+  "reasons": [
+    "Both have similar cleanliness standards (8/10 and 9/10)",
+    "Same sleep schedule — both early risers",
+    "Combined budget of $4,800 covers the $4,500 rent with room to spare",
+    "Both on the N/W train — perfect for this Astoria listing"
+  ],
+  "concerns": [
+    "Jordan has a dog — confirm building is pet-friendly"
+  ],
+  "alternativeGroup": ["renter_id_3", "renter_id_4"],
+  "alternativeReason": "Slightly lower compatibility but better move-in timing",
+  "excludedRenters": [
+    { "id": "renter_id_5", "name": "Alex", "reason": "Budget ($1,200/mo max) too low for $1,500/person share" }
+  ]
+}`;
+
+      const renterSummaries = renters.map(r => {
+        const p = r.profile ?? {};
+        return `RENTER: ${r.full_name} (ID: ${r.id})
+  Age: ${r.age} | Occupation: ${r.occupation}
+  Budget: $${p.budget_per_person_min ?? 0}–$${p.budget_per_person_max ?? p.budget_max ?? 0}/mo per person
+  Move-in: ${p.move_in_date ?? 'flexible'}
+  Sleep schedule: ${p.sleep_schedule ?? 'not specified'}
+  Cleanliness: ${p.cleanliness ?? 'not specified'}/10
+  Smoking: ${p.smoking ? 'yes' : 'no'} | Pets: ${p.pets ?? 'no'}
+  Drinking: ${p.drinking ?? 'not specified'} | Guests: ${p.guests ?? 'not specified'}
+  Preferred trains: ${(p.preferred_trains ?? []).join(', ') || 'flexible'}
+  WFH: ${p.wfh ? 'yes' : 'no'} | Location flexible: ${p.location_flexible ? 'yes' : 'no'}
+  Desires: ${p.desired_bedrooms ?? listing.bedrooms}BR apartment
+  Bio: ${p.bio ?? 'no bio'}`;
+      }).join('\n\n');
+
+      const userMessage = `I am an agent with a ${listing.bedrooms}BR apartment listed at $${listing.price}/mo in ${listing.neighborhood}.
+Available: ${listing.available_date ?? 'now'}
+Amenities: ${(listing.amenities ?? []).join(', ') || 'standard'}
+Share per person: $${sharePerPerson.toFixed(0)}/mo
+
+I have ${renters.length} shortlisted renters. Recommend the best group to fill this apartment.
+
+${renterSummaries}
+
+Which ${listing.bedrooms} renters should I group together? Explain your reasoning clearly.`;
+
+      // Call Claude
+      const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-5',
+          max_tokens: 1024,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userMessage }],
+        }),
+      });
+
+      const claudeData = await claudeResponse.json();
+      const rawText = claudeData.content?.[0]?.text ?? '';
+
+      // Parse JSON from Claude's response
+      let parsed: any = null;
+      try {
+        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) parsed = JSON.parse(jsonMatch[0]);
+      } catch {
+        return errorResponse('AI response could not be parsed', 500);
+      }
+
+      if (!parsed?.recommendedGroup) {
+        return errorResponse('AI did not return a valid recommendation', 500);
+      }
+
+      // Log usage
+      await supabase.from('ai_usage').insert({
+        user_id: user.id,
+        feature: 'agent_pairing',
+        tokens_used: claudeData.usage?.input_tokens + claudeData.usage?.output_tokens ?? 0,
+        created_at: new Date().toISOString(),
+      });
+
+      return new Response(JSON.stringify(parsed), {
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+      });
+
+    } catch (err) {
+      console.error('Agent pairing error:', err);
+      return errorResponse('Pairing failed', 500);
+    }
+  });
+
+  function errorResponse(message: string, status: number) {
+    return new Response(JSON.stringify({ error: message }), {
+      status,
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+    });
+  }
+
+---
+
+### PART 2: Client-Side Hook — useAgentPairing.ts
+
+Create: hooks/useAgentPairing.ts
+
+  import { useState } from 'react';
+  import { supabase } from '../lib/supabase';
+
+  export interface PairingResult {
+    recommendedGroup: string[];
+    groupNames: string[];
+    confidence: number;
+    headline: string;
+    reasons: string[];
+    concerns: string[];
+    alternativeGroup?: string[];
+    alternativeReason?: string;
+    excludedRenters: Array<{ id: string; name: string; reason: string }>;
+  }
+
+  export function useAgentPairing() {
+    const [loading, setLoading] = useState(false);
+    const [result, setPairingResult] = useState<PairingResult | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    const getPairing = async (renterIds: string[], listingId: string) => {
+      setLoading(true);
+      setError(null);
+      setPairingResult(null);
+
+      try {
+        const { data, error: fnError } = await supabase.functions.invoke(
+          'agent-pair-group',
+          { body: { renterIds, listingId } }
+        );
+
+        if (fnError) {
+          setError(fnError.message ?? 'Pairing failed');
+          return null;
+        }
+
+        if (data?.error) {
+          setError(data.error);
+          return null;
+        }
+
+        setPairingResult(data);
+        return data as PairingResult;
+      } catch (e: any) {
+        setError(e.message ?? 'Unexpected error');
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const reset = () => {
+      setPairingResult(null);
+      setError(null);
+    };
+
+    return { getPairing, loading, result, error, reset };
+  }
+
+---
+
+### PART 3: UI in AgentGroupBuilderScreen
+
+File: screens/host/AgentGroupBuilderScreen.tsx
+
+Add an "AI Pair Group" button that appears when:
+- The agent has a listing selected
+- At least 2 renters are shortlisted
+- Agent plan is 'pro' or 'business'
+
+Add a full-screen modal (AIPairingModal) that shows the Claude recommendation.
+
+#### Button (add near top of screen, below listing picker):
+
+  import { useAgentPairing } from '../../hooks/useAgentPairing';
+
+  const { getPairing, loading: pairingLoading, result: pairingResult, reset: resetPairing } = useAgentPairing();
+  const [showPairingModal, setShowPairingModal] = useState(false);
+
+  const handleAIPairing = async () => {
+    if (!selectedListing || shortlistedIds.size < 2) return;
+    setShowPairingModal(true);
+    await getPairing(Array.from(shortlistedIds), selectedListing.id);
+  };
+
+  {planLimits.hasAIGroupSuggestions && selectedListing && shortlistedIds.size >= 2 && (
+    <Pressable
+      style={styles.aiPairButton}
+      onPress={handleAIPairing}
+    >
+      <Feather name="zap" size={16} color="#fff" />
+      <Text style={styles.aiPairButtonText}>AI Pair Group</Text>
+    </Pressable>
+  )}
+
+  For pay_per_use or starter agents, show a locked version:
+  {!planLimits.hasAIGroupSuggestions && (
+    <Pressable
+      style={styles.aiPairButtonLocked}
+      onPress={() => navigation.navigate('Plans')}
+    >
+      <Feather name="lock" size={14} color="#ff6b5b" />
+      <Text style={styles.aiPairLockedText}>Upgrade to Pro for AI Pairing</Text>
+    </Pressable>
+  )}
+
+#### AIPairingModal component (add in same file or as separate component):
+
+  <Modal
+    visible={showPairingModal}
+    animationType="slide"
+    presentationStyle="pageSheet"
+    onRequestClose={() => { setShowPairingModal(false); resetPairing(); }}
+  >
+    <View style={styles.modalContainer}>
+      <View style={styles.modalHeader}>
+        <Text style={styles.modalTitle}>AI Group Pairing</Text>
+        <Pressable onPress={() => { setShowPairingModal(false); resetPairing(); }}>
+          <Feather name="x" size={22} color="#fff" />
+        </Pressable>
+      </View>
+
+      {pairingLoading && (
+        <View style={styles.loadingState}>
+          <ActivityIndicator size="large" color="#ff6b5b" />
+          <Text style={styles.loadingText}>Claude is analyzing your shortlist...</Text>
+          <Text style={styles.loadingSubtext}>Checking budgets, schedules, and transit</Text>
+        </View>
+      )}
+
+      {!pairingLoading && pairingResult && (
+        <ScrollView style={styles.resultScroll}>
+
+          {/* Confidence + Headline */}
+          <View style={styles.headlineCard}>
+            <View style={styles.confidenceRow}>
+              <Feather name="zap" size={14} color="#ff6b5b" />
+              <Text style={styles.confidenceText}>
+                {pairingResult.confidence}% confidence
+              </Text>
+            </View>
+            <Text style={styles.headline}>{pairingResult.headline}</Text>
+          </View>
+
+          {/* Recommended group */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>✓ Recommended Group</Text>
+            {pairingResult.groupNames.map((name, i) => (
+              <View key={i} style={styles.memberRow}>
+                <Feather name="user" size={14} color="#ff6b5b" />
+                <Text style={styles.memberName}>{name}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Reasons */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Why this group works</Text>
+            {pairingResult.reasons.map((reason, i) => (
+              <View key={i} style={styles.reasonRow}>
+                <Text style={styles.reasonBullet}>•</Text>
+                <Text style={styles.reasonText}>{reason}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Concerns */}
+          {pairingResult.concerns.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>⚠️ Things to confirm</Text>
+              {pairingResult.concerns.map((concern, i) => (
+                <View key={i} style={styles.concernRow}>
+                  <Feather name="alert-circle" size={13} color="#f39c12" />
+                  <Text style={styles.concernText}>{concern}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Alternative group */}
+          {pairingResult.alternativeGroup && (
+            <View style={styles.altSection}>
+              <Text style={styles.altTitle}>Alternative Option</Text>
+              <Text style={styles.altReason}>{pairingResult.alternativeReason}</Text>
+            </View>
+          )}
+
+          {/* Excluded renters */}
+          {pairingResult.excludedRenters.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Not recommended for this listing</Text>
+              {pairingResult.excludedRenters.map((r, i) => (
+                <View key={i} style={styles.excludedRow}>
+                  <Text style={styles.excludedName}>{r.name}</Text>
+                  <Text style={styles.excludedReason}>{r.reason}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Action buttons */}
+          <View style={styles.actionButtons}>
+            <Pressable
+              style={styles.useGroupButton}
+              onPress={() => {
+                // Pre-select the recommended group members in the builder
+                setSelectedMemberIds(new Set(pairingResult.recommendedGroup));
+                setShowPairingModal(false);
+                resetPairing();
+              }}
+            >
+              <Text style={styles.useGroupText}>Use This Group</Text>
+            </Pressable>
+
+            {pairingResult.alternativeGroup && (
+              <Pressable
+                style={styles.useAltButton}
+                onPress={() => {
+                  setSelectedMemberIds(new Set(pairingResult.alternativeGroup!));
+                  setShowPairingModal(false);
+                  resetPairing();
+                }}
+              >
+                <Text style={styles.useAltText}>Use Alternative</Text>
+              </Pressable>
+            )}
+          </View>
+
+          <Text style={styles.aiFooter}>Powered by Claude AI · Rhome Pro</Text>
+        </ScrollView>
+      )}
+
+      {!pairingLoading && error && (
+        <View style={styles.errorState}>
+          <Feather name="alert-circle" size={32} color="#e74c3c" />
+          <Text style={styles.errorText}>{error}</Text>
+          <Pressable style={styles.retryButton} onPress={() => handleAIPairing()}>
+            <Text style={styles.retryText}>Try Again</Text>
+          </Pressable>
+        </View>
+      )}
+    </View>
+  </Modal>
+
+#### Style constants:
+  modalContainer: { flex: 1, backgroundColor: '#111' }
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, borderBottomWidth: 1, borderBottomColor: '#222' }
+  modalTitle: { color: '#fff', fontSize: 18, fontWeight: '700' }
+  loadingState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 }
+  loadingText: { color: '#fff', fontSize: 16, fontWeight: '600' }
+  loadingSubtext: { color: '#888', fontSize: 13 }
+  headlineCard: { margin: 16, padding: 16, backgroundColor: '#1a1a1a', borderRadius: 12 }
+  confidenceRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }
+  confidenceText: { color: '#ff6b5b', fontSize: 13, fontWeight: '600' }
+  headline: { color: '#fff', fontSize: 16, fontWeight: '700' }
+  section: { margin: 16, marginTop: 0 }
+  sectionTitle: { color: '#fff', fontSize: 14, fontWeight: '700', marginBottom: 10 }
+  memberRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 }
+  memberName: { color: '#fff', fontSize: 14 }
+  reasonRow: { flexDirection: 'row', gap: 8, marginBottom: 6 }
+  reasonBullet: { color: '#ff6b5b', fontSize: 14 }
+  reasonText: { color: '#ccc', fontSize: 13, flex: 1 }
+  concernRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 6 }
+  concernText: { color: '#f39c12', fontSize: 13, flex: 1 }
+  useGroupButton: { backgroundColor: '#ff6b5b', borderRadius: 12, padding: 16, alignItems: 'center', margin: 16 }
+  useGroupText: { color: '#fff', fontSize: 16, fontWeight: '700' }
+  useAltButton: { borderWidth: 1, borderColor: '#ff6b5b', borderRadius: 12, padding: 14, alignItems: 'center', marginHorizontal: 16, marginBottom: 16 }
+  useAltText: { color: '#ff6b5b', fontSize: 15, fontWeight: '600' }
+  aiFooter: { color: '#444', fontSize: 10, textAlign: 'center', marginBottom: 32 }
+  excludedRow: { marginBottom: 8 }
+  excludedName: { color: '#888', fontSize: 13, fontWeight: '600' }
+  excludedReason: { color: '#555', fontSize: 12 }
+
+---
+
+### PART 4: Also add "AI Pair Group" entry point in BrowseRentersScreen
+
+In BrowseRentersScreen, the existing AI suggestions panel shows
+generateAISuggestions() (algorithmic). Below that panel, add a new button:
+
+  {planLimits.hasAIGroupSuggestions && shortlistedIds.size >= 2 && selectedListing && (
+    <Pressable
+      style={styles.fullAiPairButton}
+      onPress={() => navigation.navigate('AgentGroupBuilder', {
+        preselectedIds: Array.from(shortlistedIds),
+        listingId: selectedListing.id,
+        openAIPairing: true,  // flag to auto-open the AI modal
+      })}
+    >
+      <Feather name="zap" size={16} color="#fff" />
+      <Text style={styles.fullAiPairText}>
+        Ask Claude: Who should I group? ({shortlistedIds.size} shortlisted)
+      </Text>
+    </Pressable>
+  )}
+
+In AgentGroupBuilderScreen, check for the openAIPairing param:
+  const openAIPairing = route.params?.openAIPairing ?? false;
+  useEffect(() => {
+    if (openAIPairing && selectedListing && shortlistedIds.size >= 2) {
+      handleAIPairing();
+    }
+  }, [openAIPairing, selectedListing]);
+```

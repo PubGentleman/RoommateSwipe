@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { View, StyleSheet, Image, Pressable, Dimensions, Modal, ScrollView, Text, Animated as RNAnimated } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, withSequence, runOnJS, interpolate } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, withSequence, runOnJS, interpolate, FadeInDown } from 'react-native-reanimated';
 import { Feather } from '../../components/VectorIcons';
 import * as Haptics from 'expo-haptics';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -43,6 +43,7 @@ import { getMyGroups as getMyGroupsFromSupabase } from '../../services/groupServ
 import { recordSwipe, getAIMemory } from '../../utils/aiMemory';
 import { getNextMicroQuestion } from '../../utils/aiMicroQuestions';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { getBestMatchToday } from '../../utils/bestMatchToday';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Limit card size for web/desktop viewing
@@ -91,6 +92,8 @@ export const RoommatesScreen = () => {
   const refinementBannerOpacity = useRef(new RNAnimated.Value(0)).current;
   const [rightSwipeCount, setRightSwipeCount] = useState(0);
   const [totalSwipeCount, setTotalSwipeCount] = useState(0);
+  const [bestMatch, setBestMatch] = useState<{ profile: any; score: number; reason: string } | null>(null);
+  const [highlightedProfileId, setHighlightedProfileId] = useState<string | null>(null);
   const [showBoostModal, setShowBoostModal] = useState(false);
   const [processingBoost, setProcessingBoost] = useState(false);
   const [selectedBoostTierId, setSelectedBoostTierId] = useState<RenterBoostOptionId>('standard');
@@ -131,6 +134,19 @@ export const RoommatesScreen = () => {
   useEffect(() => {
     startSession();
   }, []);
+
+  const canSeeAIMatch = user?.plan === 'plus' || user?.plan === 'elite';
+  useEffect(() => {
+    if (canSeeAIMatch && user) {
+      getBestMatchToday(user.id).then(result => {
+        setBestMatch(result);
+        if (result) {
+          setHighlightedProfileId(result.profile.id);
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
+      }).catch(() => {});
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     loadProfiles();
@@ -1207,6 +1223,65 @@ export const RoommatesScreen = () => {
         </ScrollView>
       ) : null}
 
+      {canSeeAIMatch && bestMatch ? (
+        <Animated.View entering={FadeInDown.duration(400)} style={styles.bestMatchBanner}>
+          <LinearGradient
+            colors={['#1a1a1a', '#222']}
+            style={styles.bestMatchCard}
+          >
+            <View style={styles.bestMatchHeader}>
+              <Feather name="zap" size={14} color="#ff6b5b" />
+              <ThemedText style={styles.bestMatchLabel}>YOUR BEST MATCH TODAY</ThemedText>
+            </View>
+            <View style={styles.bestMatchContent}>
+              <Image
+                source={{ uri: bestMatch.profile.profile?.photos?.[0] || bestMatch.profile.avatar_url }}
+                style={styles.bestMatchAvatar}
+              />
+              <View style={styles.bestMatchInfo}>
+                <ThemedText style={styles.bestMatchName}>
+                  {bestMatch.profile.full_name}{bestMatch.profile.age ? `, ${bestMatch.profile.age}` : ''}
+                </ThemedText>
+                <ThemedText style={styles.bestMatchReason}>{bestMatch.reason}</ThemedText>
+              </View>
+              <View style={styles.bestMatchScoreWrap}>
+                <ThemedText style={styles.bestMatchScoreNum}>{bestMatch.score}%</ThemedText>
+                <ThemedText style={styles.bestMatchScoreLabel}>match</ThemedText>
+              </View>
+            </View>
+            <Pressable
+              style={styles.findInDeckBtn}
+              onPress={() => {
+                if (highlightedProfileId) {
+                  const idx = profiles.findIndex(p => p.id === highlightedProfileId);
+                  if (idx >= 0 && idx !== currentIndex) {
+                    setCurrentIndex(idx);
+                    setCurrentPhotoIndex(0);
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  } else {
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                    showAlert({ title: 'Not in Deck', message: 'This person may not be in your current deck. Try adjusting your filters or city.' });
+                  }
+                }
+              }}
+            >
+              <ThemedText style={styles.findInDeckText}>Find in deck</ThemedText>
+              <Feather name="arrow-right" size={14} color="#ff6b5b" />
+            </Pressable>
+          </LinearGradient>
+        </Animated.View>
+      ) : !canSeeAIMatch ? (
+        <Pressable
+          onPress={() => (navigation as any).navigate('Plans')}
+          style={styles.lockedBestMatchBanner}
+        >
+          <Feather name="zap" size={14} color="#ff6b5b" />
+          <ThemedText style={styles.lockedBestMatchText}>
+            Upgrade to Plus to see your best match today
+          </ThemedText>
+        </Pressable>
+      ) : null}
+
       {lowProfileCount ? (
         <View style={styles.lowProfileBanner}>
           <Feather name="info" size={14} color="#FFD700" />
@@ -1237,6 +1312,7 @@ export const RoommatesScreen = () => {
             { zIndex: 1 },
             isBoosted ? styles.cardBoostedGlow : null,
             user?.receivedSuperLikes?.some((sl: { superLikerId: string }) => sl.superLikerId === currentProfile.id) ? styles.cardSuperInterestGlow : null,
+            highlightedProfileId && currentProfile.id === highlightedProfileId ? styles.cardHighlightedGlow : null,
           ]}>
             <Image source={{ uri: photosArray[0] }} resizeMode="cover" style={styles.cardImage} />
 
@@ -2448,6 +2524,15 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'rgba(255,107,91,0.4)',
   },
+  cardHighlightedGlow: {
+    borderWidth: 2,
+    borderColor: 'rgba(255,107,91,0.5)',
+    shadowColor: '#ff6b5b',
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 6,
+  },
   cardImage: {
     width: '100%',
     height: '100%',
@@ -3232,5 +3317,93 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800' as const,
     color: '#fff',
+  },
+  bestMatchBanner: {
+    marginHorizontal: Spacing.md,
+    marginBottom: 8,
+  },
+  bestMatchCard: {
+    borderRadius: 16,
+    padding: 14,
+  },
+  bestMatchHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+    marginBottom: 10,
+  },
+  bestMatchLabel: {
+    fontSize: 11,
+    fontWeight: '800' as const,
+    color: '#ff6b5b',
+    letterSpacing: 1,
+  },
+  bestMatchContent: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 10,
+  },
+  bestMatchAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#333',
+  },
+  bestMatchInfo: {
+    flex: 1,
+  },
+  bestMatchName: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    color: '#fff',
+  },
+  bestMatchReason: {
+    fontSize: 12,
+    color: '#aaa',
+    marginTop: 2,
+  },
+  bestMatchScoreWrap: {
+    alignItems: 'center' as const,
+  },
+  bestMatchScoreNum: {
+    fontSize: 22,
+    fontWeight: '800' as const,
+    color: '#ff6b5b',
+  },
+  bestMatchScoreLabel: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.5)',
+    fontWeight: '600' as const,
+  },
+  findInDeckBtn: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 6,
+    marginTop: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,107,91,0.1)',
+  },
+  findInDeckText: {
+    fontSize: 13,
+    fontWeight: '700' as const,
+    color: '#ff6b5b',
+  },
+  lockedBestMatchBanner: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+    marginHorizontal: Spacing.md,
+    marginBottom: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+  },
+  lockedBestMatchText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.5)',
+    flex: 1,
   },
 });
