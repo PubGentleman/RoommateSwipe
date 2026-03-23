@@ -3,7 +3,7 @@ import { AppState, AppStateStatus } from 'react-native';
 import { StorageService } from '../utils/storage';
 import { getDailyColdMessageLimit, getDailyColdMessageCount } from '../utils/messagingUtils';
 import { User, Notification } from '../types/models';
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import type { Session } from '@supabase/supabase-js';
 import { activateBoost as boostServiceActivateBoost, deactivateExpiredBoosts } from '../services/boostService';
 
@@ -83,6 +83,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     loadUser();
+
+    if (!isSupabaseConfigured) return;
 
     const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -352,48 +354,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const loadUserFromStorage = async () => {
+    await StorageService.initializeWithMockData();
+    const currentUser = await StorageService.getCurrentUser();
+    if (currentUser) {
+      if (currentUser.messageCount === undefined) {
+        currentUser.messageCount = 0;
+      }
+      if (currentUser.subscription) {
+        currentUser.subscription = {
+          ...currentUser.subscription,
+          expiresAt: currentUser.subscription.expiresAt
+            ? new Date(currentUser.subscription.expiresAt)
+            : undefined,
+          scheduledChangeDate: currentUser.subscription.scheduledChangeDate
+            ? new Date(currentUser.subscription.scheduledChangeDate)
+            : undefined,
+        };
+      }
+      if (currentUser.boostData) {
+        currentUser.boostData = {
+          ...currentUser.boostData,
+          lastBoostDate: currentUser.boostData.lastBoostDate
+            ? new Date(currentUser.boostData.lastBoostDate)
+            : undefined,
+          boostExpiresAt: currentUser.boostData.boostExpiresAt
+            ? String(currentUser.boostData.boostExpiresAt)
+            : undefined,
+        };
+      }
+      const resetUser = await resetDailyMessagesIfNeeded(currentUser);
+      setUser(resetUser);
+    }
+    setIsLoading(false);
+  };
+
   const loadUser = async () => {
     try {
+      if (!isSupabaseConfigured) {
+        await loadUserFromStorage();
+        return;
+      }
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         await loadUserFromSupabase(session);
       } else {
-        await StorageService.initializeWithMockData();
-        const currentUser = await StorageService.getCurrentUser();
-        if (currentUser) {
-          if (currentUser.messageCount === undefined) {
-            currentUser.messageCount = 0;
-          }
-          if (currentUser.subscription) {
-            currentUser.subscription = {
-              ...currentUser.subscription,
-              expiresAt: currentUser.subscription.expiresAt
-                ? new Date(currentUser.subscription.expiresAt)
-                : undefined,
-              scheduledChangeDate: currentUser.subscription.scheduledChangeDate
-                ? new Date(currentUser.subscription.scheduledChangeDate)
-                : undefined,
-            };
-          }
-          if (currentUser.boostData) {
-            currentUser.boostData = {
-              ...currentUser.boostData,
-              lastBoostDate: currentUser.boostData.lastBoostDate
-                ? new Date(currentUser.boostData.lastBoostDate)
-                : undefined,
-              boostExpiresAt: currentUser.boostData.boostExpiresAt
-                ? String(currentUser.boostData.boostExpiresAt)
-                : undefined,
-            };
-          }
-          const resetUser = await resetDailyMessagesIfNeeded(currentUser);
-          setUser(resetUser);
-        }
-        setIsLoading(false);
+        await loadUserFromStorage();
       }
     } catch (error) {
       console.error('Error loading user:', error);
-      setIsLoading(false);
+      await loadUserFromStorage();
     }
   };
 
