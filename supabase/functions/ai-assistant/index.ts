@@ -61,12 +61,13 @@ serve(async (req) => {
       : buildSystemPrompt(profile, topMatches, nearbyListings, plan);
     const aiResponse = await callClaude(systemPrompt, history, message);
 
-    await saveMessages(supabase, user.id, sessionId, message, aiResponse);
+    const cleanedResponse = await extractAndSaveProfileUpdate(supabase, user.id, aiResponse);
+    await saveMessages(supabase, user.id, sessionId, message, cleanedResponse);
     await incrementUsage(supabase, user.id);
 
     return new Response(
       JSON.stringify({
-        reply: aiResponse,
+        reply: cleanedResponse,
         remainingMessages: dailyLimit - todayCount - 1,
         plan,
       }),
@@ -126,7 +127,10 @@ async function getUserProfile(supabase: any, userId: string) {
       budget_min, budget_max,
       move_in_date, lease_duration,
       cleanliness, noise_tolerance, sleep_schedule,
-      smoking, drinking, pets, interests
+      smoking, drinking, pets, interests,
+      room_type, desired_bedrooms,
+      budget_per_person_max, preferred_trains,
+      amenity_must_haves, apartment_prefs_complete
     `)
     .eq('user_id', userId)
     .single();
@@ -150,6 +154,7 @@ async function getUserProfile(supabase: any, userId: string) {
     drinking: profileData?.drinking,
     pets: profileData?.pets,
     interests: profileData?.interests,
+    profile: profileData,
   };
 }
 
@@ -209,6 +214,27 @@ async function getConversationHistory(supabase: any, userId: string, sessionId: 
   return (data ?? []).reverse();
 }
 
+function getMissingFields(profile: any): string[] {
+  const missing: string[] = [];
+
+  if (!profile?.sleep_schedule)          missing.push('sleep_schedule');
+  if (profile?.cleanliness == null)      missing.push('cleanliness');
+  if (profile?.smoking == null)          missing.push('smoking');
+  if (profile?.pets == null)             missing.push('pets');
+  if (!profile?.move_in_date)            missing.push('move_in_date');
+  if (!profile?.budget_max)              missing.push('budget_max');
+  if (!profile?.room_type)              missing.push('room_type');
+
+  if (!profile?.apartment_prefs_complete) {
+    if (profile?.desired_bedrooms == null)      missing.push('desired_bedrooms');
+    if (profile?.budget_per_person_max == null)  missing.push('budget_per_person_max');
+    if (!profile?.preferred_trains?.length)      missing.push('preferred_trains');
+    if (!profile?.amenity_must_haves?.length)    missing.push('amenity_must_haves');
+  }
+
+  return missing;
+}
+
 function buildSystemPrompt(profile: any, topMatches: any[], listings: any[], plan: string): string {
   const matchSummary = topMatches.length > 0
     ? topMatches.map((m: any) =>
@@ -222,7 +248,75 @@ function buildSystemPrompt(profile: any, topMatches: any[], listings: any[], pla
       ).join('; ')
     : 'no listings in their price range right now';
 
-  return `You are the AI assistant inside Rhome, a roommate matching app. Your name is Rhome AI.
+  const missingFields = getMissingFields(profile.profile);
+
+  const missingFieldGuide: Record<string, string> = {
+    sleep_schedule:         'Ask what time they usually wake up and go to sleep on weekdays.',
+    cleanliness:            'Ask how clean they keep their living space on a scale of 1-10.',
+    smoking:                'Ask if they smoke or are okay with a roommate who does.',
+    pets:                   'Ask if they have any pets or are okay living with pets.',
+    move_in_date:           'Ask when they are looking to move in.',
+    budget_max:             'Ask what their monthly budget is for rent.',
+    room_type:              'Ask if they want a private room or are okay with a shared room.',
+    desired_bedrooms:       'Ask how many bedrooms they want in the apartment.',
+    budget_per_person_max:  'Ask the maximum they can pay per person per month.',
+    preferred_trains:       'Ask which subway lines they need to be near for work or daily life. In NYC, this is crucial.',
+    amenity_must_haves:     'Ask what apartment features are must-haves for them (laundry, dishwasher, doorman, outdoor space, etc.).',
+  };
+
+  const priorityOrder = [
+    'budget_max', 'move_in_date', 'sleep_schedule', 'cleanliness',
+    'smoking', 'pets', 'preferred_trains', 'desired_bedrooms',
+    'budget_per_person_max', 'amenity_must_haves', 'room_type'
+  ];
+  const sortedMissing = missingFields.sort((a, b) =>
+    priorityOrder.indexOf(a) - priorityOrder.indexOf(b)
+  );
+
+  const missingFieldInstructions = sortedMissing.length > 0
+    ? `
+INCOMPLETE PROFILE — COLLECT MISSING INFO:
+The user is missing the following profile data: ${sortedMissing.join(', ')}.
+
+During this conversation, naturally work in ONE question about a missing field.
+Do not ask multiple questions at once — pick the most important missing field
+and weave the question into your response naturally.
+
+When you ask about a missing field, use this guidance:
+${sortedMissing.slice(0, 3).map(f => `- ${f}: ${missingFieldGuide[f]}`).join('\n')}
+
+CRITICAL: When the user answers a question about their profile, extract the data
+and include it at the END of your response in this exact format (hidden from display):
+
+<profile_update>
+{
+  "field": "sleep_schedule",
+  "value": "night_owl"
+}
+</profile_update>
+
+Only include ONE profile_update per response. Only include it when the user
+has clearly answered a profile question. Never include it for general conversation.
+
+Valid values for each field:
+- sleep_schedule: "early_bird" | "night_owl" | "flexible"
+- cleanliness: number 1-10
+- smoking: true | false
+- pets: "yes" | "no" | "ok_with_pets"
+- move_in_date: "YYYY-MM-DD" format
+- budget_max: number (monthly rent in dollars)
+- room_type: "private" | "shared" | "either"
+- desired_bedrooms: number (0 for studio, 1, 2, 3, 4)
+- budget_per_person_max: number (per person per month)
+- preferred_trains: array of NYC subway line letters/numbers e.g. ["N", "W", "7"]
+- amenity_must_haves: array of strings e.g. ["In-unit laundry", "Dishwasher", "Elevator"]
+`
+    : `
+PROFILE COMPLETE — The user has filled in all key profile fields.
+Do not ask profile questions. Focus on helping them find roommates and apartments.
+`;
+
+  let systemPrompt = `You are the AI assistant inside Rhome, a roommate matching app. Your name is Rhome AI.
 
 Your personality: warm, direct, and genuinely helpful — like a knowledgeable friend who happens to know everything about NYC apartments and roommate compatibility. You're not a corporate chatbot. You're casual but smart. You give real opinions when asked. You use the user's actual data to give specific advice, not generic tips.
 
@@ -240,7 +334,7 @@ IMPORTANT STYLE RULES:
 WHAT YOU KNOW ABOUT THIS USER:
 Name: ${profile.name ?? 'the user'}
 Age: ${profile.age ?? 'unknown'}, ${profile.occupation ?? 'unknown occupation'}
-Budget: $${profile.budget_min ?? '?'}–$${profile.budget_max ?? '?'}/mo
+Budget: $${profile.budget_min ?? '?'}-$${profile.budget_max ?? '?'}/mo
 Looking in: ${profile.neighborhood ?? profile.city ?? 'New York'}
 Move-in: ${profile.move_in_date ?? 'flexible'}
 Zodiac: ${profile.zodiac_sign ?? 'unknown'}
@@ -256,6 +350,10 @@ PLAN: ${plan}
 
 Only reference listings and matches that are listed above — never make up names or prices.
 If they ask about someone not in the matches list, say you don't have info on that person yet.`;
+
+  systemPrompt += missingFieldInstructions;
+
+  return systemPrompt;
 }
 
 function buildAgentSystemPrompt(profile: any, listings: any[], plan: string): string {
@@ -318,7 +416,7 @@ async function callClaude(
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-5',
-      max_tokens: 400,
+      max_tokens: 500,
       system: systemPrompt,
       messages,
     }),
@@ -332,6 +430,79 @@ async function callClaude(
 
   const data = await response.json();
   return data.content?.[0]?.text ?? "I'm having trouble responding right now. Try again in a moment!";
+}
+
+async function extractAndSaveProfileUpdate(
+  supabase: any,
+  userId: string,
+  aiResponse: string
+): Promise<string> {
+  const match = aiResponse.match(/<profile_update>([\s\S]*?)<\/profile_update>/);
+  const cleanedResponse = aiResponse.replace(/<profile_update>[\s\S]*?<\/profile_update>/, '').trim();
+  if (!match) return cleanedResponse;
+
+  try {
+    const update = JSON.parse(match[1].trim());
+    const { field, value } = update;
+
+    if (!field || value === undefined) return cleanedResponse;
+
+    const fieldMap: Record<string, string> = {
+      sleep_schedule:        'sleep_schedule',
+      cleanliness:           'cleanliness',
+      smoking:               'smoking',
+      pets:                  'pets',
+      move_in_date:          'move_in_date',
+      budget_max:            'budget_max',
+      room_type:             'room_type',
+      desired_bedrooms:      'desired_bedrooms',
+      budget_per_person_max: 'budget_per_person_max',
+      preferred_trains:      'preferred_trains',
+      amenity_must_haves:    'amenity_must_haves',
+    };
+
+    const dbColumn = fieldMap[field];
+    if (!dbColumn) return cleanedResponse;
+
+    const apartmentPrefFields = [
+      'desired_bedrooms', 'budget_per_person_max',
+      'preferred_trains', 'amenity_must_haves'
+    ];
+
+    if (apartmentPrefFields.includes(field)) {
+      const { data: currentProfile } = await supabase
+        .from('profiles')
+        .select('desired_bedrooms, budget_per_person_max, preferred_trains, amenity_must_haves')
+        .eq('user_id', userId)
+        .single();
+
+      const updatedProfile = { ...currentProfile, [dbColumn]: value };
+      const allPrefsComplete =
+        updatedProfile.desired_bedrooms != null &&
+        updatedProfile.budget_per_person_max != null &&
+        updatedProfile.preferred_trains?.length > 0 &&
+        updatedProfile.amenity_must_haves?.length > 0;
+
+      await supabase
+        .from('profiles')
+        .update({
+          [dbColumn]: value,
+          ...(allPrefsComplete ? { apartment_prefs_complete: true } : {}),
+        })
+        .eq('user_id', userId);
+    } else {
+      await supabase
+        .from('profiles')
+        .update({ [dbColumn]: value })
+        .eq('user_id', userId);
+    }
+
+    console.log(`[AI] Profile updated: ${field} = ${JSON.stringify(value)} for user ${userId}`);
+  } catch (e) {
+    console.warn('[AI] Failed to parse/save profile update:', e);
+  }
+
+  return cleanedResponse;
 }
 
 async function saveMessages(

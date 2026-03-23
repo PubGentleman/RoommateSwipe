@@ -5,6 +5,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { sendAIMessage, createSessionId } from '../../utils/aiService';
+import { useNotificationContext } from '../../contexts/NotificationContext';
+import { StorageService } from '../../utils/storage';
 
 type AIMessage = {
   id: string;
@@ -33,6 +35,38 @@ const QUICK_ACTION_PROMPTS: Record<string, string> = {
   food: 'Recommend some restaurants near my area',
 };
 
+const PROFILE_FIELDS = [
+  'sleep_schedule', 'cleanliness', 'smoking', 'pets',
+  'move_in_date', 'budget_max', 'preferred_trains', 'apartment_prefs_complete',
+] as const;
+
+function calculateProfileCompletion(profileData: any): number {
+  if (!profileData) return 0;
+  const fields = [
+    profileData.sleep_schedule,
+    profileData.cleanliness,
+    profileData.smoking,
+    profileData.pets,
+    profileData.move_in_date,
+    profileData.budget_max,
+    profileData.preferred_trains?.length > 0,
+    profileData.apartment_prefs_complete,
+  ];
+  const filled = fields.filter(Boolean).length;
+  return Math.round((filled / fields.length) * 100);
+}
+
+function getOpeningMessage(completion: number, userName: string): string {
+  if (completion === 0) {
+    return `Hey ${userName}! I'm your Rhome AI assistant. I'll help you find the perfect roommates and apartment. To get started, what's your budget for rent each month?`;
+  } else if (completion < 50) {
+    return `Welcome back ${userName}! Your profile is ${completion}% complete. The more I know about you, the better your matches will be. What trains do you take for work?`;
+  } else if (completion < 100) {
+    return `Hey ${userName}! Almost there \u2014 your profile is ${completion}% done. Let me ask you one more thing so I can give you better matches.`;
+  }
+  return `Hey ${userName}! Your profile looks great. I'm ready to help you find roommates and apartments. What are you looking for today?`;
+}
+
 export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
@@ -40,24 +74,63 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [limitWarning, setLimitWarning] = useState<string | null>(null);
+  const [profileCompletion, setProfileCompletion] = useState<number | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const sessionId = useRef(createSessionId());
+  const prevCompletion = useRef<number>(0);
+  const { showToast } = useNotificationContext();
+
+  const checkProfileCompletion = async () => {
+    if (!user) return 0;
+    try {
+      const profiles = await StorageService.getRoommateProfiles();
+      const myProfile = profiles.find(p => p.id === user.id);
+      const profileData = myProfile?.profileData ?? myProfile?.preferences ?? {};
+      const lifestyle = myProfile?.lifestyle ?? {};
+      const combined = {
+        sleep_schedule: lifestyle.workSchedule ?? profileData.sleep_schedule,
+        cleanliness: lifestyle.cleanliness ?? profileData.cleanliness,
+        smoking: lifestyle.smoking ?? profileData.smoking,
+        pets: lifestyle.pets ?? profileData.pets,
+        move_in_date: myProfile?.preferences?.moveInDate ?? profileData.move_in_date,
+        budget_max: myProfile?.budget ?? profileData.budget_max,
+        preferred_trains: profileData.preferred_trains,
+        apartment_prefs_complete: profileData.apartment_prefs_complete,
+      };
+      const pct = calculateProfileCompletion(combined);
+      setProfileCompletion(pct);
+      return pct;
+    } catch {
+      return 0;
+    }
+  };
 
   useEffect(() => {
-    sendWelcomeMessage();
+    checkProfileCompletion().then(pct => {
+      prevCompletion.current = pct;
+      const userName = user?.name?.split(' ')[0] || 'there';
+      const welcomeMessage: AIMessage = {
+        id: 'welcome',
+        text: getOpeningMessage(pct, userName),
+        isUser: false,
+        timestamp: new Date(),
+        isWelcome: pct >= 100,
+      };
+      setMessages([welcomeMessage]);
+    });
   }, []);
 
-  const sendWelcomeMessage = () => {
-    const userName = user?.name?.split(' ')[0] || 'there';
-    const welcomeMessage: AIMessage = {
-      id: 'welcome',
-      text: `Hi ${userName}! I'm your AI Match Assistant. I can help you find roommates, discover great neighborhoods, recommend restaurants, suggest activities, analyze zodiac compatibility, and give home decor tips.\n\nWhat would you like to explore?`,
-      isUser: false,
-      timestamp: new Date(),
-      isWelcome: true,
-    };
-    setMessages([welcomeMessage]);
-  };
+  useEffect(() => {
+    if (profileCompletion !== null && profileCompletion > prevCompletion.current) {
+      showToast({
+        id: `profile_update_${Date.now()}`,
+        title: 'Profile Updated',
+        body: 'Your profile info was saved from the conversation',
+        type: 'system',
+      });
+      prevCompletion.current = profileCompletion;
+    }
+  }, [profileCompletion]);
 
   const handleSend = async (text?: string) => {
     const messageText = text || inputText.trim();
@@ -94,6 +167,8 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
 
       setIsTyping(false);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+
+      await checkProfileCompletion();
     } catch {
       const errorResponse: AIMessage = {
         id: `ai_error_${Date.now()}`,
@@ -198,6 +273,17 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
           <Text style={styles.aiSubtitle}>Powered by Rhome AI</Text>
         </View>
       </View>
+
+      {profileCompletion !== null && profileCompletion < 100 ? (
+        <View style={styles.completionBanner}>
+          <View style={styles.completionBarTrack}>
+            <View style={[styles.completionBarFill, { width: `${profileCompletion}%` }]} />
+          </View>
+          <Text style={styles.completionText}>
+            Profile {profileCompletion}% complete {profileCompletion < 100 ? '\u2014 chat with me to finish it' : ''}
+          </Text>
+        </View>
+      ) : null}
 
       <FlatList
         ref={flatListRef}
@@ -315,6 +401,28 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: 'rgba(255,255,255,0.3)',
     fontWeight: '500',
+  },
+  completionBanner: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#1a1a1a',
+  },
+  completionBarTrack: {
+    height: 4,
+    backgroundColor: '#333',
+    borderRadius: 2,
+    marginBottom: 4,
+    overflow: 'hidden',
+  },
+  completionBarFill: {
+    height: 4,
+    backgroundColor: '#ff6b5b',
+    borderRadius: 2,
+  },
+  completionText: {
+    color: '#888',
+    fontSize: 11,
+    textAlign: 'center',
   },
   messagesList: {
     paddingTop: 8,

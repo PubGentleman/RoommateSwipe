@@ -1,0 +1,798 @@
+# Rhome — Fully Automated AI Roommate Matching (Replit Agent Prompt)
+
+This is the core product vision: the AI does the matching, grouping, inviting,
+and apartment finding automatically. Users just respond to suggestions.
+Minimal work required from anyone.
+
+---
+
+## The Full Automated Flow
+
+  User signs up
+      ↓
+  Claude asks questions conversationally → profile built
+      ↓
+  Background job runs → finds top compatible matches
+      ↓
+  Push notification → "We found great matches for you"
+      ↓
+  User sees AI suggestion card → "Group with Marcus & Jasmine?"
+      ↓
+  One tap "Yes" → group created, invites sent automatically
+      ↓
+  Others get notification → one tap to accept
+      ↓
+  All accepted → AI immediately suggests 3 apartments
+      ↓
+  Members vote yes/no/maybe → done
+
+---
+
+## PROMPT — Automated AI Matching, Grouping, and Apartment Suggestions
+
+```
+Build the fully automated AI roommate matching system for Rhome.
+The goal is zero manual work — the AI finds matches, suggests groups,
+sends invites, and recommends apartments automatically.
+
+Users only need to: answer Claude's questions and tap yes/no on suggestions.
+
+---
+
+### PART 1: New migration — ai_group_suggestions table
+
+Create: supabase/migrations/021_ai_group_suggestions.sql
+
+  CREATE TABLE IF NOT EXISTS public.ai_group_suggestions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    suggested_to_user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    suggested_member_ids UUID[] NOT NULL,
+    suggested_member_names TEXT[],
+    avg_compatibility INTEGER NOT NULL,
+    reason TEXT,
+    status TEXT DEFAULT 'pending'
+      CHECK (status IN ('pending', 'accepted', 'declined', 'expired')),
+    group_id UUID REFERENCES public.groups(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    expires_at TIMESTAMPTZ DEFAULT (now() + interval '48 hours'),
+    notified_at TIMESTAMPTZ
+  );
+
+  ALTER TABLE public.ai_group_suggestions ENABLE ROW LEVEL SECURITY;
+
+  CREATE POLICY "Users see their own suggestions"
+    ON public.ai_group_suggestions FOR ALL
+    USING (auth.uid() = suggested_to_user_id);
+
+---
+
+### PART 2: New Edge Function — generate-group-suggestions
+
+Create: supabase/functions/generate-group-suggestions/index.ts
+
+This function runs after match scores are calculated. It finds the best
+2–3 person groups for a user and creates ai_group_suggestions records.
+
+  import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
+  import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+  const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+  const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+  serve(async (req) => {
+    if (req.method === 'OPTIONS') {
+      return new Response('ok', {
+        headers: { 'Access-Control-Allow-Origin': '*',
+                   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' },
+      });
+    }
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+    const { userId } = await req.json();
+
+    if (!userId) return errorResponse('userId required', 400);
+
+    // Get user's desired bedrooms to know group size needed
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('desired_bedrooms, apartment_prefs_complete, budget_per_person_max, preferred_trains, move_in_date')
+      .eq('user_id', userId)
+      .single();
+
+    // Need at least budget and move_in_date to suggest groups
+    if (!profile?.budget_per_person_max && !profile?.move_in_date) {
+      return new Response(JSON.stringify({ suggested: 0, reason: 'profile_incomplete' }), { status: 200 });
+    }
+
+    const desiredBedrooms = profile?.desired_bedrooms ?? 2;
+    const groupSizeNeeded = desiredBedrooms; // 2BR = 2 people total, so need 1 more, etc.
+    // Actually: for a 2BR you need 2 people, for a 3BR you need 3, etc.
+    // So the group size = desiredBedrooms (each person gets a room)
+    const membersNeeded = Math.max(1, desiredBedrooms - 1); // how many others to add
+
+    // Check if user is already in a group
+    const { data: existingGroups } = await supabase
+      .from('group_members')
+      .select('group_id')
+      .eq('user_id', userId)
+      .limit(1);
+
+    if (existingGroups && existingGroups.length > 0) {
+      return new Response(JSON.stringify({ suggested: 0, reason: 'already_in_group' }), { status: 200 });
+    }
+
+    // Check for recent suggestion (don't spam)
+    const { data: recentSuggestion } = await supabase
+      .from('ai_group_suggestions')
+      .select('id')
+      .eq('suggested_to_user_id', userId)
+      .eq('status', 'pending')
+      .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      .limit(1);
+
+    if (recentSuggestion && recentSuggestion.length > 0) {
+      return new Response(JSON.stringify({ suggested: 0, reason: 'recent_suggestion_exists' }), { status: 200 });
+    }
+
+    // Get top matches from match_scores
+    const { data: scores } = await supabase
+      .from('match_scores')
+      .select('user_id_1, user_id_2, score, breakdown')
+      .or(`user_id_1.eq.${userId},user_id_2.eq.${userId}`)
+      .gte('score', 75)
+      .order('score', { ascending: false })
+      .limit(10);
+
+    if (!scores || scores.length < membersNeeded) {
+      return new Response(JSON.stringify({ suggested: 0, reason: 'not_enough_matches' }), { status: 200 });
+    }
+
+    // Get the top match IDs
+    const topMatchIds = scores
+      .map(s => s.user_id_1 === userId ? s.user_id_2 : s.user_id_1)
+      .slice(0, membersNeeded);
+
+    // Fetch their names
+    const { data: matchUsers } = await supabase
+      .from('users')
+      .select('id, full_name, avatar_url')
+      .in('id', topMatchIds);
+
+    if (!matchUsers || matchUsers.length === 0) {
+      return new Response(JSON.stringify({ suggested: 0 }), { status: 200 });
+    }
+
+    const avgScore = Math.round(
+      scores.slice(0, membersNeeded).reduce((sum, s) => sum + s.score, 0) / membersNeeded
+    );
+
+    // Build reason string
+    const topBreakdown = scores[0]?.breakdown ?? {};
+    let reason = '';
+    if (topBreakdown.sleep_schedule >= 20 && topBreakdown.cleanliness >= 15) {
+      reason = 'Same sleep schedule and cleanliness standards';
+    } else if (topBreakdown.budget >= 20) {
+      reason = 'Budgets line up perfectly';
+    } else {
+      reason = 'Strong compatibility across lifestyle and budget';
+    }
+
+    // Create suggestion
+    const { data: suggestion } = await supabase
+      .from('ai_group_suggestions')
+      .insert({
+        suggested_to_user_id: userId,
+        suggested_member_ids: topMatchIds,
+        suggested_member_names: matchUsers.map(u => u.full_name),
+        avg_compatibility: avgScore,
+        reason,
+      })
+      .select()
+      .single();
+
+    // Send push notification
+    await supabase.from('notifications').insert({
+      user_id: userId,
+      type: 'ai_group_suggestion',
+      title: 'We found great roommate matches for you',
+      body: `${matchUsers.map(u => u.full_name.split(' ')[0]).join(' and ')} are ${avgScore}% compatible with you. Want to form a group?`,
+      data: JSON.stringify({ suggestion_id: suggestion?.id }),
+    });
+
+    return new Response(
+      JSON.stringify({ suggested: 1, suggestion_id: suggestion?.id }),
+      { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } }
+    );
+  });
+
+  function errorResponse(msg: string, status: number) {
+    return new Response(JSON.stringify({ error: msg }), {
+      status,
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+    });
+  }
+
+Trigger this function at the end of calculate-match-scores after writing scores:
+  // Fire and forget after scoring
+  supabase.functions.invoke('generate-group-suggestions', { body: { userId } });
+
+---
+
+### PART 3: AI Suggestion Card on RoommatesScreen (and GroupsScreen)
+
+Show the AI group suggestion as a prominent card ABOVE the swipe deck
+in RoommatesScreen, and also at the top of GroupsScreen if the user
+has no groups yet.
+
+Create: components/AIGroupSuggestionCard.tsx
+
+  import React, { useState, useEffect } from 'react';
+  import {
+    View, Text, StyleSheet, Pressable, Image, ActivityIndicator
+  } from 'react-native';
+  import Animated, { FadeInDown, FadeOutUp } from 'react-native-reanimated';
+  import * as Haptics from 'expo-haptics';
+  import { Feather } from './VectorIcons';
+  import { LinearGradient } from 'expo-linear-gradient';
+  import { supabase } from '../lib/supabase';
+  import { useAuth } from '../contexts/AuthContext';
+  import { useNavigation } from '@react-navigation/native';
+
+  interface Props {
+    onAccepted?: (groupId: string) => void;
+    onDismissed?: () => void;
+  }
+
+  export function AIGroupSuggestionCard({ onAccepted, onDismissed }: Props) {
+    const { user } = useAuth();
+    const navigation = useNavigation<any>();
+    const [suggestion, setSuggestion] = useState<any>(null);
+    const [memberPhotos, setMemberPhotos] = useState<string[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [accepting, setAccepting] = useState(false);
+    const [dismissed, setDismissed] = useState(false);
+
+    useEffect(() => {
+      loadSuggestion();
+    }, [user]);
+
+    const loadSuggestion = async () => {
+      if (!user) return;
+      setLoading(true);
+
+      const { data } = await supabase
+        .from('ai_group_suggestions')
+        .select('*')
+        .eq('suggested_to_user_id', user.id)
+        .eq('status', 'pending')
+        .gte('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (data) {
+        setSuggestion(data);
+
+        // Fetch member photos
+        const { data: members } = await supabase
+          .from('users')
+          .select('avatar_url, profile:profiles(photos)')
+          .in('id', data.suggested_member_ids);
+
+        setMemberPhotos(
+          (members ?? []).map(m =>
+            m.profile?.photos?.[0] || m.avatar_url || ''
+          )
+        );
+      }
+      setLoading(false);
+    };
+
+    const handleAccept = async () => {
+      if (!suggestion || !user) return;
+      setAccepting(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+      try {
+        // 1. Create the group
+        const { data: group } = await supabase
+          .from('groups')
+          .insert({
+            name: `${user.fullName?.split(' ')[0]}'s Group`,
+            created_by: user.id,
+            status: 'active',
+          })
+          .select()
+          .single();
+
+        if (!group) throw new Error('Failed to create group');
+
+        // 2. Add the current user as a member
+        await supabase.from('group_members').insert({
+          group_id: group.id,
+          user_id: user.id,
+          role: 'admin',
+        });
+
+        // 3. Send invitations to suggested members
+        for (const memberId of suggestion.suggested_member_ids) {
+          await supabase.from('group_invitations').insert({
+            group_id: group.id,
+            inviter_id: user.id,
+            invitee_id: memberId,
+            message: `Hey! Our AI matched us based on compatibility. Want to look for a place together?`,
+          });
+
+          // Push notification to each invitee
+          await supabase.from('notifications').insert({
+            user_id: memberId,
+            type: 'group_invite',
+            title: `${user.fullName?.split(' ')[0]} invited you to a group`,
+            body: `Rhome AI matched you as compatible roommates. Tap to join the group!`,
+            data: JSON.stringify({ group_id: group.id }),
+          });
+        }
+
+        // 4. Update suggestion status
+        await supabase
+          .from('ai_group_suggestions')
+          .update({ status: 'accepted', group_id: group.id })
+          .eq('id', suggestion.id);
+
+        onAccepted?.(group.id);
+
+        // Navigate to the new group
+        navigation.navigate('Groups', {
+          screen: 'GroupInfo',
+          params: { groupId: group.id, groupName: group.name },
+        });
+
+      } catch (e) {
+        console.error('Failed to accept suggestion:', e);
+      }
+      setAccepting(false);
+    };
+
+    const handleDecline = async () => {
+      if (!suggestion) return;
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+      await supabase
+        .from('ai_group_suggestions')
+        .update({ status: 'declined' })
+        .eq('id', suggestion.id);
+
+      setDismissed(true);
+      onDismissed?.();
+    };
+
+    if (loading || !suggestion || dismissed) return null;
+
+    const firstNames = (suggestion.suggested_member_names ?? [])
+      .map((n: string) => n.split(' ')[0])
+      .join(' & ');
+
+    return (
+      <Animated.View entering={FadeInDown} exiting={FadeOutUp}>
+        <LinearGradient
+          colors={['#1a0a00', '#1a1a1a']}
+          style={styles.card}
+        >
+          {/* Header */}
+          <View style={styles.header}>
+            <Feather name="zap" size={14} color="#ff6b5b" />
+            <Text style={styles.headerLabel}>AI ROOMMATE MATCH</Text>
+            <Pressable onPress={handleDecline} style={styles.dismissBtn}>
+              <Feather name="x" size={16} color="#555" />
+            </Pressable>
+          </View>
+
+          {/* Member photos */}
+          <View style={styles.photosRow}>
+            {memberPhotos.map((photo, i) => (
+              <View key={i} style={[styles.photoWrapper, { marginLeft: i > 0 ? -12 : 0, zIndex: 10 - i }]}>
+                {photo ? (
+                  <Image source={{ uri: photo }} style={styles.photo} />
+                ) : (
+                  <View style={[styles.photo, styles.photoPlaceholder]}>
+                    <Feather name="user" size={18} color="#555" />
+                  </View>
+                )}
+              </View>
+            ))}
+            <View style={styles.scoreCircle}>
+              <Text style={styles.scoreCircleText}>{suggestion.avg_compatibility}%</Text>
+            </View>
+          </View>
+
+          {/* Names + reason */}
+          <Text style={styles.namesText}>
+            You + {firstNames}
+          </Text>
+          <Text style={styles.reasonText}>{suggestion.reason}</Text>
+
+          {/* Action buttons */}
+          <View style={styles.actions}>
+            <Pressable
+              style={styles.acceptButton}
+              onPress={handleAccept}
+              disabled={accepting}
+            >
+              {accepting ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Feather name="users" size={16} color="#fff" />
+                  <Text style={styles.acceptText}>Create Group & Invite</Text>
+                </>
+              )}
+            </Pressable>
+            <Pressable style={styles.declineButton} onPress={handleDecline}>
+              <Text style={styles.declineText}>Not now</Text>
+            </Pressable>
+          </View>
+
+          <Text style={styles.footer}>
+            Invites sent automatically · Powered by Rhome AI
+          </Text>
+        </LinearGradient>
+      </Animated.View>
+    );
+  }
+
+  const styles = StyleSheet.create({
+    card: {
+      marginHorizontal: 16,
+      marginBottom: 12,
+      borderRadius: 16,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: '#ff6b5b33',
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: 14,
+    },
+    headerLabel: {
+      color: '#ff6b5b',
+      fontSize: 10,
+      fontWeight: '800',
+      letterSpacing: 1.2,
+      flex: 1,
+    },
+    dismissBtn: { padding: 4 },
+    photosRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    photoWrapper: {
+      borderWidth: 2,
+      borderColor: '#111',
+      borderRadius: 24,
+    },
+    photo: { width: 48, height: 48, borderRadius: 24 },
+    photoPlaceholder: {
+      backgroundColor: '#2a2a2a',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    scoreCircle: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: '#ff6b5b',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: 12,
+    },
+    scoreCircleText: {
+      color: '#fff',
+      fontSize: 13,
+      fontWeight: '800',
+    },
+    namesText: {
+      color: '#fff',
+      fontSize: 17,
+      fontWeight: '700',
+      marginBottom: 4,
+    },
+    reasonText: {
+      color: '#aaa',
+      fontSize: 13,
+      marginBottom: 16,
+    },
+    actions: { gap: 8 },
+    acceptButton: {
+      backgroundColor: '#ff6b5b',
+      borderRadius: 12,
+      padding: 14,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+    },
+    acceptText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+    declineButton: {
+      borderRadius: 12,
+      padding: 10,
+      alignItems: 'center',
+    },
+    declineText: { color: '#555', fontSize: 14 },
+    footer: {
+      color: '#444',
+      fontSize: 10,
+      textAlign: 'center',
+      marginTop: 10,
+    },
+  });
+
+---
+
+### PART 4: Place AIGroupSuggestionCard in both RoommatesScreen and GroupsScreen
+
+File: screens/renter/RoommatesScreen.tsx
+
+Add the card above the swipe deck (below the Best Match Today banner):
+
+  import { AIGroupSuggestionCard } from '../../components/AIGroupSuggestionCard';
+
+  {/* Between the Best Match banner and the swipe deck */}
+  <AIGroupSuggestionCard
+    onAccepted={(groupId) => {
+      // Optionally show a success toast
+      showToast('Group created! Invites sent automatically.');
+    }}
+    onDismissed={() => {}}
+  />
+
+File: screens/renter/GroupsScreen.tsx
+
+Show at the top when the user has NO groups yet:
+
+  {groups.length === 0 && (
+    <View>
+      <Text style={styles.emptyTitle}>No groups yet</Text>
+      <Text style={styles.emptySubtitle}>
+        Let AI find your perfect roommates
+      </Text>
+      <AIGroupSuggestionCard />
+    </View>
+  )}
+
+Also show above the groups list even when they DO have groups
+(they might want to form additional groups):
+
+  <AIGroupSuggestionCard
+    onAccepted={() => refetchGroups()}
+  />
+
+---
+
+### PART 5: Invitee one-tap accept flow
+
+When a user gets the notification and taps it, they land on a simplified
+invite screen — not the full GroupInviteScreen but a focused accept screen.
+
+File: screens/shared/AIGroupInviteScreen.tsx
+
+  // Receives: groupId, inviterId, compatibility score
+
+  export function AIGroupInviteScreen() {
+    const route = useRoute<any>();
+    const navigation = useNavigation<any>();
+    const { user } = useAuth();
+    const { groupId } = route.params;
+    const [group, setGroup] = useState<any>(null);
+    const [members, setMembers] = useState<any[]>([]);
+    const [accepting, setAccepting] = useState(false);
+
+    useEffect(() => {
+      supabase
+        .from('groups')
+        .select('*, group_members(user_id, users(id, full_name, avatar_url, profile:profiles(photos, cleanliness, sleep_schedule)))')
+        .eq('id', groupId)
+        .single()
+        .then(({ data }) => {
+          setGroup(data);
+          setMembers(data?.group_members ?? []);
+        });
+    }, []);
+
+    const handleAccept = async () => {
+      setAccepting(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+      // Accept the invitation
+      await supabase
+        .from('group_invitations')
+        .update({ status: 'accepted' })
+        .eq('group_id', groupId)
+        .eq('invitee_id', user?.id);
+
+      // Add to group members
+      await supabase.from('group_members').insert({
+        group_id: groupId,
+        user_id: user?.id,
+        role: 'member',
+      });
+
+      // Check if all invited members have now accepted
+      const { data: pendingInvites } = await supabase
+        .from('group_invitations')
+        .select('id')
+        .eq('group_id', groupId)
+        .eq('status', 'pending');
+
+      // If no more pending invites → group is complete → trigger apartment suggestions
+      if (!pendingInvites || pendingInvites.length === 0) {
+        // Fire apartment matching
+        supabase.functions.invoke('match-groups-to-listings', {
+          body: { groupId },
+        });
+
+        // Notify all members that the group is ready
+        const { data: allMembers } = await supabase
+          .from('group_members')
+          .select('user_id')
+          .eq('group_id', groupId);
+
+        for (const member of (allMembers ?? [])) {
+          await supabase.from('notifications').insert({
+            user_id: member.user_id,
+            type: 'group_complete',
+            title: 'Your group is complete!',
+            body: 'Everyone accepted. Check out the apartments AI found for your group.',
+            data: JSON.stringify({ group_id: groupId }),
+          });
+        }
+      }
+
+      setAccepting(false);
+      navigation.replace('Groups', {
+        screen: 'GroupInfo',
+        params: { groupId, groupName: group?.name },
+      });
+    };
+
+    const handleDecline = async () => {
+      await supabase
+        .from('group_invitations')
+        .update({ status: 'declined' })
+        .eq('group_id', groupId)
+        .eq('invitee_id', user?.id);
+      navigation.goBack();
+    };
+
+    return (
+      <View style={styles.screen}>
+        <Text style={styles.aiLabel}>🤖 Rhome AI matched you</Text>
+        <Text style={styles.title}>You've been invited to a group</Text>
+
+        {/* Show existing members */}
+        <View style={styles.membersSection}>
+          {members.map(m => (
+            <View key={m.user_id} style={styles.memberRow}>
+              <Image
+                source={{ uri: m.users?.profile?.photos?.[0] || m.users?.avatar_url }}
+                style={styles.memberPhoto}
+              />
+              <View>
+                <Text style={styles.memberName}>{m.users?.full_name}</Text>
+                <Text style={styles.memberDetail}>
+                  {m.users?.profile?.sleep_schedule?.replace('_', ' ')} ·{' '}
+                  Cleanliness {m.users?.profile?.cleanliness}/10
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+
+        <Text style={styles.aiMessage}>
+          AI matched you based on lifestyle compatibility.
+          Once everyone accepts, we'll find apartments that work for your whole group.
+        </Text>
+
+        <Pressable style={styles.acceptBtn} onPress={handleAccept} disabled={accepting}>
+          {accepting
+            ? <ActivityIndicator color="#fff" />
+            : <Text style={styles.acceptBtnText}>Join Group</Text>
+          }
+        </Pressable>
+
+        <Pressable style={styles.declineBtn} onPress={handleDecline}>
+          <Text style={styles.declineBtnText}>No thanks</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+Register AIGroupInviteScreen in the appropriate navigator and handle
+the notification deep link to navigate to it when a user taps
+the 'group_invite' push notification.
+
+---
+
+### PART 6: Auto apartment suggestions when group is complete
+
+The automation is already triggered in Part 5 — when the last invite is
+accepted, match-groups-to-listings runs automatically and all group
+members get a notification.
+
+Additionally, when a user opens GroupApartmentSuggestionsScreen for a
+newly complete group, show a special "Just matched for your group" header:
+
+  {isNewlyComplete && (
+    <Animated.View entering={FadeInDown} style={styles.newGroupBanner}>
+      <Feather name="zap" size={16} color="#ff6b5b" />
+      <Text style={styles.newGroupText}>
+        Your group just formed! Here are apartments AI found for you.
+      </Text>
+    </Animated.View>
+  )}
+
+---
+
+### PART 7: Notification deep linking
+
+In hooks/useNotifications.ts, handle these notification types:
+
+  const handleNotification = (notification: any) => {
+    const data = JSON.parse(notification.data ?? '{}');
+
+    switch (notification.type) {
+      case 'ai_group_suggestion':
+        // Navigate to RoommatesScreen — the suggestion card will show
+        navigation.navigate('Roommates');
+        break;
+
+      case 'group_invite':
+        navigation.navigate('AIGroupInvite', { groupId: data.group_id });
+        break;
+
+      case 'group_complete':
+        navigation.navigate('Groups', {
+          screen: 'GroupApartmentSuggestions',
+          params: { groupId: data.group_id },
+        });
+        break;
+
+      case 'group_match':
+        // For hosts
+        navigation.navigate('Dashboard', {
+          screen: 'GroupMatches',
+          params: { listingId: data.listing_id },
+        });
+        break;
+    }
+  };
+
+---
+
+### Summary of what users experience
+
+RENTER (looking for roommates):
+  1. Opens app → AI asks 3–4 questions in chat → profile built
+  2. Gets notification: "We found great matches for you"
+  3. Sees card: "Group with Marcus & Jasmine — 91% compatible. Create group?"
+  4. Taps "Create Group & Invite" → one tap, done
+  5. Gets notification when others accept
+  6. Gets notification: "Group complete! 3 apartments found"
+  7. Votes yes/no/maybe on apartments
+
+RENTER (invited to a group):
+  1. Gets notification: "You've been invited to a group"
+  2. Sees simple accept screen with member profiles
+  3. Taps "Join Group" → done
+  4. Gets apartment suggestions automatically
+
+HOST (individual):
+  1. Gets notification: "A group matched your listing"
+  2. Sees teaser — group size, budget, trains, compatibility score
+  3. Taps "Unlock Group — $29" → pays → sees full profiles
+  4. Messages the group directly
+
+Total user actions to find a roommate and apartment: 3–4 taps.
+```
