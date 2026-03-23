@@ -13,6 +13,9 @@
       "bundleIdentifier": "com.rhome.app",
       "config": {
         "googleMapsApiKey": "${EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}"
+      },
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
