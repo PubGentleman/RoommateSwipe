@@ -497,6 +497,27 @@ export const HostDashboardScreen = () => {
           })
         )}
 
+        {activeCount > 0 ? (
+          <Pressable
+            style={styles.groupMatchCard}
+            onPress={() => {
+              const activeListing = listings.find(l => l.available && !l.rentedDate);
+              if (activeListing) navigation.navigate('GroupMatches', { listingId: activeListing.id });
+            }}
+          >
+            <View style={styles.groupMatchLeft}>
+              <View style={styles.groupMatchIconWrap}>
+                <Feather name="users" size={18} color={ACCENT} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.groupMatchTitle}>Group Matches</Text>
+                <Text style={styles.groupMatchSub}>See renter groups that match your listings</Text>
+              </View>
+            </View>
+            <Feather name="chevron-right" size={18} color="#888" />
+          </Pressable>
+        ) : null}
+
         <View style={[styles.sectionHeader, { marginTop: 6 }]}>
           <Text style={styles.sectionTitle}>QUICK ACTIONS</Text>
         </View>
@@ -909,4 +930,39 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(168,85,247,0.2)',
   },
   seePlansBtnText: { fontSize: 12, fontWeight: '700', color: '#a855f7' },
+  groupMatchCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 14,
+    padding: 14,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.15)',
+  },
+  groupMatchLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  groupMatchIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,107,91,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  groupMatchTitle: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  groupMatchSub: {
+    color: '#888',
+    fontSize: 12,
+    marginTop: 2,
+  },
 });

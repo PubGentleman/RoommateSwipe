@@ -22,6 +22,7 @@ import { RenterProfileDetailScreen } from '../screens/host/RenterProfileDetailSc
 import { RenterCompatibilityScreen } from '../screens/host/RenterCompatibilityScreen';
 import { AgentGroupBuilderScreen } from '../screens/host/AgentGroupBuilderScreen';
 import { AgentGroupsScreen } from '../screens/host/AgentGroupsScreen';
+import { HostGroupMatchesScreen } from '../screens/host/HostGroupMatchesScreen';
 import { HostMessagesStackNavigator } from './HostMessagesStackNavigator';
 import { NotificationsScreen } from '../screens/shared/NotificationsScreen';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
@@ -45,6 +46,7 @@ export type HostDashboardStackParamList = {
   HostPricing: undefined;
   HostSubscription: undefined;
   ListingBoost: { listingId: string };
+  GroupMatches: { listingId: string };
 };
 
 export type HostGroupsStackParamList = {
@@ -93,6 +95,7 @@ function DashboardStackNavigator() {
       <DashboardStack.Screen name="HostPricing" component={HostPricingScreen} />
       <DashboardStack.Screen name="HostSubscription" component={HostSubscriptionScreen} />
       <DashboardStack.Screen name="ListingBoost" component={ListingBoostScreen} />
+      <DashboardStack.Screen name="GroupMatches" component={HostGroupMatchesScreen} />
     </DashboardStack.Navigator>
   );
 }

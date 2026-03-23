@@ -29,6 +29,59 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ received: true }), { status: 200 });
   }
 
+  if (event.type === 'payment_intent.succeeded') {
+    const paymentIntent = event.data.object as Stripe.PaymentIntent;
+    const piMetadata = paymentIntent.metadata;
+
+    if (piMetadata.type === 'group_unlock') {
+      await supabase
+        .from('group_listing_matches')
+        .update({
+          unlock_status: 'unlocked',
+          unlock_paid_at: new Date().toISOString(),
+        })
+        .eq('id', piMetadata.match_id);
+
+      const { data: match } = await supabase
+        .from('group_listing_matches')
+        .select('group_id, listing:listings(title, neighborhood)')
+        .eq('id', piMetadata.match_id)
+        .single();
+
+      if (match) {
+        const { data: groupMembers } = await supabase
+          .from('group_members')
+          .select('user_id')
+          .eq('group_id', match.group_id);
+
+        for (const member of (groupMembers ?? [])) {
+          await supabase.from('notifications').insert({
+            user_id: member.user_id,
+            type: 'host_interest',
+            title: 'A host is interested in your group!',
+            body: `A host with a listing in ${(match as any).listing?.neighborhood ?? 'your area'} wants to connect with your group.`,
+            data: JSON.stringify({
+              group_id: match.group_id,
+              listing_id: piMetadata.listing_id,
+            }),
+          });
+        }
+      }
+    }
+
+    if (piMetadata.type === 'placement_fee') {
+      await supabase
+        .from('agent_placements')
+        .update({
+          payment_status: 'paid',
+          paid_at: new Date().toISOString(),
+        })
+        .eq('id', piMetadata.placement_id);
+    }
+
+    return new Response(JSON.stringify({ received: true }), { status: 200 });
+  }
+
   if (event.type === 'invoice.payment_failed') {
     const invoice = event.data.object as Stripe.Invoice;
     const customerId = invoice.customer as string;
@@ -52,6 +105,26 @@ Deno.serve(async (req) => {
           }).eq('user_id', renterSub.user_id);
         }
       }
+    }
+
+    return new Response(JSON.stringify({ received: true }), { status: 200 });
+  }
+
+  if (event.type === 'invoice.paid') {
+    const invoice = event.data.object as Stripe.Invoice;
+    const paidCustomerId = invoice.customer as string;
+
+    const { data: paidUser } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('stripe_customer_id', paidCustomerId)
+      .single();
+
+    if (paidUser) {
+      await supabase
+        .from('subscriptions')
+        .update({ free_group_unlocks_used: 0 })
+        .eq('user_id', paidUser.id);
     }
 
     return new Response(JSON.stringify({ received: true }), { status: 200 });

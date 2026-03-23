@@ -23,6 +23,7 @@ import { AdBanner } from '../../components/AdBanner';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { getGroupsHealth, GroupHealthResult } from '../../utils/groupHealthScore';
+import { getAllGroupQuickStats, GroupQuickStats } from '../../utils/groupQuickStats';
 import { useCityContext } from '../../contexts/CityContext';
 import { CityPickerModal, CityPillButton } from '../../components/CityPickerModal';
 import { RhomeAISheet } from '../../components/RhomeAISheet';
@@ -85,6 +86,7 @@ export const GroupsScreen = () => {
   const [editDescription, setEditDescription] = useState('');
   const [groupHealthScores, setGroupHealthScores] = useState<Record<string, GroupHealthResult>>({});
   const [bestGroupId, setBestGroupId] = useState<string | null>(null);
+  const [groupQuickStats, setGroupQuickStats] = useState<Record<string, GroupQuickStats>>({});
   const [savingEdit, setSavingEdit] = useState(false);
 
   const [groupName, setGroupName] = useState('');
@@ -128,6 +130,7 @@ export const GroupsScreen = () => {
         if (ranked.length > 0) setBestGroupId(ranked[0][0]);
         else setBestGroupId(null);
       }).catch(() => {});
+      getAllGroupQuickStats(ids, user.id).then(setGroupQuickStats).catch(() => {});
     }
   }, [myGroups]);
 
@@ -1066,6 +1069,33 @@ export const GroupsScreen = () => {
             <Text style={styles.conflictSnippet} numberOfLines={1}>
               {groupHealthScores[group.id].topConflict}
             </Text>
+          ) : null}
+
+          {groupQuickStats[group.id] && (groupQuickStats[group.id].suggestedMemberCount > 0 || groupQuickStats[group.id].matchingApartmentCount > 0) ? (
+            <View style={styles.quickStatsRow}>
+              {groupQuickStats[group.id].suggestedMemberCount > 0 ? (
+                <Pressable
+                  style={styles.quickStatChip}
+                  onPress={() => navigation.navigate('GroupInfo', { groupId: group.id, scrollTo: 'suggestions' })}
+                >
+                  <Feather name="user-plus" size={11} color="#ff6b5b" />
+                  <Text style={styles.quickStatText}>
+                    {groupQuickStats[group.id].suggestedMemberCount} suggested
+                  </Text>
+                </Pressable>
+              ) : null}
+              {groupQuickStats[group.id].matchingApartmentCount > 0 ? (
+                <Pressable
+                  style={styles.quickStatChip}
+                  onPress={() => navigation.navigate('GroupApartmentSuggestions', { groupId: group.id })}
+                >
+                  <Feather name="home" size={11} color="#3498db" />
+                  <Text style={[styles.quickStatText, { color: '#3498db' }]}>
+                    {groupQuickStats[group.id].matchingApartmentCount} apt{groupQuickStats[group.id].matchingApartmentCount !== 1 ? 's' : ''} match
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
           ) : null}
 
           <View style={[styles.actionRow, { borderTopColor: theme.border }]}>
@@ -3589,5 +3619,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     marginTop: 6,
+  },
+  quickStatsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 6,
+    flexWrap: 'wrap',
+  },
+  quickStatChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  quickStatText: {
+    color: '#ff6b5b',
+    fontSize: 11,
+    fontWeight: '600',
   },
 });
