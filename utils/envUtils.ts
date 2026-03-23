@@ -1,2 +1,2 @@
-export const isDev = process.env.EXPO_PUBLIC_ENV !== 'production';
-export const isProd = process.env.EXPO_PUBLIC_ENV === 'production';
+export const isDev = __DEV__;
+export const isProd = !__DEV__;

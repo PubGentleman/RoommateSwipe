@@ -66,6 +66,12 @@
         "projectId": "0c68666d-6abb-46e3-b540-7725b6e6c977"
       }
     },
-    "owner": "alwaysrhome"
+    "owner": "alwaysrhome",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/0c68666d-6abb-46e3-b540-7725b6e6c977"
+    }
   }
 }
