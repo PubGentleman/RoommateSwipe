@@ -17,7 +17,7 @@ import { RhomeAISheet } from '../../components/RhomeAISheet';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { getBoostTimeRemaining, getBoostDuration, isBoostExpired, RENTER_BOOST_OPTIONS, RenterBoostOptionId } from '../../utils/boostUtils';
 import { isDev } from '../../utils/envUtils';
-import { isHostTypeEditable, daysRemainingInGracePeriod, getHostBadgeLabel, getHostBadgeColor, getHostBadgeIcon } from '../../utils/hostTypeUtils';
+import { isHostTypeEditable, hoursRemainingInGracePeriod, getHostBadgeLabel, getHostBadgeColor, getHostBadgeIcon } from '../../utils/hostTypeUtils';
 import * as Linking from 'expo-linking';
 import { useConfirm } from '../../contexts/ConfirmContext';
 
@@ -448,7 +448,7 @@ export const ProfileScreen = () => {
             {user?.role === 'host' ? (() => {
               const hostType = user?.hostType || 'individual';
               const canEdit = isHostTypeEditable(user?.hostTypeLockedAt || null);
-              const daysLeft = daysRemainingInGracePeriod(user?.hostTypeLockedAt || null);
+              const hoursLeft = hoursRemainingInGracePeriod(user?.hostTypeLockedAt || null);
               const typeLabel = hostType === 'individual' ? 'Individual Host' : getHostBadgeLabel(hostType);
               const badgeColor = getHostBadgeColor(hostType) || '#6C63FF';
               const badgeIcon = getHostBadgeIcon(hostType);
@@ -483,7 +483,7 @@ export const ProfileScreen = () => {
                   {canEdit ? (
                     <View style={[styles.hostTypeChangeBtn, { borderColor: '#ff6b5b' }]}>
                       <Text style={{ fontSize: 11, fontWeight: '700', color: '#ff6b5b' }}>
-                        Change ({daysLeft}d left)
+                        Change ({hoursLeft}h left)
                       </Text>
                     </View>
                   ) : (

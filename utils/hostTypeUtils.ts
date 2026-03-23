@@ -41,15 +41,15 @@ export function isHostTypeEditable(hostTypeLockedAt: string | null | undefined):
   const lockedAt = new Date(hostTypeLockedAt);
   if (isNaN(lockedAt.getTime())) return true;
   const now = new Date();
-  const daysSinceLock = (now.getTime() - lockedAt.getTime()) / (1000 * 60 * 60 * 24);
-  return daysSinceLock <= 7;
+  const hoursSinceLock = (now.getTime() - lockedAt.getTime()) / (1000 * 60 * 60);
+  return hoursSinceLock <= 24;
 }
 
-export function daysRemainingInGracePeriod(hostTypeLockedAt: string | null | undefined): number {
-  if (!hostTypeLockedAt) return 7;
+export function hoursRemainingInGracePeriod(hostTypeLockedAt: string | null | undefined): number {
+  if (!hostTypeLockedAt) return 24;
   const lockedAt = new Date(hostTypeLockedAt);
-  if (isNaN(lockedAt.getTime())) return 7;
+  if (isNaN(lockedAt.getTime())) return 24;
   const now = new Date();
-  const daysSinceLock = (now.getTime() - lockedAt.getTime()) / (1000 * 60 * 60 * 24);
-  return Math.max(0, Math.ceil(7 - daysSinceLock));
+  const hoursSinceLock = (now.getTime() - lockedAt.getTime()) / (1000 * 60 * 60);
+  return Math.max(0, Math.ceil(24 - hoursSinceLock));
 }
