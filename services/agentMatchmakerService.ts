@@ -51,59 +51,210 @@ export interface AgentGroup {
 }
 
 export async function getShortlistedRenterIds(agentId: string): Promise<string[]> {
-  const data = await StorageService.getData(SHORTLIST_KEY);
-  const list = data ? JSON.parse(data) : [];
-  return list.filter((s: any) => s.agentId === agentId).map((s: any) => s.renterId);
+  if (!isSupabaseConfigured) {
+    const data = await StorageService.getData(SHORTLIST_KEY);
+    const list = data ? JSON.parse(data) : [];
+    return list.filter((s: any) => s.agentId === agentId).map((s: any) => s.renterId);
+  }
+
+  const { data, error } = await supabase
+    .from('agent_shortlists')
+    .select('renter_id')
+    .eq('agent_id', agentId);
+
+  if (error) {
+    console.warn('[AgentService] getShortlistedRenterIds error:', error.message);
+    return [];
+  }
+  return (data || []).map(s => s.renter_id);
 }
 
 export async function addToShortlist(agentId: string, renterId: string, listingId?: string): Promise<boolean> {
-  const data = await StorageService.getData(SHORTLIST_KEY);
-  const list = data ? JSON.parse(data) : [];
-  const exists = list.find((s: any) => s.agentId === agentId && s.renterId === renterId);
-  if (exists) return false;
-  list.push({ id: `sl_${Date.now()}`, agentId, renterId, listingId, createdAt: new Date().toISOString() });
-  await StorageService.storeData(SHORTLIST_KEY, JSON.stringify(list));
+  if (!isSupabaseConfigured) {
+    const data = await StorageService.getData(SHORTLIST_KEY);
+    const list = data ? JSON.parse(data) : [];
+    const exists = list.find((s: any) => s.agentId === agentId && s.renterId === renterId);
+    if (exists) return false;
+    list.push({ id: `sl_${Date.now()}`, agentId, renterId, listingId, createdAt: new Date().toISOString() });
+    await StorageService.storeData(SHORTLIST_KEY, JSON.stringify(list));
+    return true;
+  }
+
+  const { data: existing } = await supabase
+    .from('agent_shortlists')
+    .select('id')
+    .eq('agent_id', agentId)
+    .eq('renter_id', renterId)
+    .maybeSingle();
+
+  if (existing) return false;
+
+  const { error } = await supabase
+    .from('agent_shortlists')
+    .insert({ agent_id: agentId, renter_id: renterId, listing_id: listingId || null });
+
+  if (error) {
+    console.warn('[AgentService] addToShortlist error:', error.message);
+    return false;
+  }
   return true;
 }
 
 export async function removeFromShortlist(agentId: string, renterId: string): Promise<void> {
-  const data = await StorageService.getData(SHORTLIST_KEY);
-  const list = data ? JSON.parse(data) : [];
-  const filtered = list.filter((s: any) => !(s.agentId === agentId && s.renterId === renterId));
-  await StorageService.storeData(SHORTLIST_KEY, JSON.stringify(filtered));
+  if (!isSupabaseConfigured) {
+    const data = await StorageService.getData(SHORTLIST_KEY);
+    const list = data ? JSON.parse(data) : [];
+    const filtered = list.filter((s: any) => !(s.agentId === agentId && s.renterId === renterId));
+    await StorageService.storeData(SHORTLIST_KEY, JSON.stringify(filtered));
+    return;
+  }
+
+  await supabase
+    .from('agent_shortlists')
+    .delete()
+    .eq('agent_id', agentId)
+    .eq('renter_id', renterId);
 }
 
 export async function getAgentGroups(agentId: string): Promise<AgentGroup[]> {
-  const data = await StorageService.getData(AGENT_GROUPS_KEY);
-  const groups = data ? JSON.parse(data) : [];
-  return groups.filter((g: AgentGroup) => g.agentId === agentId);
+  if (!isSupabaseConfigured) {
+    const data = await StorageService.getData(AGENT_GROUPS_KEY);
+    const groups = data ? JSON.parse(data) : [];
+    return groups.filter((g: AgentGroup) => g.agentId === agentId);
+  }
+
+  const { data: groups, error } = await supabase
+    .from('groups')
+    .select(`
+      id,
+      name,
+      created_by_agent,
+      target_listing_id,
+      group_status,
+      created_at,
+      group_members(user_id, role)
+    `)
+    .eq('created_by_agent', agentId)
+    .eq('agent_assembled', true)
+    .order('created_at', { ascending: false });
+
+  if (error || !groups) {
+    console.warn('[AgentService] getAgentGroups error:', error?.message);
+    return [];
+  }
+
+  return groups.map(g => ({
+    id: g.id,
+    name: g.name || 'Untitled Group',
+    agentId: g.created_by_agent,
+    targetListingId: g.target_listing_id,
+    members: [],
+    memberIds: (g.group_members || []).map((m: any) => m.user_id),
+    groupStatus: g.group_status || 'assembling',
+    avgCompatibility: 0,
+    combinedBudgetMin: 0,
+    combinedBudgetMax: 0,
+    coversRent: false,
+    invites: [],
+    createdAt: g.created_at,
+  }));
 }
 
 export async function createAgentGroup(group: AgentGroup): Promise<AgentGroup> {
-  const data = await StorageService.getData(AGENT_GROUPS_KEY);
-  const groups = data ? JSON.parse(data) : [];
-  groups.push(group);
-  await StorageService.storeData(AGENT_GROUPS_KEY, JSON.stringify(groups));
-  return group;
+  if (!isSupabaseConfigured) {
+    const data = await StorageService.getData(AGENT_GROUPS_KEY);
+    const groups = data ? JSON.parse(data) : [];
+    groups.push(group);
+    await StorageService.storeData(AGENT_GROUPS_KEY, JSON.stringify(groups));
+    return group;
+  }
+
+  const { data: newGroup, error } = await supabase
+    .from('groups')
+    .insert({
+      name: group.name,
+      type: 'roommate',
+      created_by: group.agentId,
+      created_by_agent: group.agentId,
+      agent_assembled: true,
+      target_listing_id: group.targetListingId || null,
+      group_status: group.groupStatus || 'assembling',
+      is_discoverable: false,
+    })
+    .select()
+    .single();
+
+  if (error || !newGroup) {
+    console.warn('[AgentService] createAgentGroup error:', error?.message);
+    return group;
+  }
+
+  if (group.memberIds.length > 0) {
+    const members = group.memberIds.map(userId => ({
+      group_id: newGroup.id,
+      user_id: userId,
+      role: 'member' as const,
+    }));
+    await supabase.from('group_members').insert(members);
+  }
+
+  return { ...group, id: newGroup.id };
 }
 
 export async function updateAgentGroupStatus(
   groupId: string,
   status: 'assembling' | 'invited' | 'active' | 'placed' | 'dissolved'
 ): Promise<void> {
-  const data = await StorageService.getData(AGENT_GROUPS_KEY);
-  const groups = data ? JSON.parse(data) : [];
-  const idx = groups.findIndex((g: AgentGroup) => g.id === groupId);
-  if (idx >= 0) {
-    groups[idx].groupStatus = status;
-    await StorageService.storeData(AGENT_GROUPS_KEY, JSON.stringify(groups));
+  if (!isSupabaseConfigured) {
+    const data = await StorageService.getData(AGENT_GROUPS_KEY);
+    const groups = data ? JSON.parse(data) : [];
+    const idx = groups.findIndex((g: AgentGroup) => g.id === groupId);
+    if (idx >= 0) {
+      groups[idx].groupStatus = status;
+      await StorageService.storeData(AGENT_GROUPS_KEY, JSON.stringify(groups));
+    }
+    return;
   }
+
+  await supabase
+    .from('groups')
+    .update({ group_status: status })
+    .eq('id', groupId);
 }
 
 export async function getAgentInvitesForRenter(renterId: string): Promise<AgentGroupInvite[]> {
-  const data = await StorageService.getData(AGENT_INVITES_KEY);
-  const invites = data ? JSON.parse(data) : [];
-  return invites.filter((i: AgentGroupInvite) => i.renterId === renterId);
+  if (!isSupabaseConfigured) {
+    const data = await StorageService.getData(AGENT_INVITES_KEY);
+    const invites = data ? JSON.parse(data) : [];
+    return invites.filter((i: AgentGroupInvite) => i.renterId === renterId);
+  }
+
+  const { data, error } = await supabase
+    .from('agent_group_invites')
+    .select('*')
+    .eq('renter_id', renterId)
+    .order('sent_at', { ascending: false });
+
+  if (error || !data) return [];
+
+  return data.map(inv => ({
+    id: inv.id,
+    agentId: inv.agent_id,
+    renterId: inv.renter_id,
+    groupId: inv.group_id,
+    listingId: inv.listing_id,
+    status: inv.status,
+    message: inv.message,
+    sentAt: inv.sent_at,
+    respondedAt: inv.responded_at,
+    agentName: inv.agent_name,
+    listingTitle: inv.listing_title,
+    listingRent: inv.listing_rent,
+    listingBedrooms: inv.listing_bedrooms,
+    listingNeighborhood: inv.listing_neighborhood,
+    listingAvailableDate: inv.listing_available_date,
+    groupMembers: inv.group_members || [],
+  }));
 }
 
 export async function sendAgentInvites(
@@ -115,54 +266,134 @@ export async function sendAgentInvites(
   message: string,
   memberNames: Array<{ id: string; name: string; photo?: string }>
 ): Promise<void> {
-  const data = await StorageService.getData(AGENT_INVITES_KEY);
-  const invites = data ? JSON.parse(data) : [];
+  if (!isSupabaseConfigured) {
+    const data = await StorageService.getData(AGENT_INVITES_KEY);
+    const invites = data ? JSON.parse(data) : [];
 
-  for (const renterId of renterIds) {
-    invites.push({
-      id: `inv_${Date.now()}_${renterId}`,
-      agentId,
-      renterId,
-      groupId,
-      listingId: listing.id,
-      status: 'pending',
-      message,
-      sentAt: new Date().toISOString(),
-      agentName,
-      listingTitle: listing.title,
-      listingRent: listing.price,
-      listingBedrooms: listing.bedrooms,
-      listingNeighborhood: listing.neighborhood,
-      listingAvailableDate: listing.availableDate?.toString(),
-      groupMembers: memberNames.map(m => ({ ...m, compatibility: 0 })),
-    });
+    for (const renterId of renterIds) {
+      invites.push({
+        id: `inv_${Date.now()}_${renterId}`,
+        agentId,
+        renterId,
+        groupId,
+        listingId: listing.id,
+        status: 'pending',
+        message,
+        sentAt: new Date().toISOString(),
+        agentName,
+        listingTitle: listing.title,
+        listingRent: listing.price,
+        listingBedrooms: listing.bedrooms,
+        listingNeighborhood: listing.neighborhood,
+        listingAvailableDate: listing.availableDate?.toString(),
+        groupMembers: memberNames.map(m => ({ ...m, compatibility: 0 })),
+      });
+    }
+
+    await StorageService.storeData(AGENT_INVITES_KEY, JSON.stringify(invites));
+    return;
   }
 
-  await StorageService.storeData(AGENT_INVITES_KEY, JSON.stringify(invites));
+  const rows = renterIds.map(renterId => ({
+    agent_id: agentId,
+    renter_id: renterId,
+    group_id: groupId,
+    listing_id: listing.id,
+    status: 'pending',
+    message,
+    agent_name: agentName,
+    listing_title: listing.title,
+    listing_rent: listing.price,
+    listing_bedrooms: listing.bedrooms,
+    listing_neighborhood: listing.neighborhood || null,
+    listing_available_date: listing.availableDate?.toString() || null,
+    group_members: memberNames.map(m => ({ ...m, compatibility: 0 })),
+  }));
+
+  const { error } = await supabase
+    .from('agent_group_invites')
+    .insert(rows);
+
+  if (error) {
+    console.warn('[AgentService] sendAgentInvites error:', error.message);
+  }
+
+  await supabase
+    .from('groups')
+    .update({ group_status: 'invited' })
+    .eq('id', groupId);
 }
 
 export async function respondToInvite(inviteId: string, accept: boolean): Promise<void> {
-  const data = await StorageService.getData(AGENT_INVITES_KEY);
-  const invites = data ? JSON.parse(data) : [];
-  const idx = invites.findIndex((i: AgentGroupInvite) => i.id === inviteId);
-  if (idx >= 0) {
-    invites[idx].status = accept ? 'accepted' : 'declined';
-    invites[idx].respondedAt = new Date().toISOString();
-    await StorageService.storeData(AGENT_INVITES_KEY, JSON.stringify(invites));
+  if (!isSupabaseConfigured) {
+    const data = await StorageService.getData(AGENT_INVITES_KEY);
+    const invites = data ? JSON.parse(data) : [];
+    const idx = invites.findIndex((i: AgentGroupInvite) => i.id === inviteId);
+    if (idx >= 0) {
+      invites[idx].status = accept ? 'accepted' : 'declined';
+      invites[idx].respondedAt = new Date().toISOString();
+      await StorageService.storeData(AGENT_INVITES_KEY, JSON.stringify(invites));
 
-    if (accept) {
-      const invite = invites[idx];
-      const groupData = await StorageService.getData(AGENT_GROUPS_KEY);
-      const groups = groupData ? JSON.parse(groupData) : [];
-      const gIdx = groups.findIndex((g: AgentGroup) => g.id === invite.groupId);
-      if (gIdx >= 0) {
-        const pendingInvites = invites.filter(
-          (i: AgentGroupInvite) => i.groupId === invite.groupId && i.status === 'pending'
-        );
-        if (pendingInvites.length === 0) {
-          groups[gIdx].groupStatus = 'active';
-          await StorageService.storeData(AGENT_GROUPS_KEY, JSON.stringify(groups));
+      if (accept) {
+        const invite = invites[idx];
+        const groupData = await StorageService.getData(AGENT_GROUPS_KEY);
+        const groups = groupData ? JSON.parse(groupData) : [];
+        const gIdx = groups.findIndex((g: AgentGroup) => g.id === invite.groupId);
+        if (gIdx >= 0) {
+          const pendingInvites = invites.filter(
+            (i: AgentGroupInvite) => i.groupId === invite.groupId && i.status === 'pending'
+          );
+          if (pendingInvites.length === 0) {
+            groups[gIdx].groupStatus = 'active';
+            await StorageService.storeData(AGENT_GROUPS_KEY, JSON.stringify(groups));
+          }
         }
+      }
+    }
+    return;
+  }
+
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from('agent_group_invites')
+    .update({
+      status: accept ? 'accepted' : 'declined',
+      responded_at: now,
+    })
+    .eq('id', inviteId);
+
+  if (error) {
+    console.warn('[AgentService] respondToInvite error:', error.message);
+    return;
+  }
+
+  if (accept) {
+    const { data: invite } = await supabase
+      .from('agent_group_invites')
+      .select('group_id, renter_id')
+      .eq('id', inviteId)
+      .single();
+
+    if (invite) {
+      await supabase
+        .from('group_members')
+        .upsert({
+          group_id: invite.group_id,
+          user_id: invite.renter_id,
+          role: 'member',
+        }, { onConflict: 'group_id,user_id' });
+
+      const { data: pending } = await supabase
+        .from('agent_group_invites')
+        .select('id')
+        .eq('group_id', invite.group_id)
+        .eq('status', 'pending');
+
+      if (!pending || pending.length === 0) {
+        await supabase
+          .from('groups')
+          .update({ group_status: 'active' })
+          .eq('id', invite.group_id);
       }
     }
   }
@@ -174,20 +405,57 @@ export async function recordPlacement(
   listingId: string,
   placementFeeCents: number
 ): Promise<AgentPlacement> {
-  const placement: AgentPlacement = {
-    id: `pl_${Date.now()}`,
-    agentId,
-    groupId,
-    listingId,
-    placementFeeCents,
-    placedAt: new Date().toISOString(),
-    billingStatus: 'pending',
+  if (!isSupabaseConfigured) {
+    const placement: AgentPlacement = {
+      id: `pl_${Date.now()}`,
+      agentId,
+      groupId,
+      listingId,
+      placementFeeCents,
+      placedAt: new Date().toISOString(),
+      billingStatus: 'pending',
+    };
+    const data = await StorageService.getData(AGENT_PLACEMENTS_KEY);
+    const placements = data ? JSON.parse(data) : [];
+    placements.push(placement);
+    await StorageService.storeData(AGENT_PLACEMENTS_KEY, JSON.stringify(placements));
+    return placement;
+  }
+
+  const { data, error } = await supabase
+    .from('agent_placements')
+    .insert({
+      agent_id: agentId,
+      group_id: groupId,
+      listing_id: listingId,
+      placement_fee_cents: placementFeeCents,
+      billing_status: 'pending',
+    })
+    .select()
+    .single();
+
+  if (error || !data) {
+    console.warn('[AgentService] recordPlacement error:', error?.message);
+    return {
+      id: `pl_${Date.now()}`,
+      agentId,
+      groupId,
+      listingId,
+      placementFeeCents,
+      placedAt: new Date().toISOString(),
+      billingStatus: 'pending',
+    };
+  }
+
+  return {
+    id: data.id,
+    agentId: data.agent_id,
+    groupId: data.group_id,
+    listingId: data.listing_id,
+    placementFeeCents: data.placement_fee_cents,
+    placedAt: data.placed_at,
+    billingStatus: data.billing_status,
   };
-  const data = await StorageService.getData(AGENT_PLACEMENTS_KEY);
-  const placements = data ? JSON.parse(data) : [];
-  placements.push(placement);
-  await StorageService.storeData(AGENT_PLACEMENTS_KEY, JSON.stringify(placements));
-  return placement;
 }
 
 export async function chargeAgentPlacementFee(
@@ -223,13 +491,30 @@ export async function chargeAgentPlacementFee(
 }
 
 export async function getMonthlyPlacementCount(agentId: string): Promise<number> {
-  const data = await StorageService.getData(AGENT_PLACEMENTS_KEY);
-  const placements: AgentPlacement[] = data ? JSON.parse(data) : [];
+  if (!isSupabaseConfigured) {
+    const data = await StorageService.getData(AGENT_PLACEMENTS_KEY);
+    const placements: AgentPlacement[] = data ? JSON.parse(data) : [];
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    return placements.filter(
+      p => p.agentId === agentId && new Date(p.placedAt) >= startOfMonth
+    ).length;
+  }
+
   const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  return placements.filter(
-    p => p.agentId === agentId && new Date(p.placedAt) >= startOfMonth
-  ).length;
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+  const { count, error } = await supabase
+    .from('agent_placements')
+    .select('*', { count: 'exact', head: true })
+    .eq('agent_id', agentId)
+    .gte('placed_at', startOfMonth);
+
+  if (error) {
+    console.warn('[AgentService] getMonthlyPlacementCount error:', error.message);
+    return 0;
+  }
+  return count || 0;
 }
 
 export function generateAISuggestions(renters: AgentRenter[], listing: Property): Array<{

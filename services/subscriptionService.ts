@@ -38,6 +38,15 @@ export async function updateSubscription(plan: string, billingCycle: BillingCycl
     .single();
 
   if (error) throw error;
+
+  const agentPlans = ['pay_per_use', 'starter', 'pro', 'business'];
+  if (agentPlans.includes(plan)) {
+    await supabase
+      .from('users')
+      .update({ agent_plan: plan })
+      .eq('id', user.id);
+  }
+
   return data;
 }
 

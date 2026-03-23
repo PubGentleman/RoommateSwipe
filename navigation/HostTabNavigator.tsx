@@ -274,6 +274,27 @@ export const HostTabNavigator = () => {
     );
   }
 
+  if (hostType === 'company') {
+    return (
+      <Tab.Navigator
+        initialRouteName="Dashboard"
+        tabBar={(props) => <HostCustomTabBar {...props} />}
+        backBehavior="history"
+        screenOptions={{
+          headerShown: false,
+          lazy: true,
+          freezeOnBlur: true,
+        }}
+      >
+        <Tab.Screen name="Dashboard" component={DashboardStackNavigator} />
+        <Tab.Screen name="Listings" component={ListingsStackNavigator} />
+        <Tab.Screen name="Groups" component={HostGroupsStackNavigator} />
+        <Tab.Screen name="Messages" component={HostMessagesStackNavigator} />
+        <Tab.Screen name="Profile" component={ProfileStackNavigator} />
+      </Tab.Navigator>
+    );
+  }
+
   return (
     <Tab.Navigator
       initialRouteName="Dashboard"

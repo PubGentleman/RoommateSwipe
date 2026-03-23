@@ -1,0 +1,302 @@
+# Rhome v11 — Fix Prompts for Replit Agent
+
+Paste each prompt into Replit Agent separately, in order. Complete and verify each one before moving to the next.
+
+---
+
+## PROMPT 1 — Migrate agentMatchmakerService from AsyncStorage to Supabase
+
+```
+The file services/agentMatchmakerService.ts currently reads and writes all agent data
+(shortlists, groups, invites, placements) to AsyncStorage using StorageService.
+This means agent data is device-only and renters cannot see invites from agents.
+
+The Supabase tables for this already exist (migration 017):
+- agent_shortlists (id, agent_id, renter_id, listing_id, created_at)
+- agent_group_invites (id, agent_id, renter_id, group_id, listing_id, status, message, sent_at, responded_at)
+- agent_placements (id, agent_id, group_id, listing_id, placement_fee_cents, stripe_payment_intent_id, placed_at, billing_status)
+- groups table already has: created_by_agent, agent_assembled, target_listing_id, group_status columns
+
+Rewrite services/agentMatchmakerService.ts to use Supabase for all operations.
+Keep the same exported function signatures so no screen imports break.
+Use the pattern: if (!isSupabaseConfigured) fall back to StorageService (for dev/testing).
+
+Functions to migrate:
+1. getShortlistedRenterIds(agentId) → query agent_shortlists where agent_id = agentId
+2. addToShortlist(agentId, renterId, listingId?) → insert into agent_shortlists
+3. removeFromShortlist(agentId, renterId) → delete from agent_shortlists
+4. getAgentGroups(agentId) → query groups where created_by_agent = agentId, join with group_members
+5. createAgentGroup(group) → insert into groups with agent fields, then insert group_members
+6. updateAgentGroupStatus(groupId, status) → update groups.group_status
+7. getAgentInvitesForRenter(renterId) → query agent_group_invites where renter_id = renterId
+8. sendAgentInvites(agentId, agentName, groupId, renterIds, listing, message, memberNames) → insert into agent_group_invites for each renterId
+9. respondToInvite(inviteId, accept) → update agent_group_invites.status = accept ? 'accepted' : 'declined', update responded_at
+10. recordPlacement(agentId, groupId, listingId, feeCents) → insert into agent_placements
+11. getMonthlyPlacementCount(agentId) → count agent_placements where agent_id = agentId and placed_at >= start of current month
+
+Keep the helper functions generateAISuggestions, generateBestGroupSuggestion, calculatePairMatrix,
+generateBestGroupSuggestion as-is — they are pure computation functions, not storage.
+
+Also keep chargeAgentPlacementFee as-is — it already calls the Supabase Edge Function correctly.
+```
+
+---
+
+## PROMPT 2 — Fix BrowseRentersScreen to load real users from Supabase
+
+```
+The file screens/host/BrowseRentersScreen.tsx currently loads renter profiles from
+StorageService.getRoommateProfiles() which returns mock seed data, not real Supabase users.
+
+Fix the loadData() function to fetch real renters from Supabase instead:
+
+1. Replace the StorageService.getRoommateProfiles() call with a Supabase query:
+   - Query the users table joined with profiles where role = 'renter' and onboarding_step = 'complete'
+   - Exclude the current user
+   - Limit to 100 records
+   - Select: id, full_name, avatar_url, age, city, occupation, last_active_at from users
+   - Select from profiles: budget_max, move_in_date, room_type, cleanliness, sleep_schedule,
+     smoking, pets, interests, photos, bio, preferred_trains, budget_per_person_min,
+     budget_per_person_max, desired_bedrooms, location_flexible, wfh, apartment_prefs_complete
+
+2. Map the Supabase result into the AgentRenter interface:
+   {
+     id: user.id,
+     name: user.full_name,
+     age: user.age,
+     occupation: user.occupation,
+     photos: profile.photos || (user.avatar_url ? [user.avatar_url] : []),
+     city: user.city,
+     budgetMin: profile.budget_per_person_min || (profile.budget_max ? profile.budget_max * 0.8 : undefined),
+     budgetMax: profile.budget_per_person_max || profile.budget_max,
+     moveInDate: profile.move_in_date,
+     cleanliness: profile.cleanliness,
+     sleepSchedule: profile.sleep_schedule,
+     smoking: profile.smoking,
+     pets: profile.pets === 'yes',
+     interests: profile.interests || [],
+     roomType: profile.room_type,
+     bio: profile.bio,
+   }
+
+3. Also map each renter to a RoommateProfile shape for the transit filter
+   (filterRentersForListing needs apartmentPrefs). Map preferred_trains, budget_per_person_min/max,
+   desired_bedrooms, location_flexible, wfh, apartment_prefs_complete into the apartmentPrefs field.
+
+4. Also fix loadData() to load the agent's own listings from Supabase:
+   - Query listings where host_id = user.id and available = true
+   - Instead of StorageService.getProperties()
+
+Keep the rest of the screen logic (transit filtering, shortlisting, AI suggestions) unchanged.
+```
+
+---
+
+## PROMPT 3 — Sync ApartmentPreferences to Supabase + add agent_plan to DB
+
+```
+There are two related fixes needed:
+
+### FIX A: ApartmentPreferencesScreen must sync to Supabase
+
+The file screens/shared/ApartmentPreferencesScreen.tsx saves apartment preferences
+via StorageService only. Migration 018 added these columns to the profiles table:
+- desired_bedrooms, budget_per_person_min, budget_per_person_max
+- preferred_trains, preferred_neighborhoods, amenity_must_haves
+- location_flexible, wfh, apartment_prefs_complete
+
+Find the save function in ApartmentPreferencesScreen (the function that calls StorageService
+after step 5 / the final step). After saving to StorageService, also call:
+
+  import { updateProfile } from '../../services/profileService';
+
+  await updateProfile({
+    desired_bedrooms: bedrooms,
+    budget_per_person_min: BUDGET_OPTIONS[budgetIdx].min,
+    budget_per_person_max: BUDGET_OPTIONS[budgetIdx].max,
+    preferred_trains: selectedTrains,
+    preferred_neighborhoods: neighborhoods,
+    amenity_must_haves: amenities,
+    location_flexible: hasCar,
+    wfh: isWfh,
+    apartment_prefs_complete: true,
+  });
+
+Wrap in try/catch so a Supabase error doesn't block the local save.
+
+### FIX B: Add agent_plan column to users table and read it properly
+
+1. Create a new migration file: supabase/migrations/019_agent_plan.sql
+   Content:
+   ALTER TABLE public.users
+     ADD COLUMN IF NOT EXISTS agent_plan TEXT DEFAULT 'pay_per_use'
+       CHECK (agent_plan IN ('pay_per_use', 'starter', 'pro', 'business'));
+
+2. In services/subscriptionService.ts, find the function that handles a successful
+   agent subscription. After a subscription is created for an agent, also call:
+   await supabase.from('users').update({ agent_plan: planKey }).eq('id', userId);
+   where planKey is one of: 'pay_per_use', 'starter', 'pro', 'business'.
+
+3. In contexts/AuthContext.tsx, find where the user object is built from Supabase data.
+   Add: agentPlan: supabaseUser.agent_plan || 'pay_per_use'
+   to the mapped user object so it's available everywhere as user.agentPlan.
+
+4. In screens/host/BrowseRentersScreen.tsx, the line:
+   const agentPlan: AgentPlan = (user?.agentPlan as AgentPlan) || 'pay_per_use';
+   will now correctly read the persisted value from the DB via AuthContext.
+```
+
+---
+
+## PROMPT 4 — Build calculate-match-scores Edge Function
+
+```
+Create a new Supabase Edge Function at supabase/functions/calculate-match-scores/index.ts
+
+This function calculates compatibility scores between users and writes them to the
+match_scores table (created in migration 016):
+  match_scores(id, user_id_1, user_id_2, score, breakdown, calculated_at)
+
+The function should be called after a user sends an interest card (swipe right).
+
+### Function logic:
+
+1. Accept POST with body: { userId: string } (the user who just swiped or updated profile)
+
+2. Auth: require valid Supabase JWT in Authorization header
+
+3. Fetch the requesting user's full profile from users + profiles tables
+
+4. Fetch up to 50 candidate profiles:
+   - role = 'renter', onboarding_step = 'complete'
+   - Not the current user
+   - Not already in match_scores within last 24 hours
+
+5. For each candidate, calculate a compatibility score using this weighted system:
+   Budget overlap (25 points):
+     - If both have budget_max set: check overlap. Full overlap = 25, partial = 12, none = 0
+   Sleep schedule (20 points):
+     - Exact match = 20, one is flexible = 10, mismatch = 0
+   Cleanliness (20 points):
+     - Abs difference: 0-1 = 20, 2 = 12, 3 = 5, 4+ = 0
+   Smoking (15 points):
+     - Both same = 15, mismatch = 0
+   Move-in date (10 points):
+     - Within 14 days = 10, within 30 days = 7, within 60 days = 3, beyond = 0
+   Pets (10 points):
+     - Both same = 10, mismatch = 0
+
+   Total score = sum of above (max 100)
+
+6. Upsert into match_scores:
+   INSERT INTO match_scores (user_id_1, user_id_2, score, breakdown, calculated_at)
+   VALUES (...)
+   ON CONFLICT (user_id_1, user_id_2) DO UPDATE SET score = EXCLUDED.score,
+   breakdown = EXCLUDED.breakdown, calculated_at = EXCLUDED.calculated_at
+
+   Always store with user_id_1 < user_id_2 (alphabetically) to avoid duplicates.
+
+7. Return { calculated: number_of_scores_written }
+
+### Trigger point:
+In services/discoverService.ts or wherever interest cards are sent,
+after a successful insert into interest_cards, call:
+  supabase.functions.invoke('calculate-match-scores', { body: { userId: user.id } })
+Don't await it — fire and forget so it doesn't slow down the swipe.
+
+### Add migration: supabase/migrations/019_match_scores_unique.sql (or add to 019 if not yet created)
+  ALTER TABLE public.match_scores
+    ADD CONSTRAINT match_scores_user_pair_unique UNIQUE (user_id_1, user_id_2);
+```
+
+---
+
+## PROMPT 5 — Fix company host tab + N+1 in messageService
+
+```
+Two unrelated fixes:
+
+### FIX A: Company host should not see the Roommates swipe tab
+
+In navigation/HostTabNavigator.tsx, the HostTabNavigator currently only checks
+hostType === 'agent' to branch tab layouts. Individual AND company hosts both fall
+through to the default layout which includes the Roommates swipe tab.
+
+Company hosts list apartments for businesses/large landlords — they should not
+be browsing individual renters looking for roommates.
+
+Update the logic:
+
+  const hostType = user?.hostType;
+
+  if (hostType === 'agent') {
+    // existing agent layout (Listings, BrowseRenters, AgentGroups, Messages, Profile)
+  }
+
+  if (hostType === 'company') {
+    return (
+      <Tab.Navigator initialRouteName="Dashboard" tabBar={...} ...>
+        <Tab.Screen name="Dashboard" component={DashboardStackNavigator} />
+        <Tab.Screen name="Listings" component={ListingsStackNavigator} />
+        <Tab.Screen name="Groups" component={HostGroupsStackNavigator} />
+        <Tab.Screen name="Messages" component={HostMessagesStackNavigator} />
+        <Tab.Screen name="Profile" component={ProfileStackNavigator} />
+      </Tab.Navigator>
+    );
+  }
+
+  // Default = individual host: gets Dashboard, Listings, Roommates, Groups, Messages, Profile
+  return (existing default layout with Roommates tab);
+
+### FIX B: Fix N+1 query in messageService.getConversations()
+
+Currently getConversations() runs 3 separate Supabase queries per conversation
+(other user profile, last message, unread count). With 50 matches that's 150 DB calls.
+
+Rewrite getConversations() to use a single query with joins:
+
+  const { data: matches } = await supabase
+    .from('matches')
+    .select(`
+      id,
+      user_id_1,
+      user_id_2,
+      match_type,
+      status,
+      compatibility_score,
+      created_at,
+      user1:users!user_id_1(id, full_name, avatar_url, city),
+      user2:users!user_id_2(id, full_name, avatar_url, city),
+      messages(id, content, created_at, sender_id, read_at)
+    `)
+    .eq('status', 'matched')
+    .or(`user_id_1.eq.${user.id},user_id_2.eq.${user.id}`)
+    .order('created_at', { ascending: false })
+    .limit(30);
+
+Then for each match:
+- Determine otherUser = match.user_id_1 === user.id ? match.user2 : match.user1
+- Get lastMessage = match.messages sorted by created_at desc, take first
+- Get unreadCount = match.messages.filter(m => m.sender_id !== user.id && !m.read_at).length
+
+Build the conversation object from this data instead of making extra calls.
+Remove the Promise.all loop with individual queries.
+```
+
+---
+
+## After All Prompts — Run These Migrations in Supabase
+
+After Replit Agent completes all the above, go to your Supabase Dashboard → SQL Editor and run:
+
+```sql
+-- Migration 019: agent_plan column + match_scores unique constraint
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS agent_plan TEXT DEFAULT 'pay_per_use'
+    CHECK (agent_plan IN ('pay_per_use', 'starter', 'pro', 'business'));
+
+ALTER TABLE public.match_scores
+  ADD CONSTRAINT IF NOT EXISTS match_scores_user_pair_unique UNIQUE (user_id_1, user_id_2);
+```
+
+Then deploy the new `calculate-match-scores` Edge Function from the Supabase Dashboard or via CLI.

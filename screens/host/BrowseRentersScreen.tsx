@@ -11,6 +11,7 @@ import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { StorageService } from '../../utils/storage';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { Property, RoommateProfile } from '../../types/models';
 import {
   AgentRenter,
@@ -72,33 +73,137 @@ export const BrowseRentersScreen = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const profiles: RoommateProfile[] = await StorageService.getRoommateProfiles();
+      let mapped: AgentRenter[] = [];
+      let profiles: RoommateProfile[] = [];
+      let myListings: Property[] = [];
+
+      if (isSupabaseConfigured) {
+        const { data: supaRenters } = await supabase
+          .from('users')
+          .select(`
+            id, full_name, avatar_url, age, city, occupation, last_active_at, bio, gender,
+            profile:profiles(
+              budget_max, budget_min, move_in_date, room_type, cleanliness,
+              sleep_schedule, smoking, pets, interests, photos, bio,
+              preferred_trains, budget_per_person_min, budget_per_person_max,
+              desired_bedrooms, location_flexible, wfh, apartment_prefs_complete
+            )
+          `)
+          .eq('role', 'renter')
+          .eq('onboarding_step', 'complete')
+          .neq('id', user?.id || '')
+          .limit(100);
+
+        const renterData = supaRenters || [];
+        mapped = renterData.map((u: any) => {
+          const p = Array.isArray(u.profile) ? u.profile[0] : u.profile;
+          return {
+            id: u.id,
+            name: u.full_name || 'Unknown',
+            age: u.age || 0,
+            occupation: u.occupation || '',
+            photos: p?.photos || (u.avatar_url ? [u.avatar_url] : []),
+            city: u.city,
+            budgetMin: p?.budget_per_person_min || (p?.budget_max ? p.budget_max * 0.8 : undefined),
+            budgetMax: p?.budget_per_person_max || p?.budget_max,
+            moveInDate: p?.move_in_date,
+            cleanliness: p?.cleanliness,
+            sleepSchedule: p?.sleep_schedule,
+            smoking: p?.smoking,
+            pets: p?.pets === 'yes' || p?.pets === true,
+            interests: p?.interests || [],
+            roomType: p?.room_type,
+            gender: u.gender,
+            bio: p?.bio || u.bio,
+          };
+        });
+
+        profiles = renterData.map((u: any) => {
+          const p = Array.isArray(u.profile) ? u.profile[0] : u.profile;
+          return {
+            id: u.id,
+            name: u.full_name || 'Unknown',
+            age: u.age || 0,
+            occupation: u.occupation || '',
+            photos: p?.photos || [],
+            bio: p?.bio || u.bio || '',
+            gender: u.gender || '',
+            lookingFor: p?.room_type || '',
+            budget: p?.budget_max || 0,
+            preferences: { location: u.city || '' },
+            lifestyle: {
+              cleanliness: p?.cleanliness,
+              workSchedule: p?.sleep_schedule,
+              smoking: p?.smoking,
+              pets: p?.pets,
+            },
+            apartmentPrefs: p?.apartment_prefs_complete ? {
+              desiredBedrooms: p.desired_bedrooms,
+              budgetPerPersonMin: p.budget_per_person_min,
+              budgetPerPersonMax: p.budget_per_person_max,
+              preferredTrains: p.preferred_trains || [],
+              locationFlexible: p.location_flexible,
+              wfh: p.wfh,
+              apartmentPrefsComplete: true,
+            } : undefined,
+          } as RoommateProfile;
+        });
+
+        const { data: supaListings } = await supabase
+          .from('listings')
+          .select('*')
+          .eq('host_id', user?.id || '')
+          .eq('available', true);
+
+        myListings = (supaListings || []).map((l: any) => ({
+          id: l.id,
+          title: l.title,
+          price: l.price,
+          bedrooms: l.bedrooms,
+          bathrooms: l.bathrooms,
+          city: l.city,
+          neighborhood: l.neighborhood,
+          address: l.address,
+          description: l.description,
+          photos: l.photos || [],
+          amenities: l.amenities || [],
+          available: l.available,
+          hostId: l.host_id,
+          availableDate: l.available_date ? new Date(l.available_date) : undefined,
+          latitude: l.latitude,
+          longitude: l.longitude,
+        }));
+      } else {
+        const storedProfiles: RoommateProfile[] = await StorageService.getRoommateProfiles();
+        profiles = storedProfiles;
+        mapped = storedProfiles.map(p => ({
+          id: p.id,
+          name: p.name,
+          age: p.age,
+          occupation: p.occupation,
+          photos: p.photos || [],
+          city: p.preferences?.location,
+          neighborhood: p.preferences?.location,
+          budgetMin: p.budget ? p.budget * 0.8 : undefined,
+          budgetMax: p.budget,
+          moveInDate: p.preferences?.moveInDate,
+          cleanliness: p.lifestyle?.cleanliness,
+          sleepSchedule: p.lifestyle?.workSchedule,
+          smoking: p.lifestyle?.smoking,
+          pets: p.lifestyle?.pets,
+          interests: p.profileData?.interests || [],
+          roomType: p.lookingFor,
+          gender: p.gender,
+          bio: p.bio,
+        }));
+
+        const props = await StorageService.getProperties();
+        myListings = props.filter(p => p.hostId === user?.id && p.available);
+      }
+
       setAllProfiles(profiles);
-      const mapped: AgentRenter[] = profiles.map(p => ({
-        id: p.id,
-        name: p.name,
-        age: p.age,
-        occupation: p.occupation,
-        photos: p.photos || [],
-        city: p.preferences?.location,
-        neighborhood: p.preferences?.location,
-        budgetMin: p.budget ? p.budget * 0.8 : undefined,
-        budgetMax: p.budget,
-        moveInDate: p.preferences?.moveInDate,
-        cleanliness: p.lifestyle?.cleanliness,
-        sleepSchedule: p.lifestyle?.workSchedule,
-        smoking: p.lifestyle?.smoking,
-        pets: p.lifestyle?.pets,
-        interests: p.profileData?.interests || [],
-        roomType: p.lookingFor,
-        gender: p.gender,
-        bio: p.bio,
-      }));
       setRenters(mapped);
       setFilteredRenters(mapped);
-
-      const props = await StorageService.getProperties();
-      const myListings = props.filter(p => p.hostId === user?.id && p.available);
       setListings(myListings);
 
       if (user) {

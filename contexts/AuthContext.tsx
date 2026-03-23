@@ -265,6 +265,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       avgResponseHours: supabaseUser.avg_response_hours || undefined,
       hostTypeLockedAt: supabaseUser.host_type_locked_at || undefined,
       hostTypeChangeRequested: supabaseUser.host_type_change_requested || false,
+      agentPlan: supabaseUser.agent_plan || 'pay_per_use',
     };
   };
 

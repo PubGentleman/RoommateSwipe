@@ -13,51 +13,41 @@ export async function getConversations() {
       match_type,
       status,
       compatibility_score,
-      created_at
+      created_at,
+      user1:users!user_id_1(id, full_name, avatar_url, city),
+      user2:users!user_id_2(id, full_name, avatar_url, city),
+      messages(id, content, created_at, sender_id, read, read_at)
     `)
     .eq('status', 'matched')
     .or(`user_id_1.eq.${user.id},user_id_2.eq.${user.id}`)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .limit(30);
 
   if (!matches || matches.length === 0) return [];
 
-  const conversations = await Promise.all(
-    matches.map(async (match) => {
-      const otherUserId = match.user_id_1 === user.id ? match.user_id_2 : match.user_id_1;
+  const conversations = matches.map((match: any) => {
+    const otherUser = match.user_id_1 === user.id ? match.user2 : match.user1;
+    const msgs = match.messages || [];
+    const sortedMsgs = [...msgs].sort(
+      (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+    const lastMsg = sortedMsgs[0];
+    const unreadCount = msgs.filter(
+      (m: any) => m.sender_id !== user.id && !m.read && !m.read_at
+    ).length;
 
-      const { data: otherUser } = await supabase
-        .from('users')
-        .select('id, full_name, avatar_url, city')
-        .eq('id', otherUserId)
-        .single();
+    return {
+      matchId: match.id,
+      matchType: match.match_type,
+      compatibilityScore: match.compatibility_score,
+      participant: otherUser,
+      lastMessage: lastMsg?.content || null,
+      lastMessageAt: lastMsg?.created_at || match.created_at,
+      unreadCount,
+    };
+  });
 
-      const { data: messages } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('match_id', match.id)
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      const { count } = await supabase
-        .from('messages')
-        .select('*', { count: 'exact', head: true })
-        .eq('match_id', match.id)
-        .eq('read', false)
-        .neq('sender_id', user.id);
-
-      return {
-        matchId: match.id,
-        matchType: match.match_type,
-        compatibilityScore: match.compatibility_score,
-        participant: otherUser,
-        lastMessage: messages?.[0]?.content || null,
-        lastMessageAt: messages?.[0]?.created_at || match.created_at,
-        unreadCount: count || 0,
-      };
-    })
-  );
-
-  return conversations.sort((a, b) =>
+  return conversations.sort((a: any, b: any) =>
     new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()
   );
 }

@@ -18,6 +18,7 @@ import { Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { ProgressBar } from '../../components/questionnaire/ProgressBar';
 import { ApartmentPreferences } from '../../types/models';
 import { StorageService } from '../../utils/storage';
+import { updateProfile } from '../../services/profileService';
 import {
   SUBWAY_LINES,
   OTHER_TRANSIT,
@@ -119,6 +120,23 @@ export default function ApartmentPreferencesScreen() {
     };
 
     await StorageService.setApartmentPreferences(user.id, prefs);
+
+    try {
+      await updateProfile({
+        desired_bedrooms: bedrooms,
+        budget_per_person_min: budget.min,
+        budget_per_person_max: budget.max,
+        preferred_trains: selectedTrains,
+        preferred_neighborhoods: neighborhoods,
+        amenity_must_haves: amenities,
+        location_flexible: hasCar,
+        wfh: isWfh,
+        apartment_prefs_complete: true,
+      } as any);
+    } catch (e) {
+      console.warn('[ApartmentPrefs] Supabase sync failed:', e);
+    }
+
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setSaving(false);
     navigation.goBack();

@@ -108,6 +108,10 @@ export async function sendLike(recipientId: string) {
 
   await incrementUsage('interest_cards_today');
 
+  supabase.functions.invoke('calculate-match-scores', {
+    body: { userId: user.id },
+  }).catch(() => {});
+
   const { data: match } = await supabase
     .from('matches')
     .select('*')

@@ -38,7 +38,7 @@ The application is built with React Native and Expo using TypeScript, leveraging
 - **Boost System:** Tier-based listing and profile boosting options for increased visibility, managed by `utils/boostRotation.ts`, `utils/boostUtils.ts`, and `utils/hostPricing.ts`.
 - **Identity & Verification:** Supports phone, government ID (Stripe Identity SDK), social media verification, and optional background/income checks. Also includes a References System.
 - **Host Type Differentiation:** Hosts select type (Individual, Company, Agent) affecting profile cards, listing badges, and contact labels.
-- **Agent Matchmaker:** Agents get a dedicated tab layout (Listings, Browse Renters, My Groups, Messages, Profile) with: renter browsing/shortlisting, AI-powered renter suggestions and group composition, compatibility matrix visualization, group builder with invite flow, placement pipeline with status tracking (assembling → invited → active → placed → dissolved), and Stripe-powered placement fees. Agent plans: Pay Per Use ($149/placement), Starter ($49.99/mo), Pro ($99.99/mo), Business ($199.99/mo). Service layer at `services/agentMatchmakerService.ts`, plan config in `constants/planLimits.ts` (AGENT_PLAN_LIMITS), migration at `supabase/migrations/017_agent_matchmaker.sql`, placement fee edge function at `supabase/functions/charge-placement-fee/`.
+- **Agent Matchmaker:** Agents get a dedicated tab layout (Listings, Browse Renters, My Groups, Messages, Profile) with: renter browsing/shortlisting, AI-powered renter suggestions and group composition, compatibility matrix visualization, group builder with invite flow, placement pipeline with status tracking (assembling → invited → active → placed → dissolved), and Stripe-powered placement fees. Agent plans: Pay Per Use ($149/placement), Starter ($49.99/mo), Pro ($99.99/mo), Business ($199.99/mo). Service layer at `services/agentMatchmakerService.ts` (migrated to Supabase with AsyncStorage fallback), plan config in `constants/planLimits.ts` (AGENT_PLAN_LIMITS), migration at `supabase/migrations/017_agent_matchmaker.sql`, `agent_plan` column in users table via `019_agent_plan.sql`, placement fee edge function at `supabase/functions/charge-placement-fee/`.
 - **Account Management:** Soft-delete account with a 30-day recovery window.
 - **Activity-Based Ranking:** Users inactive for >14 days are sorted lower in the swipe deck.
 - **Subscription Management:** Host subscription cancellation flow with re-activation option and a universal `PurchaseConfirmModal` for all payment types (subscriptions, one-time, credits).
@@ -52,7 +52,7 @@ Supabase provides the entire backend infrastructure:
 - **Database**: PostgreSQL with Row Level Security (RLS).
 - **Realtime**: Subscriptions for messages and notifications.
 - **Storage**: For profile and listing photos.
-- **Supabase Edge Functions**: For webhook handling, verification sessions, background checks, payments, references, and agent placement fees.
+- **Supabase Edge Functions**: For webhook handling, verification sessions, background checks, payments, references, agent placement fees, and match score calculation (`calculate-match-scores`).
 
 ## Subscription & Paywall System
 
@@ -76,7 +76,7 @@ The application supports over 10 US cities with a centralized location data syst
 
 ## Technical Decisions
 
-Key technical decisions include Babel module resolver, platform-specific UI adaptations, performance optimizations via React Native's New Architecture, React Compiler, and Reanimated, and robust error handling. Navigation uses separate stack navigators for each major tab (`GroupsStackNavigator.tsx`, `MessagesStackNavigator.tsx`, `HostMessagesStackNavigator.tsx`, `RoommatesStackNavigator.tsx`, `ProfileStackNavigator.tsx`) with `backBehavior="history"`. `HostTabNavigator.tsx` conditionally renders agent-specific tabs when `user.hostType === 'agent'`.
+Key technical decisions include Babel module resolver, platform-specific UI adaptations, performance optimizations via React Native's New Architecture, React Compiler, and Reanimated, and robust error handling. Navigation uses separate stack navigators for each major tab (`GroupsStackNavigator.tsx`, `MessagesStackNavigator.tsx`, `HostMessagesStackNavigator.tsx`, `RoommatesStackNavigator.tsx`, `ProfileStackNavigator.tsx`) with `backBehavior="history"`. `HostTabNavigator.tsx` conditionally renders tabs by host type: agents get (Listings, Browse Renters, My Groups, Messages, Profile), company hosts get (Dashboard, Listings, Groups, Messages, Profile — no Roommates swipe tab), and individual hosts get the full default layout including Roommates. `messageService.getConversations()` uses a single joined query (matches + users + messages) to avoid N+1 queries.
 
 # External Dependencies
 
