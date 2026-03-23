@@ -22,6 +22,7 @@ import { getZodiacSymbol } from '../../utils/zodiacUtils';
 import { AdBanner } from '../../components/AdBanner';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
+import { getGroupsHealth, GroupHealthResult } from '../../utils/groupHealthScore';
 import { useCityContext } from '../../contexts/CityContext';
 import { CityPickerModal, CityPillButton } from '../../components/CityPickerModal';
 import { RhomeAISheet } from '../../components/RhomeAISheet';
@@ -82,6 +83,8 @@ export const GroupsScreen = () => {
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
+  const [groupHealthScores, setGroupHealthScores] = useState<Record<string, GroupHealthResult>>({});
+  const [bestGroupId, setBestGroupId] = useState<string | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
 
   const [groupName, setGroupName] = useState('');
@@ -113,6 +116,20 @@ export const GroupsScreen = () => {
       }
     }, [user, activeCity, activeSubArea])
   );
+
+  useEffect(() => {
+    if (myGroups.length > 0 && user) {
+      const ids = myGroups.map((g: any) => g.id);
+      getGroupsHealth(ids, user.id).then(scores => {
+        setGroupHealthScores(scores);
+        const ranked = Object.entries(scores)
+          .filter(([, h]) => h.score > 0)
+          .sort(([, a], [, b]) => b.score - a.score);
+        if (ranked.length > 0) setBestGroupId(ranked[0][0]);
+        else setBestGroupId(null);
+      }).catch(() => {});
+    }
+  }, [myGroups]);
 
   const loadLikedGroupState = async () => {
     if (!user) return;
@@ -1030,6 +1047,27 @@ export const GroupsScreen = () => {
             ) : null}
           </View>
 
+          {groupHealthScores[group.id] ? (
+            <View style={styles.healthRow}>
+              <View style={[styles.healthDot, { backgroundColor: groupHealthScores[group.id].statusColor }]} />
+              <Text style={[styles.healthLabel, { color: groupHealthScores[group.id].statusColor }]}>
+                {groupHealthScores[group.id].statusLabel}
+              </Text>
+              <Text style={styles.healthScore}>
+                {' '}· {groupHealthScores[group.id].score}%
+              </Text>
+              {groupHealthScores[group.id].topConflict ? (
+                <Feather name="alert-circle" size={12} color="#f39c12" />
+              ) : null}
+            </View>
+          ) : null}
+
+          {groupHealthScores[group.id]?.status === 'conflict' ? (
+            <Text style={styles.conflictSnippet} numberOfLines={1}>
+              {groupHealthScores[group.id].topConflict}
+            </Text>
+          ) : null}
+
           <View style={[styles.actionRow, { borderTopColor: theme.border }]}>
             {group.members.length <= 1 ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 4 }}>
@@ -1144,6 +1182,39 @@ export const GroupsScreen = () => {
               }
             </Pressable>
           </View>
+
+          {bestGroupId && groupHealthScores[bestGroupId] && myGroups.length > 1 ? (
+            <Pressable
+              style={styles.bestGroupBanner}
+              onPress={() => navigation.navigate('GroupInfo', { groupId: bestGroupId })}
+            >
+              <LinearGradient
+                colors={['#1a1a1a', '#222']}
+                style={styles.bestGroupGradient}
+              >
+                <View style={styles.bestGroupHeader}>
+                  <Feather name="zap" size={13} color="#ff6b5b" />
+                  <Text style={styles.bestGroupLabel}>BEST GROUP TO SEARCH WITH</Text>
+                </View>
+                <Text style={styles.bestGroupName}>
+                  {myGroups.find((g: any) => g.id === bestGroupId)?.name ?? 'Your Group'}
+                </Text>
+                <View style={styles.bestGroupMeta}>
+                  <Text style={[styles.bestGroupScore, { color: groupHealthScores[bestGroupId].statusColor }]}>
+                    {groupHealthScores[bestGroupId].score}% compatible
+                  </Text>
+                  {groupHealthScores[bestGroupId].sharedNeighborhoods.length > 0 ? (
+                    <Text style={styles.bestGroupNeighborhoods}>
+                      {' '}· {groupHealthScores[bestGroupId].sharedNeighborhoods.slice(0, 2).join(', ')}
+                    </Text>
+                  ) : null}
+                </View>
+                {groupHealthScores[bestGroupId].readyToSearch ? (
+                  <Text style={styles.readyBadge}>Ready to search</Text>
+                ) : null}
+              </LinearGradient>
+            </Pressable>
+          ) : null}
 
           <View style={[styles.sectionHeader, styles.sectionRow]}>
             <ThemedText style={[styles.sectionLabel, { color: theme.textSecondary }]}>
@@ -3449,5 +3520,74 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  healthRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    gap: 5,
+  },
+  healthDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  healthLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  healthScore: {
+    fontSize: 12,
+    color: '#888',
+  },
+  conflictSnippet: {
+    fontSize: 11,
+    color: '#f39c12',
+    marginTop: 2,
+  },
+  bestGroupBanner: {
+    marginHorizontal: 0,
+    marginBottom: 12,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  bestGroupGradient: {
+    padding: 16,
+  },
+  bestGroupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  bestGroupLabel: {
+    color: '#ff6b5b',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  bestGroupName: {
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  bestGroupMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  bestGroupScore: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  bestGroupNeighborhoods: {
+    fontSize: 13,
+    color: '#888',
+  },
+  readyBadge: {
+    color: '#2ecc71',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 6,
   },
 });

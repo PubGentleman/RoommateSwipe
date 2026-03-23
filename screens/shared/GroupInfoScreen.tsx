@@ -16,6 +16,7 @@ import { Typography, Spacing } from '../../constants/theme';
 import { useAuth } from '../../contexts/AuthContext';
 import { Image } from 'expo-image';
 import { getSuggestedGroupMembers } from '../../utils/groupSuggestions';
+import { getGroupHealth, GroupHealthResult } from '../../utils/groupHealthScore';
 import {
   getGroupDetails,
   removeMember,
@@ -107,6 +108,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
   const [muted, setMuted] = useState(false);
   const [suggestions, setSuggestions] = useState<Array<{ profile: any; groupScore: number; reason: string }>>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [health, setHealth] = useState<GroupHealthResult | null>(null);
 
   const isAdmin = group?.adminId === user?.id;
   const memberCount = group?.members?.length || 0;
@@ -135,6 +137,12 @@ export function GroupInfoScreen({ route, navigation }: Props) {
         .finally(() => setLoadingSuggestions(false));
     }
   }, [group?.id, user?.id, canSeeAI, spotsNeeded, isRenter]);
+
+  useEffect(() => {
+    if (groupId && user) {
+      getGroupHealth(groupId, user.id).then(setHealth).catch(() => {});
+    }
+  }, [groupId, group?.id]);
 
   async function loadGroup() {
     setLoading(true);
@@ -730,6 +738,78 @@ export function GroupInfoScreen({ route, navigation }: Props) {
             </ThemedText>
           )}
         </Section>
+
+        {health && isRenter ? (
+          <Animated.View entering={FadeInDown.duration(400)} style={styles.healthSection}>
+            <View style={styles.healthSummary}>
+              <View style={styles.healthScoreBlock}>
+                <ThemedText style={[styles.healthBigScore, { color: health.statusColor }]}>
+                  {health.score}%
+                </ThemedText>
+                <ThemedText style={[styles.healthStatusLabel, { color: health.statusColor }]}>
+                  {health.statusLabel}
+                </ThemedText>
+              </View>
+              <View style={styles.healthSummaryRight}>
+                <ThemedText style={styles.healthTitle}>Group Compatibility</ThemedText>
+                {health.readyToSearch ? (
+                  <ThemedText style={styles.readyText}>Ready to apartment search</ThemedText>
+                ) : (
+                  <ThemedText style={styles.notReadyText}>Complete preferences to search</ThemedText>
+                )}
+                {health.sharedNeighborhoods.length > 0 ? (
+                  <ThemedText style={styles.neighborhoodsText}>
+                    Works in: {health.sharedNeighborhoods.slice(0, 3).join(', ')}
+                  </ThemedText>
+                ) : null}
+              </View>
+            </View>
+
+            {health.conflicts.length > 0 ? (
+              <View style={styles.conflictsBlock}>
+                <ThemedText style={styles.conflictsTitle}>Conflicts to resolve</ThemedText>
+                {health.conflicts.map((c, i) => (
+                  <View key={i} style={styles.conflictRow}>
+                    <Feather name="alert-circle" size={13} color="#e74c3c" />
+                    <ThemedText style={styles.conflictText}>{c}</ThemedText>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+
+            {health.suggestions.length > 0 ? (
+              <View style={styles.suggestionsBlock}>
+                <ThemedText style={styles.suggestionsTitle}>Suggestions</ThemedText>
+                {health.suggestions.map((s, i) => (
+                  <ThemedText key={i} style={styles.suggestionText}>· {s}</ThemedText>
+                ))}
+              </View>
+            ) : null}
+
+            {!health.readyToSearch ? (
+              <Pressable
+                style={styles.prefsCTA}
+                onPress={() => navigation.navigate('ApartmentPreferences' as never)}
+              >
+                <ThemedText style={styles.prefsCTAText}>
+                  Set your apartment preferences
+                </ThemedText>
+              </Pressable>
+            ) : null}
+
+            {health.readyToSearch ? (
+              <Pressable
+                style={styles.searchCTA}
+                onPress={() => navigation.navigate('GroupApartmentSuggestions' as never, { groupId } as never)}
+              >
+                <Feather name="search" size={15} color="#fff" />
+                <ThemedText style={styles.searchCTAText}>See AI Apartment Suggestions</ThemedText>
+              </Pressable>
+            ) : null}
+
+            <ThemedText style={styles.aiFooter}>Powered by Rhome AI</ThemedText>
+          </Animated.View>
+        ) : null}
 
         <Section
           label={`MEMBERS (${memberCount}/${memberLimit})`}
@@ -1381,5 +1461,113 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: '#ff6b5b',
+  },
+  healthSection: {
+    marginHorizontal: Spacing.md,
+    marginBottom: Spacing.md,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 16,
+  },
+  healthSummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  healthScoreBlock: {
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  healthBigScore: {
+    fontSize: 36,
+    fontWeight: '800',
+  },
+  healthStatusLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  healthSummaryRight: {
+    flex: 1,
+  },
+  healthTitle: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  readyText: {
+    color: '#2ecc71',
+    fontSize: 12,
+  },
+  notReadyText: {
+    color: '#888',
+    fontSize: 12,
+  },
+  neighborhoodsText: {
+    color: '#aaa',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  conflictsBlock: {
+    marginBottom: 12,
+  },
+  conflictsTitle: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  conflictRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    marginBottom: 5,
+  },
+  conflictText: {
+    color: '#e74c3c',
+    fontSize: 12,
+    flex: 1,
+  },
+  suggestionsBlock: {
+    marginBottom: 12,
+  },
+  suggestionsTitle: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  suggestionText: {
+    color: '#aaa',
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  prefsCTA: {
+    backgroundColor: '#222',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  prefsCTAText: {
+    color: '#ff6b5b',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  searchCTA: {
+    backgroundColor: '#ff6b5b',
+    borderRadius: 10,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
+  searchCTAText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
