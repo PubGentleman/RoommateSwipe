@@ -30,6 +30,10 @@ import {
   filterRentersForListing,
   TransitFilterSummary,
 } from '../../utils/transitMatching';
+import {
+  shortlistRenter as companyShortlistRenter,
+  removeFromShortlist as companyRemoveFromShortlist,
+} from '../../services/companyMatchmakerService';
 import { NEIGHBORHOOD_TRAINS } from '../../constants/transitData';
 
 const BG = '#111';
@@ -263,17 +267,26 @@ export const BrowseRentersScreen = () => {
     setFilteredRenters(filtered);
   };
 
+  const isCompanyHost = user?.hostType === 'company';
+
   const handleShortlist = async (renter: AgentRenter) => {
     if (!user) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     if (shortlistedIds.has(renter.id)) {
-      await removeFromShortlist(user.id, renter.id);
-      setShortlistedIds(prev => {
-        const next = new Set(prev);
-        next.delete(renter.id);
-        return next;
-      });
+      try {
+        await removeFromShortlist(user.id, renter.id);
+        if (isCompanyHost) {
+          await companyRemoveFromShortlist(user.id, renter.id, selectedListing?.id);
+        }
+        setShortlistedIds(prev => {
+          const next = new Set(prev);
+          next.delete(renter.id);
+          return next;
+        });
+      } catch (e) {
+        console.error('[BrowseRenters] Remove shortlist error:', e);
+      }
       return;
     }
 
@@ -285,8 +298,15 @@ export const BrowseRentersScreen = () => {
       return;
     }
 
-    await addToShortlist(user.id, renter.id, selectedListing?.id);
-    setShortlistedIds(prev => new Set(prev).add(renter.id));
+    try {
+      await addToShortlist(user.id, renter.id, selectedListing?.id);
+      if (isCompanyHost) {
+        await companyShortlistRenter(user.id, renter.id, selectedListing?.id);
+      }
+      setShortlistedIds(prev => new Set(prev).add(renter.id));
+    } catch (e) {
+      console.error('[BrowseRenters] Shortlist error:', e);
+    }
   };
 
   const renderRenterCard = ({ item }: { item: AgentRenter }) => {

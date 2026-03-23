@@ -23,6 +23,8 @@ import { RenterCompatibilityScreen } from '../screens/host/RenterCompatibilitySc
 import { AgentGroupBuilderScreen } from '../screens/host/AgentGroupBuilderScreen';
 import { AgentGroupsScreen } from '../screens/host/AgentGroupsScreen';
 import { HostGroupMatchesScreen } from '../screens/host/HostGroupMatchesScreen';
+import { CompanyFillPipelineScreen } from '../screens/host/CompanyFillPipelineScreen';
+import { CompanyListingAIScreen } from '../screens/host/CompanyListingAIScreen';
 import { HostMessagesStackNavigator } from './HostMessagesStackNavigator';
 import { NotificationsScreen } from '../screens/shared/NotificationsScreen';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
@@ -47,6 +49,10 @@ export type HostDashboardStackParamList = {
   HostSubscription: undefined;
   ListingBoost: { listingId: string };
   GroupMatches: { listingId: string };
+  CompanyFillPipeline: undefined;
+  CompanyListingAI: { listingId: string; autoRunPairing?: boolean };
+  BrowseRenters: { targetListingId?: string };
+  RenterProfileDetail: { renter: any };
 };
 
 export type HostGroupsStackParamList = {
@@ -96,6 +102,10 @@ function DashboardStackNavigator() {
       <DashboardStack.Screen name="HostSubscription" component={HostSubscriptionScreen} />
       <DashboardStack.Screen name="ListingBoost" component={ListingBoostScreen} />
       <DashboardStack.Screen name="GroupMatches" component={HostGroupMatchesScreen} />
+      <DashboardStack.Screen name="CompanyFillPipeline" component={CompanyFillPipelineScreen} />
+      <DashboardStack.Screen name="CompanyListingAI" component={CompanyListingAIScreen} />
+      <DashboardStack.Screen name="BrowseRenters" component={BrowseRentersScreen} />
+      <DashboardStack.Screen name="RenterProfileDetail" component={RenterProfileDetailScreen} />
     </DashboardStack.Navigator>
   );
 }

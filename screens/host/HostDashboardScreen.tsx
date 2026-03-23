@@ -518,6 +518,24 @@ export const HostDashboardScreen = () => {
           </Pressable>
         ) : null}
 
+        {user?.hostType === 'company' ? (
+          <Pressable
+            style={styles.groupMatchCard}
+            onPress={() => navigation.navigate('CompanyFillPipeline')}
+          >
+            <View style={styles.groupMatchLeft}>
+              <View style={[styles.groupMatchIconWrap, { backgroundColor: PURPLE + '20' }]}>
+                <Feather name="zap" size={18} color={PURPLE} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.groupMatchTitle}>AI Fill Pipeline</Text>
+                <Text style={styles.groupMatchSub}>Match renter groups to your units automatically</Text>
+              </View>
+            </View>
+            <Feather name="chevron-right" size={18} color="#888" />
+          </Pressable>
+        ) : null}
+
         <View style={[styles.sectionHeader, { marginTop: 6 }]}>
           <Text style={styles.sectionTitle}>QUICK ACTIONS</Text>
         </View>

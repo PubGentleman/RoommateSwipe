@@ -169,6 +169,19 @@ export const NotificationsScreen = () => {
           });
         }
         break;
+      case 'company_group_invite':
+        if (notification.data?.listingId && notification.data?.groupId) {
+          (navigation as any).navigate('Groups', {
+            screen: 'CompanyGroupInvite',
+            params: {
+              listingId: notification.data.listingId,
+              groupId: notification.data.groupId,
+            },
+          });
+        } else {
+          (navigation as any).navigate('Groups');
+        }
+        break;
       case 'property_update':
       case 'property_rented':
         (navigation as any).navigate('Explore');
@@ -212,6 +225,7 @@ export const NotificationsScreen = () => {
         return 'briefcase';
       case 'group_invite':
       case 'group_accepted':
+      case 'company_group_invite':
         return 'users';
       case 'property_update':
       case 'property_rented':
