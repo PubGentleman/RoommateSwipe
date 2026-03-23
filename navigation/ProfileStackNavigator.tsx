@@ -27,6 +27,7 @@ import { DiagnosticScreen } from '../screens/shared/DiagnosticScreen';
 import { HostTypeSelectScreen } from '../screens/host/onboarding/HostTypeSelectScreen';
 import { HostCompanySetupScreen } from '../screens/host/onboarding/HostCompanySetupScreen';
 import { HostAgentSetupScreen } from '../screens/host/onboarding/HostAgentSetupScreen';
+import ApartmentPreferencesScreen from '../screens/shared/ApartmentPreferencesScreen';
 
 export type ProfileStackParamList = {
   ProfileMain: undefined;
@@ -54,6 +55,7 @@ export type ProfileStackParamList = {
   MyInterests: undefined;
   MatchesList: undefined;
   WhoLikedMe: undefined;
+  ApartmentPreferences: undefined;
 };
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
@@ -290,6 +292,11 @@ export const ProfileStackNavigator = () => {
         options={{
           headerShown: false,
         }}
+      />
+      <Stack.Screen
+        name="ApartmentPreferences"
+        component={ApartmentPreferencesScreen}
+        options={{ headerShown: false }}
       />
     </Stack.Navigator>
   );

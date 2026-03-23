@@ -8,6 +8,8 @@ import { PromoteAdminScreen } from '../screens/shared/PromoteAdminScreen';
 import { ListingGroupsScreen } from '../screens/shared/ListingGroupsScreen';
 import { GroupInfoScreen } from '../screens/shared/GroupInfoScreen';
 import { InterestedUsersScreen } from '../screens/shared/InterestedUsersScreen';
+import ApartmentPreferencesScreen from '../screens/shared/ApartmentPreferencesScreen';
+import GroupApartmentSuggestionsScreen from '../screens/renter/GroupApartmentSuggestionsScreen';
 import { RoommateProfile } from '../types/models';
 
 export type GroupsStackParamList = {
@@ -42,6 +44,10 @@ export type GroupsStackParamList = {
     groupId: string;
     groupName: string;
   };
+  ApartmentPreferences: undefined;
+  GroupApartmentSuggestions: {
+    groupId: string;
+  };
 };
 
 const Stack = createNativeStackNavigator<GroupsStackParamList>();
@@ -57,6 +63,8 @@ export const GroupsStackNavigator = () => {
       <Stack.Screen name="ListingGroups" component={ListingGroupsScreen} />
       <Stack.Screen name="GroupInfo" component={GroupInfoScreen} />
       <Stack.Screen name="InterestedUsers" component={InterestedUsersScreen} />
+      <Stack.Screen name="ApartmentPreferences" component={ApartmentPreferencesScreen} />
+      <Stack.Screen name="GroupApartmentSuggestions" component={GroupApartmentSuggestionsScreen} />
     </Stack.Navigator>
   );
 };

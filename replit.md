@@ -43,6 +43,7 @@ The application is built with React Native and Expo using TypeScript, leveraging
 - **Activity-Based Ranking:** Users inactive for >14 days are sorted lower in the swipe deck.
 - **Subscription Management:** Host subscription cancellation flow with re-activation option and a universal `PurchaseConfirmModal` for all payment types (subscriptions, one-time, credits).
 - **Collapsible/Sticky Headers:** Implemented across main screens using `react-native-reanimated` for dynamic UI on scroll.
+- **Transit-Aware Matching System:** NYC subway-integrated apartment matching with: 6-step `ApartmentPreferencesScreen` (bedrooms, budget, MTA train lines, move-in date, amenities, neighborhoods by borough); transit matching engine in `utils/transitMatching.ts` with group compatibility scoring (lifestyle 35%, budget 30%, transit 25%, move-in 10%), conflict detection with compromise suggestions, listing scoring (transit 40%, budget 35%, amenities 25%), and 4-stage renter pre-filtering for agents; `GroupApartmentSuggestionsScreen` with AI-powered listing suggestions, scoring breakdowns, and group voting (yes/no/maybe); transit data constants in `constants/transitData.ts` with 40+ NYC neighborhoods mapped to subway lines; agent `BrowseRentersScreen` transit pre-filtering with visual funnel summary; DB migration at `supabase/migrations/018_transit_matching.sql`.
 
 ## Backend (Supabase)
 

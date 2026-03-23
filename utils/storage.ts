@@ -1805,4 +1805,65 @@ export const StorageService = {
       return null;
     }
   },
+
+  async setApartmentPreferences(userId: string, prefs: any): Promise<void> {
+    try {
+      const key = `@rhome/apartment_prefs_${userId}`;
+      await AsyncStorage.setItem(key, JSON.stringify(prefs));
+
+      const profiles = await this.getRoommateProfiles();
+      const idx = profiles.findIndex((p: any) => p.id === userId);
+      if (idx >= 0) {
+        profiles[idx].apartmentPrefs = prefs;
+        await AsyncStorage.setItem(STORAGE_KEYS.ROOMMATE_PROFILES, JSON.stringify(profiles));
+      }
+    } catch (error) {
+      console.error('[StorageService] Error saving apartment prefs:', error);
+    }
+  },
+
+  async getApartmentPreferences(userId: string): Promise<any | null> {
+    try {
+      const key = `@rhome/apartment_prefs_${userId}`;
+      const data = await AsyncStorage.getItem(key);
+      return data ? JSON.parse(data) : null;
+    } catch {
+      return null;
+    }
+  },
+
+  async getGroupApartmentVotes(groupId: string): Promise<any[]> {
+    try {
+      const key = `@rhome/group_votes_${groupId}`;
+      const data = await AsyncStorage.getItem(key);
+      return data ? JSON.parse(data) : [];
+    } catch {
+      return [];
+    }
+  },
+
+  async submitGroupApartmentVote(
+    groupId: string, listingId: string, userId: string, vote: 'yes' | 'no' | 'maybe'
+  ): Promise<void> {
+    try {
+      const key = `@rhome/group_votes_${groupId}`;
+      const existing = await this.getGroupApartmentVotes(groupId);
+      const idx = existing.findIndex(
+        (v: any) => v.listingId === listingId && v.userId === userId
+      );
+      const record = {
+        id: idx >= 0 ? existing[idx].id : `vote_${Date.now()}`,
+        groupId, listingId, userId, vote,
+        createdAt: new Date().toISOString(),
+      };
+      if (idx >= 0) {
+        existing[idx] = record;
+      } else {
+        existing.push(record);
+      }
+      await AsyncStorage.setItem(key, JSON.stringify(existing));
+    } catch (error) {
+      console.error('[StorageService] Error saving vote:', error);
+    }
+  },
 };

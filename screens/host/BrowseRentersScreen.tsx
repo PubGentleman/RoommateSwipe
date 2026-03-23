@@ -25,6 +25,11 @@ import {
   canAgentShortlist,
   type AgentPlan,
 } from '../../constants/planLimits';
+import {
+  filterRentersForListing,
+  TransitFilterSummary,
+} from '../../utils/transitMatching';
+import { NEIGHBORHOOD_TRAINS } from '../../constants/transitData';
 
 const BG = '#111';
 const CARD_BG = '#1a1a1a';
@@ -47,6 +52,8 @@ export const BrowseRentersScreen = () => {
   const [showListingPicker, setShowListingPicker] = useState(false);
   const [roomTypeFilter, setRoomTypeFilter] = useState<string>('any');
   const [neighborhoodFilter, setNeighborhoodFilter] = useState<string>('');
+  const [transitFilterSummary, setTransitFilterSummary] = useState<TransitFilterSummary | null>(null);
+  const [allProfiles, setAllProfiles] = useState<RoommateProfile[]>([]);
 
   const [aiSuggestions, setAiSuggestions] = useState<Array<{
     renter: AgentRenter; listingFitScore: number; reason: string;
@@ -66,6 +73,7 @@ export const BrowseRentersScreen = () => {
     setLoading(true);
     try {
       const profiles: RoommateProfile[] = await StorageService.getRoommateProfiles();
+      setAllProfiles(profiles);
       const mapped: AgentRenter[] = profiles.map(p => ({
         id: p.id,
         name: p.name,
@@ -105,7 +113,7 @@ export const BrowseRentersScreen = () => {
 
   useEffect(() => {
     applyFilters();
-  }, [selectedListing, roomTypeFilter, neighborhoodFilter, renters]);
+  }, [selectedListing, roomTypeFilter, neighborhoodFilter, renters, allProfiles]);
 
   useEffect(() => {
     if (planLimits.hasAISuggestions && selectedListing && renters.length > 0) {
@@ -126,8 +134,15 @@ export const BrowseRentersScreen = () => {
     let filtered = [...renters];
 
     if (selectedListing) {
-      const sharePerPerson = selectedListing.price / selectedListing.bedrooms;
-      filtered = filtered.filter(r => (r.budgetMax ?? 0) >= sharePerPerson * 0.8);
+      const { filtered: transitFiltered, summary } = filterRentersForListing(
+        allProfiles, selectedListing
+      );
+      setTransitFilterSummary(summary);
+
+      const transitCompatibleIds = new Set(transitFiltered.map(r => r.id));
+      filtered = filtered.filter(r => transitCompatibleIds.has(r.id));
+    } else {
+      setTransitFilterSummary(null);
     }
 
     if (roomTypeFilter !== 'any') {
@@ -363,6 +378,55 @@ export const BrowseRentersScreen = () => {
         </Pressable>
       </View>
 
+      {transitFilterSummary && selectedListing ? (
+        <View style={styles.transitSummary}>
+          <View style={styles.transitSummaryHeader}>
+            <Feather name="cpu" size={14} color={ACCENT} />
+            <Text style={styles.transitSummaryTitle}>
+              Filtered for "{selectedListing.bedrooms}BR {selectedListing.neighborhood ?? selectedListing.city} - ${selectedListing.price?.toLocaleString()}/mo"
+            </Text>
+          </View>
+          <View style={styles.transitFunnelRow}>
+            <Text style={styles.transitFunnelText}>Started with {transitFilterSummary.total} renters</Text>
+          </View>
+          {transitFilterSummary.afterTransit < transitFilterSummary.total ? (
+            <View style={styles.transitFunnelRow}>
+              <Feather name="check" size={12} color={GREEN} />
+              <Text style={styles.transitFunnelText}>
+                {transitFilterSummary.afterTransit} have {(NEIGHBORHOOD_TRAINS[selectedListing.neighborhood ?? ''] ?? []).slice(0, 4).join('/')} train access
+              </Text>
+            </View>
+          ) : null}
+          {transitFilterSummary.afterBudget < transitFilterSummary.afterTransit ? (
+            <View style={styles.transitFunnelRow}>
+              <Feather name="check" size={12} color={GREEN} />
+              <Text style={styles.transitFunnelText}>
+                {transitFilterSummary.afterBudget} can afford ${Math.round(selectedListing.price / selectedListing.bedrooms).toLocaleString()}/person share
+              </Text>
+            </View>
+          ) : null}
+          {transitFilterSummary.afterBedrooms < transitFilterSummary.afterBudget ? (
+            <View style={styles.transitFunnelRow}>
+              <Feather name="check" size={12} color={GREEN} />
+              <Text style={styles.transitFunnelText}>
+                {transitFilterSummary.afterBedrooms} are looking for a {selectedListing.bedrooms}BR
+              </Text>
+            </View>
+          ) : null}
+          {transitFilterSummary.afterDate < transitFilterSummary.afterBedrooms ? (
+            <View style={styles.transitFunnelRow}>
+              <Feather name="check" size={12} color={GREEN} />
+              <Text style={styles.transitFunnelText}>
+                {transitFilterSummary.afterDate} are available by listing date
+              </Text>
+            </View>
+          ) : null}
+          <Text style={styles.transitFunnelResult}>
+            Showing {transitFilterSummary.afterDate} pre-qualified renters
+          </Text>
+        </View>
+      ) : null}
+
       {renderAIPanel()}
     </View>
   );
@@ -500,4 +564,10 @@ const styles = StyleSheet.create({
   listingOptionText: { color: '#fff', fontSize: 15 },
   listingOptionMeta: { color: '#888', fontSize: 13, marginTop: 2 },
   emptyText: { color: '#666', fontSize: 14, textAlign: 'center', marginTop: 20 },
+  transitSummary: { backgroundColor: 'rgba(255,107,91,0.06)', borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(255,107,91,0.15)' },
+  transitSummaryHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  transitSummaryTitle: { color: ACCENT, fontSize: 13, fontWeight: '600', flex: 1 },
+  transitFunnelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+  transitFunnelText: { color: 'rgba(255,255,255,0.6)', fontSize: 12 },
+  transitFunnelResult: { color: '#fff', fontSize: 13, fontWeight: '700', marginTop: 8 },
 });

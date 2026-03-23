@@ -36,6 +36,29 @@ export interface RoommateProfile {
     [key: string]: any;
   };
   references?: Reference[];
+  apartmentPrefs?: ApartmentPreferences;
+}
+
+export interface ApartmentPreferences {
+  desiredBedrooms: number;
+  budgetPerPersonMin: number;
+  budgetPerPersonMax: number;
+  preferredTrains: string[];
+  preferredNeighborhoods: string[];
+  amenityMustHaves: string[];
+  moveInDate: string;
+  locationFlexible: boolean;
+  wfh: boolean;
+  apartmentPrefsComplete: boolean;
+}
+
+export interface GroupApartmentVote {
+  id: string;
+  groupId: string;
+  listingId: string;
+  userId: string;
+  vote: 'yes' | 'no' | 'maybe';
+  createdAt: string;
 }
 
 export type HostPlanType = 'free' | 'none' | 'starter' | 'pro' | 'business';

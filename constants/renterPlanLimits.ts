@@ -15,6 +15,14 @@ export interface RenterPlanLimits {
   hasReadReceipts: boolean;
   hasIncognito: boolean;
   hasDedicatedSupport: boolean;
+  hasApartmentPreferences: boolean;
+  hasTransitFiltering: boolean;
+  hasAIGroupSuggestions: boolean;
+  hasAIApartmentSuggestions: boolean;
+  hasGroupVoting: boolean;
+  apartmentSuggestionCount: number;
+  hasConflictDetection: boolean;
+  hasCompatibilityBreakdown: boolean;
 }
 
 export const RENTER_PLAN_LIMITS: Record<RenterPlan, RenterPlanLimits> = {
@@ -33,6 +41,14 @@ export const RENTER_PLAN_LIMITS: Record<RenterPlan, RenterPlanLimits> = {
     hasReadReceipts: false,
     hasIncognito: false,
     hasDedicatedSupport: false,
+    hasApartmentPreferences: true,
+    hasTransitFiltering: false,
+    hasAIGroupSuggestions: false,
+    hasAIApartmentSuggestions: false,
+    hasGroupVoting: false,
+    apartmentSuggestionCount: 0,
+    hasConflictDetection: false,
+    hasCompatibilityBreakdown: false,
   },
   plus: {
     plan: 'plus',
@@ -49,6 +65,14 @@ export const RENTER_PLAN_LIMITS: Record<RenterPlan, RenterPlanLimits> = {
     hasReadReceipts: false,
     hasIncognito: false,
     hasDedicatedSupport: false,
+    hasApartmentPreferences: true,
+    hasTransitFiltering: true,
+    hasAIGroupSuggestions: true,
+    hasAIApartmentSuggestions: true,
+    hasGroupVoting: true,
+    apartmentSuggestionCount: 3,
+    hasConflictDetection: false,
+    hasCompatibilityBreakdown: false,
   },
   elite: {
     plan: 'elite',
@@ -65,6 +89,14 @@ export const RENTER_PLAN_LIMITS: Record<RenterPlan, RenterPlanLimits> = {
     hasReadReceipts: true,
     hasIncognito: true,
     hasDedicatedSupport: true,
+    hasApartmentPreferences: true,
+    hasTransitFiltering: true,
+    hasAIGroupSuggestions: true,
+    hasAIApartmentSuggestions: true,
+    hasGroupVoting: true,
+    apartmentSuggestionCount: -1,
+    hasConflictDetection: true,
+    hasCompatibilityBreakdown: true,
   },
 };
 
