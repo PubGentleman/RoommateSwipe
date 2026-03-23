@@ -24,7 +24,7 @@ const mapSupabaseNotification = (row: any): Notification => ({
   body: row.body,
   isRead: row.read ?? row.isRead ?? false,
   createdAt: new Date(row.created_at || row.createdAt),
-  data: row.data || undefined,
+  data: typeof row.data === 'string' ? (() => { try { return JSON.parse(row.data); } catch { return undefined; } })() : (row.data || undefined),
 });
 
 export const NotificationsScreen = () => {
@@ -135,9 +135,39 @@ export const NotificationsScreen = () => {
         break;
       case 'agent_invite':
         break;
+      case 'ai_group_suggestion':
+        (navigation as any).navigate('Roommates');
+        break;
       case 'group_invite':
+        if (notification.data?.group_id) {
+          (navigation as any).navigate('Groups', {
+            screen: 'AIGroupInvite',
+            params: { groupId: notification.data.group_id },
+          });
+        } else {
+          (navigation as any).navigate('Groups');
+        }
+        break;
       case 'group_accepted':
         (navigation as any).navigate('Groups');
+        break;
+      case 'group_complete':
+        if (notification.data?.group_id) {
+          (navigation as any).navigate('Groups', {
+            screen: 'GroupApartmentSuggestions',
+            params: { groupId: notification.data.group_id, isNewlyComplete: true },
+          });
+        } else {
+          (navigation as any).navigate('Groups');
+        }
+        break;
+      case 'group_match':
+        if (notification.data?.listing_id) {
+          (navigation as any).navigate('Dashboard', {
+            screen: 'GroupMatches',
+            params: { listingId: notification.data.listing_id },
+          });
+        }
         break;
       case 'property_update':
       case 'property_rented':

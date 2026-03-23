@@ -29,6 +29,7 @@ import { CityPickerModal, CityPillButton } from '../../components/CityPickerModa
 import { RhomeAISheet } from '../../components/RhomeAISheet';
 import { GroupPropertySearchModal } from '../../components/GroupPropertySearchModal';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { AIGroupSuggestionCard } from '../../components/AIGroupSuggestionCard';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - Spacing.xxl;
@@ -1254,11 +1255,14 @@ export const GroupsScreen = () => {
               {myGroups.length} {myGroups.length === 1 ? 'group' : 'groups'}
             </ThemedText>
           </View>
+          <AIGroupSuggestionCard
+            onAccepted={() => loadGroups()}
+          />
           {myGroups.length === 0 ? (
             <View style={[styles.emptyState, { paddingVertical: 30 }]}>
               <Feather name="users" size={40} color={theme.textSecondary} />
               <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.sm, textAlign: 'center' }]}>
-                No groups yet — create or discover one!
+                No groups yet — let AI find your perfect roommates!
               </ThemedText>
             </View>
           ) : (

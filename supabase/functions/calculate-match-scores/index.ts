@@ -160,6 +160,8 @@ serve(async (req: Request) => {
         .upsert(scores, { onConflict: 'user_id,target_id' });
     }
 
+    supabase.functions.invoke('generate-group-suggestions', { body: { userId } }).catch(() => {});
+
     return new Response(JSON.stringify({ calculated: scores.length }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

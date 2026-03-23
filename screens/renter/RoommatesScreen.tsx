@@ -44,6 +44,7 @@ import { recordSwipe, getAIMemory } from '../../utils/aiMemory';
 import { getNextMicroQuestion } from '../../utils/aiMicroQuestions';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { getBestMatchToday } from '../../utils/bestMatchToday';
+import { AIGroupSuggestionCard } from '../../components/AIGroupSuggestionCard';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Limit card size for web/desktop viewing
@@ -1222,6 +1223,11 @@ export const RoommatesScreen = () => {
           ))}
         </ScrollView>
       ) : null}
+
+      <AIGroupSuggestionCard
+        onAccepted={() => {}}
+        onDismissed={() => {}}
+      />
 
       {canSeeAIMatch && bestMatch ? (
         <Animated.View entering={FadeInDown.duration(400)} style={styles.bestMatchBanner}>

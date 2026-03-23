@@ -10,6 +10,7 @@ import { GroupInfoScreen } from '../screens/shared/GroupInfoScreen';
 import { InterestedUsersScreen } from '../screens/shared/InterestedUsersScreen';
 import ApartmentPreferencesScreen from '../screens/shared/ApartmentPreferencesScreen';
 import GroupApartmentSuggestionsScreen from '../screens/renter/GroupApartmentSuggestionsScreen';
+import { AIGroupInviteScreen } from '../screens/shared/AIGroupInviteScreen';
 import { RoommateProfile } from '../types/models';
 
 export type GroupsStackParamList = {
@@ -47,6 +48,10 @@ export type GroupsStackParamList = {
   ApartmentPreferences: undefined;
   GroupApartmentSuggestions: {
     groupId: string;
+    isNewlyComplete?: boolean;
+  };
+  AIGroupInvite: {
+    groupId: string;
   };
 };
 
@@ -65,6 +70,7 @@ export const GroupsStackNavigator = () => {
       <Stack.Screen name="InterestedUsers" component={InterestedUsersScreen} />
       <Stack.Screen name="ApartmentPreferences" component={ApartmentPreferencesScreen} />
       <Stack.Screen name="GroupApartmentSuggestions" component={GroupApartmentSuggestionsScreen} />
+      <Stack.Screen name="AIGroupInvite" component={AIGroupInviteScreen} />
     </Stack.Navigator>
   );
 };

@@ -32,6 +32,7 @@ export default function GroupApartmentSuggestionsScreen() {
   const insets = useSafeAreaInsets();
 
   const groupId = route.params?.groupId ?? '';
+  const isNewlyComplete = route.params?.isNewlyComplete ?? false;
   const [suggestions, setSuggestions] = useState<ListingSuggestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [members, setMembers] = useState<RoommateProfile[]>([]);
@@ -263,6 +264,14 @@ export default function GroupApartmentSuggestionsScreen() {
         contentContainerStyle={{ padding: Spacing.lg, paddingBottom: insets.bottom + 20 }}
         ListHeaderComponent={
           <>
+            {isNewlyComplete ? (
+              <Animated.View entering={FadeInDown.duration(400)} style={styles.newGroupBanner}>
+                <Feather name="zap" size={16} color={CORAL} />
+                <ThemedText style={styles.newGroupText}>
+                  Your group just formed! Here are apartments AI found for you.
+                </ThemedText>
+              </Animated.View>
+            ) : null}
             {renderConflictBanner()}
             {renderSharedAreas()}
             {suggestions.length > 0 ? (
@@ -372,6 +381,15 @@ const styles = StyleSheet.create({
   voteBtnMaybe: { backgroundColor: 'rgba(255,184,0,0.2)', borderColor: '#FFB800' },
   voteBtnNo: { backgroundColor: 'rgba(244,67,54,0.2)', borderColor: '#F44336' },
   voteLabel: { fontSize: 13, color: '#888' },
+  newGroupBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: 'rgba(255,107,91,0.1)', borderRadius: 14,
+    padding: Spacing.md, marginBottom: Spacing.lg,
+    borderWidth: 1, borderColor: 'rgba(255,107,91,0.3)',
+  },
+  newGroupText: {
+    fontSize: 14, fontWeight: '600', color: CORAL, flex: 1,
+  },
   emptyState: { alignItems: 'center', paddingTop: 60 },
   emptyText: {
     fontSize: 15, color: '#666', textAlign: 'center',
