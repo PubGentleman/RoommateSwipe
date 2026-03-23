@@ -383,6 +383,7 @@ export const RoommatesScreen = () => {
   };
 
   const currentProfile = profiles[currentIndex];
+  const nextProfile = profiles[currentIndex + 1];
   const currentProfileUser = currentProfile ? profileUsers.get(currentProfile.id) : null;
   
   const isBoostActive = currentProfileUser?.boostData?.isBoosted && currentProfileUser?.boostData?.boostExpiresAt
@@ -402,15 +403,12 @@ export const RoommatesScreen = () => {
   const isProfileOnline = currentProfile ? Math.random() > 0.5 : false;
 
   const advanceCard = () => {
+    setCurrentIndex(prev => prev + 1);
     translateX.value = 0;
     translateY.value = 0;
     rotation.value = 0;
-    cardOpacity.value = 0;
+    cardOpacity.value = 1;
     isAnimatingSwipe.value = false;
-    setCurrentIndex(prev => prev + 1);
-    requestAnimationFrame(() => {
-      cardOpacity.value = withTiming(1, { duration: 150 });
-    });
   };
 
   const handleInviteToGroup = async () => {
@@ -1219,10 +1217,24 @@ export const RoommatesScreen = () => {
       ) : null}
 
       <View style={styles.cardArea}>
+        {nextProfile ? (
+          <View style={[styles.card, { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }]}>
+            <Image source={{ uri: (Array.isArray(nextProfile.photos) ? nextProfile.photos : nextProfile.photos ? [nextProfile.photos] : [])[0] }} resizeMode="cover" style={styles.cardImage} />
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.95)']}
+              locations={[0, 0.4, 1]}
+              style={[styles.cardGradient, { pointerEvents: 'none' }]}
+            />
+            <View style={styles.cardInfo}>
+              <ThemedText style={styles.cardName}>{nextProfile.name}, {nextProfile.age}</ThemedText>
+            </View>
+          </View>
+        ) : null}
         <GestureDetector gesture={composedGesture}>
           <Animated.View style={[
             styles.card,
             animatedCardStyle,
+            { zIndex: 1 },
             isBoosted ? styles.cardBoostedGlow : null,
             user?.receivedSuperLikes?.some((sl: { superLikerId: string }) => sl.superLikerId === currentProfile.id) ? styles.cardSuperInterestGlow : null,
           ]}>
