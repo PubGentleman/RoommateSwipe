@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Support — Rhome</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #111111;
+      color: #ffffff;
+      min-height: 100vh;
+    }
+    a { color: #ff6b5b; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 40px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .nav-logo { font-size: 28px; font-weight: 800; letter-spacing: -1px; color: #ff6b5b; }
+    .nav-links { display: flex; gap: 24px; }
+    .nav-links a { color: #999; font-size: 14px; font-weight: 500; }
+    .nav-links a:hover { color: #fff; text-decoration: none; }
+    .content {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 60px 20px 100px;
+    }
+    .content h1 {
+      font-size: 40px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      font-size: 18px;
+      color: #999;
+      margin-bottom: 48px;
+      line-height: 1.6;
+    }
+    .content h2 {
+      font-size: 22px;
+      font-weight: 700;
+      margin-top: 40px;
+      margin-bottom: 12px;
+      color: #ff6b5b;
+    }
+    .content p, .content li {
+      font-size: 15px;
+      color: #ccc;
+      line-height: 1.8;
+      margin-bottom: 12px;
+    }
+    .content ul {
+      padding-left: 24px;
+      margin-bottom: 16px;
+    }
+    .contact-card {
+      background: #1a1a1a;
+      border: 1px solid #222;
+      border-radius: 16px;
+      padding: 32px;
+      margin-top: 32px;
+      text-align: center;
+    }
+    .contact-card h3 {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .contact-card p {
+      color: #999;
+      margin-bottom: 20px;
+    }
+    .contact-btn {
+      display: inline-block;
+      padding: 14px 32px;
+      background: #ff6b5b;
+      color: white;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      transition: transform 0.2s;
+    }
+    .contact-btn:hover { transform: translateY(-2px); text-decoration: none; }
+    .faq-item {
+      background: #1a1a1a;
+      border: 1px solid #222;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 12px;
+    }
+    .faq-item h4 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #fff;
+    }
+    .faq-item p {
+      font-size: 14px;
+      color: #999;
+      margin-bottom: 0;
+    }
+    .footer {
+      border-top: 1px solid #222;
+      padding: 40px 20px;
+      text-align: center;
+    }
+    .footer-links { display: flex; gap: 24px; justify-content: center; margin-bottom: 16px; flex-wrap: wrap; }
+    .footer-links a { color: #666; font-size: 13px; }
+    .footer-copy { font-size: 13px; color: #444; }
+    @media (max-width: 600px) {
+      .nav { padding: 16px 20px; }
+      .content { padding: 40px 20px 60px; }
+      .content h1 { font-size: 28px; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <a href="index.html" class="nav-logo">Rhome</a>
+    <div class="nav-links">
+      <a href="privacy.html">Privacy</a>
+      <a href="terms.html">Terms</a>
+      <a href="mailto:hello@rhomeapp.io">Contact</a>
+    </div>
+  </nav>
+
+  <div class="content">
+    <h1>Support</h1>
+    <p class="subtitle">We're here to help. Find answers to common questions below, or reach out to our team directly.</p>
+
+    <h2>Frequently Asked Questions</h2>
+
+    <div class="faq-item">
+      <h4>How does Rhome matching work?</h4>
+      <p>Rhome uses an AI-powered compatibility algorithm that analyzes 16 lifestyle criteria — including sleep schedule, cleanliness, noise preferences, and more — to calculate a compatibility score between you and potential roommates.</p>
+    </div>
+
+    <div class="faq-item">
+      <h4>Is Rhome free to use?</h4>
+      <p>Rhome offers a free Basic plan for renters that includes core matching and messaging features. Premium plans (Plus and Elite) unlock additional features like unlimited swipes, priority matching, and the AI assistant.</p>
+    </div>
+
+    <div class="faq-item">
+      <h4>How do I verify my identity?</h4>
+      <p>Go to your profile settings and tap "Verify Identity." You'll be guided through a secure process powered by Stripe Identity. You'll need a valid government-issued photo ID.</p>
+    </div>
+
+    <div class="faq-item">
+      <h4>Can I delete my account?</h4>
+      <p>Yes. Go to Settings and tap "Delete Account." Your account will enter a 30-day recovery period. During this time, you can log back in to restore it. After 30 days, your data is permanently deleted.</p>
+    </div>
+
+    <div class="faq-item">
+      <h4>How do roommate groups work?</h4>
+      <p>You can create or join a roommate group with people you've matched with. Once your group is complete, Rhome's AI automatically matches your group with compatible apartments based on everyone's preferences.</p>
+    </div>
+
+    <div class="faq-item">
+      <h4>I'm a host. How do I list my property?</h4>
+      <p>Sign up as a Host, then tap "Create Listing" from your dashboard. Fill in the property details, add photos, set the price, and publish. Your listing will be visible to renters searching in your area.</p>
+    </div>
+
+    <div class="faq-item">
+      <h4>How do I cancel my subscription?</h4>
+      <p>You can cancel your subscription anytime through your account settings in the App, or through the App Store / Google Play subscription management.</p>
+    </div>
+
+    <div class="faq-item">
+      <h4>How do I report a user?</h4>
+      <p>Tap the menu icon on any user's profile and select "Report." You can describe the issue and our team will review it promptly. We take safety seriously and will take appropriate action.</p>
+    </div>
+
+    <div class="contact-card">
+      <h3>Still need help?</h3>
+      <p>Our support team is available to assist you with any questions or issues.</p>
+      <a href="mailto:hello@rhomeapp.io" class="contact-btn">Email Us</a>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="footer-links">
+      <a href="privacy.html">Privacy Policy</a>
+      <a href="terms.html">Terms of Service</a>
+      <a href="support.html">Support</a>
+      <a href="mailto:hello@rhomeapp.io">Contact</a>
+    </div>
+    <p class="footer-copy">&copy; 2026 Always Rhome Inc. All rights reserved.</p>
+  </footer>
+</body>
+</html>
