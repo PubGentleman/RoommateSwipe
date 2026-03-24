@@ -198,6 +198,7 @@ async function getNearbyListings(supabase: any, profile: any) {
     .gte('price', profile.budget_min ?? 0)
     .lte('price', profile.budget_max ?? 999999)
     .eq('status', 'active')
+    .eq('is_active', true)
     .order('is_featured', { ascending: false })
     .limit(5);
   return data ?? [];

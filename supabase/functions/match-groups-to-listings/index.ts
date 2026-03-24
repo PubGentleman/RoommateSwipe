@@ -78,6 +78,7 @@ serve(async (req) => {
     .from('listings')
     .select('id, host_id, title, price, bedrooms, rooms_available, existing_roommates_count, host_lives_in, neighborhood, amenities, available_date')
     .eq('available', true)
+    .eq('is_active', true)
     .gt('rooms_available', 0);
 
   if (listingId) listingQuery.eq('id', listingId);
