@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
-  Dimensions,
   Platform,
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -40,15 +39,223 @@ import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
-import { Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { calculateZodiacFromBirthday } from '../../utils/zodiacUtils';
 import { ProgressBar } from '../../components/questionnaire/ProgressBar';
-import { SelectionCard } from '../../components/questionnaire/SelectionCard';
 import { LocationPicker } from '../../components/LocationPicker';
 import { getCoordinatesFromNeighborhood } from '../../utils/locationData';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TOTAL_STEPS = 10;
+
+function EmojiTileGrid({
+  options,
+  selected,
+  onSelect,
+  multiSelect = false,
+}: {
+  options: { value: string; emoji: string; label: string; subtitle?: string }[];
+  selected: string | string[];
+  onSelect: (value: string) => void;
+  multiSelect?: boolean;
+}) {
+  const { theme } = useTheme();
+  const isActive = (value: string) =>
+    multiSelect ? (selected as string[]).includes(value) : selected === value;
+
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+      {options.map((opt) => {
+        const active = isActive(opt.value);
+        return (
+          <TouchableOpacity
+            key={opt.value}
+            onPress={() => onSelect(opt.value)}
+            style={{
+              width: '47%',
+              backgroundColor: active ? theme.primary + '20' : theme.backgroundSecondary,
+              borderWidth: 2,
+              borderColor: active ? theme.primary : theme.border,
+              borderRadius: 14,
+              paddingVertical: 14,
+              paddingHorizontal: 12,
+              alignItems: 'center',
+              gap: 6,
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={{ fontSize: 28 }}>{opt.emoji}</Text>
+            <Text style={{
+              fontSize: 13,
+              fontWeight: '600',
+              color: active ? theme.primary : theme.text,
+              textAlign: 'center',
+            }}>
+              {opt.label}
+            </Text>
+            {opt.subtitle ? (
+              <Text style={{
+                fontSize: 11,
+                color: theme.textSecondary,
+                textAlign: 'center',
+                lineHeight: 14,
+              }}>
+                {opt.subtitle}
+              </Text>
+            ) : null}
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+function BinaryChoice({
+  options,
+  selected,
+  onSelect,
+}: {
+  options: { value: string; emoji: string; label: string }[];
+  selected: string;
+  onSelect: (value: string) => void;
+}) {
+  const { theme } = useTheme();
+
+  return (
+    <View style={{ flexDirection: 'row', gap: 14 }}>
+      {options.map((opt) => {
+        const active = selected === opt.value;
+        return (
+          <TouchableOpacity
+            key={opt.value}
+            onPress={() => onSelect(opt.value)}
+            style={{
+              flex: 1,
+              backgroundColor: active ? theme.primary : theme.backgroundSecondary,
+              borderWidth: 2,
+              borderColor: active ? theme.primary : theme.border,
+              borderRadius: 18,
+              paddingVertical: 28,
+              alignItems: 'center',
+              gap: 10,
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={{ fontSize: 36 }}>{opt.emoji}</Text>
+            <Text style={{
+              fontSize: 16,
+              fontWeight: '700',
+              color: active ? '#fff' : theme.text,
+            }}>
+              {opt.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+function IconScale({
+  levels,
+  selected,
+  onSelect,
+}: {
+  levels: { value: string; emoji: string; label: string }[];
+  selected: string;
+  onSelect: (value: string) => void;
+}) {
+  const { theme } = useTheme();
+
+  return (
+    <View>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+        {levels.map((level) => {
+          const active = selected === level.value;
+          return (
+            <TouchableOpacity
+              key={level.value}
+              onPress={() => onSelect(level.value)}
+              style={{
+                flex: 1,
+                alignItems: 'center',
+                paddingVertical: 14,
+                marginHorizontal: 3,
+                backgroundColor: active ? theme.primary + '20' : theme.backgroundSecondary,
+                borderWidth: 2,
+                borderColor: active ? theme.primary : theme.border,
+                borderRadius: 12,
+                gap: 4,
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={{ fontSize: 24 }}>{level.emoji}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+      {selected ? (
+        <Text style={{
+          textAlign: 'center',
+          color: theme.primary,
+          fontWeight: '600',
+          fontSize: 14,
+          marginTop: 6,
+        }}>
+          {levels.find(l => l.value === selected)?.label}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+function CheckboxPills({
+  options,
+  selected,
+  onToggle,
+}: {
+  options: { value: string; label: string; emoji: string }[];
+  selected: string[];
+  onToggle: (value: string) => void;
+}) {
+  const { theme } = useTheme();
+
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+      {options.map((opt) => {
+        const active = selected.includes(opt.value);
+        return (
+          <TouchableOpacity
+            key={opt.value}
+            onPress={() => onToggle(opt.value)}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              paddingVertical: 10,
+              paddingHorizontal: 16,
+              backgroundColor: active ? theme.primary + '20' : theme.backgroundSecondary,
+              borderWidth: 2,
+              borderColor: active ? theme.primary : theme.border,
+              borderRadius: 100,
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={{ fontSize: 16 }}>{opt.emoji}</Text>
+            <Text style={{
+              fontSize: 13,
+              fontWeight: active ? '700' : '500',
+              color: active ? theme.primary : theme.text,
+            }}>
+              {opt.label}
+            </Text>
+            {active ? (
+              <Feather name="check-circle" size={16} color={theme.primary} />
+            ) : null}
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
 
 type StepId =
   | 'photos'
@@ -517,9 +724,15 @@ export const ProfileQuestionnaireScreen = () => {
               />
             </View>
             {renderSubSectionHeader('Gender *')}
-            <SelectionCard icon="user" title="Male" isSelected={gender === 'male'} onPress={() => setGender('male')} index={0} />
-            <SelectionCard icon="user" title="Female" isSelected={gender === 'female'} onPress={() => setGender('female')} index={1} />
-            <SelectionCard icon="users" title="Other" isSelected={gender === 'other'} onPress={() => setGender('other')} index={2} />
+            <EmojiTileGrid
+              options={[
+                { value: 'male', emoji: '\uD83D\uDE4B\u200D\u2642\uFE0F', label: 'Male' },
+                { value: 'female', emoji: '\uD83D\uDE4B\u200D\u2640\uFE0F', label: 'Female' },
+                { value: 'other', emoji: '\uD83C\uDF08', label: 'Other' },
+              ]}
+              selected={gender || ''}
+              onSelect={(v) => setGender(v as any)}
+            />
           </View>
         );
 
@@ -578,17 +791,6 @@ export const ProfileQuestionnaireScreen = () => {
         );
 
       case 'dealbreakers': {
-        const DEALBREAKER_OPTIONS = [
-          { value: 'no_smokers', label: 'No smokers', icon: 'slash' as const, description: 'Smoking anywhere in the home' },
-          { value: 'no_cats', label: 'No cats', icon: 'x-circle' as const, description: 'Allergies or strong preference' },
-          { value: 'no_dogs', label: 'No dogs', icon: 'x-circle' as const, description: 'Allergies or strong preference' },
-          { value: 'no_pets', label: 'No pets at all', icon: 'slash' as const, description: 'Any animal in the home' },
-          { value: 'private_bathroom', label: 'Private bathroom', icon: 'droplet' as const, description: 'Must not share a bathroom' },
-          { value: 'same_sex_only', label: 'Same gender only', icon: 'users' as const, description: 'Prefer roommates of same gender' },
-          { value: 'no_overnight_guests', label: 'No overnight guests', icon: 'moon' as const, description: 'Partners/friends staying over' },
-          { value: 'quiet_hours', label: 'Strict quiet hours', icon: 'volume-x' as const, description: 'Need quiet after 10pm' },
-        ];
-
         const toggleDealbreaker = (value: string) => {
           setDealbreakers(prev =>
             prev.includes(value) ? prev.filter(d => d !== value) : [...prev, value]
@@ -602,31 +804,20 @@ export const ProfileQuestionnaireScreen = () => {
               These are hard filters \u2014 people who don't match these won't appear in your deck at all.
               Leave blank if you're flexible.
             </ThemedText>
-            {DEALBREAKER_OPTIONS.map(opt => {
-              const selected = dealbreakers.includes(opt.value);
-              return (
-                <Pressable
-                  key={opt.value}
-                  style={[
-                    styles.dealbreakersOption,
-                    { borderColor: selected ? '#ff6b5b' : '#2a2a2a',
-                      backgroundColor: selected ? 'rgba(255,107,91,0.08)' : '#1c1c1c' }
-                  ]}
-                  onPress={() => toggleDealbreaker(opt.value)}
-                >
-                  <View style={[styles.dealbreakersIconWrap, selected && { backgroundColor: 'rgba(255,107,91,0.15)' }]}>
-                    <Feather name={opt.icon} size={18} color={selected ? '#ff6b5b' : 'rgba(255,255,255,0.5)'} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <ThemedText style={styles.dealbreakersLabel}>{opt.label}</ThemedText>
-                    <ThemedText style={styles.dealbreakersDesc}>{opt.description}</ThemedText>
-                  </View>
-                  {selected ? (
-                    <Feather name="check-circle" size={20} color="#ff6b5b" />
-                  ) : null}
-                </Pressable>
-              );
-            })}
+            <CheckboxPills
+              options={[
+                { value: 'no_smokers', emoji: '\uD83D\uDEAD', label: 'No smokers' },
+                { value: 'no_cats', emoji: '\uD83D\uDC08', label: 'No cats' },
+                { value: 'no_dogs', emoji: '\uD83D\uDC15', label: 'No dogs' },
+                { value: 'no_pets', emoji: '\uD83D\uDC3E', label: 'No pets at all' },
+                { value: 'private_bathroom', emoji: '\uD83D\uDEBF', label: 'Private bathroom' },
+                { value: 'same_sex_only', emoji: '\uD83D\uDEBB', label: 'Same-sex only' },
+                { value: 'no_overnight_guests', emoji: '\uD83D\uDECF\uFE0F', label: 'No overnight guests' },
+                { value: 'quiet_hours', emoji: '\uD83E\uDD2B', label: 'Strict quiet hours' },
+              ]}
+              selected={dealbreakers}
+              onToggle={toggleDealbreaker}
+            />
             <ThemedText style={styles.dealbreakersFootnote}>
               You can update these anytime in your profile settings.
             </ThemedText>
@@ -638,17 +829,29 @@ export const ProfileQuestionnaireScreen = () => {
         return (
           <View style={styles.stepInner}>
             {renderSubSectionHeader('Sleep Schedule')}
-            <SelectionCard icon="sunrise" title="Early Bird" subtitle="Asleep by 10pm, up by 7am" isSelected={sleepSchedule === 'early_sleeper'} onPress={() => setSleepSchedule('early_sleeper')} index={0} />
-            <SelectionCard icon="moon" title="Night Owl" subtitle="Up past midnight regularly" isSelected={sleepSchedule === 'late_sleeper'} onPress={() => setSleepSchedule('late_sleeper')} index={1} />
-            <SelectionCard icon="clock" title="Flexible" subtitle="Varies, no strong preference" isSelected={sleepSchedule === 'flexible'} onPress={() => setSleepSchedule('flexible')} index={2} />
-            <SelectionCard icon="shuffle" title="Shift Worker" subtitle="Irregular hours / overnight shifts" isSelected={sleepSchedule === 'irregular'} onPress={() => setSleepSchedule('irregular')} index={3} />
+            <EmojiTileGrid
+              options={[
+                { value: 'early_sleeper', emoji: '🌅', label: 'Early Bird', subtitle: 'Bed by 10pm, up by 7am' },
+                { value: 'late_sleeper', emoji: '🦉', label: 'Night Owl', subtitle: 'Bed after midnight, up late' },
+                { value: 'flexible', emoji: '😴', label: 'Flexible', subtitle: 'Adjust to roommate' },
+                { value: 'irregular', emoji: '🔄', label: 'Shift Worker', subtitle: 'Irregular hours' },
+              ]}
+              selected={sleepSchedule || ''}
+              onSelect={(v) => setSleepSchedule(v as any)}
+            />
 
             <View style={{ height: 28 }} />
 
             {renderSubSectionHeader('Cleanliness Standard')}
-            <SelectionCard icon="check-circle" title="Very Tidy" subtitle="Clean as you go, everything has a place" isSelected={cleanliness === 'very_tidy'} onPress={() => setCleanliness('very_tidy')} index={0} />
-            <SelectionCard icon="check" title="Moderately Tidy" subtitle="Clean weekly, occasional mess is fine" isSelected={cleanliness === 'moderately_tidy'} onPress={() => setCleanliness('moderately_tidy')} index={1} />
-            <SelectionCard icon="coffee" title="Relaxed" subtitle="Clean when it's needed, no strict rules" isSelected={cleanliness === 'relaxed'} onPress={() => setCleanliness('relaxed')} index={2} />
+            <IconScale
+              levels={[
+                { value: 'relaxed', emoji: '😅', label: 'Pretty relaxed — organized chaos is fine' },
+                { value: 'moderately_tidy', emoji: '🙂', label: 'Fairly tidy — clean up after myself' },
+                { value: 'very_tidy', emoji: '✨', label: 'Very clean — things have a place' },
+              ]}
+              selected={cleanliness || ''}
+              onSelect={(v) => setCleanliness(v as any)}
+            />
           </View>
         );
 
@@ -656,42 +859,72 @@ export const ProfileQuestionnaireScreen = () => {
         return (
           <View style={styles.stepInner}>
             {renderSubSectionHeader('Smoking')}
-            <SelectionCard icon="x-circle" title="Non-smoker" subtitle="I don't smoke and prefer no smoking" isSelected={smoking === 'no'} onPress={() => setSmoking('no')} index={0} />
-            <SelectionCard icon="wind" title="Outside Only" subtitle="I smoke but only outside" isSelected={smoking === 'only_outside'} onPress={() => setSmoking('only_outside')} index={1} />
-            <SelectionCard icon="check-circle" title="Smoker" subtitle="I smoke inside, roommate should be OK with it" isSelected={smoking === 'yes'} onPress={() => setSmoking('yes')} index={2} />
+            <EmojiTileGrid
+              options={[
+                { value: 'no', emoji: '🚭', label: 'Non-Smoker', subtitle: "Don't smoke, prefer no smoking" },
+                { value: 'only_outside', emoji: '🌿', label: 'Outside Only', subtitle: 'I smoke but only outside' },
+                { value: 'yes', emoji: '🚬', label: 'Smoker', subtitle: 'I smoke, roommate should be OK' },
+              ]}
+              selected={smoking || ''}
+              onSelect={(v) => setSmoking(v as any)}
+            />
 
             <View style={{ height: 28 }} />
 
             {renderSubSectionHeader('Pets')}
-            <SelectionCard icon="heart" title="I Have Pets" subtitle="I have a pet that will live with us" isSelected={pets === 'have_pets'} onPress={() => setPets('have_pets')} index={0} />
-            <SelectionCard icon="smile" title="Open to Pets" subtitle="I don't have pets but fine if roommate does" isSelected={pets === 'open_to_pets'} onPress={() => setPets('open_to_pets')} index={1} />
-            <SelectionCard icon="x-circle" title="No Pets Please" subtitle="Prefer a pet-free home" isSelected={pets === 'no_pets'} onPress={() => setPets('no_pets')} index={2} />
+            <EmojiTileGrid
+              options={[
+                { value: 'no_pets', emoji: '🚫', label: 'No Pets', subtitle: "I don't have or want pets" },
+                { value: 'have_pets', emoji: '🐾', label: 'I Have Pets', subtitle: 'My pet will live with us' },
+                { value: 'open_to_pets', emoji: '😊', label: 'Open to Pets', subtitle: "Fine if roommate has pets" },
+              ]}
+              selected={pets || ''}
+              onSelect={(v) => setPets(v as any)}
+            />
           </View>
         );
 
       case 'lifestyle':
         return (
           <View style={styles.stepInner}>
-            {renderSubSectionHeader('Work Location')}
-            <SelectionCard icon="home" title="Work From Home" subtitle="Home is also my office \u2014 need a quieter space" isSelected={workLocation === 'wfh_fulltime'} onPress={() => setWorkLocation('wfh_fulltime')} index={0} />
-            <SelectionCard icon="repeat" title="Hybrid" subtitle="Some days home, some days out" isSelected={workLocation === 'hybrid'} onPress={() => setWorkLocation('hybrid')} index={1} />
-            <SelectionCard icon="briefcase" title="Office Full-time" subtitle="I'm rarely home during the day" isSelected={workLocation === 'office_fulltime'} onPress={() => setWorkLocation('office_fulltime')} index={2} />
-            <SelectionCard icon="shuffle" title="Irregular" subtitle="Shift work or variable schedule" isSelected={workLocation === 'irregular'} onPress={() => setWorkLocation('irregular')} index={3} />
+            {renderSubSectionHeader('Work Style')}
+            <EmojiTileGrid
+              options={[
+                { value: 'office_fulltime', emoji: '\uD83C\uDFE2', label: 'Office', subtitle: 'Out all day' },
+                { value: 'wfh_fulltime', emoji: '\uD83D\uDCBB', label: 'Remote', subtitle: 'Home most days' },
+                { value: 'hybrid', emoji: '\uD83D\uDD00', label: 'Hybrid', subtitle: 'Mix of both' },
+                { value: 'irregular', emoji: '\uD83C\uDF19', label: 'Irregular', subtitle: 'Shift work / varies' },
+              ]}
+              selected={workLocation || ''}
+              onSelect={(v) => setWorkLocation(v as any)}
+            />
 
             <View style={{ height: 28 }} />
 
             {renderSubSectionHeader('Guests at Home')}
-            <SelectionCard icon="x" title="Prefer No Guests" subtitle="Keep the home private and quiet" isSelected={guestPolicy === 'prefer_no_guests'} onPress={() => setGuestPolicy('prefer_no_guests')} index={0} />
-            <SelectionCard icon="user-x" title="Rarely" subtitle="Occasional guests with advance notice" isSelected={guestPolicy === 'rarely'} onPress={() => setGuestPolicy('rarely')} index={1} />
-            <SelectionCard icon="user-check" title="Occasionally" subtitle="Regular visitors a few times a month" isSelected={guestPolicy === 'occasionally'} onPress={() => setGuestPolicy('occasionally')} index={2} />
-            <SelectionCard icon="users" title="Frequently" subtitle="Social home, people over often" isSelected={guestPolicy === 'frequently'} onPress={() => setGuestPolicy('frequently')} index={3} />
+            <EmojiTileGrid
+              options={[
+                { value: 'prefer_no_guests', emoji: '\uD83C\uDFE0', label: 'No Guests', subtitle: 'Keep the home private' },
+                { value: 'rarely', emoji: '\uD83D\uDC4B', label: 'Rarely', subtitle: 'Guests maybe once a month' },
+                { value: 'occasionally', emoji: '\uD83D\uDE0A', label: 'Occasionally', subtitle: 'Weekends sometimes' },
+                { value: 'frequently', emoji: '\uD83C\uDF89', label: 'Often', subtitle: 'Friends over regularly' },
+              ]}
+              selected={guestPolicy || ''}
+              onSelect={(v) => setGuestPolicy(v as any)}
+            />
 
             <View style={{ height: 28 }} />
 
             {renderSubSectionHeader('Noise Level')}
-            <SelectionCard icon="volume-x" title="Prefer Quiet" subtitle="Low noise, especially in evenings" isSelected={noiseTolerance === 'prefer_quiet'} onPress={() => setNoiseTolerance('prefer_quiet')} index={0} />
-            <SelectionCard icon="volume-1" title="Normal Noise" subtitle="TV, music, conversation \u2014 all fine" isSelected={noiseTolerance === 'normal_noise'} onPress={() => setNoiseTolerance('normal_noise')} index={1} />
-            <SelectionCard icon="volume-2" title="Lively is Fine" subtitle="Music, gatherings, energy in the home" isSelected={noiseTolerance === 'loud_environments'} onPress={() => setNoiseTolerance('loud_environments')} index={2} />
+            <IconScale
+              levels={[
+                { value: 'prefer_quiet', emoji: '\uD83E\uDD2B', label: 'Very quiet \u2014 I need near-silence to relax' },
+                { value: 'normal_noise', emoji: '\uD83C\uDFB5', label: 'Moderate \u2014 normal household sounds' },
+                { value: 'loud_environments', emoji: '\uD83C\uDF89', label: 'Lively \u2014 love an active, buzzy home' },
+              ]}
+              selected={noiseTolerance || ''}
+              onSelect={(v) => setNoiseTolerance(v as any)}
+            />
           </View>
         );
 
@@ -699,8 +932,14 @@ export const ProfileQuestionnaireScreen = () => {
         return (
           <View style={styles.stepInner}>
             <ThemedText style={[styles.inputLabel, { marginBottom: 10 }]}>Looking For</ThemedText>
-            <SelectionCard icon="grid" title="A Room" subtitle="Shared apartment" isSelected={lookingFor === 'room'} onPress={() => setLookingFor('room')} index={0} />
-            <SelectionCard icon="home" title="Entire Apartment" subtitle="Full place for you and roommates" isSelected={lookingFor === 'entire_apartment'} onPress={() => setLookingFor('entire_apartment')} index={1} />
+            <BinaryChoice
+              options={[
+                { value: 'room', emoji: '\uD83D\uDECF\uFE0F', label: 'A Room' },
+                { value: 'entire_apartment', emoji: '\uD83C\uDFE0', label: 'Full Apartment' },
+              ]}
+              selected={lookingFor || ''}
+              onSelect={(v) => setLookingFor(v as any)}
+            />
 
             <View style={styles.inputGroup}>
               <ThemedText style={[styles.inputLabel, { marginTop: 12 }]}>Move-in Date</ThemedText>
@@ -729,8 +968,14 @@ export const ProfileQuestionnaireScreen = () => {
             {lookingFor !== 'entire_apartment' ? (
               <>
                 <ThemedText style={[styles.inputLabel, { marginBottom: 10, marginTop: 4 }]}>Private Bathroom</ThemedText>
-                <SelectionCard icon="check-circle" title="Yes, I need a private bathroom" isSelected={privateBathroom === true} onPress={() => setPrivateBathroom(true)} index={0} />
-                <SelectionCard icon="users" title="Shared bathroom is fine" isSelected={privateBathroom === false} onPress={() => setPrivateBathroom(false)} index={1} />
+                <BinaryChoice
+                  options={[
+                    { value: 'yes', emoji: '\uD83D\uDEBF', label: 'Private' },
+                    { value: 'no', emoji: '\uD83D\uDC65', label: 'Shared is fine' },
+                  ]}
+                  selected={privateBathroom === true ? 'yes' : privateBathroom === false ? 'no' : ''}
+                  onSelect={(v) => setPrivateBathroom(v === 'yes')}
+                />
               </>
             ) : null}
           </View>
@@ -753,50 +998,50 @@ export const ProfileQuestionnaireScreen = () => {
             id: 'q1',
             question: 'When you get home after a long day:',
             options: [
-              { value: 'alone', emoji: '🛋️', label: 'Decompress alone quietly' },
-              { value: 'music', emoji: '🎵', label: 'Put on music and unwind' },
-              { value: 'social', emoji: '📱', label: 'Call friends or catch up' },
-              { value: 'kitchen', emoji: '🍳', label: 'Cook and relax in the kitchen' },
+              { value: 'alone', emoji: '\uD83D\uDECB\uFE0F', label: 'Decompress alone quietly' },
+              { value: 'music', emoji: '\uD83C\uDFB5', label: 'Put on music and unwind' },
+              { value: 'social', emoji: '\uD83D\uDCF1', label: 'Call friends or catch up' },
+              { value: 'kitchen', emoji: '\uD83C\uDF73', label: 'Cook and relax in the kitchen' },
             ],
           },
           {
             id: 'q2',
             question: 'How do you want to handle issues with a roommate?',
             options: [
-              { value: 'text', emoji: '💬', label: 'Text \u2014 keeps things low pressure' },
-              { value: 'direct', emoji: '🗣️', label: 'Face to face, direct and clear' },
-              { value: 'meeting', emoji: '📋', label: 'Sit down together and talk it out' },
-              { value: 'flow', emoji: '😎', label: 'Go with the flow, no drama' },
+              { value: 'text', emoji: '\uD83D\uDCAC', label: 'Text \u2014 keeps things low pressure' },
+              { value: 'direct', emoji: '\uD83D\uDDE3\uFE0F', label: 'Face to face, direct and clear' },
+              { value: 'meeting', emoji: '\uD83D\uDCCB', label: 'Sit down together and talk it out' },
+              { value: 'flow', emoji: '\uD83D\uDE0E', label: 'Go with the flow, no drama' },
             ],
           },
           {
             id: 'q3',
             question: 'The kitchen after cooking:',
             options: [
-              { value: 'immediate', emoji: '🧼', label: 'Cleaned up immediately every time' },
-              { value: 'sameday', emoji: '🕐', label: 'Cleaned before the end of the day' },
-              { value: 'nextday', emoji: '😴', label: 'Sometimes the next morning is fine' },
-              { value: 'flexible', emoji: '🤷', label: "Doesn't bother me either way" },
+              { value: 'immediate', emoji: '\uD83E\uDDFC', label: 'Cleaned up immediately every time' },
+              { value: 'sameday', emoji: '\uD83D\uDD50', label: 'Cleaned before the end of the day' },
+              { value: 'nextday', emoji: '\uD83D\uDE34', label: 'Sometimes the next morning is fine' },
+              { value: 'flexible', emoji: '\uD83E\uDD37', label: "Doesn't bother me either way" },
             ],
           },
           {
             id: 'q4',
             question: 'What kind of roommate relationship do you want?',
             options: [
-              { value: 'friends', emoji: '🤝', label: 'Actual friends \u2014 hang out together' },
-              { value: 'friendly', emoji: '👋', label: 'Friendly but independent lives' },
-              { value: 'respectful', emoji: '🏠', label: 'Respectful co-living, minimal interaction' },
-              { value: 'parallel', emoji: '🚶', label: 'Ships passing \u2014 barely see each other' },
+              { value: 'friends', emoji: '\uD83E\uDD1D', label: 'Actual friends \u2014 hang out together' },
+              { value: 'friendly', emoji: '\uD83D\uDC4B', label: 'Friendly but independent lives' },
+              { value: 'respectful', emoji: '\uD83C\uDFE0', label: 'Respectful co-living, minimal interaction' },
+              { value: 'parallel', emoji: '\uD83D\uDEB6', label: 'Ships passing \u2014 barely see each other' },
             ],
           },
           {
             id: 'q5',
             question: 'How far can you realistically commute from home?',
             options: [
-              { value: 'under_20', emoji: '🚶', label: 'Under 20 minutes' },
-              { value: 'under_40', emoji: '🚇', label: 'Up to 40 minutes' },
+              { value: 'under_20', emoji: '\uD83D\uDEB6', label: 'Under 20 minutes' },
+              { value: 'under_40', emoji: '\uD83D\uDE87', label: 'Up to 40 minutes' },
               { value: 'under_60', emoji: '\u23F1\uFE0F', label: 'Up to an hour' },
-              { value: 'flexible', emoji: '🗺️', label: "Flexible \u2014 I work remotely or don't mind" },
+              { value: 'flexible', emoji: '\uD83D\uDDFA\uFE0F', label: "Flexible \u2014 I work remotely or don't mind" },
             ],
           },
         ];
@@ -806,21 +1051,11 @@ export const ProfileQuestionnaireScreen = () => {
             {PERSONALITY_QUESTIONS.map((q) => (
               <View key={q.id} style={{ marginBottom: 24 }}>
                 <ThemedText style={styles.questionText}>{q.question}</ThemedText>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-                  {q.options.map((opt) => {
-                    const isSelected = personalityAnswers[q.id] === opt.value;
-                    return (
-                      <Pressable
-                        key={opt.value}
-                        onPress={() => setPersonalityAnswers(prev => ({ ...prev, [q.id]: opt.value }))}
-                        style={[styles.personalityOption, isSelected && styles.personalityOptionSelected]}
-                      >
-                        <Text style={styles.personalityEmoji}>{opt.emoji}</Text>
-                        <ThemedText style={styles.personalityLabel}>{opt.label}</ThemedText>
-                      </Pressable>
-                    );
-                  })}
-                </View>
+                <EmojiTileGrid
+                  options={q.options}
+                  selected={personalityAnswers[q.id] || ''}
+                  onSelect={(value) => setPersonalityAnswers(prev => ({ ...prev, [q.id]: value }))}
+                />
               </View>
             ))}
           </View>
@@ -1075,33 +1310,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 20,
   },
-  dealbreakersOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    marginBottom: 10,
-  },
-  dealbreakersIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dealbreakersLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  dealbreakersDesc: {
-    fontSize: 12,
-    color: '#888',
-    marginTop: 2,
-  },
   dealbreakersFootnote: {
     fontSize: 12,
     color: '#666',
@@ -1190,31 +1398,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginBottom: 14,
     marginTop: 4,
-  },
-  personalityOption: {
-    width: '48%',
-    borderRadius: 14,
-    padding: 16,
-    backgroundColor: '#1c1c1c',
-    borderWidth: 1.5,
-    borderColor: '#2a2a2a',
-    alignItems: 'center',
-    flexGrow: 1,
-  },
-  personalityOptionSelected: {
-    backgroundColor: 'rgba(255,107,91,0.1)',
-    borderColor: '#ff6b5b',
-  },
-  personalityEmoji: {
-    fontSize: 28,
-    marginBottom: 8,
-  },
-  personalityLabel: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#fff',
-    textAlign: 'center',
-    lineHeight: 18,
   },
   footer: {
     paddingHorizontal: 24,

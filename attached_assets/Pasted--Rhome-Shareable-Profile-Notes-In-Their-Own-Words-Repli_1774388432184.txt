@@ -1,0 +1,346 @@
+# Rhome — Shareable Profile Notes ("In Their Own Words")
+## Replit Agent Prompt
+
+---
+
+## Overview
+
+Add a free-text field where users write something about themselves that they want potential roommates to know — beyond what the structured questionnaire captures. They control exactly what gets shared. Claude reads this field when answering questions about that person, so matches get richer, more honest answers than the questionnaire data alone can provide.
+
+This is the only cross-user AI data bridge in the app. Everything else stays private.
+
+The feature appears at the end of the questionnaire as a final optional step, and in the Edit Profile screen. It shows on the profile card as an "In their own words" section.
+
+---
+
+## Part 1 — Database Migration
+
+Run in Supabase SQL Editor:
+
+```sql
+-- Migration 030: Shareable profile notes
+
+ALTER TABLE profiles
+ADD COLUMN IF NOT EXISTS profile_note TEXT,
+ADD COLUMN IF NOT EXISTS profile_note_updated_at TIMESTAMPTZ;
+
+-- Add character limit constraint
+ALTER TABLE profiles
+ADD CONSTRAINT profile_note_max_length CHECK (char_length(profile_note) <= 500);
+
+-- Index for searching notes (optional, for future search feature)
+CREATE INDEX IF NOT EXISTS idx_profiles_profile_note
+  ON profiles USING gin(to_tsvector('english', COALESCE(profile_note, '')));
+
+COMMENT ON COLUMN profiles.profile_note IS
+  'User-written free text shown to potential matches and readable by AI when answering questions about this user. User controls content entirely.';
+```
+
+---
+
+## Part 2 — Add to Questionnaire
+
+In `screens/shared/ProfileQuestionnaireScreen.tsx`:
+
+### Step 2a — Add step to STEP_ORDER
+
+Find the `STEP_ORDER` array and add `'profileNote'` as the final step before the completion screen:
+
+```typescript
+const STEP_ORDER = [
+  'photos',
+  'basicInfo',
+  'budgetLocation',
+  'dealbreakers',
+  'sleepCleanliness',
+  'smokingPets',
+  'lifestyle',
+  'housing',
+  'interests',
+  'personality',
+  'profileNote',   // ← add this
+];
+```
+
+### Step 2b — Add state
+
+```typescript
+const [profileNote, setProfileNote] = useState('');
+const profileNoteCharLimit = 500;
+```
+
+Load existing value when the screen mounts (alongside other existing profile loads):
+```typescript
+if (existingProfile?.profile_note) setProfileNote(existingProfile.profile_note);
+```
+
+### Step 2c — Add the step render
+
+Inside `renderStepContent()`, add a new `case 'profileNote':`:
+
+```tsx
+case 'profileNote':
+  return (
+    <View style={styles.stepContainer}>
+      <View style={styles.stepHeader}>
+        <Text style={styles.stepEmoji}>✍️</Text>
+        <Text style={[styles.stepTitle, { color: theme.text }]}>
+          In your own words
+        </Text>
+        <Text style={[styles.stepSubtitle, { color: theme.textSecondary }]}>
+          Write anything you want potential roommates to know about you — your habits, your vibe, what makes you a great roommate. This shows on your profile and helps our AI answer questions about you honestly.
+        </Text>
+      </View>
+
+      {/* Text input */}
+      <View style={{
+        backgroundColor: theme.backgroundSecondary,
+        borderRadius: 16,
+        borderWidth: 2,
+        borderColor: profileNote.length > 0 ? theme.primary : theme.border,
+        padding: 16,
+      }}>
+        <TextInput
+          style={{
+            color: theme.text,
+            fontSize: 16,
+            lineHeight: 24,
+            minHeight: 140,
+            textAlignVertical: 'top',
+          }}
+          value={profileNote}
+          onChangeText={(text) => setProfileNote(text.slice(0, profileNoteCharLimit))}
+          placeholder="e.g. I work from home so I'm around a lot during the day, but I wear headphones and stay in my room — you'll barely notice me. I love to cook and always make extra. Very clean in shared spaces, less so in my room. Looking for someone chill who doesn't need a social roommate but is friendly when we cross paths."
+          placeholderTextColor={theme.textSecondary}
+          multiline
+          maxLength={profileNoteCharLimit}
+        />
+        <Text style={{
+          color: profileNote.length > profileNoteCharLimit * 0.9 ? '#ef4444' : theme.textSecondary,
+          fontSize: 12,
+          textAlign: 'right',
+          marginTop: 8,
+        }}>
+          {profileNote.length}/{profileNoteCharLimit}
+        </Text>
+      </View>
+
+      {/* What Claude uses this for */}
+      <View style={{
+        flexDirection: 'row',
+        gap: 10,
+        padding: 14,
+        backgroundColor: theme.primary + '10',
+        borderRadius: 14,
+        marginTop: 12,
+      }}>
+        <Text style={{ fontSize: 18 }}>✨</Text>
+        <Text style={{ color: theme.textSecondary, fontSize: 13, flex: 1, lineHeight: 18 }}>
+          When someone asks Rhome AI about you, it reads this note to give them a real answer — not just your checklist. You control exactly what it says.
+        </Text>
+      </View>
+
+      {/* Skip option */}
+      <TouchableOpacity
+        onPress={() => {
+          setProfileNote('');
+          handleNext();
+        }}
+        style={{ alignItems: 'center', marginTop: 16 }}
+      >
+        <Text style={{ color: theme.textSecondary, fontSize: 14 }}>
+          Skip for now
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+```
+
+### Step 2d — Save to Supabase
+
+In the `handleSaveProfile` function (where questionnaire data is saved to the `profiles` table), add `profile_note` to the update object:
+
+```typescript
+const profileUpdate = {
+  // ... existing fields ...
+  profile_note: profileNote.trim() || null,
+  profile_note_updated_at: profileNote.trim() ? new Date().toISOString() : null,
+};
+```
+
+---
+
+## Part 3 — Add to Edit Profile Screen
+
+In `screens/shared/EditProfileScreen.tsx`:
+
+Add state:
+```typescript
+const [profileNote, setProfileNote] = useState('');
+```
+
+Load on mount:
+```typescript
+if (profile?.profile_note) setProfileNote(profile.profile_note);
+```
+
+Find the bio/about section. Add a new card below the bio input for the profile note:
+
+```tsx
+{/* Profile Note Section */}
+<View style={styles.sectionCard}>
+  <View style={styles.sectionHeader}>
+    <Text style={[styles.sectionTitle, { color: theme.text }]}>
+      ✍️ In your own words
+    </Text>
+    <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
+      Shown to matches · Read by Rhome AI
+    </Text>
+  </View>
+
+  <TextInput
+    style={[styles.textArea, { color: theme.text, backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}
+    value={profileNote}
+    onChangeText={(text) => setProfileNote(text.slice(0, 500))}
+    placeholder="What do you want roommates to know about you beyond your profile settings? Your real daily habits, your vibe, what living with you is actually like..."
+    placeholderTextColor={theme.textSecondary}
+    multiline
+    maxLength={500}
+  />
+
+  <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 6, textAlign: 'right' }}>
+    {profileNote.length}/500
+  </Text>
+</View>
+```
+
+Save `profile_note` and `profile_note_updated_at` in the existing save function alongside other profile fields.
+
+---
+
+## Part 4 — Show on Profile Card
+
+In the profile view card (used in the swipe deck and when viewing someone's full profile):
+
+Find where the bio text renders. Below the bio, add the profile note with a distinct visual treatment:
+
+```tsx
+{profile.profile_note && (
+  <View style={{
+    marginTop: 12,
+    padding: 14,
+    backgroundColor: theme.backgroundSecondary,
+    borderRadius: 14,
+    borderLeftWidth: 3,
+    borderLeftColor: theme.primary,
+  }}>
+    <Text style={{
+      color: theme.primary,
+      fontSize: 11,
+      fontWeight: '700',
+      letterSpacing: 0.5,
+      marginBottom: 6,
+    }}>
+      IN THEIR OWN WORDS
+    </Text>
+    <Text style={{
+      color: theme.text,
+      fontSize: 14,
+      lineHeight: 21,
+      fontStyle: 'italic',
+    }}>
+      "{profile.profile_note}"
+    </Text>
+  </View>
+)}
+```
+
+---
+
+## Part 5 — Feed Profile Note to All AI Functions
+
+Update every Edge Function that loads a target user's profile to include `profile_note` in the SELECT and pass it to Claude's system prompt.
+
+### `ai-ask-about-profile/index.ts`
+
+In the target profile SELECT query, add `profile_note`:
+```typescript
+supabase
+  .from('profiles')
+  .select(`
+    first_name, age, occupation, bio,
+    sleep_schedule, cleanliness_level, noise_level,
+    guest_preference, work_style, smoking_preference,
+    pet_preference, personality_answers,
+    budget_min, budget_max, move_in_date,
+    neighborhoods, instagram_verified,
+    profile_note   // ← add this
+  `)
+  .eq('id', targetProfileId)
+```
+
+In the `targetProfileSummary` string passed to Claude, add:
+```typescript
+${targetProfile.profile_note ? `\nIn their own words: "${targetProfile.profile_note}"` : ''}
+```
+
+### `explain-match/index.ts`
+
+Same change — add `profile_note` to both profile SELECTs and include in the profiles summary passed to Claude.
+
+### `ai-assistant/index.ts`
+
+When the user asks about someone in the general AI assistant, if a `targetProfileId` is present in context, include `profile_note` in the profile load.
+
+---
+
+## Part 6 — Update System Prompt Language
+
+In `ai-ask-about-profile/index.ts`, update the system prompt to explicitly tell Claude how to use the note:
+
+Find the `YOUR ROLE:` section and add:
+
+```
+- If the profile has an "In their own words" note, treat it as the most authentic source of information about this person — they wrote it themselves to describe how they actually live. Reference it directly when answering questions about their habits or vibe.
+- Distinguish between structured profile data (what they answered in the questionnaire) and their personal note (what they chose to say in their own voice). The note often has nuance the questionnaire misses.
+```
+
+---
+
+## Part 7 — Privacy Label in App
+
+Anywhere the profile note appears in the UI (profile card, edit screen), add a small label making clear this is intentionally shared:
+
+```tsx
+<View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+  <Ionicons name="eye-outline" size={11} color={theme.textSecondary} />
+  <Text style={{ color: theme.textSecondary, fontSize: 11 }}>
+    Visible to your matches · You control this
+  </Text>
+</View>
+```
+
+This label matters. Users need to know this field is intentionally public to matches — not a private note.
+
+---
+
+## What NOT to Do
+
+- Do NOT pull private message history between users A and B into any other user's context
+- Do NOT store anything from User A's conversations into User B's `user_ai_memory`
+- Do NOT expose User B's `user_ai_memory` when User C asks about User B — that table is only loaded for the authenticated user's own context
+- The `profile_note` is the ONLY cross-user AI data bridge. Everything else stays scoped to the user who created it.
+
+---
+
+## Summary
+
+| What | Detail |
+|---|---|
+| New field | `profile_note TEXT` on `profiles` table, max 500 chars |
+| Where users write it | Final step of questionnaire + Edit Profile screen |
+| Where it shows | Profile card under bio — "IN THEIR OWN WORDS" with left border accent |
+| What Claude does with it | References it directly when answering questions about that person — treats it as the most authentic data source |
+| Privacy | Labeled "Visible to your matches · You control this" everywhere it appears |
+| What it replaces | Nothing — it adds a human voice layer on top of the structured questionnaire data |
+| Cross-user AI firewall | This is the only intentional cross-user data. Private messages, AI memory, and chat history remain scoped to their owner. |
