@@ -190,6 +190,11 @@ export const NotificationsScreen = () => {
           });
         }
         break;
+      case 'background_check':
+        (navigation as any).navigate('Profile', {
+          screen: 'BackgroundCheck',
+        });
+        break;
       case 'property_update':
       case 'property_rented':
         (navigation as any).navigate('Explore');
@@ -240,6 +245,15 @@ export const NotificationsScreen = () => {
         return 'home';
       case 'application_status':
         return 'file-text';
+      case 'background_check':
+        return 'shield';
+      case 'ai_group_suggestion':
+        return 'cpu';
+      case 'meetup_suggestion':
+        return 'coffee';
+      case 'group_complete':
+      case 'group_match':
+        return 'check-circle';
       default:
         return 'bell';
     }

@@ -18,6 +18,7 @@ import { getMessages as getSupabaseMessages, sendMessage as sendSupabaseMessage,
 import { recordMessageActivity } from '../../utils/aiMemory';
 import { acceptInquiry, declineInquiry, linkListingToGroup, leaveGroup, removeMember, getGroupMessages, sendGroupMessage, subscribeToGroupMessages } from '../../services/groupService';
 import { supabase } from '../../lib/supabase';
+import { SafeMessageText } from '../../components/SafeMessageText';
 import { GroupPropertySearchModal } from '../../components/GroupPropertySearchModal';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence } from 'react-native-reanimated';
 import { AdBanner } from '../../components/AdBanner';
@@ -49,6 +50,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [inputText, setInputText] = useState('');
   const [showGroupOption, setShowGroupOption] = useState(true);
   const [isOnline, setIsOnline] = useState(Math.random() > 0.5);
+  const [safetyModeEnabled, setSafetyModeEnabled] = useState(false);
   const [otherUser, setOtherUser] = useState<RoommateProfile | null>(routeOtherUser || null);
   const flatListRef = useRef<FlatList>(null);
   const [showReportBlockModal, setShowReportBlockModal] = useState(false);
@@ -174,6 +176,15 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   useEffect(() => {
     loadMessages();
     StorageService.updateConversation(conversationId, { unread: 0 });
+    (async () => {
+      try {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (authUser) {
+          const { data } = await supabase.from('profiles').select('safety_mode_enabled').eq('user_id', authUser.id).single();
+          if (data?.safety_mode_enabled) setSafetyModeEnabled(true);
+        }
+      } catch (_e) {}
+    })();
   }, [conversationId]);
 
   useEffect(() => {
@@ -728,14 +739,14 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             isHostMessage && !isOwnMessage ? { borderLeftWidth: 3, borderLeftColor: '#ff6b5b' } : null,
           ]}
         >
-          <ThemedText
+          <SafeMessageText
+            text={item.text}
+            safetyMode={safetyModeEnabled}
             style={[
               Typography.body,
               { color: isOwnMessage ? '#FFFFFF' : theme.text },
             ]}
-          >
-            {item.text}
-          </ThemedText>
+          />
         </View>
         {showReadReceipt ? (
           <View style={styles.readReceiptContainer}>

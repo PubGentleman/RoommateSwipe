@@ -17,6 +17,7 @@ import { DownloadDataScreen } from '../screens/shared/DownloadDataScreen';
 import { BlockedUsersScreen } from '../screens/shared/BlockedUsersScreen';
 import { NotificationPreferencesScreen } from '../screens/shared/NotificationPreferencesScreen';
 import { VerificationScreen } from '../screens/shared/VerificationScreen';
+import { BackgroundCheckScreen } from '../screens/shared/BackgroundCheckScreen';
 import { MyInterestsScreen } from '../screens/shared/MyInterestsScreen';
 import { MatchesListScreen } from '../screens/shared/MatchesListScreen';
 import { WhoLikedMeScreen } from '../screens/shared/WhoLikedMeScreen';
@@ -52,6 +53,7 @@ export type ProfileStackParamList = {
   BlockedUsers: undefined;
   NotificationPreferences: undefined;
   Verification: { fromHostPurchase?: boolean } | undefined;
+  BackgroundCheck: undefined;
   MyInterests: undefined;
   MatchesList: undefined;
   WhoLikedMe: undefined;
@@ -270,6 +272,15 @@ export const ProfileStackNavigator = () => {
         component={VerificationScreen}
         options={{
           headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="BackgroundCheck"
+        component={BackgroundCheckScreen}
+        options={{
+          title: 'Get Verified',
+          headerShown: true,
+          ...darkHeaderOptions,
         }}
       />
       <Stack.Screen 

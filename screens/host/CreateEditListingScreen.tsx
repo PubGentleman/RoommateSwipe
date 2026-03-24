@@ -88,6 +88,7 @@ export const CreateEditListingScreen = () => {
   }, [addressFromAutocomplete]);
   const [hostLivesIn, setHostLivesIn] = useState(false);
   const [existingRoommatesCount, setExistingRoommatesCount] = useState(0);
+  const [requiresBackgroundCheck, setRequiresBackgroundCheck] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showLimitModal, setShowLimitModal] = useState(false);
@@ -141,6 +142,7 @@ export const CreateEditListingScreen = () => {
     if (prop.existing_roommates_count !== undefined) setExistingRoommatesCount(prop.existing_roommates_count);
     if (prop.host_lives_in !== undefined) setHostLivesIn(!!prop.host_lives_in);
     if (prop.existingRoommatesCount !== undefined) setExistingRoommatesCount(prop.existingRoommatesCount);
+    if (prop.requires_background_check !== undefined) setRequiresBackgroundCheck(!!prop.requires_background_check);
     if (prop.transitInfo?.manualOverride) {
       setTransitOverride(prop.transitInfo.manualOverride);
     }
@@ -298,6 +300,7 @@ export const CreateEditListingScreen = () => {
         bathrooms,
         host_lives_in: hostLivesIn,
         existing_roommates_count: existingRoommatesCount,
+        requires_background_check: requiresBackgroundCheck,
         sqft: Number(sqft) || 0,
         property_type: propertyType,
         address: address.trim(),
@@ -669,6 +672,30 @@ export const CreateEditListingScreen = () => {
             </View>
           );
         })()}
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.label}>Require Background Check</Text>
+          <Text style={[styles.sectionSubtitle, { marginBottom: 8 }]}>
+            Only renters with a verified background check can apply
+          </Text>
+          <View style={styles.toggleRow}>
+            {[{ label: 'Yes', value: true, icon: 'shield' }, { label: 'No', value: false, icon: 'x' }].map(opt => {
+              const selected = opt.value === requiresBackgroundCheck;
+              return (
+                <Pressable
+                  key={String(opt.value)}
+                  style={[styles.toggleButton, { backgroundColor: selected ? '#22c55e' : 'transparent' }]}
+                  onPress={() => setRequiresBackgroundCheck(opt.value)}
+                >
+                  <Feather name={opt.icon as any} size={14} color={selected ? '#fff' : 'rgba(255,255,255,0.35)'} />
+                  <Text style={[styles.toggleText, { color: selected ? '#fff' : 'rgba(255,255,255,0.45)', fontWeight: selected ? '700' : '500', marginLeft: 5 }]}>
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
 
         <View style={styles.fieldContainer}>
           <ThemedText style={styles.label}>Square Feet</ThemedText>

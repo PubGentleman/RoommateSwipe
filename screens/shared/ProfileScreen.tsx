@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Pressable, Image, Modal, ScrollView, Text, TouchableOpacity, Platform } from 'react-native';
+import { View, StyleSheet, Pressable, Image, Modal, ScrollView, Text, TouchableOpacity, Platform, Switch } from 'react-native';
 import Animated, { useSharedValue, useAnimatedScrollHandler, useAnimatedStyle, interpolate, Extrapolation } from 'react-native-reanimated';
 import { Feather } from '../../components/VectorIcons';
 import * as Haptics from 'expo-haptics';
@@ -37,6 +37,7 @@ export const ProfileScreen = () => {
   const [aiSheetContext, setAiSheetContext] = useState<'profile' | 'profile_reminder'>('profile');
   const [devTapCount, setDevTapCount] = useState(0);
   const [devTapTimer, setDevTapTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const [safetyMode, setSafetyMode] = useState(false);
 
   const PROFILE_COLLAPSE_H = 280;
   const profileScrollY = useSharedValue(0);
@@ -118,6 +119,11 @@ export const ProfileScreen = () => {
         StorageService.getInterestCardsForRenter(user.id).then(cards => {
           setPendingInterestCount(cards.filter(c => c.status === 'pending').length);
         });
+        import('../../lib/supabase').then(({ supabase }) => {
+          supabase.from('profiles').select('safety_mode_enabled').eq('user_id', user.id).single().then(({ data }) => {
+            if (data?.safety_mode_enabled !== undefined) setSafetyMode(!!data.safety_mode_enabled);
+          });
+        }).catch(() => {});
       }
     }, [user, loadProfileStats])
   );
@@ -314,7 +320,10 @@ export const ProfileScreen = () => {
                 <Text style={styles.sectionTitle}>Background Check</Text>
               </View>
             </View>
-            <View style={styles.bgCheckCard}>
+            <Pressable
+              style={styles.bgCheckCard}
+              onPress={() => navigation.navigate('BackgroundCheck')}
+            >
               <View style={styles.bgCheckLeft}>
                 <View style={styles.bgCheckIcon}>
                   <Feather name="shield" size={20} color="#22c55e" />
@@ -326,43 +335,24 @@ export const ProfileScreen = () => {
                      'Get Background Checked'}
                   </Text>
                   <Text style={styles.bgCheckDesc}>
-                    {user?.background_check_status === 'clear' ? 'Your background check is verified and visible to hosts' :
-                     user?.background_check_status === 'pending' ? 'Results typically available in 2-3 business days' :
-                     'Increase trust with hosts. One-time fee of $9.99'}
+                    {user?.background_check_status === 'clear' ? 'Verified and visible to hosts. Tap to view details.' :
+                     user?.background_check_status === 'pending' ? 'Results typically available within minutes' :
+                     'Increase trust with hosts. Starting at $15'}
                   </Text>
                 </View>
               </View>
-              {user?.background_check_status !== 'clear' && user?.background_check_status !== 'pending' ? (
-                <Pressable
-                  style={styles.bgCheckBtn}
-                  onPress={async () => {
-                    if (isDev) {
-                      const confirmed = await confirm({
-                        title: 'Dev Mode',
-                        message: 'Mark background check as cleared?',
-                        confirmText: 'Mark Cleared',
-                        variant: 'info',
-                      });
-                      if (confirmed && user) {
-                        updateUser({ ...user, background_check_status: 'clear', background_check_completed_at: new Date().toISOString() });
-                      }
-                    } else {
-                      navigation.navigate('Payment', { type: 'background_check', amount: 999 } as any);
-                    }
-                  }}
-                >
-                  <Text style={styles.bgCheckBtnText}>$9.99</Text>
-                </Pressable>
-              ) : user?.background_check_status === 'clear' ? (
+              {user?.background_check_status === 'clear' ? (
                 <View style={styles.bgCheckClearedBadge}>
                   <Feather name="check" size={14} color="#22c55e" />
                 </View>
-              ) : (
+              ) : user?.background_check_status === 'pending' ? (
                 <View style={styles.bgCheckPendingBadge}>
                   <Feather name="clock" size={14} color="#f59e0b" />
                 </View>
+              ) : (
+                <Feather name="chevron-right" size={20} color="#999" />
               )}
-            </View>
+            </Pressable>
           </View>
         ) : null}
 
@@ -535,6 +525,36 @@ export const ProfileScreen = () => {
               subtitle="Blocked users, data, visibility"
               onPress={() => navigation.navigate('PrivacySecurity')}
             />
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#1a1a2e', borderRadius: 12, marginBottom: 8 }}>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Feather name="shield" size={18} color="#FF6B6B" />
+                  <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Safety Mode</Text>
+                </View>
+                <Text style={{ color: '#999', fontSize: 12, marginTop: 4, marginLeft: 26 }}>
+                  Blur phone numbers and social handles in messages
+                </Text>
+              </View>
+              <Switch
+                value={safetyMode}
+                onValueChange={async (value) => {
+                  setSafetyMode(value)
+                  if (user) {
+                    updateUser({ ...user, safetyModeEnabled: value })
+                  }
+                  try {
+                    const { supabase } = await import('../../lib/supabase')
+                    const { data: { user: authUser } } = await supabase.auth.getUser()
+                    if (authUser) {
+                      await supabase.from('profiles').update({ safety_mode_enabled: value }).eq('user_id', authUser.id)
+                    }
+                  } catch (_e) {}
+                }}
+                trackColor={{ false: '#333', true: '#FF6B6B' }}
+                thumbColor="#fff"
+              />
+            </View>
             <SettingsItem
               iconName="credit-card"
               iconColor="#667eea"

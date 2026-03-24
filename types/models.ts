@@ -537,6 +537,7 @@ export interface User {
   identity_verified?: boolean;
   identity_verified_at?: string;
   background_check_status?: 'none' | 'pending' | 'clear' | 'flagged';
+  safetyModeEnabled?: boolean;
   background_check_completed_at?: string;
   notificationPreferences?: {
     matches: boolean;
@@ -600,7 +601,7 @@ export interface InterestCard {
 export interface Notification {
   id: string;
   userId: string;
-  type: 'match' | 'message' | 'group_invite' | 'group_accepted' | 'property_update' | 'property_rented' | 'application_status' | 'system' | 'super_like' | 'interest_received' | 'interest_accepted' | 'interest_passed' | 'interest_expired' | 'agent_invite';
+  type: 'match' | 'message' | 'group_invite' | 'group_accepted' | 'group_complete' | 'group_match' | 'company_group_invite' | 'meetup_suggestion' | 'property_update' | 'property_rented' | 'application_status' | 'system' | 'super_like' | 'interest_received' | 'interest_accepted' | 'interest_passed' | 'interest_expired' | 'agent_invite' | 'ai_group_suggestion' | 'background_check';
   title: string;
   body: string;
   isRead: boolean;
