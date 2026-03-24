@@ -101,6 +101,10 @@ export async function updateProfile(updates: ProfileData) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
+  if (updates.photos && Array.isArray(updates.photos) && updates.photos.length < 3) {
+    throw new Error('At least 3 photos are required to save your profile');
+  }
+
   const { data: existing } = await supabase
     .from('profiles')
     .select('id')

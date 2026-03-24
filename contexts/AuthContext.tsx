@@ -231,6 +231,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         moveInDate: profile.move_in_date,
         roomType: profile.room_type,
         leaseDuration: profile.lease_duration,
+        instagram_verified: profile.instagram_verified || false,
+        instagram_handle: profile.instagram_handle || undefined,
       } : {
         neighborhood: supabaseUser.neighborhood || 'Williamsburg',
         city: supabaseUser.city || 'New York',

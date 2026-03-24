@@ -70,6 +70,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [showMembersOverlay, setShowMembersOverlay] = useState(false);
   const [meetupSuggestion, setMeetupSuggestion] = useState<any>(null);
   const [suggestionDismissed, setSuggestionDismissed] = useState(false);
+  const [leakageDetected, setLeakageDetected] = useState(false);
 
   const [inquiryStatus, setInquiryStatus] = useState<'pending' | 'accepted' | 'declined'>(
     inquiryGroup?.inquiryStatus || inquiryGroup?.inquiry_status || 'pending'
@@ -362,7 +363,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
 
     try {
       const sortedIds = [otherUser.id, user!.id].sort();
-      await supabase.functions.invoke('analyze-chat-intent', {
+      const response = await supabase.functions.invoke('analyze-chat-intent', {
         body: {
           conversationId,
           userId1: sortedIds[0],
@@ -373,6 +374,9 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           })),
         },
       });
+      if (response?.data?.leakageDetected) {
+        setLeakageDetected(true);
+      }
       await loadMeetupSuggestion();
     } catch (_e) {
       console.log('Intent analysis skipped');
@@ -1210,6 +1214,15 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           <Feather name="send" size={16} color="#9370DB" />
           <ThemedText style={[Typography.caption, { color: '#9370DB', marginLeft: Spacing.sm, flex: 1 }]}>
             You sent a direct message — they haven't matched with you yet
+          </ThemedText>
+        </View>
+      ) : null}
+
+      {leakageDetected ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,107,107,0.1)', paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: BorderRadius.md, marginHorizontal: Spacing.md, marginBottom: Spacing.sm, gap: Spacing.sm }}>
+          <Feather name="shield" size={16} color="#FF6B6B" />
+          <ThemedText style={[Typography.caption, { color: '#FF6B6B', flex: 1 }]}>
+            Keep chatting here — your messages are private and backed up on Rhome.
           </ThemedText>
         </View>
       ) : null}

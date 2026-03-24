@@ -179,7 +179,7 @@ Signals to look for: scheduling a meetup, discussing move-in dates, asking about
     }
 
     if (!shouldSuggest) {
-      return new Response(JSON.stringify({ notReadyYet: true, confidence: confidenceScore }), {
+      return new Response(JSON.stringify({ notReadyYet: true, confidence: confidenceScore, leakageDetected: contactCheck.detected }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -249,7 +249,7 @@ Signals to look for: scheduling a meetup, discussing move-in dates, asking about
       }).catch((e: any) => console.error('Push notification error:', e));
     }
 
-    return new Response(JSON.stringify({ success: true, suggestion }), {
+    return new Response(JSON.stringify({ success: true, suggestion, leakageDetected: contactCheck.detected }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (err) {

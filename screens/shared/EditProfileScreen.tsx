@@ -238,6 +238,11 @@ export const EditProfileScreen = () => {
   };
 
   const handleSave = async () => {
+    if (photos.length < 3) {
+      await alert({ title: 'More photos needed', message: `Add at least 3 photos to make your profile visible to matches. You have ${photos.length} so far.`, variant: 'warning' });
+      return;
+    }
+
     if (!name.trim()) {
       await alert({ title: 'Error', message: 'Please enter your name', variant: 'warning' });
       return;
@@ -454,6 +459,72 @@ export const EditProfileScreen = () => {
               </Pressable>
             ) : null}
           </ScrollView>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: Spacing.sm }}>
+            <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+              {photos.length}/3 required photos
+            </ThemedText>
+            {photos.length >= 3 ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: Spacing.sm }}>
+                <Feather name="check-circle" size={14} color="#4CAF50" />
+                <ThemedText style={[Typography.small, { color: '#4CAF50', marginLeft: 4 }]}>
+                  Good to go!
+                </ThemedText>
+              </View>
+            ) : (
+              <ThemedText style={[Typography.small, { color: theme.primary, marginLeft: Spacing.sm }]}>
+                Add {3 - photos.length} more to go live
+              </ThemedText>
+            )}
+          </View>
+        </View>
+
+        {/* Instagram Verification */}
+        <View style={styles.section}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.xs }}>
+            <Feather name="instagram" size={20} color="#E1306C" />
+            <ThemedText style={[Typography.h3, { marginLeft: Spacing.sm }]}>Instagram Verification</ThemedText>
+          </View>
+          <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.md }]}>
+            Verified profiles get more matches. Your handle is only shown after a mutual match.
+          </ThemedText>
+
+          {user?.profileData?.instagram_verified ? (
+            <View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.sm }}>
+                <Feather name="check-circle" size={16} color="#4CAF50" />
+                <ThemedText style={[Typography.body, { color: '#4CAF50', marginLeft: Spacing.sm }]}>
+                  @{user?.profileData?.instagram_handle} connected
+                </ThemedText>
+              </View>
+              <Pressable
+                style={[styles.optionButton, { borderColor: theme.error }]}
+                onPress={async () => {
+                  const { disconnectInstagram } = await import('../../services/instagramService');
+                  await disconnectInstagram();
+                  await alert({ title: 'Disconnected', message: 'Instagram has been unlinked from your profile.', variant: 'info' });
+                }}
+              >
+                <ThemedText style={[Typography.small, { color: theme.error }]}>Disconnect</ThemedText>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable
+              style={[styles.optionButton, { backgroundColor: '#E1306C', borderColor: '#E1306C', flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }]}
+              onPress={async () => {
+                const { connectInstagram } = await import('../../services/instagramService');
+                const result = await connectInstagram();
+                if (result.success) {
+                  await alert({ title: 'Connected!', message: `@${result.handle} is now linked to your profile.`, variant: 'success' });
+                } else {
+                  await alert({ title: 'Error', message: result.error || 'Could not connect Instagram', variant: 'warning' });
+                }
+              }}
+            >
+              <Feather name="instagram" size={16} color="#FFFFFF" />
+              <ThemedText style={[Typography.small, { color: '#FFFFFF', fontWeight: '600' }]}>Connect Instagram</ThemedText>
+            </Pressable>
+          )}
         </View>
 
         {/* Basic Information */}

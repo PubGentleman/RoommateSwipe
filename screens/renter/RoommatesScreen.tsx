@@ -45,6 +45,7 @@ import { getNextMicroQuestion } from '../../utils/aiMicroQuestions';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { getBestMatchToday } from '../../utils/bestMatchToday';
 import { AIGroupSuggestionCard } from '../../components/AIGroupSuggestionCard';
+import { InstagramBadge } from '../../components/InstagramBadge';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Limit card size for web/desktop viewing
@@ -304,6 +305,8 @@ export const RoommatesScreen = () => {
             zodiacSign: p.profile?.zodiac_sign,
             moveInDate: p.profile?.move_in_date,
             verified: p.profile?.verified || false,
+            instagram_verified: p.profile?.instagram_verified || false,
+            instagram_handle: p.profile?.instagram_handle || undefined,
             profileData: {
               interests: Array.isArray(p.profile?.interests) ? p.profile.interests : [],
             },
@@ -1373,6 +1376,9 @@ export const RoommatesScreen = () => {
                   </View>
                 ) : null}
               </View>
+              {(currentProfile as any).instagram_verified ? (
+                <InstagramBadge verified={true} />
+              ) : null}
               {user?.receivedSuperLikes?.some((sl: { superLikerId: string }) => sl.superLikerId === currentProfile.id) ? (
                 <ThemedText style={styles.superInterestCardLabel}>Sent you a Super Interest</ThemedText>
               ) : null}
@@ -1490,6 +1496,10 @@ export const RoommatesScreen = () => {
         matchedUserName={matchedProfileData?.profile?.name}
         matchedUserPlan={matchedProfileData?.profile ? profileUsers.get(matchedProfileData.profile.id)?.subscription?.plan : undefined}
         compatibility={matchedProfileData?.compatibility}
+        matchedUserInstagramVerified={matchedProfileData?.profile?.instagram_verified}
+        matchedUserInstagramHandle={matchedProfileData?.profile?.instagram_handle}
+        viewerHasPremium={user?.subscription?.plan === 'plus' || user?.subscription?.plan === 'elite'}
+        onUpgradePress={() => setShowPaywall(true)}
         onSendMessage={async () => {
           const profile = matchedProfileData?.profile;
           setShowMatch(false);

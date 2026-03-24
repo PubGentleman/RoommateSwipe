@@ -15,6 +15,7 @@ import { ThemedText } from './ThemedText';
 import { useTheme } from '../hooks/useTheme';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
 import { PlanBadge } from './PlanBadge';
+import { InstagramBadge } from './InstagramBadge';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -28,9 +29,13 @@ interface MatchCelebrationModalProps {
   matchedUserPhoto?: string;
   matchedUserName?: string;
   matchedUserPlan?: string;
+  matchedUserInstagramVerified?: boolean;
+  matchedUserInstagramHandle?: string;
+  viewerHasPremium?: boolean;
   compatibility?: number;
   onSendMessage: () => void;
   onKeepSwiping: () => void;
+  onUpgradePress?: () => void;
   showInviteToGroup?: boolean;
   onInviteToGroup?: () => void;
 }
@@ -109,9 +114,13 @@ export const MatchCelebrationModal = ({
   matchedUserPhoto,
   matchedUserName,
   matchedUserPlan,
+  matchedUserInstagramVerified,
+  matchedUserInstagramHandle,
+  viewerHasPremium,
   compatibility,
   onSendMessage,
   onKeepSwiping,
+  onUpgradePress,
   showInviteToGroup,
   onInviteToGroup,
 }: MatchCelebrationModalProps) => {
@@ -285,6 +294,17 @@ export const MatchCelebrationModal = ({
               <ThemedText style={styles.compatText}>
                 {compatibility}% Compatible
               </ThemedText>
+            </View>
+          ) : null}
+          {matchedUserInstagramVerified ? (
+            <View style={{ marginTop: 12, alignItems: 'center' }}>
+              <ThemedText style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, marginBottom: 6 }}>Connect outside Rhome</ThemedText>
+              <InstagramBadge
+                verified={true}
+                handle={viewerHasPremium ? matchedUserInstagramHandle : undefined}
+                isBlurred={!viewerHasPremium && !!matchedUserInstagramHandle}
+                onUpgradePress={onUpgradePress}
+              />
             </View>
           ) : null}
         </Animated.View>

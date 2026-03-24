@@ -37,6 +37,8 @@ export interface RoommateProfile {
   };
   references?: Reference[];
   apartmentPrefs?: ApartmentPreferences;
+  instagram_verified?: boolean;
+  instagram_handle?: string;
 }
 
 export interface ApartmentPreferences {

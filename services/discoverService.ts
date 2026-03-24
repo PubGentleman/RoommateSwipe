@@ -43,7 +43,10 @@ export async function getSwipeDeck(city?: string, filters?: {
   const { data, error } = await query.limit(50);
   if (error) throw error;
 
-  let profiles = data || [];
+  let profiles = (data || []).filter(p => {
+    const photos = p.profile?.photos || p.photos || [];
+    return Array.isArray(photos) && photos.length >= 3;
+  });
 
   if (filters?.budgetMin || filters?.budgetMax) {
     profiles = profiles.filter(p => {
