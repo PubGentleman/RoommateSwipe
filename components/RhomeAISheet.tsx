@@ -1094,7 +1094,7 @@ export const RhomeAISheet = ({ visible, onDismiss, screenContext, contextData, o
                   {isSelected ? (
                     <RNAnimated.View style={[styles.refinementOptionFill, { width: fillWidth }]} />
                   ) : null}
-                  <Text style={styles.refinementOptionEmoji}>{opt.emoji}</Text>
+                  <Feather name={(opt as any).icon || 'circle'} size={18} color="rgba(255,255,255,0.7)" />
                   <Text style={styles.refinementOptionLabel}>{opt.label}</Text>
                   <Feather name="chevron-right" size={14} color="rgba(255,255,255,0.3)" />
                 </Pressable>

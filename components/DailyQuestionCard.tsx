@@ -141,7 +141,7 @@ export function DailyQuestionCard({ onAnswered }: Props) {
               }}
               activeOpacity={0.7}
             >
-              <Text style={{ fontSize: 22 }}>{option.emoji}</Text>
+              <Feather name={(option.icon || 'circle') as any} size={18} color={isSelected ? theme.primary : 'rgba(255,255,255,0.6)'} />
               <Text style={{
                 flex: 1,
                 fontSize: 14,

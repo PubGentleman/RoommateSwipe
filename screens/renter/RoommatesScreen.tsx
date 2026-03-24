@@ -33,15 +33,17 @@ import { RoommateFilterSheet, MatchFilters, DEFAULT_FILTERS, getActiveFilterCoun
 import { PlanBadge } from '../../components/PlanBadge';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { RhomeAISheet } from '../../components/RhomeAISheet';
-import { AIFloatingButton } from '../../components/AIFloatingButton';
 import type { ScreenContext } from '../../components/RhomeAISheet';
 import { trackSwipe, startSession, shouldShowRefinementQuestion, getQuestionsAsked } from '../../utils/refinementEngine';
 import { getNextRefinementQuestion, REFINEMENT_QUESTIONS } from '../../utils/refinementQuestions';
 import type { RefinementQuestion } from '../../utils/refinementQuestions';
-import { getSwipeDeck, sendLike, sendPass, undoLastAction } from '../../services/discoverService';
+import { getSwipeDeck, sendLike, sendPass, undoLastAction, saveRefinementAnswer } from '../../services/discoverService';
 import { getMyGroups as getMyGroupsFromSupabase } from '../../services/groupService';
 import { recordSwipe, getAIMemory } from '../../utils/aiMemory';
 import { getNextMicroQuestion } from '../../utils/aiMicroQuestions';
+import { AIQuestionCard } from '../../components/AIQuestionCard';
+import { AIInsightBanner } from '../../components/AIInsightBanner';
+import { markQuestionAsked } from '../../utils/refinementEngine';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { getBestMatchToday } from '../../utils/bestMatchToday';
 import { AIGroupSuggestionCard } from '../../components/AIGroupSuggestionCard';
@@ -92,9 +94,8 @@ export const RoommatesScreen = () => {
   const [showAISheet, setShowAISheet] = useState(false);
   const [aiSheetContext, setAiSheetContext] = useState<ScreenContext>('match');
   const [showWhyModal, setShowWhyModal] = useState(false);
-  const [refinementQuestion, setRefinementQuestion] = useState<RefinementQuestion | null>(null);
-  const [showRefinementBanner, setShowRefinementBanner] = useState(false);
-  const refinementBannerOpacity = useRef(new RNAnimated.Value(0)).current;
+  const [pendingQuestion, setPendingQuestion] = useState<RefinementQuestion | null>(null);
+  const [questionInjectedAtIndex, setQuestionInjectedAtIndex] = useState<number | null>(null);
   const [rightSwipeCount, setRightSwipeCount] = useState(0);
   const [totalSwipeCount, setTotalSwipeCount] = useState(0);
   const [bestMatch, setBestMatch] = useState<{ profile: any; score: number; reason: string } | null>(null);
@@ -161,7 +162,7 @@ export const RoommatesScreen = () => {
   }, [activeCity, activeSubArea, matchFilters]);
 
   const checkRefinementTrigger = async () => {
-    if (showAISheet) return;
+    if (pendingQuestion) return;
 
     const alreadyAsked = await getQuestionsAsked();
     const allDone = alreadyAsked.length >= REFINEMENT_QUESTIONS.length;
@@ -179,17 +180,14 @@ export const RoommatesScreen = () => {
         user?.profileData?.personalityAnswers ?? {}
       );
       if (question) {
-        setTimeout(() => {
-          setRefinementQuestion(question);
-          setAiSheetContext('refinement');
-          setShowAISheet(true);
-        }, 800);
+        setPendingQuestion(question);
+        setQuestionInjectedAtIndex(currentIndex + 1);
       }
     }
   };
 
   const checkMicroQuestionTrigger = async () => {
-    if (showAISheet || !user) return;
+    if (pendingQuestion || !user) return;
     try {
       const mem = await getAIMemory();
       if (mem.rightSwipes % 25 !== 0 || mem.rightSwipes === 0) return;
@@ -203,34 +201,24 @@ export const RoommatesScreen = () => {
         id: nextQ.id,
         aiMessage: nextQ.question,
         followUpMessage: 'Thanks for sharing! This helps us refine your matches.',
-        options: nextQ.options.map(opt => ({ value: opt.value, label: opt.label, emoji: opt.emoji })),
+        options: nextQ.options.map(opt => ({ value: opt.value, label: opt.label, icon: opt.icon })),
         profileField: nextQ.category,
       };
-      setTimeout(() => {
-        setRefinementQuestion(asRefinement);
-        setAiSheetContext('refinement');
-        setShowAISheet(true);
-      }, 800);
+      setPendingQuestion(asRefinement);
+      setQuestionInjectedAtIndex(currentIndex + 1);
     } catch {}
   };
 
-  const showRefinementBannerBriefly = () => {
-    setShowRefinementBanner(true);
-    RNAnimated.timing(refinementBannerOpacity, {
-      toValue: 1,
-      duration: 300,
-      useNativeDriver: true,
-    }).start(() => {
-      setTimeout(() => {
-        RNAnimated.timing(refinementBannerOpacity, {
-          toValue: 0,
-          duration: 500,
-          useNativeDriver: true,
-        }).start(() => {
-          setShowRefinementBanner(false);
-        });
-      }, 4000);
-    });
+  const handleQuestionAnswer = async (questionId: string, value: string) => {
+    await markQuestionAsked(questionId);
+    await saveRefinementAnswer(questionId, value);
+    setPendingQuestion(null);
+    setQuestionInjectedAtIndex(null);
+  };
+
+  const handleQuestionSkip = () => {
+    setPendingQuestion(null);
+    setQuestionInjectedAtIndex(null);
   };
 
   useFocusEffect(
@@ -898,26 +886,6 @@ export const RoommatesScreen = () => {
     setShowCityPrompt(false);
   };
 
-  const handleOpenAIAssistant = async () => {
-    console.log('[AI Assistant] Button clicked');
-    const users = await StorageService.getUsers();
-    const currentUser = users.find(u => u.id === user?.id);
-    const userPlan = currentUser?.subscription?.plan || 'basic';
-    const userStatus = currentUser?.subscription?.status || 'active';
-    
-    console.log('[AI Assistant] User plan:', userPlan, 'Status:', userStatus);
-    
-    const isPaidMember = (userPlan === 'plus' || userPlan === 'elite') && userStatus === 'active';
-    
-    if (!isPaidMember) {
-      console.log('[AI Assistant] Showing upgrade modal');
-      setShowPaywall(true);
-      return;
-    }
-    
-    console.log('[AI Assistant] Navigating to AI Assistant screen');
-    (navigation as any).navigate('AIAssistant');
-  };
 
   const renderCitySelector = () => (
     <View style={styles.citySelectorRow}>
@@ -1011,7 +979,6 @@ export const RoommatesScreen = () => {
     return (
       <View style={[styles.container, { backgroundColor: '#141414' }]}>
         <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-          <AIFloatingButton onPress={handleOpenAIAssistant} position="inline" />
           <RhomeLogo variant="horizontal" size="sm" />
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <Pressable onPress={() => (navigation as any).navigate('Notifications')} style={styles.navIconBtn}>
@@ -1022,6 +989,11 @@ export const RoommatesScreen = () => {
           </View>
         </View>
         {renderCitySelector()}
+        <AIInsightBanner
+          onPress={() => (navigation as any).navigate('AIAssistant')}
+          rightSwipeCount={rightSwipeCount}
+          totalSwipeCount={totalSwipeCount}
+        />
         <DailyQuestionCard />
         <View style={styles.emptyState}>
           <Feather name={getActiveFilterCount(matchFilters) > 0 ? 'filter' : 'users'} size={64} color="rgba(255,255,255,0.35)" />
@@ -1227,7 +1199,6 @@ export const RoommatesScreen = () => {
   return (
     <View style={[styles.container, { backgroundColor: '#141414' }]}>
       <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-        <AIFloatingButton onPress={handleOpenAIAssistant} position="inline" />
         <RhomeLogo variant="horizontal" size="sm" />
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <Pressable onPress={() => {
@@ -1272,6 +1243,12 @@ export const RoommatesScreen = () => {
           ))}
         </ScrollView>
       ) : null}
+
+      <AIInsightBanner
+        onPress={() => (navigation as any).navigate('AIAssistant')}
+        rightSwipeCount={rightSwipeCount}
+        totalSwipeCount={totalSwipeCount}
+      />
 
       <AIGroupSuggestionCard
         onAccepted={() => {}}
@@ -1349,6 +1326,16 @@ export const RoommatesScreen = () => {
       ) : null}
 
       <View style={styles.cardArea}>
+        {pendingQuestion && questionInjectedAtIndex === currentIndex ? (
+          <View style={[styles.card, { zIndex: 1, justifyContent: 'center' }]}>
+            <AIQuestionCard
+              question={pendingQuestion}
+              onAnswer={handleQuestionAnswer}
+              onSkip={handleQuestionSkip}
+            />
+          </View>
+        ) : (
+        <>
         {nextProfile ? (
           <View style={[styles.card, { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0, opacity: 0, pointerEvents: 'none' }]}>
             <Image source={{ uri: (Array.isArray(nextProfile.photos) ? nextProfile.photos : nextProfile.photos ? [nextProfile.photos] : [])[0] }} resizeMode="cover" style={styles.cardImage} />
@@ -1497,7 +1484,8 @@ export const RoommatesScreen = () => {
         >
           <Feather name="flag" size={14} color="rgba(255,255,255,0.7)" />
         </Pressable>
-
+        </>
+        )}
       </View>
 
       <View style={styles.actionRow}>
@@ -2415,12 +2403,6 @@ export const RoommatesScreen = () => {
         userPlan={user?.subscription?.plan || 'basic'}
       />
 
-      {showRefinementBanner ? (
-        <RNAnimated.View style={{ position: 'absolute', top: 100, left: 20, right: 20, opacity: refinementBannerOpacity, zIndex: 200, backgroundColor: 'rgba(255,107,91,0.15)', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: 'rgba(255,107,91,0.3)', alignItems: 'center' }}>
-          <Text style={{ color: '#ff6b5b', fontSize: 14, fontWeight: '600', textAlign: 'center' }}>AI is learning your preferences to find better matches</Text>
-        </RNAnimated.View>
-      ) : null}
-
       {currentProfile ? (
         <WhyThisMatchModal
           visible={showWhyModal}
@@ -2436,7 +2418,6 @@ export const RoommatesScreen = () => {
         onDismiss={() => {
           setShowAISheet(false);
           setAiSheetContext('match');
-          setRefinementQuestion(null);
         }}
         screenContext={aiSheetContext}
         contextData={{
@@ -2445,10 +2426,6 @@ export const RoommatesScreen = () => {
             rightSwipeCount,
             leftSwipeCount: totalSwipeCount - rightSwipeCount,
           },
-        }}
-        refinementQuestion={refinementQuestion}
-        onRefinementAnswered={() => {
-          showRefinementBannerBriefly();
         }}
         onNavigate={(screen, params) => {
           if (screen === 'ProfileQuestionnaire') {

@@ -639,7 +639,7 @@ export interface Reference {
 export interface DailyQuestionOption {
   value: string;
   label: string;
-  emoji: string;
+  icon?: string;
 }
 
 export interface DailyQuestion {

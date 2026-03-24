@@ -297,3 +297,50 @@ export async function getInterestCardsForHost() {
 
   return data || [];
 }
+
+export async function saveRefinementAnswer(questionId: string, value: string): Promise<{ success: boolean }> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false };
+
+  const { data: profile, error: fetchError } = await supabase
+    .from('profiles')
+    .select('personality_answers')
+    .eq('user_id', user.id)
+    .single();
+
+  if (fetchError) {
+    console.error('[saveRefinementAnswer] Failed to fetch profile:', fetchError.message);
+    return { success: false };
+  }
+
+  const updated = {
+    ...(profile?.personality_answers || {}),
+    [questionId]: value,
+    [`${questionId}_source`]: 'ai_refinement',
+    [`${questionId}_collectedAt`]: new Date().toISOString(),
+  };
+
+  const { error: updateError } = await supabase
+    .from('profiles')
+    .update({ personality_answers: updated })
+    .eq('user_id', user.id);
+
+  if (updateError) {
+    console.error('[saveRefinementAnswer] Failed to update profile:', updateError.message);
+    return { success: false };
+  }
+
+  const { error: memoryError } = await supabase
+    .from('user_ai_memory')
+    .insert({
+      user_id: user.id,
+      memory_text: `Refinement answer: ${questionId} = ${value}`,
+      memory_type: 'refinement',
+    });
+
+  if (memoryError) {
+    console.warn('[saveRefinementAnswer] AI memory insert failed:', memoryError.message);
+  }
+
+  return { success: true };
+}

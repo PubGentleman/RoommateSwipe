@@ -4,7 +4,7 @@ import { StorageService } from './storage';
 export interface MicroQuestionOption {
   value: string;
   label: string;
-  emoji: string;
+  icon: string;
 }
 
 export interface MicroQuestion {
@@ -22,9 +22,9 @@ export const MICRO_QUESTIONS: MicroQuestion[] = [
     category: 'privacyImportance',
     keywords: ['privacy', 'private', 'alone', 'personal space'],
     options: [
-      { value: 'very_important', label: 'Very important', emoji: '🔒' },
-      { value: 'somewhat_important', label: 'Somewhat important', emoji: '🚪' },
-      { value: 'not_important', label: 'Not a big deal', emoji: '👐' },
+      { value: 'very_important', label: 'Very important', icon: 'lock' },
+      { value: 'somewhat_important', label: 'Somewhat important', icon: 'shield' },
+      { value: 'not_important', label: 'Not a big deal', icon: 'thumbs-up' },
     ],
   },
   {
@@ -33,9 +33,9 @@ export const MICRO_QUESTIONS: MicroQuestion[] = [
     category: 'cookingFrequency',
     keywords: ['cook', 'cooking', 'kitchen', 'meals', 'food'],
     options: [
-      { value: 'daily', label: 'Almost every day', emoji: '👨‍🍳' },
-      { value: 'occasionally', label: 'A few times a week', emoji: '🍳' },
-      { value: 'rarely', label: 'Rarely or never', emoji: '🥡' },
+      { value: 'daily', label: 'Almost every day', icon: 'coffee' },
+      { value: 'occasionally', label: 'A few times a week', icon: 'clock' },
+      { value: 'rarely', label: 'Rarely or never', icon: 'shopping-bag' },
     ],
   },
   {
@@ -44,9 +44,9 @@ export const MICRO_QUESTIONS: MicroQuestion[] = [
     category: 'cleaningPreference',
     keywords: ['clean', 'cleaning', 'schedule', 'chores', 'tidy'],
     options: [
-      { value: 'prefer_schedule', label: 'Set schedule', emoji: '📋' },
-      { value: 'flexible', label: 'Flexible approach', emoji: '🔄' },
-      { value: 'no_preference', label: 'No preference', emoji: '🤷' },
+      { value: 'prefer_schedule', label: 'Set schedule', icon: 'clipboard' },
+      { value: 'flexible', label: 'Flexible approach', icon: 'refresh-cw' },
+      { value: 'no_preference', label: 'No preference', icon: 'minus-circle' },
     ],
   },
   {
@@ -55,9 +55,9 @@ export const MICRO_QUESTIONS: MicroQuestion[] = [
     category: 'furnishedPreference',
     keywords: ['furnished', 'furniture', 'unfurnished', 'room'],
     options: [
-      { value: 'furnished', label: 'Furnished', emoji: '🛋' },
-      { value: 'unfurnished', label: 'Unfurnished', emoji: '📦' },
-      { value: 'no_preference', label: 'Either works', emoji: '🤷' },
+      { value: 'furnished', label: 'Furnished', icon: 'package' },
+      { value: 'unfurnished', label: 'Unfurnished', icon: 'box' },
+      { value: 'no_preference', label: 'Either works', icon: 'minus-circle' },
     ],
   },
   {
@@ -66,9 +66,9 @@ export const MICRO_QUESTIONS: MicroQuestion[] = [
     category: 'stayLength',
     keywords: ['stay', 'length', 'duration', 'months', 'years', 'lease', 'short', 'long'],
     options: [
-      { value: 'long_term', label: 'Long-term (1+ year)', emoji: '🏡' },
-      { value: 'short_term', label: 'Short-term (few months)', emoji: '📅' },
-      { value: 'flexible', label: 'Flexible', emoji: '🔄' },
+      { value: 'long_term', label: 'Long-term (1+ year)', icon: 'home' },
+      { value: 'short_term', label: 'Short-term (few months)', icon: 'calendar' },
+      { value: 'flexible', label: 'Flexible', icon: 'refresh-cw' },
     ],
   },
   {
@@ -77,9 +77,9 @@ export const MICRO_QUESTIONS: MicroQuestion[] = [
     category: 'morningRoutine',
     keywords: ['morning', 'bathroom', 'routine', 'shower', 'ready'],
     options: [
-      { value: 'takes_time', label: 'Yes, I need my time', emoji: '🛁' },
-      { value: 'quick', label: 'Quick and efficient', emoji: '⚡' },
-      { value: 'moderate', label: 'Somewhere in between', emoji: '⏱' },
+      { value: 'takes_time', label: 'Yes, I need my time', icon: 'droplet' },
+      { value: 'quick', label: 'Quick and efficient', icon: 'zap' },
+      { value: 'moderate', label: 'Somewhere in between', icon: 'clock' },
     ],
   },
   {
@@ -88,9 +88,9 @@ export const MICRO_QUESTIONS: MicroQuestion[] = [
     category: 'temperaturePreference',
     keywords: ['temperature', 'warm', 'cool', 'heat', 'ac', 'thermostat'],
     options: [
-      { value: 'warmer', label: 'Keep it warm', emoji: '🔥' },
-      { value: 'cooler', label: 'Keep it cool', emoji: '❄' },
-      { value: 'moderate', label: 'Moderate is fine', emoji: '🌡' },
+      { value: 'warmer', label: 'Keep it warm', icon: 'sun' },
+      { value: 'cooler', label: 'Keep it cool', icon: 'wind' },
+      { value: 'moderate', label: 'Moderate is fine', icon: 'thermometer' },
     ],
   },
   {
@@ -99,9 +99,9 @@ export const MICRO_QUESTIONS: MicroQuestion[] = [
     category: 'kitchenSharing',
     keywords: ['kitchen', 'cooking', 'share', 'appliances', 'fridge'],
     options: [
-      { value: 'comfortable', label: 'Totally fine sharing', emoji: '👍' },
-      { value: 'cautious', label: 'Prefer some boundaries', emoji: '⚖' },
-      { value: 'neutral', label: 'No strong feelings', emoji: '🤷' },
+      { value: 'comfortable', label: 'Totally fine sharing', icon: 'thumbs-up' },
+      { value: 'cautious', label: 'Prefer some boundaries', icon: 'shield' },
+      { value: 'neutral', label: 'No strong feelings', icon: 'minus-circle' },
     ],
   },
   {
@@ -110,8 +110,8 @@ export const MICRO_QUESTIONS: MicroQuestion[] = [
     category: 'parkingNeed',
     keywords: ['parking', 'car', 'vehicle', 'garage', 'street'],
     options: [
-      { value: 'yes_need', label: 'Yes, I need parking', emoji: '🚗' },
-      { value: 'no_need', label: 'No, I don\'t drive', emoji: '🚶' },
+      { value: 'yes_need', label: 'Yes, I need parking', icon: 'truck' },
+      { value: 'no_need', label: 'No, I don\'t drive', icon: 'navigation' },
     ],
   },
   {
@@ -120,9 +120,9 @@ export const MICRO_QUESTIONS: MicroQuestion[] = [
     category: 'commonAreaUsage',
     keywords: ['common', 'living room', 'shared space', 'hang out'],
     options: [
-      { value: 'frequently', label: 'Mostly in common areas', emoji: '🛋' },
-      { value: 'occasionally', label: 'A mix of both', emoji: '🔄' },
-      { value: 'rarely', label: 'Mostly in my room', emoji: '🚪' },
+      { value: 'frequently', label: 'Mostly in common areas', icon: 'users' },
+      { value: 'occasionally', label: 'A mix of both', icon: 'refresh-cw' },
+      { value: 'rarely', label: 'Mostly in my room', icon: 'user' },
     ],
   },
   {
@@ -131,9 +131,9 @@ export const MICRO_QUESTIONS: MicroQuestion[] = [
     category: 'communicationStyle',
     keywords: ['communication', 'text', 'talk', 'message', 'discuss'],
     options: [
-      { value: 'in_person', label: 'In person', emoji: '🗣' },
-      { value: 'text', label: 'Text or message', emoji: '💬' },
-      { value: 'either', label: 'Either works', emoji: '🤷' },
+      { value: 'in_person', label: 'In person', icon: 'mic' },
+      { value: 'text', label: 'Text or message', icon: 'message-square' },
+      { value: 'either', label: 'Either works', icon: 'minus-circle' },
     ],
   },
   {
@@ -142,8 +142,8 @@ export const MICRO_QUESTIONS: MicroQuestion[] = [
     category: 'allergiesRestrictions',
     keywords: ['allergies', 'dietary', 'restrictions', 'food', 'sensitivities'],
     options: [
-      { value: 'yes', label: 'Yes, I have some', emoji: '⚠' },
-      { value: 'none', label: 'No, none at all', emoji: '✅' },
+      { value: 'yes', label: 'Yes, I have some', icon: 'alert-triangle' },
+      { value: 'none', label: 'No, none at all', icon: 'check-circle' },
     ],
   },
 ];

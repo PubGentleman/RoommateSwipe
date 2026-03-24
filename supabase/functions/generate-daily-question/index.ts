@@ -83,7 +83,7 @@ serve(async (req) => {
 
 Your job is to invent ONE original, thoughtful question that helps reveal roommate compatibility. You must write:
 1. The question itself (conversational, specific, not generic)
-2. Exactly 3 or 4 answer options (each with a short label + emoji)
+2. Exactly 3 or 4 answer options (each with a short label + a Feather icon name)
 3. A category tag
 
 RULES:
@@ -93,6 +93,7 @@ RULES:
 - The question must be specifically useful for roommate compatibility (not general personality trivia)
 - Answer options must be mutually exclusive, cover the realistic range, and have no "right" answer
 - Write conversationally — like you're a friend asking, not a form
+- For icons, use valid Feather icon names only (e.g. "sun", "moon", "home", "clock", "heart", "star", "zap", "coffee", "music", "book", "globe", "shield", "users", "thumbs-up", "thermometer", "volume-x", "monitor", "smile", "lock", "wind", "droplet", "calendar", "map-pin", "navigation", "truck", "mic", "message-square", "check-circle", "alert-triangle", "minus-circle", "refresh-cw", "package", "box", "clipboard", "user", "shopping-bag")
 
 CATEGORIES (pick the best fit):
 - lifestyle: daily routines, home habits, morning/evening patterns
@@ -106,9 +107,9 @@ OUTPUT FORMAT — respond with ONLY valid JSON, nothing else:
   "question_text": "...",
   "question_category": "...",
   "options": [
-    { "value": "option_1", "label": "...", "emoji": "..." },
-    { "value": "option_2", "label": "...", "emoji": "..." },
-    { "value": "option_3", "label": "...", "emoji": "..." }
+    { "value": "option_1", "label": "...", "icon": "..." },
+    { "value": "option_2", "label": "...", "icon": "..." },
+    { "value": "option_3", "label": "...", "icon": "..." }
   ]
 }`;
 
