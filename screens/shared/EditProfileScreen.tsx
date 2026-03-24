@@ -1,12 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Pressable, TextInput, ScrollView, Platform } from 'react-native';
+import { View, StyleSheet, Pressable, TextInput, ScrollView, Platform, TouchableOpacity } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS } from 'react-native-reanimated';
-import * as Haptics from 'expo-haptics';
 import { ScreenKeyboardAwareScrollView } from '../../components/ScreenKeyboardAwareScrollView';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
@@ -20,88 +17,6 @@ import { OccupationBarSelector } from '../../components/OccupationBarSelector';
 import { dispatchInsightTrigger } from '../../utils/insightRefresh';
 import { InterestCategoryBars } from '../../components/InterestCategoryBars';
 import { useConfirm } from '../../contexts/ConfirmContext';
-
-const DraggablePhoto = ({ photo, index, photos, theme, onRemove, onReorder }: any) => {
-  const translateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
-  const scale = useSharedValue(1);
-  const isDragging = useSharedValue(false);
-
-  const handleReorder = (fromIndex: number, toIndex: number) => {
-    const newPhotos = [...photos];
-    const [removed] = newPhotos.splice(fromIndex, 1);
-    newPhotos.splice(toIndex, 0, removed);
-    onReorder(newPhotos);
-  };
-
-  const longPress = Gesture.LongPress()
-    .minDuration(200)
-    .onStart(() => {
-      isDragging.value = true;
-      scale.value = withSpring(1.1);
-      runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Medium);
-    });
-
-  const pan = Gesture.Pan()
-    .onChange((event) => {
-      if (isDragging.value) {
-        translateX.value = event.translationX;
-        translateY.value = event.translationY;
-      }
-    })
-    .onEnd((event) => {
-      if (isDragging.value) {
-        const photoWidth = 120 + Spacing.md;
-        const movedBy = Math.round(event.translationX / photoWidth);
-        const newIndex = index + movedBy;
-        
-        if (newIndex >= 0 && newIndex < photos.length && movedBy !== 0) {
-          runOnJS(handleReorder)(index, newIndex);
-        }
-      }
-      
-      translateX.value = withSpring(0);
-      translateY.value = withSpring(0);
-      scale.value = withSpring(1);
-      isDragging.value = false;
-    });
-
-  const gesture = Gesture.Simultaneous(longPress, pan);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: translateX.value },
-      { translateY: translateY.value },
-      { scale: scale.value },
-    ],
-    zIndex: isDragging.value ? 999 : 1,
-    opacity: isDragging.value ? 0.9 : 1,
-  }));
-
-  return (
-    <GestureDetector gesture={gesture}>
-      <Animated.View style={[styles.photoWrapper, animatedStyle]}>
-        <Image source={{ uri: photo }} style={styles.photoPreview} />
-        {index === 0 ? (
-          <View style={[styles.mainBadge, { backgroundColor: theme.primary }]}>
-            <ThemedText style={[Typography.caption, { color: '#FFFFFF', fontWeight: '600' }]}>
-              Main
-            </ThemedText>
-          </View>
-        ) : null}
-        <Pressable
-          style={[styles.removePhotoButton, { backgroundColor: theme.error }]}
-          onPress={() => {
-            console.log('[DraggablePhoto] Remove button clicked, index:', index);
-            onRemove(index);
-          }}
-        >
-          <Feather name="x" size={16} color="#FFFFFF" />
-        </Pressable>
-      </Animated.View>
-    </GestureDetector>
-  );
-};
 
 export const EditProfileScreen = () => {
   const { theme } = useTheme();
@@ -426,56 +341,107 @@ export const EditProfileScreen = () => {
         <View style={styles.section}>
           <ThemedText style={[Typography.h3, styles.sectionTitle]}>Profile Photos</ThemedText>
           <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.md }]}>
-            Add up to 6 photos. Long press and drag to reorder. Your first photo will be your main profile picture.
+            Add up to 6 photos. Use the arrows to reorder. Your first photo is your main profile picture.
           </ThemedText>
-          
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            style={styles.photosScroll}
-            contentContainerStyle={styles.photosContainer}
-          >
-            {photos.map((photo, index) => (
-              <DraggablePhoto
-                key={photo}
-                photo={photo}
-                index={index}
-                photos={photos}
-                theme={theme}
-                onRemove={removePhoto}
-                onReorder={setPhotos}
-              />
-            ))}
-            
-            {photos.length < 6 ? (
-              <Pressable
-                style={[styles.addPhotoButton, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}
-                onPress={pickImage}
-              >
-                <Feather name="plus" size={32} color={theme.textSecondary} />
-                <ThemedText style={[Typography.small, { color: theme.textSecondary, marginTop: Spacing.xs }]}>
-                  Add Photo
-                </ThemedText>
-              </Pressable>
-            ) : null}
-          </ScrollView>
 
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: Spacing.sm }}>
-            <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
-              {photos.length}/3 required photos
+          <View style={styles.photoCountRow}>
+            <ThemedText style={[styles.photoCountText, { color: theme.textSecondary }]}>
+              {photos.length} of 6 photos added
             </ThemedText>
             {photos.length >= 3 ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: Spacing.sm }}>
+              <View style={styles.photoCountGood}>
                 <Feather name="check-circle" size={14} color="#4CAF50" />
-                <ThemedText style={[Typography.small, { color: '#4CAF50', marginLeft: 4 }]}>
-                  Good to go!
-                </ThemedText>
+                <ThemedText style={styles.photoCountGoodText}>Looking good!</ThemedText>
               </View>
             ) : (
-              <ThemedText style={[Typography.small, { color: theme.primary, marginLeft: Spacing.sm }]}>
+              <ThemedText style={[styles.photoCountWarning, { color: '#FF6B6B' }]}>
                 Add {3 - photos.length} more to go live
               </ThemedText>
             )}
+          </View>
+
+          <View style={styles.photoGrid}>
+            {Array.from({ length: 6 }).map((_, index) => {
+              const photo = photos[index];
+              const isFirst = index === 0;
+
+              if (photo) {
+                return (
+                  <View key={index} style={styles.photoGridItem}>
+                    <Image source={{ uri: photo }} style={styles.photoGridImage} />
+                    {isFirst ? (
+                      <View style={[styles.mainBadge, { backgroundColor: theme.primary }]}>
+                        <ThemedText style={styles.mainBadgeText}>Main</ThemedText>
+                      </View>
+                    ) : null}
+                    <TouchableOpacity
+                      style={[styles.removePhotoButton, { backgroundColor: theme.error }]}
+                      onPress={() => removePhoto(index)}
+                    >
+                      <Feather name="x" size={14} color="#fff" />
+                    </TouchableOpacity>
+                    <View style={styles.reorderButtons} pointerEvents="box-none">
+                      {index > 0 ? (
+                        <TouchableOpacity
+                          style={[styles.reorderButton, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
+                          onPress={() => {
+                            const newPhotos = [...photos];
+                            const temp = newPhotos[index - 1];
+                            newPhotos[index - 1] = newPhotos[index];
+                            newPhotos[index] = temp;
+                            setPhotos(newPhotos);
+                          }}
+                        >
+                          <Feather name="arrow-left" size={14} color="#fff" />
+                        </TouchableOpacity>
+                      ) : null}
+                      {index < photos.length - 1 ? (
+                        <TouchableOpacity
+                          style={[styles.reorderButton, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
+                          onPress={() => {
+                            const newPhotos = [...photos];
+                            const temp = newPhotos[index + 1];
+                            newPhotos[index + 1] = newPhotos[index];
+                            newPhotos[index] = temp;
+                            setPhotos(newPhotos);
+                          }}
+                        >
+                          <Feather name="arrow-right" size={14} color="#fff" />
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
+                  </View>
+                );
+              }
+
+              const isNextSlot = index === photos.length;
+              return (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.photoGridItem,
+                    styles.photoGridEmpty,
+                    {
+                      backgroundColor: theme.backgroundSecondary,
+                      borderColor: isNextSlot ? theme.primary : theme.border,
+                      borderStyle: 'dashed',
+                      opacity: isNextSlot ? 1 : 0.5,
+                    },
+                  ]}
+                  onPress={isNextSlot ? pickImage : undefined}
+                  activeOpacity={isNextSlot ? 0.7 : 1}
+                >
+                  {isNextSlot ? (
+                    <>
+                      <Feather name="plus-circle" size={28} color={theme.primary} />
+                      <ThemedText style={[styles.addPhotoLabel, { color: theme.primary }]}>Add Photo</ThemedText>
+                    </>
+                  ) : (
+                    <Feather name="image" size={24} color={theme.border} />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
 
@@ -919,65 +885,92 @@ const styles = StyleSheet.create({
   sectionTitle: {
     marginBottom: Spacing.md,
   },
-  photosScroll: {
-    marginHorizontal: -Spacing.lg,
+  photoCountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.md,
   },
-  photosContainer: {
-    paddingHorizontal: Spacing.lg,
-    gap: Spacing.md,
+  photoCountText: {
+    fontSize: 13,
   },
-  photoWrapper: {
+  photoCountGood: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  photoCountGoodText: {
+    fontSize: 13,
+    color: '#4CAF50',
+    fontWeight: '600',
+  },
+  photoCountWarning: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  photoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  photoGridItem: {
+    width: '31%' as any,
+    aspectRatio: 3 / 4,
+    borderRadius: BorderRadius.medium,
+    overflow: 'hidden',
     position: 'relative',
-    width: 120,
-    height: 150,
   },
-  photoPreview: {
+  photoGridImage: {
     width: '100%',
     height: '100%',
-    borderRadius: BorderRadius.medium,
+  },
+  photoGridEmpty: {
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  addPhotoLabel: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   mainBadge: {
     position: 'absolute',
     top: Spacing.xs,
     left: Spacing.xs,
     paddingHorizontal: Spacing.sm,
-    paddingVertical: 4,
+    paddingVertical: 3,
     borderRadius: BorderRadius.small,
+  },
+  mainBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
   },
   removePhotoButton: {
     position: 'absolute',
     top: Spacing.xs,
     right: Spacing.xs,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
   },
-  addPhotoButton: {
-    width: 120,
-    height: 150,
-    borderRadius: BorderRadius.medium,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   reorderButtons: {
     position: 'absolute',
-    bottom: Spacing.sm,
+    bottom: Spacing.xs,
     left: 0,
     right: 0,
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: Spacing.sm,
-    pointerEvents: 'box-none',
+    gap: Spacing.xs,
   },
   reorderButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
