@@ -840,7 +840,7 @@ export const ExploreScreen = () => {
             <View style={styles.detailChips}>
               <View style={styles.detailChip}>
                 <Feather name="home" size={13} color="rgba(255,255,255,0.5)" />
-                <Text style={styles.detailChipText}>{item.bedrooms} bd{item.roomType === 'room' ? ' total' : ''}</Text>
+                <Text style={styles.detailChipText}>{item.bedrooms} bd{item.rooms_available && item.rooms_available < item.bedrooms ? ` · ${item.rooms_available} avail` : ''}{item.roomType === 'room' ? ' total' : ''}</Text>
               </View>
               <View style={styles.detailChip}>
                 <Feather name="droplet" size={13} color="rgba(255,255,255,0.5)" />

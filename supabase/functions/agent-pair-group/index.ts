@@ -43,11 +43,13 @@ serve(async (req) => {
 
     const { data: listing } = await supabase
       .from('listings')
-      .select('title, price, bedrooms, neighborhood, amenities, available_date')
+      .select('title, price, bedrooms, rooms_available, existing_roommates_count, host_lives_in, neighborhood, amenities, available_date')
       .eq('id', listingId)
       .single();
 
     if (!listing) return errorResponse('Listing not found', 404);
+
+    const bedroomsNeeded = listing.rooms_available ?? listing.bedrooms;
 
     const { data: renters } = await supabase
       .from('users')
@@ -83,7 +85,7 @@ serve(async (req) => {
       return errorResponse('Could not fetch renter profiles', 404);
     }
 
-    const sharePerPerson = listing.price / listing.bedrooms;
+    const sharePerPerson = listing.price / Math.max(1, bedroomsNeeded);
 
     const systemPrompt = `You are an expert real estate agent assistant specializing in NYC roommate matching.
 Your job is to analyze a group of shortlisted renters and recommend the best combination to fill a specific apartment.
@@ -94,7 +96,7 @@ When recommending a group:
 2. Lifestyle must be compatible — sleep schedules, cleanliness, smoking, pets
 3. Move-in timing must align — within 30 days of each other and the listing availability
 4. Transit must work for everyone — preferred train lines vs listing neighborhood
-5. Group size must match bedrooms — exactly the right number of people
+5. Group size must match rooms available — exactly the right number of people to fill open rooms
 
 Always respond in this exact JSON format:
 {
@@ -134,16 +136,20 @@ Always respond in this exact JSON format:
   Bio: ${p.bio ?? 'no bio'}`;
     }).join('\n\n');
 
-    const userMessage = `I am an agent with a ${listing.bedrooms}BR apartment listed at $${listing.price}/mo in ${listing.neighborhood}.
+    const existingOccupantsNote = listing.existing_roommates_count > 0
+      ? `\nNote: This unit already has ${listing.existing_roommates_count} existing roommate(s) living there. The new renter(s) must be compatible with them too.`
+      : '';
+
+    const userMessage = `I am an agent with a ${listing.bedrooms}BR apartment (${bedroomsNeeded} rooms available) listed at $${listing.price}/mo in ${listing.neighborhood}.
 Available: ${listing.available_date ?? 'now'}
 Amenities: ${(listing.amenities ?? []).join(', ') || 'standard'}
-Share per person: $${sharePerPerson.toFixed(0)}/mo
+Share per person: $${sharePerPerson.toFixed(0)}/mo${existingOccupantsNote}
 
-I have ${renters.length} shortlisted renters. Recommend the best group to fill this apartment.
+I have ${renters.length} shortlisted renters. Recommend the best group to fill the ${bedroomsNeeded} open room${bedroomsNeeded !== 1 ? 's' : ''}.
 
 ${renterSummaries}
 
-Which ${listing.bedrooms} renters should I group together? Explain your reasoning clearly.`;
+Which ${bedroomsNeeded} renters should I group together? Explain your reasoning clearly.`;
 
     const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',

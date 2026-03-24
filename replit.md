@@ -51,7 +51,7 @@ The application is built with React Native and Expo using TypeScript, leveraging
 
 Supabase provides the entire backend infrastructure:
 - **Auth:** Email/password authentication with `AuthContext` and Row Level Security (RLS).
-- **Database:** PostgreSQL with RLS.
+- **Database:** PostgreSQL with RLS. Listings have a computed `rooms_available` column (`bedrooms - host_lives_in - existing_roommates_count`) used across all AI matching.
 - **Realtime:** Subscriptions for messages and notifications.
 - **Storage:** For profile and listing photos.
 - **Edge Functions:** For webhooks (Stripe), verification sessions, background checks, payments, references, agent placement fees, match score calculation, Claude AI operations (`agent-pair-group`, `company-pair-group`), group-to-listing matching, and group unlock payments.

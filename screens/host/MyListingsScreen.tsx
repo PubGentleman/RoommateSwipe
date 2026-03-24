@@ -343,7 +343,7 @@ export const MyListingsScreen = () => {
               <Feather name="map-pin" size={12} color={ACCENT} />
               <Text style={styles.cardLocationText} numberOfLines={1}>
                 {listing.neighborhood ? `${listing.neighborhood}, ` : ''}{listing.city}
-                {listing.bedrooms || listing.bathrooms ? ` · ${listing.bedrooms} bd ${listing.bathrooms} ba` : ''}
+                {listing.bedrooms || listing.bathrooms ? ` · ${listing.bedrooms} bd ${listing.bathrooms} ba${listing.rooms_available && listing.rooms_available < listing.bedrooms ? ` (${listing.rooms_available} open)` : ''}` : ''}
               </Text>
             </View>
           </Pressable>

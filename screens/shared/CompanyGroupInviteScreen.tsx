@@ -95,8 +95,11 @@ export const CompanyGroupInviteScreen = () => {
     );
   }
 
+  const roomsAvailable = listing
+    ? (listing.rooms_available ?? listing.bedrooms - (listing.host_lives_in ? 1 : 0))
+    : 1;
   const pricePerPerson = listing
-    ? Math.round(listing.price / Math.max(1, listing.bedrooms - (listing.host_lives_in ? 1 : 0)))
+    ? Math.round(listing.price / Math.max(1, roomsAvailable))
     : 0;
   const hostName = hostInfo?.company_name || hostInfo?.full_name || 'A property manager';
 
@@ -126,7 +129,7 @@ export const CompanyGroupInviteScreen = () => {
         <View style={styles.listingStats}>
           <View style={styles.stat}>
             <Feather name="home" size={16} color={ACCENT} />
-            <Text style={styles.statText}>{listing?.bedrooms || '?'}BR</Text>
+            <Text style={styles.statText}>{listing?.bedrooms || '?'}BR ({roomsAvailable} open)</Text>
           </View>
           <View style={styles.stat}>
             <Feather name="dollar-sign" size={16} color={ACCENT} />

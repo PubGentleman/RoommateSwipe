@@ -76,8 +76,9 @@ serve(async (req) => {
 
   const listingQuery = supabase
     .from('listings')
-    .select('id, host_id, title, price, bedrooms, neighborhood, amenities, available_date')
-    .eq('available', true);
+    .select('id, host_id, title, price, bedrooms, rooms_available, existing_roommates_count, host_lives_in, neighborhood, amenities, available_date')
+    .eq('available', true)
+    .gt('rooms_available', 0);
 
   if (listingId) listingQuery.eq('id', listingId);
 
@@ -141,10 +142,10 @@ serve(async (req) => {
       const allTrains = [...new Set(
         memberProfiles.flatMap((m: any) => m.apartmentPrefs?.preferredTrains ?? [])
       )];
-      const desiredBedrooms = memberProfiles[0]?.apartmentPrefs?.desiredBedrooms ?? 2;
+      const groupSize = memberIds.length;
 
       if (listing.price > combinedBudgetMax * 1.1) continue;
-      if (listing.bedrooms !== desiredBedrooms) continue;
+      if (groupSize < listing.rooms_available - 1 || groupSize > listing.rooms_available) continue;
 
       const nearbyTrains = NEIGHBORHOOD_TRAINS[listing.neighborhood ?? ''] ?? [];
       const transitMatches = allTrains.filter((t: string) => nearbyTrains.includes(t));
@@ -189,7 +190,7 @@ serve(async (req) => {
             user_id: listing.host_id,
             type: 'group_match',
             title: 'A group might be perfect for your listing',
-            body: `A group of ${memberIds.length} renters is a ${matchScore}% match for your ${listing.bedrooms}BR in ${listing.neighborhood ?? 'your area'}. Unlock their profile to connect.`,
+            body: `A group of ${memberIds.length} renters is a ${matchScore}% match for your ${listing.bedrooms}BR (${listing.rooms_available} rooms open) in ${listing.neighborhood ?? 'your area'}. Unlock their profile to connect.`,
             data: JSON.stringify({
               listing_id: listing.id,
               group_id: group.id,

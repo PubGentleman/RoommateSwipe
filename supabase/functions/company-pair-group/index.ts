@@ -94,7 +94,11 @@ serve(async (req) => {
       })
       .filter(Boolean);
 
-    const bedroomsNeeded = listing.bedrooms - (listing.host_lives_in ? 1 : 0);
+    const bedroomsNeeded = listing.rooms_available ?? (listing.bedrooms - (listing.host_lives_in ? 1 : 0));
+
+    const existingOccupantsNote = listing.existing_roommates_count > 0
+      ? `\nIMPORTANT: This unit already has ${listing.existing_roommates_count} existing roommate(s) living there alongside the host. Any new tenants must be compatible with ALL current occupants. Factor this into your grouping recommendation.`
+      : '';
 
     const systemPrompt = `You are an expert roommate matching AI for a property management company.
 Your job is to analyze a pool of pre-screened renter candidates and recommend the best possible group to fill a specific apartment unit.
@@ -124,7 +128,9 @@ Candidate ${i + 1}: ${r.full_name}
 - Lifestyle: ${r.lifestyle_tags?.join(', ') || 'not specified'}
 `).join('')}
 
-Task: Select the best ${bedroomsNeeded} candidates to form a group for this unit. Consider:
+Task: Select the best ${bedroomsNeeded} candidates to form a group for this unit.${existingOccupantsNote}
+
+Consider:
 1. Budget compatibility with the listing price per person
 2. Lifestyle compatibility among the group members
 3. Move-in timing alignment with listing availability

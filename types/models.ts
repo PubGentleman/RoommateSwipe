@@ -121,6 +121,9 @@ export interface Property {
     onApp: boolean;
     userId?: string;
   }>;
+  hostLivesIn?: boolean;
+  existingRoommatesCount?: number;
+  rooms_available?: number;
   hostProfileId?: string;
   hostType?: 'individual' | 'company' | 'agent';
   walkScore?: number;

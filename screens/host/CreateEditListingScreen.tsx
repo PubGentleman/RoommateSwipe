@@ -86,6 +86,8 @@ export const CreateEditListingScreen = () => {
       setAddressFromAutocomplete(false);
     }
   }, [addressFromAutocomplete]);
+  const [hostLivesIn, setHostLivesIn] = useState(false);
+  const [existingRoommatesCount, setExistingRoommatesCount] = useState(0);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showLimitModal, setShowLimitModal] = useState(false);
@@ -135,6 +137,10 @@ export const CreateEditListingScreen = () => {
     setAvailableDate(prop.availableDate ? new Date(prop.availableDate).toISOString().split('T')[0] : '');
     setSelectedAmenities(prop.amenities);
     setPhotos(prop.photos);
+    if (prop.hostLivesIn !== undefined) setHostLivesIn(!!prop.hostLivesIn);
+    if (prop.existing_roommates_count !== undefined) setExistingRoommatesCount(prop.existing_roommates_count);
+    if (prop.host_lives_in !== undefined) setHostLivesIn(!!prop.host_lives_in);
+    if (prop.existingRoommatesCount !== undefined) setExistingRoommatesCount(prop.existingRoommatesCount);
     if (prop.transitInfo?.manualOverride) {
       setTransitOverride(prop.transitInfo.manualOverride);
     }
@@ -216,6 +222,12 @@ export const CreateEditListingScreen = () => {
       return;
     }
 
+    const roomsAvailableCheck = bedrooms - (hostLivesIn ? 1 : 0) - existingRoommatesCount;
+    if (roomsAvailableCheck < 1) {
+      await showAlert({ title: 'Invalid Configuration', message: 'Your listing must have at least 1 room available for renters. Adjust bedrooms or existing roommates.', variant: 'warning' });
+      return;
+    }
+
     if (!isEditing) {
       if (!hostSub) {
         await showAlert({ title: 'Unable to verify plan', message: 'Please try again in a moment.', variant: 'warning' });
@@ -284,6 +296,8 @@ export const CreateEditListingScreen = () => {
         rent: Number(price),
         bedrooms,
         bathrooms,
+        host_lives_in: hostLivesIn,
+        existing_roommates_count: existingRoommatesCount,
         sqft: Number(sqft) || 0,
         property_type: propertyType,
         address: address.trim(),
@@ -574,8 +588,76 @@ export const CreateEditListingScreen = () => {
           </View>
         </View>
 
-        {renderNumberSelector('Bedrooms', BEDROOM_OPTIONS, bedrooms, setBedrooms)}
+        {renderNumberSelector('Bedrooms', BEDROOM_OPTIONS, bedrooms, (n) => {
+          setBedrooms(n);
+          const maxExisting = n - (hostLivesIn ? 1 : 0) - 1;
+          if (existingRoommatesCount > maxExisting) setExistingRoommatesCount(Math.max(0, maxExisting));
+        })}
         {renderNumberSelector('Bathrooms', BATHROOM_OPTIONS, bathrooms, setBathrooms)}
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.label}>Do you live in this unit?</Text>
+          <View style={styles.toggleRow}>
+            {[{ label: 'Yes', value: true, icon: 'check' }, { label: 'No', value: false, icon: 'x' }].map(opt => {
+              const selected = opt.value === hostLivesIn;
+              return (
+                <Pressable
+                  key={String(opt.value)}
+                  style={[styles.toggleButton, { backgroundColor: selected ? '#ff6b5b' : 'transparent' }]}
+                  onPress={() => {
+                    setHostLivesIn(opt.value);
+                    const maxExisting = bedrooms - (opt.value ? 1 : 0) - 1;
+                    if (existingRoommatesCount > maxExisting) setExistingRoommatesCount(Math.max(0, maxExisting));
+                  }}
+                >
+                  <Feather name={opt.icon as any} size={14} color={selected ? '#fff' : 'rgba(255,255,255,0.35)'} />
+                  <Text style={[styles.toggleText, { color: selected ? '#fff' : 'rgba(255,255,255,0.45)', fontWeight: selected ? '700' : '500', marginLeft: 5 }]}>
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.label}>Existing Roommates</Text>
+          <Text style={styles.sectionSubtitle}>
+            How many people already live here (not counting yourself)?
+          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20, marginTop: 8 }}>
+            <Pressable
+              style={[styles.chip, styles.chipUnselected, { width: 44, height: 44 }]}
+              onPress={() => setExistingRoommatesCount(Math.max(0, existingRoommatesCount - 1))}
+            >
+              <Text style={[styles.chipText, { color: 'rgba(255,255,255,0.45)' }]}>-</Text>
+            </Pressable>
+            <Text style={{ fontSize: 22, fontWeight: '700', color: '#fff', minWidth: 30, textAlign: 'center' }}>
+              {existingRoommatesCount}
+            </Text>
+            <Pressable
+              style={[styles.chip, styles.chipUnselected, { width: 44, height: 44 }]}
+              onPress={() => {
+                const maxExisting = bedrooms - (hostLivesIn ? 1 : 0) - 1;
+                setExistingRoommatesCount(Math.min(maxExisting, existingRoommatesCount + 1));
+              }}
+            >
+              <Text style={[styles.chipText, { color: 'rgba(255,255,255,0.45)' }]}>+</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        {(() => {
+          const roomsAvailable = bedrooms - (hostLivesIn ? 1 : 0) - existingRoommatesCount;
+          return (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,107,91,0.08)', padding: 10, borderRadius: 8, marginTop: 4 }}>
+              <Feather name="key" size={16} color="#ff6b5b" />
+              <Text style={{ fontSize: 13, color: '#ff6b5b', fontWeight: '600' }}>
+                {roomsAvailable} room{roomsAvailable !== 1 ? 's' : ''} available to fill
+              </Text>
+            </View>
+          );
+        })()}
 
         <View style={styles.fieldContainer}>
           <ThemedText style={styles.label}>Square Feet</ThemedText>

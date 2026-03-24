@@ -160,7 +160,9 @@ export const CompanyListingAIScreen = () => {
     );
   }
 
-  const bedroomsNeeded = listing ? listing.bedrooms - (listing.host_lives_in ? 1 : 0) : 2;
+  const bedroomsNeeded = listing
+    ? (listing.rooms_available ?? listing.bedrooms - (listing.host_lives_in ? 1 : 0))
+    : 2;
   const isReadyToPair = shortlisted.length >= bedroomsNeeded;
 
   return (
@@ -178,7 +180,7 @@ export const CompanyListingAIScreen = () => {
           <View style={styles.listingHeader}>
             <Text style={styles.listingAddress}>{listing.address || 'Listing'}</Text>
             <Text style={styles.listingDetails}>
-              {listing.bedrooms}BR  ·  ${listing.price}/mo  ·  {listing.neighborhood || listing.city}
+              {listing.bedrooms}BR  ·  {bedroomsNeeded} room{bedroomsNeeded !== 1 ? 's' : ''} open  ·  ${listing.price}/mo  ·  {listing.neighborhood || listing.city}
             </Text>
             <View style={styles.needRow}>
               <Feather name="users" size={14} color={ACCENT} />

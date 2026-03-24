@@ -158,7 +158,7 @@ export default function GroupApartmentSuggestionsScreen() {
           <View style={styles.cardHeader}>
             <View style={{ flex: 1 }}>
               <ThemedText style={styles.cardTitle}>
-                {item.listing.bedrooms}BR in {item.listing.neighborhood ?? item.listing.city}
+                {item.listing.bedrooms}BR{item.listing.rooms_available ? ` · ${item.listing.rooms_available} open` : ''} in {item.listing.neighborhood ?? item.listing.city}
               </ThemedText>
               <ThemedText style={styles.cardPrice}>
                 ${item.listing.price?.toLocaleString()}/mo
