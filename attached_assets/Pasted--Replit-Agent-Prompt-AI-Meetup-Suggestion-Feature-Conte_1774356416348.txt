@@ -1,0 +1,721 @@
+# Replit Agent Prompt — AI Meetup Suggestion Feature
+
+## Context
+Rhome is a React Native / Expo (TypeScript) roommate matching app with a Supabase backend and Anthropic Claude API. After two renters match and start messaging, the app should automatically detect when they're showing strong interest in living together — then proactively suggest a meetup at a coffee shop halfway between their neighborhoods. Claude reads the conversation to detect intent. Phone number/Instagram exchanges are automatically detected via regex as the strongest signal. No payments are made — just a suggestion card inside the chat.
+
+This builds on the existing:
+- `screens/shared/ChatScreen.tsx` — the main messaging screen
+- `supabase/functions/ai-assistant/index.ts` — Claude integration
+- `services/messageService.ts` — message fetching
+- `services/notificationService.ts` — push notifications
+
+---
+
+## What To Build
+
+### 1. Database Migration — `supabase/migrations/025_meetup_suggestions.sql`
+
+```sql
+-- Meetup suggestions between matched users
+CREATE TABLE IF NOT EXISTS meetup_suggestions (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  conversation_id UUID NOT NULL, -- references the chat between two users
+  user_id_1 UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id_2 UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  trigger_type TEXT NOT NULL CHECK (trigger_type IN ('phone_detected', 'instagram_detected', 'ai_detected')),
+  confidence_score INTEGER DEFAULT 0, -- 0-100, AI confidence they want to live together
+  suggested_venue_name TEXT,
+  suggested_venue_address TEXT,
+  suggested_venue_maps_url TEXT,
+  midpoint_neighborhood TEXT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted_both', 'accepted_one', 'dismissed')),
+  user_1_response TEXT CHECK (user_1_response IN ('yes', 'no', 'maybe')),
+  user_2_response TEXT CHECK (user_2_response IN ('yes', 'no', 'maybe')),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(conversation_id)
+);
+
+ALTER TABLE meetup_suggestions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users view their own meetup suggestions" ON meetup_suggestions
+  FOR SELECT USING (auth.uid() = user_id_1 OR auth.uid() = user_id_2);
+
+CREATE POLICY "Users update their own meetup suggestions" ON meetup_suggestions
+  FOR UPDATE USING (auth.uid() = user_id_1 OR auth.uid() = user_id_2);
+
+CREATE INDEX IF NOT EXISTS idx_meetup_conversation ON meetup_suggestions(conversation_id);
+```
+
+Run this in Supabase SQL Editor.
+
+---
+
+### 2. Supabase Edge Function — `supabase/functions/analyze-chat-intent/index.ts`
+
+This function is called after every new message. It does two things:
+1. Checks for phone numbers or Instagram handles via regex (instant trigger)
+2. If no instant trigger, sends last 15 messages to Claude for intent analysis
+
+```typescript
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import Anthropic from 'https://esm.sh/@anthropic-ai/sdk'
+
+const anthropic = new Anthropic({ apiKey: Deno.env.get('ANTHROPIC_API_KEY')! })
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+// Detect phone numbers (US formats) and Instagram handles
+function detectContactExchange(messages: any[]): { detected: boolean; type: string } {
+  const phoneRegex = /(\+?1?\s?)?(\(?\d{3}\)?[\s\-.]?\d{3}[\s\-.]?\d{4})/g
+  const instagramRegex = /@[a-zA-Z0-9_.]{1,30}/g
+  const snapchatRegex = /snapchat[:\s]+[a-zA-Z0-9_.]{1,30}/gi
+  const whatsappRegex = /whatsapp/gi
+
+  const recentMessages = messages.slice(-10).map(m => m.content).join(' ')
+
+  if (phoneRegex.test(recentMessages)) return { detected: true, type: 'phone_detected' }
+  if (instagramRegex.test(recentMessages)) return { detected: true, type: 'instagram_detected' }
+  if (snapchatRegex.test(recentMessages)) return { detected: true, type: 'phone_detected' }
+  if (whatsappRegex.test(recentMessages)) return { detected: true, type: 'phone_detected' }
+
+  return { detected: false, type: '' }
+}
+
+// Find coffee shop midpoint using Google Places API
+async function findMidpointCoffeeShop(
+  neighborhood1: string,
+  neighborhood2: string,
+  city: string = 'New York'
+): Promise<{ name: string; address: string; mapsUrl: string; midpoint: string } | null> {
+  const googleApiKey = Deno.env.get('GOOGLE_PLACES_API_KEY')
+  if (!googleApiKey) return null
+
+  // Use a simple neighborhood midpoint lookup
+  // In production this would use Google Geocoding to get exact coordinates
+  // For now we search for coffee near midpoint neighborhood keyword
+  const midpointQuery = `coffee shop near ${neighborhood1} ${neighborhood2} ${city}`
+  const searchUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(midpointQuery)}&key=${googleApiKey}`
+
+  try {
+    const response = await fetch(searchUrl)
+    const data = await response.json()
+
+    if (data.results && data.results.length > 0) {
+      // Pick a top-rated result
+      const sorted = data.results
+        .filter((p: any) => p.rating >= 4.0)
+        .sort((a: any, b: any) => b.rating - a.rating)
+
+      const place = sorted[0] || data.results[0]
+      const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(place.formatted_address)}`
+
+      return {
+        name: place.name,
+        address: place.formatted_address,
+        mapsUrl,
+        midpoint: `between ${neighborhood1} and ${neighborhood2}`
+      }
+    }
+  } catch (e) {
+    console.error('Places API error:', e)
+  }
+
+  return null
+}
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  )
+
+  const { conversationId, userId1, userId2, messages } = await req.json()
+
+  // Check if we already have a suggestion for this conversation
+  const { data: existing } = await supabase
+    .from('meetup_suggestions')
+    .select('id, status')
+    .eq('conversation_id', conversationId)
+    .maybeSingle()
+
+  // Don't re-analyze if suggestion already exists
+  if (existing) {
+    return new Response(JSON.stringify({ alreadySuggested: true }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
+  // Only analyze if there are at least 6 messages (3 exchanges each)
+  if (!messages || messages.length < 6) {
+    return new Response(JSON.stringify({ notEnoughMessages: true }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
+  // Step 1: Check for instant contact exchange signals
+  const contactCheck = detectContactExchange(messages)
+
+  let shouldSuggest = contactCheck.detected
+  let triggerType = contactCheck.type
+  let confidenceScore = contactCheck.detected ? 95 : 0
+
+  // Step 2: If no instant signal, ask Claude
+  if (!shouldSuggest) {
+    const conversationText = messages
+      .slice(-15)
+      .map((m: any) => `${m.senderName}: ${m.content}`)
+      .join('\n')
+
+    const claudeResponse = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001', // Use faster/cheaper model for this
+      max_tokens: 256,
+      system: `You analyze roommate app conversations to determine if two people are genuinely interested in living together.
+Respond ONLY with a JSON object, no other text.`,
+      messages: [{
+        role: 'user',
+        content: `Analyze this conversation between two people looking for roommates.
+Are they showing strong mutual interest in actually living together?
+
+Conversation:
+${conversationText}
+
+Respond with exactly this JSON:
+{
+  "interestedInLivingTogether": true or false,
+  "confidence": 0-100,
+  "signals": ["list", "of", "signals", "you", "detected"]
+}
+
+Signals to look for: scheduling a meetup, discussing move-in dates, asking about the actual apartment, expressing excitement about compatibility, both parties being very engaged and responsive.`
+      }]
+    })
+
+    const responseText = claudeResponse.content[0].type === 'text'
+      ? claudeResponse.content[0].text
+      : ''
+
+    try {
+      const analysis = JSON.parse(responseText)
+      if (analysis.interestedInLivingTogether && analysis.confidence >= 75) {
+        shouldSuggest = true
+        triggerType = 'ai_detected'
+        confidenceScore = analysis.confidence
+      }
+    } catch (e) {
+      console.error('Failed to parse Claude response:', e)
+    }
+  }
+
+  if (!shouldSuggest) {
+    return new Response(JSON.stringify({ notReadyYet: true, confidence: confidenceScore }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
+  // Step 3: Get both users' neighborhoods for midpoint calculation
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id, first_name, neighborhood, preferred_trains')
+    .in('id', [userId1, userId2])
+
+  const profile1 = profiles?.find(p => p.id === userId1)
+  const profile2 = profiles?.find(p => p.id === userId2)
+
+  const neighborhood1 = profile1?.neighborhood || 'Manhattan'
+  const neighborhood2 = profile2?.neighborhood || 'Brooklyn'
+
+  // Step 4: Find coffee shop near midpoint
+  const venue = await findMidpointCoffeeShop(neighborhood1, neighborhood2)
+
+  // Step 5: Create the suggestion record
+  const { data: suggestion, error } = await supabase
+    .from('meetup_suggestions')
+    .insert({
+      conversation_id: conversationId,
+      user_id_1: userId1,
+      user_id_2: userId2,
+      trigger_type: triggerType,
+      confidence_score: confidenceScore,
+      suggested_venue_name: venue?.name || null,
+      suggested_venue_address: venue?.address || null,
+      suggested_venue_maps_url: venue?.mapsUrl || null,
+      midpoint_neighborhood: venue?.midpoint || `between ${neighborhood1} and ${neighborhood2}`,
+      status: 'pending'
+    })
+    .select()
+    .single()
+
+  if (error) {
+    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders })
+  }
+
+  // Step 6: Send push notifications to both users
+  const { data: tokens } = await supabase
+    .from('push_tokens')
+    .select('token, user_id')
+    .in('user_id', [userId1, userId2])
+
+  if (tokens?.length) {
+    const notifications = tokens.map(t => {
+      const otherProfile = t.user_id === userId1 ? profile2 : profile1
+      return {
+        to: t.token,
+        title: '☕ You two seem like a great match!',
+        body: `Want to meet ${otherProfile?.first_name} for coffee? We found a spot halfway between you.`,
+        data: {
+          type: 'meetup_suggestion',
+          conversationId,
+          suggestionId: suggestion.id,
+          screen: 'Chat'
+        }
+      }
+    })
+
+    await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(notifications)
+    })
+  }
+
+  return new Response(JSON.stringify({ success: true, suggestion }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  })
+})
+```
+
+Deploy: `supabase functions deploy analyze-chat-intent`
+
+Also add `GOOGLE_PLACES_API_KEY` to Supabase Edge Function secrets (get from Google Cloud Console — enable Places API, create an API key).
+
+---
+
+### 3. Component — `src/components/MeetupSuggestionCard.tsx`
+
+This card appears pinned at the top of the chat when a suggestion is triggered. Both users see it.
+
+```tsx
+import React, { useState } from 'react'
+import {
+  View, Text, TouchableOpacity, StyleSheet,
+  Linking, ActivityIndicator, Animated
+} from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
+import { supabase } from '../services/supabase'
+
+interface MeetupSuggestion {
+  id: string
+  suggestedVenueName?: string
+  suggestedVenueAddress?: string
+  suggestedVenueMapsUrl?: string
+  midpointNeighborhood?: string
+  triggerType: string
+  status: string
+  user1Response?: string
+  user2Response?: string
+}
+
+interface Props {
+  suggestion: MeetupSuggestion
+  currentUserId: string
+  userId1: string
+  otherUserName: string
+  onDismiss: () => void
+}
+
+export default function MeetupSuggestionCard({
+  suggestion,
+  currentUserId,
+  userId1,
+  otherUserName,
+  onDismiss
+}: Props) {
+  const [responding, setResponding] = useState(false)
+  const [myResponse, setMyResponse] = useState<string | null>(null)
+
+  const isUser1 = currentUserId === userId1
+  const myResponseField = isUser1 ? 'user_1_response' : 'user_2_response'
+  const theirResponse = isUser1 ? suggestion.user2Response : suggestion.user1Response
+
+  const handleRespond = async (response: 'yes' | 'no') => {
+    setResponding(true)
+    setMyResponse(response)
+
+    try {
+      const update: any = { [myResponseField]: response }
+
+      // Check if both said yes
+      const bothSaidYes =
+        (isUser1 && response === 'yes' && theirResponse === 'yes') ||
+        (!isUser1 && response === 'yes' && suggestion.user1Response === 'yes')
+
+      if (bothSaidYes) update.status = 'accepted_both'
+      else if (response === 'no') update.status = 'dismissed'
+
+      await supabase
+        .from('meetup_suggestions')
+        .update(update)
+        .eq('id', suggestion.id)
+
+      if (response === 'no') onDismiss()
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setResponding(false)
+    }
+  }
+
+  const openMaps = () => {
+    if (suggestion.suggestedVenueMapsUrl) {
+      Linking.openURL(suggestion.suggestedVenueMapsUrl)
+    }
+  }
+
+  // Both said yes — show confirmed state
+  if (suggestion.status === 'accepted_both') {
+    return (
+      <View style={[styles.card, styles.confirmedCard]}>
+        <View style={styles.confirmedHeader}>
+          <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+          <Text style={styles.confirmedTitle}>Meetup confirmed! 🎉</Text>
+        </View>
+        {suggestion.suggestedVenueName && (
+          <TouchableOpacity style={styles.venueRow} onPress={openMaps}>
+            <Ionicons name="location" size={16} color="#FF6B6B" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.venueName}>{suggestion.suggestedVenueName}</Text>
+              <Text style={styles.venueAddress} numberOfLines={1}>
+                {suggestion.suggestedVenueAddress}
+              </Text>
+            </View>
+            <Text style={styles.mapsLink}>Open Maps →</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    )
+  }
+
+  // I already responded yes — waiting for them
+  if (myResponse === 'yes' || (isUser1 ? suggestion.user1Response : suggestion.user2Response) === 'yes') {
+    return (
+      <View style={styles.card}>
+        <View style={styles.header}>
+          <Text style={styles.coffeeEmoji}>☕</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.title}>You're down to meet!</Text>
+            <Text style={styles.subtitle}>Waiting for {otherUserName} to respond…</Text>
+          </View>
+        </View>
+        {suggestion.suggestedVenueName && (
+          <TouchableOpacity style={styles.venueRow} onPress={openMaps}>
+            <Ionicons name="location" size={16} color="#FF6B6B" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.venueName}>{suggestion.suggestedVenueName}</Text>
+              <Text style={styles.venueAddress} numberOfLines={1}>{suggestion.suggestedVenueAddress}</Text>
+            </View>
+          </TouchableOpacity>
+        )}
+      </View>
+    )
+  }
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.header}>
+        <Text style={styles.coffeeEmoji}>☕</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.title}>You two seem like a great fit!</Text>
+          <Text style={styles.subtitle}>
+            Want to meet {otherUserName} in person?
+            {suggestion.midpointNeighborhood
+              ? ` We found a spot ${suggestion.midpointNeighborhood}.`
+              : ''}
+          </Text>
+        </View>
+        <TouchableOpacity onPress={onDismiss} style={styles.dismissButton}>
+          <Ionicons name="close" size={18} color="#ccc" />
+        </TouchableOpacity>
+      </View>
+
+      {suggestion.suggestedVenueName && (
+        <TouchableOpacity style={styles.venueRow} onPress={openMaps}>
+          <Ionicons name="location" size={16} color="#FF6B6B" />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.venueName}>{suggestion.suggestedVenueName}</Text>
+            <Text style={styles.venueAddress} numberOfLines={1}>
+              {suggestion.suggestedVenueAddress}
+            </Text>
+          </View>
+          <Text style={styles.mapsLink}>View →</Text>
+        </TouchableOpacity>
+      )}
+
+      <View style={styles.actionRow}>
+        <TouchableOpacity
+          style={[styles.actionButton, styles.yesButton, responding && { opacity: 0.6 }]}
+          onPress={() => handleRespond('yes')}
+          disabled={responding}
+        >
+          {responding
+            ? <ActivityIndicator color="#fff" size="small" />
+            : <>
+              <Ionicons name="cafe" size={16} color="#fff" />
+              <Text style={styles.yesText}>Yes, let's meet!</Text>
+            </>
+          }
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.noButton}
+          onPress={() => handleRespond('no')}
+          disabled={responding}
+        >
+          <Text style={styles.noText}>Not yet</Text>
+        </TouchableOpacity>
+      </View>
+
+      {theirResponse === 'yes' && (
+        <View style={styles.theyRespondedBanner}>
+          <Ionicons name="heart" size={12} color="#FF6B6B" />
+          <Text style={styles.theyRespondedText}>
+            {otherUserName} already said yes!
+          </Text>
+        </View>
+      )}
+    </View>
+  )
+}
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: '#fff',
+    marginHorizontal: 12,
+    marginBottom: 8,
+    marginTop: 4,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: '#FF6B6B30',
+    shadowColor: '#FF6B6B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  confirmedCard: { borderColor: '#4CAF5040' },
+  header: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 10 },
+  confirmedHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  confirmedTitle: { fontSize: 15, fontWeight: '700', color: '#4CAF50' },
+  coffeeEmoji: { fontSize: 24 },
+  title: { fontSize: 14, fontWeight: '700', color: '#1a1a1a' },
+  subtitle: { fontSize: 12, color: '#666', marginTop: 2, lineHeight: 16 },
+  dismissButton: { padding: 2 },
+  venueRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#f9f9f9', padding: 10, borderRadius: 10, marginBottom: 10
+  },
+  venueName: { fontSize: 13, fontWeight: '600', color: '#1a1a1a' },
+  venueAddress: { fontSize: 11, color: '#999', marginTop: 1 },
+  mapsLink: { fontSize: 12, color: '#FF6B6B', fontWeight: '600' },
+  actionRow: { flexDirection: 'row', gap: 8 },
+  actionButton: {
+    flex: 1, flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'center', gap: 6,
+    paddingVertical: 10, borderRadius: 10
+  },
+  yesButton: { backgroundColor: '#FF6B6B' },
+  yesText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  noButton: {
+    paddingVertical: 10, paddingHorizontal: 16,
+    borderRadius: 10, borderWidth: 1, borderColor: '#e0e0e0',
+    justifyContent: 'center'
+  },
+  noText: { color: '#999', fontSize: 13 },
+  theyRespondedBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#f0f0f0'
+  },
+  theyRespondedText: { fontSize: 12, color: '#FF6B6B', fontWeight: '500' }
+})
+```
+
+---
+
+### 4. Update `screens/shared/ChatScreen.tsx`
+
+Add the meetup suggestion flow to the chat screen:
+
+**At the top of the component, add state and data fetching:**
+
+```typescript
+import MeetupSuggestionCard from '../../components/MeetupSuggestionCard'
+import { supabase } from '../../services/supabase'
+
+// Add to component state:
+const [meetupSuggestion, setMeetupSuggestion] = useState<any>(null)
+const [suggestionDismissed, setSuggestionDismissed] = useState(false)
+
+// Add to useEffect (after messages load):
+const loadMeetupSuggestion = async () => {
+  const { data } = await supabase
+    .from('meetup_suggestions')
+    .select('*')
+    .eq('conversation_id', conversationId)
+    .neq('status', 'dismissed')
+    .maybeSingle()
+
+  if (data) {
+    setMeetupSuggestion({
+      id: data.id,
+      suggestedVenueName: data.suggested_venue_name,
+      suggestedVenueAddress: data.suggested_venue_address,
+      suggestedVenueMapsUrl: data.suggested_venue_maps_url,
+      midpointNeighborhood: data.midpoint_neighborhood,
+      triggerType: data.trigger_type,
+      status: data.status,
+      user1Response: data.user_1_response,
+      user2Response: data.user_2_response,
+    })
+  }
+}
+
+useEffect(() => { loadMeetupSuggestion() }, [conversationId])
+```
+
+**After each message is sent, trigger the intent analysis:**
+
+```typescript
+const analyzeIntentAfterMessage = async () => {
+  // Only analyze every 3rd message to avoid excessive API calls
+  if (messages.length % 3 !== 0) return
+  // Only analyze if no suggestion exists yet
+  if (meetupSuggestion) return
+
+  try {
+    await supabase.functions.invoke('analyze-chat-intent', {
+      body: {
+        conversationId,
+        userId1: otherUserId < user.id ? otherUserId : user.id,
+        userId2: otherUserId < user.id ? user.id : otherUserId,
+        messages: messages.slice(-15).map(m => ({
+          content: m.content,
+          senderName: m.senderId === user.id ? 'Me' : otherUserName
+        }))
+      }
+    })
+    // Reload suggestion after analysis
+    await loadMeetupSuggestion()
+  } catch (e) {
+    // Silently fail — this is background analysis, don't disrupt chat
+    console.log('Intent analysis skipped:', e)
+  }
+}
+
+// Call this inside the sendMessage function after the message is saved:
+await analyzeIntentAfterMessage()
+```
+
+**Add the card to the JSX, just above the message list:**
+
+```tsx
+{meetupSuggestion && !suggestionDismissed && (
+  <MeetupSuggestionCard
+    suggestion={meetupSuggestion}
+    currentUserId={user.id}
+    userId1={meetupSuggestion.userId1}
+    otherUserName={otherUserName}
+    onDismiss={() => setSuggestionDismissed(true)}
+  />
+)}
+```
+
+Also subscribe to real-time updates on the meetup_suggestions table so both users see the card update live when the other person responds:
+
+```typescript
+useEffect(() => {
+  const channel = supabase
+    .channel(`meetup_${conversationId}`)
+    .on('postgres_changes', {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'meetup_suggestions',
+      filter: `conversation_id=eq.${conversationId}`
+    }, (payload) => {
+      const d = payload.new
+      setMeetupSuggestion(prev => prev ? {
+        ...prev,
+        status: d.status,
+        user1Response: d.user_1_response,
+        user2Response: d.user_2_response
+      } : null)
+    })
+    .subscribe()
+
+  return () => { supabase.removeChannel(channel) }
+}, [conversationId])
+```
+
+---
+
+### 5. Push Notification Deep Linking
+
+In the notification handler, add routing for meetup suggestions:
+
+```typescript
+case 'meetup_suggestion':
+  navigation.navigate('Chat', {
+    conversationId: data.conversationId,
+    // existing chat params
+  })
+  break
+```
+
+---
+
+### 6. Add Google Places API Key to Supabase Secrets
+
+In Supabase → Edge Functions → Secrets, add:
+- Name: `GOOGLE_PLACES_API_KEY`
+- Value: Your Google Places API key (from Google Cloud Console → enable "Places API")
+
+If you don't have a Google Places API key yet, the venue suggestion will be skipped gracefully — the meetup card will still show without a specific venue name, just saying "find a coffee spot near you both."
+
+---
+
+## Summary of What Gets Built
+
+| Component | Description |
+|---|---|
+| Migration 025 | `meetup_suggestions` table |
+| `analyze-chat-intent` Edge Function | Detects phone/Instagram via regex + Claude intent analysis |
+| `MeetupSuggestionCard` component | In-chat card with venue, yes/no buttons, real-time updates |
+| ChatScreen updates | Loads suggestion, triggers analysis on send, real-time subscription |
+| Push notifications | Notifies both users when suggestion fires |
+
+## How It Flows
+
+1. User sends a message
+2. Every 3rd message, `analyze-chat-intent` is called in the background
+3. If phone number / Instagram detected → instant trigger (95% confidence)
+4. If not → Claude reads last 15 messages and scores intent 0-100
+5. If score ≥ 75 → suggestion created, both users notified
+6. Card appears at top of chat for both users with coffee shop suggestion
+7. If both tap "Yes, let's meet!" → card turns green with confirmed state
+8. Maps link opens Google Maps to the suggested venue
+9. If either taps "Not yet" → card is dismissed for that session
+
+## Implementation Order
+
+1. Run migration 025 in Supabase SQL Editor
+2. Add `GOOGLE_PLACES_API_KEY` to Supabase secrets (optional but recommended)
+3. Deploy `analyze-chat-intent` Edge Function
+4. Create `MeetupSuggestionCard` component
+5. Update `ChatScreen.tsx` with suggestion loading, analysis trigger, and card render
+6. Test with two accounts — send 6+ messages, include a phone number to test instant trigger
