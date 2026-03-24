@@ -38,6 +38,7 @@ interface MatchCelebrationModalProps {
   onUpgradePress?: () => void;
   showInviteToGroup?: boolean;
   onInviteToGroup?: () => void;
+  onAskAI?: () => void;
 }
 
 const Particle = ({ index, visible }: { index: number; visible: boolean }) => {
@@ -123,6 +124,7 @@ export const MatchCelebrationModal = ({
   onUpgradePress,
   showInviteToGroup,
   onInviteToGroup,
+  onAskAI,
 }: MatchCelebrationModalProps) => {
   const { theme } = useTheme();
 
@@ -330,6 +332,17 @@ export const MatchCelebrationModal = ({
               </ThemedText>
             </Pressable>
           ) : null}
+          {onAskAI ? (
+            <Pressable
+              style={styles.askAIButton}
+              onPress={onAskAI}
+            >
+              <Feather name="cpu" size={16} color="#FF6B6B" />
+              <ThemedText style={styles.askAIButtonText}>
+                Ask AI about {matchedUserName}
+              </ThemedText>
+            </Pressable>
+          ) : null}
           <Pressable
             style={styles.keepSwipingButton}
             onPress={onKeepSwiping}
@@ -490,6 +503,21 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
     marginLeft: Spacing.sm,
+  },
+  askAIButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1.5,
+    borderColor: '#FF6B6B',
+  },
+  askAIButtonText: {
+    color: '#FF6B6B',
+    fontSize: 15,
+    fontWeight: '700',
   },
   keepSwipingButton: {
     alignItems: 'center',

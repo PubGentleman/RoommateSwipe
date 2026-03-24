@@ -43,6 +43,7 @@ import { recordSwipe, getAIMemory } from '../../utils/aiMemory';
 import { getNextMicroQuestion } from '../../utils/aiMicroQuestions';
 import { AIQuestionCard } from '../../components/AIQuestionCard';
 import { AIInsightBanner } from '../../components/AIInsightBanner';
+import { AskAboutPersonModal } from '../../components/AskAboutPersonModal';
 import { markQuestionAsked } from '../../utils/refinementEngine';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { getBestMatchToday } from '../../utils/bestMatchToday';
@@ -94,6 +95,8 @@ export const RoommatesScreen = () => {
   const [showAISheet, setShowAISheet] = useState(false);
   const [aiSheetContext, setAiSheetContext] = useState<ScreenContext>('match');
   const [showWhyModal, setShowWhyModal] = useState(false);
+  const [askAboutVisible, setAskAboutVisible] = useState(false);
+  const [askAboutTarget, setAskAboutTarget] = useState<{ id: string; name: string; age?: number; compatibility?: number; entryPoint: 'swipe_card' | 'match_screen' | 'chat_screen' } | null>(null);
   const [pendingQuestion, setPendingQuestion] = useState<RefinementQuestion | null>(null);
   const [questionInjectedAtIndex, setQuestionInjectedAtIndex] = useState<number | null>(null);
   const [rightSwipeCount, setRightSwipeCount] = useState(0);
@@ -1453,6 +1456,22 @@ export const RoommatesScreen = () => {
                   <ThemedText style={styles.whyMatchText}>Why?</ThemedText>
                   <Feather name="zap" size={12} color="#FF6B6B" />
                 </Pressable>
+                <Pressable
+                  style={styles.askAIPill}
+                  onPress={() => {
+                    setAskAboutTarget({
+                      id: currentProfile.id,
+                      name: currentProfile.name,
+                      age: currentProfile.age,
+                      compatibility: currentProfile.compatibility,
+                      entryPoint: 'swipe_card',
+                    });
+                    setAskAboutVisible(true);
+                  }}
+                >
+                  <Feather name="cpu" size={12} color="#FF6B6B" />
+                  <ThemedText style={styles.askAIPillText}>Ask AI</ThemedText>
+                </Pressable>
               </View>
               {(() => {
                 const rawMyTags = user?.profileData?.interests;
@@ -1637,6 +1656,19 @@ export const RoommatesScreen = () => {
         }}
         showInviteToGroup={!!userOpenGroup}
         onInviteToGroup={handleInviteToGroup}
+        onAskAI={() => {
+          const p = matchedProfileData?.profile;
+          if (p) {
+            setAskAboutTarget({
+              id: p.id,
+              name: p.name,
+              age: p.age,
+              compatibility: matchedProfileData?.compatibility,
+              entryPoint: 'match_screen',
+            });
+            setAskAboutVisible(true);
+          }
+        }}
       />
 
       <PaywallSheet
@@ -2413,6 +2445,21 @@ export const RoommatesScreen = () => {
         />
       ) : null}
 
+      {askAboutTarget ? (
+        <AskAboutPersonModal
+          visible={askAboutVisible}
+          onClose={() => {
+            setAskAboutVisible(false);
+            setTimeout(() => setAskAboutTarget(null), 300);
+          }}
+          targetProfileId={askAboutTarget.id}
+          targetName={askAboutTarget.name}
+          targetAge={askAboutTarget.age}
+          entryPoint={askAboutTarget.entryPoint}
+          compatibilityScore={askAboutTarget.compatibility}
+        />
+      ) : null}
+
       <RhomeAISheet
         visible={showAISheet}
         onDismiss={() => {
@@ -2750,6 +2797,22 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,107,107,0.3)',
   },
   whyMatchText: {
+    color: '#FF6B6B',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  askAIPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,107,107,0.1)',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,107,0.25)',
+  },
+  askAIPillText: {
     color: '#FF6B6B',
     fontSize: 12,
     fontWeight: '600',

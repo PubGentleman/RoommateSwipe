@@ -26,6 +26,7 @@ import { getDailyMessageCount, MESSAGING_LIMITS, getTimeUntilMidnight, increment
 import { dispatchInsightTrigger } from '../../utils/insightRefresh';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import MeetupSuggestionCard from '../../components/MeetupSuggestionCard';
+import { AskAboutPersonModal } from '../../components/AskAboutPersonModal';
 
 type ChatScreenProps = {
   route: {
@@ -54,6 +55,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [otherUser, setOtherUser] = useState<RoommateProfile | null>(routeOtherUser || null);
   const flatListRef = useRef<FlatList>(null);
   const [showReportBlockModal, setShowReportBlockModal] = useState(false);
+  const [showAskAbout, setShowAskAbout] = useState(false);
   const [showAISheet, setShowAISheet] = useState(false);
   const [aiSheetContext, setAiSheetContext] = useState<ScreenContext>('chat');
   const [otherUserPlan, setOtherUserPlan] = useState<string | undefined>();
@@ -1001,9 +1003,16 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
               <Feather name="settings" size={20} color={theme.textSecondary} />
             </Pressable>
           ) : (
-            <Pressable onPress={() => setShowOptionsMenu(true)} style={styles.moreButton}>
-              <Feather name="more-vertical" size={24} color={theme.text} />
-            </Pressable>
+            <>
+              {otherUser ? (
+                <Pressable onPress={() => setShowAskAbout(true)} style={styles.moreButton}>
+                  <Feather name="cpu" size={20} color="#FF6B6B" />
+                </Pressable>
+              ) : null}
+              <Pressable onPress={() => setShowOptionsMenu(true)} style={styles.moreButton}>
+                <Feather name="more-vertical" size={24} color={theme.text} />
+              </Pressable>
+            </>
           )}
         </View>
       )}
@@ -1358,6 +1367,18 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
               navigation.goBack();
             }
           }}
+        />
+      ) : null}
+
+      {otherUser ? (
+        <AskAboutPersonModal
+          visible={showAskAbout}
+          onClose={() => setShowAskAbout(false)}
+          targetProfileId={otherUser.id}
+          targetName={otherUser.name}
+          targetAge={otherUser.age}
+          entryPoint="chat_screen"
+          compatibilityScore={otherUser.compatibility}
         />
       ) : null}
 
