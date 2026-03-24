@@ -24,6 +24,7 @@ import { AdBanner } from '../../components/AdBanner';
 import { getDailyMessageCount, MESSAGING_LIMITS, getTimeUntilMidnight, incrementDailyColdMessageCount } from '../../utils/messagingUtils';
 import { dispatchInsightTrigger } from '../../utils/insightRefresh';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import MeetupSuggestionCard from '../../components/MeetupSuggestionCard';
 
 type ChatScreenProps = {
   route: {
@@ -67,6 +68,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [showInquiryOptionsMenu, setShowInquiryOptionsMenu] = useState(false);
   const [groupMembers, setGroupMembers] = useState<any[]>([]);
   const [showMembersOverlay, setShowMembersOverlay] = useState(false);
+  const [meetupSuggestion, setMeetupSuggestion] = useState<any>(null);
+  const [suggestionDismissed, setSuggestionDismissed] = useState(false);
 
   const [inquiryStatus, setInquiryStatus] = useState<'pending' | 'accepted' | 'declined'>(
     inquiryGroup?.inquiryStatus || inquiryGroup?.inquiry_status || 'pending'
@@ -297,6 +300,84 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     });
     return () => { unsubscribe(); };
   }, [matchIdFromConversation, user?.id]);
+
+  const loadMeetupSuggestion = async () => {
+    if (isInquiryChat || conversationId.startsWith('group-')) return;
+    try {
+      const { data } = await supabase
+        .from('meetup_suggestions')
+        .select('*')
+        .eq('conversation_id', conversationId)
+        .neq('status', 'dismissed')
+        .maybeSingle();
+
+      if (data) {
+        setMeetupSuggestion({
+          id: data.id,
+          suggestedVenueName: data.suggested_venue_name,
+          suggestedVenueAddress: data.suggested_venue_address,
+          suggestedVenueMapsUrl: data.suggested_venue_maps_url,
+          midpointNeighborhood: data.midpoint_neighborhood,
+          triggerType: data.trigger_type,
+          status: data.status,
+          user1Response: data.user_1_response,
+          user2Response: data.user_2_response,
+          userId1: data.user_id_1,
+          userId2: data.user_id_2,
+        });
+      }
+    } catch (_e) {}
+  };
+
+  useEffect(() => { loadMeetupSuggestion(); }, [conversationId]);
+
+  useEffect(() => {
+    if (isInquiryChat || conversationId.startsWith('group-')) return;
+    const channel = supabase
+      .channel(`meetup_${conversationId}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'meetup_suggestions',
+        filter: `conversation_id=eq.${conversationId}`,
+      }, (payload: any) => {
+        const d = payload.new;
+        setMeetupSuggestion((prev: any) => prev ? {
+          ...prev,
+          status: d.status,
+          user1Response: d.user_1_response,
+          user2Response: d.user_2_response,
+        } : null);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [conversationId]);
+
+  const analyzeIntentAfterMessage = async () => {
+    if (isInquiryChat || conversationId.startsWith('group-')) return;
+    if (messages.length % 3 !== 0) return;
+    if (meetupSuggestion) return;
+    if (!otherUser) return;
+
+    try {
+      const sortedIds = [otherUser.id, user!.id].sort();
+      await supabase.functions.invoke('analyze-chat-intent', {
+        body: {
+          conversationId,
+          userId1: sortedIds[0],
+          userId2: sortedIds[1],
+          messages: messages.slice(-15).map(m => ({
+            content: m.text || m.content || '',
+            senderName: m.senderId === user!.id ? 'Me' : (otherUser.name || 'Them'),
+          })),
+        },
+      });
+      await loadMeetupSuggestion();
+    } catch (_e) {
+      console.log('Intent analysis skipped');
+    }
+  };
 
   const loadMessages = async () => {
     let supabaseMessages: Message[] = [];
@@ -591,6 +672,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     setMessages(prev => [...prev, newMessage]);
     setInputText('');
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+
+    analyzeIntentAfterMessage().catch(() => {});
   };
 
   const handleCreateGroup = () => {
@@ -1129,6 +1212,19 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             You sent a direct message — they haven't matched with you yet
           </ThemedText>
         </View>
+      ) : null}
+
+      {meetupSuggestion && !suggestionDismissed && !isInquiryChat ? (
+        <MeetupSuggestionCard
+          suggestion={meetupSuggestion}
+          currentUserId={user?.id || ''}
+          userId1={meetupSuggestion.userId1}
+          otherUserName={otherUser?.name || 'your match'}
+          onDismiss={() => {
+            setSuggestionDismissed(true);
+            supabase.from('meetup_suggestions').update({ status: 'dismissed' }).eq('id', meetupSuggestion.id).then(() => {});
+          }}
+        />
       ) : null}
 
       <View style={{ flex: 1 }}>

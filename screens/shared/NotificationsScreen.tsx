@@ -182,6 +182,14 @@ export const NotificationsScreen = () => {
           (navigation as any).navigate('Groups');
         }
         break;
+      case 'meetup_suggestion':
+        if (notification.data?.conversationId) {
+          (navigation as any).navigate('Messages', {
+            screen: 'Chat',
+            params: { conversationId: notification.data.conversationId },
+          });
+        }
+        break;
       case 'property_update':
       case 'property_rented':
         (navigation as any).navigate('Explore');

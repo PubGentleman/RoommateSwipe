@@ -1,0 +1,1438 @@
+# Replit Agent Prompt — Company Host AI Auto-Fill System
+
+## Context
+Rhome is a React Native / Expo (TypeScript) roommate matching app with a Supabase backend. Company hosts (role='host', host_type='company') manage multiple listings and need an AI-powered system that automatically matches renter groups to their units and helps them fill vacancies fast. This mirrors the agent's AI pairing feature (agent-pair-group Edge Function) but is adapted for company hosts who own the listings rather than brokering them.
+
+The following already exists and should NOT be changed:
+- `agent-pair-group` Supabase Edge Function (Claude AI group recommendations)
+- `match-groups-to-listings` Supabase Edge Function
+- `unlock-group-match` Supabase Edge Function
+- `group_listing_matches` table
+- `ai_group_suggestions` table
+- `HostGroupMatchesScreen` (individual/company host sees inbound matched groups)
+- Migration 017 (agent_matchmaker tables: agent_shortlisted_renters, agent_groups, group_invitations, agent_placements)
+
+---
+
+## What To Build
+
+### 1. Database Migration — `supabase/migrations/022_company_matchmaker.sql`
+
+```sql
+-- Company shortlisted renters (same pattern as agent_shortlisted_renters)
+CREATE TABLE IF NOT EXISTS company_shortlisted_renters (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  company_host_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  renter_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  listing_id UUID REFERENCES listings(id) ON DELETE SET NULL, -- optional: shortlist for specific unit
+  notes TEXT,
+  shortlisted_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(company_host_id, renter_id, listing_id)
+);
+
+ALTER TABLE company_shortlisted_renters ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Company hosts manage their shortlist" ON company_shortlisted_renters
+  FOR ALL USING (auth.uid() = company_host_id);
+
+-- Company auto-invites sent to renter groups
+CREATE TABLE IF NOT EXISTS company_group_invites (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  company_host_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  listing_id UUID NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+  group_id UUID NOT NULL REFERENCES renter_groups(id) ON DELETE CASCADE,
+  match_score INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','accepted','declined','expired')),
+  ai_reason TEXT,
+  sent_at TIMESTAMPTZ DEFAULT NOW(),
+  responded_at TIMESTAMPTZ,
+  UNIQUE(listing_id, group_id)
+);
+
+ALTER TABLE company_group_invites ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Company host manages invites" ON company_group_invites
+  FOR ALL USING (auth.uid() = company_host_id);
+CREATE POLICY "Renter group members view their invites" ON company_group_invites
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM renter_group_members
+      WHERE renter_group_members.group_id = company_group_invites.group_id
+        AND renter_group_members.user_id = auth.uid()
+    )
+  );
+
+-- Fill pipeline analytics per listing
+CREATE TABLE IF NOT EXISTS listing_fill_pipeline (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  listing_id UUID NOT NULL REFERENCES listings(id) ON DELETE CASCADE UNIQUE,
+  days_vacant INTEGER DEFAULT 0,
+  total_groups_matched INTEGER DEFAULT 0,
+  total_invites_sent INTEGER DEFAULT 0,
+  best_match_score INTEGER DEFAULT 0,
+  projected_fill_date DATE,
+  last_updated TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE listing_fill_pipeline ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Company host views their pipeline" ON listing_fill_pipeline
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM listings WHERE listings.id = listing_fill_pipeline.listing_id
+        AND listings.host_id = auth.uid()
+    )
+  );
+```
+
+Run this migration in the Supabase SQL Editor.
+
+---
+
+### 2. Supabase Edge Function — `supabase/functions/company-pair-group/index.ts`
+
+This works exactly like `agent-pair-group` but the company host passes a specific `listing_id`. Claude receives all shortlisted renters for that listing and recommends the best group composition.
+
+```typescript
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import Anthropic from 'https://esm.sh/@anthropic-ai/sdk'
+
+const anthropic = new Anthropic({ apiKey: Deno.env.get('ANTHROPIC_API_KEY')! })
+
+serve(async (req) => {
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  )
+
+  const { listingId, companyHostId } = await req.json()
+
+  // Fetch listing details
+  const { data: listing } = await supabase
+    .from('listings')
+    .select('*')
+    .eq('id', listingId)
+    .single()
+
+  if (!listing) return new Response(JSON.stringify({ error: 'Listing not found' }), { status: 404 })
+
+  // Fetch shortlisted renters for this listing (or all of company's shortlist if no listing filter)
+  const { data: shortlisted } = await supabase
+    .from('company_shortlisted_renters')
+    .select(`
+      renter_id,
+      profiles!company_shortlisted_renters_renter_id_fkey (
+        id, first_name, last_name, age, occupation, bio,
+        sleep_schedule, cleanliness, smoking, pets,
+        move_in_date, budget_max, budget_per_person_max,
+        desired_bedrooms, preferred_trains, amenity_must_haves,
+        room_type, lifestyle_tags
+      )
+    `)
+    .eq('company_host_id', companyHostId)
+    .or(`listing_id.eq.${listingId},listing_id.is.null`)
+
+  if (!shortlisted || shortlisted.length < 2) {
+    return new Response(JSON.stringify({ error: 'Need at least 2 shortlisted renters' }), { status: 400 })
+  }
+
+  const renters = shortlisted.map(s => s.profiles).filter(Boolean)
+  const bedroomsNeeded = listing.bedrooms - (listing.host_lives_in ? 1 : 0)
+
+  const systemPrompt = `You are an expert roommate matching AI for a property management company.
+Your job is to analyze a pool of pre-screened renter candidates and recommend the best possible group to fill a specific apartment unit.
+The company needs to fill vacancies quickly with compatible, reliable tenants.
+You must respond ONLY with valid JSON — no markdown, no explanation outside the JSON.`
+
+  const userPrompt = `
+LISTING TO FILL:
+- Address: ${listing.address}, ${listing.neighborhood}
+- Bedrooms: ${listing.bedrooms} (${bedroomsNeeded} rooms available for renters)
+- Monthly Rent: $${listing.price}
+- Per-person cost: ~$${Math.round(listing.price / bedroomsNeeded)}/month
+- Amenities: ${listing.amenities?.join(', ') || 'standard'}
+- Available: ${listing.available_date}
+
+SHORTLISTED CANDIDATES (${renters.length} total):
+${renters.map((r, i) => `
+Candidate ${i + 1}: ${r.first_name} ${r.last_name}
+- Budget: up to $${r.budget_per_person_max || r.budget_max}/month per person
+- Move-in: ${r.move_in_date}
+- Sleep schedule: ${r.sleep_schedule}
+- Cleanliness: ${r.cleanliness}/5
+- Smoking: ${r.smoking ? 'yes' : 'no'}
+- Pets: ${r.pets ? 'yes' : 'no'}
+- Subway lines: ${r.preferred_trains?.join(', ') || 'flexible'}
+- Occupation: ${r.occupation}
+- Lifestyle: ${r.lifestyle_tags?.join(', ') || 'not specified'}
+`).join('')}
+
+Task: Select the best ${bedroomsNeeded} candidates to form a group for this unit. Consider:
+1. Budget compatibility with the listing price per person
+2. Lifestyle compatibility among the group members
+3. Move-in timing alignment with listing availability
+4. Deal-breakers (smoking, pets, sleep schedule conflicts)
+5. Overall group harmony for long-term tenancy
+
+Respond ONLY with this JSON structure:
+{
+  "recommendedGroup": ["candidate_id_1", "candidate_id_2"],
+  "confidence": 85,
+  "fillScore": 92,
+  "reasons": ["reason 1", "reason 2", "reason 3"],
+  "concerns": ["concern 1"],
+  "alternativeGroup": ["candidate_id_X", "candidate_id_Y"],
+  "alternativeReason": "why this is a backup option",
+  "excludedRenters": [{"id": "candidate_id", "reason": "budget too low for this unit"}],
+  "estimatedFillTime": "3-5 days",
+  "recommendation": "This group is your strongest option — high compatibility and budget alignment."
+}
+
+Use the candidate index numbers (1, 2, 3...) as the IDs in recommendedGroup/alternativeGroup/excludedRenters.
+`
+
+  const message = await anthropic.messages.create({
+    model: 'claude-sonnet-4-5',
+    max_tokens: 1024,
+    messages: [{ role: 'user', content: userPrompt }],
+    system: systemPrompt
+  })
+
+  const responseText = message.content[0].type === 'text' ? message.content[0].text : ''
+  const result = JSON.parse(responseText)
+
+  // Map index references back to actual renter profiles
+  const indexedRenters = renters.map((r, i) => ({ index: String(i + 1), ...r }))
+  result.recommendedGroupProfiles = result.recommendedGroup.map((idx: string) =>
+    indexedRenters.find(r => r.index === idx)
+  ).filter(Boolean)
+  result.alternativeGroupProfiles = result.alternativeGroup?.map((idx: string) =>
+    indexedRenters.find(r => r.index === idx)
+  ).filter(Boolean) || []
+
+  return new Response(JSON.stringify(result), {
+    headers: { 'Content-Type': 'application/json' }
+  })
+})
+```
+
+Deploy: `supabase functions deploy company-pair-group`
+
+---
+
+### 3. Supabase Edge Function — `supabase/functions/company-auto-invite/index.ts`
+
+When a company host taps "Invite Group" for a matched group, this function sends the official match invite to all group members.
+
+```typescript
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+serve(async (req) => {
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  )
+
+  const { listingId, groupId, companyHostId, matchScore, aiReason } = await req.json()
+
+  // Fetch group members
+  const { data: members } = await supabase
+    .from('renter_group_members')
+    .select('user_id')
+    .eq('group_id', groupId)
+
+  if (!members?.length) {
+    return new Response(JSON.stringify({ error: 'No group members found' }), { status: 400 })
+  }
+
+  // Fetch listing for notification copy
+  const { data: listing } = await supabase
+    .from('listings')
+    .select('address, neighborhood, price, bedrooms')
+    .eq('id', listingId)
+    .single()
+
+  // Create invite record
+  const { error: inviteError } = await supabase
+    .from('company_group_invites')
+    .upsert({
+      company_host_id: companyHostId,
+      listing_id: listingId,
+      group_id: groupId,
+      match_score: matchScore,
+      ai_reason: aiReason,
+      status: 'pending'
+    }, { onConflict: 'listing_id,group_id' })
+
+  if (inviteError) {
+    return new Response(JSON.stringify({ error: inviteError.message }), { status: 500 })
+  }
+
+  // Send push notification to all group members
+  const memberIds = members.map(m => m.user_id)
+  const { data: tokens } = await supabase
+    .from('push_tokens')
+    .select('token')
+    .in('user_id', memberIds)
+
+  if (tokens?.length) {
+    const notifications = tokens.map(t => ({
+      to: t.token,
+      title: '🏠 A Property Matched Your Group!',
+      body: `${listing?.bedrooms}BR in ${listing?.neighborhood} — $${listing?.price}/mo. A property manager selected your group. Tap to view.`,
+      data: {
+        type: 'company_group_invite',
+        listingId,
+        groupId,
+        screen: 'CompanyGroupInviteScreen'
+      }
+    }))
+
+    await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(notifications)
+    })
+  }
+
+  return new Response(JSON.stringify({ success: true, notified: memberIds.length }), {
+    headers: { 'Content-Type': 'application/json' }
+  })
+})
+```
+
+Deploy: `supabase functions deploy company-auto-invite`
+
+---
+
+### 4. Service — `src/services/companyMatchmakerService.ts`
+
+```typescript
+import { supabase } from './supabase'
+
+export interface CompanyShortlistedRenter {
+  id: string
+  renterId: string
+  listingId?: string
+  firstName: string
+  lastName: string
+  age?: number
+  occupation?: string
+  bio?: string
+  budgetMax?: number
+  budgetPerPersonMax?: number
+  moveInDate?: string
+  sleepSchedule?: string
+  cleanliness?: number
+  smoking?: boolean
+  pets?: boolean
+  preferredTrains?: string[]
+  lifestyleTags?: string[]
+  avatarUrl?: string
+  shortlistedAt: string
+}
+
+export interface FillPipelineItem {
+  listingId: string
+  address: string
+  neighborhood: string
+  price: number
+  bedrooms: number
+  daysVacant: number
+  totalGroupsMatched: number
+  totalInvitesSent: number
+  bestMatchScore: number
+  projectedFillDate?: string
+  status: 'urgent' | 'active' | 'filled'
+}
+
+// Shortlist a renter for a listing (or generally)
+export async function shortlistRenter(
+  companyHostId: string,
+  renterId: string,
+  listingId?: string,
+  notes?: string
+): Promise<void> {
+  const { error } = await supabase
+    .from('company_shortlisted_renters')
+    .upsert({
+      company_host_id: companyHostId,
+      renter_id: renterId,
+      listing_id: listingId || null,
+      notes: notes || null
+    }, { onConflict: 'company_host_id,renter_id,listing_id' })
+
+  if (error) throw error
+}
+
+// Remove from shortlist
+export async function removeFromShortlist(
+  companyHostId: string,
+  renterId: string,
+  listingId?: string
+): Promise<void> {
+  let query = supabase
+    .from('company_shortlisted_renters')
+    .delete()
+    .eq('company_host_id', companyHostId)
+    .eq('renter_id', renterId)
+
+  if (listingId) query = query.eq('listing_id', listingId)
+
+  const { error } = await query
+  if (error) throw error
+}
+
+// Get all shortlisted renters for a listing (or all)
+export async function getShortlistedRenters(
+  companyHostId: string,
+  listingId?: string
+): Promise<CompanyShortlistedRenter[]> {
+  let query = supabase
+    .from('company_shortlisted_renters')
+    .select(`
+      id, renter_id, listing_id, shortlisted_at,
+      profiles!company_shortlisted_renters_renter_id_fkey (
+        id, first_name, last_name, age, occupation, bio,
+        budget_max, budget_per_person_max, move_in_date,
+        sleep_schedule, cleanliness, smoking, pets,
+        preferred_trains, lifestyle_tags, avatar_url
+      )
+    `)
+    .eq('company_host_id', companyHostId)
+    .order('shortlisted_at', { ascending: false })
+
+  if (listingId) {
+    query = query.or(`listing_id.eq.${listingId},listing_id.is.null`)
+  }
+
+  const { data, error } = await query
+  if (error) throw error
+
+  return (data || []).map(item => {
+    const p = item.profiles as any
+    return {
+      id: item.id,
+      renterId: item.renter_id,
+      listingId: item.listing_id,
+      firstName: p.first_name,
+      lastName: p.last_name,
+      age: p.age,
+      occupation: p.occupation,
+      bio: p.bio,
+      budgetMax: p.budget_max,
+      budgetPerPersonMax: p.budget_per_person_max,
+      moveInDate: p.move_in_date,
+      sleepSchedule: p.sleep_schedule,
+      cleanliness: p.cleanliness,
+      smoking: p.smoking,
+      pets: p.pets,
+      preferredTrains: p.preferred_trains,
+      lifestyleTags: p.lifestyle_tags,
+      avatarUrl: p.avatar_url,
+      shortlistedAt: item.shortlisted_at
+    }
+  })
+}
+
+// Get fill pipeline for all company listings
+export async function getFillPipeline(companyHostId: string): Promise<FillPipelineItem[]> {
+  const { data: listings, error } = await supabase
+    .from('listings')
+    .select(`
+      id, address, neighborhood, price, bedrooms, available_date, is_active,
+      listing_fill_pipeline (
+        days_vacant, total_groups_matched, total_invites_sent,
+        best_match_score, projected_fill_date
+      )
+    `)
+    .eq('host_id', companyHostId)
+    .eq('is_active', true)
+    .order('available_date', { ascending: true })
+
+  if (error) throw error
+
+  return (listings || []).map(l => {
+    const pipeline = (l.listing_fill_pipeline as any)?.[0]
+    const daysVacant = pipeline?.days_vacant || 0
+    return {
+      listingId: l.id,
+      address: l.address,
+      neighborhood: l.neighborhood,
+      price: l.price,
+      bedrooms: l.bedrooms,
+      daysVacant,
+      totalGroupsMatched: pipeline?.total_groups_matched || 0,
+      totalInvitesSent: pipeline?.total_invites_sent || 0,
+      bestMatchScore: pipeline?.best_match_score || 0,
+      projectedFillDate: pipeline?.projected_fill_date,
+      status: daysVacant > 30 ? 'urgent' : daysVacant > 0 ? 'active' : 'filled'
+    }
+  })
+}
+
+// Send auto-invite to a matched group
+export async function sendAutoInvite(
+  companyHostId: string,
+  listingId: string,
+  groupId: string,
+  matchScore: number,
+  aiReason?: string
+): Promise<void> {
+  const { data, error } = await supabase.functions.invoke('company-auto-invite', {
+    body: { listingId, groupId, companyHostId, matchScore, aiReason }
+  })
+  if (error) throw error
+}
+
+// Run Claude AI pairing for a listing
+export async function runAIPairing(
+  companyHostId: string,
+  listingId: string
+): Promise<any> {
+  const { data, error } = await supabase.functions.invoke('company-pair-group', {
+    body: { listingId, companyHostId }
+  })
+  if (error) throw error
+  return data
+}
+
+// Check if renter is shortlisted
+export async function isRenterShortlisted(
+  companyHostId: string,
+  renterId: string
+): Promise<boolean> {
+  const { data } = await supabase
+    .from('company_shortlisted_renters')
+    .select('id')
+    .eq('company_host_id', companyHostId)
+    .eq('renter_id', renterId)
+    .maybeSingle()
+  return !!data
+}
+```
+
+---
+
+### 5. Screen — `src/screens/company/CompanyFillPipelineScreen.tsx`
+
+This is the company's central AI dashboard — every listing in the portfolio with vacancy stats, AI match pipeline, and action buttons.
+
+```tsx
+import React, { useEffect, useState } from 'react'
+import {
+  View, Text, ScrollView, TouchableOpacity,
+  StyleSheet, ActivityIndicator, RefreshControl
+} from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
+import { useAuth } from '../../context/AuthContext'
+import {
+  getFillPipeline,
+  FillPipelineItem
+} from '../../services/companyMatchmakerService'
+
+export default function CompanyFillPipelineScreen({ navigation }: any) {
+  const { user } = useAuth()
+  const [pipeline, setPipeline] = useState<FillPipelineItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+
+  const loadPipeline = async () => {
+    try {
+      const data = await getFillPipeline(user!.id)
+      setPipeline(data)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
+  }
+
+  useEffect(() => { loadPipeline() }, [])
+
+  const totalVacant = pipeline.filter(p => p.status !== 'filled').length
+  const urgentCount = pipeline.filter(p => p.status === 'urgent').length
+  const totalMatches = pipeline.reduce((sum, p) => sum + p.totalGroupsMatched, 0)
+
+  const getStatusColor = (status: FillPipelineItem['status']) => {
+    if (status === 'urgent') return '#FF4444'
+    if (status === 'active') return '#FF8C00'
+    return '#4CAF50'
+  }
+
+  const getStatusLabel = (status: FillPipelineItem['status']) => {
+    if (status === 'urgent') return 'URGENT'
+    if (status === 'active') return 'ACTIVE'
+    return 'FILLED'
+  }
+
+  if (loading) return (
+    <View style={styles.centered}>
+      <ActivityIndicator size="large" color="#FF6B6B" />
+    </View>
+  )
+
+  return (
+    <ScrollView
+      style={styles.container}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadPipeline() }} />}
+    >
+      {/* Header Summary */}
+      <View style={styles.summaryRow}>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryNumber}>{totalVacant}</Text>
+          <Text style={styles.summaryLabel}>Vacant Units</Text>
+        </View>
+        <View style={styles.summaryCard}>
+          <Text style={[styles.summaryNumber, urgentCount > 0 && { color: '#FF4444' }]}>
+            {urgentCount}
+          </Text>
+          <Text style={styles.summaryLabel}>Urgent</Text>
+        </View>
+        <View style={styles.summaryCard}>
+          <Text style={[styles.summaryNumber, { color: '#FF6B6B' }]}>{totalMatches}</Text>
+          <Text style={styles.summaryLabel}>AI Matches</Text>
+        </View>
+      </View>
+
+      <Text style={styles.sectionTitle}>Your Portfolio</Text>
+
+      {pipeline.length === 0 && (
+        <View style={styles.emptyState}>
+          <Ionicons name="home-outline" size={48} color="#ccc" />
+          <Text style={styles.emptyText}>No active listings found.</Text>
+          <Text style={styles.emptySubtext}>Add listings to start the AI fill pipeline.</Text>
+        </View>
+      )}
+
+      {pipeline.map(item => (
+        <TouchableOpacity
+          key={item.listingId}
+          style={styles.listingCard}
+          onPress={() => navigation.navigate('CompanyListingAIScreen', { listingId: item.listingId })}
+          activeOpacity={0.8}
+        >
+          <View style={styles.cardHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.listingAddress} numberOfLines={1}>{item.address}</Text>
+              <Text style={styles.listingNeighborhood}>{item.neighborhood}</Text>
+            </View>
+            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '20' }]}>
+              <View style={[styles.statusDot, { backgroundColor: getStatusColor(item.status) }]} />
+              <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
+                {getStatusLabel(item.status)}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Ionicons name="time-outline" size={14} color="#999" />
+              <Text style={styles.statText}>{item.daysVacant}d vacant</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Ionicons name="people-outline" size={14} color="#999" />
+              <Text style={styles.statText}>{item.totalGroupsMatched} groups matched</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Ionicons name="mail-outline" size={14} color="#999" />
+              <Text style={styles.statText}>{item.totalInvitesSent} invites sent</Text>
+            </View>
+          </View>
+
+          {item.bestMatchScore > 0 && (
+            <View style={styles.bestMatchBar}>
+              <Text style={styles.bestMatchLabel}>Best match score</Text>
+              <View style={styles.scoreTrack}>
+                <View style={[styles.scoreFill, { width: `${item.bestMatchScore}%` }]} />
+              </View>
+              <Text style={styles.scoreValue}>{item.bestMatchScore}%</Text>
+            </View>
+          )}
+
+          <View style={styles.cardActions}>
+            <TouchableOpacity
+              style={styles.aiButton}
+              onPress={() => navigation.navigate('CompanyListingAIScreen', {
+                listingId: item.listingId,
+                autoRunPairing: true
+              })}
+            >
+              <Ionicons name="sparkles" size={14} color="#fff" />
+              <Text style={styles.aiButtonText}>AI Pair Group</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.viewMatchesButton}
+              onPress={() => navigation.navigate('HostGroupMatchesScreen', { listingId: item.listingId })}
+            >
+              <Text style={styles.viewMatchesText}>View Matches →</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      ))}
+
+      <View style={{ height: 40 }} />
+    </ScrollView>
+  )
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#f5f5f5' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  summaryRow: {
+    flexDirection: 'row', padding: 16, gap: 12,
+    backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f0f0f0'
+  },
+  summaryCard: {
+    flex: 1, alignItems: 'center', padding: 12,
+    backgroundColor: '#f9f9f9', borderRadius: 12
+  },
+  summaryNumber: { fontSize: 28, fontWeight: '700', color: '#1a1a1a' },
+  summaryLabel: { fontSize: 11, color: '#999', marginTop: 2, textAlign: 'center' },
+  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#1a1a1a', padding: 16, paddingBottom: 8 },
+  emptyState: { alignItems: 'center', padding: 40 },
+  emptyText: { fontSize: 16, color: '#999', marginTop: 12 },
+  emptySubtext: { fontSize: 13, color: '#bbb', marginTop: 4 },
+  listingCard: {
+    backgroundColor: '#fff', marginHorizontal: 16, marginBottom: 12,
+    borderRadius: 16, padding: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 8, elevation: 3
+  },
+  cardHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 },
+  listingAddress: { fontSize: 15, fontWeight: '600', color: '#1a1a1a' },
+  listingNeighborhood: { fontSize: 12, color: '#999', marginTop: 2 },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
+  statusDot: { width: 6, height: 6, borderRadius: 3, marginRight: 4 },
+  statusText: { fontSize: 10, fontWeight: '700' },
+  statsRow: { flexDirection: 'row', gap: 16, marginBottom: 12 },
+  statItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  statText: { fontSize: 12, color: '#666' },
+  bestMatchBar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  bestMatchLabel: { fontSize: 11, color: '#999', width: 90 },
+  scoreTrack: { flex: 1, height: 4, backgroundColor: '#f0f0f0', borderRadius: 2, overflow: 'hidden' },
+  scoreFill: { height: '100%', backgroundColor: '#FF6B6B', borderRadius: 2 },
+  scoreValue: { fontSize: 12, fontWeight: '700', color: '#FF6B6B', width: 32, textAlign: 'right' },
+  cardActions: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4 },
+  aiButton: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: '#FF6B6B', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20
+  },
+  aiButtonText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  viewMatchesButton: { paddingVertical: 8 },
+  viewMatchesText: { color: '#FF6B6B', fontSize: 13, fontWeight: '600' }
+})
+```
+
+---
+
+### 6. Screen — `src/screens/company/CompanyListingAIScreen.tsx`
+
+Per-listing AI pairing screen — company shortlists renters for a unit, runs Claude pairing, and sends auto-invites to recommended groups. Mirrors `AgentGroupBuilderScreen` but for company hosts.
+
+```tsx
+import React, { useEffect, useState, useCallback } from 'react'
+import {
+  View, Text, ScrollView, TouchableOpacity,
+  StyleSheet, ActivityIndicator, Image, Alert, Modal
+} from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
+import { useAuth } from '../../context/AuthContext'
+import {
+  getShortlistedRenters,
+  removeFromShortlist,
+  runAIPairing,
+  sendAutoInvite,
+  CompanyShortlistedRenter
+} from '../../services/companyMatchmakerService'
+import { supabase } from '../../services/supabase'
+
+export default function CompanyListingAIScreen({ route, navigation }: any) {
+  const { listingId, autoRunPairing } = route.params
+  const { user } = useAuth()
+  const [listing, setListing] = useState<any>(null)
+  const [shortlisted, setShortlisted] = useState<CompanyShortlistedRenter[]>([])
+  const [loading, setLoading] = useState(true)
+  const [pairingLoading, setPairingLoading] = useState(false)
+  const [pairingResult, setPairingResult] = useState<any>(null)
+  const [showPairingModal, setShowPairingModal] = useState(false)
+  const [inviteSending, setInviteSending] = useState(false)
+
+  const loadData = useCallback(async () => {
+    try {
+      const [{ data: listingData }, renters] = await Promise.all([
+        supabase.from('listings').select('*').eq('id', listingId).single(),
+        getShortlistedRenters(user!.id, listingId)
+      ])
+      setListing(listingData)
+      setShortlisted(renters)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
+  }, [listingId, user])
+
+  useEffect(() => {
+    loadData()
+    if (autoRunPairing) setTimeout(() => handleAIPairing(), 1000)
+  }, [])
+
+  const handleAIPairing = async () => {
+    if (shortlisted.length < 2) {
+      Alert.alert('Need more candidates', 'Shortlist at least 2 renters for this unit first.')
+      return
+    }
+    setPairingLoading(true)
+    setShowPairingModal(true)
+    try {
+      const result = await runAIPairing(user!.id, listingId)
+      setPairingResult(result)
+    } catch (e) {
+      Alert.alert('AI Pairing Failed', 'Could not run AI pairing. Try again.')
+      setShowPairingModal(false)
+    } finally {
+      setPairingLoading(false)
+    }
+  }
+
+  const handleSendInvite = async (groupId: string, matchScore: number, reason: string) => {
+    setInviteSending(true)
+    try {
+      await sendAutoInvite(user!.id, listingId, groupId, matchScore, reason)
+      Alert.alert('Invite Sent! 🎉', 'The renter group has been notified about your property.')
+      setShowPairingModal(false)
+    } catch (e) {
+      Alert.alert('Error', 'Could not send invite. Try again.')
+    } finally {
+      setInviteSending(false)
+    }
+  }
+
+  const handleRemove = async (renterId: string) => {
+    await removeFromShortlist(user!.id, renterId, listingId)
+    setShortlisted(prev => prev.filter(r => r.renterId !== renterId))
+  }
+
+  if (loading) return (
+    <View style={styles.centered}><ActivityIndicator size="large" color="#FF6B6B" /></View>
+  )
+
+  const bedroomsNeeded = listing ? listing.bedrooms - (listing.host_lives_in ? 1 : 0) : 0
+  const isReadyToPair = shortlisted.length >= bedroomsNeeded
+
+  return (
+    <View style={styles.container}>
+      <ScrollView>
+        {/* Listing Header */}
+        {listing && (
+          <View style={styles.listingHeader}>
+            <Text style={styles.listingAddress}>{listing.address}</Text>
+            <Text style={styles.listingDetails}>
+              {listing.bedrooms}BR · ${listing.price}/mo · {listing.neighborhood}
+            </Text>
+            <View style={styles.needRow}>
+              <Ionicons name="people-outline" size={16} color="#FF6B6B" />
+              <Text style={styles.needText}>
+                Need {bedroomsNeeded} renter{bedroomsNeeded !== 1 ? 's' : ''} to fill this unit
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* AI Pair Button */}
+        <View style={styles.aiSection}>
+          <TouchableOpacity
+            style={[styles.aiButton, !isReadyToPair && styles.aiButtonDisabled]}
+            onPress={handleAIPairing}
+            disabled={!isReadyToPair}
+          >
+            <Ionicons name="sparkles" size={20} color="#fff" />
+            <Text style={styles.aiButtonText}>
+              {isReadyToPair
+                ? 'Ask Claude: Who Should Move In?'
+                : `Add ${bedroomsNeeded - shortlisted.length} more to run AI pairing`}
+            </Text>
+          </TouchableOpacity>
+          {shortlisted.length > 0 && (
+            <Text style={styles.aiSubtext}>
+              {shortlisted.length} candidate{shortlisted.length !== 1 ? 's' : ''} shortlisted
+            </Text>
+          )}
+        </View>
+
+        {/* Shortlisted Renters */}
+        <Text style={styles.sectionTitle}>Shortlisted for This Unit</Text>
+
+        {shortlisted.length === 0 && (
+          <View style={styles.emptyState}>
+            <Ionicons name="person-add-outline" size={40} color="#ccc" />
+            <Text style={styles.emptyText}>No renters shortlisted yet.</Text>
+            <Text style={styles.emptySubtext}>
+              Browse renters and tap the bookmark icon to shortlist them for this unit.
+            </Text>
+            <TouchableOpacity
+              style={styles.browseButton}
+              onPress={() => navigation.navigate('BrowseRenters', { targetListingId: listingId })}
+            >
+              <Text style={styles.browseButtonText}>Browse Renters →</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {shortlisted.map(renter => (
+          <View key={renter.id} style={styles.renterCard}>
+            {renter.avatarUrl ? (
+              <Image source={{ uri: renter.avatarUrl }} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                <Text style={styles.avatarInitial}>
+                  {renter.firstName?.[0]?.toUpperCase() || '?'}
+                </Text>
+              </View>
+            )}
+            <View style={styles.renterInfo}>
+              <Text style={styles.renterName}>{renter.firstName} {renter.lastName}</Text>
+              <Text style={styles.renterOccupation}>{renter.occupation || 'No occupation listed'}</Text>
+              <View style={styles.renterTags}>
+                {renter.budgetPerPersonMax && (
+                  <View style={styles.tag}>
+                    <Text style={styles.tagText}>${renter.budgetPerPersonMax}/mo</Text>
+                  </View>
+                )}
+                {renter.moveInDate && (
+                  <View style={styles.tag}>
+                    <Text style={styles.tagText}>
+                      Move {new Date(renter.moveInDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </Text>
+                  </View>
+                )}
+                {renter.smoking && <View style={[styles.tag, styles.tagWarning]}><Text style={styles.tagText}>Smoker</Text></View>}
+                {renter.pets && <View style={[styles.tag, styles.tagWarning]}><Text style={styles.tagText}>Has pets</Text></View>}
+              </View>
+            </View>
+            <TouchableOpacity onPress={() => handleRemove(renter.renterId)} style={styles.removeButton}>
+              <Ionicons name="close-circle" size={22} color="#ccc" />
+            </TouchableOpacity>
+          </View>
+        ))}
+
+        <View style={{ height: 40 }} />
+      </ScrollView>
+
+      {/* AI Pairing Modal */}
+      <Modal visible={showPairingModal} animationType="slide" presentationStyle="pageSheet">
+        <View style={styles.modal}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>AI Group Recommendation</Text>
+            <TouchableOpacity onPress={() => setShowPairingModal(false)}>
+              <Ionicons name="close" size={24} color="#1a1a1a" />
+            </TouchableOpacity>
+          </View>
+
+          {pairingLoading ? (
+            <View style={styles.centered}>
+              <ActivityIndicator size="large" color="#FF6B6B" />
+              <Text style={styles.loadingText}>Claude is analyzing your candidates…</Text>
+            </View>
+          ) : pairingResult ? (
+            <ScrollView style={styles.modalContent}>
+              {/* Confidence */}
+              <View style={styles.confidenceRow}>
+                <View style={styles.confidenceCircle}>
+                  <Text style={styles.confidenceNumber}>{pairingResult.confidence}%</Text>
+                  <Text style={styles.confidenceLabel}>confidence</Text>
+                </View>
+                <View style={styles.fillScoreCircle}>
+                  <Text style={styles.confidenceNumber}>{pairingResult.fillScore}%</Text>
+                  <Text style={styles.confidenceLabel}>fill score</Text>
+                </View>
+                <View style={{ flex: 1, paddingLeft: 16 }}>
+                  <Text style={styles.estimatedFill}>
+                    ⏱ Est. fill time: {pairingResult.estimatedFillTime}
+                  </Text>
+                  <Text style={styles.aiRec}>{pairingResult.recommendation}</Text>
+                </View>
+              </View>
+
+              {/* Recommended Group */}
+              <Text style={styles.groupLabel}>Recommended Group</Text>
+              {pairingResult.recommendedGroupProfiles?.map((profile: any, i: number) => (
+                <View key={i} style={styles.profileRow}>
+                  <View style={styles.profileAvatar}>
+                    <Text style={styles.profileInitial}>{profile.first_name?.[0]}</Text>
+                  </View>
+                  <Text style={styles.profileName}>{profile.first_name} {profile.last_name}</Text>
+                  <Text style={styles.profileBudget}>${profile.budget_per_person_max || profile.budget_max}/mo</Text>
+                </View>
+              ))}
+
+              {/* Reasons */}
+              <Text style={styles.groupLabel}>Why This Group</Text>
+              {pairingResult.reasons?.map((r: string, i: number) => (
+                <View key={i} style={styles.reasonRow}>
+                  <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
+                  <Text style={styles.reasonText}>{r}</Text>
+                </View>
+              ))}
+
+              {/* Concerns */}
+              {pairingResult.concerns?.length > 0 && (
+                <>
+                  <Text style={styles.groupLabel}>Watch Out For</Text>
+                  {pairingResult.concerns.map((c: string, i: number) => (
+                    <View key={i} style={styles.reasonRow}>
+                      <Ionicons name="warning-outline" size={16} color="#FF8C00" />
+                      <Text style={styles.reasonText}>{c}</Text>
+                    </View>
+                  ))}
+                </>
+              )}
+
+              {/* Send Invite Button */}
+              <TouchableOpacity
+                style={[styles.inviteButton, inviteSending && { opacity: 0.6 }]}
+                onPress={() => {
+                  // In production, this would create/find an actual group record.
+                  // For now, navigate to group creation with pre-selected members.
+                  Alert.alert(
+                    'Send Group Invite',
+                    'This will notify the recommended renters that your property matched their profile.',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Send Invites', onPress: () => {
+                          navigation.navigate('CreateGroupFromAI', {
+                            memberIds: pairingResult.recommendedGroupProfiles?.map((p: any) => p.id),
+                            listingId,
+                            aiReason: pairingResult.recommendation
+                          })
+                          setShowPairingModal(false)
+                        }
+                      }
+                    ]
+                  )
+                }}
+                disabled={inviteSending}
+              >
+                {inviteSending
+                  ? <ActivityIndicator color="#fff" />
+                  : <>
+                    <Ionicons name="send" size={18} color="#fff" />
+                    <Text style={styles.inviteButtonText}>Invite This Group to Your Listing</Text>
+                  </>
+                }
+              </TouchableOpacity>
+
+              <View style={{ height: 40 }} />
+            </ScrollView>
+          ) : null}
+        </View>
+      </Modal>
+    </View>
+  )
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#f5f5f5' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
+  listingHeader: { backgroundColor: '#fff', padding: 16, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  listingAddress: { fontSize: 18, fontWeight: '700', color: '#1a1a1a' },
+  listingDetails: { fontSize: 13, color: '#666', marginTop: 4 },
+  needRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
+  needText: { fontSize: 13, color: '#FF6B6B', fontWeight: '500' },
+  aiSection: { padding: 16, backgroundColor: '#fff', marginTop: 8 },
+  aiButton: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#FF6B6B', padding: 14, borderRadius: 12, justifyContent: 'center'
+  },
+  aiButtonDisabled: { backgroundColor: '#ccc' },
+  aiButtonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  aiSubtext: { fontSize: 12, color: '#999', textAlign: 'center', marginTop: 8 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#1a1a1a', padding: 16, paddingBottom: 8 },
+  emptyState: { alignItems: 'center', padding: 32 },
+  emptyText: { fontSize: 16, color: '#666', marginTop: 12 },
+  emptySubtext: { fontSize: 13, color: '#999', textAlign: 'center', marginTop: 4 },
+  browseButton: { marginTop: 16, paddingHorizontal: 24, paddingVertical: 10, backgroundColor: '#FF6B6B', borderRadius: 20 },
+  browseButtonText: { color: '#fff', fontWeight: '600' },
+  renterCard: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff',
+    marginHorizontal: 16, marginBottom: 8, padding: 12, borderRadius: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2
+  },
+  avatar: { width: 48, height: 48, borderRadius: 24, marginRight: 12 },
+  avatarPlaceholder: { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' },
+  avatarInitial: { fontSize: 20, fontWeight: '700', color: '#999' },
+  renterInfo: { flex: 1 },
+  renterName: { fontSize: 15, fontWeight: '600', color: '#1a1a1a' },
+  renterOccupation: { fontSize: 12, color: '#999', marginTop: 2 },
+  renterTags: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 6 },
+  tag: { paddingHorizontal: 8, paddingVertical: 3, backgroundColor: '#f0f0f0', borderRadius: 10 },
+  tagWarning: { backgroundColor: '#FFF3E0' },
+  tagText: { fontSize: 11, color: '#666' },
+  removeButton: { padding: 4 },
+  modal: { flex: 1, backgroundColor: '#fff' },
+  modalHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    padding: 16, borderBottomWidth: 1, borderBottomColor: '#f0f0f0'
+  },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: '#1a1a1a' },
+  modalContent: { flex: 1, padding: 16 },
+  loadingText: { marginTop: 16, color: '#999', fontSize: 14, textAlign: 'center' },
+  confidenceRow: {
+    flexDirection: 'row', alignItems: 'center', padding: 16,
+    backgroundColor: '#f9f9f9', borderRadius: 12, marginBottom: 16
+  },
+  confidenceCircle: {
+    width: 64, height: 64, borderRadius: 32, backgroundColor: '#FF6B6B20',
+    justifyContent: 'center', alignItems: 'center', marginRight: 12
+  },
+  fillScoreCircle: {
+    width: 64, height: 64, borderRadius: 32, backgroundColor: '#4CAF5020',
+    justifyContent: 'center', alignItems: 'center'
+  },
+  confidenceNumber: { fontSize: 18, fontWeight: '800', color: '#1a1a1a' },
+  confidenceLabel: { fontSize: 9, color: '#999', textAlign: 'center' },
+  estimatedFill: { fontSize: 12, color: '#FF8C00', fontWeight: '600', marginBottom: 4 },
+  aiRec: { fontSize: 13, color: '#444', lineHeight: 18 },
+  groupLabel: { fontSize: 14, fontWeight: '700', color: '#1a1a1a', marginTop: 16, marginBottom: 8 },
+  profileRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    padding: 12, backgroundColor: '#f9f9f9', borderRadius: 10, marginBottom: 6
+  },
+  profileAvatar: {
+    width: 36, height: 36, borderRadius: 18, backgroundColor: '#FF6B6B20',
+    justifyContent: 'center', alignItems: 'center'
+  },
+  profileInitial: { fontSize: 14, fontWeight: '700', color: '#FF6B6B' },
+  profileName: { flex: 1, fontSize: 14, fontWeight: '600', color: '#1a1a1a' },
+  profileBudget: { fontSize: 13, color: '#666' },
+  reasonRow: { flexDirection: 'row', gap: 8, marginBottom: 6, alignItems: 'flex-start' },
+  reasonText: { flex: 1, fontSize: 13, color: '#444', lineHeight: 18 },
+  inviteButton: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#FF6B6B', padding: 16, borderRadius: 12,
+    justifyContent: 'center', marginTop: 24
+  },
+  inviteButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' }
+})
+```
+
+---
+
+### 7. Renter Screen — `src/screens/renter/CompanyGroupInviteScreen.tsx`
+
+When a company invites a renter group, all members see this screen after tapping the push notification.
+
+```tsx
+import React, { useEffect, useState } from 'react'
+import {
+  View, Text, ScrollView, TouchableOpacity,
+  StyleSheet, ActivityIndicator, Image, Alert
+} from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
+import { supabase } from '../../services/supabase'
+
+export default function CompanyGroupInviteScreen({ route, navigation }: any) {
+  const { listingId, groupId } = route.params
+  const [listing, setListing] = useState<any>(null)
+  const [invite, setInvite] = useState<any>(null)
+  const [members, setMembers] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [responding, setResponding] = useState(false)
+
+  useEffect(() => {
+    const loadData = async () => {
+      const [
+        { data: listingData },
+        { data: inviteData },
+        { data: membersData }
+      ] = await Promise.all([
+        supabase.from('listings').select('*, profiles!listings_host_id_fkey(first_name, last_name, avatar_url, company_name)').eq('id', listingId).single(),
+        supabase.from('company_group_invites').select('*').eq('listing_id', listingId).eq('group_id', groupId).single(),
+        supabase.from('renter_group_members').select('profiles(first_name, last_name, avatar_url)').eq('group_id', groupId)
+      ])
+      setListing(listingData)
+      setInvite(inviteData)
+      setMembers(membersData?.map(m => m.profiles) || [])
+      setLoading(false)
+    }
+    loadData()
+  }, [])
+
+  const handleRespond = async (accept: boolean) => {
+    setResponding(true)
+    try {
+      await supabase
+        .from('company_group_invites')
+        .update({ status: accept ? 'accepted' : 'declined', responded_at: new Date().toISOString() })
+        .eq('listing_id', listingId)
+        .eq('group_id', groupId)
+
+      if (accept) {
+        navigation.replace('GroupApartmentSuggestions', { groupId, highlightListingId: listingId })
+      } else {
+        navigation.goBack()
+      }
+    } catch (e) {
+      Alert.alert('Error', 'Could not respond. Try again.')
+    } finally {
+      setResponding(false)
+    }
+  }
+
+  if (loading) return <View style={styles.centered}><ActivityIndicator size="large" color="#FF6B6B" /></View>
+
+  const host = listing?.profiles
+  const pricePerPerson = listing ? Math.round(listing.price / (listing.bedrooms - (listing.host_lives_in ? 1 : 0))) : 0
+
+  return (
+    <ScrollView style={styles.container}>
+      <View style={styles.header}>
+        <View style={styles.matchBadge}>
+          <Ionicons name="sparkles" size={14} color="#FF6B6B" />
+          <Text style={styles.matchBadgeText}>AI Matched Your Group</Text>
+        </View>
+        <Text style={styles.headline}>A Property Manager Selected Your Group</Text>
+        <Text style={styles.subheadline}>
+          {host?.company_name || `${host?.first_name} ${host?.last_name}`} thinks your group is a great fit for their {listing?.neighborhood} listing.
+        </Text>
+      </View>
+
+      {/* Listing Preview */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>The Apartment</Text>
+        <Text style={styles.listingAddress}>{listing?.address}</Text>
+        <Text style={styles.listingNeighborhood}>{listing?.neighborhood}</Text>
+        <View style={styles.listingStats}>
+          <View style={styles.stat}>
+            <Ionicons name="bed-outline" size={18} color="#FF6B6B" />
+            <Text style={styles.statText}>{listing?.bedrooms}BR</Text>
+          </View>
+          <View style={styles.stat}>
+            <Ionicons name="cash-outline" size={18} color="#FF6B6B" />
+            <Text style={styles.statText}>${pricePerPerson}/mo each</Text>
+          </View>
+          <View style={styles.stat}>
+            <Ionicons name="calendar-outline" size={18} color="#FF6B6B" />
+            <Text style={styles.statText}>Avail. {listing?.available_date ? new Date(listing.available_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'soon'}</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* AI Reason */}
+      {invite?.ai_reason && (
+        <View style={styles.aiReasonCard}>
+          <Ionicons name="sparkles" size={16} color="#FF6B6B" />
+          <Text style={styles.aiReasonText}>{invite.ai_reason}</Text>
+        </View>
+      )}
+
+      {/* Match Score */}
+      {invite?.match_score > 0 && (
+        <View style={styles.scoreCard}>
+          <Text style={styles.scoreLabel}>Group match score</Text>
+          <Text style={styles.scoreValue}>{invite.match_score}%</Text>
+          <View style={styles.scoreTrack}>
+            <View style={[styles.scoreFill, { width: `${invite.match_score}%` }]} />
+          </View>
+        </View>
+      )}
+
+      {/* Group Members */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Your Group</Text>
+        {members.map((m: any, i: number) => (
+          <View key={i} style={styles.memberRow}>
+            {m.avatar_url
+              ? <Image source={{ uri: m.avatar_url }} style={styles.memberAvatar} />
+              : <View style={[styles.memberAvatar, styles.avatarPlaceholder]}>
+                <Text style={styles.avatarInitial}>{m.first_name?.[0]}</Text>
+              </View>
+            }
+            <Text style={styles.memberName}>{m.first_name} {m.last_name}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Action Buttons */}
+      <View style={styles.actions}>
+        <TouchableOpacity
+          style={[styles.acceptButton, responding && { opacity: 0.6 }]}
+          onPress={() => handleRespond(true)}
+          disabled={responding}
+        >
+          {responding
+            ? <ActivityIndicator color="#fff" />
+            : <>
+              <Ionicons name="checkmark-circle" size={20} color="#fff" />
+              <Text style={styles.acceptText}>View This Apartment</Text>
+            </>
+          }
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.declineButton}
+          onPress={() => handleRespond(false)}
+          disabled={responding}
+        >
+          <Text style={styles.declineText}>Not Interested</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={{ height: 40 }} />
+    </ScrollView>
+  )
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#f5f5f5' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  header: { padding: 24, backgroundColor: '#fff', alignItems: 'center' },
+  matchBadge: {
+    flexDirection: 'row', gap: 4, alignItems: 'center',
+    backgroundColor: '#FF6B6B15', paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: 20, marginBottom: 12
+  },
+  matchBadgeText: { color: '#FF6B6B', fontSize: 12, fontWeight: '600' },
+  headline: { fontSize: 22, fontWeight: '800', color: '#1a1a1a', textAlign: 'center', marginBottom: 8 },
+  subheadline: { fontSize: 14, color: '#666', textAlign: 'center', lineHeight: 20 },
+  card: { backgroundColor: '#fff', margin: 16, marginBottom: 0, padding: 16, borderRadius: 16 },
+  cardTitle: { fontSize: 13, fontWeight: '700', color: '#999', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
+  listingAddress: { fontSize: 18, fontWeight: '700', color: '#1a1a1a' },
+  listingNeighborhood: { fontSize: 13, color: '#999', marginTop: 2 },
+  listingStats: { flexDirection: 'row', gap: 16, marginTop: 12 },
+  stat: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  statText: { fontSize: 13, color: '#444', fontWeight: '500' },
+  aiReasonCard: {
+    flexDirection: 'row', gap: 8, alignItems: 'flex-start',
+    backgroundColor: '#FF6B6B08', margin: 16, marginBottom: 0, padding: 14,
+    borderRadius: 12, borderLeftWidth: 3, borderLeftColor: '#FF6B6B'
+  },
+  aiReasonText: { flex: 1, fontSize: 13, color: '#444', lineHeight: 18 },
+  scoreCard: {
+    backgroundColor: '#fff', margin: 16, marginBottom: 0, padding: 16, borderRadius: 16,
+    flexDirection: 'row', alignItems: 'center', gap: 12
+  },
+  scoreLabel: { fontSize: 13, color: '#999', flex: 1 },
+  scoreValue: { fontSize: 18, fontWeight: '800', color: '#FF6B6B', width: 44 },
+  scoreTrack: { flex: 2, height: 6, backgroundColor: '#f0f0f0', borderRadius: 3, overflow: 'hidden' },
+  scoreFill: { height: '100%', backgroundColor: '#FF6B6B', borderRadius: 3 },
+  memberRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
+  memberAvatar: { width: 36, height: 36, borderRadius: 18 },
+  avatarPlaceholder: { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' },
+  avatarInitial: { fontSize: 14, fontWeight: '700', color: '#999' },
+  memberName: { fontSize: 14, color: '#1a1a1a', fontWeight: '500' },
+  actions: { padding: 16, gap: 10 },
+  acceptButton: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#FF6B6B', padding: 16, borderRadius: 12, justifyContent: 'center'
+  },
+  acceptText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  declineButton: { padding: 14, alignItems: 'center' },
+  declineText: { color: '#999', fontSize: 14 }
+})
+```
+
+---
+
+### 8. Navigation Updates
+
+In `src/navigation/AppNavigator.tsx` (or wherever company host navigation is defined), add the new screens:
+
+```typescript
+// In the company host stack navigator, add:
+import CompanyFillPipelineScreen from '../screens/company/CompanyFillPipelineScreen'
+import CompanyListingAIScreen from '../screens/company/CompanyListingAIScreen'
+
+// Add to company host stack:
+<Stack.Screen name="CompanyFillPipeline" component={CompanyFillPipelineScreen} options={{ title: 'Fill Pipeline' }} />
+<Stack.Screen name="CompanyListingAI" component={CompanyListingAIScreen} options={{ title: 'AI Group Pairing' }} />
+
+// In the renter stack, add:
+import CompanyGroupInviteScreen from '../screens/renter/CompanyGroupInviteScreen'
+<Stack.Screen name="CompanyGroupInvite" component={CompanyGroupInviteScreen} options={{ title: 'Property Match' }} />
+```
+
+Add "AI Fill Pipeline" as a tab or prominent button in the company host dashboard:
+
+```typescript
+// In CompanyHostDashboardScreen, add a new card/button:
+<TouchableOpacity
+  style={styles.pipelineCard}
+  onPress={() => navigation.navigate('CompanyFillPipeline')}
+>
+  <Ionicons name="sparkles" size={24} color="#FF6B6B" />
+  <View style={{ flex: 1, marginLeft: 12 }}>
+    <Text style={styles.pipelineTitle}>AI Fill Pipeline</Text>
+    <Text style={styles.pipelineSubtitle}>Match renter groups to your units automatically</Text>
+  </View>
+  <Ionicons name="chevron-forward" size={20} color="#ccc" />
+</TouchableOpacity>
+```
+
+---
+
+### 9. Push Notification Deep Linking
+
+In the notification handler (wherever push notification routing is handled):
+
+```typescript
+// Add to existing notification routing:
+case 'company_group_invite':
+  navigation.navigate('CompanyGroupInvite', {
+    listingId: data.listingId,
+    groupId: data.groupId
+  })
+  break
+```
+
+---
+
+### 10. BrowseRentersScreen — Add Shortlist Button for Company Hosts
+
+In `BrowseRentersScreen.tsx`, add context-aware shortlisting for company hosts. Check if the user is a company host and show a bookmark icon that shortlists the renter:
+
+```typescript
+// At the top of the swipe card or profile view, for company hosts:
+const { user, profile } = useAuth()
+const isCompanyHost = profile?.role === 'host' && profile?.host_type === 'company'
+
+// Add shortlist button to renter cards (company hosts only):
+{isCompanyHost && (
+  <TouchableOpacity onPress={() => handleShortlist(renter.id)} style={styles.shortlistButton}>
+    <Ionicons
+      name={isShortlisted ? 'bookmark' : 'bookmark-outline'}
+      size={22}
+      color={isShortlisted ? '#FF6B6B' : '#ccc'}
+    />
+  </TouchableOpacity>
+)}
+```
+
+---
+
+## Summary of What Gets Built
+
+| Component | Description |
+|---|---|
+| Migration 022 | `company_shortlisted_renters`, `company_group_invites`, `listing_fill_pipeline` |
+| `company-pair-group` | Claude AI recommends best renter group for a specific unit |
+| `company-auto-invite` | Sends official match invite + push notification to renter group |
+| `companyMatchmakerService` | All shortlist/pipeline/pairing/invite logic |
+| `CompanyFillPipelineScreen` | Portfolio overview with vacancy stats and AI match pipeline |
+| `CompanyListingAIScreen` | Per-unit shortlisting + Claude AI pairing + invite flow |
+| `CompanyGroupInviteScreen` | Renter-side invite screen with listing details and accept/decline |
+| Navigation updates | Wire new screens into company host stack and renter stack |
+| BrowseRenters shortlist | Context-aware bookmark button for company hosts |
+
+## Implementation Order
+
+1. Run migration 022 in Supabase SQL Editor
+2. Deploy `company-pair-group` Edge Function
+3. Deploy `company-auto-invite` Edge Function
+4. Create `companyMatchmakerService.ts`
+5. Build `CompanyFillPipelineScreen`
+6. Build `CompanyListingAIScreen`
+7. Build `CompanyGroupInviteScreen`
+8. Update navigation
+9. Update `BrowseRentersScreen` with shortlist button for company hosts
