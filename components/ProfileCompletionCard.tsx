@@ -139,17 +139,16 @@ function getCompletionData(user: User) {
 
 const FIELD_TO_STEP: Record<string, string> = {
   photo: 'photos',
-  bio: 'bio',
   birthday: 'basicInfo',
-  budget: 'housing',
-  location: 'locationOccupation',
-  occupation: 'locationOccupation',
+  budget: 'budgetLocation',
+  location: 'budgetLocation',
+  occupation: 'budgetLocation',
   interests: 'interests',
-  sleepSchedule: 'sleepSchedule',
-  cleanliness: 'cleanliness',
-  smoking: 'smoking',
-  pets: 'workPets',
-  work: 'workPets',
+  sleepSchedule: 'sleepCleanliness',
+  cleanliness: 'sleepCleanliness',
+  smoking: 'smokingPets',
+  pets: 'smokingPets',
+  work: 'lifestyle',
   moveInDate: 'housing',
 };
 

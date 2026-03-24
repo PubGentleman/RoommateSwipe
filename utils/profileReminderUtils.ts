@@ -32,18 +32,6 @@ export const getProfileGaps = (user: User): ProfileGap[] => {
     });
   }
 
-  const bio = user.profileData?.bio;
-  if (!bio || bio.trim().length < 20) {
-    gaps.push({
-      field: 'bio',
-      label: 'About Me',
-      impact: 'A bio helps roommates know if you are a good fit before swiping',
-      icon: 'file-text',
-      screen: 'ProfileQuestionnaire',
-      screenParams: { missingSteps: ['bio'] },
-    });
-  }
-
   if (!user.profileData?.occupation) {
     gaps.push({
       field: 'occupation',
@@ -51,7 +39,7 @@ export const getProfileGaps = (user: User): ProfileGap[] => {
       impact: 'Occupation helps match you with roommates who have compatible schedules',
       icon: 'briefcase',
       screen: 'ProfileQuestionnaire',
-      screenParams: { missingSteps: ['locationOccupation'] },
+      screenParams: { missingSteps: ['budgetLocation'] },
     });
   }
 
@@ -76,7 +64,7 @@ export const getProfileGaps = (user: User): ProfileGap[] => {
       impact: 'Cleanliness and noise preferences are the top cause of roommate conflicts',
       icon: 'home',
       screen: 'ProfileQuestionnaire',
-      screenParams: { missingSteps: !prefs?.cleanliness ? ['cleanliness'] : ['noiseTolerance'] },
+      screenParams: { missingSteps: ['sleepCleanliness'] },
     });
   }
 
@@ -87,7 +75,7 @@ export const getProfileGaps = (user: User): ProfileGap[] => {
       impact: 'Pet and smoking preferences filter out incompatible matches instantly',
       icon: 'sliders',
       screen: 'ProfileQuestionnaire',
-      screenParams: { missingSteps: !prefs?.smoking ? ['smoking'] : ['workPets'] },
+      screenParams: { missingSteps: ['smokingPets'] },
     });
   }
 

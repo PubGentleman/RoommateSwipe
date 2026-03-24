@@ -48,102 +48,76 @@ import { LocationPicker } from '../../components/LocationPicker';
 import { getCoordinatesFromNeighborhood } from '../../utils/locationData';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const TOTAL_STEPS = 15;
+const TOTAL_STEPS = 10;
 
 type StepId =
   | 'photos'
   | 'basicInfo'
-  | 'gender'
-  | 'locationOccupation'
-  | 'bio'
-  | 'sleepSchedule'
-  | 'cleanliness'
-  | 'smoking'
-  | 'social'
-  | 'noiseTolerance'
-  | 'workPets'
+  | 'budgetLocation'
+  | 'dealbreakers'
+  | 'sleepCleanliness'
+  | 'smokingPets'
+  | 'lifestyle'
   | 'housing'
   | 'interests'
-  | 'expenses'
   | 'personality';
 
 const STEP_ORDER: StepId[] = [
   'photos',
   'basicInfo',
-  'gender',
-  'locationOccupation',
-  'bio',
-  'sleepSchedule',
-  'cleanliness',
-  'smoking',
-  'social',
-  'noiseTolerance',
-  'workPets',
+  'budgetLocation',
+  'dealbreakers',
+  'sleepCleanliness',
+  'smokingPets',
+  'lifestyle',
   'housing',
   'interests',
-  'expenses',
   'personality',
 ];
 
 const ONBOARDING_STEPS: StepId[] = [
   'photos',
   'basicInfo',
-  'gender',
-  'locationOccupation',
-  'bio',
+  'budgetLocation',
+  'dealbreakers',
 ];
 
 const STEP_TITLES: Record<StepId, string> = {
   photos: 'Add Your Photos',
   basicInfo: 'About You',
-  gender: 'Your Gender',
-  locationOccupation: 'Location & Work',
-  bio: 'Write Your Bio',
-  sleepSchedule: 'Sleep Schedule',
-  cleanliness: 'Cleanliness Style',
-  smoking: 'Smoking Preferences',
-  social: 'Social Preferences',
-  noiseTolerance: 'Noise Tolerance',
-  workPets: 'Work & Pets',
-  housing: 'Housing Preferences',
-  interests: 'Interests & Lifestyle',
-  expenses: 'Shared Expenses',
-  personality: 'One Last Thing',
+  budgetLocation: 'Budget & Location',
+  dealbreakers: 'Any Dealbreakers?',
+  sleepCleanliness: 'Sleep & Cleanliness',
+  smokingPets: 'Smoking & Pets',
+  lifestyle: 'Your Lifestyle',
+  housing: 'Housing Needs',
+  interests: 'Interests',
+  personality: 'Your Living Style',
 };
 
 const STEP_SUBTITLES: Record<StepId, string> = {
   photos: 'Add up to 6 photos. Your first photo is your main profile picture.',
   basicInfo: 'Let others know who you are.',
-  gender: 'How do you identify?',
-  locationOccupation: 'Where are you looking and what do you do?',
-  bio: 'Tell potential roommates about yourself.',
-  sleepSchedule: 'When do you usually sleep and wake up?',
-  cleanliness: 'How tidy do you keep your space?',
-  smoking: 'What are your preferences on smoking?',
-  social: 'How do you feel about guests?',
-  noiseTolerance: 'How much noise can you handle?',
-  workPets: 'Where do you work and how do you feel about pets?',
-  housing: 'What are your housing needs?',
-  interests: 'Pick at least 1 tag from each category. This helps us find your perfect roommate.',
-  expenses: 'How would you like to split shared costs?',
-  personality: '5 quick questions to find your best matches',
+  budgetLocation: 'This is how we filter your matches. Be honest \u2014 it helps.',
+  dealbreakers: 'These filter out incompatible matches entirely. Select everything that applies.',
+  sleepCleanliness: 'The top two causes of roommate friction. Be honest.',
+  smokingPets: 'Hard preferences \u2014 we use these to filter your matches.',
+  lifestyle: 'How you actually live day-to-day.',
+  housing: 'What you need in your next place.',
+  interests: 'Pick at least 1 tag from each category.',
+  personality: 'How you live with others.',
 };
 
 const STEP_ICONS: Record<StepId, keyof typeof Feather.glyphMap> = {
   photos: 'camera',
   basicInfo: 'user',
-  gender: 'credit-card',
-  locationOccupation: 'map-pin',
-  bio: 'edit-3',
-  sleepSchedule: 'moon',
-  cleanliness: 'trash-2',
-  smoking: 'wind',
-  social: 'users',
-  noiseTolerance: 'volume-2',
-  workPets: 'briefcase',
+  budgetLocation: 'dollar-sign',
+  dealbreakers: 'shield',
+  sleepCleanliness: 'moon',
+  smokingPets: 'wind',
+  lifestyle: 'users',
   housing: 'home',
   interests: 'star',
-  expenses: 'dollar-sign',
   personality: 'cpu',
 };
 
@@ -218,6 +192,10 @@ export const ProfileQuestionnaireScreen = () => {
   const [personalityAnswers, setPersonalityAnswers] = useState<Record<string, string>>(
     user?.profileData?.personalityAnswers || {}
   );
+  const [dealbreakers, setDealbreakers] = useState<string[]>(
+    user?.profileData?.dealbreakers || []
+  );
+  const [budgetMin, setBudgetMin] = useState(user?.profileData?.budgetMin?.toString() || '');
 
   useEffect(() => {
     if (user?.photos && user.photos.length > 0) {
@@ -288,7 +266,7 @@ export const ProfileQuestionnaireScreen = () => {
       case 'photos':
         if (photos.length === 0) { await showAlert({ title: 'Required', message: 'Please add at least one photo', variant: 'warning' }); return false; }
         return true;
-      case 'basicInfo':
+      case 'basicInfo': {
         if (!name.trim()) { await showAlert({ title: 'Required', message: 'Please enter your name', variant: 'warning' }); return false; }
         if (!email.trim()) { await showAlert({ title: 'Required', message: 'Please enter your email', variant: 'warning' }); return false; }
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -296,46 +274,34 @@ export const ProfileQuestionnaireScreen = () => {
         if (!birthday.trim()) { await showAlert({ title: 'Required', message: 'Please enter your date of birth', variant: 'warning' }); return false; }
         const v = validateBirthday(birthday);
         if (!v.valid) { setBirthdayError(v.error); await showAlert({ title: 'Error', message: v.error, variant: 'warning' }); return false; }
-        return true;
-      case 'gender':
         if (!gender) { await showAlert({ title: 'Required', message: 'Please select your gender', variant: 'warning' }); return false; }
         return true;
-      case 'locationOccupation':
-        if (!selectedCity && !location.trim()) { await showAlert({ title: 'Required', message: 'Please select a location', variant: 'warning' }); return false; }
+      }
+      case 'budgetLocation':
+        if (!budget || parseInt(budget) < 100) {
+          await showAlert({ title: 'Required', message: 'Please enter your maximum monthly budget', variant: 'warning' });
+          return false;
+        }
+        if (!selectedCity) {
+          await showAlert({ title: 'Required', message: 'Please select a city', variant: 'warning' });
+          return false;
+        }
         return true;
-      case 'bio':
-        if (!bio.trim()) { await showAlert({ title: 'Required', message: 'Please write a short bio', variant: 'warning' }); return false; }
+      case 'dealbreakers':
         return true;
-      case 'sleepSchedule':
+      case 'sleepCleanliness':
         if (!sleepSchedule) { await showAlert({ title: 'Required', message: 'Please select your sleep schedule', variant: 'warning' }); return false; }
+        if (!cleanliness) { await showAlert({ title: 'Required', message: 'Please select your cleanliness style', variant: 'warning' }); return false; }
         return true;
-      case 'cleanliness':
-        if (!cleanliness) { await showAlert({ title: 'Required', message: 'Please select your cleanliness level', variant: 'warning' }); return false; }
-        return true;
-      case 'smoking':
+      case 'smokingPets':
         if (!smoking) { await showAlert({ title: 'Required', message: 'Please select your smoking preference', variant: 'warning' }); return false; }
-        return true;
-      case 'social':
-        if (!guestPolicy) { await showAlert({ title: 'Required', message: 'Please select your guest policy', variant: 'warning' }); return false; }
-        if (!roommateRelationship) { await showAlert({ title: 'Required', message: 'Please select your roommate relationship preference', variant: 'warning' }); return false; }
-        return true;
-      case 'noiseTolerance':
-        if (!noiseTolerance) { await showAlert({ title: 'Required', message: 'Please select your noise tolerance', variant: 'warning' }); return false; }
-        return true;
-      case 'workPets':
-        if (!workLocation) { await showAlert({ title: 'Required', message: 'Please select your work location', variant: 'warning' }); return false; }
         if (!pets) { await showAlert({ title: 'Required', message: 'Please select your pet preference', variant: 'warning' }); return false; }
         return true;
+      case 'lifestyle':
+        return true;
       case 'housing':
-        if (!budget.trim()) { await showAlert({ title: 'Required', message: 'Please enter your monthly budget', variant: 'warning' }); return false; }
-        if (isNaN(parseInt(budget)) || parseInt(budget) <= 0) { await showAlert({ title: 'Error', message: 'Please enter a valid budget amount', variant: 'warning' }); return false; }
         if (!lookingFor) { await showAlert({ title: 'Required', message: 'Please select what you are looking for', variant: 'warning' }); return false; }
         if (!moveInDate.trim()) { await showAlert({ title: 'Required', message: 'Please select your move-in date', variant: 'warning' }); return false; }
-        if (!bedrooms.trim()) { await showAlert({ title: 'Required', message: 'Please enter the number of bedrooms', variant: 'warning' }); return false; }
-        if (isNaN(parseInt(bedrooms)) || parseInt(bedrooms) <= 0) { await showAlert({ title: 'Error', message: 'Please enter a valid number of bedrooms', variant: 'warning' }); return false; }
-        if (!bathrooms.trim()) { await showAlert({ title: 'Required', message: 'Please enter the number of bathrooms', variant: 'warning' }); return false; }
-        if (isNaN(parseInt(bathrooms)) || parseInt(bathrooms) <= 0) { await showAlert({ title: 'Error', message: 'Please enter a valid number of bathrooms', variant: 'warning' }); return false; }
-        if (lookingFor !== 'entire_apartment' && privateBathroom === undefined) { await showAlert({ title: 'Required', message: 'Please select whether you need a private or shared bathroom', variant: 'warning' }); return false; }
         return true;
       case 'interests': {
         const tagIdsByCategory: Record<string, string[]> = {};
@@ -346,15 +312,9 @@ export const ProfileQuestionnaireScreen = () => {
         if (!result.valid) { await showAlert({ title: 'Required', message: result.message, variant: 'warning' }); return false; }
         return true;
       }
-      case 'expenses':
-        if (!expenseUtilities) { await showAlert({ title: 'Required', message: 'Please select how to split utilities', variant: 'warning' }); return false; }
-        if (!expenseGroceries) { await showAlert({ title: 'Required', message: 'Please select how to handle groceries', variant: 'warning' }); return false; }
-        if (!expenseInternet) { await showAlert({ title: 'Required', message: 'Please select how to handle internet', variant: 'warning' }); return false; }
-        if (!expenseCleaning) { await showAlert({ title: 'Required', message: 'Please select how to handle cleaning', variant: 'warning' }); return false; }
-        return true;
       case 'personality':
         if (Object.keys(personalityAnswers).length < 5) {
-          await showAlert({ title: 'Required', message: 'Please answer all 5 questions', variant: 'warning' });
+          await showAlert({ title: 'Almost done', message: 'Please answer all 5 questions', variant: 'info' });
           return false;
         }
         return true;
@@ -376,6 +336,7 @@ export const ProfileQuestionnaireScreen = () => {
       profileData: {
         bio: bio.trim() || undefined,
         budget: budget.trim() ? parseInt(budget) : undefined,
+        budgetMin: budgetMin.trim() ? parseInt(budgetMin) : undefined,
         lookingFor,
         location: selectedNeighborhood || selectedCity || location.trim() || undefined,
         neighborhood: selectedNeighborhood || undefined,
@@ -385,6 +346,7 @@ export const ProfileQuestionnaireScreen = () => {
         occupation: occupation.trim() || undefined,
         interests: interests.length > 0 ? interests : undefined,
         gender,
+        dealbreakers,
         personalityAnswers: Object.keys(personalityAnswers).length > 0 ? personalityAnswers : undefined,
         preferences: {
           sleepSchedule,
@@ -554,21 +516,50 @@ export const ProfileQuestionnaireScreen = () => {
                 initialDate={birthday || undefined}
               />
             </View>
-          </View>
-        );
-
-      case 'gender':
-        return (
-          <View style={styles.stepInner}>
+            {renderSubSectionHeader('Gender *')}
             <SelectionCard icon="user" title="Male" isSelected={gender === 'male'} onPress={() => setGender('male')} index={0} />
             <SelectionCard icon="user" title="Female" isSelected={gender === 'female'} onPress={() => setGender('female')} index={1} />
             <SelectionCard icon="users" title="Other" isSelected={gender === 'other'} onPress={() => setGender('other')} index={2} />
           </View>
         );
 
-      case 'locationOccupation':
+      case 'budgetLocation':
         return (
           <View style={styles.stepInner}>
+            <ThemedText style={styles.questionText}>Monthly rent budget</ThemedText>
+            <View style={styles.budgetRangeRow}>
+              <View style={{ flex: 1 }}>
+                <ThemedText style={styles.budgetRangeLabel}>Min</ThemedText>
+                <View style={styles.budgetInputRow}>
+                  <ThemedText style={styles.budgetPrefix}>$</ThemedText>
+                  <TextInput
+                    style={styles.budgetRangeInput}
+                    placeholder="1,000"
+                    placeholderTextColor="rgba(255,255,255,0.25)"
+                    keyboardType="numeric"
+                    value={budgetMin}
+                    onChangeText={setBudgetMin}
+                  />
+                </View>
+              </View>
+              <ThemedText style={styles.budgetRangeSeparator}>to</ThemedText>
+              <View style={{ flex: 1 }}>
+                <ThemedText style={styles.budgetRangeLabel}>Max</ThemedText>
+                <View style={styles.budgetInputRow}>
+                  <ThemedText style={styles.budgetPrefix}>$</ThemedText>
+                  <TextInput
+                    style={styles.budgetRangeInput}
+                    placeholder="2,500"
+                    placeholderTextColor="rgba(255,255,255,0.25)"
+                    keyboardType="numeric"
+                    value={budget}
+                    onChangeText={setBudget}
+                  />
+                </View>
+              </View>
+            </View>
+
+            <ThemedText style={[styles.questionText, { marginTop: 24 }]}>Where are you looking?</ThemedText>
             <LocationPicker
               selectedState={selectedState}
               selectedCity={selectedCity}
@@ -577,129 +568,137 @@ export const ProfileQuestionnaireScreen = () => {
               onCityChange={setSelectedCity}
               onNeighborhoodChange={setSelectedNeighborhood}
             />
-            <View style={[styles.inputGroup, { marginTop: Spacing.lg }]}>
-              <ThemedText style={styles.inputLabel}>Occupation</ThemedText>
-              <ThemedText style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: Spacing.sm }}>Select the option that best describes what you do</ThemedText>
-              <OccupationBarSelector
-                selectedOccupation={occupation}
-                onChange={setOccupation}
-              />
-            </View>
+
+            <ThemedText style={[styles.questionText, { marginTop: 24 }]}>What do you do for work?</ThemedText>
+            <OccupationBarSelector
+              selectedOccupation={occupation}
+              onChange={setOccupation}
+            />
           </View>
         );
 
-      case 'bio':
+      case 'dealbreakers': {
+        const DEALBREAKER_OPTIONS = [
+          { value: 'no_smokers', label: 'No smokers', icon: 'slash' as const, description: 'Smoking anywhere in the home' },
+          { value: 'no_cats', label: 'No cats', icon: 'x-circle' as const, description: 'Allergies or strong preference' },
+          { value: 'no_dogs', label: 'No dogs', icon: 'x-circle' as const, description: 'Allergies or strong preference' },
+          { value: 'no_pets', label: 'No pets at all', icon: 'slash' as const, description: 'Any animal in the home' },
+          { value: 'private_bathroom', label: 'Private bathroom', icon: 'droplet' as const, description: 'Must not share a bathroom' },
+          { value: 'same_sex_only', label: 'Same gender only', icon: 'users' as const, description: 'Prefer roommates of same gender' },
+          { value: 'no_overnight_guests', label: 'No overnight guests', icon: 'moon' as const, description: 'Partners/friends staying over' },
+          { value: 'quiet_hours', label: 'Strict quiet hours', icon: 'volume-x' as const, description: 'Need quiet after 10pm' },
+        ];
+
+        const toggleDealbreaker = (value: string) => {
+          setDealbreakers(prev =>
+            prev.includes(value) ? prev.filter(d => d !== value) : [...prev, value]
+          );
+          try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+        };
+
         return (
           <View style={styles.stepInner}>
-            <TextInput
-              style={styles.bioInput}
-              value={bio}
-              onChangeText={setBio}
-              placeholder="Tell potential roommates about yourself, your hobbies, and what you're looking for..."
-              placeholderTextColor="rgba(255,255,255,0.25)"
-              multiline
-              textAlignVertical="top"
-              maxLength={500}
-            />
-            <ThemedText style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', textAlign: 'right', marginTop: 6 }}>
-              {bio.length}/500
+            <ThemedText style={styles.dealbreakersHint}>
+              These are hard filters \u2014 people who don't match these won't appear in your deck at all.
+              Leave blank if you're flexible.
+            </ThemedText>
+            {DEALBREAKER_OPTIONS.map(opt => {
+              const selected = dealbreakers.includes(opt.value);
+              return (
+                <Pressable
+                  key={opt.value}
+                  style={[
+                    styles.dealbreakersOption,
+                    { borderColor: selected ? '#ff6b5b' : '#2a2a2a',
+                      backgroundColor: selected ? 'rgba(255,107,91,0.08)' : '#1c1c1c' }
+                  ]}
+                  onPress={() => toggleDealbreaker(opt.value)}
+                >
+                  <View style={[styles.dealbreakersIconWrap, selected && { backgroundColor: 'rgba(255,107,91,0.15)' }]}>
+                    <Feather name={opt.icon} size={18} color={selected ? '#ff6b5b' : 'rgba(255,255,255,0.5)'} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <ThemedText style={styles.dealbreakersLabel}>{opt.label}</ThemedText>
+                    <ThemedText style={styles.dealbreakersDesc}>{opt.description}</ThemedText>
+                  </View>
+                  {selected ? (
+                    <Feather name="check-circle" size={20} color="#ff6b5b" />
+                  ) : null}
+                </Pressable>
+              );
+            })}
+            <ThemedText style={styles.dealbreakersFootnote}>
+              You can update these anytime in your profile settings.
             </ThemedText>
           </View>
         );
+      }
 
-      case 'sleepSchedule':
+      case 'sleepCleanliness':
         return (
           <View style={styles.stepInner}>
-            <SelectionCard icon="sunrise" title="Early Sleeper / Early Riser" subtitle="In bed by 10pm, up by 7am" isSelected={sleepSchedule === 'early_sleeper'} onPress={() => setSleepSchedule('early_sleeper')} index={0} />
-            <SelectionCard icon="moon" title="Late Sleeper / Late Riser" subtitle="Night owl, sleep in late" isSelected={sleepSchedule === 'late_sleeper'} onPress={() => setSleepSchedule('late_sleeper')} index={1} />
-            <SelectionCard icon="clock" title="Flexible" subtitle="Adapts to any schedule" isSelected={sleepSchedule === 'flexible'} onPress={() => setSleepSchedule('flexible')} index={2} />
-            <SelectionCard icon="shuffle" title="Irregular" subtitle="Shift work or unpredictable hours" isSelected={sleepSchedule === 'irregular'} onPress={() => setSleepSchedule('irregular')} index={3} />
+            {renderSubSectionHeader('Sleep Schedule')}
+            <SelectionCard icon="sunrise" title="Early Bird" subtitle="Asleep by 10pm, up by 7am" isSelected={sleepSchedule === 'early_sleeper'} onPress={() => setSleepSchedule('early_sleeper')} index={0} />
+            <SelectionCard icon="moon" title="Night Owl" subtitle="Up past midnight regularly" isSelected={sleepSchedule === 'late_sleeper'} onPress={() => setSleepSchedule('late_sleeper')} index={1} />
+            <SelectionCard icon="clock" title="Flexible" subtitle="Varies, no strong preference" isSelected={sleepSchedule === 'flexible'} onPress={() => setSleepSchedule('flexible')} index={2} />
+            <SelectionCard icon="shuffle" title="Shift Worker" subtitle="Irregular hours / overnight shifts" isSelected={sleepSchedule === 'irregular'} onPress={() => setSleepSchedule('irregular')} index={3} />
+
+            <View style={{ height: 28 }} />
+
+            {renderSubSectionHeader('Cleanliness Standard')}
+            <SelectionCard icon="check-circle" title="Very Tidy" subtitle="Clean as you go, everything has a place" isSelected={cleanliness === 'very_tidy'} onPress={() => setCleanliness('very_tidy')} index={0} />
+            <SelectionCard icon="check" title="Moderately Tidy" subtitle="Clean weekly, occasional mess is fine" isSelected={cleanliness === 'moderately_tidy'} onPress={() => setCleanliness('moderately_tidy')} index={1} />
+            <SelectionCard icon="coffee" title="Relaxed" subtitle="Clean when it's needed, no strict rules" isSelected={cleanliness === 'relaxed'} onPress={() => setCleanliness('relaxed')} index={2} />
           </View>
         );
 
-      case 'cleanliness':
+      case 'smokingPets':
         return (
           <View style={styles.stepInner}>
-            <SelectionCard icon="check-circle" title="Very Tidy" subtitle="Everything in its place" isSelected={cleanliness === 'very_tidy'} onPress={() => setCleanliness('very_tidy')} index={0} />
-            <SelectionCard icon="check" title="Moderately Tidy" subtitle="Clean but not obsessive" isSelected={cleanliness === 'moderately_tidy'} onPress={() => setCleanliness('moderately_tidy')} index={1} />
-            <SelectionCard icon="coffee" title="Relaxed About Clutter" subtitle="Comfortable with a lived-in look" isSelected={cleanliness === 'relaxed'} onPress={() => setCleanliness('relaxed')} index={2} />
+            {renderSubSectionHeader('Smoking')}
+            <SelectionCard icon="x-circle" title="Non-smoker" subtitle="I don't smoke and prefer no smoking" isSelected={smoking === 'no'} onPress={() => setSmoking('no')} index={0} />
+            <SelectionCard icon="wind" title="Outside Only" subtitle="I smoke but only outside" isSelected={smoking === 'only_outside'} onPress={() => setSmoking('only_outside')} index={1} />
+            <SelectionCard icon="check-circle" title="Smoker" subtitle="I smoke inside, roommate should be OK with it" isSelected={smoking === 'yes'} onPress={() => setSmoking('yes')} index={2} />
+
+            <View style={{ height: 28 }} />
+
+            {renderSubSectionHeader('Pets')}
+            <SelectionCard icon="heart" title="I Have Pets" subtitle="I have a pet that will live with us" isSelected={pets === 'have_pets'} onPress={() => setPets('have_pets')} index={0} />
+            <SelectionCard icon="smile" title="Open to Pets" subtitle="I don't have pets but fine if roommate does" isSelected={pets === 'open_to_pets'} onPress={() => setPets('open_to_pets')} index={1} />
+            <SelectionCard icon="x-circle" title="No Pets Please" subtitle="Prefer a pet-free home" isSelected={pets === 'no_pets'} onPress={() => setPets('no_pets')} index={2} />
           </View>
         );
 
-      case 'smoking':
-        return (
-          <View style={styles.stepInner}>
-            <SelectionCard icon="check-circle" title="Yes" subtitle="I smoke indoors" isSelected={smoking === 'yes'} onPress={() => setSmoking('yes')} index={0} />
-            <SelectionCard icon="x-circle" title="No" subtitle="I don't smoke" isSelected={smoking === 'no'} onPress={() => setSmoking('no')} index={1} />
-            <SelectionCard icon="wind" title="Only Outside" subtitle="I smoke but only outdoors" isSelected={smoking === 'only_outside'} onPress={() => setSmoking('only_outside')} index={2} />
-          </View>
-        );
-
-      case 'social':
-        return (
-          <View style={styles.stepInner}>
-            {renderSubSectionHeader('Guest Policy')}
-            <SelectionCard icon="user-x" title="Rarely" isSelected={guestPolicy === 'rarely'} onPress={() => setGuestPolicy('rarely')} index={0} />
-            <SelectionCard icon="user-check" title="Occasionally" isSelected={guestPolicy === 'occasionally'} onPress={() => setGuestPolicy('occasionally')} index={1} />
-            <SelectionCard icon="users" title="Frequently" isSelected={guestPolicy === 'frequently'} onPress={() => setGuestPolicy('frequently')} index={2} />
-            <SelectionCard icon="x" title="Prefer No Guests" isSelected={guestPolicy === 'prefer_no_guests'} onPress={() => setGuestPolicy('prefer_no_guests')} index={3} />
-
-            <View style={{ height: 24 }} />
-
-            {renderSubSectionHeader('Roommate Relationship')}
-            <SelectionCard icon="shield" title="Respectful Co-living" subtitle="Keep things friendly but independent" isSelected={roommateRelationship === 'respectful_coliving'} onPress={() => setRoommateRelationship('respectful_coliving')} index={0} />
-            <SelectionCard icon="coffee" title="Occasional Hangouts" subtitle="Grab a meal or watch a show together sometimes" isSelected={roommateRelationship === 'occasional_hangouts'} onPress={() => setRoommateRelationship('occasional_hangouts')} index={1} />
-            <SelectionCard icon="heart" title="Prefer Friends" subtitle="Looking for a roommate who becomes a friend" isSelected={roommateRelationship === 'prefer_friends'} onPress={() => setRoommateRelationship('prefer_friends')} index={2} />
-            <SelectionCard icon="minimize-2" title="Minimal Interaction" subtitle="Prefer to keep to myself" isSelected={roommateRelationship === 'minimal_interaction'} onPress={() => setRoommateRelationship('minimal_interaction')} index={3} />
-          </View>
-        );
-
-      case 'noiseTolerance':
-        return (
-          <View style={styles.stepInner}>
-            <SelectionCard icon="volume-x" title="Prefer Quiet" subtitle="I need a peaceful space to focus and relax" isSelected={noiseTolerance === 'prefer_quiet'} onPress={() => setNoiseTolerance('prefer_quiet')} index={0} />
-            <SelectionCard icon="volume-1" title="Normal Noise is Fine" subtitle="Everyday sounds don't bother me" isSelected={noiseTolerance === 'normal_noise'} onPress={() => setNoiseTolerance('normal_noise')} index={1} />
-            <SelectionCard icon="volume-2" title="Loud Environments are OK" subtitle="Music, TV, and lively spaces are welcome" isSelected={noiseTolerance === 'loud_environments'} onPress={() => setNoiseTolerance('loud_environments')} index={2} />
-          </View>
-        );
-
-      case 'workPets':
+      case 'lifestyle':
         return (
           <View style={styles.stepInner}>
             {renderSubSectionHeader('Work Location')}
-            <SelectionCard icon="home" title="Work From Home" subtitle="Full-time remote" isSelected={workLocation === 'wfh_fulltime'} onPress={() => setWorkLocation('wfh_fulltime')} index={0} />
-            <SelectionCard icon="repeat" title="Hybrid" subtitle="Mix of home and office" isSelected={workLocation === 'hybrid'} onPress={() => setWorkLocation('hybrid')} index={1} />
-            <SelectionCard icon="briefcase" title="Office Full-time" subtitle="Out of the house all day" isSelected={workLocation === 'office_fulltime'} onPress={() => setWorkLocation('office_fulltime')} index={2} />
-            <SelectionCard icon="shuffle" title="Irregular Schedule" isSelected={workLocation === 'irregular'} onPress={() => setWorkLocation('irregular')} index={3} />
+            <SelectionCard icon="home" title="Work From Home" subtitle="Home is also my office \u2014 need a quieter space" isSelected={workLocation === 'wfh_fulltime'} onPress={() => setWorkLocation('wfh_fulltime')} index={0} />
+            <SelectionCard icon="repeat" title="Hybrid" subtitle="Some days home, some days out" isSelected={workLocation === 'hybrid'} onPress={() => setWorkLocation('hybrid')} index={1} />
+            <SelectionCard icon="briefcase" title="Office Full-time" subtitle="I'm rarely home during the day" isSelected={workLocation === 'office_fulltime'} onPress={() => setWorkLocation('office_fulltime')} index={2} />
+            <SelectionCard icon="shuffle" title="Irregular" subtitle="Shift work or variable schedule" isSelected={workLocation === 'irregular'} onPress={() => setWorkLocation('irregular')} index={3} />
 
-            <View style={{ height: 24 }} />
+            <View style={{ height: 28 }} />
 
-            {renderSubSectionHeader('Pets')}
-            <SelectionCard icon="heart" title="I Have Pets" isSelected={pets === 'have_pets'} onPress={() => setPets('have_pets')} index={0} />
-            <SelectionCard icon="smile" title="Open to Pets" isSelected={pets === 'open_to_pets'} onPress={() => setPets('open_to_pets')} index={1} />
-            <SelectionCard icon="x-circle" title="Prefer No Pets" subtitle="Allergies or personal preference" isSelected={pets === 'no_pets'} onPress={() => setPets('no_pets')} index={2} />
+            {renderSubSectionHeader('Guests at Home')}
+            <SelectionCard icon="x" title="Prefer No Guests" subtitle="Keep the home private and quiet" isSelected={guestPolicy === 'prefer_no_guests'} onPress={() => setGuestPolicy('prefer_no_guests')} index={0} />
+            <SelectionCard icon="user-x" title="Rarely" subtitle="Occasional guests with advance notice" isSelected={guestPolicy === 'rarely'} onPress={() => setGuestPolicy('rarely')} index={1} />
+            <SelectionCard icon="user-check" title="Occasionally" subtitle="Regular visitors a few times a month" isSelected={guestPolicy === 'occasionally'} onPress={() => setGuestPolicy('occasionally')} index={2} />
+            <SelectionCard icon="users" title="Frequently" subtitle="Social home, people over often" isSelected={guestPolicy === 'frequently'} onPress={() => setGuestPolicy('frequently')} index={3} />
+
+            <View style={{ height: 28 }} />
+
+            {renderSubSectionHeader('Noise Level')}
+            <SelectionCard icon="volume-x" title="Prefer Quiet" subtitle="Low noise, especially in evenings" isSelected={noiseTolerance === 'prefer_quiet'} onPress={() => setNoiseTolerance('prefer_quiet')} index={0} />
+            <SelectionCard icon="volume-1" title="Normal Noise" subtitle="TV, music, conversation \u2014 all fine" isSelected={noiseTolerance === 'normal_noise'} onPress={() => setNoiseTolerance('normal_noise')} index={1} />
+            <SelectionCard icon="volume-2" title="Lively is Fine" subtitle="Music, gatherings, energy in the home" isSelected={noiseTolerance === 'loud_environments'} onPress={() => setNoiseTolerance('loud_environments')} index={2} />
           </View>
         );
 
       case 'housing':
         return (
           <View style={styles.stepInner}>
-            <View style={styles.inputGroup}>
-              <ThemedText style={styles.inputLabel}>Monthly Budget</ThemedText>
-              <View style={styles.budgetInputRow}>
-                <ThemedText style={styles.budgetPrefix}>$</ThemedText>
-                <TextInput
-                  style={styles.budgetInput}
-                  value={budget}
-                  onChangeText={setBudget}
-                  placeholder="1500"
-                  placeholderTextColor="rgba(255,255,255,0.25)"
-                  keyboardType="number-pad"
-                />
-              </View>
-            </View>
-
-            <ThemedText style={[styles.inputLabel, { marginBottom: 10, marginTop: 4 }]}>Looking For</ThemedText>
+            <ThemedText style={[styles.inputLabel, { marginBottom: 10 }]}>Looking For</ThemedText>
             <SelectionCard icon="grid" title="A Room" subtitle="Shared apartment" isSelected={lookingFor === 'room'} onPress={() => setLookingFor('room')} index={0} />
             <SelectionCard icon="home" title="Entire Apartment" subtitle="Full place for you and roommates" isSelected={lookingFor === 'entire_apartment'} onPress={() => setLookingFor('entire_apartment')} index={1} />
 
@@ -726,28 +725,6 @@ export const ProfileQuestionnaireScreen = () => {
                 userPlan={(user?.subscription?.plan as 'basic' | 'plus' | 'elite') || 'basic'}
               />
             </View>
-            <View style={styles.inputGroup}>
-              <ThemedText style={styles.inputLabel}>Bedrooms</ThemedText>
-              <TextInput
-                style={styles.textInput}
-                value={bedrooms}
-                onChangeText={setBedrooms}
-                placeholder="2"
-                placeholderTextColor="rgba(255,255,255,0.25)"
-                keyboardType="number-pad"
-              />
-            </View>
-            <View style={styles.inputGroup}>
-              <ThemedText style={styles.inputLabel}>Bathrooms</ThemedText>
-              <TextInput
-                style={styles.textInput}
-                value={bathrooms}
-                onChangeText={setBathrooms}
-                placeholder="1"
-                placeholderTextColor="rgba(255,255,255,0.25)"
-                keyboardType="number-pad"
-              />
-            </View>
 
             {lookingFor !== 'entire_apartment' ? (
               <>
@@ -770,34 +747,6 @@ export const ProfileQuestionnaireScreen = () => {
           </View>
         );
 
-      case 'expenses':
-        return (
-          <View style={styles.stepInner}>
-            {renderSubSectionHeader('Utilities')}
-            <SelectionCard icon="zap" title="Split Equally" isSelected={expenseUtilities === 'split_equally'} onPress={() => setExpenseUtilities('split_equally')} index={0} />
-            <SelectionCard icon="bar-chart" title="Based on Usage" isSelected={expenseUtilities === 'usage_based'} onPress={() => setExpenseUtilities('usage_based')} index={1} />
-            <SelectionCard icon="home" title="Included in Rent" isSelected={expenseUtilities === 'included_in_rent'} onPress={() => setExpenseUtilities('included_in_rent')} index={2} />
-
-            <View style={{ height: 20 }} />
-            {renderSubSectionHeader('Groceries')}
-            <SelectionCard icon="shopping-cart" title="Split Equally" isSelected={expenseGroceries === 'split_equally'} onPress={() => setExpenseGroceries('split_equally')} index={0} />
-            <SelectionCard icon="shopping-bag" title="Everyone Buys Their Own" isSelected={expenseGroceries === 'buy_own'} onPress={() => setExpenseGroceries('buy_own')} index={1} />
-            <SelectionCard icon="share-2" title="Share Basics" isSelected={expenseGroceries === 'shared_basics'} onPress={() => setExpenseGroceries('shared_basics')} index={2} />
-
-            <View style={{ height: 20 }} />
-            {renderSubSectionHeader('Internet / WiFi')}
-            <SelectionCard icon="wifi" title="Split Equally" isSelected={expenseInternet === 'split_equally'} onPress={() => setExpenseInternet('split_equally')} index={0} />
-            <SelectionCard icon="user" title="One Person Pays" isSelected={expenseInternet === 'one_pays'} onPress={() => setExpenseInternet('one_pays')} index={1} />
-            <SelectionCard icon="home" title="Included in Rent" isSelected={expenseInternet === 'included_in_rent'} onPress={() => setExpenseInternet('included_in_rent')} index={2} />
-
-            <View style={{ height: 20 }} />
-            {renderSubSectionHeader('Cleaning Supplies')}
-            <SelectionCard icon="droplet" title="Split Equally" isSelected={expenseCleaning === 'split_equally'} onPress={() => setExpenseCleaning('split_equally')} index={0} />
-            <SelectionCard icon="refresh-cw" title="Take Turns Buying" isSelected={expenseCleaning === 'take_turns'} onPress={() => setExpenseCleaning('take_turns')} index={1} />
-            <SelectionCard icon="award" title="Hire a Cleaner" isSelected={expenseCleaning === 'hire_cleaner'} onPress={() => setExpenseCleaning('hire_cleaner')} index={2} />
-          </View>
-        );
-
       case 'personality': {
         const PERSONALITY_QUESTIONS = [
           {
@@ -806,48 +755,48 @@ export const ProfileQuestionnaireScreen = () => {
             options: [
               { value: 'alone', emoji: '🛋️', label: 'Decompress alone quietly' },
               { value: 'music', emoji: '🎵', label: 'Put on music and unwind' },
-              { value: 'social', emoji: '📱', label: 'Call friends or family' },
+              { value: 'social', emoji: '📱', label: 'Call friends or catch up' },
               { value: 'kitchen', emoji: '🍳', label: 'Cook and relax in the kitchen' },
             ],
           },
           {
             id: 'q2',
-            question: 'Your ideal weekend at home:',
+            question: 'How do you want to handle issues with a roommate?',
             options: [
-              { value: 'clean', emoji: '🧹', label: 'Deep clean and organize' },
-              { value: 'chill', emoji: '🎮', label: 'Games, movies, total chill' },
-              { value: 'social', emoji: '🏠', label: 'Have people over' },
-              { value: 'out', emoji: '🚶', label: 'Out most of the time' },
+              { value: 'text', emoji: '💬', label: 'Text \u2014 keeps things low pressure' },
+              { value: 'direct', emoji: '🗣️', label: 'Face to face, direct and clear' },
+              { value: 'meeting', emoji: '📋', label: 'Sit down together and talk it out' },
+              { value: 'flow', emoji: '😎', label: 'Go with the flow, no drama' },
             ],
           },
           {
             id: 'q3',
-            question: 'Shared spaces should be:',
+            question: 'The kitchen after cooking:',
             options: [
-              { value: 'spotless', emoji: '✨', label: 'Spotless — clean as you go' },
-              { value: 'tidy', emoji: '👍', label: 'Tidy — cleaned weekly' },
-              { value: 'relaxed', emoji: '😌', label: 'Relaxed — cleaned when needed' },
-              { value: 'doesnt_matter', emoji: '🤷', label: "Doesn't bother me" },
+              { value: 'immediate', emoji: '🧼', label: 'Cleaned up immediately every time' },
+              { value: 'sameday', emoji: '🕐', label: 'Cleaned before the end of the day' },
+              { value: 'nextday', emoji: '😴', label: 'Sometimes the next morning is fine' },
+              { value: 'flexible', emoji: '🤷', label: "Doesn't bother me either way" },
             ],
           },
           {
             id: 'q4',
-            question: 'Guests at home:',
+            question: 'What kind of roommate relationship do you want?',
             options: [
-              { value: 'advance', emoji: '❌', label: 'Always let me know in advance' },
-              { value: 'headsup', emoji: '👋', label: 'Occasionally fine with a heads up' },
-              { value: 'open', emoji: '✅', label: 'Come anytime' },
-              { value: 'love', emoji: '🎉', label: 'Love it, the more the merrier' },
+              { value: 'friends', emoji: '🤝', label: 'Actual friends \u2014 hang out together' },
+              { value: 'friendly', emoji: '👋', label: 'Friendly but independent lives' },
+              { value: 'respectful', emoji: '🏠', label: 'Respectful co-living, minimal interaction' },
+              { value: 'parallel', emoji: '🚶', label: 'Ships passing \u2014 barely see each other' },
             ],
           },
           {
             id: 'q5',
-            question: 'Your communication style:',
+            question: 'How far can you realistically commute from home?',
             options: [
-              { value: 'text', emoji: '💬', label: 'Text everything' },
-              { value: 'direct', emoji: '🗣️', label: 'Direct — face to face' },
-              { value: 'meeting', emoji: '📋', label: 'Group house meeting' },
-              { value: 'flow', emoji: '😎', label: 'Go with the flow' },
+              { value: 'under_20', emoji: '🚶', label: 'Under 20 minutes' },
+              { value: 'under_40', emoji: '🚇', label: 'Up to 40 minutes' },
+              { value: 'under_60', emoji: '\u23F1\uFE0F', label: 'Up to an hour' },
+              { value: 'flexible', emoji: '🗺️', label: "Flexible \u2014 I work remotely or don't mind" },
             ],
           },
         ];
@@ -1100,10 +1049,64 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.4)',
     marginRight: 8,
   },
-  budgetInput: {
+  budgetRangeRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 12,
+    marginBottom: 8,
+  },
+  budgetRangeLabel: {
+    fontSize: 12,
+    color: '#888',
+    marginBottom: 4,
+  },
+  budgetRangeInput: {
     flex: 1,
     fontSize: 16,
     color: '#fff',
+  },
+  budgetRangeSeparator: {
+    color: '#888',
+    marginBottom: 16,
+  },
+  dealbreakersHint: {
+    fontSize: 14,
+    color: '#aaa',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  dealbreakersOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    marginBottom: 10,
+  },
+  dealbreakersIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dealbreakersLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  dealbreakersDesc: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 2,
+  },
+  dealbreakersFootnote: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 16,
   },
   photoGrid: {
     flexDirection: 'row',

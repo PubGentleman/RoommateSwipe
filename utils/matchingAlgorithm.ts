@@ -69,22 +69,22 @@ const COMPATIBLE_PERSONALITY: Record<string, string[]> = {
   q1_music: ['q1_alone', 'q1_music'],
   q1_social: ['q1_social', 'q1_kitchen'],
   q1_kitchen: ['q1_social', 'q1_kitchen'],
-  q2_clean: ['q2_clean'],
-  q2_chill: ['q2_chill', 'q2_out'],
-  q2_social: ['q2_social'],
-  q2_out: ['q2_chill', 'q2_out'],
-  q3_spotless: ['q3_spotless', 'q3_tidy'],
-  q3_tidy: ['q3_spotless', 'q3_tidy'],
-  q3_relaxed: ['q3_relaxed', 'q3_doesnt_matter'],
-  q3_doesnt_matter: ['q3_relaxed', 'q3_doesnt_matter'],
-  q4_advance: ['q4_advance', 'q4_headsup'],
-  q4_headsup: ['q4_advance', 'q4_headsup'],
-  q4_open: ['q4_open', 'q4_love'],
-  q4_love: ['q4_open', 'q4_love'],
-  q5_text: ['q5_text', 'q5_flow'],
-  q5_flow: ['q5_text', 'q5_flow'],
-  q5_direct: ['q5_direct', 'q5_meeting'],
-  q5_meeting: ['q5_direct', 'q5_meeting'],
+  q2_text: ['q2_text', 'q2_flow'],
+  q2_direct: ['q2_direct', 'q2_meeting'],
+  q2_meeting: ['q2_direct', 'q2_meeting'],
+  q2_flow: ['q2_text', 'q2_flow'],
+  q3_immediate: ['q3_immediate', 'q3_sameday'],
+  q3_sameday: ['q3_immediate', 'q3_sameday'],
+  q3_nextday: ['q3_nextday', 'q3_flexible'],
+  q3_flexible: ['q3_nextday', 'q3_flexible'],
+  q4_friends: ['q4_friends', 'q4_friendly'],
+  q4_friendly: ['q4_friends', 'q4_friendly'],
+  q4_respectful: ['q4_respectful', 'q4_parallel'],
+  q4_parallel: ['q4_respectful', 'q4_parallel'],
+  q5_under_20: ['q5_under_20', 'q5_under_40'],
+  q5_under_40: ['q5_under_20', 'q5_under_40', 'q5_under_60'],
+  q5_under_60: ['q5_under_40', 'q5_under_60', 'q5_flexible'],
+  q5_flexible: ['q5_under_60', 'q5_flexible'],
 };
 
 const calculatePersonalityScore = (
@@ -146,10 +146,53 @@ export const calculateCompatibility = (
 /**
  * Calculate detailed compatibility with breakdown and reasoning
  */
+const ZERO_SCORE: MatchScore = {
+  totalScore: 0,
+  breakdown: {
+    age: 0, location: 0, budget: 0, sleepSchedule: 0, cleanliness: 0,
+    smoking: 0, moveInTimeline: 0, workLocation: 0, guestPolicy: 0,
+    noiseTolerance: 0, pets: 0, roommateRelationship: 0, sharedExpenses: 0,
+    lifestyle: 0, zodiac: 0, personality: 0,
+  },
+  reasons: {
+    strengths: [],
+    concerns: ['This profile doesn\'t match your dealbreakers'],
+    notes: [],
+  },
+};
+
 export const calculateDetailedCompatibility = (
   currentUser: User,
   roommateProfile: RoommateProfile
 ): MatchScore => {
+  const userDealbreakers: string[] = currentUser.profileData?.dealbreakers || [];
+
+  if (userDealbreakers.length > 0) {
+    const profileSmoking = roommateProfile.lifestyle?.smoking || roommateProfile.profileData?.preferences?.smoking;
+    const profilePets = roommateProfile.lifestyle?.pets || roommateProfile.profileData?.preferences?.pets;
+    const profilePetType = roommateProfile.profileData?.petType;
+
+    for (const dealbreaker of userDealbreakers) {
+      switch (dealbreaker) {
+        case 'no_smokers':
+          if (profileSmoking === 'yes' || profileSmoking === 'only_outside') return ZERO_SCORE;
+          break;
+        case 'no_cats':
+          if (profilePets === 'have_pets' && profilePetType === 'cat') return ZERO_SCORE;
+          break;
+        case 'no_dogs':
+          if (profilePets === 'have_pets' && profilePetType === 'dog') return ZERO_SCORE;
+          break;
+        case 'no_pets':
+          if (profilePets === 'have_pets') return ZERO_SCORE;
+          break;
+        case 'no_overnight_guests':
+          if (roommateProfile.profileData?.preferences?.guestPolicy === 'frequently') return ZERO_SCORE;
+          break;
+      }
+    }
+  }
+
   const breakdown = {
     age: 0,
     location: 0,

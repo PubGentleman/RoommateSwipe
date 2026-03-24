@@ -8,6 +8,7 @@ import { Spacing } from '../constants/theme';
 import { calculateDetailedCompatibility } from '../utils/matchingAlgorithm';
 import { getProfileGaps, getCompletionPercentage, getMatchMultiplier, GAP_MESSAGES } from '../utils/profileReminderUtils';
 import { markQuestionAsked, resetRefinementCooldown } from '../utils/refinementEngine';
+import { supabase } from '../lib/supabase';
 import { StorageService } from '../utils/storage';
 import { thumbsUp, thumbsDown, shouldShowInsight } from '../utils/aiInsightFeedback';
 import { shouldRecalculate, cacheInsight, getTriggerVersion, onInsightTrigger } from '../utils/insightRefresh';
@@ -441,6 +442,31 @@ export const RhomeAISheet = ({ visible, onDismiss, screenContext, contextData, o
             personalityAnswers: updatedAnswers,
           },
         } as any);
+
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (authUser) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('personality_answers')
+            .eq('user_id', authUser.id)
+            .single();
+
+          const currentAnswers = profile?.personality_answers || {};
+          const mergedAnswers = { ...currentAnswers, [question.profileField]: value };
+
+          await supabase
+            .from('profiles')
+            .update({ personality_answers: mergedAnswers })
+            .eq('user_id', authUser.id);
+
+          if (question.profileField === 'commuteTime' || question.profileField === 'roommateRelationship' || question.profileField === 'priorityFactor') {
+            const memoryUpdate: Record<string, string> = { user_id: authUser.id, last_updated: new Date().toISOString() };
+            if (question.profileField === 'commuteTime') memoryUpdate.commute_preference = value;
+            if (question.profileField === 'roommateRelationship') memoryUpdate.social_preference = value;
+            if (question.profileField === 'priorityFactor') memoryUpdate.priority_factor = value;
+            await supabase.from('user_ai_memory').upsert(memoryUpdate, { onConflict: 'user_id' });
+          }
+        }
 
         await markQuestionAsked(question.id);
         onRefinementAnswered?.();

@@ -5,11 +5,11 @@ const SESSION_START_KEY = 'refinementSessionStart';
 const LAST_QUESTION_KEY = 'lastRefinementQuestionTime';
 const QUESTIONS_ASKED_KEY = 'refinementQuestionsAsked';
 
-const MIN_SWIPES_BEFORE_FIRST_QUESTION = 20;
-const MIN_SESSION_MINUTES = 15;
-const SWIPES_BETWEEN_QUESTIONS = 30;
-const HOURS_BETWEEN_QUESTIONS = 3;
-const LOW_MATCH_RATE_THRESHOLD = 0.15;
+const MIN_SWIPES_BEFORE_FIRST_QUESTION = 5;
+const MIN_SESSION_MINUTES = 3;
+const SWIPES_BETWEEN_QUESTIONS = 15;
+const HOURS_BETWEEN_QUESTIONS = 1;
+const LOW_MATCH_RATE_THRESHOLD = 0.40;
 
 export const trackSwipe = async (): Promise<void> => {
   const current = parseInt(await AsyncStorage.getItem(SWIPE_COUNT_KEY) ?? '0');
@@ -72,14 +72,10 @@ export const shouldShowRefinementQuestion = async (
   if (questionsAsked.length === 0) {
     return (
       swipeCount >= MIN_SWIPES_BEFORE_FIRST_QUESTION &&
-      sessionMins >= MIN_SESSION_MINUTES &&
-      matchRate <= LOW_MATCH_RATE_THRESHOLD
+      sessionMins >= MIN_SESSION_MINUTES
     );
   }
 
   const swipesSinceLast = swipeCount % SWIPES_BETWEEN_QUESTIONS;
-  return (
-    swipesSinceLast === 0 &&
-    hoursSinceLast >= HOURS_BETWEEN_QUESTIONS
-  );
+  return swipesSinceLast === 0 && hoursSinceLast >= HOURS_BETWEEN_QUESTIONS;
 };

@@ -1,0 +1,689 @@
+# Rhome — AI Neighborhood Intelligence Feature
+## Replit Agent Prompt
+
+---
+
+## Overview
+
+When a user views a listing, they can tap "Ask about this area" and get an AI-powered neighborhood briefing — safety, walkability, transit, nearby spots, and vibe — all without leaving the app. Claude already knows the address from the listing, so the user never has to type it. They can also ask follow-up questions in a live chat.
+
+This uses the Google Places API (already in the codebase for meetup suggestions) plus Walk Score API for walkability data. Claude synthesizes everything into a conversational briefing.
+
+---
+
+## Part 1 — Walk Score API Setup
+
+Sign up at https://www.walkscore.com/professional/api.php (free tier available).
+
+Add to Supabase Edge Function secrets:
+```
+WALKSCORE_API_KEY = your_key_here
+```
+
+---
+
+## Part 2 — Edge Function: `ai-neighborhood-info`
+
+Create file `supabase/functions/ai-neighborhood-info/index.ts`:
+
+```typescript
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import Anthropic from 'https://esm.sh/@anthropic-ai/sdk@0.24.0';
+
+const anthropic = new Anthropic({ apiKey: Deno.env.get('ANTHROPIC_API_KEY')! });
+
+serve(async (req) => {
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  };
+
+  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+
+  try {
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
+
+    const authHeader = req.headers.get('Authorization')!;
+    const { data: { user } } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
+    if (!user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+
+    const { listingId, userMessage, conversationHistory, requestType } = await req.json();
+    // requestType: 'briefing' (first load) | 'chat' (follow-up question)
+
+    // Load the listing
+    const { data: listing } = await supabase
+      .from('listings')
+      .select('address, city, state, zip, lat, lng, neighborhood, rent, bedrooms, bathrooms, title')
+      .eq('id', listingId)
+      .single();
+
+    if (!listing) throw new Error('Listing not found');
+
+    const fullAddress = `${listing.address}, ${listing.city}, ${listing.state} ${listing.zip}`;
+    const lat = listing.lat;
+    const lng = listing.lng;
+
+    // Load user profile for personalized context
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('work_style, occupation, budget_min, budget_max, move_in_date, neighborhoods')
+      .eq('id', user.id)
+      .single();
+
+    // Fetch Walk Score, Transit Score, Bike Score in parallel with Places data
+    const [walkScoreData, nearbyPlaces] = await Promise.all([
+
+      // Walk Score API
+      (async () => {
+        try {
+          const wsUrl = `https://api.walkscore.com/score?format=json&address=${encodeURIComponent(fullAddress)}&lat=${lat}&lon=${lng}&transit=1&bike=1&wsapikey=${Deno.env.get('WALKSCORE_API_KEY')}`;
+          const res = await fetch(wsUrl);
+          return await res.json();
+        } catch {
+          return null;
+        }
+      })(),
+
+      // Google Places — nearby categories
+      (async () => {
+        if (!lat || !lng) return null;
+        const googleKey = Deno.env.get('GOOGLE_PLACES_API_KEY');
+        const radius = 800; // ~10 min walk
+
+        const categories = ['grocery_or_supermarket', 'restaurant', 'cafe', 'gym', 'bar', 'transit_station', 'park'];
+
+        const results: Record<string, any[]> = {};
+
+        await Promise.all(categories.map(async (type) => {
+          try {
+            const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=${type}&key=${googleKey}`;
+            const res = await fetch(url);
+            const data = await res.json();
+            results[type] = (data.results || []).slice(0, 3).map((p: any) => ({
+              name: p.name,
+              rating: p.rating,
+              vicinity: p.vicinity,
+            }));
+          } catch {
+            results[type] = [];
+          }
+        }));
+
+        return results;
+      })(),
+    ]);
+
+    // Build context summary for Claude
+    const walkContext = walkScoreData ? `
+Walk Score: ${walkScoreData.walkscore}/100 (${walkScoreData.description})
+Transit Score: ${walkScoreData.transit?.score ?? 'N/A'}/100 ${walkScoreData.transit?.description ? `(${walkScoreData.transit.description})` : ''}
+Bike Score: ${walkScoreData.bike?.score ?? 'N/A'}/100 ${walkScoreData.bike?.description ? `(${walkScoreData.bike.description})` : ''}
+    `.trim() : 'Walk/transit scores unavailable';
+
+    const placesContext = nearbyPlaces ? `
+NEARBY (within ~10 min walk):
+Grocery stores: ${nearbyPlaces.grocery_or_supermarket?.map((p: any) => p.name).join(', ') || 'none found'}
+Restaurants: ${nearbyPlaces.restaurant?.map((p: any) => `${p.name}${p.rating ? ` (${p.rating}★)` : ''}`).join(', ') || 'none found'}
+Cafes: ${nearbyPlaces.cafe?.map((p: any) => p.name).join(', ') || 'none found'}
+Gyms: ${nearbyPlaces.gym?.map((p: any) => p.name).join(', ') || 'none found'}
+Bars/nightlife: ${nearbyPlaces.bar?.map((p: any) => p.name).join(', ') || 'none found'}
+Transit stops: ${nearbyPlaces.transit_station?.map((p: any) => p.name).join(', ') || 'none found'}
+Parks: ${nearbyPlaces.park?.map((p: any) => p.name).join(', ') || 'none found'}
+    `.trim() : 'Nearby places data unavailable';
+
+    const listingContext = `
+LISTING: ${listing.title || fullAddress}
+Address: ${fullAddress}
+Neighborhood: ${listing.neighborhood || listing.city}
+Rent: $${listing.rent}/mo | ${listing.bedrooms}bd/${listing.bathrooms}ba
+    `.trim();
+
+    const userContext = profile ? `
+USER CONTEXT:
+- Work style: ${profile.work_style || 'unknown'} ${profile.work_style === 'remote' ? '(works from home — transit less critical)' : ''}
+- Occupation: ${profile.occupation || 'unknown'}
+- Budget: $${profile.budget_min}–$${profile.budget_max}/mo
+- Preferred neighborhoods: ${profile.neighborhoods?.join(', ') || 'flexible'}
+    `.trim() : '';
+
+    const systemPrompt = `You are Rhome AI, helping a renter evaluate a specific neighborhood before committing to a lease.
+
+${listingContext}
+
+NEIGHBORHOOD DATA:
+${walkContext}
+
+${placesContext}
+
+${userContext}
+
+YOUR ROLE:
+- Give honest, practical neighborhood assessments — not marketing copy
+- Reference the actual data above (scores, specific place names) to make your answers feel real and grounded
+- If the user works remotely, note that transit matters less; if they mentioned a commute, factor that in
+- Characterize the vibe based on what's nearby (lots of bars = nightlife area, parks + cafes = family-friendly, etc.)
+- Be direct about tradeoffs — a low walk score isn't a dealbreaker, but the user should know
+- Keep responses conversational and concise — 3–5 sentences unless more detail is genuinely needed
+- When asked about safety, be factual and measured — don't sensationalize, don't sugarcoat
+
+If this is the first message (briefing request), give a structured overview covering:
+1. The vibe / what kind of neighborhood this is
+2. Walkability and getting around
+3. What's nearby that matters day-to-day
+4. One honest thing to know (positive or negative)
+
+For follow-up questions, answer directly and conversationally.`;
+
+    const messages: { role: 'user' | 'assistant'; content: string }[] = requestType === 'briefing'
+      ? [{ role: 'user', content: `Give me a neighborhood briefing for this listing.` }]
+      : [
+          ...(conversationHistory || []),
+          { role: 'user', content: userMessage },
+        ];
+
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 600,
+      system: systemPrompt,
+      messages,
+    });
+
+    const reply = response.content[0].type === 'text' ? response.content[0].text : '';
+
+    return new Response(JSON.stringify({
+      reply,
+      walkScore: walkScoreData?.walkscore || null,
+      transitScore: walkScoreData?.transit?.score || null,
+      neighborhood: listing.neighborhood || listing.city,
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+
+  } catch (error) {
+    console.error('ai-neighborhood-info error:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+});
+```
+
+Deploy:
+```bash
+supabase functions deploy ai-neighborhood-info
+```
+
+---
+
+## Part 3 — `NeighborhoodAISheet` Component
+
+Create file `components/NeighborhoodAISheet.tsx`:
+
+```tsx
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View, Text, TouchableOpacity, FlatList, TextInput,
+  ActivityIndicator, StyleSheet, Modal, KeyboardAvoidingView, Platform
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '../context/ThemeContext';
+import { supabase } from '../services/supabase';
+
+interface Message {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+interface Props {
+  visible: boolean;
+  onClose: () => void;
+  listingId: string;
+  address: string;
+  neighborhood?: string;
+}
+
+const QUICK_PROMPTS = [
+  'Is it safe at night?',
+  'How's the commute?',
+  'Good for young professionals?',
+  'What's the nightlife like?',
+  'Is it walkable for groceries?',
+  'Any downsides I should know?',
+];
+
+export function NeighborhoodAISheet({ visible, onClose, listingId, address, neighborhood }: Props) {
+  const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [briefingLoaded, setBriefingLoaded] = useState(false);
+  const [walkScore, setWalkScore] = useState<number | null>(null);
+  const [transitScore, setTransitScore] = useState<number | null>(null);
+  const [conversationHistory, setConversationHistory] = useState<{ role: string; content: string }[]>([]);
+  const flatListRef = useRef<FlatList>(null);
+
+  useEffect(() => {
+    if (visible && !briefingLoaded) {
+      loadBriefing();
+    }
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible) {
+      setTimeout(() => {
+        setMessages([]);
+        setConversationHistory([]);
+        setBriefingLoaded(false);
+        setWalkScore(null);
+        setTransitScore(null);
+      }, 300);
+    }
+  }, [visible]);
+
+  async function callFunction(requestType: 'briefing' | 'chat', userMessage?: string) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return null;
+
+    const response = await fetch(
+      `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/ai-neighborhood-info`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          listingId,
+          userMessage,
+          conversationHistory,
+          requestType,
+        }),
+      }
+    );
+
+    return await response.json();
+  }
+
+  async function loadBriefing() {
+    setLoading(true);
+    setBriefingLoaded(true);
+
+    // Show typing indicator immediately
+    setMessages([{ id: 'loading', role: 'assistant', content: '...' }]);
+
+    try {
+      const data = await callFunction('briefing');
+      if (data?.reply) {
+        setMessages([{ id: 'briefing', role: 'assistant', content: data.reply }]);
+        if (data.walkScore) setWalkScore(data.walkScore);
+        if (data.transitScore) setTransitScore(data.transitScore);
+        setConversationHistory([
+          { role: 'user', content: 'Give me a neighborhood briefing for this listing.' },
+          { role: 'assistant', content: data.reply },
+        ]);
+      }
+    } catch {
+      setMessages([{ id: 'error', role: 'assistant', content: 'Could not load neighborhood data. Try asking a specific question below.' }]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function sendMessage(text?: string) {
+    const messageText = text || input.trim();
+    if (!messageText || loading) return;
+
+    setInput('');
+    setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', content: messageText }]);
+    setLoading(true);
+
+    try {
+      const data = await callFunction('chat', messageText);
+      if (data?.reply) {
+        const aiMsg = { id: (Date.now() + 1).toString(), role: 'assistant' as const, content: data.reply };
+        setMessages(prev => [...prev, aiMsg]);
+        setConversationHistory(prev => [
+          ...prev,
+          { role: 'user', content: messageText },
+          { role: 'assistant', content: data.reply },
+        ]);
+      }
+    } catch {
+      setMessages(prev => [...prev, { id: 'err', role: 'assistant', content: 'Something went wrong. Try again.' }]);
+    } finally {
+      setLoading(false);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+    }
+  }
+
+  function ScorePill({ label, score, icon }: { label: string; score: number; icon: string }) {
+    const color = score >= 70 ? '#22c55e' : score >= 50 ? '#f59e0b' : '#ef4444';
+    return (
+      <View style={[styles.scorePill, { backgroundColor: color + '20', borderColor: color }]}>
+        <Text style={{ fontSize: 14 }}>{icon}</Text>
+        <Text style={[styles.scoreLabel, { color }]}>{score}</Text>
+        <Text style={[styles.scoreSublabel, { color: theme.textSecondary }]}>{label}</Text>
+      </View>
+    );
+  }
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={[styles.container, { backgroundColor: theme.background }]}
+      >
+        {/* Header */}
+        <View style={[styles.header, { borderBottomColor: theme.border }]}>
+          <View style={{ flex: 1 }}>
+            <View style={styles.headerTop}>
+              <Ionicons name="location" size={16} color={theme.primary} />
+              <Text style={[styles.headerTitle, { color: theme.text }]} numberOfLines={1}>
+                {neighborhood || address}
+              </Text>
+            </View>
+            <Text style={[styles.headerSub, { color: theme.textSecondary }]} numberOfLines={1}>
+              {address}
+            </Text>
+          </View>
+          <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+            <Ionicons name="close" size={22} color={theme.textSecondary} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Score pills */}
+        {(walkScore || transitScore) && (
+          <View style={styles.scoreRow}>
+            {walkScore && <ScorePill label="Walk" score={walkScore} icon="🚶" />}
+            {transitScore && <ScorePill label="Transit" score={transitScore} icon="🚌" />}
+          </View>
+        )}
+
+        {/* Messages */}
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.messageList}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+          renderItem={({ item }) => {
+            if (item.content === '...') {
+              return (
+                <View style={[styles.aiBubble, { backgroundColor: theme.backgroundSecondary }]}>
+                  <ActivityIndicator size="small" color={theme.primary} />
+                </View>
+              );
+            }
+            return (
+              <View style={[
+                styles.bubble,
+                item.role === 'user'
+                  ? [styles.userBubble, { backgroundColor: theme.primary }]
+                  : [styles.aiBubble, { backgroundColor: theme.backgroundSecondary }],
+              ]}>
+                <Text style={[styles.bubbleText, { color: item.role === 'user' ? '#fff' : theme.text }]}>
+                  {item.content}
+                </Text>
+              </View>
+            );
+          }}
+        />
+
+        {/* Quick prompts — show until user sends a message */}
+        {messages.length <= 1 && !loading && (
+          <View style={styles.quickPromptsWrap}>
+            <FlatList
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              data={QUICK_PROMPTS}
+              keyExtractor={(item) => item}
+              contentContainerStyle={styles.quickPromptsList}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  onPress={() => sendMessage(item)}
+                  style={[styles.quickChip, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}
+                >
+                  <Text style={[styles.quickChipText, { color: theme.text }]}>{item}</Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        )}
+
+        {/* Input */}
+        <View style={[styles.inputRow, { borderTopColor: theme.border, paddingBottom: insets.bottom + 8 }]}>
+          <TextInput
+            style={[styles.input, { backgroundColor: theme.backgroundSecondary, color: theme.text }]}
+            value={input}
+            onChangeText={setInput}
+            placeholder="Ask about this neighborhood..."
+            placeholderTextColor={theme.textSecondary}
+            multiline
+            maxLength={300}
+            returnKeyType="send"
+            onSubmitEditing={() => sendMessage()}
+          />
+          <TouchableOpacity
+            onPress={() => sendMessage()}
+            disabled={!input.trim() || loading}
+            style={[styles.sendBtn, { backgroundColor: input.trim() ? theme.primary : theme.border }]}
+          >
+            <Ionicons name="arrow-up" size={18} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  header: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 20, paddingVertical: 16,
+    borderBottomWidth: 1, gap: 12,
+  },
+  headerTop: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  headerTitle: { fontSize: 16, fontWeight: '700', flex: 1 },
+  headerSub: { fontSize: 12, marginTop: 2 },
+  closeBtn: { padding: 4 },
+  scoreRow: {
+    flexDirection: 'row', gap: 10,
+    paddingHorizontal: 16, paddingVertical: 12,
+  },
+  scorePill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: 100, borderWidth: 1.5,
+  },
+  scoreLabel: { fontSize: 16, fontWeight: '800' },
+  scoreSublabel: { fontSize: 11, fontWeight: '500' },
+  messageList: { padding: 16, gap: 10, paddingBottom: 4 },
+  bubble: { maxWidth: '82%', padding: 13, borderRadius: 16 },
+  userBubble: { alignSelf: 'flex-end', borderBottomRightRadius: 4 },
+  aiBubble: { alignSelf: 'flex-start', borderBottomLeftRadius: 4 },
+  bubbleText: { fontSize: 15, lineHeight: 22 },
+  quickPromptsWrap: { paddingVertical: 10 },
+  quickPromptsList: { paddingHorizontal: 16, gap: 8 },
+  quickChip: {
+    paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: 100, borderWidth: 1,
+  },
+  quickChipText: { fontSize: 13, fontWeight: '500' },
+  inputRow: {
+    flexDirection: 'row', alignItems: 'flex-end',
+    paddingHorizontal: 16, paddingTop: 10,
+    gap: 10, borderTopWidth: 1,
+  },
+  input: {
+    flex: 1, paddingHorizontal: 14, paddingVertical: 10,
+    borderRadius: 20, fontSize: 15, maxHeight: 100,
+  },
+  sendBtn: {
+    width: 38, height: 38, borderRadius: 19,
+    alignItems: 'center', justifyContent: 'center',
+  },
+});
+```
+
+---
+
+## Part 4 — Add the Button to Listing Screens
+
+### On the Listing Detail Screen
+
+In `screens/shared/ListingDetailScreen.tsx` (or wherever a full listing is shown):
+
+Add state:
+```tsx
+const [neighborhoodSheetVisible, setNeighborhoodSheetVisible] = useState(false);
+```
+
+Find the section that shows the listing address or map. Add the button directly below the address:
+
+```tsx
+<TouchableOpacity
+  onPress={() => setNeighborhoodSheetVisible(true)}
+  style={{
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: theme.backgroundSecondary,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: theme.border,
+    marginTop: 12,
+  }}
+>
+  <Ionicons name="sparkles" size={16} color={theme.primary} />
+  <View style={{ flex: 1 }}>
+    <Text style={{ color: theme.text, fontWeight: '700', fontSize: 14 }}>
+      Ask AI about this neighborhood
+    </Text>
+    <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 2 }}>
+      Safety, walkability, transit, nearby spots
+    </Text>
+  </View>
+  <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
+</TouchableOpacity>
+```
+
+Add the sheet at the bottom of the screen:
+```tsx
+<NeighborhoodAISheet
+  visible={neighborhoodSheetVisible}
+  onClose={() => setNeighborhoodSheetVisible(false)}
+  listingId={listing.id}
+  address={`${listing.address}, ${listing.city}, ${listing.state}`}
+  neighborhood={listing.neighborhood}
+/>
+```
+
+### On the Listing Card (Browse Screen)
+
+If listings appear as cards in a browse/search screen, add a small pill button to the card footer:
+
+```tsx
+<TouchableOpacity
+  onPress={(e) => {
+    e.stopPropagation(); // don't open the full listing
+    setNeighborhoodSheetVisible(true);
+  }}
+  style={{
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: theme.primary + '15',
+    borderRadius: 100,
+  }}
+>
+  <Ionicons name="location" size={12} color={theme.primary} />
+  <Text style={{ color: theme.primary, fontSize: 11, fontWeight: '600' }}>Area info</Text>
+</TouchableOpacity>
+```
+
+---
+
+## Part 5 — Database: Cache Neighborhood Briefings
+
+To avoid calling the API on every view of the same listing, cache the briefing in the database.
+
+Add to the migration SQL (run in Supabase SQL Editor):
+
+```sql
+ALTER TABLE listings
+ADD COLUMN IF NOT EXISTS neighborhood_briefing TEXT,
+ADD COLUMN IF NOT EXISTS neighborhood_briefing_at TIMESTAMPTZ,
+ADD COLUMN IF NOT EXISTS walk_score INTEGER,
+ADD COLUMN IF NOT EXISTS transit_score INTEGER;
+```
+
+In the `ai-neighborhood-info` Edge Function, after generating the briefing response, add this save step:
+
+```typescript
+// Cache briefing on the listing (only on first load, not follow-up questions)
+if (requestType === 'briefing') {
+  await supabase
+    .from('listings')
+    .update({
+      neighborhood_briefing: reply,
+      neighborhood_briefing_at: new Date().toISOString(),
+      walk_score: walkScoreData?.walkscore || null,
+      transit_score: walkScoreData?.transit?.score || null,
+    })
+    .eq('id', listingId);
+}
+```
+
+At the top of the Edge Function, before calling any APIs, check if a cached briefing exists (less than 7 days old):
+
+```typescript
+// Check for cached briefing
+if (requestType === 'briefing') {
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  if (
+    listing.neighborhood_briefing &&
+    listing.neighborhood_briefing_at &&
+    listing.neighborhood_briefing_at > sevenDaysAgo
+  ) {
+    return new Response(JSON.stringify({
+      reply: listing.neighborhood_briefing,
+      walkScore: listing.walk_score,
+      transitScore: listing.transit_score,
+      neighborhood: listing.neighborhood || listing.city,
+      cached: true,
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+}
+```
+
+This means the first person to view a listing pays the API cost. Every subsequent viewer gets the cached answer instantly.
+
+---
+
+## Summary
+
+| Feature | Detail |
+|---|---|
+| Entry point | "Ask AI about this neighborhood" button on listing detail + card |
+| Auto-briefing | Claude generates a full neighborhood summary the moment the sheet opens |
+| Data sources | Walk Score API (walk/transit/bike scores) + Google Places API (nearby groceries, cafes, gyms, bars, transit, parks) |
+| Walk/Transit score pills | Shown at top of sheet with color coding (green/amber/red) |
+| Quick prompts | Is it safe at night? How's the commute? Good for young professionals? + 3 more |
+| Follow-up chat | Full multi-turn conversation — ask anything about the area |
+| Personalization | Claude knows if user works remotely, their budget, and preferred areas — answers factor that in |
+| Caching | Briefing cached on listing row for 7 days — first viewer pays cost, everyone else gets instant load |
