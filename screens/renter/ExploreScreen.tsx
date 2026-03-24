@@ -28,6 +28,7 @@ import { shouldShowMatchScore, getHostBadgeLabel, getHostBadgeColor, getHostBadg
 import type { HostType } from '../../utils/hostTypeUtils';
 import { PropertyMapView } from '../../components/PropertyMapView';
 import { RhomeAISheet } from '../../components/RhomeAISheet';
+import { NeighborhoodAISheet } from '../../components/NeighborhoodAISheet';
 
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
@@ -99,6 +100,7 @@ export const ExploreScreen = () => {
   const [tempFilters, setTempFilters] = useState<PropertyFilter>({});
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [showPropertyDetail, setShowPropertyDetail] = useState(false);
+  const [showNeighborhoodSheet, setShowNeighborhoodSheet] = useState(false);
   const [photoIndex, setPhotoIndex] = useState(0);
   const [showMatchBreakdown, setShowMatchBreakdown] = useState(false);
   const [viewMode, setViewMode] = useState<'all' | 'saved'>('all');
@@ -873,6 +875,16 @@ export const ExploreScreen = () => {
           <View style={styles.locationRow2}>
             <Feather name="map-pin" size={12} color="rgba(255,107,91,0.55)" />
             <Text style={styles.locationText}>{formatLocation(item)}</Text>
+            <Pressable
+              onPress={() => {
+                setSelectedProperty(item);
+                setShowNeighborhoodSheet(true);
+              }}
+              style={styles.areaInfoPill}
+            >
+              <Feather name="cpu" size={11} color="#ff6b5b" />
+              <Text style={styles.areaInfoPillText}>Area info</Text>
+            </Pressable>
           </View>
           <View style={styles.hostRow}>
             <LinearGradient colors={avatarGradient} style={styles.hostAvatar}>
@@ -1714,6 +1726,22 @@ export const ExploreScreen = () => {
                       </View>
                     ) : null}
 
+                    <Pressable
+                      onPress={() => setShowNeighborhoodSheet(true)}
+                      style={styles.pdNeighborhoodBtn}
+                    >
+                      <Feather name="cpu" size={16} color="#ff6b5b" />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.pdNeighborhoodBtnTitle}>
+                          Ask AI about this neighborhood
+                        </Text>
+                        <Text style={styles.pdNeighborhoodBtnSub}>
+                          Safety, walkability, transit, nearby spots
+                        </Text>
+                      </View>
+                      <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.4)" />
+                    </Pressable>
+
                     {selectedProperty.amenities?.length > 0 ? (
                       <View style={styles.pdSection}>
                         <Text style={styles.pdSectionTitle}>Amenities</Text>
@@ -2049,6 +2077,16 @@ export const ExploreScreen = () => {
           },
         }}
       />
+
+      {selectedProperty ? (
+        <NeighborhoodAISheet
+          visible={showNeighborhoodSheet}
+          onClose={() => setShowNeighborhoodSheet(false)}
+          listingId={selectedProperty.id}
+          address={`${selectedProperty.address}, ${selectedProperty.city}, ${selectedProperty.state}`}
+          neighborhood={selectedProperty.neighborhood}
+        />
+      ) : null}
       <Modal
         visible={showGroupPickerModal}
         transparent
@@ -2568,6 +2606,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
     marginTop: 8,
+  },
+  areaInfoPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    backgroundColor: 'rgba(255,107,91,0.12)',
+    borderRadius: 100,
+    marginLeft: 'auto',
+  },
+  areaInfoPillText: {
+    color: '#ff6b5b',
+    fontSize: 11,
+    fontWeight: '600',
   },
   locationText: {
     color: 'rgba(255,255,255,0.35)',
@@ -3187,6 +3240,29 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '500',
     color: 'rgba(255,255,255,0.45)',
+  },
+  pdNeighborhoodBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginHorizontal: 16,
+    marginTop: 8,
+    backgroundColor: 'rgba(255,107,91,0.08)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.2)',
+  },
+  pdNeighborhoodBtnTitle: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  pdNeighborhoodBtnSub: {
+    color: 'rgba(255,255,255,0.45)',
+    fontSize: 12,
+    marginTop: 2,
   },
   pdSection: {
     paddingHorizontal: 16,

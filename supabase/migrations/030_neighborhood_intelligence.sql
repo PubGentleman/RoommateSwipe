@@ -1,0 +1,5 @@
+ALTER TABLE listings
+ADD COLUMN IF NOT EXISTS neighborhood_briefing TEXT,
+ADD COLUMN IF NOT EXISTS neighborhood_briefing_at TIMESTAMPTZ,
+ADD COLUMN IF NOT EXISTS walk_score INTEGER,
+ADD COLUMN IF NOT EXISTS transit_score INTEGER;
