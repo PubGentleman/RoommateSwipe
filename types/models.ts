@@ -635,3 +635,20 @@ export interface Reference {
   isVerified: boolean;
   createdAt: string;
 }
+
+export interface DailyQuestionOption {
+  value: string;
+  label: string;
+  emoji: string;
+}
+
+export interface DailyQuestion {
+  id: string;
+  user_id: string;
+  question_text: string;
+  question_category: string;
+  options: DailyQuestionOption[];
+  selected_value: string | null;
+  generated_at: string;
+  expires_at: string;
+}

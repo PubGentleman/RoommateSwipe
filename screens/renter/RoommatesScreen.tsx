@@ -47,6 +47,7 @@ import { getBestMatchToday } from '../../utils/bestMatchToday';
 import { AIGroupSuggestionCard } from '../../components/AIGroupSuggestionCard';
 import { InstagramBadge } from '../../components/InstagramBadge';
 import { WhyThisMatchModal } from '../../components/WhyThisMatchModal';
+import { DailyQuestionCard } from '../../components/DailyQuestionCard';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Limit card size for web/desktop viewing
@@ -1021,6 +1022,7 @@ export const RoommatesScreen = () => {
           </View>
         </View>
         {renderCitySelector()}
+        <DailyQuestionCard />
         <View style={styles.emptyState}>
           <Feather name={getActiveFilterCount(matchFilters) > 0 ? 'filter' : 'users'} size={64} color="rgba(255,255,255,0.35)" />
           <ThemedText style={[Typography.h2, styles.emptyTitle, { color: '#FFFFFF' }]}>
@@ -1275,6 +1277,8 @@ export const RoommatesScreen = () => {
         onAccepted={() => {}}
         onDismissed={() => {}}
       />
+
+      <DailyQuestionCard />
 
       {canSeeAIMatch && bestMatch ? (
         <Animated.View entering={FadeInDown.duration(400)} style={styles.bestMatchBanner}>

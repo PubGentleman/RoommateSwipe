@@ -1,4 +1,58 @@
 import { supabase } from '../lib/supabase';
+import type { DailyQuestion } from '../types/models';
+
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+
+export async function getDailyQuestion(): Promise<DailyQuestion | null> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return null;
+
+    const response = await fetch(
+      `${supabaseUrl}/functions/v1/generate-daily-question`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) return null;
+    const { question } = await response.json();
+    return question;
+  } catch (error) {
+    console.error('[getDailyQuestion] error:', error);
+    return null;
+  }
+}
+
+export async function answerDailyQuestion(questionId: string, selectedValue: string): Promise<boolean> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return false;
+
+    const response = await fetch(
+      `${supabaseUrl}/functions/v1/answer-daily-question`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ questionId, selectedValue }),
+      }
+    );
+
+    if (!response.ok) return false;
+    const { success } = await response.json();
+    return success;
+  } catch (error) {
+    console.error('[answerDailyQuestion] error:', error);
+    return false;
+  }
+}
 
 export interface AIServiceMessage {
   id: string;
@@ -29,8 +83,6 @@ export async function sendAIMessage(
 ): Promise<AIResponse> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Not authenticated');
-
-  const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 
   const response = await fetch(
     `${supabaseUrl}/functions/v1/ai-assistant`,
