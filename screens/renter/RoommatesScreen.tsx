@@ -1437,24 +1437,6 @@ export const RoommatesScreen = () => {
           <Feather name="flag" size={14} color="rgba(255,255,255,0.7)" />
         </Pressable>
 
-        {subscriptionPlan === 'basic' ? (
-          <View style={styles.adBanner}>
-            <View style={styles.adLeft}>
-              <View style={styles.adLogo}>
-                <Feather name="home" size={16} color="#FFFFFF" />
-              </View>
-              <View>
-                <ThemedText style={styles.adSponsoredLabel}>SPONSORED</ThemedText>
-                <ThemedText style={styles.adTitle}>Renters Insurance from $5/mo</ThemedText>
-                <ThemedText style={styles.adSubtitle}>Protect your belongings</ThemedText>
-              </View>
-            </View>
-            <View style={styles.adCta}>
-              <ThemedText style={styles.adCtaText}>View</ThemedText>
-              <Feather name="arrow-right" size={10} color="#FFFFFF" />
-            </View>
-          </View>
-        ) : null}
       </View>
 
       <View style={styles.actionRow}>
@@ -2701,63 +2683,6 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '600',
     color: '#ff8070',
-  },
-  adBanner: {
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 16,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  adLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
-  },
-  adLogo: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: '#667eea',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  adSponsoredLabel: {
-    fontSize: 9,
-    color: 'rgba(255,255,255,0.2)',
-    letterSpacing: 0.5,
-    marginBottom: 2,
-  },
-  adTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  adSubtitle: {
-    fontSize: 10.5,
-    color: 'rgba(255,255,255,0.4)',
-    marginTop: 1,
-  },
-  adCta: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  adCtaText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#FFFFFF',
   },
   actionRow: {
     flexDirection: 'row',
