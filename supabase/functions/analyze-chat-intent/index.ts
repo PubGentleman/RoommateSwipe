@@ -186,11 +186,11 @@ Signals to look for: scheduling a meetup, discussing move-in dates, asking about
 
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('id, first_name, neighborhood, preferred_trains')
-      .in('id', [userId1, userId2]);
+      .select('user_id, first_name, neighborhood, preferred_trains')
+      .in('user_id', [userId1, userId2]);
 
-    const profile1 = profiles?.find((p: any) => p.id === userId1);
-    const profile2 = profiles?.find((p: any) => p.id === userId2);
+    const profile1 = profiles?.find((p: any) => p.user_id === userId1);
+    const profile2 = profiles?.find((p: any) => p.user_id === userId2);
 
     const neighborhood1 = profile1?.neighborhood || 'Manhattan';
     const neighborhood2 = profile2?.neighborhood || 'Brooklyn';
