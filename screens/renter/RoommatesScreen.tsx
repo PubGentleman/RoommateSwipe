@@ -196,7 +196,7 @@ export const RoommatesScreen = () => {
         id: nextQ.id,
         aiMessage: nextQ.question,
         followUpMessage: 'Thanks for sharing! This helps us refine your matches.',
-        options: [],
+        options: nextQ.options.map(opt => ({ value: opt.value, label: opt.label, emoji: opt.emoji })),
         profileField: nextQ.category,
       };
       setTimeout(() => {

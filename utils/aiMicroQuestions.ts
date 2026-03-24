@@ -1,11 +1,18 @@
 import { User } from '../types/models';
 import { StorageService } from './storage';
 
+export interface MicroQuestionOption {
+  value: string;
+  label: string;
+  emoji: string;
+}
+
 export interface MicroQuestion {
   id: string;
   question: string;
   category: keyof NonNullable<NonNullable<User['aiAssistantData']>['microQuestionPreferences']>;
   keywords: string[];
+  options: MicroQuestionOption[];
 }
 
 export const MICRO_QUESTIONS: MicroQuestion[] = [
@@ -14,72 +21,130 @@ export const MICRO_QUESTIONS: MicroQuestion[] = [
     question: 'How important is personal privacy and alone time to you?',
     category: 'privacyImportance',
     keywords: ['privacy', 'private', 'alone', 'personal space'],
+    options: [
+      { value: 'very_important', label: 'Very important', emoji: '🔒' },
+      { value: 'somewhat_important', label: 'Somewhat important', emoji: '🚪' },
+      { value: 'not_important', label: 'Not a big deal', emoji: '👐' },
+    ],
   },
   {
     id: 'cooking',
     question: 'How often do you cook at home?',
     category: 'cookingFrequency',
     keywords: ['cook', 'cooking', 'kitchen', 'meals', 'food'],
+    options: [
+      { value: 'daily', label: 'Almost every day', emoji: '👨‍🍳' },
+      { value: 'occasionally', label: 'A few times a week', emoji: '🍳' },
+      { value: 'rarely', label: 'Rarely or never', emoji: '🥡' },
+    ],
   },
   {
     id: 'cleaning_schedule',
     question: 'Do you prefer a set cleaning schedule or a more flexible approach?',
     category: 'cleaningPreference',
     keywords: ['clean', 'cleaning', 'schedule', 'chores', 'tidy'],
+    options: [
+      { value: 'prefer_schedule', label: 'Set schedule', emoji: '📋' },
+      { value: 'flexible', label: 'Flexible approach', emoji: '🔄' },
+      { value: 'no_preference', label: 'No preference', emoji: '🤷' },
+    ],
   },
   {
     id: 'furnished',
     question: 'Would you prefer a furnished or unfurnished place?',
     category: 'furnishedPreference',
     keywords: ['furnished', 'furniture', 'unfurnished', 'room'],
+    options: [
+      { value: 'furnished', label: 'Furnished', emoji: '🛋' },
+      { value: 'unfurnished', label: 'Unfurnished', emoji: '📦' },
+      { value: 'no_preference', label: 'Either works', emoji: '🤷' },
+    ],
   },
   {
     id: 'stay_length',
     question: 'Are you looking for a short-term or long-term living situation?',
     category: 'stayLength',
     keywords: ['stay', 'length', 'duration', 'months', 'years', 'lease', 'short', 'long'],
+    options: [
+      { value: 'long_term', label: 'Long-term (1+ year)', emoji: '🏡' },
+      { value: 'short_term', label: 'Short-term (few months)', emoji: '📅' },
+      { value: 'flexible', label: 'Flexible', emoji: '🔄' },
+    ],
   },
   {
     id: 'morning_routine',
     question: 'Do you have a morning bathroom routine that takes a while?',
     category: 'morningRoutine',
     keywords: ['morning', 'bathroom', 'routine', 'shower', 'ready'],
+    options: [
+      { value: 'takes_time', label: 'Yes, I need my time', emoji: '🛁' },
+      { value: 'quick', label: 'Quick and efficient', emoji: '⚡' },
+      { value: 'moderate', label: 'Somewhere in between', emoji: '⏱' },
+    ],
   },
   {
     id: 'temperature',
     question: 'Do you prefer a warmer or cooler apartment temperature?',
     category: 'temperaturePreference',
     keywords: ['temperature', 'warm', 'cool', 'heat', 'ac', 'thermostat'],
+    options: [
+      { value: 'warmer', label: 'Keep it warm', emoji: '🔥' },
+      { value: 'cooler', label: 'Keep it cool', emoji: '❄' },
+      { value: 'moderate', label: 'Moderate is fine', emoji: '🌡' },
+    ],
   },
   {
     id: 'kitchen_sharing',
     question: 'How do you feel about sharing kitchen space and appliances?',
     category: 'kitchenSharing',
     keywords: ['kitchen', 'cooking', 'share', 'appliances', 'fridge'],
+    options: [
+      { value: 'comfortable', label: 'Totally fine sharing', emoji: '👍' },
+      { value: 'cautious', label: 'Prefer some boundaries', emoji: '⚖' },
+      { value: 'neutral', label: 'No strong feelings', emoji: '🤷' },
+    ],
   },
   {
     id: 'parking',
     question: 'Do you need parking or own a vehicle?',
     category: 'parkingNeed',
     keywords: ['parking', 'car', 'vehicle', 'garage', 'street'],
+    options: [
+      { value: 'yes_need', label: 'Yes, I need parking', emoji: '🚗' },
+      { value: 'no_need', label: 'No, I don\'t drive', emoji: '🚶' },
+    ],
   },
   {
     id: 'common_area',
     question: 'How much time do you spend in common areas versus your room?',
     category: 'commonAreaUsage',
     keywords: ['common', 'living room', 'shared space', 'hang out'],
+    options: [
+      { value: 'frequently', label: 'Mostly in common areas', emoji: '🛋' },
+      { value: 'occasionally', label: 'A mix of both', emoji: '🔄' },
+      { value: 'rarely', label: 'Mostly in my room', emoji: '🚪' },
+    ],
   },
   {
     id: 'communication',
     question: 'Do you prefer to communicate about house matters in person or via text?',
     category: 'communicationStyle',
     keywords: ['communication', 'text', 'talk', 'message', 'discuss'],
+    options: [
+      { value: 'in_person', label: 'In person', emoji: '🗣' },
+      { value: 'text', label: 'Text or message', emoji: '💬' },
+      { value: 'either', label: 'Either works', emoji: '🤷' },
+    ],
   },
   {
     id: 'allergies',
     question: 'Do you have any allergies or dietary restrictions we should know about?',
     category: 'allergiesRestrictions',
     keywords: ['allergies', 'dietary', 'restrictions', 'food', 'sensitivities'],
+    options: [
+      { value: 'yes', label: 'Yes, I have some', emoji: '⚠' },
+      { value: 'none', label: 'No, none at all', emoji: '✅' },
+    ],
   },
 ];
 
