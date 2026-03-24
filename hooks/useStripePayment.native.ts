@@ -11,7 +11,8 @@ export function useStripePayment() {
     userId: string,
     email: string,
     plan: string,
-    billingCycle: 'monthly' | '3month' | 'annual'
+    billingCycle: 'monthly' | '3month' | 'annual',
+    planType?: 'renter' | 'host' | 'agent' | 'company'
   ): Promise<{ success: boolean; subscriptionId?: string }> => {
     const priceId = getPriceId(plan, billingCycle);
     if (!priceId) {
@@ -21,7 +22,7 @@ export function useStripePayment() {
 
     try {
       const { data, error } = await supabase.functions.invoke('create-subscription', {
-        body: { priceId },
+        body: { priceId, plan, billingCycle, planType },
       });
 
       if (error || !data?.clientSecret) {

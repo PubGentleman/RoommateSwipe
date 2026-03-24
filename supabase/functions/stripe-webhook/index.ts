@@ -7,6 +7,26 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 );
 
+async function findProfileByCustomer(customerId: string) {
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id, role')
+    .eq('stripe_customer_id', customerId)
+    .single();
+  return profile;
+}
+
+async function updateSubscription(userId: string, customerId: string, updates: Record<string, any>) {
+  await supabase
+    .from('subscriptions')
+    .upsert({
+      user_id: userId,
+      stripe_customer_id: customerId,
+      ...updates,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id' });
+}
+
 Deno.serve(async (req) => {
   const signature = req.headers.get('stripe-signature')!;
   const body = await req.text();
@@ -82,29 +102,16 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ received: true }), { status: 200 });
   }
 
-  if (event.type === 'invoice.payment_failed') {
+  if (event.type === 'invoice.payment_succeeded') {
     const invoice = event.data.object as Stripe.Invoice;
     const customerId = invoice.customer as string;
-    const subscriptionId = invoice.subscription as string | null;
 
-    if (subscriptionId) {
-      const sub = await stripe.subscriptions.retrieve(subscriptionId);
-      const planType = sub.metadata?.plan_type ?? 'renter';
-
-      if (planType === 'renter') {
-        const { data: renterSub } = await supabase
-          .from('subscriptions')
-          .select('user_id')
-          .eq('stripe_customer_id', customerId)
-          .single();
-
-        if (renterSub) {
-          await supabase.from('subscriptions').update({
-            status: 'past_due',
-            updated_at: new Date().toISOString(),
-          }).eq('user_id', renterSub.user_id);
-        }
-      }
+    const profile = await findProfileByCustomer(customerId);
+    if (profile) {
+      await supabase
+        .from('subscriptions')
+        .update({ free_group_unlocks_used: 0 })
+        .eq('user_id', profile.id);
     }
 
     return new Response(JSON.stringify({ received: true }), { status: 200 });
@@ -114,17 +121,38 @@ Deno.serve(async (req) => {
     const invoice = event.data.object as Stripe.Invoice;
     const paidCustomerId = invoice.customer as string;
 
-    const { data: paidUser } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('stripe_customer_id', paidCustomerId)
-      .single();
-
-    if (paidUser) {
+    const profile = await findProfileByCustomer(paidCustomerId);
+    if (profile) {
       await supabase
         .from('subscriptions')
         .update({ free_group_unlocks_used: 0 })
-        .eq('user_id', paidUser.id);
+        .eq('user_id', profile.id);
+    }
+
+    return new Response(JSON.stringify({ received: true }), { status: 200 });
+  }
+
+  if (event.type === 'invoice.payment_failed') {
+    const invoice = event.data.object as Stripe.Invoice;
+    const customerId = invoice.customer as string;
+    const subscriptionId = invoice.subscription as string | null;
+
+    const profile = await findProfileByCustomer(customerId);
+    if (!profile) {
+      console.error('No profile found for customer:', customerId);
+      return new Response(JSON.stringify({ received: true }), { status: 200 });
+    }
+
+    if (subscriptionId) {
+      await updateSubscription(profile.id, customerId, {
+        stripe_subscription_id: subscriptionId,
+        status: 'past_due',
+      });
+
+      await supabase
+        .from('profiles')
+        .update({ is_premium: false })
+        .eq('id', profile.id);
     }
 
     return new Response(JSON.stringify({ received: true }), { status: 200 });
@@ -145,20 +173,17 @@ Deno.serve(async (req) => {
   const planTier = subscription.metadata?.plan ?? 'free';
   const billingCycle = subscription.metadata?.billing_cycle ?? 'monthly';
 
+  const profile = await findProfileByCustomer(customerId);
+  if (!profile) {
+    console.error('No profile found for customer:', customerId);
+    return new Response('User not found', { status: 404 });
+  }
+
   if (planType === 'renter') {
-    const { data: sub } = await supabase
-      .from('subscriptions')
-      .select('user_id')
-      .eq('stripe_customer_id', customerId)
-      .single();
-
-    if (!sub) return new Response('User not found', { status: 404 });
-
     const updates: Record<string, any> = {
       stripe_subscription_id: subscription.id,
       current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
       cancel_at_period_end: subscription.cancel_at_period_end,
-      updated_at: new Date().toISOString(),
     };
 
     if (
@@ -173,18 +198,18 @@ Deno.serve(async (req) => {
       updates.plan = 'free';
     }
 
-    await supabase.from('subscriptions').update(updates).eq('user_id', sub.user_id);
+    await updateSubscription(profile.id, customerId, updates);
+
+    await supabase
+      .from('profiles')
+      .update({
+        is_premium: event.type !== 'customer.subscription.deleted',
+        plan: event.type === 'customer.subscription.deleted' ? 'free' : planTier,
+      })
+      .eq('id', profile.id);
   }
 
   if (planType === 'host') {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('stripe_customer_id', customerId)
-      .single();
-
-    if (!profile) return new Response('Host profile not found', { status: 404 });
-
     if (
       event.type === 'customer.subscription.created' ||
       event.type === 'customer.subscription.updated'
@@ -194,6 +219,7 @@ Deno.serve(async (req) => {
         host_stripe_subscription_id: subscription.id,
         host_plan_billing_cycle: billingCycle,
         host_plan_expires_at: new Date(subscription.current_period_end * 1000).toISOString(),
+        is_premium: true,
         updated_at: new Date().toISOString(),
       }).eq('id', profile.id);
     } else if (event.type === 'customer.subscription.deleted') {
@@ -201,6 +227,7 @@ Deno.serve(async (req) => {
         host_plan: 'free',
         host_stripe_subscription_id: null,
         host_plan_expires_at: null,
+        is_premium: false,
         updated_at: new Date().toISOString(),
       }).eq('id', profile.id);
     }

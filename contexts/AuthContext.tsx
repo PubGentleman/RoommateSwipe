@@ -409,48 +409,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const login = async (email: string, password: string, role: UserRole) => {
-    if (email === 'demo@rhome.com') {
-      await StorageService.initializeWithMockData();
-      let currentUser = await StorageService.getCurrentUser();
-      if (!currentUser) {
-        const allUsers = await StorageService.getUsers();
-        if (allUsers.length > 0) {
-          currentUser = allUsers[0];
-          await StorageService.setCurrentUser(currentUser);
-        }
-      }
-      if (currentUser) {
-        if (currentUser.messageCount === undefined) {
-          currentUser.messageCount = 0;
-        }
-        if (currentUser.subscription) {
-          currentUser.subscription = {
-            ...currentUser.subscription,
-            expiresAt: currentUser.subscription.expiresAt
-              ? new Date(currentUser.subscription.expiresAt)
-              : undefined,
-            scheduledChangeDate: currentUser.subscription.scheduledChangeDate
-              ? new Date(currentUser.subscription.scheduledChangeDate)
-              : undefined,
-          };
-        }
-        currentUser.role = role;
-        currentUser.onboardingStep = 'complete';
-        currentUser.lastActiveAt = new Date();
-        if (role === 'host' && !currentUser.hostType) {
-          currentUser.hostType = 'individual';
-        }
-        if (currentUser.isDeleted) {
-          currentUser.isDeleted = false;
-          currentUser.deletedAt = undefined;
-        }
-        await StorageService.setCurrentUser(currentUser);
-        await StorageService.addOrUpdateUser(currentUser);
-        setUser(currentUser);
-      }
-      return;
-    }
-
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,

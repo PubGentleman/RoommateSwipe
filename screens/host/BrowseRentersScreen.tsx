@@ -605,6 +605,27 @@ export const BrowseRentersScreen = () => {
           ListHeaderComponent={renderHeader}
           contentContainerStyle={{ paddingBottom: 100, paddingHorizontal: 16 }}
           showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={{ alignItems: 'center', paddingVertical: 60, paddingHorizontal: 24 }}>
+              <Feather name="search" size={48} color="rgba(255,255,255,0.3)" />
+              <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '700', marginTop: 16, textAlign: 'center' }}>
+                No renters match your filters
+              </Text>
+              <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, marginTop: 8, textAlign: 'center' }}>
+                Try adjusting your search criteria or selecting a different listing
+              </Text>
+              {selectedListing ? (
+                <Pressable
+                  onPress={() => setSelectedListing(null)}
+                  style={{ marginTop: 20, paddingVertical: 10, paddingHorizontal: 20, backgroundColor: ACCENT, borderRadius: 10 }}
+                >
+                  <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 14 }}>
+                    Clear listing filter
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
+          }
         />
       )}
 

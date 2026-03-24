@@ -47,7 +47,7 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
           const isFocused = state.index === index;
           const config = TAB_CONFIG[route.name] || { icon: 'circle', label: route.name };
           const color = isFocused ? '#ff6b5b' : '#A0A0A0';
-          const showBadge = (route.name === 'Profile' || route.name === 'Messages') && unreadCount > 0;
+          const showBadge = route.name === 'Messages' && unreadCount > 0;
 
           const onPress = () => {
             const event = navigation.emit({

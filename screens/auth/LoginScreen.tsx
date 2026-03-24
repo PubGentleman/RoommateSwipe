@@ -27,9 +27,9 @@ export const LoginScreen = () => {
     setError('');
     setIsLoading(true);
     try {
-      if (!email.trim() && !password) {
-        await login('demo@rhome.com', 'demo123', selectedRole);
-      } else if (isSignUp) {
+      if (!email.trim()) { setError('Please enter your email address'); setIsLoading(false); return; }
+      if (!password) { setError('Please enter your password'); setIsLoading(false); return; }
+      if (isSignUp) {
         if (!name.trim()) { setError('Please enter your name'); setIsLoading(false); return; }
         if (!email.trim()) { setError('Please enter your email address'); setIsLoading(false); return; }
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setError('Please enter a valid email address'); setIsLoading(false); return; }
