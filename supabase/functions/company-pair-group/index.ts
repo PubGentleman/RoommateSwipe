@@ -96,9 +96,31 @@ serve(async (req) => {
 
     const bedroomsNeeded = listing.rooms_available ?? (listing.bedrooms - (listing.host_lives_in ? 1 : 0));
 
-    const existingOccupantsNote = listing.existing_roommates_count > 0
-      ? `\nIMPORTANT: This unit already has ${listing.existing_roommates_count} existing roommate(s) living there alongside the host. Any new tenants must be compatible with ALL current occupants. Factor this into your grouping recommendation.`
-      : '';
+    let existingOccupantsSection = '';
+    if (listing.existing_roommates_count > 0) {
+      const { data: existingRoommates } = await supabase
+        .from('existing_roommates')
+        .select('*')
+        .eq('listing_id', listingId)
+        .eq('profile_completed', true);
+
+      if (existingRoommates && existingRoommates.length > 0) {
+        existingOccupantsSection = `\nEXISTING OCCUPANTS (already living in the unit — new tenants must be compatible with them):
+${existingRoommates.map((er: any, i: number) => `
+Existing Roommate ${i + 1}: ${er.first_name || 'Anonymous'}
+- Sleep schedule: ${er.sleep_schedule || 'unknown'}
+- Cleanliness: ${er.cleanliness || 'unknown'}/5
+- Smoking: ${er.smoking ? 'yes' : 'no'}
+- Pets: ${er.pets ? 'yes' : 'no'}
+- Guest preference: ${er.guests_frequency || 'unknown'}
+- Home vibe: ${er.noise_level || 'unknown'}
+- Lifestyle: ${(er.lifestyle_tags || []).join(', ') || 'not specified'}
+`).join('')}
+IMPORTANT: New tenants must be compatible with the above existing occupants. Factor this heavily into your recommendation.`;
+      } else {
+        existingOccupantsSection = `\nIMPORTANT: This unit already has ${listing.existing_roommates_count} existing roommate(s) living there alongside the host. Any new tenants must be compatible with ALL current occupants. Factor this into your grouping recommendation.`;
+      }
+    }
 
     const systemPrompt = `You are an expert roommate matching AI for a property management company.
 Your job is to analyze a pool of pre-screened renter candidates and recommend the best possible group to fill a specific apartment unit.
@@ -128,7 +150,7 @@ Candidate ${i + 1}: ${r.full_name}
 - Lifestyle: ${r.lifestyle_tags?.join(', ') || 'not specified'}
 `).join('')}
 
-Task: Select the best ${bedroomsNeeded} candidates to form a group for this unit.${existingOccupantsNote}
+Task: Select the best ${bedroomsNeeded} candidates to form a group for this unit.${existingOccupantsSection}
 
 Consider:
 1. Budget compatibility with the listing price per person

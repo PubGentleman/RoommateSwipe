@@ -39,6 +39,7 @@ The application is built with React Native and Expo using TypeScript, leveraging
     - **Automated AI Roommate Matching:** AI-generated group suggestions with invite flow and automatic listing matching upon group completion.
     - **Agent Matchmaker:** AI-powered renter shortlisting, group composition, compatibility matrix, group builder with invite flow, placement pipeline, and Claude AI Group Pairing for recommendations.
     - **Company Host AI Auto-Fill:** AI-powered vacancy fill system with group recommendations and invites for shortlisted renters.
+- **Existing Roommate Shareable Profile Links:** Hosts with existing roommates can share web links so non-Rhome roommates fill out a lifestyle preferences form (`web/roommate-profile.html`). Preferences are stored in `existing_roommates` table and factored into AI compatibility scoring via `scoreRenterVsExistingRoommate` and `calculateCombinedCompatibility` in `existingRoommateService.ts`. Post-listing creation flow auto-navigates to `InviteExistingRoommatesScreen` when `existing_roommates_count > 0`.
 - **Identity & Verification:** Phone, government ID (Stripe Identity SDK), social media verification, optional background/income checks, and a References System.
 - **Boost System:** Tier-based listing and profile boosting for increased visibility.
 - **Account Management:** Soft-delete with a 30-day recovery window.
@@ -51,10 +52,10 @@ The application is built with React Native and Expo using TypeScript, leveraging
 
 Supabase provides the entire backend infrastructure:
 - **Auth:** Email/password authentication with `AuthContext` and Row Level Security (RLS).
-- **Database:** PostgreSQL with RLS. Listings have a computed `rooms_available` column (`bedrooms - host_lives_in - existing_roommates_count`) used across all AI matching.
+- **Database:** PostgreSQL with RLS. Listings have a computed `rooms_available` column (`bedrooms - host_lives_in - existing_roommates_count`) used across all AI matching. The `existing_roommates` table stores invite tokens and lifestyle preferences for non-Rhome roommates already living in a unit.
 - **Realtime:** Subscriptions for messages and notifications.
 - **Storage:** For profile and listing photos.
-- **Edge Functions:** For webhooks (Stripe), verification sessions, background checks, payments, references, agent placement fees, match score calculation, Claude AI operations (`agent-pair-group`, `company-pair-group`), group-to-listing matching, and group unlock payments.
+- **Edge Functions:** For webhooks (Stripe), verification sessions, background checks, payments, references, agent placement fees, match score calculation, Claude AI operations (`agent-pair-group`, `company-pair-group`), group-to-listing matching, group unlock payments, and `submit-roommate-profile` (public, no-auth endpoint for existing roommate web form submissions).
 
 ## Subscription & Paywall System
 

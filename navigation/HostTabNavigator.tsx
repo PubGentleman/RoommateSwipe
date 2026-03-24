@@ -25,6 +25,7 @@ import { AgentGroupsScreen } from '../screens/host/AgentGroupsScreen';
 import { HostGroupMatchesScreen } from '../screens/host/HostGroupMatchesScreen';
 import { CompanyFillPipelineScreen } from '../screens/host/CompanyFillPipelineScreen';
 import { CompanyListingAIScreen } from '../screens/host/CompanyListingAIScreen';
+import { InviteExistingRoommatesScreen } from '../screens/host/InviteExistingRoommatesScreen';
 import { HostMessagesStackNavigator } from './HostMessagesStackNavigator';
 import { NotificationsScreen } from '../screens/shared/NotificationsScreen';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
@@ -37,6 +38,7 @@ export type HostListingsStackParamList = {
   CreateEditListing: { propertyId?: string };
   ListingBoost: { listingId: string };
   HostGroupOutreach: { listingId: string; listingTitle: string };
+  InviteExistingRoommates: { listingId: string; count: number; listingAddress?: string };
 };
 
 export type HostDashboardStackParamList = {
@@ -53,6 +55,7 @@ export type HostDashboardStackParamList = {
   CompanyListingAI: { listingId: string; autoRunPairing?: boolean };
   BrowseRenters: { targetListingId?: string };
   RenterProfileDetail: { renter: any };
+  InviteExistingRoommates: { listingId: string; count: number; listingAddress?: string };
 };
 
 export type HostGroupsStackParamList = {
@@ -106,6 +109,7 @@ function DashboardStackNavigator() {
       <DashboardStack.Screen name="CompanyListingAI" component={CompanyListingAIScreen} />
       <DashboardStack.Screen name="BrowseRenters" component={BrowseRentersScreen} />
       <DashboardStack.Screen name="RenterProfileDetail" component={RenterProfileDetailScreen} />
+      <DashboardStack.Screen name="InviteExistingRoommates" component={InviteExistingRoommatesScreen} />
     </DashboardStack.Navigator>
   );
 }
@@ -117,6 +121,7 @@ function ListingsStackNavigator() {
       <ListingsStack.Screen name="CreateEditListing" component={CreateEditListingScreen} />
       <ListingsStack.Screen name="ListingBoost" component={ListingBoostScreen} />
       <ListingsStack.Screen name="HostGroupOutreach" component={HostGroupOutreachScreen} />
+      <ListingsStack.Screen name="InviteExistingRoommates" component={InviteExistingRoommatesScreen} />
     </ListingsStack.Navigator>
   );
 }

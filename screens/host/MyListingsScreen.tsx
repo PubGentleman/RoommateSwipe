@@ -442,6 +442,19 @@ export const MyListingsScreen = () => {
               <Feather name="edit-2" size={13} color="rgba(255,255,255,0.7)" />
               <Text style={styles.actEditText}>Edit</Text>
             </Pressable>
+            {(listing.existingRoommatesCount ?? 0) > 0 ? (
+              <Pressable
+                style={styles.actOutreach}
+                onPress={() => navigation.navigate('InviteExistingRoommates' as any, {
+                  listingId: listing.id,
+                  count: listing.existingRoommatesCount || 0,
+                  listingAddress: listing.address,
+                })}
+              >
+                <Feather name="users" size={13} color={BLUE} />
+                <Text style={styles.actOutreachText}>Roommates</Text>
+              </Pressable>
+            ) : null}
             {status === 'active' ? (
               <>
                 {!isFreePlan(getHostPlan() as any) ? (

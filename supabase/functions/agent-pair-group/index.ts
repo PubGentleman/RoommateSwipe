@@ -136,14 +136,36 @@ Always respond in this exact JSON format:
   Bio: ${p.bio ?? 'no bio'}`;
     }).join('\n\n');
 
-    const existingOccupantsNote = listing.existing_roommates_count > 0
-      ? `\nNote: This unit already has ${listing.existing_roommates_count} existing roommate(s) living there. The new renter(s) must be compatible with them too.`
-      : '';
+    let existingOccupantsSection = '';
+    if (listing.existing_roommates_count > 0) {
+      const { data: existingRoommates } = await supabase
+        .from('existing_roommates')
+        .select('*')
+        .eq('listing_id', listing.id)
+        .eq('profile_completed', true);
+
+      if (existingRoommates && existingRoommates.length > 0) {
+        existingOccupantsSection = `\nEXISTING OCCUPANTS (already living in the unit — new tenants must be compatible with them):
+${existingRoommates.map((er: any, i: number) => `
+Existing Roommate ${i + 1}: ${er.first_name || 'Anonymous'}
+- Sleep schedule: ${er.sleep_schedule || 'unknown'}
+- Cleanliness: ${er.cleanliness || 'unknown'}/5
+- Smoking: ${er.smoking ? 'yes' : 'no'}
+- Pets: ${er.pets ? 'yes' : 'no'}
+- Guest preference: ${er.guests_frequency || 'unknown'}
+- Home vibe: ${er.noise_level || 'unknown'}
+- Lifestyle: ${(er.lifestyle_tags || []).join(', ') || 'not specified'}
+`).join('')}
+IMPORTANT: New tenants must be compatible with the above existing occupants. Factor this heavily into your recommendation.`;
+      } else {
+        existingOccupantsSection = `\nNote: This unit already has ${listing.existing_roommates_count} existing roommate(s) living there. The new renter(s) must be compatible with them too.`;
+      }
+    }
 
     const userMessage = `I am an agent with a ${listing.bedrooms}BR apartment (${bedroomsNeeded} rooms available) listed at $${listing.price}/mo in ${listing.neighborhood}.
 Available: ${listing.available_date ?? 'now'}
 Amenities: ${(listing.amenities ?? []).join(', ') || 'standard'}
-Share per person: $${sharePerPerson.toFixed(0)}/mo${existingOccupantsNote}
+Share per person: $${sharePerPerson.toFixed(0)}/mo${existingOccupantsSection}
 
 I have ${renters.length} shortlisted renters. Recommend the best group to fill the ${bedroomsNeeded} open room${bedroomsNeeded !== 1 ? 's' : ''}.
 

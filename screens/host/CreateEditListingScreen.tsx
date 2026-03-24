@@ -317,11 +317,13 @@ export const CreateEditListingScreen = () => {
       if (savedCoords) supaData.coordinates = savedCoords;
       if (transitInfo) supaData.transit_info = transitInfo;
 
+      let createdListingId: string | null = null;
       try {
         if (isEditing && propertyId) {
           await updateListingSupa(propertyId, supaData);
         } else {
-          await createListingSupa(supaData);
+          const created = await createListingSupa(supaData);
+          createdListingId = created?.id || null;
         }
       } catch {
         const property: Property = {
@@ -351,12 +353,21 @@ export const CreateEditListingScreen = () => {
         await StorageService.addOrUpdateProperty(property);
       }
       if (!isEditing) {
-        await showAlert({ title: 'Listing Posted!', message: 'Your listing is now live. You can manage it from the Listings tab.', variant: 'success' });
-        const parentNav = navigation.getParent();
-        if (parentNav) {
-          parentNav.navigate('Listings');
+        if (existingRoommatesCount > 0 && createdListingId) {
+          await showAlert({ title: 'Listing Posted!', message: 'Now let\'s set up profile links for your existing roommates.', variant: 'success' });
+          navigation.navigate('InviteExistingRoommates' as any, {
+            listingId: createdListingId,
+            count: existingRoommatesCount,
+            listingAddress: address.trim(),
+          });
         } else {
-          navigation.goBack();
+          await showAlert({ title: 'Listing Posted!', message: 'Your listing is now live. You can manage it from the Listings tab.', variant: 'success' });
+          const parentNav = navigation.getParent();
+          if (parentNav) {
+            parentNav.navigate('Listings');
+          } else {
+            navigation.goBack();
+          }
         }
       } else {
         if (propertyId) {
