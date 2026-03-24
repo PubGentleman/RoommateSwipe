@@ -10,17 +10,12 @@ export async function getSwipeDeck(city?: string, filters?: {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return [];
 
-  const { data: blockedIds } = await supabase
-    .from('blocked_users')
-    .select('blocked_id')
-    .eq('blocker_id', user.id);
-  const blocked = (blockedIds || []).map(b => b.blocked_id);
-
-  const { data: alreadySwiped } = await supabase
-    .from('interest_cards')
-    .select('recipient_id')
-    .eq('sender_id', user.id);
-  const swiped = (alreadySwiped || []).map(s => s.recipient_id);
+  const [blockedResult, swipedResult] = await Promise.all([
+    supabase.from('blocked_users').select('blocked_id').eq('blocker_id', user.id),
+    supabase.from('interest_cards').select('recipient_id').eq('sender_id', user.id),
+  ]);
+  const blocked = (blockedResult.data || []).map((b: any) => b.blocked_id);
+  const swiped = (swipedResult.data || []).map((s: any) => s.recipient_id);
 
   const excludeIds = [...blocked, ...swiped, user.id];
 
@@ -109,20 +104,22 @@ export async function sendLike(recipientId: string) {
 
   if (error) throw error;
 
-  await incrementUsage('interest_cards_today');
+  incrementUsage('interest_cards_today').catch(() => {});
 
   supabase.functions.invoke('calculate-match-scores', {
     body: { userId: user.id },
   }).catch(() => {});
 
-  const { data: match } = await supabase
+  const matchPromise = supabase
     .from('matches')
     .select('*')
     .or(`and(user_id_1.eq.${user.id},user_id_2.eq.${recipientId}),and(user_id_1.eq.${recipientId},user_id_2.eq.${user.id})`)
     .eq('status', 'matched')
-    .single();
+    .single()
+    .then(({ data: match }) => match)
+    .catch(() => null);
 
-  return { interestCard: data, match };
+  return { interestCard: data, matchPromise };
 }
 
 export async function sendPass(recipientId: string) {

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { View, StyleSheet, Image, Pressable, Dimensions, Modal, ScrollView, Text, Animated as RNAnimated } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, withSequence, runOnJS, interpolate, FadeInDown } from 'react-native-reanimated';
@@ -150,6 +150,9 @@ export const RoommatesScreen = () => {
     }
   }, [user?.id]);
 
+  const lastLoadTime = useRef<number>(0);
+  const RELOAD_THRESHOLD_MS = 5 * 60 * 1000;
+
   useEffect(() => {
     loadProfiles();
   }, [activeCity, activeSubArea, matchFilters]);
@@ -229,8 +232,15 @@ export const RoommatesScreen = () => {
 
   useFocusEffect(
     React.useCallback(() => {
-      console.log('[RoommatesScreen] Screen focused, reloading profiles to get latest photos');
-      loadProfiles();
+      const now = Date.now();
+      const shouldReload = now - lastLoadTime.current > RELOAD_THRESHOLD_MS;
+
+      if (shouldReload) {
+        console.log('[RoommatesScreen] Screen focused, reloading profiles (threshold met)');
+        loadProfiles();
+        lastLoadTime.current = now;
+      }
+
       if (user) {
         (async () => {
           try {
@@ -270,6 +280,7 @@ export const RoommatesScreen = () => {
   const loadProfiles = async () => {
     try {
       setIsLoading(true);
+      lastLoadTime.current = Date.now();
 
       let allProfiles: RoommateProfile[] = [];
       let allUsers: any[] = [];
@@ -390,6 +401,7 @@ export const RoommatesScreen = () => {
       sortedProfiles.forEach(p => validateProfileDataConsistency(p));
       setProfiles(sortedProfiles);
       setCurrentIndex(0);
+      prefetchNextImages(sortedProfiles, 0);
     } catch (error) {
       console.error('Error loading profiles:', error);
     } finally {
@@ -397,10 +409,32 @@ export const RoommatesScreen = () => {
     }
   };
 
+  const prefetchNextImages = useCallback((profileList: RoommateProfile[], fromIndex: number) => {
+    const nextProfiles = profileList.slice(fromIndex, fromIndex + 3);
+    nextProfiles.forEach(profile => {
+      const photos = Array.isArray(profile.photos) ? profile.photos : profile.photos ? [profile.photos] : [];
+      (photos as string[]).slice(0, 2).forEach((uri: string) => {
+        if (uri && uri.startsWith('http')) {
+          Image.prefetch(uri).catch(() => {});
+        }
+      });
+    });
+  }, []);
+
   const resetSwipeHistory = async () => {
     await StorageService.clearSwipeHistory();
     await loadProfiles();
   };
+
+  const compatibilityMap = useMemo(() => {
+    if (!user) return new Map<string, number>();
+    const map = new Map<string, number>();
+    profiles.forEach(profile => {
+      const score = profile.compatibility ?? calculateCompatibility(user, profile);
+      map.set(profile.id, score);
+    });
+    return map;
+  }, [profiles, user?.id]);
 
   const currentProfile = profiles[currentIndex];
   const nextProfile = profiles[currentIndex + 1];
@@ -423,7 +457,11 @@ export const RoommatesScreen = () => {
   const isProfileOnline = currentProfile ? Math.random() > 0.5 : false;
 
   const advanceCard = () => {
-    setCurrentIndex(prev => prev + 1);
+    setCurrentIndex(prev => {
+      const next = prev + 1;
+      prefetchNextImages(profiles, next + 1);
+      return next;
+    });
     translateX.value = 0;
     translateY.value = 0;
     rotation.value = 0;
@@ -571,7 +609,11 @@ export const RoommatesScreen = () => {
           await StorageService.addSuperLike(profileId, userId, user?.name, user?.profilePicture);
         }
 
-        const hasMatch = usedSupabase ? !!supabaseResult?.match : await StorageService.checkReciprocalLike(userId, profileId);
+        let supabaseMatch: any = null;
+        if (usedSupabase && supabaseResult?.matchPromise) {
+          supabaseMatch = await supabaseResult.matchPromise;
+        }
+        const hasMatch = usedSupabase ? !!supabaseMatch : await StorageService.checkReciprocalLike(userId, profileId);
         
         if (hasMatch) {
           if (!usedSupabase) {
@@ -596,7 +638,7 @@ export const RoommatesScreen = () => {
           }
 
           const matchedName = matchedProfile?.name || 'Someone';
-          const matchId = usedSupabase ? supabaseResult?.match?.id : `match_${Date.now()}`;
+          const matchId = usedSupabase ? supabaseMatch?.id : `match_${Date.now()}`;
 
           await StorageService.addNotification({
             id: `notification_match_${Date.now()}_${Math.random()}`,
@@ -1106,7 +1148,7 @@ export const RoommatesScreen = () => {
         ? `conv_${thisMatch.id}`
         : `conv-cold-${currentProfile.id}`;
 
-      const compatibility = user ? calculateCompatibility(user, currentProfile) : 0;
+      const compatibility = compatibilityMap.get(currentProfile.id) ?? 50;
       const systemText = isCold
         ? `You sent a direct message request to ${currentProfile.name}.`
         : `You matched with ${currentProfile.name}! Say hello.`;
@@ -1525,7 +1567,7 @@ export const RoommatesScreen = () => {
                 ? `conv_${thisMatch.id}`
                 : `conv-match-${profile.id}`;
 
-              const compatibility = user ? calculateCompatibility(user, profile) : 0;
+              const compatibility = compatibilityMap.get(profile.id) ?? 50;
               const systemText = `You matched with ${profile.name}! Say hello.`;
               const systemMessage = {
                 id: `msg-sys-${Date.now()}`,
