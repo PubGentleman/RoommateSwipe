@@ -29,6 +29,10 @@ export type ScreenContext = 'match' | 'chat' | 'explore' | 'messages' | 'groups'
 
 interface MatchContextData {
   currentProfile?: RoommateProfile;
+  rightSwipeCount?: number;
+  leftSwipeCount?: number;
+  avgCompatibilityRight?: number;
+  commonOccupationInterest?: string;
 }
 
 interface ChatContextData {
@@ -292,6 +296,31 @@ export const RhomeAISheet = ({ visible, onDismiss, screenContext, contextData, o
   const [refinementSelectedValue, setRefinementSelectedValue] = useState<string | null>(null);
   const optionFillAnim = useRef(new RNAnimated.Value(0)).current;
 
+  const getSwipeInsight = () => {
+    const rightCount = contextData?.match?.rightSwipeCount || 0;
+    const leftCount = contextData?.match?.leftSwipeCount || 0;
+    const avgScore = contextData?.match?.avgCompatibilityRight || 0;
+    const topOccupation = contextData?.match?.commonOccupationInterest;
+
+    if (rightCount === 0) return null;
+
+    const selectivity = leftCount > 0 ? Math.round((leftCount / (rightCount + leftCount)) * 100) : 0;
+
+    if (selectivity > 80) {
+      return `You're swiping left on ${selectivity}% of profiles — you have high standards. Make sure your own profile is complete so the people you like will like you back.`;
+    }
+    if (selectivity < 20) {
+      return `You're swiping right on almost everyone. Try being more selective — focus on the top ${Math.round(rightCount * 0.3)} profiles with the highest compatibility scores.`;
+    }
+    if (topOccupation) {
+      return `You've been matching with a lot of ${topOccupation}s. Want me to prioritize similar profiles?`;
+    }
+    if (avgScore > 80) {
+      return `Your matches are strong — averaging ${avgScore}% compatibility. Keep going, you're close to finding your person.`;
+    }
+    return `You've liked ${rightCount} people today. Send at least one message to keep momentum going.`;
+  };
+
   useEffect(() => {
     if (visible && screenContext === 'refinement') {
       setRefinementAnswered(false);
@@ -487,6 +516,8 @@ export const RhomeAISheet = ({ visible, onDismiss, screenContext, contextData, o
       }
       case 'match': {
         const profile = contextData?.match?.currentProfile;
+        const swipeInsight = getSwipeInsight();
+        if (swipeInsight) return swipeInsight;
         if (profile && user) {
           const detailed = calculateDetailedCompatibility(user, profile);
           const score = Math.round(detailed.totalScore);

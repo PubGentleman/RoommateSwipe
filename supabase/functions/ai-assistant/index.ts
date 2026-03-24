@@ -51,33 +51,110 @@ serve(async (req) => {
       );
     }
 
-    const profile = await getUserProfile(supabase, user.id);
+    const [profile, aiMemory] = await Promise.all([
+      getUserProfile(supabase, user.id),
+      getAIMemory(supabase, user.id),
+    ]);
     const isAgent = plan.startsWith('agent_');
     const topMatches = isAgent ? [] : await getTopMatches(supabase, user.id);
     const nearbyListings = await getNearbyListings(supabase, profile);
     const history = await getConversationHistory(supabase, user.id, sessionId);
+
+    const memoryContext = buildMemoryContext(aiMemory);
     const systemPrompt = isAgent
       ? buildAgentSystemPrompt(profile, nearbyListings, plan)
-      : buildSystemPrompt(profile, topMatches, nearbyListings, plan);
-    const aiResponse = await callClaude(systemPrompt, history, message);
+      : buildSystemPrompt(profile, topMatches, nearbyListings, plan, memoryContext);
 
-    const cleanedResponse = await extractAndSaveProfileUpdate(supabase, user.id, aiResponse);
-    await saveMessages(supabase, user.id, sessionId, message, cleanedResponse);
-    await incrementUsage(supabase, user.id);
+    const remainingMessages = dailyLimit - todayCount - 1;
+    const conversationMessages = [
+      ...history.map(h => ({ role: h.role as 'user' | 'assistant', content: h.content })),
+      { role: 'user' as const, content: message },
+    ];
 
-    return new Response(
-      JSON.stringify({
-        reply: cleanedResponse,
-        remainingMessages: dailyLimit - todayCount - 1,
-        plan,
-      }),
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-        },
-      }
-    );
+    const encoder = new TextEncoder();
+    const readable = new ReadableStream({
+      async start(controller) {
+        try {
+          const response = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'x-api-key': ANTHROPIC_API_KEY,
+              'anthropic-version': '2023-06-01',
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'claude-sonnet-4-5',
+              max_tokens: 1024,
+              stream: true,
+              system: systemPrompt,
+              messages: conversationMessages,
+            }),
+          });
+
+          if (!response.ok || !response.body) {
+            const errText = await response.text();
+            console.error('Claude streaming error:', errText);
+            const fallback = JSON.stringify({ delta: "I'm having trouble responding right now. Try again in a moment!" });
+            controller.enqueue(encoder.encode(`data: ${fallback}\n\n`));
+            const done = JSON.stringify({ done: true, remainingMessages, plan });
+            controller.enqueue(encoder.encode(`data: ${done}\n\n`));
+            controller.close();
+            return;
+          }
+
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let fullResponse = '';
+          let buffer = '';
+
+          while (true) {
+            const { done: readerDone, value } = await reader.read();
+            if (readerDone) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+              if (!line.startsWith('data: ')) continue;
+              const jsonStr = line.slice(6).trim();
+              if (jsonStr === '[DONE]') continue;
+              try {
+                const event = JSON.parse(jsonStr);
+                if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+                  const text = event.delta.text;
+                  fullResponse += text;
+                  const data = JSON.stringify({ delta: text });
+                  controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+                }
+              } catch {}
+            }
+          }
+
+          const cleanedResponse = await extractAndSaveProfileUpdate(supabase, user.id, fullResponse);
+          await saveMessages(supabase, user.id, sessionId, message, cleanedResponse);
+          await incrementUsage(supabase, user.id);
+
+          extractAndSaveMemory(supabase, user.id, message, aiMemory).catch(() => {});
+
+          const done = JSON.stringify({ done: true, remainingMessages, plan });
+          controller.enqueue(encoder.encode(`data: ${done}\n\n`));
+          controller.close();
+        } catch (err) {
+          console.error('Streaming error:', err);
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(readable, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+      },
+    });
   } catch (err) {
     console.error('AI Assistant error:', err);
     return errorResponse('Something went wrong. Please try again.', 500);
@@ -236,7 +313,96 @@ function getMissingFields(profile: any): string[] {
   return missing;
 }
 
-function buildSystemPrompt(profile: any, topMatches: any[], listings: any[], plan: string): string {
+async function getAIMemory(supabase: any, userId: string) {
+  const { data } = await supabase
+    .from('user_ai_memory')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle();
+  return data;
+}
+
+function buildMemoryContext(aiMemory: any): string {
+  if (!aiMemory) return 'This is the first conversation with this user.';
+  return `
+WHAT I ALREADY KNOW ABOUT THIS USER:
+- Budget: ${aiMemory.budget_stated ? `$${aiMemory.budget_stated}/month` : 'not stated'}
+- Move-in timeline: ${aiMemory.move_in_timeline || 'unknown'}
+- Dealbreakers: ${aiMemory.dealbreakers?.join(', ') || 'none stated'}
+- Must-haves: ${aiMemory.must_haves?.join(', ') || 'none stated'}
+- Preferred neighborhoods: ${aiMemory.preferred_neighborhoods?.join(', ') || 'none stated'}
+- Preferred trains: ${aiMemory.preferred_trains?.join(', ') || 'none stated'}
+- Work schedule: ${aiMemory.work_schedule || 'unknown'}
+- Social preference: ${aiMemory.social_preference || 'unknown'}
+- Notes from past conversations: ${aiMemory.memory_notes?.join('; ') || 'none'}`;
+}
+
+async function extractAndSaveMemory(
+  supabase: any,
+  userId: string,
+  userMessage: string,
+  existingMemory: any
+) {
+  try {
+    const extractPrompt = `Based on this user message: "${userMessage}"
+Extract any new facts to remember about this user for future conversations.
+Respond with JSON only:
+{
+  "budget_stated": number or null,
+  "move_in_timeline": "asap"|"1_month"|"3_months"|"flexible"|null,
+  "new_dealbreakers": ["string"] or [],
+  "new_must_haves": ["string"] or [],
+  "new_neighborhoods": ["string"] or [],
+  "new_memory_notes": ["string"] or []
+}`;
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 256,
+        messages: [{ role: 'user', content: extractPrompt }],
+      }),
+    });
+
+    const data = await response.json();
+    const text = data.content?.[0]?.type === 'text' ? data.content[0].text : '{}';
+    const facts = JSON.parse(text);
+
+    const updates: any = { last_updated: new Date().toISOString() };
+
+    if (facts.budget_stated) updates.budget_stated = facts.budget_stated;
+    if (facts.move_in_timeline) updates.move_in_timeline = facts.move_in_timeline;
+
+    if (facts.new_dealbreakers?.length) {
+      updates.dealbreakers = [...new Set([...(existingMemory?.dealbreakers || []), ...facts.new_dealbreakers])];
+    }
+    if (facts.new_must_haves?.length) {
+      updates.must_haves = [...new Set([...(existingMemory?.must_haves || []), ...facts.new_must_haves])];
+    }
+    if (facts.new_neighborhoods?.length) {
+      updates.preferred_neighborhoods = [...new Set([...(existingMemory?.preferred_neighborhoods || []), ...facts.new_neighborhoods])];
+    }
+    if (facts.new_memory_notes?.length) {
+      updates.memory_notes = [...(existingMemory?.memory_notes || []).slice(-10), ...facts.new_memory_notes];
+    }
+
+    if (Object.keys(updates).length > 1) {
+      await supabase
+        .from('user_ai_memory')
+        .upsert({ user_id: userId, ...updates }, { onConflict: 'user_id' });
+    }
+  } catch (e) {
+    console.warn('[AI] Memory extraction failed:', e);
+  }
+}
+
+function buildSystemPrompt(profile: any, topMatches: any[], listings: any[], plan: string, memoryContext: string = ''): string {
   const matchSummary = topMatches.length > 0
     ? topMatches.map((m: any) =>
         `${m.name ?? 'Unknown'} (${m.score}% match, ${m.occupation ?? 'unknown occupation'}, ${m.zodiac_sign ?? 'unknown sign'})`
@@ -319,7 +485,24 @@ Do not ask profile questions. Focus on helping them find roommates and apartment
 
   let systemPrompt = `You are the AI assistant inside Rhome, a roommate matching app. Your name is Rhome AI.
 
+${memoryContext}
+
 Your personality: warm, direct, and genuinely helpful — like a knowledgeable friend who happens to know everything about NYC apartments and roommate compatibility. You're not a corporate chatbot. You're casual but smart. You give real opinions when asked. You use the user's actual data to give specific advice, not generic tips.
+
+MEMORY EXTRACTION:
+After each user message, if they mention ANY of these, note them for the memory update:
+- Budget changes or corrections
+- New dealbreakers (no smokers, no pets, etc.)
+- Move-in timeline
+- Neighborhood preferences
+- Work schedule / lifestyle
+- Any personal facts relevant to roommate matching
+
+NEVER:
+- Recommend restaurants, bars, or activities unrelated to housing
+- Give generic "tips for finding a roommate" articles
+- Suggest things you already know don't match their stated preferences
+- Ask for information you already have in the memory context above
 
 IMPORTANT STYLE RULES:
 - Write like a human texting a friend, not like a customer service bot
@@ -395,43 +578,6 @@ Only reference listings that are listed above — never make up data.
 Focus on actionable advice that helps the agent close placements faster.`;
 }
 
-async function callClaude(
-  systemPrompt: string,
-  history: { role: string; content: string }[],
-  userMessage: string
-): Promise<string> {
-  const messages = [
-    ...history.map(h => ({
-      role: h.role as 'user' | 'assistant',
-      content: h.content,
-    })),
-    { role: 'user' as const, content: userMessage },
-  ];
-
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 500,
-      system: systemPrompt,
-      messages,
-    }),
-  });
-
-  if (!response.ok) {
-    const err = await response.text();
-    console.error('Claude API error:', err);
-    throw new Error('Claude API request failed');
-  }
-
-  const data = await response.json();
-  return data.content?.[0]?.text ?? "I'm having trouble responding right now. Try again in a moment!";
-}
 
 async function extractAndSaveProfileUpdate(
   supabase: any,

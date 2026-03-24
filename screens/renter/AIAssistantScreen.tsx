@@ -22,17 +22,17 @@ type AIAssistantScreenProps = {
 };
 
 const QUICK_ACTIONS = [
-  { icon: 'users' as const, label: 'Find roommates\nin my budget', action: 'budget' },
-  { icon: 'star' as const, label: 'Zodiac\ncompatibility', action: 'zodiac' },
-  { icon: 'map-pin' as const, label: 'Best neighborhoods\nfor me', action: 'hoods' },
-  { icon: 'coffee' as const, label: 'Restaurant\nrecommendations', action: 'food' },
+  { icon: 'search' as const, label: 'Find my best\nmatches today', action: 'best_matches' },
+  { icon: 'trending-up' as const, label: 'Improve my\nprofile', action: 'improve_profile' },
+  { icon: 'map-pin' as const, label: 'Best neighborhoods\nfor my budget', action: 'neighborhoods' },
+  { icon: 'calendar' as const, label: 'Plan my\nmove-in timeline', action: 'timeline' },
 ];
 
 const QUICK_ACTION_PROMPTS: Record<string, string> = {
-  budget: 'Find me roommates within my budget',
-  zodiac: 'Check my zodiac compatibility with potential roommates',
-  hoods: 'What are the best neighborhoods for me?',
-  food: 'Recommend some restaurants near my area',
+  best_matches: 'Based on my profile, who should I be swiping right on today and why?',
+  improve_profile: 'What changes to my profile would get me the most matches?',
+  neighborhoods: 'What neighborhoods in NYC fit my budget and lifestyle best?',
+  timeline: 'Help me plan a realistic move-in timeline based on when I need to be moved in.',
 };
 
 const PROFILE_FIELDS = [
@@ -64,7 +64,7 @@ function getOpeningMessage(completion: number, userName: string): string {
   } else if (completion < 100) {
     return `Hey ${userName}! Almost there \u2014 your profile is ${completion}% done. Let me ask you one more thing so I can give you better matches.`;
   }
-  return `Hey ${userName}! Your profile looks great. I'm ready to help you find roommates and apartments. What are you looking for today?`;
+  return `Hey ${userName}! Your profile looks great — you're all set to find your perfect roommate. Ask me anything: who to swipe on, which neighborhoods fit your budget, how to stand out to hosts, or what to ask when you meet someone.`;
 }
 
 export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
@@ -148,37 +148,43 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
     setInputText('');
     setIsTyping(true);
 
+    const aiMessageId = `ai_${Date.now()}`;
+    const aiMessage: AIMessage = {
+      id: aiMessageId,
+      text: '',
+      isUser: false,
+      timestamp: new Date(),
+    };
+    setMessages(prev => [...prev, aiMessage]);
+
     try {
-      const { reply, remainingMessages } = await sendAIMessage(
+      await sendAIMessage(
         messageText,
-        sessionId.current
+        sessionId.current,
+        (delta: string) => {
+          setMessages(prev => prev.map(m =>
+            m.id === aiMessageId ? { ...m, text: m.text + delta } : m
+          ));
+          setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+        },
+        (remaining: number, _plan: string) => {
+          setIsTyping(false);
+          if (remaining <= 3) {
+            setLimitWarning(`${remaining} AI message${remaining !== 1 ? 's' : ''} remaining today`);
+          }
+        },
       );
-
-      setMessages(prev => [...prev, {
-        id: `ai_${Date.now()}`,
-        text: reply,
-        isUser: false,
-        timestamp: new Date(),
-      }]);
-
-      if (remainingMessages <= 2) {
-        setLimitWarning(`${remainingMessages} message${remainingMessages !== 1 ? 's' : ''} left today`);
-      }
 
       setIsTyping(false);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-
       await checkProfileCompletion();
     } catch {
-      const errorResponse: AIMessage = {
-        id: `ai_error_${Date.now()}`,
-        text: `I'm having trouble connecting right now. Please check your internet connection and try again in a moment.`,
-        isUser: false,
-        timestamp: new Date(),
-        suggestions: ['Try again'],
-      };
-      setMessages(prev => [...prev, errorResponse]);
       setIsTyping(false);
+      setMessages(prev => prev.map(m =>
+        m.id === aiMessageId
+          ? { ...m, text: 'Something went wrong. Please try again.' }
+          : m
+      ));
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     }
   };

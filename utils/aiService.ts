@@ -23,20 +23,110 @@ export const createSessionId = (): string => {
 
 export async function sendAIMessage(
   message: string,
-  sessionId: string
+  sessionId: string,
+  onChunk?: (text: string) => void,
+  onComplete?: (remainingMessages: number, plan: string) => void,
 ): Promise<AIResponse> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Not authenticated');
 
-  const response = await supabase.functions.invoke('ai-assistant', {
-    body: { message, sessionId },
-    headers: { Authorization: `Bearer ${session.access_token}` },
-  });
+  const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 
-  if (response.error) throw new Error(response.error.message);
-  if (response.data?.error) throw new Error(response.data.error);
+  const response = await fetch(
+    `${supabaseUrl}/functions/v1/ai-assistant`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ message, sessionId }),
+    }
+  );
 
-  return response.data as AIResponse;
+  if (!response.ok) {
+    const errBody = await response.text().catch(() => '');
+    throw new Error(errBody || 'AI request failed');
+  }
+
+  const contentType = response.headers.get('content-type') || '';
+  const isStreaming = contentType.includes('text/event-stream');
+
+  if (!isStreaming || !onChunk) {
+    const data = await response.json();
+    if (data?.error) throw new Error(data.error);
+    return data as AIResponse;
+  }
+
+  let fullReply = '';
+  let remaining = 0;
+  let planResult = 'free';
+
+  if (response.body && typeof response.body.getReader === 'function') {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const data = JSON.parse(line.slice(6));
+          if (data.delta) {
+            fullReply += data.delta;
+            onChunk(data.delta);
+          }
+          if (data.done) {
+            remaining = data.remainingMessages ?? 0;
+            planResult = data.plan ?? 'free';
+            onComplete?.(remaining, planResult);
+          }
+        } catch {}
+      }
+    }
+
+    if (buffer.startsWith('data: ')) {
+      try {
+        const data = JSON.parse(buffer.slice(6));
+        if (data.delta) {
+          fullReply += data.delta;
+          onChunk(data.delta);
+        }
+        if (data.done) {
+          remaining = data.remainingMessages ?? 0;
+          planResult = data.plan ?? 'free';
+          onComplete?.(remaining, planResult);
+        }
+      } catch {}
+    }
+  } else {
+    const text = await response.text();
+    const lines = text.split('\n');
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      try {
+        const data = JSON.parse(line.slice(6));
+        if (data.delta) {
+          fullReply += data.delta;
+          onChunk(data.delta);
+        }
+        if (data.done) {
+          remaining = data.remainingMessages ?? 0;
+          planResult = data.plan ?? 'free';
+          onComplete?.(remaining, planResult);
+        }
+      } catch {}
+    }
+  }
+
+  return { reply: fullReply, remainingMessages: remaining, plan: planResult };
 }
 
 export async function loadConversationHistory(sessionId: string): Promise<AIServiceMessage[]> {

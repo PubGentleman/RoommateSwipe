@@ -1,0 +1,524 @@
+# Rhome — Questionnaire UI Redesign
+## Replit Agent Prompt
+
+---
+
+## Problem
+
+The questionnaire in `screens/shared/ProfileQuestionnaireScreen.tsx` uses full-width `SelectionCard` stacks for every question step. These are tall rectangular cards — one per row — that feel like settings menus. Users must scroll to see all options, all steps look identical, and binary yes/no questions use the same oversized card as multi-choice questions. The personality step uses a different emoji tile grid which is far better — but it's only used once.
+
+This prompt replaces the input format for each step to match the question type, while keeping all state logic, step navigation, validation, and saved data untouched.
+
+**Do not change:**
+- Any state variables or how answers are stored
+- The `handleNext` / `handleBack` navigation logic
+- The progress bar at the top
+- Step order or step IDs (unless specified below)
+- Any data submitted to Supabase
+
+---
+
+## New Answer Input Formats
+
+Four new layout components replace `SelectionCard` stacks throughout the questionnaire. All are defined inline in the file or as local components — no new files needed.
+
+---
+
+### Component 1 — `EmojiTileGrid`
+
+Use for: lifestyle multi-choice questions (sleep schedule, cleanliness, noise level, guest preference, work style, personality traits)
+
+```tsx
+// Local component — add near top of ProfileQuestionnaireScreen
+function EmojiTileGrid({
+  options,
+  selected,
+  onSelect,
+  multiSelect = false,
+}: {
+  options: { value: string; emoji: string; label: string; subtitle?: string }[];
+  selected: string | string[];
+  onSelect: (value: string) => void;
+  multiSelect?: boolean;
+}) {
+  const { theme } = useTheme();
+
+  const isSelected = (value: string) =>
+    multiSelect
+      ? (selected as string[]).includes(value)
+      : selected === value;
+
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+      {options.map((opt) => {
+        const active = isSelected(opt.value);
+        return (
+          <TouchableOpacity
+            key={opt.value}
+            onPress={() => onSelect(opt.value)}
+            style={{
+              width: '47%',
+              backgroundColor: active ? theme.primary + '20' : theme.backgroundSecondary,
+              borderWidth: 2,
+              borderColor: active ? theme.primary : theme.border,
+              borderRadius: 14,
+              paddingVertical: 14,
+              paddingHorizontal: 12,
+              alignItems: 'center',
+              gap: 6,
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={{ fontSize: 28 }}>{opt.emoji}</Text>
+            <Text style={{
+              fontSize: 13,
+              fontWeight: '600',
+              color: active ? theme.primary : theme.text,
+              textAlign: 'center',
+            }}>
+              {opt.label}
+            </Text>
+            {opt.subtitle && (
+              <Text style={{
+                fontSize: 11,
+                color: theme.textSecondary,
+                textAlign: 'center',
+                lineHeight: 14,
+              }}>
+                {opt.subtitle}
+              </Text>
+            )}
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+```
+
+---
+
+### Component 2 — `BinaryChoice`
+
+Use for: yes/no questions (smoking, pets, private bathroom preference)
+
+```tsx
+function BinaryChoice({
+  options,
+  selected,
+  onSelect,
+}: {
+  options: { value: string; emoji: string; label: string }[];
+  selected: string;
+  onSelect: (value: string) => void;
+}) {
+  const { theme } = useTheme();
+
+  return (
+    <View style={{ flexDirection: 'row', gap: 14 }}>
+      {options.map((opt) => {
+        const active = selected === opt.value;
+        return (
+          <TouchableOpacity
+            key={opt.value}
+            onPress={() => onSelect(opt.value)}
+            style={{
+              flex: 1,
+              backgroundColor: active ? theme.primary : theme.backgroundSecondary,
+              borderWidth: 2,
+              borderColor: active ? theme.primary : theme.border,
+              borderRadius: 18,
+              paddingVertical: 28,
+              alignItems: 'center',
+              gap: 10,
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={{ fontSize: 36 }}>{opt.emoji}</Text>
+            <Text style={{
+              fontSize: 16,
+              fontWeight: '700',
+              color: active ? '#fff' : theme.text,
+            }}>
+              {opt.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+```
+
+---
+
+### Component 3 — `IconScale`
+
+Use for: 5-point scale questions (cleanliness level, noise tolerance)
+
+```tsx
+function IconScale({
+  levels,
+  selected,
+  onSelect,
+}: {
+  levels: { value: string; emoji: string; label: string }[];
+  selected: string;
+  onSelect: (value: string) => void;
+}) {
+  const { theme } = useTheme();
+
+  return (
+    <View>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+        {levels.map((level) => {
+          const active = selected === level.value;
+          return (
+            <TouchableOpacity
+              key={level.value}
+              onPress={() => onSelect(level.value)}
+              style={{
+                flex: 1,
+                alignItems: 'center',
+                paddingVertical: 14,
+                marginHorizontal: 3,
+                backgroundColor: active ? theme.primary + '20' : theme.backgroundSecondary,
+                borderWidth: 2,
+                borderColor: active ? theme.primary : theme.border,
+                borderRadius: 12,
+                gap: 4,
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={{ fontSize: 24 }}>{level.emoji}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+      {/* Show selected label below scale */}
+      {selected && (
+        <Text style={{
+          textAlign: 'center',
+          color: theme.primary,
+          fontWeight: '600',
+          fontSize: 14,
+          marginTop: 6,
+        }}>
+          {levels.find(l => l.value === selected)?.label}
+        </Text>
+      )}
+    </View>
+  );
+}
+```
+
+---
+
+### Component 4 — `CheckboxPills`
+
+Use for: the dealbreakers step (multi-select checkboxes)
+
+```tsx
+function CheckboxPills({
+  options,
+  selected,
+  onToggle,
+}: {
+  options: { value: string; label: string; emoji: string }[];
+  selected: string[];
+  onToggle: (value: string) => void;
+}) {
+  const { theme } = useTheme();
+
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+      {options.map((opt) => {
+        const active = selected.includes(opt.value);
+        return (
+          <TouchableOpacity
+            key={opt.value}
+            onPress={() => onToggle(opt.value)}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              paddingVertical: 10,
+              paddingHorizontal: 16,
+              backgroundColor: active ? theme.primary + '20' : theme.backgroundSecondary,
+              borderWidth: 2,
+              borderColor: active ? theme.primary : theme.border,
+              borderRadius: 100,
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={{ fontSize: 16 }}>{opt.emoji}</Text>
+            <Text style={{
+              fontSize: 13,
+              fontWeight: active ? '700' : '500',
+              color: active ? theme.primary : theme.text,
+            }}>
+              {opt.label}
+            </Text>
+            {active && (
+              <Ionicons name="checkmark-circle" size={16} color={theme.primary} />
+            )}
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+```
+
+---
+
+## Step-by-Step Replacements
+
+For each step below, find the existing `case` block inside `renderStepContent()` and replace the `SelectionCard` list with the new component. Keep all surrounding container `<View>` wrappers, step title/subtitle `<Text>` elements, and `<Animated.View>` wrappers — only replace the answer cards inside.
+
+---
+
+### Step: `sleepSchedule` (or merged `sleepCleanliness` step 1 of 2)
+
+Replace SelectionCards with `EmojiTileGrid`:
+
+```tsx
+<EmojiTileGrid
+  options={[
+    { value: 'early_sleeper', emoji: '🌅', label: 'Early Bird', subtitle: 'Bed by 10pm, up by 7am' },
+    { value: 'night_owl', emoji: '🦉', label: 'Night Owl', subtitle: 'Bed after midnight, up late' },
+    { value: 'flexible', emoji: '😴', label: 'Flexible', subtitle: 'Adjust to roommate' },
+    { value: 'shift_worker', emoji: '🔄', label: 'Shift Worker', subtitle: 'Irregular hours' },
+  ]}
+  selected={sleepSchedule}
+  onSelect={setSleepSchedule}
+/>
+```
+
+---
+
+### Step: `cleanlinessLevel`
+
+Replace SelectionCards with `IconScale`:
+
+```tsx
+<IconScale
+  levels={[
+    { value: '1', emoji: '😅', label: 'Pretty relaxed — organized chaos is fine' },
+    { value: '2', emoji: '🙂', label: 'Fairly tidy — clean up after myself' },
+    { value: '3', emoji: '✨', label: 'Clean — regular tidying expected' },
+    { value: '4', emoji: '🧹', label: 'Very clean — things have a place' },
+    { value: '5', emoji: '🏥', label: 'Spotless — clean is a lifestyle' },
+  ]}
+  selected={cleanlinessLevel}
+  onSelect={setCleanlinessLevel}
+/>
+```
+
+---
+
+### Step: `smokingPreference` (or `smokingPets` step 1 of 2)
+
+Replace SelectionCards with `BinaryChoice`:
+
+```tsx
+<BinaryChoice
+  options={[
+    { value: 'non_smoker', emoji: '🚭', label: 'Non-Smoker' },
+    { value: 'smoker', emoji: '🚬', label: 'Smoker' },
+  ]}
+  selected={smokingPreference}
+  onSelect={setSmokingPreference}
+/>
+```
+
+---
+
+### Step: `petPreference` (or `smokingPets` step 2 of 2)
+
+Replace SelectionCards with `EmojiTileGrid`:
+
+```tsx
+<EmojiTileGrid
+  options={[
+    { value: 'no_pets', emoji: '🚫', label: 'No Pets', subtitle: "I don't have or want pets" },
+    { value: 'has_dog', emoji: '🐕', label: 'Dog Owner', subtitle: 'I have a dog' },
+    { value: 'has_cat', emoji: '🐈', label: 'Cat Owner', subtitle: 'I have a cat' },
+    { value: 'loves_pets', emoji: '🐾', label: 'Pet Friendly', subtitle: "Love all animals" },
+  ]}
+  selected={petPreference}
+  onSelect={setPetPreference}
+/>
+```
+
+---
+
+### Step: `guestPreference`
+
+Replace SelectionCards with `EmojiTileGrid`:
+
+```tsx
+<EmojiTileGrid
+  options={[
+    { value: 'rarely', emoji: '🏠', label: 'Rarely', subtitle: 'Guests maybe once a month' },
+    { value: 'occasionally', emoji: '👋', label: 'Occasionally', subtitle: 'Weekends sometimes' },
+    { value: 'often', emoji: '🎉', label: 'Often', subtitle: 'Friends over regularly' },
+    { value: 'overnight', emoji: '🛏️', label: 'Overnight OK', subtitle: 'Partners stay over' },
+  ]}
+  selected={guestPreference}
+  onSelect={setGuestPreference}
+/>
+```
+
+---
+
+### Step: `workStyle`
+
+Replace SelectionCards with `EmojiTileGrid`:
+
+```tsx
+<EmojiTileGrid
+  options={[
+    { value: 'office', emoji: '🏢', label: 'Office', subtitle: 'Out all day' },
+    { value: 'remote', emoji: '💻', label: 'Remote', subtitle: 'Home most days' },
+    { value: 'hybrid', emoji: '🔀', label: 'Hybrid', subtitle: 'Mix of both' },
+    { value: 'student', emoji: '📚', label: 'Student', subtitle: 'Class + study' },
+    { value: 'flexible', emoji: '🌍', label: 'Flexible', subtitle: 'Varies by week' },
+    { value: 'night_shift', emoji: '🌙', label: 'Night Shift', subtitle: 'Work nights' },
+  ]}
+  selected={workStyle}
+  onSelect={setWorkStyle}
+/>
+```
+
+---
+
+### Step: `noiseLevel`
+
+Replace SelectionCards with `IconScale`:
+
+```tsx
+<IconScale
+  levels={[
+    { value: '1', emoji: '🤫', label: 'Very quiet — I need near-silence to relax' },
+    { value: '2', emoji: '📖', label: 'Quiet — music is fine, TV low' },
+    { value: '3', emoji: '🎵', label: 'Moderate — normal household sounds' },
+    { value: '4', emoji: '🎧', label: 'Lively — music, TV, talking' },
+    { value: '5', emoji: '🎉', label: 'Loud — love an active, buzzy home' },
+  ]}
+  selected={noiseLevel}
+  onSelect={setNoiseLevel}
+/>
+```
+
+---
+
+### Step: `dealbreakers`
+
+Replace SelectionCards with `CheckboxPills`:
+
+```tsx
+<CheckboxPills
+  options={[
+    { value: 'no_smokers', emoji: '🚭', label: 'No smokers' },
+    { value: 'no_cats', emoji: '🐈', label: 'No cats' },
+    { value: 'no_dogs', emoji: '🐕', label: 'No dogs' },
+    { value: 'no_pets', emoji: '🐾', label: 'No pets at all' },
+    { value: 'private_bathroom', emoji: '🚿', label: 'Private bathroom' },
+    { value: 'same_sex_only', emoji: '🚻', label: 'Same-sex only' },
+    { value: 'no_overnight_guests', emoji: '🛏️', label: 'No overnight guests' },
+    { value: 'quiet_hours', emoji: '🤫', label: 'Strict quiet hours' },
+  ]}
+  selected={dealbreakers}
+  onToggle={(value) => {
+    setDealbreakers(prev =>
+      prev.includes(value) ? prev.filter(d => d !== value) : [...prev, value]
+    );
+  }}
+/>
+```
+
+---
+
+### Step: `personality` (already uses emoji tiles — update styling only)
+
+The personality step already uses a tile grid but with `Pressable`. Replace with `EmojiTileGrid` in multi-select mode:
+
+```tsx
+<EmojiTileGrid
+  options={[
+    { value: 'homebody', emoji: '🏠', label: 'Homebody' },
+    { value: 'social_butterfly', emoji: '🦋', label: 'Social' },
+    { value: 'adventurous', emoji: '🧗', label: 'Adventurous' },
+    { value: 'creative', emoji: '🎨', label: 'Creative' },
+    { value: 'athletic', emoji: '💪', label: 'Athletic' },
+    { value: 'foodie', emoji: '🍜', label: 'Foodie' },
+    { value: 'bookworm', emoji: '📚', label: 'Bookworm' },
+    { value: 'gamer', emoji: '🎮', label: 'Gamer' },
+    { value: 'music_lover', emoji: '🎵', label: 'Music Lover' },
+    { value: 'wellness', emoji: '🧘', label: 'Wellness' },
+    { value: 'traveler', emoji: '✈️', label: 'Traveler' },
+    { value: 'professional', emoji: '💼', label: 'Professional' },
+  ]}
+  selected={personalityTraits}
+  onSelect={(value) => {
+    setPersonalityTraits(prev =>
+      prev.includes(value)
+        ? prev.filter(t => t !== value)
+        : prev.length < 5 ? [...prev, value] : prev
+    );
+  }}
+  multiSelect={true}
+/>
+```
+
+If `personalityTraits` is already defined as a string array, this works as-is.
+
+Add a helper note below the grid:
+```tsx
+<Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 10, textAlign: 'center' }}>
+  Pick up to 5
+</Text>
+```
+
+---
+
+## Also Update: `OnboardingScreen.tsx` Lifestyle Step
+
+If `OnboardingScreen.tsx` has a lifestyle preferences step that uses `SelectionCard`, apply the same `EmojiTileGrid` components there using the same options and state setters.
+
+---
+
+## Remove Unused Imports
+
+After replacing all `SelectionCard` usages in the questionnaire steps above, check whether `SelectionCard` is used anywhere else in `ProfileQuestionnaireScreen.tsx`. If it is only used in these steps, remove its import.
+
+Do not remove `SelectionCard` if it's still used in other parts of the file.
+
+---
+
+## Do Not Change
+
+- Any step logic, state variables, or validation
+- The step progress bar, header, or navigation buttons
+- The `photos` step — it uses image pickers, keep as-is
+- The `basicInfo` step — it uses text inputs, keep as-is
+- The `budgetLocation` step — it uses sliders/inputs, keep as-is
+- Any Supabase save or profile update logic
+- `SelectionCard` component itself (it may be used in other screens)
+
+---
+
+## Summary
+
+| Step | Old Format | New Format |
+|---|---|---|
+| Sleep schedule | 4 tall SelectionCards | 2×2 EmojiTileGrid |
+| Cleanliness | 5 tall SelectionCards | 5-point IconScale |
+| Smoking | 2 tall SelectionCards | BinaryChoice (2 large buttons) |
+| Pets | 4 tall SelectionCards | 2×2 EmojiTileGrid |
+| Guests | 4 tall SelectionCards | 2×2 EmojiTileGrid |
+| Work style | 5–6 tall SelectionCards | 2×3 EmojiTileGrid |
+| Noise level | 5 tall SelectionCards | 5-point IconScale |
+| Dealbreakers | 8 tall SelectionCards | Checkbox pill cloud |
+| Personality | Custom Pressable tiles | EmojiTileGrid (multi-select) |

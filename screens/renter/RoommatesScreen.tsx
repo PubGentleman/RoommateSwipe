@@ -46,6 +46,7 @@ import { useConfirm } from '../../contexts/ConfirmContext';
 import { getBestMatchToday } from '../../utils/bestMatchToday';
 import { AIGroupSuggestionCard } from '../../components/AIGroupSuggestionCard';
 import { InstagramBadge } from '../../components/InstagramBadge';
+import { WhyThisMatchModal } from '../../components/WhyThisMatchModal';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Limit card size for web/desktop viewing
@@ -89,6 +90,7 @@ export const RoommatesScreen = () => {
   const [unfilteredProfiles, setUnfilteredProfiles] = useState<RoommateProfile[]>([]);
   const [showAISheet, setShowAISheet] = useState(false);
   const [aiSheetContext, setAiSheetContext] = useState<ScreenContext>('match');
+  const [showWhyModal, setShowWhyModal] = useState(false);
   const [refinementQuestion, setRefinementQuestion] = useState<RefinementQuestion | null>(null);
   const [showRefinementBanner, setShowRefinementBanner] = useState(false);
   const refinementBannerOpacity = useRef(new RNAnimated.Value(0)).current;
@@ -1453,6 +1455,13 @@ export const RoommatesScreen = () => {
                   <Feather name="heart" size={12} color="#ff8070" />
                   <ThemedText style={styles.tagMatchText}>{currentProfile.compatibility || 50}% Match</ThemedText>
                 </View>
+                <Pressable
+                  style={styles.whyMatchButton}
+                  onPress={() => setShowWhyModal(true)}
+                >
+                  <ThemedText style={styles.whyMatchText}>Why?</ThemedText>
+                  <Feather name="zap" size={12} color="#FF6B6B" />
+                </Pressable>
               </View>
               {(() => {
                 const rawMyTags = user?.profileData?.interests;
@@ -2408,6 +2417,16 @@ export const RoommatesScreen = () => {
         </RNAnimated.View>
       ) : null}
 
+      {currentProfile ? (
+        <WhyThisMatchModal
+          visible={showWhyModal}
+          profileId={currentProfile.id}
+          profileName={currentProfile.name}
+          compatibilityScore={currentProfile.compatibility || 50}
+          onClose={() => setShowWhyModal(false)}
+        />
+      ) : null}
+
       <RhomeAISheet
         visible={showAISheet}
         onDismiss={() => {
@@ -2419,6 +2438,8 @@ export const RoommatesScreen = () => {
         contextData={{
           match: {
             currentProfile: profiles[currentIndex] || undefined,
+            rightSwipeCount,
+            leftSwipeCount: totalSwipeCount - rightSwipeCount,
           },
         }}
         refinementQuestion={refinementQuestion}
@@ -2735,6 +2756,22 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '600',
     color: '#ff8070',
+  },
+  whyMatchButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,107,107,0.15)',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,107,0.3)',
+  },
+  whyMatchText: {
+    color: '#FF6B6B',
+    fontSize: 12,
+    fontWeight: '600',
   },
   actionRow: {
     flexDirection: 'row',
