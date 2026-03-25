@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { View, StyleSheet, Image, Pressable, Dimensions, Modal, ScrollView, Text, Animated as RNAnimated } from 'react-native';
+import { View, StyleSheet, Image, Pressable, Dimensions, Modal, ScrollView, Text, Animated as RNAnimated, InteractionManager } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, withSequence, runOnJS, interpolate, FadeInDown } from 'react-native-reanimated';
 import { Feather } from '../../components/VectorIcons';
@@ -452,16 +452,18 @@ export const RoommatesScreen = () => {
   const isProfileOnline = currentProfile ? Math.random() > 0.5 : false;
 
   const advanceCard = () => {
-    setCurrentIndex(prev => {
-      const next = prev + 1;
-      prefetchNextImages(profiles, next + 1);
-      return next;
+    InteractionManager.runAfterInteractions(() => {
+      setCurrentIndex(prev => {
+        const next = prev + 1;
+        prefetchNextImages(profiles, next + 1);
+        return next;
+      });
+      translateX.value = 0;
+      translateY.value = 0;
+      rotation.value = 0;
+      cardOpacity.value = 1;
+      isAnimatingSwipe.value = false;
     });
-    translateX.value = 0;
-    translateY.value = 0;
-    rotation.value = 0;
-    cardOpacity.value = 1;
-    isAnimatingSwipe.value = false;
   };
 
   const handleInviteToGroup = async () => {
@@ -505,6 +507,7 @@ export const RoommatesScreen = () => {
     const toY = action === 'superlike' ? -SCREEN_HEIGHT : 0;
     const exitDuration = 250;
 
+    cardOpacity.value = withTiming(0, { duration: exitDuration });
     translateX.value = withTiming(toX, { duration: exitDuration });
     translateY.value = withTiming(toY, { duration: exitDuration });
     rotation.value = withTiming(direction * 15, { duration: exitDuration }, () => {
