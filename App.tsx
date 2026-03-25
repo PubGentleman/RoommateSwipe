@@ -15,6 +15,7 @@ import { CityProvider } from "./contexts/CityContext";
 import { ProfileReminderProvider } from "./contexts/ProfileReminderContext";
 import { ConfirmProvider } from "./contexts/ConfirmContext";
 import { StripeWrapper } from "./components/StripeWrapper";
+import { RevenueCatProvider } from "./contexts/RevenueCatContext";
 import { StorageService } from "./utils/storage";
 import { isDev } from "./utils/dataUtils";
 import { checkDailyTrigger } from "./utils/insightRefresh";
@@ -57,10 +58,12 @@ export default function App() {
                   <ProfileReminderProvider>
                     <NotificationProvider>
                       <ConfirmProvider>
-                        <NavigationContainer>
-                          <RootNavigator />
-                        </NavigationContainer>
-                        <StatusBar style="light" />
+                        <RevenueCatProvider>
+                          <NavigationContainer>
+                            <RootNavigator />
+                          </NavigationContainer>
+                          <StatusBar style="light" />
+                        </RevenueCatProvider>
                       </ConfirmProvider>
                     </NotificationProvider>
                   </ProfileReminderProvider>

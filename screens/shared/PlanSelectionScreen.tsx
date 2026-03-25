@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { useStripePayment } from '../../hooks/useStripePayment';
+import { useRevenueCat } from '../../contexts/RevenueCatContext';
 
 const BG = '#111111';
 const CARD_BG = '#1a1a1a';
@@ -161,8 +162,10 @@ export const PlanSelectionScreen = () => {
   const insets = useSafeAreaInsets();
   const { user, upgradeToPlus, upgradeToElite, upgradeHostPlan, completeOnboardingStep } = useAuth();
   const { processPayment } = useStripePayment();
+  const { restore } = useRevenueCat();
   const { alert } = useConfirm();
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
+  const [restoring, setRestoring] = useState(false);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -341,6 +344,28 @@ export const PlanSelectionScreen = () => {
           );
         })}
 
+        <Pressable
+          style={[s.restoreBtn, restoring && { opacity: 0.5 }]}
+          disabled={restoring}
+          onPress={async () => {
+            setRestoring(true);
+            try {
+              const result = await restore();
+              if (result.success) {
+                await alert({ title: 'Purchases Restored', message: 'Your previous purchases have been restored.', variant: 'success' });
+              } else if (result.error) {
+                await alert({ title: 'Restore Failed', message: result.error, variant: 'warning' });
+              }
+            } catch (e) {
+              await alert({ title: 'Error', message: 'Could not restore purchases. Please try again.', variant: 'warning' });
+            } finally {
+              setRestoring(false);
+            }
+          }}
+        >
+          <Text style={s.restoreBtnText}>{restoring ? 'Restoring...' : 'Restore Purchases'}</Text>
+        </Pressable>
+
         <Text style={s.footer}>
           {isHost
             ? 'You can change your plan anytime from your profile settings.'
@@ -438,6 +463,8 @@ const s = StyleSheet.create({
   selectBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
   selectBtnTextFree: { color: 'rgba(255,255,255,0.7)' },
 
+  restoreBtn: { alignSelf: 'center', paddingVertical: 10, paddingHorizontal: 20, marginBottom: 4 },
+  restoreBtnText: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.4)', textDecorationLine: 'underline' },
   footer: { textAlign: 'center', fontSize: 12, color: 'rgba(255,255,255,0.3)', marginTop: 8, marginBottom: 20, paddingHorizontal: 20, lineHeight: 18 },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 24 },

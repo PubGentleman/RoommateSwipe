@@ -11,6 +11,7 @@ import { useConfirm } from '../../contexts/ConfirmContext';
 import { StorageService } from '../../utils/storage';
 import * as Haptics from 'expo-haptics';
 import { useStripePayment } from '../../hooks/useStripePayment';
+import { useRevenueCat } from '../../contexts/RevenueCatContext';
 import { PurchaseConfirmModal } from '../../components/modals/PurchaseConfirmModal';
 import type { PurchaseConfig } from '../../constants/purchaseConfig';
 import { RENTER_PLAN_CONFIGS } from '../../constants/purchaseConfig';
@@ -121,6 +122,7 @@ export const PlansScreen = () => {
   const insets = useSafeAreaInsets();
   const { user, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscriptionAtPeriodEnd, reactivateSubscription } = useAuth();
   const { processPayment } = useStripePayment();
+  const { restore } = useRevenueCat();
   const { alert } = useConfirm();
   const navigation = useNavigation<PlansScreenNavigationProp>();
 
@@ -128,6 +130,7 @@ export const PlansScreen = () => {
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [subscribing, setSubscribing] = useState(false);
+  const [restoring, setRestoring] = useState(false);
   const [pendingAction, setPendingAction] = useState<{ type: 'downgrade' | 'cancel'; target: 'basic' | 'plus' } | null>(null);
 
   const currentPlan = normalizeRenterPlan(user?.subscription?.plan);
@@ -504,6 +507,28 @@ export const PlansScreen = () => {
 
         {PLAN_DISPLAY.map(renderPlanCard)}
 
+        <Pressable
+          style={[styles.restoreBtn, restoring && { opacity: 0.5 }]}
+          disabled={restoring}
+          onPress={async () => {
+            setRestoring(true);
+            try {
+              const result = await restore();
+              if (result.success) {
+                await alert({ title: 'Purchases Restored', message: 'Your previous purchases have been restored.', variant: 'success' });
+              } else if (result.error) {
+                await alert({ title: 'Restore Failed', message: result.error, variant: 'warning' });
+              }
+            } catch (e) {
+              await alert({ title: 'Error', message: 'Could not restore purchases. Please try again.', variant: 'warning' });
+            } finally {
+              setRestoring(false);
+            }
+          }}
+        >
+          <Text style={styles.restoreBtnText}>{restoring ? 'Restoring...' : 'Restore Purchases'}</Text>
+        </Pressable>
+
         <Text style={styles.finePrint}>
           Cancel anytime · No hidden fees{'\n'}
           {billingCycle === 'monthly'
@@ -725,6 +750,19 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,107,91,0.2)',
   },
   upgradeNudgeText: { fontSize: 12, color: ROOMDR_CORAL, flex: 1, lineHeight: 17 },
+
+  restoreBtn: {
+    alignSelf: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    marginBottom: 8,
+  },
+  restoreBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.4)',
+    textDecorationLine: 'underline',
+  },
 
   finePrint: {
     textAlign: 'center',

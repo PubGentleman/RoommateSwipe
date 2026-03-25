@@ -69,7 +69,7 @@ Supabase provides the entire backend infrastructure:
 
 ## Subscription & Paywall System
 
-Tiered subscription plans for renters (Basic, Plus, Elite), hosts (Free, Starter, Pro, Business), and agents (Pay Per Use, Starter, Pro, Business), plus one-time purchases. Stripe handles all payment processing. Plan limits are centralized in `constants/planLimits.ts`.
+Tiered subscription plans for renters (Basic, Plus, Elite), hosts (Free, Starter, Pro, Business), and agents (Pay Per Use, Starter, Pro, Business), plus one-time purchases. **Hybrid payment architecture:** RevenueCat handles Apple IAP + Google Play Billing on native iOS/Android; Stripe handles web payments. `RevenueCatProvider` (contexts/RevenueCatContext.tsx) wraps the app, `lib/revenueCat.ts` provides initialization/purchase/restore helpers. `useStripePayment.native.ts` routes to RevenueCat on native platforms, falls back to Stripe on web. "Restore Purchases" button on all plan screens (required for App Store). RevenueCat webhook edge function (`revenuecat-webhook`) syncs subscription state to Supabase. Plan limits are centralized in `constants/planLimits.ts`.
 
 ## Data Layer
 
@@ -101,7 +101,9 @@ Babel module resolver, platform-specific UI adaptations, performance optimizatio
 - `expo-haptics`
 
 **Payments:**
-- `@stripe/stripe-react-native`
+- `@stripe/stripe-react-native` (web fallback)
+- `react-native-purchases` (RevenueCat — Apple IAP + Google Play Billing on native)
+- `@replit/revenuecat-sdk` (RevenueCat API client for seeding/webhooks)
 
 **Storage & State:**
 - `@react-native-async-storage/async-storage`

@@ -8,6 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { useStripePayment } from '../../hooks/useStripePayment';
+import { useRevenueCat } from '../../contexts/RevenueCatContext';
 
 const BG = '#111';
 const CARD_BG = '#1a1a1a';
@@ -157,7 +158,9 @@ export const HostPricingScreen = () => {
   const { user, getHostPlan, upgradeHostPlan, downgradeHostPlan, purchaseListingBoost, purchaseHostVerification, purchaseSuperInterest } = useAuth();
   const { confirm, alert: showAlert } = useConfirm();
   const { processPayment } = useStripePayment();
+  const { restore } = useRevenueCat();
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
+  const [restoring, setRestoring] = useState(false);
   const [selectedTier, setSelectedTier] = useState<HostPlan>('pro');
   const currentPlan = getHostPlan();
 
@@ -431,6 +434,28 @@ export const HostPricingScreen = () => {
             </View>
           ))}
         </View>
+
+        <Pressable
+          style={[s.restoreBtn, restoring && { opacity: 0.5 }]}
+          disabled={restoring}
+          onPress={async () => {
+            setRestoring(true);
+            try {
+              const result = await restore();
+              if (result.success) {
+                await showAlert({ title: 'Purchases Restored', message: 'Your previous purchases have been restored.', variant: 'success' });
+              } else if (result.error) {
+                await showAlert({ title: 'Restore Failed', message: result.error, variant: 'warning' });
+              }
+            } catch (e) {
+              await showAlert({ title: 'Error', message: 'Could not restore purchases. Please try again.', variant: 'warning' });
+            } finally {
+              setRestoring(false);
+            }
+          }}
+        >
+          <Text style={s.restoreBtnText}>{restoring ? 'Restoring...' : 'Restore Purchases'}</Text>
+        </Pressable>
 
         <Text style={s.finePrint}>
           Cancel anytime in Account Settings  ·  Prices in USD{'\n'}
@@ -869,6 +894,18 @@ const s = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: '#fff',
+  },
+  restoreBtn: {
+    alignSelf: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    marginBottom: 8,
+  },
+  restoreBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.4)',
+    textDecorationLine: 'underline',
   },
   finePrint: {
     textAlign: 'center',

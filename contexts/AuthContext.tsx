@@ -6,6 +6,7 @@ import { User, Notification } from '../types/models';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import type { Session } from '@supabase/supabase-js';
 import { activateBoost as boostServiceActivateBoost, deactivateExpiredBoosts } from '../services/boostService';
+import { identifyUser as rcIdentifyUser, logoutRevenueCat as rcLogout } from '../lib/revenueCat';
 
 export type UserRole = 'renter' | 'host';
 
@@ -341,6 +342,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await StorageService.setCurrentUser(mappedUser);
       await StorageService.addOrUpdateUser(mappedUser);
 
+      rcIdentifyUser(mappedUser.id).catch(() => {});
+
       setUser(mappedUser);
     } catch (error) {
       console.error('Error loading user from Supabase:', error);
@@ -631,6 +634,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     await supabase.auth.signOut();
     await StorageService.logoutAndReset();
+    rcLogout().catch(() => {});
     setUser(null);
   };
 

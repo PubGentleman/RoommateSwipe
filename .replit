@@ -77,7 +77,7 @@ ensurePreviewReachable = "/status"
 
 [agent]
 stack = "EXPO"
-integrations = ["stripe:1.0.0"]
+integrations = ["stripe:1.0.0", "revenuecat:1.0.0"]
 
 [deployment]
 deploymentTarget = "static"
@@ -100,6 +100,10 @@ value = "0"
 [userenv.shared]
 EXPO_PUBLIC_SUPABASE_URL = "https://lnjupgvvsbdooomvdjho.supabase.co"
 EXPO_PUBLIC_GOOGLE_MAPS_API_KEY = "AIzaSyDE0nHW-BWYB9unrSztxncYWITtQwFGYa4"
+EXPO_PUBLIC_REVENUECAT_TEST_API_KEY = "test_QYjXcboAZxWLyZURrZMcwWgymEu"
+EXPO_PUBLIC_REVENUECAT_IOS_API_KEY = "appl_TEBrLjKZRBzOJnqAIUQhtKDdZQs"
+EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY = "goog_bQJLyySFQHwCerKZtVyrnKtrxqf"
+REVENUECAT_PROJECT_ID = "projfff5f27a"
 
 [userenv.development]
 EXPO_PUBLIC_ENV = "development"
