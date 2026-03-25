@@ -10,6 +10,17 @@ import { identifyUser as rcIdentifyUser, logoutRevenueCat as rcLogout } from '..
 
 export type UserRole = 'renter' | 'host';
 
+export function getInitialRoute(user: User): 'HostTabs' | 'RenterTabs' {
+  if (user.hostType === 'agent' || user.hostType === 'company') {
+    return 'HostTabs';
+  }
+  if (user.role === 'host') {
+    const mode = user.activeMode ?? 'host';
+    return mode === 'renter' ? 'RenterTabs' : 'HostTabs';
+  }
+  return 'RenterTabs';
+}
+
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;

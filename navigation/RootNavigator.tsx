@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth, getInitialRoute } from '../contexts/AuthContext';
 import { LoginScreen } from '../screens/auth/LoginScreen';
 import { OnboardingScreen } from '../screens/shared/OnboardingScreen';
 import { ProfileQuestionnaireScreen } from '../screens/shared/ProfileQuestionnaireScreen';
@@ -45,7 +45,7 @@ function HostMain() { return <HostTabNavigator />; }
 HostMain.displayName = 'HostMain';
 
 export const RootNavigator = () => {
-  const { user, isLoading, activeMode } = useAuth();
+  const { user, isLoading } = useAuth();
   const { theme } = useTheme();
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -110,10 +110,8 @@ export const RootNavigator = () => {
     );
   }
 
-  const effectiveIsHost = user.hostType === 'agent' || user.hostType === 'company'
-    ? true
-    : activeMode === 'host';
-  const MainComponent = effectiveIsHost ? HostMain : RenterMain;
+  const route = getInitialRoute(user);
+  const MainComponent = route === 'HostTabs' ? HostMain : RenterMain;
 
   return (
     <>
