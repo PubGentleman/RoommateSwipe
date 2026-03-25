@@ -188,16 +188,16 @@ For follow-up questions, answer directly and conversationally.`;
         .update({
           neighborhood_briefing: reply,
           neighborhood_briefing_at: new Date().toISOString(),
-          walk_score: walkScoreData?.walkscore || null,
-          transit_score: walkScoreData?.transit?.score || null,
+          walk_score: walkScoreData?.walkscore ?? null,
+          transit_score: walkScoreData?.transit?.score ?? null,
         })
         .eq('id', listingId);
     }
 
     return new Response(JSON.stringify({
       reply,
-      walkScore: walkScoreData?.walkscore || null,
-      transitScore: walkScoreData?.transit?.score || null,
+      walkScore: walkScoreData?.walkscore ?? null,
+      transitScore: walkScoreData?.transit?.score ?? null,
       neighborhood: listing.neighborhood || listing.city,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
