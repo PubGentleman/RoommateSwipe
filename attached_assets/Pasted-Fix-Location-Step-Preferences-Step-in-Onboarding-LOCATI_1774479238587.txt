@@ -1,0 +1,43 @@
+Fix Location Step & Preferences Step in Onboarding
+LOCATION STEP — Cascading 3-tier selector (4-tier for NYC)
+Replace the city chip grid entirely. Build a cascading location selector where each tier unlocks only after the one above it is filled. Each tier is a rounded card with an icon on the left, a small label above the value, and a short vertical gradient connector line between cards. Locked tiers are dimmed at opacity 0.45. Tapping a locked tier triggers a gentle horizontal shake animation.
+Standard flow (all cities except NYC):
+Tier 1 — State
+Dropdown picker with all 50 US states. On selection, show a green checkmark on the card and unlock Tier 2.
+Tier 2 — City
+Text input with autocomplete. As the user types, show a dropdown filtered to cities within the selected state only. On selection, show a green checkmark and unlock Tier 3.
+Tier 3 — Neighborhood (optional)
+Text input with autocomplete filtered to neighborhoods within the selected city. Use a hardcoded dataset of neighborhoods for the top 20 US cities. For cities not in the dataset, allow free text entry. Has a "Skip neighborhood" link below the Continue button.
+
+Special case — New York City gets a 4-tier flow:
+When the user selects New York (state) → New York City (city), insert an extra Borough tier between City and Neighborhood:
+Tier 3 — Borough
+Dropdown of the 5 NYC boroughs: Manhattan, Brooklyn, Queens, The Bronx, Staten Island. On selection, unlock Tier 4.
+Tier 4 — Neighborhood
+Autocomplete filtered to the selected borough using this hardcoded dataset:
+
+Manhattan: Financial District, Tribeca, SoHo, Greenwich Village, Chelsea, Midtown, Hell's Kitchen, Upper West Side, Upper East Side, Harlem, Washington Heights, Inwood
+Brooklyn: Williamsburg, Bushwick, Bed-Stuy, Crown Heights, Park Slope, Flatbush, Sunset Park, Bay Ridge, Coney Island, DUMBO, Greenpoint, Carroll Gardens, Cobble Hill, Fort Greene
+Queens: Astoria, Long Island City, Flushing, Jamaica, Forest Hills, Jackson Heights, Ridgewood, Bayside, Far Rockaway, Sunnyside
+The Bronx: Fordham, Riverdale, Mott Haven, South Bronx, Pelham Bay, Norwood, Wakefield, Concourse
+Staten Island: St. George, Stapleton, New Dorp, Tottenville, Great Kills
+
+The connector line and cascading lock/unlock behavior applies to the Borough tier exactly the same as the others.
+Continue button enables once State + City are filled. Neighborhood (and Borough for NYC) are optional.
+
+PREFERENCES STEP — Dual-handle range slider + room type cards
+Replace the 5 budget chips with a dual-handle range slider:
+
+Large text above the slider shows the live selected range: "$900 – $1,800 per month" — updates in real time as handles move
+Slider range: $500 minimum to $5,000 maximum. Show "$5,000+" label when max handle is at the far right
+Two handles on a single track — the fill between them uses the brand red/orange gradient color
+Labels below the track: "$500" on the far left, "$5,000+" on the far right
+Handles are white circles with a red ring shadow
+
+Below the slider keep the Room Type section with these three tappable cards. Each card shows an icon, bold name, and short description. Selected card gets a red border and red checkmark on the right:
+
+🔒 Private Room — "Your own locked bedroom"
+👥 Shared Room — "Shared with roommates"
+🏠 Full Apartment — "Entire unit to yourself"
+
+Multiple room types can be selected at once. Continue button is always enabled on this step.
