@@ -518,6 +518,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data.session) {
         await loadUserFromSupabase(data.session);
       } else {
+        const nextStep = role === 'host' ? 'hostType' : 'complete';
+        const agentOccupation = hostType === 'agent' ? 'Real Estate Agent' : undefined;
         const newUser: User = {
           id: data.user.id,
           email,
@@ -525,17 +527,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           firstName: firstName ?? undefined,
           lastName: lastName ?? undefined,
           role,
-          onboardingStep: 'profile',
+          onboardingStep: nextStep,
           hostType: hostType ?? undefined,
           companyName: companyName ?? undefined,
           subscription: { plan: 'basic', status: 'active' },
           messageCount: 0,
-          profileData: role === 'renter' ? {
+          profileData: {
             neighborhood: 'Williamsburg',
             city: 'New York',
             state: 'NY',
             coordinates: { lat: 40.7081, lng: -73.9571 },
-          } : undefined,
+            ...(agentOccupation ? { occupation: agentOccupation } : {}),
+          },
         };
         await StorageService.setCurrentUser(newUser);
         await StorageService.addOrUpdateUser(newUser);

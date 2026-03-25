@@ -18,6 +18,7 @@ import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { HostPlanBadge } from '../../components/HostPlanBadge';
 import { canAddListingCheck, isFreePlan } from '../../utils/hostPricing';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getHostCompletionPercentage } from '../../utils/profileReminderUtils';
 
 const BG = '#111';
 const CARD_BG = '#1a1a1a';
@@ -84,6 +85,8 @@ export const HostDashboardScreen = () => {
   const [showAISheet, setShowAISheet] = useState(false);
   const [hostSub, setHostSub] = useState<HostSubscriptionData | null>(null);
   const [showUpgradeBanner, setShowUpgradeBanner] = useState(false);
+  const [completionBannerDismissed, setCompletionBannerDismissed] = useState(false);
+  const hostCompletion = user ? getHostCompletionPercentage(user) : 100;
 
   const DASH_COLLAPSE_H = 50;
   const dashScrollY = useSharedValue(0);
@@ -375,6 +378,38 @@ export const HostDashboardScreen = () => {
               </Pressable>
             </View>
           </View>
+        ) : null}
+
+        {hostCompletion < 100 && !completionBannerDismissed ? (
+          <Pressable
+            style={styles.completionBanner}
+            onPress={() => navigation.navigate('ProfileCompletion')}
+          >
+            <View style={{ flex: 1, gap: 8 }}>
+              <Text style={styles.completionBannerText}>
+                Complete your profile — {hostCompletion}% done
+              </Text>
+              <View style={styles.completionBarTrack}>
+                <LinearGradient
+                  colors={[ACCENT, '#e83a2a']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={[styles.completionBarFill, { width: `${Math.max(hostCompletion, 5)}%` }]}
+                />
+              </View>
+            </View>
+            <Feather name="chevron-right" size={18} color="rgba(255,255,255,0.4)" />
+            <Pressable
+              style={styles.completionDismissBtn}
+              hitSlop={8}
+              onPress={(e) => {
+                e.stopPropagation();
+                setCompletionBannerDismissed(true);
+              }}
+            >
+              <Feather name="x" size={14} color="rgba(255,255,255,0.35)" />
+            </Pressable>
+          </Pressable>
         ) : null}
 
         <View style={styles.roleRow}>
@@ -982,5 +1017,42 @@ const styles = StyleSheet.create({
     color: '#888',
     fontSize: 12,
     marginTop: 2,
+  },
+  completionBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 20,
+    marginBottom: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255,107,91,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.15)',
+    borderRadius: 14,
+    gap: 12,
+  },
+  completionBannerText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  completionBarTrack: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    overflow: 'hidden' as const,
+  },
+  completionBarFill: {
+    height: '100%' as any,
+    borderRadius: 2,
+  },
+  completionDismissBtn: {
+    position: 'absolute' as const,
+    top: 8,
+    right: 8,
+    width: 24,
+    height: 24,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
   },
 });

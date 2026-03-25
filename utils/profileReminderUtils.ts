@@ -94,17 +94,15 @@ export const getProfileGaps = (user: User): ProfileGap[] => {
 export const getCompletionPercentage = (user: User): number => {
   const fields = [
     !!(user.photos?.length || user.profilePicture),
-    !!(user.profileData?.occupation && user.profileData.occupation.trim().length > 0),
     !!(user.profileData?.bio && user.profileData.bio.trim().length >= 20),
+    !!(user.profileData?.occupation && user.profileData.occupation.trim().length > 0),
+    !!(user.profileData?.preferences?.sleepSchedule && user.profileData?.preferences?.cleanliness),
     !!user.profileData?.budget,
-    !!user.profileData?.preferences?.sleepSchedule,
-    !!user.profileData?.preferences?.cleanliness,
-    !!user.profileData?.preferences?.noiseTolerance,
-    !!user.profileData?.preferences?.guestPolicy,
     (Array.isArray(user.profileData?.interests) && user.profileData!.interests!.length >= 3),
+    !!(user.profileData?.city || user.profileData?.neighborhood),
   ];
 
-  const weights = [15, 15, 15, 10, 10, 10, 10, 10, 5];
+  const weights = [15, 15, 15, 20, 15, 10, 10];
   return fields.reduce((total, done, i) => total + (done ? weights[i] : 0), 0);
 };
 

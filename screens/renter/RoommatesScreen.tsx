@@ -54,8 +54,7 @@ import { DailyQuestionCard } from '../../components/DailyQuestionCard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getCompletionPercentage } from '../../utils/profileReminderUtils';
 
-const BANNER_DISMISS_KEY = 'rhome_completion_banner_dismissed';
-const FIRST_SESSION_DONE_KEY = 'rhome_first_session_done';
+const PROFILE_PROMPT_KEY = 'hasSeenProfilePrompt';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Limit card size for web/desktop viewing
@@ -113,7 +112,7 @@ export const RoommatesScreen = () => {
   const [selectedBoostTierId, setSelectedBoostTierId] = useState<RenterBoostOptionId>('standard');
   const [boostTimeLabel, setBoostTimeLabel] = useState('');
   const [userOpenGroup, setUserOpenGroup] = useState<Group | null>(null);
-  const [bannerDismissed, setBannerDismissed] = useState(true);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
   const [showFirstSessionPrompt, setShowFirstSessionPrompt] = useState(false);
   const profileCompletion = user ? getCompletionPercentage(user) : 0;
   const translateX = useSharedValue(0);
@@ -142,25 +141,16 @@ export const RoommatesScreen = () => {
   }, []);
 
   useEffect(() => {
-    const checkBannerAndPrompt = async () => {
+    const checkFirstSessionPrompt = async () => {
       try {
-        const [dismissed, firstDone] = await Promise.all([
-          AsyncStorage.getItem(BANNER_DISMISS_KEY),
-          AsyncStorage.getItem(FIRST_SESSION_DONE_KEY),
-        ]);
-        const sessionKey = dismissed ? JSON.parse(dismissed) : null;
-        const today = new Date().toDateString();
-        if (sessionKey !== today && profileCompletion < 80) {
-          setBannerDismissed(false);
-        }
+        const seen = await AsyncStorage.getItem(PROFILE_PROMPT_KEY);
         const isOnboarded = user?.onboardingStep === 'complete' || !user?.onboardingStep;
-        const hasNoOccupation = !user?.profileData?.occupation;
-        if (isOnboarded && hasNoOccupation && firstDone !== 'true') {
+        if (isOnboarded && seen !== 'true') {
           setShowFirstSessionPrompt(true);
         }
       } catch {}
     };
-    if (user) checkBannerAndPrompt();
+    if (user) checkFirstSessionPrompt();
   }, [user?.id]);
 
   useEffect(() => {
@@ -1264,15 +1254,14 @@ export const RoommatesScreen = () => {
 
       {renderCitySelector()}
 
-      {profileCompletion < 80 && !bannerDismissed ? (
+      {profileCompletion < 100 && !bannerDismissed ? (
         <Pressable
           style={styles.completionBannerWrap}
           onPress={() => (navigation as any).navigate('ProfileCompletion')}
         >
           <View style={styles.completionBannerLeft}>
-            <ThemedText style={styles.completionBannerTitle}>Complete your profile</ThemedText>
-            <ThemedText style={styles.completionBannerSub}>
-              {profileCompletion}% done — better profiles get more matches
+            <ThemedText style={styles.completionBannerTitle}>
+              Complete your profile — {profileCompletion}% done
             </ThemedText>
             <View style={styles.completionBarTrack}>
               <LinearGradient
@@ -1289,10 +1278,9 @@ export const RoommatesScreen = () => {
           <Pressable
             style={styles.completionDismissBtn}
             hitSlop={8}
-            onPress={async (e) => {
+            onPress={(e) => {
               e.stopPropagation();
               setBannerDismissed(true);
-              await AsyncStorage.setItem(BANNER_DISMISS_KEY, JSON.stringify(new Date().toDateString()));
             }}
           >
             <Feather name="x" size={14} color="rgba(255,255,255,0.35)" />
@@ -1759,15 +1747,15 @@ export const RoommatesScreen = () => {
             <View style={styles.firstSessionIconWrap}>
               <Feather name="user-check" size={36} color="#ff6b5b" />
             </View>
-            <ThemedText style={styles.firstSessionTitle}>One more thing</ThemedText>
+            <ThemedText style={styles.firstSessionTitle}>Let's set up your profile</ThemedText>
             <ThemedText style={styles.firstSessionSub}>
-              Tell us a bit about yourself so we can find your best matches. Takes about 60 seconds.
+              A complete profile helps us find your best matches. It only takes a minute.
             </ThemedText>
             <Pressable
               style={styles.firstSessionPrimary}
               onPress={async () => {
                 setShowFirstSessionPrompt(false);
-                await AsyncStorage.setItem(FIRST_SESSION_DONE_KEY, 'true');
+                await AsyncStorage.setItem(PROFILE_PROMPT_KEY, 'true');
                 (navigation as any).navigate('ProfileCompletion');
               }}
             >
@@ -1777,18 +1765,9 @@ export const RoommatesScreen = () => {
                 end={{ x: 1, y: 1 }}
                 style={styles.firstSessionPrimaryGrad}
               >
-                <ThemedText style={styles.firstSessionPrimaryText}>Complete Profile</ThemedText>
+                <ThemedText style={styles.firstSessionPrimaryText}>Get started</ThemedText>
                 <Feather name="arrow-right" size={16} color="#FFFFFF" />
               </LinearGradient>
-            </Pressable>
-            <Pressable
-              style={styles.firstSessionSkip}
-              onPress={async () => {
-                setShowFirstSessionPrompt(false);
-                await AsyncStorage.setItem(FIRST_SESSION_DONE_KEY, 'true');
-              }}
-            >
-              <ThemedText style={styles.firstSessionSkipText}>Skip for now</ThemedText>
             </Pressable>
           </View>
         </View>
@@ -3634,17 +3613,12 @@ const styles = StyleSheet.create({
   },
   completionBannerLeft: {
     flex: 1,
-    gap: 4,
+    gap: 8,
   },
   completionBannerTitle: {
     fontSize: 14,
     fontWeight: '700' as const,
     color: '#FFFFFF',
-  },
-  completionBannerSub: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.55)',
-    marginBottom: 6,
   },
   completionBarTrack: {
     height: 4,
@@ -3722,12 +3696,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700' as const,
     color: '#FFFFFF',
-  },
-  firstSessionSkip: {
-    paddingVertical: 8,
-  },
-  firstSessionSkipText: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.4)',
   },
 });

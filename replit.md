@@ -27,7 +27,7 @@ Preferred communication style: Simple, everyday language.
 The application is built using React Native, Expo, and TypeScript, utilizing React Navigation for role-based access (Renter, Host, Agent/Landlord). It supports light/dark modes, animations with React Native Reanimated, and state management via React Context API and AsyncStorage.
 
 **Key Features:**
-- **Matching & Profiles:** Features a compatibility algorithm, interest tags, detailed profile questionnaires, and personality quizzes.
+- **Matching & Profiles:** Features a compatibility algorithm, interest tags, and personality quizzes. Profile questionnaire removed from sign-up; replaced by a post-signup Profile Completion system (inline form in `screens/shared/ProfileCompletionScreen.tsx`).
 - **Role-Specific Features:**
     - **Renter:** Swipe-based matching, 1-on-1 messaging, group management, property exploration with advanced filters and transit integration, saved properties, AI Match Assistant, and notifications.
     - **Host:** Dashboard for listing management (create, edit, delete, boost), inquiry handling, analytics, and group matches monetization. Supports Individual, Company, and Agent host types with varying UI/features.
