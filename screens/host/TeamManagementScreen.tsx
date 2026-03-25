@@ -17,7 +17,7 @@ type InviteRole = 'admin' | 'member';
 
 export function TeamManagementScreen() {
   const { theme } = useTheme();
-  const { user, getTeamMembers, inviteTeamMember, removeTeamMember, updateTeamMemberRole, getTeamSeatLimit } = useAuth();
+  const { user, getTeamMembers, inviteTeamMember, resendTeamInvite, removeTeamMember, updateTeamMemberRole, getTeamSeatLimit } = useAuth();
   const { confirm, alert: showAlert } = useConfirm();
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
@@ -79,6 +79,15 @@ export function TeamManagementScreen() {
     loadMembers();
   };
 
+  const handleResend = async (member: TeamMember) => {
+    try {
+      await resendTeamInvite(member);
+      await showAlert({ title: 'Invite Resent', message: `A new invite email has been sent to ${member.email}.` });
+    } catch (e: any) {
+      await showAlert({ title: 'Error', message: e?.message || 'Failed to resend invite.', variant: 'warning' });
+    }
+  };
+
   const getInitials = (name?: string, email?: string) => {
     if (name) {
       const parts = name.split(' ');
@@ -138,6 +147,15 @@ export function TeamManagementScreen() {
       ) : null}
       {menuMemberId === item.id && item.role !== 'owner' ? (
         <View style={[styles.menuDropdown, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          {item.status === 'pending' ? (
+            <Pressable
+              style={styles.menuItem}
+              onPress={() => { setMenuMemberId(null); handleResend(item); }}
+            >
+              <Feather name="mail" size={14} color={theme.text} />
+              <Text style={[styles.menuItemText, { color: theme.text }]}>Resend Invite</Text>
+            </Pressable>
+          ) : null}
           <Pressable
             style={styles.menuItem}
             onPress={() => { setMenuMemberId(null); handleRoleChange(item); }}

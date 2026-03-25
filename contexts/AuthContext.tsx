@@ -90,6 +90,7 @@ interface AuthContextType {
   completeHostOnboarding: () => Promise<void>;
   getTeamMembers: () => Promise<TeamMember[]>;
   inviteTeamMember: (email: string, name: string, role: 'admin' | 'member') => Promise<void>;
+  resendTeamInvite: (member: TeamMember) => Promise<void>;
   removeTeamMember: (memberId: string) => Promise<void>;
   updateTeamMemberRole: (memberId: string, role: 'admin' | 'member') => Promise<void>;
   getTeamSeatLimit: () => number;
@@ -2167,6 +2168,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return [];
   };
 
+  const sendTeamInviteEmail = async (teamMemberId: string) => {
+    if (!user || !isSupabaseConfigured) return;
+    try {
+      const { error } = await supabase.functions.invoke('send-team-invite', {
+        body: { teamMemberId },
+      });
+      if (error) console.warn('Team invite email error:', error);
+    } catch (e) {
+      console.warn('Team invite email failed (invite still saved):', e);
+    }
+  };
+
   const inviteTeamMember = async (email: string, name: string, role: 'admin' | 'member'): Promise<void> => {
     if (!user || user.hostType !== 'company') return;
     const members = await getTeamMembers();
@@ -2176,15 +2189,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error(`Your plan allows up to ${seatLimit} seats (including the owner). Upgrade to add more.`);
     }
     if (isSupabaseConfigured) {
-      const { error } = await supabase.from('team_members').insert({
+      const { data, error } = await supabase.from('team_members').insert({
         company_user_id: user.id,
         email,
         full_name: name,
         role,
         status: 'pending',
-      });
+      }).select('id').single();
       if (error) throw new Error(error.message);
+      if (data?.id) {
+        await sendTeamInviteEmail(data.id);
+      }
     }
+  };
+
+  const resendTeamInvite = async (member: TeamMember): Promise<void> => {
+    if (!user || user.hostType !== 'company') throw new Error('Only company accounts can resend invites.');
+    if (member.status !== 'pending') throw new Error('Can only resend invites to pending members.');
+    if (member.companyUserId !== user.id) throw new Error('You can only resend invites for your own team.');
+    await sendTeamInviteEmail(member.id);
   };
 
   const removeTeamMember = async (memberId: string): Promise<void> => {
@@ -2240,7 +2263,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const canRespondToInquiries = teamRole !== null;
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout, abandonSignup, resetPassword, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, cancelSubscriptionAtPeriodEnd, reactivateSubscription, getSubscriptionDetails, updateUser, blockUser: blockUserAction, unblockUser: unblockUserAction, reportUser: reportUserAction, isUserBlocked: isUserBlockedCheck, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike, watchAdForCredit, getAdCredits, useAdCredit, isBasicUser, canViewListing, useListingView, canSendInterest, canSendSuperInterest, useSuperInterestCredit, canSendColdMessage, useColdMessage, getSuperInterestCount, upgradeHostPlan, downgradeHostPlan, getHostPlan, canAddListing, canRespondToInquiry, useInquiryResponse, purchaseListingBoost, purchaseHostVerification, purchaseSuperInterest, completeOnboardingStep, cancelHostSubscriptionAtPeriodEnd, reactivateHostSubscription, softDeleteAccount, recoverDeletedAccount, updateLastActive, activeMode: effectiveMode, canSwitchMode, isFirstTimeHost, switchMode, completeHostOnboarding, getTeamMembers, inviteTeamMember, removeTeamMember, updateTeamMemberRole, getTeamSeatLimit, teamRole, canInviteMembers, canManageBilling, canDeleteListings, canRespondToInquiries }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout, abandonSignup, resetPassword, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, cancelSubscriptionAtPeriodEnd, reactivateSubscription, getSubscriptionDetails, updateUser, blockUser: blockUserAction, unblockUser: unblockUserAction, reportUser: reportUserAction, isUserBlocked: isUserBlockedCheck, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike, watchAdForCredit, getAdCredits, useAdCredit, isBasicUser, canViewListing, useListingView, canSendInterest, canSendSuperInterest, useSuperInterestCredit, canSendColdMessage, useColdMessage, getSuperInterestCount, upgradeHostPlan, downgradeHostPlan, getHostPlan, canAddListing, canRespondToInquiry, useInquiryResponse, purchaseListingBoost, purchaseHostVerification, purchaseSuperInterest, completeOnboardingStep, cancelHostSubscriptionAtPeriodEnd, reactivateHostSubscription, softDeleteAccount, recoverDeletedAccount, updateLastActive, activeMode: effectiveMode, canSwitchMode, isFirstTimeHost, switchMode, completeHostOnboarding, getTeamMembers, inviteTeamMember, resendTeamInvite, removeTeamMember, updateTeamMemberRole, getTeamSeatLimit, teamRole, canInviteMembers, canManageBilling, canDeleteListings, canRespondToInquiries }}>
       {children}
     </AuthContext.Provider>
   );
