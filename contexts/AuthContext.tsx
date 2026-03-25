@@ -200,7 +200,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         billingCycle: subscription?.billing_cycle || 'monthly',
         billingHistory: [],
       },
-      hostSubscription: supabaseUser.role === 'host' ? {
+      hostSubscription: (supabaseUser.role === 'host' || supabaseUser.host_type) ? {
         plan: subscription?.plan || 'free',
         status: subscription?.status || 'active',
         billingCycle: subscription?.billing_cycle || 'monthly',
@@ -738,12 +738,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const downgradeToPlan = async (targetPlan: 'basic' | 'plus') => {
     if (!user || !user.subscription) return;
-    
+
     const currentPlan = user.subscription.plan;
     let expiresAt = user.subscription.expiresAt 
       ? new Date(user.subscription.expiresAt)
       : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-    
+
     if (!user.subscription.expiresAt) {
       const tempUser: User = {
         ...user,
@@ -755,7 +755,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await StorageService.setCurrentUser(tempUser);
       await StorageService.addOrUpdateUser(tempUser);
     }
-    
+
     const updatedUser: User = {
       ...user,
       subscription: {
@@ -765,7 +765,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         scheduledChangeDate: expiresAt,
       },
     };
-    
+
     await StorageService.setCurrentUser(updatedUser);
     await StorageService.addOrUpdateUser(updatedUser);
     setUser(updatedUser);
@@ -774,16 +774,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const cancelSubscription = async () => {
     if (!user || !user.subscription) return;
-    
+
     const currentPlan = user.subscription.plan;
     if (currentPlan === 'basic') {
       return;
     }
-    
+
     let expiresAt = user.subscription.expiresAt 
       ? new Date(user.subscription.expiresAt)
       : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-    
+
     if (!user.subscription.expiresAt) {
       const tempUser: User = {
         ...user,
@@ -795,7 +795,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await StorageService.setCurrentUser(tempUser);
       await StorageService.addOrUpdateUser(tempUser);
     }
-    
+
     const updatedUser: User = {
       ...user,
       subscription: {
@@ -806,7 +806,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         scheduledChangeDate: expiresAt,
       },
     };
-    
+
     await StorageService.setCurrentUser(updatedUser);
     await StorageService.addOrUpdateUser(updatedUser);
     setUser(updatedUser);
@@ -815,7 +815,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const reactivateSubscription = async () => {
     if (!user || !user.subscription) return;
-    
+
     const updatedUser: User = {
       ...user,
       subscription: {
@@ -825,7 +825,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         scheduledChangeDate: undefined,
       },
     };
-    
+
     await StorageService.setCurrentUser(updatedUser);
     await StorageService.addOrUpdateUser(updatedUser);
     setUser(updatedUser);
@@ -869,20 +869,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateUser = async (updates: Partial<User>) => {
     if (!user) return;
-    
+
     const updatedUser: User = {
       ...user,
       ...updates,
     };
-    
+
     await StorageService.setCurrentUser(updatedUser);
     await StorageService.addOrUpdateUser(updatedUser);
-    
+
     // Sync photos, zodiacSign, and profile data with RoommateProfile if user is a renter
     if (updatedUser.role === 'renter' && (updates.photos || updates.zodiacSign !== undefined || updates.profileData)) {
       const roommateProfiles = await StorageService.getRoommateProfiles();
       const profileIndex = roommateProfiles.findIndex(p => p.id === updatedUser.id);
-      
+
       if (profileIndex >= 0) {
         console.log('[Auth] Syncing User data with RoommateProfile for user:', updatedUser.id);
         const updatedProfile = {
@@ -905,7 +905,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('[Auth] RoommateProfile synced');
       }
     }
-    
+
     setUser(updatedUser);
 
     const supabaseFields: Record<string, any> = {};
@@ -923,6 +923,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (updates.birthday !== undefined) supabaseFields.birthday = updates.birthday;
     if (updates.zodiacSign !== undefined) supabaseFields.zodiac_sign = updates.zodiacSign;
     if (updates.gender !== undefined) supabaseFields.gender = updates.gender;
+    if (updates.role !== undefined) supabaseFields.role = updates.role;
+    if (updates.hostType !== undefined) supabaseFields.host_type = updates.hostType;
+    if (updates.hostTypeLockedAt !== undefined) supabaseFields.host_type_locked_at = updates.hostTypeLockedAt;
+    if (updates.hostTypeChangeRequested !== undefined) supabaseFields.host_type_change_requested = updates.hostTypeChangeRequested;
+    if (updates.licenseNumber !== undefined) supabaseFields.license_number = updates.licenseNumber;
+    if (updates.agencyName !== undefined) supabaseFields.agency_name = updates.agencyName;
+    if (updates.companyName !== undefined) supabaseFields.company_name = updates.companyName;
 
     if (Object.keys(supabaseFields).length > 0) {
       supabaseFields.updated_at = new Date().toISOString();
@@ -1019,23 +1026,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const canBoost = (): { canBoost: boolean; reason?: string; requiresPayment?: boolean; nextAvailableAt?: string; hasFreeBoost?: boolean } => {
     if (!user) return { canBoost: false, reason: 'Not logged in' };
-    
+
     const plan = user.subscription?.plan || 'basic';
-    
+
     if (user.boostData?.isBoosted && user.boostData.boostExpiresAt) {
       if (new Date().getTime() < new Date(user.boostData.boostExpiresAt).getTime()) {
         return { canBoost: false, reason: 'Boost is already active' };
       }
     }
-    
+
     if (plan === 'basic') {
       return { canBoost: true, requiresPayment: true, hasFreeBoost: false };
     }
-    
+
     if (plan === 'elite') {
       return { canBoost: true, hasFreeBoost: true };
     }
-    
+
     if (plan === 'plus') {
       const nextFree = user.boostData?.nextFreeBoostAvailableAt;
       if (nextFree && new Date() < new Date(nextFree)) {
@@ -1049,7 +1056,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       return { canBoost: true, hasFreeBoost: true };
     }
-    
+
     return { canBoost: false };
   };
 
@@ -1057,14 +1064,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) {
       return { success: false, message: 'Not logged in' };
     }
-    
+
     const plan = user.subscription?.plan || 'basic';
     const defaultDuration = plan === 'elite' ? 24 : plan === 'plus' ? 12 : 6;
     const durationHours = durationHoursParam || defaultDuration;
-    
+
     const now = new Date();
     const expiresAt = new Date(now.getTime() + durationHours * 60 * 60 * 1000).toISOString();
-    
+
     const boostData = {
       ...(user.boostData || { boostsUsed: 0, boostDurationHours: durationHours as 6 | 12 | 24 | 48 }),
       isBoosted: true,
@@ -1074,15 +1081,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       boostsUsed: (user.boostData?.boostsUsed || 0) + 1,
       lastBoostDate: now,
     };
-    
+
     const isFreeBoost = (plan === 'plus' || plan === 'elite') && durationHours === defaultDuration;
     if (plan === 'plus' && isFreeBoost) {
       const nextFree = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
       boostData.nextFreeBoostAvailableAt = nextFree.toISOString();
     }
-    
+
     const updatedUser: User = { ...user, boostData };
-    
+
     await StorageService.setCurrentUser(updatedUser);
     await StorageService.addOrUpdateUser(updatedUser);
     setUser(updatedUser);
@@ -1093,7 +1100,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err) {
       console.log('[Auth] Supabase boost sync failed, local state updated:', err);
     }
-    
+
     return { success: true, message: `Boost activated! Your profile will be prioritized for ${durationHours} hours.` };
   };
 
@@ -1139,7 +1146,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             isBoosted: false,
           },
         };
-        
+
         await StorageService.setCurrentUser(updatedUser);
         await StorageService.addOrUpdateUser(updatedUser);
         setUser(updatedUser);
@@ -1165,7 +1172,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-    
+
     const updatedUser: User = {
       ...user,
       undoPassData: {
@@ -1173,29 +1180,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         undoPassExpiresAt: expiresAt,
       },
     };
-    
+
     await StorageService.setCurrentUser(updatedUser);
     await StorageService.addOrUpdateUser(updatedUser);
     setUser(updatedUser);
-    
+
     return { success: true, message: 'Undo Pass activated! You can now undo swipes for 24 hours.' };
   };
 
   const hasActiveUndoPass = (): boolean => {
     if (!user) return false;
-    
+
     const userPlan = user.subscription?.plan || 'basic';
     if (userPlan === 'plus' || userPlan === 'elite') {
       return true;
     }
-    
+
     if (!user.undoPassData?.hasUndoPass) return false;
-    
+
     const now = new Date();
     const expiresAt = user.undoPassData.undoPassExpiresAt 
       ? new Date(user.undoPassData.undoPassExpiresAt)
       : null;
-    
+
     return expiresAt ? expiresAt > now : false;
   };
 
@@ -1276,7 +1283,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const userPlan = user.subscription?.plan || 'basic';
     const userStatus = user.subscription?.status || 'active';
-    
+
     if (userPlan === 'elite' && userStatus === 'active') {
       return { canRewind: true, remaining: Infinity, limit: Infinity };
     }
@@ -1286,16 +1293,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const lastReset = user.rewindData?.lastRewindReset 
         ? new Date(user.rewindData.lastRewindReset)
         : null;
-      
+
       let rewindsUsed = user.rewindData?.rewindsUsedToday || 0;
-      
+
       if (!lastReset || !isSameDay(lastReset, now)) {
         rewindsUsed = 0;
       }
-      
+
       const limit = 5;
       const remaining = Math.max(0, limit - rewindsUsed);
-      
+
       if (remaining > 0) {
         return { canRewind: true, remaining, limit };
       } else {
@@ -1313,16 +1320,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const lastReset = user.rewindData?.lastRewindReset 
         ? new Date(user.rewindData.lastRewindReset)
         : null;
-      
+
       let rewindsUsed = user.rewindData?.rewindsUsedToday || 0;
-      
+
       if (!lastReset || !isSameDay(lastReset, now)) {
         rewindsUsed = 0;
       }
-      
+
       const limit = 1;
       const remaining = Math.max(0, limit - rewindsUsed);
-      
+
       if (remaining > 0) {
         return { canRewind: true, remaining, limit };
       }
@@ -1331,7 +1338,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const expiresAt = user.undoPassData.undoPassExpiresAt 
           ? new Date(user.undoPassData.undoPassExpiresAt)
           : null;
-        
+
         if (expiresAt && expiresAt > now) {
           return { canRewind: true, remaining: 1, limit: 1 };
         }
@@ -1368,7 +1375,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const userPlan = user.subscription?.plan || 'basic';
     const userStatus = user.subscription?.status || 'active';
-    
+
     if (userPlan === 'elite' && userStatus === 'active') {
       return;
     }
@@ -1378,13 +1385,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const lastReset = user.rewindData?.lastRewindReset 
         ? new Date(user.rewindData.lastRewindReset)
         : null;
-      
+
       let rewindsUsed = user.rewindData?.rewindsUsedToday || 0;
-      
+
       if (!lastReset || !isSameDay(lastReset, now)) {
         rewindsUsed = 0;
       }
-      
+
       const updatedUser: User = {
         ...user,
         rewindData: {
@@ -1392,11 +1399,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           lastRewindReset: now,
         },
       };
-      
+
       await StorageService.setCurrentUser(updatedUser);
       await StorageService.addOrUpdateUser(updatedUser);
       setUser(updatedUser);
-      
+
       console.log('[Auth] Rewind used. Total today:', rewindsUsed + 1);
       return;
     }
@@ -1406,9 +1413,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const lastReset = user.rewindData?.lastRewindReset 
         ? new Date(user.rewindData.lastRewindReset)
         : null;
-      
+
       let rewindsUsed = user.rewindData?.rewindsUsedToday || 0;
-      
+
       if (!lastReset || !isSameDay(lastReset, now)) {
         rewindsUsed = 0;
       }
@@ -1421,18 +1428,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             lastRewindReset: now,
           },
         };
-        
+
         await StorageService.setCurrentUser(updatedUser);
         await StorageService.addOrUpdateUser(updatedUser);
         setUser(updatedUser);
-        
+
         console.log('[Auth] Free daily rewind used (Basic tier)');
         return;
       }
 
       if (user.undoPassData?.hasUndoPass) {
         await StorageService.consumeUndoPass(user.id);
-        
+
         const updatedUser: User = {
           ...user,
           undoPassData: {
@@ -1440,7 +1447,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             undoPassExpiresAt: null as any,
           },
         };
-        
+
         setUser(updatedUser);
         console.log('[Auth] 24h undo pass consumed');
         return;
@@ -1454,7 +1461,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             rewinds: user.adCredits.rewinds - 1,
           },
         };
-        
+
         await StorageService.setCurrentUser(updatedUser);
         await StorageService.addOrUpdateUser(updatedUser);
         setUser(updatedUser);
@@ -1470,7 +1477,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const userPlan = user.subscription?.plan || 'basic';
     const userStatus = user.subscription?.status || 'active';
-    
+
     if (userPlan === 'elite' && userStatus === 'active') {
       return { canSuperLike: true, remaining: Infinity, limit: Infinity };
     }
@@ -1479,16 +1486,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const lastReset = user.superLikeData?.lastSuperLikeReset 
       ? new Date(user.superLikeData.lastSuperLikeReset)
       : null;
-    
+
     let superLikesUsed = user.superLikeData?.superLikesUsedToday || 0;
-    
+
     if (!lastReset || !isSameDay(lastReset, now)) {
       superLikesUsed = 0;
     }
-    
+
     const limit = userPlan === 'plus' && userStatus === 'active' ? 3 : 1;
     const remaining = Math.max(0, limit - superLikesUsed);
-    
+
     if (remaining > 0) {
       return { canSuperLike: true, remaining, limit };
     }
@@ -1496,7 +1503,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (userPlan === 'basic' && user.adCredits && user.adCredits.superLikes > 0) {
       return { canSuperLike: true, remaining: user.adCredits.superLikes, limit };
     }
-    
+
     return { 
       canSuperLike: false, 
       remaining: 0, 
@@ -1510,7 +1517,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const userPlan = user.subscription?.plan || 'basic';
     const userStatus = user.subscription?.status || 'active';
-    
+
     if (userPlan === 'elite' && userStatus === 'active') {
       return;
     }
@@ -1519,9 +1526,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const lastReset = user.superLikeData?.lastSuperLikeReset 
       ? new Date(user.superLikeData.lastSuperLikeReset)
       : null;
-    
+
     let superLikesUsed = user.superLikeData?.superLikesUsedToday || 0;
-    
+
     if (!lastReset || !isSameDay(lastReset, now)) {
       superLikesUsed = 0;
     }
@@ -1536,11 +1543,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           lastSuperLikeReset: now,
         },
       };
-      
+
       await StorageService.setCurrentUser(updatedUser);
       await StorageService.addOrUpdateUser(updatedUser);
       setUser(updatedUser);
-      
+
       console.log('[Auth] Super Like used:', { plan: userPlan, used: superLikesUsed + 1, limit: dailyLimit });
       return;
     }
@@ -1553,11 +1560,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           superLikes: user.adCredits.superLikes - 1,
         },
       };
-      
+
       await StorageService.setCurrentUser(updatedUser);
       await StorageService.addOrUpdateUser(updatedUser);
       setUser(updatedUser);
-      
+
       console.log('[Auth] Ad credit super like consumed. Remaining:', updatedUser.adCredits!.superLikes);
     }
   };
@@ -1619,7 +1626,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await new Promise(resolve => setTimeout(resolve, 2000));
 
     const currentCredits = user.adCredits || { rewinds: 0, superLikes: 0, boosts: 0, messages: 0, totalAdsWatched: 0 };
-    
+
     const creditRewards: Record<string, number> = {
       rewinds: 1,
       superLikes: 1,
@@ -1656,7 +1663,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const useAdCredit = async (creditType: 'rewinds' | 'superLikes' | 'boosts' | 'messages'): Promise<boolean> => {
     if (!user) return false;
-    
+
     const currentCredits = user.adCredits || { rewinds: 0, superLikes: 0, boosts: 0, messages: 0, totalAdsWatched: 0 };
     if ((currentCredits[creditType] || 0) <= 0) return false;
 
@@ -1886,7 +1893,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(updated);
   };
 
-  const getHostPlan = (): 'free' | 'starter' | 'pro' | 'business' => {
+  const getHostPlan = (): string => {
     const plan = user?.hostSubscription?.plan;
     if (!plan) return 'free';
     return plan;

@@ -1,0 +1,371 @@
+# Rhome — Renter / Host Mode Switch
+## Replit Agent Prompt
+
+---
+
+## Overview
+
+Individual users on Rhome may be both a renter (looking for a place) and a host (listing a room). This prompt handles two distinct situations:
+
+**Situation A — Pure renter with no host history**
+They've never gone through host onboarding. They don't have a `host_type` set. They see a **"Become a Host"** button in Settings that starts the host onboarding flow.
+
+**Situation B — Individual host switching between modes**
+They've already completed host onboarding with `host_type = 'individual'`. They see a mode toggle and can switch freely between Renter Mode and Host Mode.
+
+**Agents and companies are always locked to Host Mode.** No toggle, no "Become a Host" button — they land directly in the host dashboard every time.
+
+**Core rules:**
+- `host_type = null` (pure renter) → show "Become a Host" button, no toggle
+- `host_type = 'individual'` → show toggle, can switch freely
+- `host_type = 'agent'` → always Host Mode, no toggle, no conversion path
+- `host_type = 'company'` → always Host Mode, no toggle, no conversion path
+- Agents and companies who want to use Rhome as a renter must **create a separate renter account** — there is no in-app conversion
+- Switching modes **never deletes data** — renter profile, swipe history, matches, and host listings are always preserved
+- Only one subscription is ever active at a time (renter OR host — never both)
+
+---
+
+## Part 1 — Database
+
+### Migration: `031_user_mode.sql`
+
+```sql
+-- Add active_mode and host onboarding flag to profiles
+ALTER TABLE profiles
+  ADD COLUMN IF NOT EXISTS active_mode TEXT NOT NULL DEFAULT 'renter'
+    CHECK (active_mode IN ('renter', 'host')),
+  ADD COLUMN IF NOT EXISTS has_completed_host_onboarding BOOLEAN NOT NULL DEFAULT false;
+
+-- Index for quick mode lookups
+CREATE INDEX IF NOT EXISTS idx_profiles_active_mode ON profiles(active_mode);
+```
+
+Run this in the Supabase SQL Editor.
+
+---
+
+## Part 2 — AuthContext
+
+In `contexts/AuthContext.tsx`, add mode state and helpers.
+
+### Step 2a — Add to context type
+
+```typescript
+interface AuthContextType {
+  // ... existing fields
+  activeMode: 'renter' | 'host';
+  hostType: 'individual' | 'agent' | 'company' | null;
+  canSwitchMode: boolean;       // true only for individual hosts who completed onboarding
+  isFirstTimeHost: boolean;     // true if individual but never completed host onboarding
+  switchMode: (mode: 'renter' | 'host') => Promise<void>;
+}
+```
+
+### Step 2b — Derive values from profile
+
+```typescript
+const hostType = profile?.host_type as 'individual' | 'agent' | 'company' | null ?? null;
+const hasCompletedHostOnboarding = profile?.has_completed_host_onboarding ?? false;
+
+// Agents and companies are always in host mode
+const effectiveMode: 'renter' | 'host' =
+  hostType === 'agent' || hostType === 'company'
+    ? 'host'
+    : (profile?.active_mode ?? 'renter') as 'renter' | 'host';
+
+// Toggle is only visible for individual hosts who've finished onboarding
+const canSwitchMode = hostType === 'individual' && hasCompletedHostOnboarding;
+
+// "Become a Host" button is shown to pure renters and individuals who haven't onboarded yet
+const isFirstTimeHost = !hasCompletedHostOnboarding && hostType !== 'agent' && hostType !== 'company';
+```
+
+### Step 2c — switchMode function
+
+```typescript
+const switchMode = async (mode: 'renter' | 'host') => {
+  if (!canSwitchMode) return;
+  if (!user) return;
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ active_mode: mode })
+    .eq('id', user.id);
+
+  if (!error) {
+    await refreshProfile();
+  }
+};
+```
+
+Export `effectiveMode` as `activeMode`, plus `canSwitchMode`, `isFirstTimeHost`, `hostType`, and `switchMode`.
+
+---
+
+## Part 3 — Two Different UI States in Settings
+
+In `screens/SettingsScreen.tsx`, show either the toggle or the "Become a Host" button — never both.
+
+```typescript
+const { activeMode, canSwitchMode, isFirstTimeHost, hostType } = useAuth();
+
+// Situation A: Pure renter or individual who hasn't done host onboarding yet
+{isFirstTimeHost && (
+  <TouchableOpacity
+    style={styles.becomeHostButton}
+    onPress={() => navigation.navigate('HostTypeSelect')}
+    activeOpacity={0.85}
+  >
+    <View style={styles.becomeHostLeft}>
+      <Ionicons name="home-outline" size={22} color="#1a1a2e" />
+      <View>
+        <Text style={styles.becomeHostTitle}>Become a Host</Text>
+        <Text style={styles.becomeHostSub}>List a room and find great renters</Text>
+      </View>
+    </View>
+    <Ionicons name="chevron-forward" size={18} color="#888" />
+  </TouchableOpacity>
+)}
+
+// Situation B: Individual host who can toggle freely
+{canSwitchMode && (
+  <View style={styles.modeSection}>
+    <Text style={styles.modeSectionLabel}>Current Mode</Text>
+    <ModeSwitchToggle />
+    <Text style={styles.modeHint}>
+      {activeMode === 'renter'
+        ? 'Switch to Host to manage your listings'
+        : 'Switch to Renter to find your next place'}
+    </Text>
+  </View>
+)}
+
+// Situation C: Agent or company — show an informational message only
+{(hostType === 'agent' || hostType === 'company') && (
+  <View style={styles.agentLockNotice}>
+    <Ionicons name="lock-closed-outline" size={18} color="#888" />
+    <View style={styles.agentLockText}>
+      <Text style={styles.agentLockTitle}>
+        {hostType === 'agent' ? 'Agent Account' : 'Company Account'}
+      </Text>
+      <Text style={styles.agentLockSub}>
+        To browse Rhome as a renter, sign up with a separate renter account.
+      </Text>
+    </View>
+  </View>
+)}
+```
+
+Style the notice as a subtle, non-clickable info row — muted colors, no chevron. It should feel informative, not like an error.
+
+Also add the toggle to the **Profile screen** beneath the user's name for quick access:
+
+```typescript
+// In ProfileScreen.tsx header area:
+{canSwitchMode && <ModeSwitchToggle />}
+```
+
+---
+
+## Part 4 — ModeSwitchToggle Component
+
+Create `components/ModeSwitchToggle.tsx`:
+
+```typescript
+import React from 'react';
+import { View, TouchableOpacity, Text, StyleSheet, Alert } from 'react-native';
+import { useAuth } from '../contexts/AuthContext';
+import { Ionicons } from '@expo/vector-icons';
+
+export default function ModeSwitchToggle() {
+  const { activeMode, canSwitchMode, switchMode } = useAuth();
+
+  if (!canSwitchMode) return null;
+
+  const isHost = activeMode === 'host';
+
+  const handlePress = (targetMode: 'renter' | 'host') => {
+    if (targetMode === activeMode) return;
+
+    Alert.alert(
+      targetMode === 'host' ? 'Switch to Host Mode?' : 'Switch to Renter Mode?',
+      targetMode === 'host'
+        ? "You'll see your listings and renter inquiries. Your renter profile and matches are saved."
+        : "You'll see your renter profile and matches. Your listings stay active.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: targetMode === 'host' ? 'Switch to Host' : 'Switch to Renter',
+          onPress: () => switchMode(targetMode),
+        },
+      ]
+    );
+  };
+
+  return (
+    <View style={styles.container}>
+      <TouchableOpacity
+        style={[styles.pill, !isHost && styles.pillActive]}
+        onPress={() => handlePress('renter')}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="search-outline" size={15} color={!isHost ? '#fff' : '#888'} />
+        <Text style={[styles.label, !isHost && styles.labelActive]}>Renter</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.pill, isHost && styles.pillActive]}
+        onPress={() => handlePress('host')}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="home-outline" size={15} color={isHost ? '#fff' : '#888'} />
+        <Text style={[styles.label, isHost && styles.labelActive]}>Host</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    backgroundColor: '#F0F0F0',
+    borderRadius: 20,
+    padding: 3,
+    alignSelf: 'center',
+  },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 17,
+  },
+  pillActive: {
+    backgroundColor: '#1a1a2e',
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#888',
+  },
+  labelActive: {
+    color: '#fff',
+  },
+});
+```
+
+---
+
+## Part 5 — Host Onboarding: Subscription Warning Screen
+
+When a renter taps "Become a Host" and reaches the host pricing screen for the first time, show a banner at the top if they have an active renter subscription:
+
+```typescript
+const { subscriptionSource, renterTier } = useEntitlements();
+
+{subscriptionSource === 'renter' && renterTier !== 'free' && (
+  <View style={styles.subscriptionNotice}>
+    <Ionicons name="information-circle-outline" size={18} color="#6C63FF" />
+    <Text style={styles.subscriptionNoticeText}>
+      Your Renter {capitalize(renterTier)} subscription will be cancelled automatically
+      when your host plan activates. All renter features are included in every host plan.
+    </Text>
+  </View>
+)}
+```
+
+This sets expectations before they pay — they won't be charged twice, and nothing is lost.
+
+---
+
+## Part 6 — Mark Host Onboarding Complete
+
+At the final step of host onboarding (after the subscription purchase is confirmed), set `has_completed_host_onboarding = true` and `active_mode = 'host'` on the profile:
+
+```typescript
+// Call this after RevenueCat purchase succeeds in host onboarding:
+const completeHostOnboarding = async () => {
+  await supabase
+    .from('profiles')
+    .update({
+      has_completed_host_onboarding: true,
+      active_mode: 'host',
+    })
+    .eq('id', user.id);
+
+  await refreshProfile();
+
+  // Navigate to host dashboard
+  navigation.reset({
+    index: 0,
+    routes: [{ name: 'HostTabs' }],
+  });
+};
+```
+
+After this runs, `canSwitchMode` becomes `true` (for individual hosts) and the toggle appears everywhere going forward.
+
+---
+
+## Part 7 — Tab Navigator Gating
+
+In `navigation/TabNavigator.tsx`, gate tabs by `activeMode`:
+
+```typescript
+const { activeMode, hostType } = useAuth();
+
+return (
+  <Tab.Navigator>
+    {activeMode === 'renter' ? (
+      <>
+        <Tab.Screen name="Discover" component={SwipeScreen} />
+        <Tab.Screen name="Matches" component={MatchesScreen} />
+        <Tab.Screen name="Messages" component={MessagesScreen} />
+        <Tab.Screen name="Profile" component={ProfileScreen} />
+      </>
+    ) : (
+      <>
+        <Tab.Screen name="Listings" component={HostListingsScreen} />
+        <Tab.Screen name="Inquiries" component={HostInquiriesScreen} />
+        <Tab.Screen name="Messages" component={MessagesScreen} />
+        <Tab.Screen name="Profile" component={HostProfileScreen} />
+      </>
+    )}
+  </Tab.Navigator>
+);
+```
+
+Messages is shared — the same conversations appear in both modes.
+
+---
+
+## Part 8 — Screen-Level Mode Guards
+
+Add a guard to any screen that could be reached via stale navigation or deep link:
+
+```typescript
+// Renter-only screens (SwipeScreen, MatchesScreen, etc.):
+useEffect(() => {
+  if (activeMode === 'host') navigation.replace('HostListings');
+}, [activeMode]);
+
+// Host-only screens (HostListingsScreen, HostInquiriesScreen, etc.):
+useEffect(() => {
+  if (activeMode === 'renter') navigation.replace('Discover');
+}, [activeMode]);
+```
+
+---
+
+## Summary
+
+| User State | What They See | Can They Switch? |
+|---|---|---|
+| Pure renter, no host history | "Become a Host" button in Settings | No toggle yet — tapping button starts onboarding |
+| Individual host (onboarding done) | Mode toggle in Settings + Profile | Yes — freely with confirmation alert |
+| Agent | "Agent Account — create a separate renter account to browse as a renter" info notice | No |
+| Company | "Company Account — create a separate renter account to browse as a renter" info notice | No |
+
+Renter data (questionnaire, swipe history, matches) is never deleted when switching to host mode. Host listings stay active when switching to renter mode. Apple handles subscription cancellation automatically when upgrading from a renter plan to a host plan since they are in separate subscription groups. The user sees a clear warning before purchasing so there are no surprises.

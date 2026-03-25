@@ -657,6 +657,18 @@ export const ProfileScreen = () => {
               </View>
               <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.35)" />
             </Pressable>
+          ) : (user?.hostType === 'agent' || user?.hostType === 'company') ? (
+            <View style={styles.agentLockNotice}>
+              <Feather name="lock" size={16} color="rgba(255,255,255,0.35)" />
+              <View style={styles.agentLockTextWrap}>
+                <Text style={styles.agentLockTitle}>
+                  {user?.hostType === 'agent' ? 'Agent Account' : 'Company Account'}
+                </Text>
+                <Text style={styles.agentLockSub}>
+                  To browse Rhome as a renter, sign up with a separate renter account.
+                </Text>
+              </View>
+            </View>
           ) : null}
 
           <Pressable style={styles.signoutBtn} onPress={logout}>
@@ -1324,6 +1336,32 @@ const styles = StyleSheet.create({
   becomeHostSub: {
     fontSize: 12,
     color: 'rgba(255,255,255,0.45)',
+  },
+  agentLockNotice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginTop: 16,
+  },
+  agentLockTextWrap: {
+    flex: 1,
+  },
+  agentLockTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.6)',
+    marginBottom: 3,
+  },
+  agentLockSub: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.35)',
+    lineHeight: 17,
   },
   signoutBtn: {
     flexDirection: 'row',
