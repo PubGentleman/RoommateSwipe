@@ -214,7 +214,17 @@ export const ProfileScreen = () => {
 
           <View style={styles.nameRow}>
             <Text style={styles.profileName}>{user?.name || 'User'}</Text>
-            {user?.purchases?.hostVerificationBadge === true ? (
+            {user?.licenseVerificationStatus === 'verified' ? (
+              <View style={styles.verifiedBadge}>
+                <Feather name="shield" size={14} color="#3ECF8E" />
+                <Text style={styles.verifiedBadgeText}>Verified Agent</Text>
+              </View>
+            ) : user?.licenseVerificationStatus === 'manual_review' || user?.licenseVerificationStatus === 'pending' ? (
+              <View style={styles.pendingBadge}>
+                <Feather name="clock" size={14} color="#F59E0B" />
+                <Text style={styles.pendingBadgeText}>Verification Pending</Text>
+              </View>
+            ) : user?.purchases?.hostVerificationBadge === true ? (
               <View style={styles.verifiedBadge}>
                 <Feather name="shield" size={14} color="#3ECF8E" />
                 <Text style={styles.verifiedBadgeText}>Verified</Text>
@@ -1046,6 +1056,22 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#3ECF8E',
+  },
+  pendingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(245,158,11,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(245,158,11,0.25)',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  pendingBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#F59E0B',
   },
   profileName: {
     fontSize: 22,

@@ -56,6 +56,13 @@ const HOST_TYPES: Array<{
   },
 ];
 
+const INDIVIDUAL_BENEFITS = [
+  { icon: 'home' as const, text: 'List your room and start getting inquiries fast' },
+  { icon: 'search' as const, text: 'Switch between renter and host mode anytime' },
+  { icon: 'star' as const, text: 'AI-powered roommate matching' },
+  { icon: 'shield' as const, text: 'Verified host badge builds trust with renters' },
+];
+
 export function HostTypeSelectScreen() {
   const { theme } = useTheme();
   const { user, updateUser, completeOnboardingStep } = useAuth();
@@ -319,6 +326,18 @@ export function HostTypeSelectScreen() {
           </Text>
         )}
       </Pressable>
+
+      <View style={[styles.benefitsSection, { borderTopColor: theme.border }]}>
+        <Text style={[styles.benefitsTitle, { color: theme.text }]}>Why host on Rhome?</Text>
+        {INDIVIDUAL_BENEFITS.map((item, i) => (
+          <View key={i} style={styles.benefitRow}>
+            <View style={[styles.benefitIcon, { backgroundColor: '#6C63FF15' }]}>
+              <Feather name={item.icon} size={14} color="#6C63FF" />
+            </View>
+            <Text style={[styles.benefitText, { color: theme.textSecondary }]}>{item.text}</Text>
+          </View>
+        ))}
+      </View>
     </ScrollView>
   );
 }
@@ -372,5 +391,32 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 14,
     alignItems: 'center',
+  },
+  benefitsSection: {
+    marginTop: Spacing.xl,
+    paddingTop: Spacing.lg,
+    borderTopWidth: 1,
+  },
+  benefitsTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: Spacing.md,
+  },
+  benefitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+  },
+  benefitIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  benefitText: {
+    fontSize: 13,
+    flex: 1,
   },
 });

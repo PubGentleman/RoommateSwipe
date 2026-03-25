@@ -1,0 +1,340 @@
+# Rhome — Agent License Verification & Onboarding Screen Improvements
+## Replit Agent Prompt
+
+---
+
+## Overview
+
+This prompt covers three improvements to the agent onboarding flow:
+
+1. **License upload** — agents can upload a photo/PDF of their license in addition to entering their license number
+2. **ARELLO API verification** — automatically cross-reference license number + name against state licensing board records
+3. **Benefit callouts** — fill empty screen space on all host onboarding screens with feature highlights
+
+---
+
+## Part 1 — Database Migration
+
+Create `034_agent_verification.sql` and run in Supabase SQL Editor:
+
+```sql
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS license_state TEXT,
+  ADD COLUMN IF NOT EXISTS license_document_url TEXT,
+  ADD COLUMN IF NOT EXISTS license_verified BOOLEAN DEFAULT false,
+  ADD COLUMN IF NOT EXISTS license_verified_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS license_verification_status TEXT DEFAULT 'unverified'
+    CHECK (license_verification_status IN ('unverified', 'pending', 'verified', 'failed', 'manual_review'));
+```
+
+---
+
+## Part 2 — Updated Agent Setup Screen
+
+Update `screens/host/onboarding/HostAgentSetupScreen.tsx` with the following changes:
+
+### 2a — Add State Selector
+
+Add a state picker above the license number field. Agents must select their licensing state before entering their license number:
+
+```typescript
+const US_STATES = [
+  { label: 'Alabama', value: 'AL' },
+  { label: 'Alaska', value: 'AK' },
+  // ... all 50 states
+  { label: 'Wyoming', value: 'WY' },
+];
+```
+
+Show as a tappable row that opens a bottom sheet picker. Display: "State: Florida" with a chevron.
+
+### 2b — License Number Field
+
+Keep existing license number text input. Add helper text below:
+> "Enter your license number exactly as it appears on your license"
+
+### 2c — License Document Upload
+
+Add an upload section below the license number field:
+
+```typescript
+// Upload section
+<TouchableOpacity style={styles.uploadBox} onPress={handlePickDocument}>
+  {licenseDocumentUri ? (
+    <View style={styles.uploadSuccess}>
+      <Feather name="check-circle" size={20} color="#22C55E" />
+      <Text style={styles.uploadSuccessText}>License uploaded</Text>
+      <TouchableOpacity onPress={() => setLicenseDocumentUri(null)}>
+        <Feather name="x" size={16} color="#888" />
+      </TouchableOpacity>
+    </View>
+  ) : (
+    <View style={styles.uploadPrompt}>
+      <Feather name="upload" size={20} color="#6C63FF" />
+      <Text style={styles.uploadTitle}>Upload your license</Text>
+      <Text style={styles.uploadSub}>Photo or PDF • Optional but speeds up verification</Text>
+    </View>
+  )}
+</TouchableOpacity>
+```
+
+Use `expo-document-picker` to allow PDF selection, and `expo-image-picker` for photo capture. Upload the file to Supabase Storage bucket `license-documents` with path `{userId}/license.{ext}`. Store the public URL in `license_document_url`.
+
+### 2d — Verification Status Banner
+
+After the user taps Continue and verification runs, show a status banner:
+
+```typescript
+// Pending
+<View style={styles.verifyBanner}>
+  <ActivityIndicator size="small" color="#6C63FF" />
+  <Text>Verifying your license...</Text>
+</View>
+
+// Verified
+<View style={[styles.verifyBanner, styles.verifySuccess]}>
+  <Feather name="check-circle" size={16} color="#22C55E" />
+  <Text style={styles.verifySuccessText}>License verified! ✓</Text>
+</View>
+
+// Manual review
+<View style={[styles.verifyBanner, styles.verifyPending]}>
+  <Feather name="clock" size={16} color="#F59E0B" />
+  <Text>We'll verify your license within 24 hours</Text>
+</View>
+```
+
+### 2e — Updated handleContinue
+
+```typescript
+async function handleContinue() {
+  if (!canContinue) return;
+  setSaving(true);
+  try {
+    // Upload document if selected
+    let documentUrl: string | undefined;
+    if (licenseDocumentUri) {
+      documentUrl = await uploadLicenseDocument(licenseDocumentUri);
+    }
+
+    // Save fields
+    await updateUser({
+      hostType: 'agent',
+      licenseNumber: values.licenseNumber?.trim(),
+      licenseState: values.licenseState,
+      agencyName: values.agencyName?.trim() || undefined,
+      hostTypeLockedAt: new Date().toISOString(),
+    });
+
+    // Run ARELLO verification via Edge Function
+    setVerifying(true);
+    const verified = await verifyAgentLicense({
+      licenseNumber: values.licenseNumber?.trim(),
+      licenseState: values.licenseState,
+      firstName: user?.firstName,
+      lastName: user?.lastName,
+    });
+
+    if (verified) {
+      await updateUser({ licenseVerificationStatus: 'verified' });
+    } else {
+      await updateUser({ licenseVerificationStatus: 'manual_review' });
+    }
+
+    setVerifying(false);
+
+    // Proceed to subscription regardless of verification status
+    if (isFromSettings) {
+      navigation.replace('HostSubscription');
+    } else {
+      await completeOnboardingStep('plan');
+    }
+  } catch (e) {
+    console.error(e);
+  } finally {
+    setSaving(false);
+  }
+}
+```
+
+---
+
+## Part 3 — Supabase Edge Function: verifyAgentLicense
+
+Create `supabase/functions/verify-agent-license/index.ts`:
+
+```typescript
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
+
+serve(async (req) => {
+  const { licenseNumber, licenseState, firstName, lastName } = await req.json();
+
+  try {
+    // Call ARELLO Licensee Lookup API
+    const arelloResponse = await fetch(
+      `https://api.arello.com/licensee/lookup`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get('ARELLO_API_KEY')}`,
+        },
+        body: JSON.stringify({
+          licenseNumber,
+          state: licenseState,
+          firstName,
+          lastName,
+        }),
+      }
+    );
+
+    const data = await arelloResponse.json();
+
+    // Check if license matches
+    const isVerified = data.status === 'active' &&
+      data.licenseNumber === licenseNumber &&
+      data.state === licenseState;
+
+    // Update user's verification status in Supabase
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+    await fetch(`${supabaseUrl}/rest/v1/users?id=eq.${req.headers.get('x-user-id')}`, {
+      method: 'PATCH',
+      headers: {
+        'apikey': supabaseKey,
+        'Authorization': `Bearer ${supabaseKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        license_verified: isVerified,
+        license_verified_at: isVerified ? new Date().toISOString() : null,
+        license_verification_status: isVerified ? 'verified' : 'manual_review',
+      }),
+    });
+
+    return new Response(JSON.stringify({ verified: isVerified }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ verified: false, error: err.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+});
+```
+
+Add `ARELLO_API_KEY` to Supabase Edge Function secrets.
+
+### Client-side call:
+
+```typescript
+const verifyAgentLicense = async (params: {
+  licenseNumber: string;
+  licenseState: string;
+  firstName?: string;
+  lastName?: string;
+}): Promise<boolean> => {
+  const { data, error } = await supabase.functions.invoke('verify-agent-license', {
+    body: params,
+    headers: { 'x-user-id': user?.id },
+  });
+  if (error) return false;
+  return data.verified === true;
+};
+```
+
+---
+
+## Part 4 — Verified Agent Badge
+
+In `screens/shared/ProfileScreen.tsx` and on listing cards, show a verified badge next to the agent's name when `user.licenseVerificationStatus === 'verified'`:
+
+```typescript
+{user.licenseVerificationStatus === 'verified' && (
+  <View style={styles.verifiedBadge}>
+    <Feather name="shield" size={11} color="#fff" />
+    <Text style={styles.verifiedText}>Verified Agent</Text>
+  </View>
+)}
+```
+
+Show a pending badge when `licenseVerificationStatus === 'manual_review'` or `'pending'`:
+
+```typescript
+{user.licenseVerificationStatus === 'manual_review' && (
+  <View style={styles.pendingBadge}>
+    <Feather name="clock" size={11} color="#F59E0B" />
+    <Text style={styles.pendingText}>Verification Pending</Text>
+  </View>
+)}
+```
+
+---
+
+## Part 5 — Benefit Callouts for Empty Screen Space
+
+On all host onboarding screens that have empty space below the form fields, add a **"What you get"** section. This fills the space and reinforces why the user is going through the setup.
+
+### For HostAgentSetupScreen (below the upload section):
+
+```typescript
+<View style={styles.benefitsSection}>
+  <Text style={styles.benefitsTitle}>What you get as a verified agent</Text>
+  {[
+    { icon: 'shield', text: 'Verified Agent badge on your profile and listings' },
+    { icon: 'trending-up', text: 'Priority placement in renter search results' },
+    { icon: 'users', text: 'AI-powered renter matching for your listings' },
+    { icon: 'file-text', text: 'Background check access built right in' },
+    { icon: 'bar-chart-2', text: 'Advanced analytics and leads tracking' },
+  ].map((item, i) => (
+    <View key={i} style={styles.benefitRow}>
+      <View style={styles.benefitIcon}>
+        <Feather name={item.icon} size={14} color="#6C63FF" />
+      </View>
+      <Text style={styles.benefitText}>{item.text}</Text>
+    </View>
+  ))}
+</View>
+```
+
+### For HostCompanySetupScreen (below the form fields):
+
+```typescript
+const COMPANY_BENEFITS = [
+  { icon: 'users', text: 'Invite your team — up to 10 members on Pro' },
+  { icon: 'home', text: 'Manage up to 100 listings from one dashboard' },
+  { icon: 'shield', text: 'Company profile and branding on every listing' },
+  { icon: 'bar-chart-2', text: 'Full analytics suite and reporting' },
+  { icon: 'zap', text: 'Bulk messaging and boost tools' },
+];
+```
+
+### For HostTypeSelectScreen (below the Continue button):
+
+```typescript
+const INDIVIDUAL_BENEFITS = [
+  { icon: 'home', text: 'List your room and start getting inquiries fast' },
+  { icon: 'search', text: 'Switch between renter and host mode anytime' },
+  { icon: 'star', text: 'AI-powered roommate matching' },
+  { icon: 'shield', text: 'Verified host badge builds trust with renters' },
+];
+```
+
+Style the benefits section with subtle dividers, small colored icon backgrounds, and muted text. Should feel like a helpful reminder, not a sales pitch.
+
+---
+
+## Summary
+
+| Feature | File |
+|---|---|
+| State selector | `HostAgentSetupScreen.tsx` |
+| License document upload | `HostAgentSetupScreen.tsx` + Supabase Storage |
+| ARELLO verification | `supabase/functions/verify-agent-license/` |
+| Verified Agent badge | `ProfileScreen.tsx` + listing cards |
+| Benefit callouts | All host onboarding screens |
+| DB columns | Migration `034_agent_verification.sql` |
+
+Agents can proceed to subscription whether verified or pending — verification runs in the background and the badge appears once confirmed.

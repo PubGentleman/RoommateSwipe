@@ -372,6 +372,11 @@ export interface User {
   companyName?: string;
   companyLogoUrl?: string;
   licenseNumber?: string;
+  licenseState?: string;
+  licenseDocumentUrl?: string;
+  licenseVerified?: boolean;
+  licenseVerifiedAt?: string;
+  licenseVerificationStatus?: 'unverified' | 'pending' | 'verified' | 'failed' | 'manual_review';
   agencyName?: string;
   unitsManaged?: number;
   verifiedBusiness?: boolean;

@@ -897,7 +897,17 @@ export const ExploreScreen = () => {
                     ? hostUser.companyName
                     : `${hostName.split(' ')[0]}${hostName.split(' ')[1]?.[0] ? ` ${hostName.split(' ')[1][0]}.` : ''}`}
                 </Text>
-                {hostUser?.purchases?.hostVerificationBadge === true || hostUser?.verifiedBusiness ? (
+                {hostUser?.licenseVerificationStatus === 'verified' ? (
+                  <View style={styles.verifiedHostBadge}>
+                    <Feather name="shield" size={10} color="#3ECF8E" />
+                    <Text style={styles.verifiedHostText}>Verified Agent</Text>
+                  </View>
+                ) : hostUser?.licenseVerificationStatus === 'manual_review' || hostUser?.licenseVerificationStatus === 'pending' ? (
+                  <View style={[styles.verifiedHostBadge, { backgroundColor: 'rgba(245,158,11,0.15)', borderColor: 'rgba(245,158,11,0.3)' }]}>
+                    <Feather name="clock" size={10} color="#F59E0B" />
+                    <Text style={[styles.verifiedHostText, { color: '#F59E0B' }]}>Pending</Text>
+                  </View>
+                ) : hostUser?.purchases?.hostVerificationBadge === true || hostUser?.verifiedBusiness ? (
                   <View style={styles.verifiedHostBadge}>
                     <Feather name="shield" size={10} color="#3ECF8E" />
                     <Text style={styles.verifiedHostText}>Verified</Text>

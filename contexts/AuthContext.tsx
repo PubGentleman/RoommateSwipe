@@ -280,6 +280,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       hostType: supabaseUser.host_type || undefined,
       companyName: supabaseUser.company_name || undefined,
       licenseNumber: supabaseUser.license_number || undefined,
+      licenseState: supabaseUser.license_state || undefined,
+      licenseDocumentUrl: supabaseUser.license_document_url || undefined,
+      licenseVerified: supabaseUser.license_verified || false,
+      licenseVerifiedAt: supabaseUser.license_verified_at || undefined,
+      licenseVerificationStatus: supabaseUser.license_verification_status || 'unverified',
       agencyName: supabaseUser.agency_name || undefined,
       unitsManaged: supabaseUser.units_managed || undefined,
       verifiedBusiness: supabaseUser.verified_business || false,
@@ -935,6 +940,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (updates.hostTypeLockedAt !== undefined) supabaseFields.host_type_locked_at = updates.hostTypeLockedAt;
     if (updates.hostTypeChangeRequested !== undefined) supabaseFields.host_type_change_requested = updates.hostTypeChangeRequested;
     if (updates.licenseNumber !== undefined) supabaseFields.license_number = updates.licenseNumber;
+    if (updates.licenseState !== undefined) supabaseFields.license_state = updates.licenseState;
+    if (updates.licenseDocumentUrl !== undefined) supabaseFields.license_document_url = updates.licenseDocumentUrl;
+    if (updates.licenseVerified !== undefined) supabaseFields.license_verified = updates.licenseVerified;
+    if (updates.licenseVerifiedAt !== undefined) supabaseFields.license_verified_at = updates.licenseVerifiedAt;
+    if (updates.licenseVerificationStatus !== undefined) supabaseFields.license_verification_status = updates.licenseVerificationStatus;
     if (updates.agencyName !== undefined) supabaseFields.agency_name = updates.agencyName;
     if (updates.companyName !== undefined) supabaseFields.company_name = updates.companyName;
 

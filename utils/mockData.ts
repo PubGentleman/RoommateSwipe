@@ -4,7 +4,7 @@ import { additionalProfiles } from './additionalProfiles';
 import { extraProfiles } from './extraProfiles';
 import { extraConversations, extraProperties, extraGroups, extraApplications } from './extraMockData';
 
-export const MOCK_DATA_VERSION = '2.5.0';
+export const MOCK_DATA_VERSION = '2.6.0';
 
 export const mockProfileUsers: User[] = [
   {
@@ -639,6 +639,10 @@ export const mockProfileUsers: User[] = [
     role: 'host',
     hostType: 'agent',
     licenseNumber: 'NY-10987654',
+    licenseState: 'NY',
+    licenseVerificationStatus: 'verified',
+    licenseVerified: true,
+    licenseVerifiedAt: '2025-09-01T12:00:00Z',
     agencyName: 'Premier Realty Group',
     profilePicture: 'https://picsum.photos/400/500?random=301',
     photos: ['https://picsum.photos/400/500?random=301', 'https://picsum.photos/400/500?random=302'],
@@ -670,6 +674,10 @@ export const mockProfileUsers: User[] = [
     role: 'host',
     hostType: 'agent',
     licenseNumber: 'NY-22334455',
+    licenseState: 'NY',
+    licenseVerificationStatus: 'verified',
+    licenseVerified: true,
+    licenseVerifiedAt: '2025-06-15T12:00:00Z',
     agencyName: 'Elite Properties',
     profilePicture: 'https://picsum.photos/400/500?random=303',
     photos: ['https://picsum.photos/400/500?random=303', 'https://picsum.photos/400/500?random=304'],
@@ -701,6 +709,8 @@ export const mockProfileUsers: User[] = [
     role: 'host',
     hostType: 'agent',
     licenseNumber: 'NY-55667788',
+    licenseState: 'NY',
+    licenseVerificationStatus: 'manual_review',
     agencyName: 'Metro Rentals NYC',
     profilePicture: 'https://picsum.photos/400/500?random=305',
     photos: ['https://picsum.photos/400/500?random=305', 'https://picsum.photos/400/500?random=306'],

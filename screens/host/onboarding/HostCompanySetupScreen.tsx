@@ -15,6 +15,14 @@ const FIELDS = [
   { key: 'unitsManaged', label: 'Units Managed', placeholder: '24', keyboardType: 'numeric' as const },
 ];
 
+const COMPANY_BENEFITS = [
+  { icon: 'users' as const, text: 'Invite your team — up to 10 members on Pro' },
+  { icon: 'home' as const, text: 'Manage up to 100 listings from one dashboard' },
+  { icon: 'shield' as const, text: 'Company profile and branding on every listing' },
+  { icon: 'bar-chart-2' as const, text: 'Full analytics suite and reporting' },
+  { icon: 'zap' as const, text: 'Bulk messaging and boost tools' },
+];
+
 export function HostCompanySetupScreen() {
   const { theme } = useTheme();
   const { user, updateUser, completeOnboardingStep } = useAuth();
@@ -108,6 +116,18 @@ export function HostCompanySetupScreen() {
             : <Text style={[Typography.body, { color: '#fff', fontWeight: '700' }]}>Continue</Text>
           }
         </Pressable>
+
+        <View style={[styles.benefitsSection, { borderTopColor: theme.border }]}>
+          <Text style={[styles.benefitsTitle, { color: theme.text }]}>What you get as a property company</Text>
+          {COMPANY_BENEFITS.map((item, i) => (
+            <View key={i} style={styles.benefitRow}>
+              <View style={[styles.benefitIcon, { backgroundColor: '#22C55E15' }]}>
+                <Feather name={item.icon} size={14} color="#22C55E" />
+              </View>
+              <Text style={[styles.benefitText, { color: theme.textSecondary }]}>{item.text}</Text>
+            </View>
+          ))}
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -157,5 +177,32 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 14,
     alignItems: 'center',
+  },
+  benefitsSection: {
+    marginTop: Spacing.xl,
+    paddingTop: Spacing.lg,
+    borderTopWidth: 1,
+  },
+  benefitsTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: Spacing.md,
+  },
+  benefitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+  },
+  benefitIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  benefitText: {
+    fontSize: 13,
+    flex: 1,
   },
 });

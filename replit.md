@@ -42,7 +42,9 @@ The application is built using React Native, Expo, and TypeScript, utilizing Rea
     - **"Ask AI About This Person":** Multi-turn chat to inquire about other users with context-aware responses.
     - **AI Neighborhood Intelligence:** Provides AI-generated neighborhood briefings with local data from Walk Score and Google Places, with follow-up chat capabilities.
     - **Shareable Profile Notes:** Users can add free-text descriptions of themselves, which AI can leverage.
-- **Verification & Safety:** Instagram verification, multi-photo enforcement, chat leakage detection, Safety Mode with background checks (via Persona), identity verification (Stripe Identity SDK), and a References System.
+- **Verification & Safety:** Instagram verification, multi-photo enforcement, chat leakage detection, Safety Mode with background checks (via Persona), identity verification (Stripe Identity SDK), References System, and Agent License Verification (ARELLO API with state selector, document upload, verified/pending badges).
+- **Agent License Verification:** State selector, license number input with helper text, optional document upload (PDF/photo via expo-document-picker), ARELLO API verification via Supabase Edge Function (`verify-agent-license`), verified/pending agent badges on profiles and listing cards. DB fields: `license_state`, `license_document_url`, `license_verified`, `license_verified_at`, `license_verification_status`. Migration: `034_agent_verification.sql`.
+- **Benefit Callouts:** All host onboarding screens (HostTypeSelectScreen, HostAgentSetupScreen, HostCompanySetupScreen) display role-specific benefit lists below form fields.
 - **Boost System:** Tier-based boosting for increased visibility of listings and profiles.
 - **Account Management:** Soft-delete functionality with a recovery window.
 - **Subscription Management:** Tiered subscription plans for renters, hosts, and agents, with bundled pricing and a hybrid payment architecture (RevenueCat for native, Stripe for web).
