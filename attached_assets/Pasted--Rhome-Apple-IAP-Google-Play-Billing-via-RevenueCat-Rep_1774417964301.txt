@@ -1,0 +1,463 @@
+# Rhome — Apple IAP + Google Play Billing via RevenueCat
+## Replit Agent Prompt
+
+---
+
+## Overview
+
+Apple and Google require all in-app purchases of digital goods (subscriptions, boosts, super likes) to go through their native billing systems — not Stripe. Stripe can only be used for real-world services like background checks.
+
+This prompt adds **RevenueCat** as the IAP layer for iOS and Android. RevenueCat handles Apple App Store billing, Google Play Billing, receipt validation, and subscription status — all in one SDK. The existing Stripe payment sheet stays in place for the web version only.
+
+The routing is:
+- **iOS app** → RevenueCat → Apple IAP
+- **Android app** → RevenueCat → Google Play Billing
+- **Web** → Stripe (unchanged)
+
+---
+
+## Part 1 — Install RevenueCat
+
+Run in the Replit shell:
+
+```bash
+npx expo install react-native-purchases react-native-purchases-ui
+```
+
+Add to `app.json` under `expo.plugins`:
+```json
+[
+  "react-native-purchases",
+  {
+    "androidApiKey": "your_revenuecat_android_key"
+  }
+]
+```
+
+---
+
+## Part 2 — RevenueCat Setup (Manual — do this in RevenueCat dashboard)
+
+Before running the code, the developer must:
+
+1. Sign up at **https://www.revenuecat.com** (free up to $2,500/mo revenue)
+2. Create a new **Rhome** project
+3. Add two apps: one for **App Store** (iOS) and one for **Google Play** (Android)
+4. Copy the API keys:
+   - `REVENUECAT_IOS_API_KEY` — starts with `appl_`
+   - `REVENUECAT_ANDROID_API_KEY` — starts with `goog_`
+5. Add these to Replit environment secrets
+
+In RevenueCat dashboard, create **Entitlements** matching the app's plans:
+- `plus` — maps to Plus plan
+- `elite` — maps to Elite plan
+- `host_starter` — maps to Host Starter plan
+- `host_pro` — maps to Host Pro plan
+- `host_business` — maps to Host Business plan
+
+Create **Products** in RevenueCat that map to your App Store Connect and Google Play products (set those up there first — see Part 3).
+
+---
+
+## Part 3 — App Store Connect Products (Manual)
+
+The developer must create these products in **App Store Connect** → **My Apps** → **Rhome** → **Subscriptions**:
+
+Create a Subscription Group called **"Rhome Renter"**:
+| Product ID | Name | Price |
+|---|---|---|
+| `rhome_plus_monthly` | Rhome Plus Monthly | $9.99 |
+| `rhome_plus_3month` | Rhome Plus 3 Month | $24.99 |
+| `rhome_plus_annual` | Rhome Plus Annual | $79.99 |
+| `rhome_elite_monthly` | Rhome Elite Monthly | $19.99 |
+| `rhome_elite_3month` | Rhome Elite 3 Month | $49.99 |
+| `rhome_elite_annual` | Rhome Elite Annual | $149.99 |
+
+Create a Subscription Group called **"Rhome Host"**:
+| Product ID | Name | Price |
+|---|---|---|
+| `rhome_host_starter_monthly` | Host Starter Monthly | $29.99 |
+| `rhome_host_pro_monthly` | Host Pro Monthly | $59.99 |
+| `rhome_host_business_monthly` | Host Business Monthly | $99.99 |
+
+Create **Consumable In-App Purchases** for boosts:
+| Product ID | Name | Price |
+|---|---|---|
+| `rhome_boost_6h` | 6 Hour Boost | $1.99 |
+| `rhome_boost_12h` | 12 Hour Boost | $3.99 |
+| `rhome_boost_24h` | 24 Hour Boost | $5.99 |
+
+---
+
+## Part 4 — Initialize RevenueCat
+
+Create file `utils/revenueCatService.ts`:
+
+```typescript
+import Purchases, { LOG_LEVEL, PurchasesPackage } from 'react-native-purchases';
+import { Platform } from 'react-native';
+import { supabase } from '../lib/supabase';
+
+const IOS_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY || '';
+const ANDROID_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY || '';
+
+export async function initializeRevenueCat(userId: string) {
+  const apiKey = Platform.OS === 'ios' ? IOS_API_KEY : ANDROID_API_KEY;
+  if (!apiKey) return;
+
+  Purchases.setLogLevel(LOG_LEVEL.ERROR);
+  await Purchases.configure({ apiKey, appUserID: userId });
+}
+
+export async function getOfferings() {
+  try {
+    const offerings = await Purchases.getOfferings();
+    return offerings.current;
+  } catch (error) {
+    console.error('getOfferings error:', error);
+    return null;
+  }
+}
+
+export async function purchasePackage(pkg: PurchasesPackage): Promise<{
+  success: boolean;
+  entitlements?: string[];
+  error?: string;
+}> {
+  try {
+    const { customerInfo } = await Purchases.purchasePackage(pkg);
+    const entitlements = Object.keys(customerInfo.entitlements.active);
+
+    // Sync subscription to Supabase
+    await syncSubscriptionToSupabase(customerInfo);
+
+    return { success: true, entitlements };
+  } catch (error: any) {
+    if (error.userCancelled) {
+      return { success: false, error: 'cancelled' };
+    }
+    return { success: false, error: error.message };
+  }
+}
+
+export async function restorePurchases(): Promise<boolean> {
+  try {
+    const customerInfo = await Purchases.restorePurchases();
+    await syncSubscriptionToSupabase(customerInfo);
+    return Object.keys(customerInfo.entitlements.active).length > 0;
+  } catch (error) {
+    console.error('restorePurchases error:', error);
+    return false;
+  }
+}
+
+export async function getCustomerInfo() {
+  try {
+    return await Purchases.getCustomerInfo();
+  } catch {
+    return null;
+  }
+}
+
+async function syncSubscriptionToSupabase(customerInfo: any) {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const activeEntitlements = Object.keys(customerInfo.entitlements.active);
+
+    // Map RevenueCat entitlement to Rhome plan name
+    let plan = 'free';
+    let planType = 'renter';
+
+    if (activeEntitlements.includes('elite')) { plan = 'elite'; planType = 'renter'; }
+    else if (activeEntitlements.includes('plus')) { plan = 'plus'; planType = 'renter'; }
+    else if (activeEntitlements.includes('host_business')) { plan = 'business'; planType = 'host'; }
+    else if (activeEntitlements.includes('host_pro')) { plan = 'pro'; planType = 'host'; }
+    else if (activeEntitlements.includes('host_starter')) { plan = 'starter'; planType = 'host'; }
+
+    // Get expiry date
+    const expiryDate = activeEntitlements.length > 0
+      ? customerInfo.entitlements.active[activeEntitlements[0]]?.expirationDate
+      : null;
+
+    await supabase
+      .from('subscriptions')
+      .upsert({
+        user_id: user.id,
+        plan,
+        plan_type: planType,
+        status: activeEntitlements.length > 0 ? 'active' : 'inactive',
+        platform: Platform.OS,
+        revenuecat_customer_id: customerInfo.originalAppUserId,
+        expires_at: expiryDate,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id' });
+
+  } catch (error) {
+    console.error('syncSubscriptionToSupabase error:', error);
+  }
+}
+```
+
+---
+
+## Part 5 — New `useIAPPayment` Hook
+
+Create file `hooks/useIAPPayment.native.ts`:
+
+```typescript
+import { useState } from 'react';
+import { Alert } from 'react-native';
+import {
+  getOfferings,
+  purchasePackage,
+  restorePurchases,
+} from '../utils/revenueCatService';
+
+export function useIAPPayment() {
+  const [loading, setLoading] = useState(false);
+
+  // Map plan + billingCycle to RevenueCat package identifier
+  function getPackageIdentifier(plan: string, billingCycle: string): string {
+    const cycleMap: Record<string, string> = {
+      monthly: '$rc_monthly',
+      '3month': '$rc_three_month',
+      annual: '$rc_annual',
+    };
+    return cycleMap[billingCycle] || '$rc_monthly';
+  }
+
+  async function processPayment(
+    userId: string,
+    email: string,
+    plan: string,
+    billingCycle: 'monthly' | '3month' | 'annual',
+  ): Promise<{ success: boolean; subscriptionId?: string }> {
+    setLoading(true);
+    try {
+      const offering = await getOfferings();
+      if (!offering) {
+        Alert.alert('Error', 'Could not load subscription options. Please try again.');
+        return { success: false };
+      }
+
+      // Find the right package
+      const packageId = getPackageIdentifier(plan, billingCycle);
+      const pkg = offering.availablePackages.find(p => p.packageType === packageId)
+        || offering.availablePackages.find(p => p.identifier === packageId)
+        || offering.availablePackages[0];
+
+      if (!pkg) {
+        Alert.alert('Error', 'Could not find this plan. Please try again.');
+        return { success: false };
+      }
+
+      const result = await purchasePackage(pkg);
+
+      if (result.success) {
+        return { success: true, subscriptionId: result.entitlements?.join(',') };
+      } else if (result.error === 'cancelled') {
+        return { success: false };
+      } else {
+        Alert.alert('Purchase Failed', result.error || 'Something went wrong.');
+        return { success: false };
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Something went wrong.');
+      return { success: false };
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRestore(): Promise<boolean> {
+    setLoading(true);
+    try {
+      const restored = await restorePurchases();
+      if (restored) {
+        Alert.alert('Restored', 'Your purchases have been restored.');
+      } else {
+        Alert.alert('No Purchases', 'No previous purchases found for this account.');
+      }
+      return restored;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return { processPayment, handleRestore, loading };
+}
+```
+
+Create file `hooks/useIAPPayment.web.ts`:
+
+```typescript
+// Web uses Stripe — re-export the Stripe hook under the IAP name
+export { useStripePayment as useIAPPayment } from './useStripePayment.web';
+```
+
+---
+
+## Part 6 — Replace `useStripePayment` with `useIAPPayment` in Native Screens
+
+Search for every screen that imports `useStripePayment` on native:
+
+```bash
+grep -rn "useStripePayment" --include="*.tsx" --include="*.ts" screens/
+```
+
+In each file found, replace:
+```typescript
+import { useStripePayment } from '../hooks/useStripePayment';
+```
+with:
+```typescript
+import { useIAPPayment } from '../hooks/useIAPPayment';
+```
+
+And replace every usage of `useStripePayment()` with `useIAPPayment()`.
+
+The function signature is identical — `processPayment(userId, email, plan, billingCycle)` — so no other changes needed in those screens.
+
+---
+
+## Part 7 — Keep Stripe for Background Checks Only
+
+In `screens/shared/BackgroundCheckScreen.tsx` and `services/backgroundCheckService.ts`, keep the existing Stripe payment flow unchanged. Background checks are a real-world service and are exempt from Apple's IAP requirement.
+
+Add a comment to `BackgroundCheckScreen.tsx` at the top:
+```typescript
+// Background check payments use Stripe intentionally.
+// Apple guideline 3.1.1 exempts real-world services from IAP requirements.
+// Persona/Stripe processes the actual background check service fee.
+```
+
+---
+
+## Part 8 — Initialize RevenueCat on App Start
+
+In `contexts/AuthContext.tsx`, find where the user session is established after login (the `useEffect` that loads the user profile). Add RevenueCat initialization after the user ID is confirmed:
+
+```typescript
+import { initializeRevenueCat } from '../utils/revenueCatService';
+import { Platform } from 'react-native';
+
+// Inside the auth state change handler, after user is confirmed:
+if (user && Platform.OS !== 'web') {
+  initializeRevenueCat(user.id).catch(console.error);
+}
+```
+
+---
+
+## Part 9 — Add Restore Purchases Button
+
+In `screens/shared/ManageSubscriptionScreen.tsx`, add a "Restore Purchases" button. Apple requires this to be visible in the app:
+
+```tsx
+import { useIAPPayment } from '../../hooks/useIAPPayment';
+import { Platform } from 'react-native';
+
+// Inside the component:
+const { handleRestore, loading } = useIAPPayment();
+
+// Add this button to the screen, visible only on native:
+{Platform.OS !== 'web' && (
+  <TouchableOpacity
+    onPress={handleRestore}
+    disabled={loading}
+    style={{
+      alignItems: 'center',
+      paddingVertical: 16,
+      marginTop: 8,
+    }}
+  >
+    <Text style={{ color: theme.textSecondary, fontSize: 14 }}>
+      Restore Purchases
+    </Text>
+  </TouchableOpacity>
+)}
+```
+
+---
+
+## Part 10 — RevenueCat Webhook → Supabase (Optional but recommended)
+
+In the RevenueCat dashboard → Project Settings → Webhooks, add a webhook pointing to a new Supabase Edge Function `revenuecat-webhook` that updates subscription status when Apple/Google sends renewal, cancellation, or billing failure events.
+
+Create file `supabase/functions/revenuecat-webhook/index.ts`:
+
+```typescript
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+serve(async (req) => {
+  try {
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
+
+    const body = await req.json();
+    const event = body.event;
+
+    if (!event) return new Response('OK', { status: 200 });
+
+    const userId = event.app_user_id;
+    const eventType = event.type;
+
+    // Map RevenueCat event types to subscription status
+    const activeEvents = ['INITIAL_PURCHASE', 'RENEWAL', 'PRODUCT_CHANGE', 'UNCANCELLATION'];
+    const inactiveEvents = ['CANCELLATION', 'EXPIRATION', 'BILLING_ISSUE'];
+
+    if (activeEvents.includes(eventType)) {
+      await supabase
+        .from('subscriptions')
+        .upsert({
+          user_id: userId,
+          status: 'active',
+          revenuecat_customer_id: userId,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' });
+    } else if (inactiveEvents.includes(eventType)) {
+      await supabase
+        .from('subscriptions')
+        .update({
+          status: eventType === 'BILLING_ISSUE' ? 'past_due' : 'inactive',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', userId);
+    }
+
+    return new Response('OK', { status: 200 });
+  } catch (error) {
+    console.error('revenuecat-webhook error:', error);
+    return new Response('Error', { status: 500 });
+  }
+});
+```
+
+Deploy:
+```bash
+supabase functions deploy revenuecat-webhook
+```
+
+---
+
+## Summary
+
+| Platform | Subscriptions & Boosts | Background Checks |
+|---|---|---|
+| iOS (App Store) | RevenueCat → Apple IAP ✓ | Stripe ✓ |
+| Android (Google Play) | RevenueCat → Google Play Billing ✓ | Stripe ✓ |
+| Web | Stripe ✓ | Stripe ✓ |
+
+**Manual steps required before this works:**
+1. Sign up at revenuecat.com, create Rhome project, get API keys
+2. Create subscription products in App Store Connect
+3. Create subscription products in Google Play Console
+4. Link products to RevenueCat entitlements in RevenueCat dashboard
+5. Add `EXPO_PUBLIC_REVENUECAT_IOS_KEY` and `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` to Replit secrets
+
+**Apple App Store review requirement:** The app must have a visible "Restore Purchases" button — added in Part 9 of this prompt.
