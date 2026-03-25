@@ -33,6 +33,7 @@ export interface RoommateProfile {
   profileData?: {
     interests?: string[];
     preferences?: Record<string, any>;
+    profileNote?: string;
     [key: string]: any;
   };
   references?: Reference[];
@@ -531,6 +532,7 @@ export interface User {
         cleaning?: 'split_equally' | 'take_turns' | 'hire_cleaner';
       };
     };
+    profileNote?: string;
   };
   personalityAnswers?: Record<string, string>;
   references?: Reference[];

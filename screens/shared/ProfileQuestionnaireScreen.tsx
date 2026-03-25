@@ -1133,7 +1133,7 @@ export const ProfileQuestionnaireScreen = () => {
               onPress={async () => {
                 setProfileNote('');
                 const data = buildProfileData();
-                if (data.profileData) data.profileData.profileNote = undefined;
+                if (data.profileData) data.profileData.profileNote = '';
                 await updateUser(data);
                 if (user?.onboardingStep === 'profile') {
                   await completeOnboardingStep(user?.role === 'host' ? 'hostType' : 'plan');

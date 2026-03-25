@@ -207,7 +207,8 @@ async function getUserProfile(supabase: any, userId: string) {
       smoking, drinking, pets, interests,
       room_type, desired_bedrooms,
       budget_per_person_max, preferred_trains,
-      amenity_must_haves, apartment_prefs_complete
+      amenity_must_haves, apartment_prefs_complete,
+      profile_note
     `)
     .eq('user_id', userId)
     .single();
@@ -231,6 +232,7 @@ async function getUserProfile(supabase: any, userId: string) {
     drinking: profileData?.drinking,
     pets: profileData?.pets,
     interests: profileData?.interests,
+    profile_note: profileData?.profile_note,
     profile: profileData,
   };
 }
@@ -524,7 +526,7 @@ Move-in: ${profile.move_in_date ?? 'flexible'}
 Zodiac: ${profile.zodiac_sign ?? 'unknown'}
 Interests: ${profile.interests?.join(', ') ?? 'not set'}
 Pets: ${profile.pets ?? 'none'}
-Cleanliness: ${profile.cleanliness ?? '?'}/5, Sleep: ${profile.sleep_schedule ?? '?'}, Noise tolerance: ${profile.noise_tolerance ?? '?'}/5
+Cleanliness: ${profile.cleanliness ?? '?'}/5, Sleep: ${profile.sleep_schedule ?? '?'}, Noise tolerance: ${profile.noise_tolerance ?? '?'}/5${profile.profile_note ? `\nIn their own words: "${profile.profile_note}"` : ''}
 
 THEIR TOP MATCHES RIGHT NOW: ${matchSummary}
 

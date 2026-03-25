@@ -604,7 +604,7 @@ export const EditProfileScreen = () => {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
               <Feather name="eye" size={11} color={theme.textSecondary} />
               <ThemedText style={{ color: theme.textSecondary, fontSize: 11 }}>
-                Visible to your matches
+                Visible to your matches · You control this
               </ThemedText>
             </View>
           </View>

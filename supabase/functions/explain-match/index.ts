@@ -76,7 +76,7 @@ MY PROFILE:
 - Smoking: ${myProfile.smoking ? 'smoker' : 'non-smoker'}
 - Pets: ${myProfile.pets ? 'has pets' : 'no pets'}
 - Lifestyle tags: ${myProfile.lifestyle_tags?.join(', ') || 'none'}
-- Bio: ${myProfile.bio || 'none'}
+- Bio: ${myProfile.bio || 'none'}${myProfile.profile_note ? `\n- In their own words: "${myProfile.profile_note}"` : ''}
 ${myMemory?.dealbreakers?.length ? `- Known dealbreakers: ${myMemory.dealbreakers.join(', ')}` : ''}
 ${myMemory?.must_haves?.length ? `- Must-haves: ${myMemory.must_haves.join(', ')}` : ''}
 
@@ -89,7 +89,7 @@ THEIR PROFILE:
 - Smoking: ${theirProfile.smoking ? 'smoker' : 'non-smoker'}
 - Pets: ${theirProfile.pets ? 'has pets' : 'no pets'}
 - Lifestyle tags: ${theirProfile.lifestyle_tags?.join(', ') || 'none'}
-- Bio: ${theirProfile.bio || 'none'}
+- Bio: ${theirProfile.bio || 'none'}${theirProfile.profile_note ? `\n- In their own words: "${theirProfile.profile_note}"` : ''}
 
 Analyze their compatibility and respond with ONLY this JSON:
 {

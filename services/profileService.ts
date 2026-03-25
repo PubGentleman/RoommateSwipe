@@ -22,6 +22,8 @@ export interface ProfileData {
   private_bathroom?: boolean;
   bathrooms?: number;
   coordinates?: { lat: number; lng: number };
+  profile_note?: string | null;
+  profile_note_updated_at?: string | null;
 }
 
 export interface UserData {
