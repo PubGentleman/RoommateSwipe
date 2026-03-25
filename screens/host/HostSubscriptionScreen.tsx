@@ -98,7 +98,7 @@ function billingPrice(base: number, cycle: BillingCycle): number {
 export const HostSubscriptionScreen = () => {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
-  const { user, updateUser, cancelHostSubscriptionAtPeriodEnd, reactivateHostSubscription } = useAuth();
+  const { user, updateUser, cancelHostSubscriptionAtPeriodEnd, reactivateHostSubscription, isFirstTimeHost, completeHostOnboarding } = useAuth();
   const { confirm, alert: showAlert } = useConfirm();
   const hostType = (user?.hostType as HostType) ?? 'individual';
   const planDisplayItems = getHostPlanDisplay(hostType);
@@ -129,11 +129,16 @@ export const HostSubscriptionScreen = () => {
     });
   }, [user]);
 
-  const handleSelectPlan = (plan: HostPlanType | string) => {
+  const handleSelectPlan = async (plan: HostPlanType | string) => {
     if (!user || !hostSub) return;
     const planDisplay = PLAN_DISPLAY.find(d => d.id === plan);
     if (planDisplay?.ctaLabel === 'Contact Sales') {
       openEnterpriseSalesContact();
+      return;
+    }
+    if (isFirstTimeHost && isFreePlan(plan as HostPlanType)) {
+      await completeHostOnboarding();
+      navigation.goBack();
       return;
     }
     if (plan === hostSub.plan) return;
@@ -180,6 +185,9 @@ export const HostSubscriptionScreen = () => {
           billingCycle: 'monthly' as const,
         },
       });
+      if (isFirstTimeHost) {
+        await completeHostOnboarding();
+      }
       setShowDowngradeModal(false);
       navigation.goBack();
     } catch (e) {
@@ -208,6 +216,9 @@ export const HostSubscriptionScreen = () => {
           billingCycle: billingCycle === 'annual' ? 'annual' as any : 'monthly' as const,
         },
       });
+      if (isFirstTimeHost) {
+        await completeHostOnboarding();
+      }
       setSelectedPlan(null);
       await StorageService.addNotification({
         id: `notif-host-plan-${plan}-${Date.now()}`,

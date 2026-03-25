@@ -63,13 +63,13 @@ const ONE_TIME_PURCHASES = [
 export const HostPricingScreen = () => {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
-  const { user, getHostPlan, upgradeHostPlan, downgradeHostPlan, purchaseListingBoost, purchaseHostVerification, purchaseSuperInterest } = useAuth();
+  const { user, getHostPlan, upgradeHostPlan, downgradeHostPlan, purchaseListingBoost, purchaseHostVerification, purchaseSuperInterest, isFirstTimeHost, completeHostOnboarding } = useAuth();
   const { confirm, alert: showAlert } = useConfirm();
   const { processPayment } = useStripePayment();
   const { restore } = useRevenueCat();
   const hostType = (user?.hostType as HostType) ?? 'individual';
   const plans = getHostPlans(hostType);
-  const { subscriptionSource: entSubscriptionSource } = useEntitlements();
+  const { subscriptionSource: entSubscriptionSource, renterTier: entRenterTier } = useEntitlements();
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
   const [restoring, setRestoring] = useState(false);
   const defaultSelected = plans.find(p => p.recommended)?.id ?? plans[1]?.id ?? 'pro';
@@ -152,6 +152,9 @@ export const HostPricingScreen = () => {
           if (!success) return;
         }
         await upgradeHostPlan(plan.id as any, billingCycle);
+        if (isFirstTimeHost) {
+          await completeHostOnboarding();
+        }
       } else {
         await downgradeHostPlan(plan.id as any);
       }
@@ -220,6 +223,15 @@ export const HostPricingScreen = () => {
         contentContainerStyle={{ paddingBottom: insets.bottom + 40, gap: 10 }}
         showsVerticalScrollIndicator={false}
       >
+        {entSubscriptionSource === 'renter' && entRenterTier !== 'free' ? (
+          <View style={s.subWarningBanner}>
+            <Feather name="info" size={16} color="#6C63FF" />
+            <Text style={s.subWarningText}>
+              Your Renter {entRenterTier === 'elite' ? 'Elite' : 'Plus'} subscription will be cancelled automatically when your host plan activates. All renter features are included in every host plan.
+            </Text>
+          </View>
+        ) : null}
+
         <View style={s.hero}>
           <Text style={s.heroTitle}>Grow Your <Text style={s.heroAccent}>Listings</Text></Text>
           <Text style={s.heroSub}>Reach more renters and fill vacancies faster</Text>
@@ -401,6 +413,24 @@ export const HostPricingScreen = () => {
 
 const s = StyleSheet.create({
   container: { flex: 1 },
+  subWarningBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: 'rgba(108,99,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(108,99,255,0.2)',
+    borderRadius: 14,
+    padding: 14,
+    marginHorizontal: 20,
+    marginBottom: 4,
+  },
+  subWarningText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+    color: 'rgba(255,255,255,0.7)',
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

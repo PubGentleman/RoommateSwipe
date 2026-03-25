@@ -1,6 +1,6 @@
 # Overview
 
-Rhome is a React Native mobile application that revolutionizes the housing and roommate search by connecting renters and hosts. It offers role-based navigation, swipe-based matching, property listings, group functionalities, and secure messaging. The platform aims to be an intuitive, comprehensive "Airbnb for roommates," providing a seamless solution for finding compatible roommates and suitable properties.
+Rhome is a React Native mobile application designed to simplify housing and roommate searches. It connects renters and hosts through a role-based, swipe-based matching platform. The project aims to provide a comprehensive and intuitive solution, akin to "Airbnb for roommates," facilitating the discovery of compatible roommates and suitable properties. Key capabilities include AI-powered matching, property listings, group functionalities, and secure communication.
 
 # User Preferences
 
@@ -24,60 +24,51 @@ Preferred communication style: Simple, everyday language.
 
 ## Frontend
 
-The application is built with React Native and Expo using TypeScript, leveraging React Navigation for role-based access (Renter, Host, Agent/Landlord). It supports light/dark modes, uses React Native Reanimated for animations and gestures, and manages state with React Context API and AsyncStorage.
+The application is built using React Native, Expo, and TypeScript, utilizing React Navigation for role-based access (Renter, Host, Agent/Landlord). It supports light/dark modes, animations with React Native Reanimated, and state management via React Context API and AsyncStorage.
 
 **Key Features:**
-- **Matching & Profiles:** Compatibility algorithm (0-100+ score) based on 16 weighted criteria, interest tag system, 14-step Profile Questionnaire, and a 5-question Personality Quiz.
-- **Renter Features:** Swipe-based matching, 1-on-1 messaging, Roommate and Listing Inquiry group management, property exploration with advanced filters (including transit-aware matching with NYC subway integration) and map/list views, saved properties, AI Match Assistant, notification feed, and daily cold messaging limits.
-- **Host Features:** Host dashboard, listing management (create, edit, delete, boost), inquiries screen, analytics, and group matches monetization. Host types (Individual, Company, Agent) affect UI and features.
+- **Matching & Profiles:** Features a compatibility algorithm, interest tags, detailed profile questionnaires, and personality quizzes.
+- **Role-Specific Features:**
+    - **Renter:** Swipe-based matching, 1-on-1 messaging, group management, property exploration with advanced filters and transit integration, saved properties, AI Match Assistant, and notifications.
+    - **Host:** Dashboard for listing management (create, edit, delete, boost), inquiry handling, analytics, and group matches monetization. Supports Individual, Company, and Agent host types with varying UI/features.
 - **AI-Powered Enhancements:**
-    - **AI Assistant:** Context-aware floating button, AI Memory Layer (persistent `user_ai_memory` table), and AI Match Assistant powered by Claude (claude-sonnet-4-5) via Supabase Edge Functions with streaming SSE responses. Housing-focused quick actions (find matches, improve profile, neighborhoods, move-in timeline). Persistent memory extracts budget, dealbreakers, must-haves, neighborhoods, and lifestyle facts across sessions via background Haiku extraction. Streaming responses show characters in real-time as Claude types them.
-    - **"Why This Match?" Modal:** Tap "Why?" next to compatibility score on swipe cards to get a Claude Haiku-generated breakdown with headline, top 3 reasons, concerns, and conversation starter. Results cached in `match_explanations` table via `explain-match` Edge Function.
-    - **AI Renter Suggestions:** GroupInfoScreen shows compatible renter suggestions for groups.
-    - **"Best Match Today" Banner:** Displays a top match in the RoommatesScreen swipe feed.
-    - **AI Group Health Scores:** Calculates group compatibility and identifies conflicts, displayed with badges and snippets.
-    - **Group Quick Stats:** Inline chip counts for suggested members and matching apartments on group cards.
-    - **Automated AI Roommate Matching:** AI-generated group suggestions with invite flow and automatic listing matching upon group completion.
-    - **Agent Matchmaker:** AI-powered renter shortlisting, group composition, compatibility matrix, group builder with invite flow, placement pipeline, and Claude AI Group Pairing for recommendations.
-    - **Company Host AI Auto-Fill:** AI-powered vacancy fill system with group recommendations and invites for shortlisted renters.
-    - **AI Meetup Suggestions:** After matched renters exchange 6+ messages, Claude analyzes conversation intent (or detects phone/Instagram sharing via regex) and proactively suggests a coffee shop meetup halfway between their neighborhoods. Uses `analyze-chat-intent` Edge Function, `meetup_suggestions` table (migration 025), `MeetupSuggestionCard` component with real-time response updates, Google Places API for venue suggestions, and push notifications.
-    - **Question of the Day:** AI-generated daily compatibility question via `generate-daily-question` Edge Function (Claude Haiku). Questions are personalized based on user profile, AI memory, and recent question history to avoid repeats. Answers saved to `daily_questions` table (migration 029), merged into `personality_answers` on profiles, and stored in `user_ai_memory` via `answer-daily-question` Edge Function. `DailyQuestionCard` component displays above swipe deck in RoommatesScreen (and in empty deck state). Questions expire after 24h.
-    - **"Ask AI About This Person":** Multi-turn chat modal (`AskAboutPersonModal`) accessible from 3 entry points: swipe card ("Ask AI" pill), match celebration screen ("Ask AI about [name]" button), and chat screen header (CPU icon). Context-aware opening messages and quick prompts per entry point. Uses `ai-ask-about-profile` Edge Function (Claude Haiku) which loads both profiles, match scores, and conversation history (for chat entry). Conversation lookup uses proper AND filtering to prevent privacy leakage.
-    - **AI Neighborhood Intelligence:** `NeighborhoodAISheet` component opens from listing detail ("Ask AI about this neighborhood" button) and listing cards ("Area info" pill). Auto-generates neighborhood briefing on open using `ai-neighborhood-info` Edge Function (Claude Haiku) with Walk Score API (walk/transit/bike scores) and Google Places API (nearby groceries, cafes, gyms, bars, transit, parks). Walk/transit score pills shown with color coding (green/amber/red). Follow-up chat for questions about safety, commute, nightlife, etc. Briefings cached on `listings` table for 7 days (migration 030). User profile context (work style, budget, preferred areas) personalizes responses.
-    - **Shareable Profile Notes ("In Their Own Words"):** Free-text field (500 chars) where users describe themselves in their own voice. Added as final step in ProfileQuestionnaireScreen and in EditProfileScreen. Shows on profile detail card as "IN THEIR OWN WORDS" section with coral left-border accent and italic quoted text. Migration `031_profile_notes.sql` adds `profile_note` and `profile_note_updated_at` to `profiles` table. Fed to `ai-ask-about-profile` Edge Function as the most authentic data source about a user. Privacy label ("Visible to your matches") shown everywhere the note appears. This is the only intentional cross-user AI data bridge — everything else (messages, AI memory, chat history) stays scoped to the owner.
-- **Existing Roommate Shareable Profile Links:** Hosts with existing roommates can share web links so non-Rhome roommates fill out a lifestyle preferences form (`web/roommate-profile.html`). Preferences are stored in `existing_roommates` table and factored into AI compatibility scoring via `scoreRenterVsExistingRoommate` and `calculateCombinedCompatibility` in `existingRoommateService.ts`. Post-listing creation flow auto-navigates to `InviteExistingRoommatesScreen` when `existing_roommates_count > 0`.
-- **Instagram Verification:** OAuth-based Instagram account linking via `instagram-oauth` Edge Function and `instagramService.ts`. Verified badge (`InstagramBadge` component) shown on swipe cards and match celebration. Handle reveal is gated behind Plus/Elite subscription. Edit Profile shows connect/disconnect UI with status. Migration `026_instagram_photos.sql` adds `instagram_verified`, `instagram_handle`, `instagram_user_id` columns plus `live_profiles` view.
-- **Multi-Photo Enforcement:** Minimum 3 photos required to save profile (guard in `profileService.ts` and `EditProfileScreen`). Swipe deck filters out profiles with fewer than 3 photos (`discoverService.ts`). Photo counter UI in Edit Profile shows progress toward 3-photo minimum.
-- **Chat Leakage Detection & Retention:** `analyze-chat-intent` Edge Function returns `leakageDetected` flag when phone/Instagram sharing is detected. `ChatScreen` shows a retention banner encouraging users to keep chatting on-platform.
-- **Safety Mode + Background Check (Persona):** Two-tier background check system (Standard $15, Premium $35) via Persona API with `create-background-check` and `persona-webhook` Edge Functions. `BackgroundCheckScreen` lets renters initiate checks via WebBrowser flow. `BackgroundCheckBadge` shows ID Verified, Background Clear, and Credit Score pills. Safety Mode toggle in Profile Settings blurs phone numbers and social handles in chat messages using `SafeMessageText` component with regex-based detection and tap-to-reveal. Hosts can require background checks on listings via `requires_background_check` toggle. Migration `027_safety_background.sql` adds `background_checks` table, `public_background_badges` view, and `safety_mode_enabled` on profiles.
-- **Identity & Verification:** Phone, government ID (Stripe Identity SDK), social media verification, optional background/income checks, and a References System.
-- **Boost System:** Tier-based listing and profile boosting for increased visibility.
-- **Account Management:** Soft-delete with a 30-day recovery window.
-- **Activity-Based Ranking:** Inactive users are ranked lower in the swipe deck.
-- **Subscription Management:** Host subscription cancellation and re-activation, universal purchase confirmation modal.
-- **UI/UX:** Consistent dark theme with `RhomeLogo` (SVG), collapsible/sticky headers with `react-native-reanimated`.
-- **Location System:** Supports multiple US cities with sub-area filtering (e.g., NYC boroughs) via `LocationPicker` and `CityContext`.
+    - **AI Assistant:** Context-aware assistant with persistent memory, powered by Claude via Supabase Edge Functions for personalized housing assistance and streaming responses.
+    - **Match Explanations:** AI-generated breakdowns of compatibility scores for matches.
+    - **Group & Listing Suggestions:** AI-driven renter suggestions for groups, "Best Match Today" banners, AI group health scores, and automated roommate/listing matching.
+    - **Agent & Company Tools:** AI-powered shortlisting, group composition, pairing, and vacancy filling.
+    - **Meetup Suggestions:** AI analyzes chat intent to suggest meetups at halfway points.
+    - **Question of the Day:** AI-generated daily compatibility questions personalized for users.
+    - **"Ask AI About This Person":** Multi-turn chat to inquire about other users with context-aware responses.
+    - **AI Neighborhood Intelligence:** Provides AI-generated neighborhood briefings with local data from Walk Score and Google Places, with follow-up chat capabilities.
+    - **Shareable Profile Notes:** Users can add free-text descriptions of themselves, which AI can leverage.
+- **Verification & Safety:** Instagram verification, multi-photo enforcement, chat leakage detection, Safety Mode with background checks (via Persona), identity verification (Stripe Identity SDK), and a References System.
+- **Boost System:** Tier-based boosting for increased visibility of listings and profiles.
+- **Account Management:** Soft-delete functionality with a recovery window.
+- **Subscription Management:** Tiered subscription plans for renters, hosts, and agents, with bundled pricing and a hybrid payment architecture (RevenueCat for native, Stripe for web).
+- **UI/UX:** Consistent dark theme, collapsible/sticky headers, and platform-specific adaptations.
+- **Location System:** Supports multiple US cities with sub-area filtering.
+- **Renter/Host Mode Switch:** Allows individual hosts to toggle between modes.
 
 ## Backend (Supabase)
 
-Supabase provides the entire backend infrastructure:
-- **Auth:** Email/password authentication with `AuthContext` and Row Level Security (RLS).
-- **Database:** PostgreSQL with RLS. Listings have a computed `rooms_available` column (`bedrooms - host_lives_in - existing_roommates_count`) used across all AI matching. The `existing_roommates` table stores invite tokens and lifestyle preferences for non-Rhome roommates already living in a unit.
-- **Realtime:** Subscriptions for messages and notifications.
-- **Storage:** For profile and listing photos.
-- **Edge Functions:** For webhooks (Stripe), verification sessions, background checks, payments, references, agent placement fees, match score calculation, Claude AI operations (`agent-pair-group`, `company-pair-group`), group-to-listing matching, group unlock payments, and `submit-roommate-profile` (public, no-auth endpoint for existing roommate web form submissions).
+Supabase provides the complete backend infrastructure:
+- **Auth:** Email/password authentication with Row Level Security (RLS).
+- **Database:** PostgreSQL with RLS, including computed columns for available rooms and a table for existing roommate preferences.
+- **Realtime:** Subscriptions for messaging and notifications.
+- **Storage:** For media assets like photos.
+- **Edge Functions:** Used for webhooks (Stripe), verification, background checks, payments, references, AI operations (Claude), match score calculations, group-to-listing matching, and public forms.
 
 ## Subscription & Paywall System
 
-Tiered subscription plans for renters (Basic, Plus, Elite), hosts (Free, Starter, Pro, Business), and agents (Pay Per Use, Starter, Pro, Business), plus one-time purchases. **Bundled Pricing:** Host plans include renter access automatically — Host Starter bundles Renter Plus, Host Pro/Business bundle Renter Elite. Agent/Company plans do not include renter access. Entitlement logic centralized in `utils/entitlements.ts` and `hooks/useEntitlements.ts`. No user ever pays two subscriptions at once. **Hybrid payment architecture:** RevenueCat handles Apple IAP + Google Play Billing on native iOS/Android; Stripe handles web payments. `RevenueCatProvider` (contexts/RevenueCatContext.tsx) wraps the app, `lib/revenueCat.ts` provides initialization/purchase/restore helpers. `useStripePayment.native.ts` routes to RevenueCat on native platforms, falls back to Stripe on web. "Restore Purchases" button on all plan screens (required for App Store). RevenueCat webhook edge function (`revenuecat-webhook`) syncs subscription state + derived tiers to Supabase `profiles` table (`host_tier`, `renter_tier`, `subscription_source` columns). Plan limits are centralized in `constants/planLimits.ts`.
+A tiered subscription model exists for renters, hosts, and agents, complemented by one-time purchases. Host plans automatically include renter access. Payments are managed through RevenueCat for native iOS/Android (Apple IAP, Google Play Billing) and Stripe for web. RevenueCat webhooks sync subscription states to the Supabase database.
 
 ## Data Layer
 
-Supabase PostgreSQL for primary data storage and local AsyncStorage for caching. TypeScript interfaces define models. A centralized `listingService.ts` handles CRUD operations. The group system supports `roommate` and `listing_inquiry` groups with plan-based limits and administration rules. Host Proactive Group Outreach allows hosts on Starter+ plans to message discoverable renter groups with caps and cooldowns.
+Supabase PostgreSQL is the primary data store, with AsyncStorage for local caching. TypeScript interfaces define data models. A centralized `listingService.ts` manages CRUD operations. The group system handles roommate and listing inquiry groups with plan-based limits.
 
 ## Technical Decisions
 
-Babel module resolver, platform-specific UI adaptations, performance optimizations via React Native's New Architecture, React Compiler, and Reanimated. Robust error handling. Navigation uses separate stack navigators per major tab with `backBehavior="history"`. `messageService.getConversations()` uses single joined queries to prevent N+1 issues. Conditional rendering of HostTabNavigator based on host type.
+The architecture includes a Babel module resolver, platform-specific UI, performance optimizations (React Native's New Architecture, React Compiler, Reanimated), and robust error handling. Navigation employs separate stack navigators with history behavior. Efficient data fetching prevents N+1 issues.
 
 # External Dependencies
 
@@ -101,9 +92,9 @@ Babel module resolver, platform-specific UI adaptations, performance optimizatio
 - `expo-haptics`
 
 **Payments:**
-- `@stripe/stripe-react-native` (web fallback)
-- `react-native-purchases` (RevenueCat — Apple IAP + Google Play Billing on native)
-- `@replit/revenuecat-sdk` (RevenueCat API client for seeding/webhooks)
+- `@stripe/stripe-react-native`
+- `react-native-purchases` (RevenueCat)
+- `@replit/revenuecat-sdk`
 
 **Storage & State:**
 - `@react-native-async-storage/async-storage`

@@ -17,7 +17,7 @@ type PrivacySecurityScreenNavigationProp = NativeStackNavigationProp<ProfileStac
 
 export const PrivacySecurityScreen = () => {
   const { theme } = useTheme();
-  const { user, logout, updateUser, softDeleteAccount, activeMode, canSwitchMode } = useAuth();
+  const { user, logout, updateUser, softDeleteAccount, activeMode, canSwitchMode, isFirstTimeHost } = useAuth();
   const navigation = useNavigation<PrivacySecurityScreenNavigationProp>();
   
   const [showPasswordSection, setShowPasswordSection] = useState(false);
@@ -156,6 +156,22 @@ export const PrivacySecurityScreen = () => {
               ? 'Switch to Renter to find your next place'
               : 'Switch to Host to manage your listings'}
           </ThemedText>
+        </View>
+      ) : isFirstTimeHost ? (
+        <View style={[styles.section, { alignItems: 'center' }]}>
+          <Pressable
+            style={styles.becomeHostBtn}
+            onPress={() => navigation.navigate('HostTypeSelect' as any)}
+          >
+            <View style={styles.becomeHostIcon}>
+              <Feather name="home" size={18} color="#fff" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ThemedText style={styles.becomeHostTitle}>Become a Host</ThemedText>
+              <ThemedText style={styles.becomeHostSub}>List a room and find great renters</ThemedText>
+            </View>
+            <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.35)" />
+          </Pressable>
         </View>
       ) : null}
 
@@ -489,5 +505,35 @@ const styles = StyleSheet.create({
   },
   deleteModalButton: {
     backgroundColor: '#DC2626',
+  },
+  becomeHostBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: 'rgba(255,107,91,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.2)',
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    width: '100%',
+  },
+  becomeHostIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#ff6b5b',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  becomeHostTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 2,
+  },
+  becomeHostSub: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.45)',
   },
 });

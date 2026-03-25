@@ -25,7 +25,7 @@ import { ModeSwitchToggle } from '../../components/ModeSwitchToggle';
 type ProfileScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'ProfileMain'>;
 
 export const ProfileScreen = () => {
-  const { user, logout, updateUser, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, getHostPlan, getSuperInterestCount, activeMode, canSwitchMode } = useAuth();
+  const { user, logout, updateUser, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, getHostPlan, getSuperInterestCount, activeMode, canSwitchMode, isFirstTimeHost } = useAuth();
   const { unreadCount } = useNotificationContext();
   const navigation = useNavigation<ProfileScreenNavigationProp>();
   const insets = useSafeAreaInsets();
@@ -641,20 +641,23 @@ export const ProfileScreen = () => {
                   : 'Switch to Host to manage your listings'}
               </Text>
             </View>
-          ) : (
+          ) : isFirstTimeHost ? (
             <Pressable
-              style={styles.switchRoleBtn}
-              onPress={() => {
-                const newRole = user?.role === 'renter' ? 'host' : 'renter';
-                updateUser({ role: newRole });
-              }}
+              style={styles.becomeHostBtn}
+              onPress={() => navigation.navigate('HostTypeSelect' as any)}
             >
-              <Feather name="repeat" size={16} color="#ff6b5b" />
-              <Text style={styles.switchRoleText}>
-                Switch to {user?.role === 'renter' ? 'Host' : 'Renter'}
-              </Text>
+              <View style={styles.becomeHostLeft}>
+                <View style={styles.becomeHostIcon}>
+                  <Feather name="home" size={18} color="#fff" />
+                </View>
+                <View>
+                  <Text style={styles.becomeHostTitle}>Become a Host</Text>
+                  <Text style={styles.becomeHostSub}>List a room and find great renters</Text>
+                </View>
+              </View>
+              <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.35)" />
             </Pressable>
-          )}
+          ) : null}
 
           <Pressable style={styles.signoutBtn} onPress={logout}>
             <Feather name="log-out" size={16} color="#ff4d4d" />
@@ -1287,22 +1290,40 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
   },
-  switchRoleBtn: {
+  becomeHostBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
     backgroundColor: 'rgba(255,107,91,0.08)',
     borderWidth: 1,
     borderColor: 'rgba(255,107,91,0.2)',
-    borderRadius: 14,
-    height: 48,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     marginTop: 16,
   },
-  switchRoleText: {
+  becomeHostLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  becomeHostIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#ff6b5b',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  becomeHostTitle: {
     fontSize: 15,
-    fontWeight: '600',
-    color: '#ff6b5b',
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 2,
+  },
+  becomeHostSub: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.45)',
   },
   signoutBtn: {
     flexDirection: 'row',
