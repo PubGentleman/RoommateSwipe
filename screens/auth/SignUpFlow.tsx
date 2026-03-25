@@ -44,11 +44,11 @@ interface SignUpState {
   profilePhoto: string | null;
 }
 
-const ACCOUNT_TYPES: { id: AccountType; icon: string; label: string; description: string; color: string }[] = [
-  { id: 'renter', icon: 'search', label: 'Renter', description: 'Find a room or roommate', color: '#6C63FF' },
-  { id: 'individual', icon: 'home', label: 'Individual Host', description: 'Rent out your own property', color: '#3B82F6' },
-  { id: 'agent', icon: 'award', label: 'Licensed Agent', description: 'Real estate professional', color: '#F59E0B' },
-  { id: 'company', icon: 'briefcase', label: 'Property Company', description: 'Manage multiple properties', color: '#22C55E' },
+const ACCOUNT_TYPES: { id: AccountType; icon: string; label: string; description: string; color: string; hostOnly?: boolean }[] = [
+  { id: 'renter', icon: 'search', label: 'Renter', description: "I'm looking for a place to rent", color: '#6C63FF' },
+  { id: 'individual', icon: 'key', label: 'Individual Host', description: 'I rent out my own property', color: '#3B82F6' },
+  { id: 'agent', icon: 'briefcase', label: 'Agent', description: "I'm a licensed real estate agent", color: '#F59E0B', hostOnly: true },
+  { id: 'company', icon: 'grid', label: 'Company', description: 'I manage properties for clients', color: '#22C55E', hostOnly: true },
 ];
 
 const CITIES = [
@@ -313,6 +313,11 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
                 ]}
                 onPress={() => handleAccountTypeSelect(type.id)}
               >
+                {type.hostOnly ? (
+                  <View style={styles.hostOnlyBadge}>
+                    <Text style={styles.hostOnlyBadgeText}>Host-only account</Text>
+                  </View>
+                ) : null}
                 <View style={[styles.typeIconWrap, { backgroundColor: `${type.color}20` }]}>
                   <Feather name={type.icon as any} size={22} color={type.color} />
                 </View>
@@ -326,7 +331,7 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
           <View style={styles.agentNotice}>
             <Feather name="info" size={14} color="#F59E0B" />
             <Text style={styles.agentNoticeText}>
-              {state.accountType === 'agent' ? 'Agent' : 'Company'} accounts are host-only. To use Rhome as a renter, create a separate account.
+              This creates a host-only account. You cannot switch to renter later.
             </Text>
           </View>
         ) : null}
@@ -901,6 +906,21 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.45)',
     textAlign: 'center',
     lineHeight: 16,
+  },
+  hostOnlyBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(245,158,11,0.15)',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  hostOnlyBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#F59E0B',
+    letterSpacing: 0.3,
   },
   agentNotice: {
     flexDirection: 'row',
