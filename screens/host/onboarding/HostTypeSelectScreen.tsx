@@ -56,12 +56,26 @@ const HOST_TYPES: Array<{
   },
 ];
 
-const INDIVIDUAL_BENEFITS = [
-  { icon: 'home' as const, text: 'List your room and start getting inquiries fast' },
-  { icon: 'search' as const, text: 'Switch between renter and host mode anytime' },
-  { icon: 'star' as const, text: 'AI-powered roommate matching' },
-  { icon: 'shield' as const, text: 'Verified host badge builds trust with renters' },
-];
+const BENEFITS_BY_TYPE: Record<string, Array<{ icon: string; text: string }>> = {
+  individual: [
+    { icon: 'home', text: 'List your room and start getting inquiries fast' },
+    { icon: 'refresh-cw', text: 'Switch between renter and host mode anytime' },
+    { icon: 'star', text: 'AI-powered roommate matching' },
+    { icon: 'shield', text: 'Verified host badge builds trust with renters' },
+  ],
+  agent: [
+    { icon: 'shield', text: 'Verified Agent badge on all your listings' },
+    { icon: 'trending-up', text: 'Priority placement in search results' },
+    { icon: 'users', text: 'AI-powered renter matching' },
+    { icon: 'bar-chart-2', text: 'Leads tracking and analytics' },
+  ],
+  company: [
+    { icon: 'users', text: 'Multi-seat team access for your whole team' },
+    { icon: 'home', text: 'Manage your entire portfolio in one place' },
+    { icon: 'shield', text: 'Company branding on every listing' },
+    { icon: 'zap', text: 'Bulk tools for high-volume operations' },
+  ],
+};
 
 export function HostTypeSelectScreen() {
   const { theme } = useTheme();
@@ -327,17 +341,21 @@ export function HostTypeSelectScreen() {
         )}
       </Pressable>
 
-      <View style={[styles.benefitsSection, { borderTopColor: theme.border }]}>
-        <Text style={[styles.benefitsTitle, { color: theme.text }]}>Why host on Rhome?</Text>
-        {INDIVIDUAL_BENEFITS.map((item, i) => (
-          <View key={i} style={styles.benefitRow}>
-            <View style={[styles.benefitIcon, { backgroundColor: '#6C63FF15' }]}>
-              <Feather name={item.icon} size={14} color="#6C63FF" />
+      {selected ? (
+        <View style={[styles.benefitsSection, { borderTopColor: theme.border }]}>
+          <Text style={[styles.benefitsTitle, { color: theme.text }]}>
+            {selected === 'agent' ? 'What you get as an agent' : selected === 'company' ? 'What you get as a company' : 'Why host on Rhome?'}
+          </Text>
+          {(BENEFITS_BY_TYPE[selected] || []).map((item, i) => (
+            <View key={i} style={styles.benefitRow}>
+              <View style={[styles.benefitIcon, { backgroundColor: (HOST_TYPES.find(t => t.id === selected)?.color || '#6C63FF') + '15' }]}>
+                <Feather name={item.icon} size={14} color={HOST_TYPES.find(t => t.id === selected)?.color || '#6C63FF'} />
+              </View>
+              <Text style={[styles.benefitText, { color: theme.textSecondary }]}>{item.text}</Text>
             </View>
-            <Text style={[styles.benefitText, { color: theme.textSecondary }]}>{item.text}</Text>
-          </View>
-        ))}
-      </View>
+          ))}
+        </View>
+      ) : null}
     </ScrollView>
   );
 }
