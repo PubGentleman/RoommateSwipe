@@ -267,7 +267,8 @@ type StepId =
   | 'lifestyle'
   | 'housing'
   | 'interests'
-  | 'personality';
+  | 'personality'
+  | 'profileNote';
 
 const STEP_ORDER: StepId[] = [
   'photos',
@@ -280,6 +281,7 @@ const STEP_ORDER: StepId[] = [
   'housing',
   'interests',
   'personality',
+  'profileNote',
 ];
 
 const ONBOARDING_STEPS: StepId[] = [
@@ -300,6 +302,7 @@ const STEP_TITLES: Record<StepId, string> = {
   housing: 'Housing Needs',
   interests: 'Interests',
   personality: 'Your Living Style',
+  profileNote: 'In Your Own Words',
 };
 
 const STEP_SUBTITLES: Record<StepId, string> = {
@@ -313,6 +316,7 @@ const STEP_SUBTITLES: Record<StepId, string> = {
   housing: 'What you need in your next place.',
   interests: 'Pick at least 1 tag from each category.',
   personality: 'How you live with others.',
+  profileNote: 'Write anything you want potential roommates to know about you.',
 };
 
 const STEP_ICONS: Record<StepId, keyof typeof Feather.glyphMap> = {
@@ -326,6 +330,7 @@ const STEP_ICONS: Record<StepId, keyof typeof Feather.glyphMap> = {
   housing: 'home',
   interests: 'star',
   personality: 'cpu',
+  profileNote: 'edit-3',
 };
 
 export const ProfileQuestionnaireScreen = () => {
@@ -403,6 +408,8 @@ export const ProfileQuestionnaireScreen = () => {
     user?.profileData?.dealbreakers || []
   );
   const [budgetMin, setBudgetMin] = useState(user?.profileData?.budgetMin?.toString() || '');
+  const [profileNote, setProfileNote] = useState(user?.profileData?.profileNote || '');
+  const profileNoteCharLimit = 500;
 
   useEffect(() => {
     if (user?.photos && user.photos.length > 0) {
@@ -555,6 +562,7 @@ export const ProfileQuestionnaireScreen = () => {
         gender,
         dealbreakers,
         personalityAnswers: Object.keys(personalityAnswers).length > 0 ? personalityAnswers : undefined,
+        profileNote: profileNote.trim() || undefined,
         preferences: {
           sleepSchedule,
           cleanliness,
@@ -1058,6 +1066,87 @@ export const ProfileQuestionnaireScreen = () => {
                 />
               </View>
             ))}
+          </View>
+        );
+      }
+
+      case 'profileNote': {
+        return (
+          <View style={styles.stepContainer}>
+            <View style={styles.stepHeader}>
+              <Feather name="edit-3" size={28} color={theme.primary} />
+              <Text style={[styles.stepTitle, { color: theme.text }]}>
+                In your own words
+              </Text>
+              <Text style={[styles.stepSubtitle, { color: theme.textSecondary }]}>
+                Write anything you want potential roommates to know about you — your habits, your vibe, what makes you a great roommate. This shows on your profile and helps our AI answer questions about you honestly.
+              </Text>
+            </View>
+
+            <View style={{
+              backgroundColor: theme.backgroundSecondary,
+              borderRadius: 16,
+              borderWidth: 2,
+              borderColor: profileNote.length > 0 ? theme.primary : theme.border,
+              padding: 16,
+            }}>
+              <TextInput
+                style={{
+                  color: theme.text,
+                  fontSize: 16,
+                  lineHeight: 24,
+                  minHeight: 140,
+                  textAlignVertical: 'top',
+                }}
+                value={profileNote}
+                onChangeText={(text) => setProfileNote(text.slice(0, profileNoteCharLimit))}
+                placeholder="e.g. I work from home so I'm around a lot during the day, but I wear headphones and stay in my room. I love to cook and always make extra. Very clean in shared spaces. Looking for someone chill who doesn't need a social roommate but is friendly when we cross paths."
+                placeholderTextColor={theme.textSecondary}
+                multiline
+                maxLength={profileNoteCharLimit}
+              />
+              <Text style={{
+                color: profileNote.length > profileNoteCharLimit * 0.9 ? '#ef4444' : theme.textSecondary,
+                fontSize: 12,
+                textAlign: 'right',
+                marginTop: 8,
+              }}>
+                {profileNote.length}/{profileNoteCharLimit}
+              </Text>
+            </View>
+
+            <View style={{
+              flexDirection: 'row',
+              gap: 10,
+              padding: 14,
+              backgroundColor: theme.primary + '10',
+              borderRadius: 14,
+              marginTop: 12,
+            }}>
+              <Feather name="zap" size={16} color={theme.primary} />
+              <Text style={{ color: theme.textSecondary, fontSize: 13, flex: 1, lineHeight: 18 }}>
+                When someone asks Rhome AI about you, it reads this note to give them a real answer — not just your checklist. You control exactly what it says.
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              onPress={async () => {
+                setProfileNote('');
+                const data = buildProfileData();
+                if (data.profileData) data.profileData.profileNote = undefined;
+                await updateUser(data);
+                if (user?.onboardingStep === 'profile') {
+                  await completeOnboardingStep(user?.role === 'host' ? 'hostType' : 'plan');
+                } else {
+                  navigation.goBack();
+                }
+              }}
+              style={{ alignItems: 'center', marginTop: 16 }}
+            >
+              <Text style={{ color: theme.textSecondary, fontSize: 14 }}>
+                Skip for now
+              </Text>
+            </TouchableOpacity>
           </View>
         );
       }

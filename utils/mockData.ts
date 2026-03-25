@@ -24,6 +24,7 @@ export const mockProfileUsers: User[] = [
     boostData: { boostsUsed: 2, isBoosted: true, boostExpiresAt: new Date(Date.now() + 20 * 60 * 60 * 1000), lastBoostDate: new Date() },
     profileData: {
       bio: 'Software engineer who loves hiking, cooking, and quiet evenings. Looking for a clean and respectful roommate.',
+      profileNote: 'I work from home 3 days a week but wear headphones and stay in my room. I cook dinner most nights and always make extra if you want some. Very clean in shared spaces but my room is organized chaos. Morning person who is asleep by 11pm.',
       budget: 1200,
       location: 'Downtown',
       neighborhood: 'Williamsburg',
@@ -70,6 +71,7 @@ export const mockProfileUsers: User[] = [
     boostData: { boostsUsed: 1, isBoosted: true, boostExpiresAt: new Date(Date.now() + 10 * 60 * 60 * 1000), lastBoostDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) },
     profileData: {
       bio: 'Marketing professional, gym enthusiast, and weekend adventurer. Love to host small gatherings!',
+      profileNote: 'Real talk: I have friends over maybe once every two weeks for dinner and board games, never past midnight. Gym at 6am every day so I keep it quiet in the mornings. I split groceries for shared staples like milk, eggs, and coffee. Looking for someone social but not a party animal.',
       budget: 1400,
       location: 'Midtown',
       neighborhood: 'Bushwick',

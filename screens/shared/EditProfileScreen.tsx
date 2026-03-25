@@ -72,6 +72,7 @@ export const EditProfileScreen = () => {
   const [showMoveInPicker, setShowMoveInPicker] = useState(false);
   const [bedrooms, setBedrooms] = useState(user?.profileData?.preferences?.bedrooms?.toString() || '');
   
+  const [profileNote, setProfileNote] = useState(user?.profileData?.profileNote || '');
   const [isSaving, setIsSaving] = useState(false);
 
   const pickImage = async () => {
@@ -231,6 +232,8 @@ export const EditProfileScreen = () => {
         work_location: workLocation,
         move_in_date: moveInDate.trim() || undefined,
         bathrooms: bedrooms.trim() ? parseInt(bedrooms) : undefined,
+        profile_note: profileNote.trim() || null,
+        profile_note_updated_at: profileNote.trim() ? new Date().toISOString() : null,
       });
 
       console.log('[EditProfileScreen] Supabase profile updated successfully');
@@ -253,6 +256,7 @@ export const EditProfileScreen = () => {
         occupation: occupation.trim() || undefined,
         interests: interests.length > 0 ? interests : undefined,
         gender,
+        profileNote: profileNote.trim() || undefined,
         preferences: {
           sleepSchedule,
           cleanliness,
@@ -575,6 +579,34 @@ export const EditProfileScreen = () => {
               numberOfLines={4}
               textAlignVertical="top"
             />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.xs }}>
+              <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+                In your own words
+              </ThemedText>
+              <ThemedText style={[Typography.small, { color: profileNote.length > 450 ? '#ef4444' : theme.textSecondary }]}>
+                {profileNote.length}/500
+              </ThemedText>
+            </View>
+            <TextInput
+              style={[styles.input, styles.textArea, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
+              placeholder="What do you want roommates to know about you beyond your profile settings? Your real daily habits, your vibe, what living with you is actually like..."
+              placeholderTextColor={theme.textSecondary}
+              value={profileNote}
+              onChangeText={(text) => setProfileNote(text.slice(0, 500))}
+              multiline
+              maxLength={500}
+              numberOfLines={4}
+              textAlignVertical="top"
+            />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+              <Feather name="eye" size={11} color={theme.textSecondary} />
+              <ThemedText style={{ color: theme.textSecondary, fontSize: 11 }}>
+                Visible to your matches
+              </ThemedText>
+            </View>
           </View>
 
           <View style={styles.inputGroup}>

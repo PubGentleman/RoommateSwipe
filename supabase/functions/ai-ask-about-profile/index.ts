@@ -64,7 +64,8 @@ serve(async (req) => {
           guest_preference, work_style, smoking_preference,
           pet_preference, personality_answers,
           budget_min, budget_max, move_in_date,
-          neighborhoods, instagram_verified
+          neighborhoods, instagram_verified,
+          profile_note
         `)
         .eq('user_id', targetProfileId)
         .single(),
@@ -139,7 +140,7 @@ PROFILE BEING ASKED ABOUT (${targetProfile.first_name}):
 - Neighborhoods: ${targetProfile.neighborhoods?.join(', ') || 'flexible'}
 - Move-in: ${targetProfile.move_in_date || 'flexible'}
 - Bio: ${targetProfile.bio || 'none'}
-- Instagram verified: ${targetProfile.instagram_verified ? 'yes' : 'no'}`.trim() : '';
+- Instagram verified: ${targetProfile.instagram_verified ? 'yes' : 'no'}${targetProfile.profile_note ? `\n- In their own words: "${targetProfile.profile_note}"` : ''}`.trim() : '';
 
     const memoryContext = aiMemory?.map(m => m.memory_text).join('\n') || '';
 
@@ -171,6 +172,8 @@ YOUR ROLE:
 - Never reveal exact private data (handle, phone, specific address) that should stay private
 - Keep responses concise — 2-4 sentences unless a longer answer is genuinely needed
 - Use the person's first name naturally (${targetProfile?.first_name})
+- If the profile has an "In their own words" note, treat it as the most authentic source of information about this person — they wrote it themselves to describe how they actually live. Reference it directly when answering questions about their habits or vibe.
+- Distinguish between structured profile data (what they answered in the questionnaire) and their personal note (what they chose to say in their own voice). The note often has nuance the questionnaire misses.
 
 Do NOT be a yes-machine. If there's a real compatibility concern based on the data, say so clearly.`;
 

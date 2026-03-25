@@ -314,6 +314,7 @@ export const RoommatesScreen = () => {
             instagram_handle: p.profile?.instagram_handle || undefined,
             profileData: {
               interests: Array.isArray(p.profile?.interests) ? p.profile.interests : [],
+              profileNote: p.profile?.profile_note || undefined,
             },
           })) as RoommateProfile[];
           usedSupabase = true;
@@ -2267,6 +2268,42 @@ export const RoommatesScreen = () => {
                       <Text style={styles.pdSectionLabel}>About</Text>
                       <View style={styles.pdCard}>
                         <Text style={styles.pdBioText}>{currentProfile.bio}</Text>
+                      </View>
+                    </View>
+                  ) : null}
+
+                  {currentProfile.profileData?.profileNote ? (
+                    <View style={styles.pdSection}>
+                      <View style={{
+                        padding: 14,
+                        backgroundColor: 'rgba(255,255,255,0.04)',
+                        borderRadius: 14,
+                        borderLeftWidth: 3,
+                        borderLeftColor: '#ff6b5b',
+                      }}>
+                        <Text style={{
+                          color: '#ff6b5b',
+                          fontSize: 11,
+                          fontWeight: '700',
+                          letterSpacing: 0.5,
+                          marginBottom: 6,
+                        }}>
+                          IN THEIR OWN WORDS
+                        </Text>
+                        <Text style={{
+                          color: 'rgba(255,255,255,0.85)',
+                          fontSize: 14,
+                          lineHeight: 21,
+                          fontStyle: 'italic',
+                        }}>
+                          "{currentProfile.profileData.profileNote}"
+                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8 }}>
+                          <Feather name="eye" size={10} color="rgba(255,255,255,0.3)" />
+                          <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>
+                            Written by {currentProfile.name?.split(' ')[0]}
+                          </Text>
+                        </View>
                       </View>
                     </View>
                   ) : null}
