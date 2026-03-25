@@ -1,0 +1,249 @@
+/**
+ * Rhome — Fake User Seed Script
+ *
+ * Creates 25 realistic fake renter profiles in your Supabase database
+ * so you have a full swipe deck to test against.
+ *
+ * HOW TO RUN:
+ * 1. In Replit, open the Shell tab
+ * 2. Run: node rhome-seed-users.js
+ *
+ * Or paste the SQL version at the bottom directly into Supabase SQL Editor
+ * if you don't want to run Node.
+ *
+ * SETUP: Add your Supabase URL and service role key below.
+ * Use the SERVICE ROLE key (not the anon key) — it bypasses RLS.
+ * Find it in Supabase → Settings → API → service_role secret
+ */
+
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';         // e.g. https://abc.supabase.co
+const SUPABASE_SERVICE_KEY = 'YOUR_SERVICE_ROLE_KEY'; // Settings → API → service_role
+
+// ─── CONFIG ────────────────────────────────────────────────────────────────
+const SEED_CITY = 'Miami';           // Change to your test city
+const SEED_STATE = 'FL';
+const SEED_COUNT = 25;               // Number of fake users to create
+const SEED_PASSWORD = 'Rhome2024!';  // Password for all seed accounts
+// ────────────────────────────────────────────────────────────────────────────
+
+const { createClient } = require('@supabase/supabase-js');
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+  auth: { autoRefreshToken: false, persistSession: false }
+});
+
+// ─── FAKE USER DATA ──────────────────────────────────────────────────────────
+
+const firstNames = [
+  'Jordan', 'Taylor', 'Morgan', 'Alex', 'Casey', 'Riley', 'Avery', 'Quinn',
+  'Sage', 'Drew', 'Blake', 'Jamie', 'Cameron', 'Peyton', 'Logan', 'Skyler',
+  'Reese', 'Finley', 'Emerson', 'Harley', 'Dakota', 'Rowan', 'Parker', 'River', 'Hayden'
+];
+
+const lastNames = [
+  'Williams', 'Johnson', 'Brown', 'Davis', 'Miller', 'Wilson', 'Moore', 'Taylor',
+  'Anderson', 'Thomas', 'Jackson', 'White', 'Harris', 'Martin', 'Garcia',
+  'Martinez', 'Robinson', 'Clark', 'Rodriguez', 'Lewis', 'Lee', 'Walker',
+  'Hall', 'Allen', 'Young'
+];
+
+const occupations = [
+  'Software Engineer', 'Graphic Designer', 'Nurse', 'Teacher', 'Marketing Manager',
+  'Freelance Writer', 'Accountant', 'Personal Trainer', 'Photographer', 'Chef',
+  'Social Worker', 'UX Designer', 'Real Estate Agent', 'Dentist', 'Journalist',
+  'Event Planner', 'Data Analyst', 'Musician', 'Physical Therapist', 'Architect',
+  'Lawyer', 'Pharmacist', 'Flight Attendant', 'Barista', 'Film Editor'
+];
+
+const bios = [
+  "Looking for a chill place to come home to after long days. I cook a lot and always share food. Clean, quiet, and easy to live with.",
+  "New to the city for work! Excited to find a great roommate situation. I'm tidy, social on weekends, and respectful of personal space.",
+  "Remote worker who loves a quiet home during the day. Loves cooking, hiking on weekends, and binge-watching shows at night. Very clean.",
+  "Grad student finishing my thesis. Mostly in the library or working from home. Quiet, clean, and looking for someone low-drama.",
+  "Work in healthcare so my schedule varies. Super clean, respectful of space, and love having people over occasionally on weekends.",
+  "Artist and freelancer. Work from home but keep to myself during work hours. Great at keeping shared spaces clean. Love plants.",
+  "Just relocated for a new job. Active lifestyle — gym in the mornings, cooking healthy meals, early to bed. Very organized.",
+  "I travel a lot for work so I'm gone 1-2 weeks a month. Pay rent on time, super clean, and don't throw loud parties.",
+  "Bookworm and coffee enthusiast. Work 9-5 at a local firm. Spend evenings reading or watching documentaries. Very low-key roommate.",
+  "Social but not in-your-face about it. Host small gatherings occasionally but always give heads up. Clean, responsible, and reliable.",
+  "Big foodie who loves trying new restaurants and cooking elaborate meals on Sundays. Clean kitchen is non-negotiable for me.",
+  "Fitness-focused lifestyle. Up early, in bed by 10pm. Work in finance downtown. Looking for a similar energy in a roommate.",
+  "Moved here from NYC. Miss the city energy but loving the pace here. Creative professional looking for a vibe match.",
+  "Introvert who recharges at home. Love my space but am genuinely friendly. I keep things spotless and respect everyone's privacy.",
+  "Teacher life — up early, home by 4pm, papers to grade by 7pm. Quiet evenings, neat common spaces, and I bake on Fridays.",
+  "Night shift nurse so I sleep during the day sometimes. Need a roommate who can respect that. Clean, responsible, and drama-free.",
+  "Tech startup life means I work weird hours but I respect shared spaces religiously. Coffee snob. Love a good conversation.",
+  "Outdoor enthusiast — hiking, biking, kayaking. Home is my recharge space. Keep it clean and peaceful. Dog-friendly a plus.",
+  "Finishing my MBA while working full time. Busy but very organized. Pay on time, communicate well, and respect boundaries.",
+  "Creative director at an agency. Work hard, play smart. Looking for someone who values a clean, calm, well-decorated home.",
+  "Yoga instructor with a calm, mindful vibe. Non-smoker, light drinker, love plants and good music. Early bird lifestyle.",
+  "Engineer by day, home chef by night. Keep the kitchen clean after cooking — always. Looking for a mature, responsible roommate.",
+  "Journalist with odd hours. Sometimes home at 6pm, sometimes midnight. Very clean and quiet. Respect your space completely.",
+  "Just graduated and started my first real job! Excited, responsible, and looking for a positive living situation to grow in.",
+  "Work from home in tech. Very comfortable being home all day without being in your way. Clean, quiet, and pay on time."
+];
+
+const sleepSchedules = ['early_bird', 'night_owl', 'flexible'];
+const workLocations = ['wfh_fulltime', 'hybrid', 'office_fulltime', 'irregular'];
+const guestPreferences = ['rarely', 'occasionally', 'often'];
+const drinkingOptions = ['never', 'socially', 'regularly'];
+const petOptions = ['no_pets', 'has_cats', 'has_dogs', 'pet_friendly'];
+const interestSets = [
+  ['cooking', 'hiking', 'yoga'],
+  ['gaming', 'movies', 'music'],
+  ['fitness', 'travel', 'reading'],
+  ['art', 'photography', 'coffee'],
+  ['sports', 'cooking', 'netflix'],
+  ['music', 'dancing', 'foodie'],
+  ['tech', 'gaming', 'podcasts'],
+  ['outdoors', 'fitness', 'travel'],
+  ['reading', 'yoga', 'wellness'],
+  ['art', 'music', 'cafes'],
+];
+
+// Miami neighborhoods
+const neighborhoods = [
+  'Brickell', 'Wynwood', 'Midtown', 'South Beach', 'Coconut Grove',
+  'Coral Gables', 'Little Havana', 'Design District', 'Edgewater', 'Downtown'
+];
+
+// randomuser.me gives free realistic profile photos
+const getPhotoUrl = (seed) => `https://randomuser.me/api/portraits/${seed % 2 === 0 ? 'women' : 'men'}/${(seed % 70) + 1}.jpg`;
+
+function randomBetween(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function pick(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function generateUser(index) {
+  const firstName = firstNames[index % firstNames.length];
+  const lastName = lastNames[index % lastNames.length];
+  const age = randomBetween(22, 38);
+  const budgetMin = pick([800, 900, 1000, 1100, 1200, 1400]);
+  const budgetMax = budgetMin + randomBetween(300, 700);
+
+  return {
+    email: `seed.user.${index + 1}@rhome-test.com`,
+    password: SEED_PASSWORD,
+    user: {
+      full_name: `${firstName} ${lastName}`,
+      age,
+      gender: index % 3 === 0 ? 'male' : index % 3 === 1 ? 'female' : 'non-binary',
+      occupation: occupations[index % occupations.length],
+      bio: bios[index % bios.length],
+      city: SEED_CITY,
+      state: SEED_STATE,
+      neighborhood: pick(neighborhoods),
+      location: `${SEED_CITY}, ${SEED_STATE}`,
+      role: 'renter',
+      avatar_url: getPhotoUrl(index),
+      onboarding_step: 'complete',
+    },
+    profile: {
+      budget_min: budgetMin,
+      budget_max: budgetMax,
+      move_in_date: new Date(Date.now() + randomBetween(7, 60) * 86400000).toISOString().split('T')[0],
+      lease_duration: pick(['month_to_month', '6_months', '1_year']),
+      room_type: pick(['private', 'private', 'shared']), // mostly private
+      cleanliness: randomBetween(3, 5),
+      noise_tolerance: randomBetween(1, 5),
+      sleep_schedule: pick(sleepSchedules),
+      wake_time: pick(['6:00 AM', '7:00 AM', '8:00 AM', '9:00 AM']),
+      sleep_time: pick(['9:00 PM', '10:00 PM', '11:00 PM', '12:00 AM', '1:00 AM']),
+      pets: pick(petOptions),
+      smoking: Math.random() < 0.15, // 15% smokers
+      drinking: pick(drinkingOptions),
+      guests: pick(guestPreferences),
+      work_location: pick(workLocations),
+      interests: pick(interestSets),
+      photos: [getPhotoUrl(index), getPhotoUrl(index + 25)],
+      coordinates: {
+        latitude: 25.7617 + (Math.random() - 0.5) * 0.1,   // Miami lat ± slight variation
+        longitude: -80.1918 + (Math.random() - 0.5) * 0.1, // Miami lng ± slight variation
+      },
+    }
+  };
+}
+
+// ─── MAIN SEED FUNCTION ───────────────────────────────────────────────────────
+
+async function seedUsers() {
+  console.log(`\n🌱 Rhome Seed Script — creating ${SEED_COUNT} fake renters in ${SEED_CITY}...\n`);
+
+  let created = 0;
+  let skipped = 0;
+  let failed = 0;
+
+  for (let i = 0; i < SEED_COUNT; i++) {
+    const { email, password, user: userData, profile: profileData } = generateUser(i);
+
+    try {
+      // Step 1: Create auth user
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true, // skip email verification
+      });
+
+      if (authError) {
+        if (authError.message.includes('already been registered')) {
+          console.log(`  ⏭  Skipped ${email} (already exists)`);
+          skipped++;
+          continue;
+        }
+        throw authError;
+      }
+
+      const userId = authData.user.id;
+
+      // Step 2: Insert into users table
+      const { error: userError } = await supabase
+        .from('users')
+        .upsert({ id: userId, email, ...userData });
+
+      if (userError) throw userError;
+
+      // Step 3: Insert into profiles table
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .upsert({ user_id: userId, ...profileData });
+
+      if (profileError) throw profileError;
+
+      console.log(`  ✅ Created ${userData.full_name} (${email})`);
+      created++;
+
+      // Small delay to avoid rate limiting
+      await new Promise(r => setTimeout(r, 150));
+
+    } catch (err) {
+      console.error(`  ❌ Failed ${email}:`, err.message);
+      failed++;
+    }
+  }
+
+  console.log(`\n─────────────────────────────────`);
+  console.log(`✅ Created:  ${created}`);
+  console.log(`⏭  Skipped:  ${skipped}`);
+  console.log(`❌ Failed:   ${failed}`);
+  console.log(`─────────────────────────────────`);
+  console.log(`\nDone! Open the app and start swiping.\n`);
+  console.log(`All seed accounts use password: ${SEED_PASSWORD}`);
+  console.log(`Email format: seed.user.1@rhome-test.com → seed.user.${SEED_COUNT}@rhome-test.com\n`);
+}
+
+seedUsers().catch(console.error);
+
+
+/**
+ * ─── TO DELETE ALL SEED USERS LATER ─────────────────────────────────────────
+ * Run this in Supabase SQL Editor when you're done testing:
+ *
+ * DELETE FROM auth.users
+ * WHERE email LIKE 'seed.user.%@rhome-test.com';
+ *
+ * This cascades and removes everything (users, profiles, matches, messages).
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
