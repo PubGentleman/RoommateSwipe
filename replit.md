@@ -31,6 +31,7 @@ The application is built using React Native, Expo, and TypeScript, utilizing Rea
 - **Role-Specific Features:**
     - **Renter:** Swipe-based matching, 1-on-1 messaging, group management, property exploration with advanced filters and transit integration, saved properties, AI Match Assistant, and notifications.
     - **Host:** Dashboard for listing management (create, edit, delete, boost), inquiry handling, analytics, and group matches monetization. Supports Individual, Company, and Agent host types with varying UI/features.
+    - **Company Teams:** Multi-seat team access for company accounts with Owner/Admin/Member roles, invite system, seat limits by plan (Starter: 3, Pro: 10, Enterprise: unlimited), team management dashboard, and role-based permissions.
 - **AI-Powered Enhancements:**
     - **AI Assistant:** Context-aware assistant with persistent memory, powered by Claude via Supabase Edge Functions for personalized housing assistance and streaming responses.
     - **Match Explanations:** AI-generated breakdowns of compatibility scores for matches.

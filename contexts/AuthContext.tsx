@@ -2136,8 +2136,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user || user.hostType !== 'company') return;
     const members = await getTeamMembers();
     const seatLimit = getTeamSeatLimit();
-    if (members.length >= seatLimit) {
-      throw new Error(`Your plan allows up to ${seatLimit} team members. Upgrade to add more.`);
+    const totalSeats = members.length + 1;
+    if (totalSeats >= seatLimit) {
+      throw new Error(`Your plan allows up to ${seatLimit} seats (including the owner). Upgrade to add more.`);
     }
     if (isSupabaseConfigured) {
       const { error } = await supabase.from('team_members').insert({

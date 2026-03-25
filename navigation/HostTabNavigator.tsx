@@ -29,6 +29,7 @@ import { InviteExistingRoommatesScreen } from '../screens/host/InviteExistingRoo
 import { HostMessagesStackNavigator } from './HostMessagesStackNavigator';
 import { NotificationsScreen } from '../screens/shared/NotificationsScreen';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
+import { TeamManagementScreen } from '../screens/host/TeamManagementScreen';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotificationContext } from '../contexts/NotificationContext';
@@ -78,6 +79,7 @@ export type AgentGroupsStackParamList = {
 export type HostTabParamList = {
   Dashboard: undefined;
   Listings: undefined;
+  Team: undefined;
   Groups: undefined;
   Roommates: undefined;
   BrowseRenters: undefined;
@@ -158,6 +160,7 @@ function AgentGroupsStackNavigator() {
 const HOST_TAB_CONFIG: Record<string, { icon: string; label: string }> = {
   Dashboard: { icon: 'grid', label: 'Dashboard' },
   Listings: { icon: 'home', label: 'Listings' },
+  Team: { icon: 'users', label: 'Team' },
   Groups: { icon: 'users', label: 'Groups' },
   Roommates: { icon: 'heart', label: 'Match' },
   BrowseRenters: { icon: 'search', label: 'Renters' },
@@ -306,7 +309,7 @@ export const HostTabNavigator = () => {
       >
         <Tab.Screen name="Dashboard" component={DashboardStackNavigator} />
         <Tab.Screen name="Listings" component={ListingsStackNavigator} />
-        <Tab.Screen name="Groups" component={HostGroupsStackNavigator} />
+        <Tab.Screen name="Team" component={TeamManagementScreen} />
         <Tab.Screen name="Messages" component={HostMessagesStackNavigator} />
         <Tab.Screen name="Profile" component={ProfileStackNavigator} />
       </Tab.Navigator>
