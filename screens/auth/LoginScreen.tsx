@@ -31,7 +31,7 @@ export const LoginScreen = () => {
       if (!email.trim()) { setError('Please enter your email address'); setIsLoading(false); return; }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setError('Please enter a valid email address'); setIsLoading(false); return; }
       if (!password || password.length < 6) { setError('Password must be at least 6 characters'); setIsLoading(false); return; }
-      await login(email.trim(), password);
+      await login(email.trim().toLowerCase(), password);
     } catch (err: any) {
       setError(err?.message || 'Something went wrong. Please try again.');
     } finally {
@@ -101,7 +101,7 @@ export const LoginScreen = () => {
               return;
             }
             try {
-              await resetPassword(email.trim());
+              await resetPassword(email.trim().toLowerCase());
               await showAlert({ title: 'Check Your Email', message: 'A password reset link has been sent to your email address.', variant: 'success' });
             } catch (err: any) {
               await showAlert({ title: 'Error', message: err.message || 'Failed to send reset email. Please try again.', variant: 'warning' });

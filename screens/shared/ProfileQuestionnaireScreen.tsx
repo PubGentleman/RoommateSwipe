@@ -542,7 +542,7 @@ export const ProfileQuestionnaireScreen = () => {
     const zodiacSign = birthdayStorageFormat ? calculateZodiacFromBirthday(birthdayStorageFormat) : undefined;
     return {
       name: name.trim() || user?.name,
-      email: email.trim() || user?.email,
+      email: (email.trim() || user?.email || '').toLowerCase(),
       birthday: birthdayStorageFormat,
       zodiacSign,
       photos: photos.length > 0 ? photos : user?.photos,

@@ -248,7 +248,7 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
       const hostType = state.accountType === 'renter' ? null : (state.accountType as 'individual' | 'agent' | 'company');
       const companyName = state.accountType === 'company' && state.companyName.trim() ? state.companyName.trim() : undefined;
       const fullName = `${state.firstName.trim()} ${state.lastName.trim()}`;
-      await register(state.email.trim(), state.password, fullName, role as any, hostType, companyName, state.firstName.trim(), state.lastName.trim());
+      await register(state.email.trim().toLowerCase(), state.password, fullName, role as any, hostType, companyName, state.firstName.trim(), state.lastName.trim());
     } catch (err: any) {
       await showAlert({ title: 'Error', message: err?.message || 'Failed to create account. Please try again.', variant: 'warning' });
     } finally {

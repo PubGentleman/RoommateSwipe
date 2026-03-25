@@ -243,7 +243,7 @@ export const EditProfileScreen = () => {
     
     await updateUser({
       name: name.trim(),
-      email: email.trim(),
+      email: email.trim().toLowerCase(),
       birthday: birthdayStorageFormat,
       zodiacSign,
       photos,

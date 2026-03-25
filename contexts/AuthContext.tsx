@@ -451,8 +451,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const login = async (email: string, password: string) => {
+    const sanitizedEmail = email.trim().toLowerCase();
     const { data, error } = await supabase.auth.signInWithPassword({
-      email,
+      email: sanitizedEmail,
       password,
     });
 
@@ -493,8 +494,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const register = async (email: string, password: string, name: string, role: UserRole, hostType?: 'individual' | 'agent' | 'company' | null, companyName?: string, firstName?: string, lastName?: string) => {
+    const sanitizedEmail = email.trim().toLowerCase();
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email: sanitizedEmail,
       password,
       options: {
         data: {
@@ -691,7 +693,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const resetPassword = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    const sanitizedEmail = email.trim().toLowerCase();
+    const { error } = await supabase.auth.resetPasswordForEmail(sanitizedEmail);
     if (error) throw error;
   };
 
@@ -2188,10 +2191,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (totalSeats >= seatLimit) {
       throw new Error(`Your plan allows up to ${seatLimit} seats (including the owner). Upgrade to add more.`);
     }
+    const sanitizedEmail = email.trim().toLowerCase();
     if (isSupabaseConfigured) {
       const { data, error } = await supabase.from('team_members').insert({
         company_user_id: user.id,
-        email,
+        email: sanitizedEmail,
         full_name: name,
         role,
         status: 'pending',
