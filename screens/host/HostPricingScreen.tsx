@@ -17,6 +17,8 @@ import {
   HOST_TYPE_LABELS,
   openEnterpriseSalesContact,
 } from '../../constants/hostPlansByType';
+import { BUNDLE_LABELS } from '../../utils/entitlements';
+import { useEntitlements } from '../../hooks/useEntitlements';
 
 const BG = '#111';
 const CARD_BG = '#1a1a1a';
@@ -67,6 +69,7 @@ export const HostPricingScreen = () => {
   const { restore } = useRevenueCat();
   const hostType = (user?.hostType as HostType) ?? 'individual';
   const plans = getHostPlans(hostType);
+  const { subscriptionSource: entSubscriptionSource } = useEntitlements();
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
   const [restoring, setRestoring] = useState(false);
   const defaultSelected = plans.find(p => p.recommended)?.id ?? plans[1]?.id ?? 'pro';
@@ -131,9 +134,13 @@ export const HostPricingScreen = () => {
     else price = `$${plan.monthlyPrice.toFixed(2)}/month`;
     const title = isUpgrade ? `Upgrade to ${plan.name}` : `Switch to ${plan.name}`;
     const actionText = isUpgrade ? 'Subscribe' : 'Switch';
+    const hasRenterSub = entSubscriptionSource === 'renter';
+    const bundleNote = hostType === 'individual' && BUNDLE_LABELS[plan.id]
+      ? `\n\n${BUNDLE_LABELS[plan.id]} — ${hasRenterSub ? 'your current renter subscription will be cancelled automatically.' : 'no extra renter subscription needed.'}`
+      : '';
     const confirmed = await confirm({
       title,
-      message: `${actionText} to ${plan.name} for ${price}?`,
+      message: `${actionText} to ${plan.name} for ${price}?${bundleNote}`,
       confirmText: actionText,
       variant: 'info',
     });
@@ -309,6 +316,12 @@ export const HostPricingScreen = () => {
                     <Text style={feat.included ? s.featLabelOn : s.featLabelOff}>{feat.label}</Text>
                   </View>
                 ))}
+                {hostType === 'individual' && BUNDLE_LABELS[plan.id] ? (
+                  <View style={s.bundleBadge}>
+                    <Feather name="gift" size={11} color="#6C63FF" />
+                    <Text style={s.bundleBadgeText}>{BUNDLE_LABELS[plan.id]}</Text>
+                  </View>
+                ) : null}
               </View>
               <Pressable
                 style={[
@@ -841,5 +854,22 @@ const s = StyleSheet.create({
     color: 'rgba(255,255,255,0.18)',
     lineHeight: 16,
     paddingBottom: 2,
+  },
+  bundleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(108,99,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(108,99,255,0.18)',
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    marginTop: 8,
+  },
+  bundleBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: 'rgba(108,99,255,0.9)',
   },
 });

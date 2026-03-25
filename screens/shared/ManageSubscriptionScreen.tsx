@@ -5,6 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../contexts/AuthContext';
+import { useEntitlements } from '../../hooks/useEntitlements';
 
 const ACCENT = '#ff6b5b';
 const ACCENT_DARK = '#e83a2a';
@@ -28,6 +29,7 @@ export const ManageSubscriptionScreen = () => {
   const details = getSubscriptionDetails();
   const planName = plan.charAt(0).toUpperCase() + plan.slice(1);
   const isCancelling = status === 'cancelling' || status === 'cancelled';
+  const { hostTier, renterTier, subscriptionSource, isAnyHost } = useEntitlements();
 
   const handleCancel = async () => {
     setShowCancelSheet(false);
@@ -82,6 +84,14 @@ export const ManageSubscriptionScreen = () => {
               <Text style={s.planBadgeText}>{isCancelling ? 'CANCELLING' : 'ACTIVE'}</Text>
             </View>
           </View>
+          {isAnyHost && subscriptionSource === 'host' && renterTier !== 'free' ? (
+            <View style={s.bundleRow}>
+              <Feather name="gift" size={12} color="#6C63FF" />
+              <Text style={s.bundleRowText}>
+                Includes Renter {renterTier === 'elite' ? 'Elite' : 'Plus'} access
+              </Text>
+            </View>
+          ) : null}
           <View style={s.divider} />
           <View style={s.detailRow}>
             <Text style={s.detailLabel}>Billing Cycle</Text>
@@ -223,4 +233,20 @@ const s = StyleSheet.create({
   keepBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
   cancelAnyway: { height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.11)', marginBottom: 8 },
   cancelAnywayText: { fontSize: 14, fontWeight: '600', color: 'rgba(255,255,255,0.4)' },
+
+  bundleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(108,99,255,0.08)',
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    marginBottom: 12,
+  },
+  bundleRowText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: 'rgba(108,99,255,0.9)',
+  },
 });

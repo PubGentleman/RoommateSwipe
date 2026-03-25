@@ -183,8 +183,6 @@ export function hasEntitlement(info: CustomerInfo, entitlement: string): boolean
 }
 
 export function getActivePlanFromEntitlements(info: CustomerInfo): { plan: string; planType: 'renter' | 'host' } | null {
-  if (hasEntitlement(info, RC_ENTITLEMENTS.ELITE)) return { plan: 'elite', planType: 'renter' };
-  if (hasEntitlement(info, RC_ENTITLEMENTS.PLUS)) return { plan: 'plus', planType: 'renter' };
   if (hasEntitlement(info, RC_ENTITLEMENTS.HOST_AGENT_BUSINESS)) return { plan: 'agent_business', planType: 'host' };
   if (hasEntitlement(info, RC_ENTITLEMENTS.HOST_AGENT_PRO)) return { plan: 'agent_pro', planType: 'host' };
   if (hasEntitlement(info, RC_ENTITLEMENTS.HOST_AGENT_STARTER)) return { plan: 'agent_starter', planType: 'host' };
@@ -193,6 +191,8 @@ export function getActivePlanFromEntitlements(info: CustomerInfo): { plan: strin
   if (hasEntitlement(info, RC_ENTITLEMENTS.HOST_BUSINESS)) return { plan: 'business', planType: 'host' };
   if (hasEntitlement(info, RC_ENTITLEMENTS.HOST_PRO)) return { plan: 'pro', planType: 'host' };
   if (hasEntitlement(info, RC_ENTITLEMENTS.HOST_STARTER)) return { plan: 'starter', planType: 'host' };
+  if (hasEntitlement(info, RC_ENTITLEMENTS.ELITE)) return { plan: 'elite', planType: 'renter' };
+  if (hasEntitlement(info, RC_ENTITLEMENTS.PLUS)) return { plan: 'plus', planType: 'renter' };
   return null;
 }
 

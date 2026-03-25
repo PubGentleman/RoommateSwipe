@@ -17,6 +17,17 @@ const ENTITLEMENT_TO_PLAN: Record<string, { plan: string; planType: 'renter' | '
   host_company_pro: { plan: 'company_pro', planType: 'host' },
 };
 
+const HOST_TO_RENTER_BUNDLE: Record<string, string> = {
+  starter: 'plus',
+  pro: 'elite',
+  business: 'elite',
+  agent_starter: 'free',
+  agent_pro: 'free',
+  agent_business: 'free',
+  company_starter: 'free',
+  company_pro: 'free',
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 200, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*' } });
@@ -43,7 +54,7 @@ serve(async (req) => {
     const entitlements = event?.entitlement_ids || [];
     let activePlan: { plan: string; planType: 'renter' | 'host' } | null = null;
 
-    for (const ent of ['elite', 'plus', 'host_agent_business', 'host_agent_pro', 'host_agent_starter', 'host_company_pro', 'host_company_starter', 'host_business', 'host_pro', 'host_starter']) {
+    for (const ent of ['host_agent_business', 'host_agent_pro', 'host_agent_starter', 'host_company_pro', 'host_company_starter', 'host_business', 'host_pro', 'host_starter', 'elite', 'plus']) {
       if (entitlements.includes(ent)) {
         activePlan = ENTITLEMENT_TO_PLAN[ent];
         break;
@@ -81,6 +92,15 @@ serve(async (req) => {
             expires_at: expiresAt,
             updated_at: new Date().toISOString(),
           }, { onConflict: 'user_id' });
+
+        await supabase
+          .from('profiles')
+          .update({
+            host_tier: 'none',
+            renter_tier: activePlan.plan,
+            subscription_source: 'renter',
+          })
+          .eq('user_id', appUserId);
       } else {
         await supabase
           .from('host_subscriptions')
@@ -92,6 +112,16 @@ serve(async (req) => {
             expires_at: expiresAt,
             updated_at: new Date().toISOString(),
           }, { onConflict: 'user_id' });
+
+        const bundledRenter = HOST_TO_RENTER_BUNDLE[activePlan.plan] || 'free';
+        await supabase
+          .from('profiles')
+          .update({
+            host_tier: activePlan.plan,
+            renter_tier: bundledRenter,
+            subscription_source: 'host',
+          })
+          .eq('user_id', appUserId);
       }
     } else if (isCancelled) {
       const expiresAt = event?.expiration_at_ms
@@ -117,6 +147,15 @@ serve(async (req) => {
         })
         .eq('user_id', appUserId)
         .eq('provider', 'revenuecat');
+
+      await supabase
+        .from('profiles')
+        .update({
+          host_tier: 'none',
+          renter_tier: 'free',
+          subscription_source: 'none',
+        })
+        .eq('user_id', appUserId);
     }
 
     return new Response(JSON.stringify({ ok: true, event: eventType }), { status: 200 });

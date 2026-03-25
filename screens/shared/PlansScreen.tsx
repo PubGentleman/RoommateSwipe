@@ -16,6 +16,7 @@ import { PurchaseConfirmModal } from '../../components/modals/PurchaseConfirmMod
 import type { PurchaseConfig } from '../../constants/purchaseConfig';
 import { RENTER_PLAN_CONFIGS } from '../../constants/purchaseConfig';
 import { RENTER_PLAN_LIMITS, normalizeRenterPlan, type RenterPlan } from '../../constants/renterPlanLimits';
+import { useEntitlements } from '../../hooks/useEntitlements';
 
 type PlansScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'Plans'>;
 
@@ -125,6 +126,7 @@ export const PlansScreen = () => {
   const { restore } = useRevenueCat();
   const { alert } = useConfirm();
   const navigation = useNavigation<PlansScreenNavigationProp>();
+  const { isAnyHost, subscriptionSource, renterTier, hostTier } = useEntitlements();
 
   const [processing, setProcessing] = useState(false);
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
@@ -437,6 +439,18 @@ export const PlansScreen = () => {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {isAnyHost && subscriptionSource === 'host' && renterTier !== 'free' ? (
+          <View style={styles.hostBundleBanner}>
+            <Feather name="check-circle" size={20} color="#4CAF50" />
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <Text style={styles.hostBundleTitle}>Renter Access Included</Text>
+              <Text style={styles.hostBundleBody}>
+                Your host plan includes Renter {renterTier === 'elite' ? 'Elite' : 'Plus'} features. No extra subscription needed.
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
         <View style={styles.heroSection}>
           <View style={styles.heroEyebrow}>
             <Text style={styles.heroEyebrowText}>RENTER PLANS</Text>
@@ -770,5 +784,27 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.18)',
     lineHeight: 16,
     marginTop: 4,
+  },
+  hostBundleBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(76,175,80,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(76,175,80,0.2)',
+    borderRadius: 14,
+    padding: 14,
+    marginHorizontal: 20,
+    marginBottom: 12,
+  },
+  hostBundleTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#4CAF50',
+    marginBottom: 3,
+  },
+  hostBundleBody: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.55)',
+    lineHeight: 17,
   },
 });
