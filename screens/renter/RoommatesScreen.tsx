@@ -113,6 +113,7 @@ export const RoommatesScreen = () => {
   const rotation = useSharedValue(0);
   const cardOpacity = useSharedValue(1);
   const isAnimatingSwipe = useSharedValue(false);
+  const swipingOutId = useRef<string | null>(null);
   const animatedCardStyle = useAnimatedStyle(() => ({
     opacity: cardOpacity.value,
     transform: [
@@ -453,6 +454,7 @@ export const RoommatesScreen = () => {
 
   const advanceCard = () => {
     InteractionManager.runAfterInteractions(() => {
+      swipingOutId.current = null;
       setCurrentIndex(prev => {
         const next = prev + 1;
         prefetchNextImages(profiles, next + 1);
@@ -498,6 +500,7 @@ export const RoommatesScreen = () => {
     }
 
     isAnimatingSwipe.value = true;
+    swipingOutId.current = currentProfile.id;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     
     setLastSwipedProfile({ profile: currentProfile, action });
@@ -507,7 +510,7 @@ export const RoommatesScreen = () => {
     const toY = action === 'superlike' ? -SCREEN_HEIGHT : 0;
     const exitDuration = 250;
 
-    cardOpacity.value = withTiming(0, { duration: exitDuration });
+    cardOpacity.value = 0;
     translateX.value = withTiming(toX, { duration: exitDuration });
     translateY.value = withTiming(toY, { duration: exitDuration });
     rotation.value = withTiming(direction * 15, { duration: exitDuration }, () => {
