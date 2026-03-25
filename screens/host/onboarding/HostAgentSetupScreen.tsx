@@ -43,11 +43,10 @@ const US_STATES = [
 ];
 
 const AGENT_BENEFITS = [
-  { icon: 'shield' as const, text: 'Verified Agent badge on your profile and listings' },
-  { icon: 'trending-up' as const, text: 'Priority placement in renter search results' },
-  { icon: 'users' as const, text: 'AI-powered renter matching for your listings' },
-  { icon: 'file-text' as const, text: 'Background check access built right in' },
-  { icon: 'bar-chart-2' as const, text: 'Advanced analytics and leads tracking' },
+  { icon: 'users' as const, text: 'Reach thousands of verified renters actively looking' },
+  { icon: 'dollar-sign' as const, text: 'No listing fees — free to post and manage' },
+  { icon: 'zap' as const, text: 'Smart AI matching connects your listings to ideal tenants' },
+  { icon: 'bell' as const, text: 'Instant notifications when renters show interest' },
 ];
 
 export function HostAgentSetupScreen() {
@@ -58,13 +57,42 @@ export function HostAgentSetupScreen() {
   const [values, setValues] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [verifying, setVerifying] = useState(false);
-  const [verificationResult, setVerificationResult] = useState<'verified' | 'manual_review' | null>(null);
+  const [verificationResult, setVerificationResult] = useState<'verified' | 'not_found' | 'manual_review' | null>(null);
   const [licenseDocumentUri, setLicenseDocumentUri] = useState<string | null>(null);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
   const [showStatePicker, setShowStatePicker] = useState(false);
 
   const isFromSettings = user?.onboardingStep === 'complete';
   const selectedState = US_STATES.find(s => s.value === values.licenseState);
   const canContinue = (values.licenseNumber ?? '').trim().length > 0 && !!values.licenseState;
+
+  async function uploadLicenseDocument(uri: string): Promise<string | null> {
+    if (!user?.id) return null;
+    try {
+      setUploadingDoc(true);
+      const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
+      const filePath = `${user.id}/license.${ext}`;
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      const arrayBuffer = await new Response(blob).arrayBuffer();
+      const { error } = await supabase.storage
+        .from('license-documents')
+        .upload(filePath, arrayBuffer, {
+          contentType: ext === 'pdf' ? 'application/pdf' : `image/${ext}`,
+          upsert: true,
+        });
+      if (error) {
+        console.error('License upload error:', error);
+        return null;
+      }
+      return filePath;
+    } catch (e) {
+      console.error('License upload failed:', e);
+      return null;
+    } finally {
+      setUploadingDoc(false);
+    }
+  }
 
   async function handlePickDocument() {
     try {
@@ -74,6 +102,10 @@ export function HostAgentSetupScreen() {
       });
       if (!result.canceled && result.assets?.[0]) {
         setLicenseDocumentUri(result.assets[0].uri);
+        const publicUrl = await uploadLicenseDocument(result.assets[0].uri);
+        if (publicUrl) {
+          await updateUser({ licenseDocumentUrl: publicUrl });
+        }
       }
     } catch {
       try {
@@ -83,11 +115,25 @@ export function HostAgentSetupScreen() {
         });
         if (!imgResult.canceled && imgResult.assets?.[0]) {
           setLicenseDocumentUri(imgResult.assets[0].uri);
+          const publicUrl = await uploadLicenseDocument(imgResult.assets[0].uri);
+          if (publicUrl) {
+            await updateUser({ licenseDocumentUrl: publicUrl });
+          }
         }
       } catch (e) {
         console.error('Document pick failed:', e);
       }
     }
+  }
+
+  async function handleRemoveDocument() {
+    if (user?.licenseDocumentUrl) {
+      await supabase.storage
+        .from('license-documents')
+        .remove([user.licenseDocumentUrl]);
+    }
+    setLicenseDocumentUri(null);
+    await updateUser({ licenseDocumentUrl: null });
   }
 
   async function handleContinue() {
@@ -105,16 +151,19 @@ export function HostAgentSetupScreen() {
       setVerifying(true);
 
       try {
-        const verified = await verifyAgentLicense({
+        const result = await verifyAgentLicense({
           licenseNumber: values.licenseNumber?.trim(),
           licenseState: values.licenseState,
           firstName: user?.firstName,
           lastName: user?.lastName,
         });
 
-        if (verified) {
+        if (result.verified) {
           await updateUser({ licenseVerificationStatus: 'verified', licenseVerified: true, licenseVerifiedAt: new Date().toISOString() });
           setVerificationResult('verified');
+        } else if (result.reason === 'not_found') {
+          await updateUser({ licenseVerificationStatus: 'pending' });
+          setVerificationResult('not_found');
         } else {
           await updateUser({ licenseVerificationStatus: 'manual_review' });
           setVerificationResult('manual_review');
@@ -215,10 +264,16 @@ export function HostAgentSetupScreen() {
             {licenseDocumentUri ? (
               <View style={styles.uploadSuccess}>
                 <Feather name="check-circle" size={20} color="#22C55E" />
-                <Text style={[styles.uploadSuccessText, { color: theme.text }]}>License uploaded</Text>
-                <Pressable onPress={() => setLicenseDocumentUri(null)} hitSlop={8}>
-                  <Feather name="x" size={16} color={theme.textSecondary} />
-                </Pressable>
+                <Text style={[styles.uploadSuccessText, { color: theme.text }]}>
+                  {uploadingDoc ? 'Uploading...' : 'License uploaded'}
+                </Text>
+                {uploadingDoc ? (
+                  <ActivityIndicator size="small" color="#22C55E" />
+                ) : (
+                  <Pressable onPress={handleRemoveDocument} hitSlop={8}>
+                    <Feather name="x" size={16} color={theme.textSecondary} />
+                  </Pressable>
+                )}
               </View>
             ) : (
               <View style={styles.uploadPrompt}>
@@ -240,12 +295,21 @@ export function HostAgentSetupScreen() {
         ) : verificationResult === 'verified' ? (
           <View style={[styles.verifyBanner, { backgroundColor: '#22C55E15', borderColor: '#22C55E30' }]}>
             <Feather name="check-circle" size={16} color="#22C55E" />
-            <Text style={[Typography.small, { color: '#22C55E', fontWeight: '600' }]}>License verified</Text>
+            <Text style={[Typography.small, { color: '#22C55E', fontWeight: '600' }]}>License Verified</Text>
+          </View>
+        ) : verificationResult === 'not_found' ? (
+          <View style={[styles.verifyBanner, { backgroundColor: '#EF444415', borderColor: '#EF444430' }]}>
+            <Feather name="alert-circle" size={16} color="#EF4444" />
+            <Text style={[styles.verifyBannerText, { color: '#EF4444' }]}>
+              We couldn't verify this license. Please check your details or upload a document below.
+            </Text>
           </View>
         ) : verificationResult === 'manual_review' ? (
           <View style={[styles.verifyBanner, { backgroundColor: '#F59E0B15', borderColor: '#F59E0B30' }]}>
             <Feather name="clock" size={16} color="#F59E0B" />
-            <Text style={[Typography.small, { color: theme.text }]}>We'll verify your license within 24 hours</Text>
+            <Text style={[styles.verifyBannerText, { color: '#F59E0B' }]}>
+              Your license will be manually reviewed within 24-48 hours.
+            </Text>
           </View>
         ) : null}
 
@@ -261,7 +325,7 @@ export function HostAgentSetupScreen() {
         </Pressable>
 
         <View style={[styles.benefitsSection, { borderTopColor: theme.border }]}>
-          <Text style={[styles.benefitsTitle, { color: theme.text }]}>What you get as a verified agent</Text>
+          <Text style={[styles.benefitsTitle, { color: theme.text }]}>Why list on Rhome?</Text>
           {AGENT_BENEFITS.map((item, i) => (
             <View key={i} style={styles.benefitRow}>
               <View style={[styles.benefitIcon, { backgroundColor: '#6C63FF15' }]}>
@@ -310,15 +374,18 @@ async function verifyAgentLicense(params: {
   licenseState: string;
   firstName?: string;
   lastName?: string;
-}): Promise<boolean> {
+}): Promise<{ verified: boolean; reason: string }> {
   try {
     const { data, error } = await supabase.functions.invoke('verify-agent-license', {
       body: params,
     });
-    if (error) return false;
-    return data?.verified === true;
+    if (error) return { verified: false, reason: 'manual_review' };
+    return {
+      verified: data?.verified === true,
+      reason: data?.reason || 'manual_review',
+    };
   } catch {
-    return false;
+    return { verified: false, reason: 'manual_review' };
   }
 }
 
@@ -394,6 +461,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     marginBottom: Spacing.md,
+  },
+  verifyBannerText: {
+    fontSize: 13,
+    flex: 1,
+    lineHeight: 18,
   },
   continueBtn: {
     paddingVertical: 16,

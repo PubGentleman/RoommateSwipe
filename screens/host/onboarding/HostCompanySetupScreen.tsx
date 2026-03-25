@@ -16,11 +16,10 @@ const FIELDS = [
 ];
 
 const COMPANY_BENEFITS = [
-  { icon: 'users' as const, text: 'Invite your team — up to 10 members on Pro' },
-  { icon: 'home' as const, text: 'Manage up to 100 listings from one dashboard' },
-  { icon: 'shield' as const, text: 'Company profile and branding on every listing' },
-  { icon: 'bar-chart-2' as const, text: 'Full analytics suite and reporting' },
-  { icon: 'zap' as const, text: 'Bulk messaging and boost tools' },
+  { icon: 'users' as const, text: 'Reach thousands of verified renters actively looking' },
+  { icon: 'dollar-sign' as const, text: 'No listing fees — free to post and manage' },
+  { icon: 'zap' as const, text: 'Smart AI matching connects your listings to ideal tenants' },
+  { icon: 'bell' as const, text: 'Instant notifications when renters show interest' },
 ];
 
 export function HostCompanySetupScreen() {
@@ -118,7 +117,7 @@ export function HostCompanySetupScreen() {
         </Pressable>
 
         <View style={[styles.benefitsSection, { borderTopColor: theme.border }]}>
-          <Text style={[styles.benefitsTitle, { color: theme.text }]}>What you get as a property company</Text>
+          <Text style={[styles.benefitsTitle, { color: theme.text }]}>Why list on Rhome?</Text>
           {COMPANY_BENEFITS.map((item, i) => (
             <View key={i} style={styles.benefitRow}>
               <View style={[styles.benefitIcon, { backgroundColor: '#22C55E15' }]}>

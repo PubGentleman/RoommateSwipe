@@ -58,22 +58,22 @@ const HOST_TYPES: Array<{
 
 const BENEFITS_BY_TYPE: Record<string, Array<{ icon: string; text: string }>> = {
   individual: [
-    { icon: 'home', text: 'List your room and start getting inquiries fast' },
-    { icon: 'refresh-cw', text: 'Switch between renter and host mode anytime' },
-    { icon: 'star', text: 'AI-powered roommate matching' },
-    { icon: 'shield', text: 'Verified host badge builds trust with renters' },
+    { icon: 'users', text: 'Reach thousands of verified renters actively looking' },
+    { icon: 'dollar-sign', text: 'No listing fees — free to post and manage' },
+    { icon: 'zap', text: 'Smart AI matching connects your listings to ideal tenants' },
+    { icon: 'bell', text: 'Instant notifications when renters show interest' },
   ],
   agent: [
-    { icon: 'shield', text: 'Verified Agent badge on all your listings' },
-    { icon: 'trending-up', text: 'Priority placement in search results' },
-    { icon: 'users', text: 'AI-powered renter matching' },
-    { icon: 'bar-chart-2', text: 'Leads tracking and analytics' },
+    { icon: 'users', text: 'Reach thousands of verified renters actively looking' },
+    { icon: 'dollar-sign', text: 'No listing fees — free to post and manage' },
+    { icon: 'zap', text: 'Smart AI matching connects your listings to ideal tenants' },
+    { icon: 'bell', text: 'Instant notifications when renters show interest' },
   ],
   company: [
-    { icon: 'users', text: 'Multi-seat team access for your whole team' },
-    { icon: 'home', text: 'Manage your entire portfolio in one place' },
-    { icon: 'shield', text: 'Company branding on every listing' },
-    { icon: 'zap', text: 'Bulk tools for high-volume operations' },
+    { icon: 'users', text: 'Reach thousands of verified renters actively looking' },
+    { icon: 'dollar-sign', text: 'No listing fees — free to post and manage' },
+    { icon: 'zap', text: 'Smart AI matching connects your listings to ideal tenants' },
+    { icon: 'bell', text: 'Instant notifications when renters show interest' },
   ],
 };
 
@@ -344,7 +344,7 @@ export function HostTypeSelectScreen() {
       {selected ? (
         <View style={[styles.benefitsSection, { borderTopColor: theme.border }]}>
           <Text style={[styles.benefitsTitle, { color: theme.text }]}>
-            {selected === 'agent' ? 'What you get as an agent' : selected === 'company' ? 'What you get as a company' : 'Why host on Rhome?'}
+            Why list on Rhome?
           </Text>
           {(BENEFITS_BY_TYPE[selected] || []).map((item, i) => (
             <View key={i} style={styles.benefitRow}>
