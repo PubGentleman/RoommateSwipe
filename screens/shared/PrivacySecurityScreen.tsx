@@ -11,12 +11,13 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { StorageService } from '../../utils/storage';
 import { supabase } from '../../lib/supabase';
+import { ModeSwitchToggle } from '../../components/ModeSwitchToggle';
 
 type PrivacySecurityScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'PrivacySecurity'>;
 
 export const PrivacySecurityScreen = () => {
   const { theme } = useTheme();
-  const { user, logout, updateUser, softDeleteAccount } = useAuth();
+  const { user, logout, updateUser, softDeleteAccount, activeMode, canSwitchMode } = useAuth();
   const navigation = useNavigation<PrivacySecurityScreenNavigationProp>();
   
   const [showPasswordSection, setShowPasswordSection] = useState(false);
@@ -144,6 +145,20 @@ export const PrivacySecurityScreen = () => {
 
   return (
     <ScreenScrollView style={{ backgroundColor: '#111111' }} contentContainerStyle={{ paddingTop: Spacing.lg, backgroundColor: '#111111' }}>
+      {canSwitchMode ? (
+        <View style={[styles.section, { alignItems: 'center' }]}>
+          <ThemedText style={[Typography.h3, { marginBottom: Spacing.sm, color: theme.textSecondary }]}>
+            Your Mode
+          </ThemedText>
+          <ModeSwitchToggle />
+          <ThemedText style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: Spacing.sm, textAlign: 'center' }}>
+            {activeMode === 'host'
+              ? 'Switch to Renter to find your next place'
+              : 'Switch to Host to manage your listings'}
+          </ThemedText>
+        </View>
+      ) : null}
+
       <View style={styles.section}>
         <ThemedText style={[Typography.h3, { marginBottom: Spacing.md, color: theme.textSecondary }]}>
           Account Security

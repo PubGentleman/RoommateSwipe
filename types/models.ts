@@ -377,6 +377,8 @@ export interface User {
   avgResponseHours?: number;
   hostTypeLockedAt?: string;
   hostTypeChangeRequested?: boolean;
+  activeMode?: 'renter' | 'host';
+  hasCompletedHostOnboarding?: boolean;
   profilePicture?: string;
   verification?: VerificationStatus;
   photos?: string[];

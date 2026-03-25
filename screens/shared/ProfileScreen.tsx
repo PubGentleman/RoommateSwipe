@@ -20,11 +20,12 @@ import { isDev } from '../../utils/envUtils';
 import { isHostTypeEditable, hoursRemainingInGracePeriod, getHostBadgeLabel, getHostBadgeColor, getHostBadgeIcon } from '../../utils/hostTypeUtils';
 import * as Linking from 'expo-linking';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { ModeSwitchToggle } from '../../components/ModeSwitchToggle';
 
 type ProfileScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'ProfileMain'>;
 
 export const ProfileScreen = () => {
-  const { user, logout, updateUser, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, getHostPlan, getSuperInterestCount } = useAuth();
+  const { user, logout, updateUser, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, getHostPlan, getSuperInterestCount, activeMode, canSwitchMode } = useAuth();
   const { unreadCount } = useNotificationContext();
   const navigation = useNavigation<ProfileScreenNavigationProp>();
   const insets = useSafeAreaInsets();
@@ -70,7 +71,7 @@ export const ProfileScreen = () => {
   };
 
   const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : 'U';
-  const isHost = user?.role === 'host';
+  const isHost = activeMode === 'host';
   const [matchCount, setMatchCount] = useState(0);
   const [profileViewCount, setProfileViewCount] = useState(0);
   const [likesCount, setLikesCount] = useState(0);
@@ -201,9 +202,15 @@ export const ProfileScreen = () => {
             </View>
           </View>
 
-          <View style={[styles.roleBadge, isHost && styles.roleBadgeHost]}>
-            <Text style={[styles.roleBadgeText, isHost && styles.roleBadgeTextHost]}>{getRoleLabel()}</Text>
-          </View>
+          {canSwitchMode ? (
+            <View style={{ marginBottom: 10 }}>
+              <ModeSwitchToggle compact />
+            </View>
+          ) : (
+            <View style={[styles.roleBadge, isHost && styles.roleBadgeHost]}>
+              <Text style={[styles.roleBadgeText, isHost && styles.roleBadgeTextHost]}>{getRoleLabel()}</Text>
+            </View>
+          )}
 
           <View style={styles.nameRow}>
             <Text style={styles.profileName}>{user?.name || 'User'}</Text>
@@ -293,7 +300,7 @@ export const ProfileScreen = () => {
         </LinearGradient>
         </Animated.View>
 
-        {user?.role === 'renter' ? (
+        {!isHost ? (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitleRow}>
@@ -312,7 +319,7 @@ export const ProfileScreen = () => {
 
         {/* TODO: References section — build invite-based reference system post-launch */}
 
-        {user?.role === 'renter' ? (
+        {!isHost ? (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitleRow}>
@@ -363,11 +370,11 @@ export const ProfileScreen = () => {
               <Text style={styles.sectionTitle}>Subscription</Text>
             </View>
           </View>
-          <Pressable style={styles.subCard} onPress={() => navigation.navigate(user?.role === 'host' ? 'HostSubscription' : 'Plans')}>
+          <Pressable style={styles.subCard} onPress={() => navigation.navigate(isHost ? 'HostSubscription' : 'Plans')}>
             <View style={styles.subLeft}>
               <Text style={styles.subLabel}>Current Plan</Text>
               <Text style={styles.subPlan}>
-                {user?.role === 'host'
+                {isHost
                   ? (user?.hostSubscription?.plan === 'pro' ? 'Pro · $49.99/mo'
                     : user?.hostSubscription?.plan === 'business' ? 'Business · $99/mo'
                     : user?.hostSubscription?.plan === 'starter' ? 'Starter · $19.99/mo'
@@ -376,15 +383,15 @@ export const ProfileScreen = () => {
                 }
               </Text>
               <Text style={styles.subDesc}>
-                {user?.role === 'host'
+                {isHost
                   ? (!user?.hostSubscription?.plan || user?.hostSubscription?.plan === 'free' || user?.hostSubscription?.plan === 'none'
                     ? 'Upgrade to reach more renters' : 'You have full access')
                   : (user?.subscription?.plan === 'basic' ? 'Upgrade to unlock unlimited matches' : 'You have full access')
                 }
               </Text>
             </View>
-            {(user?.role === 'host' ? (!user?.hostSubscription?.plan || user?.hostSubscription?.plan === 'free' || user?.hostSubscription?.plan === 'none') : user?.subscription?.plan === 'basic') ? (
-              <Pressable onPress={() => navigation.navigate(user?.role === 'host' ? 'HostSubscription' : 'Plans')}>
+            {(isHost ? (!user?.hostSubscription?.plan || user?.hostSubscription?.plan === 'free' || user?.hostSubscription?.plan === 'none') : user?.subscription?.plan === 'basic') ? (
+              <Pressable onPress={() => navigation.navigate(isHost ? 'HostSubscription' : 'Plans')}>
                 <LinearGradient colors={['#ff6b5b', '#e83a2a']} style={styles.upgradeBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
                   <Text style={styles.upgradeBtnText}>Upgrade</Text>
                 </LinearGradient>
@@ -399,7 +406,7 @@ export const ProfileScreen = () => {
               </Text>
             </View>
           ) : null}
-          {user?.role === 'renter' ? (
+          {!isHost ? (
             <View style={styles.superInterestTracker}>
               <Feather name="star" size={16} color="#4A90E2" />
               {user?.subscription?.plan === 'elite' ? (
@@ -418,7 +425,7 @@ export const ProfileScreen = () => {
                   <Text style={styles.superInterestTrackerText}>
                     Super Interests: {getSuperInterestCount()} remaining
                   </Text>
-                  <Pressable onPress={() => navigation.navigate(user?.role === 'host' ? 'HostSubscription' : 'Plans')}>
+                  <Pressable onPress={() => navigation.navigate(isHost ? 'HostSubscription' : 'Plans')}>
                     <Text style={{ color: '#4A90E2', fontWeight: '600', fontSize: 13 }}>Buy more</Text>
                   </Pressable>
                 </View>
@@ -435,7 +442,7 @@ export const ProfileScreen = () => {
             </View>
           </View>
           <View style={styles.settingsCard}>
-            {user?.role === 'host' ? (() => {
+            {isHost ? (() => {
               const hostType = user?.hostType || 'individual';
               const canEdit = isHostTypeEditable(user?.hostTypeLockedAt || null);
               const hoursLeft = hoursRemainingInGracePeriod(user?.hostTypeLockedAt || null);
@@ -572,9 +579,9 @@ export const ProfileScreen = () => {
               title="Verify Identity"
               subtitle="Phone, ID, social verification"
               onPress={() => navigation.navigate('Verification')}
-              isLast={!(user?.role === 'host' && getHostPlan() === 'business')}
+              isLast={!(isHost && getHostPlan() === 'business')}
             />
-            {user?.role === 'host' && getHostPlan() === 'business' ? (
+            {isHost && getHostPlan() === 'business' ? (
               <SettingsItem
                 iconName="headphones"
                 iconColor="#667eea"
@@ -624,18 +631,30 @@ export const ProfileScreen = () => {
             />
           </View>
 
-          <Pressable
-            style={styles.switchRoleBtn}
-            onPress={() => {
-              const newRole = user?.role === 'renter' ? 'host' : 'renter';
-              updateUser({ role: newRole });
-            }}
-          >
-            <Feather name="repeat" size={16} color="#ff6b5b" />
-            <Text style={styles.switchRoleText}>
-              Switch to {user?.role === 'renter' ? 'Host' : 'Renter'}
-            </Text>
-          </Pressable>
+          {canSwitchMode ? (
+            <View style={styles.modeSwitchSection}>
+              <Text style={styles.modeSwitchLabel}>Your Mode</Text>
+              <ModeSwitchToggle />
+              <Text style={styles.modeSwitchHint}>
+                {isHost
+                  ? 'Switch to Renter to find your next place'
+                  : 'Switch to Host to manage your listings'}
+              </Text>
+            </View>
+          ) : (
+            <Pressable
+              style={styles.switchRoleBtn}
+              onPress={() => {
+                const newRole = user?.role === 'renter' ? 'host' : 'renter';
+                updateUser({ role: newRole });
+              }}
+            >
+              <Feather name="repeat" size={16} color="#ff6b5b" />
+              <Text style={styles.switchRoleText}>
+                Switch to {user?.role === 'renter' ? 'Host' : 'Renter'}
+              </Text>
+            </Pressable>
+          )}
 
           <Pressable style={styles.signoutBtn} onPress={logout}>
             <Feather name="log-out" size={16} color="#ff4d4d" />
@@ -1242,6 +1261,31 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 20,
     borderWidth: 1.5,
+  },
+  modeSwitchSection: {
+    alignItems: 'center',
+    marginTop: 16,
+    marginBottom: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  modeSwitchLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.5)',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  modeSwitchHint: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.35)',
+    marginTop: 8,
+    textAlign: 'center',
   },
   switchRoleBtn: {
     flexDirection: 'row',

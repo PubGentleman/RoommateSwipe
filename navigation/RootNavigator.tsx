@@ -39,7 +39,7 @@ function HostMain() { return <HostTabNavigator />; }
 HostMain.displayName = 'HostMain';
 
 export const RootNavigator = () => {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, activeMode } = useAuth();
   const { theme } = useTheme();
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -104,9 +104,10 @@ export const RootNavigator = () => {
     );
   }
 
-  const MainComponent = user.role === 'host'
-    ? HostMain
-    : RenterMain;
+  const effectiveIsHost = user.hostType === 'agent' || user.hostType === 'company'
+    ? true
+    : activeMode === 'host';
+  const MainComponent = effectiveIsHost ? HostMain : RenterMain;
 
   return (
     <>

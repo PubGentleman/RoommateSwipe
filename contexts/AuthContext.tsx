@@ -72,6 +72,9 @@ interface AuthContextType {
   softDeleteAccount: () => Promise<void>;
   recoverDeletedAccount: () => Promise<void>;
   updateLastActive: () => Promise<void>;
+  activeMode: 'renter' | 'host';
+  canSwitchMode: boolean;
+  switchMode: (mode: 'renter' | 'host') => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -269,6 +272,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       avgResponseHours: supabaseUser.avg_response_hours || undefined,
       hostTypeLockedAt: supabaseUser.host_type_locked_at || undefined,
       hostTypeChangeRequested: supabaseUser.host_type_change_requested || false,
+      activeMode: profile?.active_mode || 'renter',
+      hasCompletedHostOnboarding: profile?.has_completed_host_onboarding || false,
       agentPlan: supabaseUser.agent_plan || 'pay_per_use',
     };
   };
@@ -2054,8 +2059,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { success: true, message: 'Super Interest purchased!' };
   };
 
+  const hostType = user?.hostType as 'individual' | 'agent' | 'company' | null | undefined;
+  const canSwitchMode = hostType === 'individual';
+  const effectiveMode: 'renter' | 'host' =
+    hostType === 'agent' || hostType === 'company'
+      ? 'host'
+      : (user?.activeMode || 'renter');
+
+  const switchMode = async (mode: 'renter' | 'host') => {
+    if (!canSwitchMode || !user) return;
+    if (mode === 'host' && !user.hasCompletedHostOnboarding && !user.hostType) {
+      const updated = { ...user, activeMode: mode as 'renter' | 'host' };
+      await StorageService.setCurrentUser(updated);
+      await StorageService.addOrUpdateUser(updated);
+      setUser(updated);
+      return;
+    }
+    if (isSupabaseConfigured) {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ active_mode: mode })
+        .eq('user_id', user.id);
+      if (error) {
+        console.error('[switchMode] Supabase error:', error);
+      }
+    }
+    const updated = { ...user, activeMode: mode as 'renter' | 'host' };
+    await StorageService.setCurrentUser(updated);
+    await StorageService.addOrUpdateUser(updated);
+    setUser(updated);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout, abandonSignup, resetPassword, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, cancelSubscriptionAtPeriodEnd, reactivateSubscription, getSubscriptionDetails, updateUser, blockUser: blockUserAction, unblockUser: unblockUserAction, reportUser: reportUserAction, isUserBlocked: isUserBlockedCheck, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike, watchAdForCredit, getAdCredits, useAdCredit, isBasicUser, canViewListing, useListingView, canSendInterest, canSendSuperInterest, useSuperInterestCredit, canSendColdMessage, useColdMessage, getSuperInterestCount, upgradeHostPlan, downgradeHostPlan, getHostPlan, canAddListing, canRespondToInquiry, useInquiryResponse, purchaseListingBoost, purchaseHostVerification, purchaseSuperInterest, completeOnboardingStep, cancelHostSubscriptionAtPeriodEnd, reactivateHostSubscription, softDeleteAccount, recoverDeletedAccount, updateLastActive }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout, abandonSignup, resetPassword, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, cancelSubscriptionAtPeriodEnd, reactivateSubscription, getSubscriptionDetails, updateUser, blockUser: blockUserAction, unblockUser: unblockUserAction, reportUser: reportUserAction, isUserBlocked: isUserBlockedCheck, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike, watchAdForCredit, getAdCredits, useAdCredit, isBasicUser, canViewListing, useListingView, canSendInterest, canSendSuperInterest, useSuperInterestCredit, canSendColdMessage, useColdMessage, getSuperInterestCount, upgradeHostPlan, downgradeHostPlan, getHostPlan, canAddListing, canRespondToInquiry, useInquiryResponse, purchaseListingBoost, purchaseHostVerification, purchaseSuperInterest, completeOnboardingStep, cancelHostSubscriptionAtPeriodEnd, reactivateHostSubscription, softDeleteAccount, recoverDeletedAccount, updateLastActive, activeMode: effectiveMode, canSwitchMode, switchMode }}>
       {children}
     </AuthContext.Provider>
   );

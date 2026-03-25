@@ -1,0 +1,364 @@
+# Rhome — Renter / Host Mode Switch
+## Replit Agent Prompt
+
+---
+
+## Overview
+
+Individual users on Rhome may be both a renter (looking for a place) and a host (listing a room). This prompt adds a mode toggle that lets individual hosts switch between Renter Mode and Host Mode within the same account. Agents and company hosts are permanently locked to Host Mode — the toggle is hidden entirely for them.
+
+**Core rules:**
+- `hostType === 'individual'` → toggle visible, can switch freely
+- `hostType === 'agent'` → always Host Mode, no toggle
+- `hostType === 'company'` → always Host Mode, no toggle
+- Switching modes **never deletes data** — renter profile, swipe history, matches, and host listings are all preserved
+- Only one subscription is needed (see `rhome-host-pricing-bundle-prompt.md`)
+
+---
+
+## Part 1 — Database
+
+### Migration: `031_user_mode.sql`
+
+```sql
+-- Add active_mode column to profiles
+ALTER TABLE profiles
+ADD COLUMN IF NOT EXISTS active_mode TEXT NOT NULL DEFAULT 'renter'
+  CHECK (active_mode IN ('renter', 'host'));
+
+-- Agents and companies are always in host mode
+-- Individual users default to renter mode unless they have an active host subscription
+```
+
+Run this in the Supabase SQL Editor.
+
+---
+
+## Part 2 — AuthContext
+
+In `contexts/AuthContext.tsx`, add `activeMode` to the context and a `switchMode` function.
+
+### Step 2a — Add to context type
+
+```typescript
+interface AuthContextType {
+  // ... existing fields
+  activeMode: 'renter' | 'host';
+  canSwitchMode: boolean; // true only for individual hosts
+  switchMode: (mode: 'renter' | 'host') => Promise<void>;
+}
+```
+
+### Step 2b — Derive values from profile
+
+```typescript
+const hostType = profile?.host_type as 'individual' | 'agent' | 'company' | null;
+const activeMode = (profile?.active_mode ?? 'renter') as 'renter' | 'host';
+
+// Only individual hosts can switch modes
+const canSwitchMode = hostType === 'individual';
+
+// Agents and companies are always in host mode regardless of DB value
+const effectiveMode: 'renter' | 'host' =
+  hostType === 'agent' || hostType === 'company' ? 'host' : activeMode;
+```
+
+### Step 2c — switchMode function
+
+```typescript
+const switchMode = async (mode: 'renter' | 'host') => {
+  if (!canSwitchMode) return; // safety guard
+  if (!user) return;
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ active_mode: mode })
+    .eq('id', user.id);
+
+  if (!error) {
+    // Refresh profile in context
+    await refreshProfile();
+  }
+};
+```
+
+Export `effectiveMode` as `activeMode`, `canSwitchMode`, and `switchMode` from the context.
+
+---
+
+## Part 3 — ModeSwitchToggle Component
+
+Create `components/ModeSwitchToggle.tsx`:
+
+```typescript
+import React from 'react';
+import { View, TouchableOpacity, Text, StyleSheet, Animated } from 'react-native';
+import { useAuth } from '../contexts/AuthContext';
+import { Ionicons } from '@expo/vector-icons';
+
+export default function ModeSwitchToggle() {
+  const { activeMode, canSwitchMode, switchMode } = useAuth();
+
+  // Don't render for agents and companies
+  if (!canSwitchMode) return null;
+
+  const isHost = activeMode === 'host';
+
+  return (
+    <View style={styles.container}>
+      <TouchableOpacity
+        style={[styles.pill, !isHost && styles.pillActive]}
+        onPress={() => switchMode('renter')}
+        activeOpacity={0.8}
+      >
+        <Ionicons
+          name="search-outline"
+          size={15}
+          color={!isHost ? '#fff' : '#888'}
+        />
+        <Text style={[styles.label, !isHost && styles.labelActive]}>
+          Renter
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.pill, isHost && styles.pillActive]}
+        onPress={() => switchMode('host')}
+        activeOpacity={0.8}
+      >
+        <Ionicons
+          name="home-outline"
+          size={15}
+          color={isHost ? '#fff' : '#888'}
+        />
+        <Text style={[styles.label, isHost && styles.labelActive]}>
+          Host
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    backgroundColor: '#F0F0F0',
+    borderRadius: 20,
+    padding: 3,
+    alignSelf: 'center',
+  },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 17,
+  },
+  pillActive: {
+    backgroundColor: '#1a1a2e', // your app's primary color
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#888',
+  },
+  labelActive: {
+    color: '#fff',
+  },
+});
+```
+
+---
+
+## Part 4 — Tab Navigator Gating
+
+The tab navigator should show completely different tabs based on `activeMode`.
+
+In `navigation/TabNavigator.tsx` (or wherever your main tabs are defined):
+
+```typescript
+const { activeMode, canSwitchMode } = useAuth();
+
+// Renter tabs: Discover (swipe), Matches, Messages, Profile
+// Host tabs: Listings, Inquiries, Messages, Profile
+
+return (
+  <Tab.Navigator>
+    {activeMode === 'renter' ? (
+      <>
+        <Tab.Screen name="Discover" component={SwipeScreen} />
+        <Tab.Screen name="Matches" component={MatchesScreen} />
+        <Tab.Screen name="Messages" component={MessagesScreen} />
+        <Tab.Screen name="Profile" component={ProfileScreen} />
+      </>
+    ) : (
+      <>
+        <Tab.Screen name="Listings" component={HostListingsScreen} />
+        <Tab.Screen name="Inquiries" component={HostInquiriesScreen} />
+        <Tab.Screen name="Messages" component={MessagesScreen} />
+        <Tab.Screen name="Profile" component={HostProfileScreen} />
+      </>
+    )}
+  </Tab.Navigator>
+);
+```
+
+Messages is shared between both modes — the same conversations are visible regardless of which mode the user is in.
+
+---
+
+## Part 5 — Where to Show the Toggle
+
+### Option A — Settings Screen (recommended primary location)
+
+In `screens/SettingsScreen.tsx`, add a section at the top:
+
+```typescript
+import ModeSwitchToggle from '../components/ModeSwitchToggle';
+
+// Inside render, near the top of the screen:
+{canSwitchMode && (
+  <View style={styles.modeSection}>
+    <Text style={styles.modeSectionLabel}>Your Mode</Text>
+    <ModeSwitchToggle />
+    <Text style={styles.modeHint}>
+      {activeMode === 'renter'
+        ? 'Switch to Host to manage your listings'
+        : 'Switch to Renter to find your next place'}
+    </Text>
+  </View>
+)}
+```
+
+### Option B — Profile Screen header
+
+Add the toggle beneath the user's name/photo on the Profile screen so it's always discoverable.
+
+### Option C — Sidebar or drawer (if app uses one)
+
+Place it at the very top of the drawer for quick switching.
+
+**Implement all three** — the toggle in Settings is the canonical location, the Profile placement makes it discoverable.
+
+---
+
+## Part 6 — Switching Flow UX
+
+When the user taps the toggle to switch modes, show a brief confirmation bottom sheet before switching:
+
+```typescript
+// On switchMode press, show this sheet first:
+
+// Switching TO host:
+title: "Switch to Host Mode?"
+body: "You'll see your listings and renter inquiries. Your renter profile and matches are saved."
+confirmCTA: "Switch to Host"
+
+// Switching TO renter:
+title: "Switch to Renter Mode?"
+body: "You'll see your renter profile and matches. Your listings are saved and still active."
+confirmCTA: "Switch to Renter"
+```
+
+Use a simple `Alert.alert()` for this — no need for a full sheet.
+
+```typescript
+const handleModeSwitch = (targetMode: 'renter' | 'host') => {
+  if (targetMode === activeMode) return;
+
+  Alert.alert(
+    targetMode === 'host' ? 'Switch to Host Mode?' : 'Switch to Renter Mode?',
+    targetMode === 'host'
+      ? "You'll see your listings and renter inquiries. Your renter profile and matches are saved."
+      : "You'll see your renter profile and matches. Your listings are saved and still active.",
+    [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: targetMode === 'host' ? 'Switch to Host' : 'Switch to Renter',
+        onPress: () => switchMode(targetMode),
+      },
+    ]
+  );
+};
+```
+
+---
+
+## Part 7 — Guard Individual Screens
+
+Some screens should only be accessible in the correct mode. Add a mode guard at the top of screens that could be reached via deep link or stale navigation state:
+
+```typescript
+// At the top of SwipeScreen, MatchesScreen, etc.:
+const { activeMode } = useAuth();
+
+useEffect(() => {
+  if (activeMode === 'host') {
+    // Redirect to host dashboard
+    navigation.replace('HostListings');
+  }
+}, [activeMode]);
+```
+
+```typescript
+// At the top of HostListingsScreen, HostInquiriesScreen, etc.:
+const { activeMode } = useAuth();
+
+useEffect(() => {
+  if (activeMode === 'renter') {
+    navigation.replace('Discover');
+  }
+}, [activeMode]);
+```
+
+---
+
+## Part 8 — First-Time Host Onboarding Trigger
+
+When an individual renter switches to host mode for the first time (no host profile exists yet), redirect them to host onboarding instead of the host dashboard:
+
+```typescript
+const switchMode = async (mode: 'renter' | 'host') => {
+  if (mode === 'host' && !profile?.has_completed_host_onboarding) {
+    // Send them to host type selection
+    navigation.navigate('HostTypeSelect');
+    return;
+  }
+  // Otherwise proceed with normal mode switch
+  await updateActiveMode(mode);
+};
+```
+
+Add `has_completed_host_onboarding BOOLEAN DEFAULT false` to the `031_user_mode.sql` migration and set it to `true` at the end of the host onboarding flow.
+
+---
+
+## Part 9 — Agents and Companies — No Toggle, Clean Host UX
+
+For agents and companies, the mode is always `host`. There is no toggle. Their experience should feel like a professional business tool, not a consumer app.
+
+In `navigation/TabNavigator.tsx`:
+
+```typescript
+// Agents and companies always see host tabs, no toggle rendered
+const effectiveTabs =
+  hostType === 'agent' || hostType === 'company' || activeMode === 'host'
+    ? hostTabs
+    : renterTabs;
+```
+
+In `screens/ProfileScreen.tsx`, `screens/SettingsScreen.tsx` — the `ModeSwitchToggle` already returns `null` for non-individual hosts so no additional gating is needed.
+
+---
+
+## Summary
+
+| Host Type | Toggle Visible | Default Mode | Can Switch |
+|---|---|---|---|
+| None (pure renter) | No | Renter | N/A |
+| Individual | Yes | Renter | ✓ |
+| Agent | No | Host (locked) | ✗ |
+| Company | No | Host (locked) | ✗ |
+
+Data is never deleted on mode switch. Switching is confirmed with an Alert before executing. First-time host switch triggers onboarding.
