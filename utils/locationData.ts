@@ -903,6 +903,20 @@ export function isSameCity(neighborhood1: string, neighborhood2: string): boolea
   return city1 === city2;
 }
 
+export function getBoroughsByCity(city: string): string[] {
+  const boroughs = new Set<string>();
+  Object.values(NEIGHBORHOODS).forEach(n => {
+    if (n.city === city && n.borough) boroughs.add(n.borough);
+  });
+  return Array.from(boroughs).sort();
+}
+
+export function getNeighborhoodsByBorough(city: string, borough: string): string[] {
+  return Object.keys(NEIGHBORHOODS).filter(
+    n => NEIGHBORHOODS[n].city === city && NEIGHBORHOODS[n].borough === borough
+  );
+}
+
 export function getNeighborhoodsByCity(city: string): string[] {
   return Object.keys(NEIGHBORHOODS).filter(
     neighborhood => NEIGHBORHOODS[neighborhood].city === city

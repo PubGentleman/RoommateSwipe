@@ -21,6 +21,9 @@ import { Feather } from '../../components/VectorIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RhomeLogo } from '../../components/RhomeLogo';
 import * as ImagePicker from 'expo-image-picker';
+import { LocationStep } from './components/LocationStep';
+import { PreferencesStep } from './components/PreferencesStep';
+import { getStateNameFromCode } from '../../utils/locationData';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SWIPE_THRESHOLD = 80;
@@ -34,22 +37,20 @@ interface SignUpState {
   email: string;
   password: string;
   city: string;
+  locationState: string;
+  locationBorough: string;
+  locationNeighborhood: string;
   licenseNumber: string;
   agencyName: string;
   companyName: string;
   propertyCount: string;
-  budgetRange: string;
+  budgetMin: number;
+  budgetMax: number;
   roomType: string;
   propertyType: string;
   profilePhoto: string | null;
 }
 
-const BUDGET_RANGES = ['Under $800', '$800-$1200', '$1200-$1800', '$1800-$2500', '$2500+'];
-const ROOM_TYPES = [
-  { id: 'private', icon: 'lock', label: 'Private Room' },
-  { id: 'shared', icon: 'users', label: 'Shared Room' },
-  { id: 'apartment', icon: 'home', label: 'Full Apartment' },
-];
 const PROPERTY_TYPES = [
   { id: 'apartment', icon: 'home', label: 'Apartment' },
   { id: 'house', icon: 'home', label: 'House' },
@@ -65,20 +66,6 @@ const ACCOUNT_TYPES: { id: AccountType; icon: string; label: string; description
   { id: 'company', icon: 'grid', label: 'Company', description: 'I manage properties for clients', color: '#22C55E', hostOnly: true },
 ];
 
-const CITIES = [
-  'Miami, FL',
-  'New York, NY',
-  'Los Angeles, CA',
-  'Chicago, IL',
-  'Houston, TX',
-  'Austin, TX',
-  'San Francisco, CA',
-  'Boston, MA',
-  'Seattle, WA',
-  'Atlanta, GA',
-  'Denver, CO',
-  'Philadelphia, PA',
-];
 
 const PROPERTY_COUNTS = ['1-10', '11-50', '51-200', '200+'];
 
@@ -95,11 +82,15 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
     email: '',
     password: '',
     city: '',
+    locationState: '',
+    locationBorough: '',
+    locationNeighborhood: '',
     licenseNumber: '',
     agencyName: '',
     companyName: '',
     propertyCount: '',
-    budgetRange: '',
+    budgetMin: 800,
+    budgetMax: 2000,
     roomType: '',
     propertyType: '',
     profilePhoto: null,
@@ -117,7 +108,6 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [citySearch, setCitySearch] = useState('');
   const [agentNotice, setAgentNotice] = useState(false);
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
 
@@ -222,13 +212,20 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
     goForward();
   };
 
-  const handleCitySelect = (city: string) => {
-    setSelectedCard(city);
-    updateState({ city });
-    setTimeout(() => {
-      setSelectedCard(null);
-      goForward();
-    }, 150);
+  const handleLocationSelect = (location: { state: string; city: string; borough?: string; neighborhood?: string }) => {
+    const displayCity = `${location.city}, ${location.state}`;
+    updateState({
+      city: displayCity,
+      locationState: location.state,
+      locationBorough: location.borough || '',
+      locationNeighborhood: location.neighborhood || '',
+    });
+    setTimeout(goForward, 150);
+  };
+
+  const handlePreferencesSubmit = (prefs: { budgetMin: number; budgetMax: number; roomTypes: string[] }) => {
+    updateState({ budgetMin: prefs.budgetMin, budgetMax: prefs.budgetMax, roomType: prefs.roomTypes.join(',') });
+    goForward();
   };
 
   const handlePhotoUpload = async () => {
@@ -259,9 +256,6 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
     }
   };
 
-  const filteredCities = citySearch.trim()
-    ? CITIES.filter(c => c.toLowerCase().includes(citySearch.toLowerCase()))
-    : CITIES;
 
   const progressIndex = Math.max(0, currentStep - 1);
 
@@ -485,59 +479,19 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
     );
   };
 
-  const renderLocation = () => {
-    const headlines: Record<AccountType, string> = {
-      renter: 'Where are you looking?',
-      individual: 'Where is your property?',
-      agent: 'Where do you work?',
-      company: 'Where are your properties?',
-    };
-    return (
-      <View style={styles.stepContainer}>
-        <View style={styles.stepTopBar}>
-          <View style={styles.topBarSpacer} />
-          <ProgressDots />
-          <View style={styles.topBarSpacer} />
-        </View>
-        <View style={styles.stepContent}>
-          <Text style={styles.headline}>{headlines[state.accountType!]}</Text>
-          <View style={styles.searchWrap}>
-            <Feather name="search" size={16} color="rgba(255,255,255,0.35)" />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search cities..."
-              placeholderTextColor="rgba(255,255,255,0.35)"
-              value={citySearch}
-              onChangeText={setCitySearch}
-              autoCapitalize="none"
-            />
-            {citySearch ? (
-              <Pressable onPress={() => setCitySearch('')} hitSlop={8}>
-                <Feather name="x" size={16} color="rgba(255,255,255,0.35)" />
-              </Pressable>
-            ) : null}
-          </View>
-          <ScrollView showsVerticalScrollIndicator={false} style={styles.cityScroll}>
-            <View style={styles.cityChipGrid}>
-              {filteredCities.map((city) => (
-                <Pressable
-                  key={city}
-                  style={[
-                    styles.cityChip,
-                    selectedCard === city ? styles.cityChipActive : null,
-                  ]}
-                  onPress={() => handleCitySelect(city)}
-                >
-                  <Feather name="map-pin" size={14} color={selectedCard === city ? '#fff' : 'rgba(255,255,255,0.5)'} />
-                  <Text style={[styles.cityChipText, selectedCard === city ? styles.cityChipTextActive : null]}>{city}</Text>
-                </Pressable>
-              ))}
-            </View>
-          </ScrollView>
-        </View>
+  const renderLocation = () => (
+    <View style={styles.stepContainer}>
+      <View style={styles.stepTopBar}>
+        <View style={styles.topBarSpacer} />
+        <ProgressDots />
+        <View style={styles.topBarSpacer} />
       </View>
-    );
-  };
+      <LocationStep
+        accountType={state.accountType!}
+        onLocationSelect={handleLocationSelect}
+      />
+    </View>
+  );
 
   const handleDetailsSubmit = () => {
     setError('');
@@ -556,41 +510,6 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
       company: 'Your company details',
     };
 
-    const renderRenterDetails = () => (
-      <>
-        <View style={styles.field}>
-          <Text style={styles.fieldLabel}>BUDGET RANGE</Text>
-          <View style={styles.countChipRow}>
-            {BUDGET_RANGES.map((range) => (
-              <Pressable
-                key={range}
-                style={[styles.countChip, state.budgetRange === range ? styles.countChipActive : null]}
-                onPress={() => updateState({ budgetRange: range })}
-              >
-                <Text style={[styles.countChipText, state.budgetRange === range ? styles.countChipTextActive : null]}>{range}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-        <View style={styles.field}>
-          <Text style={styles.fieldLabel}>ROOM TYPE PREFERENCE</Text>
-          <View style={styles.optionsList}>
-            {ROOM_TYPES.map((rt) => (
-              <Pressable
-                key={rt.id}
-                style={[styles.optionCard, state.roomType === rt.id ? styles.optionCardActive : null]}
-                onPress={() => updateState({ roomType: rt.id })}
-              >
-                <View style={styles.optionIconWrap}>
-                  <Feather name={rt.icon as any} size={20} color={state.roomType === rt.id ? '#ff6b5b' : 'rgba(255,255,255,0.5)'} />
-                </View>
-                <Text style={[styles.optionLabel, state.roomType === rt.id ? styles.optionLabelActive : null]}>{rt.label}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-      </>
-    );
 
     const renderIndividualDetails = () => (
       <View style={styles.field}>
@@ -668,37 +587,40 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
           <ProgressDots />
           <View style={styles.topBarSpacer} />
         </View>
-        <ScrollView
-          style={styles.scrollArea}
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <Text style={styles.headline}>{headlines[state.accountType!]}</Text>
-          <View style={styles.formFields}>
-            {state.accountType === 'renter' ? renderRenterDetails() : null}
-            {state.accountType === 'individual' ? renderIndividualDetails() : null}
-            {state.accountType === 'agent' ? renderAgentDetails() : null}
-            {state.accountType === 'company' ? renderCompanyDetails() : null}
-          </View>
-          {error ? (
-            <View style={styles.errorBox}>
-              <Feather name="alert-circle" size={14} color="#ff6b5b" />
-              <Text style={styles.errorText}>{error}</Text>
+        {state.accountType === 'renter' ? (
+          <PreferencesStep onSubmit={handlePreferencesSubmit} />
+        ) : (
+          <ScrollView
+            style={styles.scrollArea}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <Text style={styles.headline}>{headlines[state.accountType!]}</Text>
+            <View style={styles.formFields}>
+              {state.accountType === 'individual' ? renderIndividualDetails() : null}
+              {state.accountType === 'agent' ? renderAgentDetails() : null}
+              {state.accountType === 'company' ? renderCompanyDetails() : null}
             </View>
-          ) : null}
-          <Pressable onPress={handleDetailsSubmit}>
-            <LinearGradient
-              colors={['#ff6b5b', '#e83a2a']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.continueBtn}
-            >
-              <Text style={styles.continueBtnText}>Continue</Text>
-              <Feather name="arrow-right" size={16} color="#FFFFFF" />
-            </LinearGradient>
-          </Pressable>
-        </ScrollView>
+            {error ? (
+              <View style={styles.errorBox}>
+                <Feather name="alert-circle" size={14} color="#ff6b5b" />
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            ) : null}
+            <Pressable onPress={handleDetailsSubmit}>
+              <LinearGradient
+                colors={['#ff6b5b', '#e83a2a']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.continueBtn}
+              >
+                <Text style={styles.continueBtnText}>Continue</Text>
+                <Feather name="arrow-right" size={16} color="#FFFFFF" />
+              </LinearGradient>
+            </Pressable>
+          </ScrollView>
+        )}
       </View>
     );
   };
@@ -1075,54 +997,6 @@ const styles = StyleSheet.create({
   switchRowCenter: {
     alignItems: 'center',
     marginTop: 4,
-  },
-  searchWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    gap: 10,
-    marginBottom: 16,
-  },
-  searchInput: {
-    flex: 1,
-    paddingVertical: 14,
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.85)',
-  },
-  cityScroll: {
-    flex: 1,
-  },
-  cityChipGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  cityChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  cityChipActive: {
-    backgroundColor: 'rgba(255,107,91,0.2)',
-    borderColor: '#ff6b5b',
-  },
-  cityChipText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: 'rgba(255,255,255,0.7)',
-  },
-  cityChipTextActive: {
-    color: '#FFFFFF',
   },
   optionsList: {
     gap: 12,
