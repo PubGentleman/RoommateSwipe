@@ -1,0 +1,262 @@
+# Rhome — Post-Signup Profile Completion Flow
+## Replit Agent Prompt
+
+---
+
+## Overview
+
+Move all detailed profile questions out of the sign-up flow and into a post-signup **profile completion** experience. Sign-up should only collect the minimum needed to create an account (account type, name, email, password, city, photo). Everything else — occupation, lifestyle, sleep schedule, roommate preferences, budget — is collected after the user is already in the app.
+
+This reduces sign-up drop-off and lets users see the app before committing to a long questionnaire.
+
+---
+
+## Part 1 — Remove These Questions From Sign-Up
+
+Remove the following screens from the current onboarding flow entirely. They will be replaced by the profile completion system described below:
+
+- "What do you do?" (occupation picker)
+- "Describe yourself" / lifestyle tags
+- Sleep schedule
+- Cleanliness level
+- Noise tolerance
+- Guest preferences
+- Budget range (can be collected later)
+- Any other preference or personality questions
+
+Keep only:
+- Account type selection
+- Name, email, password
+- City / location
+- Profile photo
+
+---
+
+## Part 2 — Profile Completion Percentage
+
+Add a `profile_completion` integer (0–100) to the `profiles` table, or compute it dynamically from which fields are filled in. Track which sections are complete:
+
+```typescript
+function getProfileCompletion(user: User): number {
+  const fields = [
+    !!user.profilePicture,        // 15 points
+    !!user.occupation,            // 15 points
+    !!user.bio,                   // 15 points
+    !!user.budget,                // 10 points
+    !!user.sleepSchedule,         // 10 points
+    !!user.cleanlinessLevel,      // 10 points
+    !!user.noiseTolerance,        // 10 points
+    !!user.guestPreference,       // 10 points
+    (user.tags?.length ?? 0) >= 3, // 5 points
+  ];
+
+  const weights = [15, 15, 15, 10, 10, 10, 10, 10, 5];
+  return fields.reduce((total, done, i) => total + (done ? weights[i] : 0), 0);
+}
+```
+
+---
+
+## Part 3 — Profile Completion Banner
+
+Show a dismissible banner on the home/discover screen for users whose profile is less than 80% complete.
+
+```typescript
+{profileCompletion < 80 && !bannerDismissed && (
+  <TouchableOpacity
+    style={styles.completionBanner}
+    onPress={() => navigation.navigate('ProfileCompletion')}
+    activeOpacity={0.85}
+  >
+    <View style={styles.completionLeft}>
+      <Text style={styles.completionTitle}>Complete your profile</Text>
+      <Text style={styles.completionSub}>
+        {profileCompletion}% done — better profiles get more matches
+      </Text>
+      <View style={styles.progressBarTrack}>
+        <View style={[styles.progressBarFill, { width: `${profileCompletion}%` }]} />
+      </View>
+    </View>
+    <Ionicons name="chevron-forward" size={18} color="#888" />
+  </TouchableOpacity>
+)}
+```
+
+Dismiss button (X) saves dismissal to AsyncStorage so it doesn't reappear in the same session. Reappears next session if still under 80%.
+
+---
+
+## Part 4 — Profile Completion Screen
+
+Create `screens/shared/ProfileCompletionScreen.tsx`. This is a scrollable list of completion sections, each with a status indicator.
+
+```typescript
+const COMPLETION_SECTIONS = [
+  {
+    id: 'occupation',
+    title: 'What do you do?',
+    description: 'Your occupation helps find compatible roommates',
+    icon: 'briefcase',
+    screen: 'OccupationPicker',
+    points: 15,
+  },
+  {
+    id: 'bio',
+    title: 'About you',
+    description: 'A short bio lets people know who you are',
+    icon: 'user',
+    screen: 'BioEdit',
+    points: 15,
+  },
+  {
+    id: 'lifestyle',
+    title: 'Lifestyle preferences',
+    description: 'Sleep schedule, cleanliness, noise tolerance',
+    icon: 'sun',
+    screen: 'LifestyleQuestions',
+    points: 30,
+  },
+  {
+    id: 'budget',
+    title: 'Your budget',
+    description: 'Monthly rent budget range',
+    icon: 'dollar-sign',
+    screen: 'BudgetSelect',
+    points: 10,
+  },
+  {
+    id: 'tags',
+    title: 'Your vibe',
+    description: 'Add at least 3 tags that describe you',
+    icon: 'tag',
+    screen: 'TagsPicker',
+    points: 5,
+  },
+];
+```
+
+Each row shows:
+- Icon + title + description
+- Points badge ("+ 15 pts")
+- Green checkmark if complete, grey circle if not
+- Tapping navigates to that specific screen
+
+After completing a section, navigate back to `ProfileCompletionScreen` automatically.
+
+---
+
+## Part 5 — Occupation Picker (Standalone Screen)
+
+Extract the existing "What do you do?" bottom sheet into a standalone full screen at `screens/shared/OccupationPickerScreen.tsx`.
+
+Same categories and chips as before:
+- Tech & Engineering
+- Business & Finance
+- Creative & Media
+- Healthcare & Science
+- Service & Trades
+- Legal & Government
+- Education
+- Student
+- Other
+
+Tapping a chip selects it, highlights it, and shows a "Save" button at the bottom. On Save: update `users.occupation` via `updateUser`, navigate back to ProfileCompletionScreen.
+
+**For agents** — pre-select "Real Estate" in Business & Finance and skip this screen entirely. Agents already identified their profession at sign-up.
+
+**For companies** — skip this screen entirely. Not relevant.
+
+---
+
+## Part 6 — Lifestyle Questions (Standalone Screen)
+
+Extract sleep schedule, cleanliness, noise tolerance, and guest preferences into a single scrollable screen at `screens/shared/LifestyleQuestionsScreen.tsx`.
+
+Each question is a row of tappable chips:
+
+**Sleep schedule:**
+- 🌅 Early Bird (before 10pm)
+- 🌙 Night Owl (after midnight)
+- 😴 Flexible
+
+**Cleanliness:**
+- ✨ Very Clean
+- 🙂 Pretty Tidy
+- 😅 Relaxed
+
+**Noise level:**
+- 🤫 Quiet
+- 🎵 Some Music / TV
+- 🎉 Lively
+
+**Guests:**
+- 🚫 No Guests
+- 👤 Occasionally
+- 🏠 Guests Welcome
+
+Show a "Save" button at the bottom. On Save: update all four fields via `updateUser`.
+
+---
+
+## Part 7 — First Session Prompt (Renters Only)
+
+On the renter's **first session after sign-up** (check `onboarding_complete = true` but `occupation = null`), show a full-screen prompt before taking them to the discover/swipe screen:
+
+```typescript
+// Full screen modal — not dismissible on first session
+<View style={styles.firstSessionPrompt}>
+  <Text style={styles.headline}>One more thing</Text>
+  <Text style={styles.sub}>
+    Tell us a bit about yourself so we can find your best matches.
+    Takes about 60 seconds.
+  </Text>
+  <TouchableOpacity onPress={() => navigation.navigate('ProfileCompletion')}>
+    <Text>Complete Profile</Text>
+  </TouchableOpacity>
+  <TouchableOpacity onPress={() => setFirstSessionDone(true)}>
+    <Text style={styles.skipLink}>Skip for now</Text>
+  </TouchableOpacity>
+</View>
+```
+
+After first session, this modal never shows again — only the dismissible banner (Part 3) is used going forward.
+
+---
+
+## Part 8 — Profile Completion for Hosts
+
+For **individual hosts**, the profile completion sections are different:
+
+```typescript
+const HOST_COMPLETION_SECTIONS = [
+  { id: 'listing_photos', title: 'Add listing photos', points: 20 },
+  { id: 'listing_description', title: 'Write a description', points: 20 },
+  { id: 'amenities', title: 'Add amenities', points: 15 },
+  { id: 'house_rules', title: 'Set house rules', points: 15 },
+  { id: 'profile_photo', title: 'Add your photo', points: 15 },
+  { id: 'bio', title: 'About you', points: 15 },
+];
+```
+
+For **agents and companies**, profile completion focuses on professional details:
+
+```typescript
+const AGENT_COMPLETION_SECTIONS = [
+  { id: 'profile_photo', title: 'Add your photo', points: 20 },
+  { id: 'bio', title: 'Professional bio', points: 20 },
+  { id: 'license_number', title: 'License number', points: 30 },
+  { id: 'agency_name', title: 'Agency name', points: 30 },
+];
+```
+
+---
+
+## Summary
+
+| Before | After |
+|---|---|
+| 5+ screens of questions during sign-up | Sign-up = 4 steps max |
+| Users drop off before seeing the app | Users in the app in under 2 minutes |
+| Occupation asked of everyone including agents | Agents skip occupation — already identified |
+| No way to complete profile later | Profile completion screen + banner + % tracker |
+| All-or-nothing questionnaire | Complete one section at a time, anytime |

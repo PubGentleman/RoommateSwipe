@@ -1,0 +1,1256 @@
+import React, { useState, useRef, useCallback } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  Pressable,
+  Animated,
+  PanResponder,
+  Easing,
+  Dimensions,
+  Platform,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  ScrollView,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '../../contexts/AuthContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
+import { Feather } from '../../components/VectorIcons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { RhomeLogo } from '../../components/RhomeLogo';
+import * as ImagePicker from 'expo-image-picker';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const SWIPE_THRESHOLD = 80;
+
+type AccountType = 'renter' | 'individual' | 'agent' | 'company';
+
+interface SignUpState {
+  accountType: AccountType | null;
+  name: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+  city: string;
+  licenseNumber: string;
+  agencyName: string;
+  companyName: string;
+  propertyCount: string;
+  lookingFor: string;
+  propertyType: string;
+  profilePhoto: string | null;
+}
+
+const ACCOUNT_TYPES: { id: AccountType; icon: string; label: string; description: string; color: string }[] = [
+  { id: 'renter', icon: 'search', label: 'Renter', description: 'Find a room or roommate', color: '#6C63FF' },
+  { id: 'individual', icon: 'home', label: 'Individual Host', description: 'Rent out your own property', color: '#3B82F6' },
+  { id: 'agent', icon: 'award', label: 'Licensed Agent', description: 'Real estate professional', color: '#F59E0B' },
+  { id: 'company', icon: 'briefcase', label: 'Property Company', description: 'Manage multiple properties', color: '#22C55E' },
+];
+
+const CITIES = [
+  'Miami, FL',
+  'New York, NY',
+  'Los Angeles, CA',
+  'Chicago, IL',
+  'Houston, TX',
+  'Austin, TX',
+  'San Francisco, CA',
+  'Boston, MA',
+  'Seattle, WA',
+  'Atlanta, GA',
+  'Denver, CO',
+  'Philadelphia, PA',
+];
+
+const RENTER_OPTIONS = [
+  { id: 'private', icon: 'lock', label: 'Private Room' },
+  { id: 'entire', icon: 'home', label: 'Entire Place' },
+  { id: 'either', icon: 'users', label: 'Either' },
+];
+
+const HOST_PROPERTY_TYPES = [
+  { id: 'private', icon: 'lock', label: 'Private Room' },
+  { id: 'entire', icon: 'home', label: 'Entire Unit' },
+  { id: 'shared', icon: 'users', label: 'Shared Room' },
+];
+
+const PROPERTY_COUNTS = ['1-10', '11-50', '51-200', '200+'];
+
+const TOTAL_PROGRESS_STEPS = 5;
+
+export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => {
+  const { register } = useAuth();
+  const { alert: showAlert } = useConfirm();
+  const insets = useSafeAreaInsets();
+
+  const [currentStep, setCurrentStep] = useState(0);
+  const [state, setState] = useState<SignUpState>({
+    accountType: null,
+    name: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    city: '',
+    licenseNumber: '',
+    agencyName: '',
+    companyName: '',
+    propertyCount: '',
+    lookingFor: '',
+    propertyType: '',
+    profilePhoto: null,
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [citySearch, setCitySearch] = useState('');
+  const [agentNotice, setAgentNotice] = useState(false);
+  const [selectedCard, setSelectedCard] = useState<string | null>(null);
+
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const dragAnim = useRef(new Animated.Value(0)).current;
+
+  const goForward = useCallback(() => {
+    const nextStep = currentStep + 1;
+    Animated.timing(slideAnim, {
+      toValue: -SCREEN_WIDTH,
+      duration: 280,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      setCurrentStep(nextStep);
+      slideAnim.setValue(SCREEN_WIDTH);
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 280,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    });
+  }, [currentStep, slideAnim]);
+
+  const goBack = useCallback(() => {
+    if (currentStep <= 0) return;
+    const prevStep = currentStep - 1;
+    dragAnim.setValue(0);
+    Animated.timing(slideAnim, {
+      toValue: SCREEN_WIDTH,
+      duration: 280,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      setCurrentStep(prevStep);
+      slideAnim.setValue(-SCREEN_WIDTH);
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 280,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    });
+  }, [currentStep, slideAnim, dragAnim]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gs) => gs.dx > 10 && Math.abs(gs.dy) < 20,
+      onPanResponderMove: (_, gs) => {
+        if (gs.dx > 0) dragAnim.setValue(gs.dx);
+      },
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dx > SWIPE_THRESHOLD && currentStep > 0) {
+          goBack();
+        } else {
+          Animated.spring(dragAnim, {
+            toValue: 0,
+            tension: 120,
+            friction: 10,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    })
+  ).current;
+
+  const updateState = (updates: Partial<SignUpState>) => {
+    setState(prev => ({ ...prev, ...updates }));
+  };
+
+  const handleAccountTypeSelect = (type: AccountType) => {
+    setSelectedCard(type);
+    updateState({ accountType: type });
+    if (type === 'agent' || type === 'company') {
+      setAgentNotice(true);
+      setTimeout(() => {
+        setAgentNotice(false);
+        goForward();
+      }, 600);
+    } else {
+      setTimeout(() => {
+        setSelectedCard(null);
+        goForward();
+      }, 150);
+    }
+  };
+
+  const handleCredentialsSubmit = async () => {
+    setError('');
+    if (!state.name.trim()) { setError('Please enter your name'); return; }
+    if (!state.email.trim()) { setError('Please enter your email'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.email.trim())) { setError('Please enter a valid email'); return; }
+    if (!state.password || state.password.length < 6) { setError('Password must be at least 6 characters'); return; }
+    if (state.password !== state.confirmPassword) { setError('Passwords do not match'); return; }
+    goForward();
+  };
+
+  const handleCitySelect = (city: string) => {
+    setSelectedCard(city);
+    updateState({ city });
+    setTimeout(() => {
+      setSelectedCard(null);
+      goForward();
+    }, 150);
+  };
+
+  const handleDetailsSelect = (value: string) => {
+    setSelectedCard(value);
+    if (state.accountType === 'renter') {
+      updateState({ lookingFor: value });
+    } else if (state.accountType === 'individual') {
+      updateState({ propertyType: value });
+    }
+    setTimeout(() => {
+      setSelectedCard(null);
+      goForward();
+    }, 150);
+  };
+
+  const handleAgentDetailsSubmit = () => {
+    setError('');
+    if (state.accountType === 'agent' && !state.licenseNumber.trim()) {
+      setError('License number is required');
+      return;
+    }
+    if (state.accountType === 'company' && !state.companyName.trim()) {
+      setError('Company name is required');
+      return;
+    }
+    goForward();
+  };
+
+  const handlePhotoUpload = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets?.[0]) {
+      updateState({ profilePhoto: result.assets[0].uri });
+      setTimeout(goForward, 300);
+    }
+  };
+
+  const handleComplete = async () => {
+    setIsLoading(true);
+    try {
+      const role = state.accountType === 'renter' ? 'renter' : 'host';
+      await register(state.email.trim(), state.password, state.name.trim(), role as any);
+    } catch (err: any) {
+      await showAlert({ title: 'Error', message: err?.message || 'Failed to create account. Please try again.', variant: 'warning' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const filteredCities = citySearch.trim()
+    ? CITIES.filter(c => c.toLowerCase().includes(citySearch.toLowerCase()))
+    : CITIES;
+
+  const BackButton = () => (
+    <Pressable onPress={goBack} style={styles.backBtn} hitSlop={12}>
+      <Feather name="chevron-left" size={24} color="rgba(255,255,255,0.7)" />
+    </Pressable>
+  );
+
+  const ProgressDots = ({ current }: { current: number }) => (
+    <View style={styles.dotsRow}>
+      {Array.from({ length: TOTAL_PROGRESS_STEPS }).map((_, i) => (
+        <View
+          key={i}
+          style={[
+            styles.dot,
+            i < current ? styles.dotComplete : null,
+            i === current ? styles.dotActive : null,
+          ]}
+        />
+      ))}
+    </View>
+  );
+
+  const renderStep = () => {
+    switch (currentStep) {
+      case 0: return renderAccountType();
+      case 1: return renderCredentials();
+      case 2: return renderLocation();
+      case 3: return renderDetails();
+      case 4: return renderPhoto();
+      case 5: return renderComplete();
+      default: return null;
+    }
+  };
+
+  const renderAccountType = () => (
+    <View style={styles.stepContainer}>
+      <View style={styles.stepHeader}>
+        <RhomeLogo variant="horizontal" size="sm" />
+      </View>
+      <View style={styles.stepContent}>
+        <Text style={styles.headline}>Who are you?</Text>
+        <Text style={styles.subheadline}>This shapes your entire Rhome experience</Text>
+        <View style={styles.typeGrid}>
+          {ACCOUNT_TYPES.map((type) => {
+            const isSelected = selectedCard === type.id;
+            return (
+              <Pressable
+                key={type.id}
+                style={[
+                  styles.typeCard,
+                  isSelected ? { borderColor: type.color, backgroundColor: `${type.color}15` } : null,
+                ]}
+                onPress={() => handleAccountTypeSelect(type.id)}
+              >
+                <View style={[styles.typeIconWrap, { backgroundColor: `${type.color}20` }]}>
+                  <Feather name={type.icon as any} size={22} color={type.color} />
+                </View>
+                <Text style={styles.typeLabel}>{type.label}</Text>
+                <Text style={styles.typeDesc}>{type.description}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        {agentNotice ? (
+          <View style={styles.agentNotice}>
+            <Feather name="info" size={14} color="#F59E0B" />
+            <Text style={styles.agentNoticeText}>
+              {state.accountType === 'agent' ? 'Agent' : 'Company'} accounts are host-only. To use Rhome as a renter, create a separate account.
+            </Text>
+          </View>
+        ) : null}
+      </View>
+      <View style={styles.stepFooter}>
+        <Pressable onPress={onBackToLogin} hitSlop={8}>
+          <Text style={styles.switchLink}>Already have an account? <Text style={styles.switchLinkBold}>Sign In</Text></Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+
+  const renderCredentials = () => {
+    const headlines: Record<AccountType, string> = {
+      renter: 'Set up your profile',
+      individual: 'Set up your host account',
+      agent: 'Set up your agent account',
+      company: 'Set up your company account',
+    };
+    return (
+      <View style={styles.stepContainer}>
+        <View style={styles.stepTopBar}>
+          <BackButton />
+          <ProgressDots current={0} />
+          <View style={styles.backBtn} />
+        </View>
+        <ScrollView
+          style={styles.scrollArea}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={styles.headline}>{headlines[state.accountType!]}</Text>
+          <View style={styles.formFields}>
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>FULL NAME</Text>
+              <View style={styles.inputWrap}>
+                <Feather name="user" size={16} color="rgba(255,255,255,0.35)" />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Your full name"
+                  placeholderTextColor="rgba(255,255,255,0.35)"
+                  value={state.name}
+                  onChangeText={(v) => updateState({ name: v })}
+                  autoCapitalize="words"
+                />
+              </View>
+            </View>
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>EMAIL</Text>
+              <View style={styles.inputWrap}>
+                <Feather name="mail" size={16} color="rgba(255,255,255,0.35)" />
+                <TextInput
+                  style={styles.input}
+                  placeholder="you@example.com"
+                  placeholderTextColor="rgba(255,255,255,0.35)"
+                  value={state.email}
+                  onChangeText={(v) => updateState({ email: v })}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              </View>
+            </View>
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>PASSWORD</Text>
+              <View style={styles.inputWrap}>
+                <Feather name="lock" size={16} color="rgba(255,255,255,0.35)" />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Create a password"
+                  placeholderTextColor="rgba(255,255,255,0.35)"
+                  value={state.password}
+                  onChangeText={(v) => updateState({ password: v })}
+                  secureTextEntry={!showPassword}
+                  textContentType="newPassword"
+                  autoComplete="new-password"
+                />
+                <Pressable onPress={() => setShowPassword(!showPassword)} hitSlop={8}>
+                  <Feather name={showPassword ? 'eye-off' : 'eye'} size={16} color="rgba(255,255,255,0.35)" />
+                </Pressable>
+              </View>
+            </View>
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>CONFIRM PASSWORD</Text>
+              <View style={styles.inputWrap}>
+                <Feather name="lock" size={16} color="rgba(255,255,255,0.35)" />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Confirm your password"
+                  placeholderTextColor="rgba(255,255,255,0.35)"
+                  value={state.confirmPassword}
+                  onChangeText={(v) => updateState({ confirmPassword: v })}
+                  secureTextEntry={!showConfirmPassword}
+                  textContentType="newPassword"
+                  autoComplete="new-password"
+                />
+                <Pressable onPress={() => setShowConfirmPassword(!showConfirmPassword)} hitSlop={8}>
+                  <Feather name={showConfirmPassword ? 'eye-off' : 'eye'} size={16} color="rgba(255,255,255,0.35)" />
+                </Pressable>
+              </View>
+            </View>
+          </View>
+          {error ? (
+            <View style={styles.errorBox}>
+              <Feather name="alert-circle" size={14} color="#ff6b5b" />
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : null}
+          <Pressable onPress={handleCredentialsSubmit}>
+            <LinearGradient
+              colors={['#ff6b5b', '#e83a2a']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.continueBtn}
+            >
+              <Text style={styles.continueBtnText}>Continue</Text>
+              <Feather name="arrow-right" size={16} color="#FFFFFF" />
+            </LinearGradient>
+          </Pressable>
+          <View style={styles.orRow}>
+            <View style={styles.orLine} />
+            <Text style={styles.orText}>OR CONTINUE WITH</Text>
+            <View style={styles.orLine} />
+          </View>
+          <View style={styles.socialRow}>
+            <Pressable style={styles.socialBtn} onPress={() => showAlert({ title: 'Google Sign In', message: 'Google authentication will be available in a future update.', variant: 'info' })}>
+              <Feather name="globe" size={16} color="rgba(255,255,255,0.75)" />
+              <Text style={styles.socialBtnText}>Google</Text>
+            </Pressable>
+            <Pressable style={styles.socialBtn} onPress={() => showAlert({ title: 'Apple Sign In', message: 'Apple authentication will be available in a future update.', variant: 'info' })}>
+              <Feather name="smartphone" size={16} color="rgba(255,255,255,0.75)" />
+              <Text style={styles.socialBtnText}>Apple</Text>
+            </Pressable>
+          </View>
+          <Pressable onPress={onBackToLogin} hitSlop={8} style={styles.switchRowCenter}>
+            <Text style={styles.switchLink}>Already have an account? <Text style={styles.switchLinkBold}>Sign In</Text></Text>
+          </Pressable>
+        </ScrollView>
+      </View>
+    );
+  };
+
+  const renderLocation = () => {
+    const headlines: Record<AccountType, string> = {
+      renter: 'Where are you looking?',
+      individual: 'Where is your property?',
+      agent: 'Where do you work?',
+      company: 'Where are your properties?',
+    };
+    return (
+      <View style={styles.stepContainer}>
+        <View style={styles.stepTopBar}>
+          <BackButton />
+          <ProgressDots current={1} />
+          <View style={styles.backBtn} />
+        </View>
+        <View style={styles.stepContent}>
+          <Text style={styles.headline}>{headlines[state.accountType!]}</Text>
+          <View style={styles.searchWrap}>
+            <Feather name="search" size={16} color="rgba(255,255,255,0.35)" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search cities..."
+              placeholderTextColor="rgba(255,255,255,0.35)"
+              value={citySearch}
+              onChangeText={setCitySearch}
+              autoCapitalize="none"
+            />
+            {citySearch ? (
+              <Pressable onPress={() => setCitySearch('')} hitSlop={8}>
+                <Feather name="x" size={16} color="rgba(255,255,255,0.35)" />
+              </Pressable>
+            ) : null}
+          </View>
+          <ScrollView showsVerticalScrollIndicator={false} style={styles.cityScroll}>
+            <View style={styles.cityChipGrid}>
+              {filteredCities.map((city) => (
+                <Pressable
+                  key={city}
+                  style={[
+                    styles.cityChip,
+                    selectedCard === city ? styles.cityChipActive : null,
+                  ]}
+                  onPress={() => handleCitySelect(city)}
+                >
+                  <Feather name="map-pin" size={14} color={selectedCard === city ? '#fff' : 'rgba(255,255,255,0.5)'} />
+                  <Text style={[styles.cityChipText, selectedCard === city ? styles.cityChipTextActive : null]}>{city}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    );
+  };
+
+  const renderDetails = () => {
+    if (state.accountType === 'renter') {
+      return (
+        <View style={styles.stepContainer}>
+          <View style={styles.stepTopBar}>
+            <BackButton />
+            <ProgressDots current={2} />
+            <View style={styles.backBtn} />
+          </View>
+          <View style={styles.stepContent}>
+            <Text style={styles.headline}>What are you looking for?</Text>
+            <View style={styles.optionsList}>
+              {RENTER_OPTIONS.map((opt) => (
+                <Pressable
+                  key={opt.id}
+                  style={[styles.optionCard, selectedCard === opt.id ? styles.optionCardActive : null]}
+                  onPress={() => handleDetailsSelect(opt.id)}
+                >
+                  <View style={styles.optionIconWrap}>
+                    <Feather name={opt.icon as any} size={20} color={selectedCard === opt.id ? '#fff' : 'rgba(255,255,255,0.6)'} />
+                  </View>
+                  <Text style={[styles.optionLabel, selectedCard === opt.id ? styles.optionLabelActive : null]}>{opt.label}</Text>
+                  <Feather name="chevron-right" size={18} color={selectedCard === opt.id ? '#fff' : 'rgba(255,255,255,0.2)'} />
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    if (state.accountType === 'individual') {
+      return (
+        <View style={styles.stepContainer}>
+          <View style={styles.stepTopBar}>
+            <BackButton />
+            <ProgressDots current={2} />
+            <View style={styles.backBtn} />
+          </View>
+          <View style={styles.stepContent}>
+            <Text style={styles.headline}>What type of property?</Text>
+            <View style={styles.optionsList}>
+              {HOST_PROPERTY_TYPES.map((opt) => (
+                <Pressable
+                  key={opt.id}
+                  style={[styles.optionCard, selectedCard === opt.id ? styles.optionCardActive : null]}
+                  onPress={() => handleDetailsSelect(opt.id)}
+                >
+                  <View style={styles.optionIconWrap}>
+                    <Feather name={opt.icon as any} size={20} color={selectedCard === opt.id ? '#fff' : 'rgba(255,255,255,0.6)'} />
+                  </View>
+                  <Text style={[styles.optionLabel, selectedCard === opt.id ? styles.optionLabelActive : null]}>{opt.label}</Text>
+                  <Feather name="chevron-right" size={18} color={selectedCard === opt.id ? '#fff' : 'rgba(255,255,255,0.2)'} />
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    if (state.accountType === 'agent') {
+      return (
+        <View style={styles.stepContainer}>
+          <View style={styles.stepTopBar}>
+            <BackButton />
+            <ProgressDots current={2} />
+            <View style={styles.backBtn} />
+          </View>
+          <ScrollView
+            style={styles.scrollArea}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <Text style={styles.headline}>Your license details</Text>
+            <View style={styles.formFields}>
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>LICENSE NUMBER</Text>
+                <View style={styles.inputWrap}>
+                  <Feather name="hash" size={16} color="rgba(255,255,255,0.35)" />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Required"
+                    placeholderTextColor="rgba(255,255,255,0.35)"
+                    value={state.licenseNumber}
+                    onChangeText={(v) => updateState({ licenseNumber: v })}
+                    autoCapitalize="characters"
+                  />
+                </View>
+              </View>
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>AGENCY NAME (OPTIONAL)</Text>
+                <View style={styles.inputWrap}>
+                  <Feather name="briefcase" size={16} color="rgba(255,255,255,0.35)" />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Your agency"
+                    placeholderTextColor="rgba(255,255,255,0.35)"
+                    value={state.agencyName}
+                    onChangeText={(v) => updateState({ agencyName: v })}
+                  />
+                </View>
+              </View>
+            </View>
+            {error ? (
+              <View style={styles.errorBox}>
+                <Feather name="alert-circle" size={14} color="#ff6b5b" />
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            ) : null}
+            <Pressable onPress={handleAgentDetailsSubmit}>
+              <LinearGradient
+                colors={['#ff6b5b', '#e83a2a']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.continueBtn}
+              >
+                <Text style={styles.continueBtnText}>Continue</Text>
+                <Feather name="arrow-right" size={16} color="#FFFFFF" />
+              </LinearGradient>
+            </Pressable>
+          </ScrollView>
+        </View>
+      );
+    }
+
+    if (state.accountType === 'company') {
+      return (
+        <View style={styles.stepContainer}>
+          <View style={styles.stepTopBar}>
+            <BackButton />
+            <ProgressDots current={2} />
+            <View style={styles.backBtn} />
+          </View>
+          <ScrollView
+            style={styles.scrollArea}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <Text style={styles.headline}>Your company details</Text>
+            <View style={styles.formFields}>
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>COMPANY NAME</Text>
+                <View style={styles.inputWrap}>
+                  <Feather name="briefcase" size={16} color="rgba(255,255,255,0.35)" />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Required"
+                    placeholderTextColor="rgba(255,255,255,0.35)"
+                    value={state.companyName}
+                    onChangeText={(v) => updateState({ companyName: v })}
+                  />
+                </View>
+              </View>
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>NUMBER OF PROPERTIES</Text>
+                <View style={styles.countChipRow}>
+                  {PROPERTY_COUNTS.map((count) => (
+                    <Pressable
+                      key={count}
+                      style={[styles.countChip, state.propertyCount === count ? styles.countChipActive : null]}
+                      onPress={() => updateState({ propertyCount: count })}
+                    >
+                      <Text style={[styles.countChipText, state.propertyCount === count ? styles.countChipTextActive : null]}>{count}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            </View>
+            {error ? (
+              <View style={styles.errorBox}>
+                <Feather name="alert-circle" size={14} color="#ff6b5b" />
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            ) : null}
+            <Pressable onPress={handleAgentDetailsSubmit}>
+              <LinearGradient
+                colors={['#ff6b5b', '#e83a2a']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.continueBtn}
+              >
+                <Text style={styles.continueBtnText}>Continue</Text>
+                <Feather name="arrow-right" size={16} color="#FFFFFF" />
+              </LinearGradient>
+            </Pressable>
+          </ScrollView>
+        </View>
+      );
+    }
+
+    return null;
+  };
+
+  const renderPhoto = () => (
+    <View style={styles.stepContainer}>
+      <View style={styles.stepTopBar}>
+        <BackButton />
+        <ProgressDots current={3} />
+        <Pressable onPress={goForward} hitSlop={8} style={styles.skipBtn}>
+          <Text style={styles.skipText}>Skip</Text>
+        </Pressable>
+      </View>
+      <View style={styles.stepContent}>
+        <Text style={styles.headline}>Add a photo</Text>
+        <Text style={styles.subheadline}>Help others recognize you</Text>
+        <Pressable style={styles.photoCircle} onPress={handlePhotoUpload}>
+          {state.profilePhoto ? (
+            <View style={styles.photoPreview}>
+              <Feather name="check" size={40} color="#22C55E" />
+              <Text style={styles.photoAddedText}>Photo added</Text>
+            </View>
+          ) : (
+            <View style={styles.photoPlaceholder}>
+              <Feather name="camera" size={40} color="rgba(255,255,255,0.3)" />
+            </View>
+          )}
+        </Pressable>
+        <Pressable onPress={handlePhotoUpload} style={styles.photoActionBtn}>
+          <Feather name="image" size={16} color="#FFFFFF" />
+          <Text style={styles.photoActionText}>Choose from Library</Text>
+        </Pressable>
+        <Pressable onPress={goForward} hitSlop={8} style={styles.skipLink}>
+          <Text style={styles.skipLinkText}>Skip for now</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+
+  const renderComplete = () => {
+    const subheadlines: Record<AccountType, string> = {
+      renter: 'Start finding your perfect roommate',
+      individual: "Let's set up your first listing",
+      agent: 'Your professional dashboard is ready',
+      company: 'Manage your portfolio with ease',
+    };
+    return (
+      <View style={styles.stepContainer}>
+        <View style={styles.stepTopBar}>
+          <View style={styles.backBtn} />
+          <ProgressDots current={4} />
+          <View style={styles.backBtn} />
+        </View>
+        <View style={[styles.stepContent, styles.stepContentCenter]}>
+          <View style={styles.checkCircle}>
+            <Feather name="check" size={48} color="#22C55E" />
+          </View>
+          <Text style={styles.headline}>You're all set!</Text>
+          <Text style={styles.subheadline}>{subheadlines[state.accountType!]}</Text>
+          <Pressable onPress={handleComplete} disabled={isLoading} style={{ width: '100%', opacity: isLoading ? 0.5 : 1 }}>
+            <LinearGradient
+              colors={['#ff6b5b', '#e83a2a']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.continueBtn, { marginTop: 32 }]}
+            >
+              {isLoading ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <>
+                  <Text style={styles.continueBtnText}>Let's Go</Text>
+                  <Feather name="arrow-right" size={16} color="#FFFFFF" />
+                </>
+              )}
+            </LinearGradient>
+          </Pressable>
+        </View>
+      </View>
+    );
+  };
+
+  const combinedTransform = Animated.add(slideAnim, dragAnim);
+
+  return (
+    <KeyboardAvoidingView
+      style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <Animated.View
+        style={[styles.animatedWrap, { transform: [{ translateX: currentStep > 0 ? combinedTransform : slideAnim }] }]}
+        {...(currentStep > 0 ? panResponder.panHandlers : {})}
+      >
+        {renderStep()}
+      </Animated.View>
+    </KeyboardAvoidingView>
+  );
+};
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: '#111111',
+  },
+  animatedWrap: {
+    flex: 1,
+  },
+  stepContainer: {
+    flex: 1,
+  },
+  stepTopBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  stepHeader: {
+    alignItems: 'center',
+    paddingTop: 24,
+    paddingBottom: 8,
+  },
+  stepContent: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 8,
+  },
+  stepContentCenter: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  stepFooter: {
+    alignItems: 'center',
+    paddingBottom: 24,
+  },
+  scrollArea: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingBottom: 32,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  skipBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  skipText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.5)',
+  },
+  dotsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  dotComplete: {
+    backgroundColor: 'rgba(255,107,91,0.5)',
+  },
+  dotActive: {
+    backgroundColor: '#ff6b5b',
+    width: 20,
+    borderRadius: 4,
+  },
+  headline: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -0.5,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  subheadline: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.55)',
+    lineHeight: 21,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  typeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 16,
+  },
+  typeCard: {
+    width: '47%',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 18,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    gap: 8,
+  },
+  typeIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  typeLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  typeDesc: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.45)',
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+  agentNotice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: 'rgba(245,158,11,0.1)',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginTop: 16,
+  },
+  agentNoticeText: {
+    fontSize: 12,
+    color: '#F59E0B',
+    flex: 1,
+    lineHeight: 17,
+  },
+  formFields: {
+    gap: 14,
+    marginBottom: 18,
+    marginTop: 8,
+  },
+  field: {
+    gap: 7,
+  },
+  fieldLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.6)',
+    letterSpacing: 0.6,
+  },
+  inputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    gap: 10,
+  },
+  input: {
+    flex: 1,
+    paddingVertical: 14,
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.85)',
+  },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255,107,91,0.1)',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 12,
+  },
+  errorText: {
+    fontSize: 12.5,
+    fontWeight: '500',
+    color: '#ff6b5b',
+    flex: 1,
+  },
+  continueBtn: {
+    height: 54,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  continueBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
+  },
+  orRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginVertical: 16,
+  },
+  orLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+  },
+  orText: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.35)',
+    letterSpacing: 0.6,
+  },
+  socialRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 20,
+  },
+  socialBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  socialBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.75)',
+  },
+  switchLink: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.5)',
+  },
+  switchLinkBold: {
+    fontWeight: '700',
+    color: '#ff6b5b',
+  },
+  switchRowCenter: {
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    gap: 10,
+    marginBottom: 16,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 14,
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.85)',
+  },
+  cityScroll: {
+    flex: 1,
+  },
+  cityChipGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  cityChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  cityChipActive: {
+    backgroundColor: 'rgba(255,107,91,0.2)',
+    borderColor: '#ff6b5b',
+  },
+  cityChipText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.7)',
+  },
+  cityChipTextActive: {
+    color: '#FFFFFF',
+  },
+  optionsList: {
+    gap: 12,
+    marginTop: 16,
+  },
+  optionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 18,
+  },
+  optionCardActive: {
+    backgroundColor: 'rgba(255,107,91,0.15)',
+    borderColor: '#ff6b5b',
+  },
+  optionIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  optionLabel: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.8)',
+  },
+  optionLabelActive: {
+    color: '#FFFFFF',
+  },
+  countChipRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 4,
+  },
+  countChip: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+  },
+  countChipActive: {
+    backgroundColor: 'rgba(255,107,91,0.2)',
+    borderColor: '#ff6b5b',
+  },
+  countChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.6)',
+  },
+  countChipTextActive: {
+    color: '#FFFFFF',
+  },
+  photoCircle: {
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginVertical: 32,
+  },
+  photoPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoPreview: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  photoAddedText: {
+    fontSize: 12,
+    color: '#22C55E',
+    fontWeight: '600',
+  },
+  photoActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  photoActionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  skipLink: {
+    alignSelf: 'center',
+    paddingVertical: 8,
+  },
+  skipLinkText: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.45)',
+  },
+  checkCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: 'rgba(34,197,94,0.12)',
+    borderWidth: 2,
+    borderColor: 'rgba(34,197,94,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
+});

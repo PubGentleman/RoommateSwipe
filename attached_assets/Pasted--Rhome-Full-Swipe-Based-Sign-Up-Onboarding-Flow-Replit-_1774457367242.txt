@@ -1,0 +1,330 @@
+# Rhome — Full Swipe-Based Sign-Up Onboarding Flow
+## Replit Agent Prompt
+
+---
+
+## Overview
+
+Replace the current sign-up screen with a fully swipe-driven multi-step onboarding flow. Each step is a full screen. When a user makes a definitive selection (tapping a card, choosing an option), the screen automatically slides left and the next step slides in from the right. Users can swipe right or tap the back chevron to go to the previous step at any time.
+
+This pattern is used by Hinge, Bumble, and other top consumer apps. It feels native, fast, and focused — one question at a time, no overwhelming forms.
+
+---
+
+## Architecture
+
+Create a single `SignUpFlow` component that manages all steps using a horizontal pager. Use `react-native-pager-view` if already installed, otherwise implement with `Animated.Value` + `PanResponder`.
+
+```typescript
+type SignUpStep =
+  | 'account_type'    // Step 1 — Who are you?
+  | 'credentials'     // Step 2 — Name, email, password
+  | 'location'        // Step 3 — Where are you? (renter) / Property location (host)
+  | 'details'         // Step 4 — Type-specific details
+  | 'photo'           // Step 5 — Profile photo
+  | 'complete';       // Done
+
+interface SignUpState {
+  accountType: 'renter' | 'individual' | 'agent' | 'company' | null;
+  name: string;
+  email: string;
+  password: string;
+  city: string;
+  // Agent-specific
+  licenseNumber: string;
+  agencyName: string;
+  // Company-specific
+  companyName: string;
+  // Individual host
+  propertyType: string;
+  // Photo
+  profilePhoto: string | null;
+}
+```
+
+---
+
+## Navigation Rules
+
+**Auto-advance (no button tap needed):**
+- Step 1: Tapping an account type card
+- Step 3: Tapping a city / location option
+- Step 4: Tapping a single-choice option (property type, etc.)
+
+**Manual advance (user taps Continue/Next):**
+- Step 2: Credentials form (name, email, password)
+- Step 4: If it contains text input fields (license number, company name)
+- Step 5: Photo upload (also skippable)
+
+**Going back:**
+- Swipe right anywhere on the screen (PanResponder drag threshold: 80px)
+- Tap the back chevron (top left)
+- Back gesture snaps to previous step with spring animation, or snaps forward if not dragged far enough
+
+**Never go back from Step 1** — no back button, no back swipe. Step 1 is the entry point.
+
+---
+
+## Swipe Gesture Implementation
+
+Use `PanResponder` to handle the back swipe on every step after Step 1:
+
+```typescript
+const panResponder = useRef(
+  PanResponder.create({
+    onMoveShouldSetPanResponder: (_, gestureState) => {
+      // Only capture horizontal right swipes
+      return gestureState.dx > 10 && Math.abs(gestureState.dy) < 20;
+    },
+    onPanResponderMove: (_, gestureState) => {
+      if (gestureState.dx > 0) {
+        dragAnim.setValue(gestureState.dx);
+      }
+    },
+    onPanResponderRelease: (_, gestureState) => {
+      if (gestureState.dx > 80) {
+        // Crossed threshold — snap back to previous step
+        goBack();
+      } else {
+        // Not far enough — spring back to current step
+        Animated.spring(dragAnim, {
+          toValue: 0,
+          useNativeDriver: true,
+        }).start();
+      }
+    },
+  })
+).current;
+```
+
+---
+
+## Progress Indicator
+
+Show dots at the top of every step (except Step 1). Active dot is filled, completed dots are filled with lower opacity, future dots are empty.
+
+```typescript
+function ProgressDots({ current, total }: { current: number; total: number }) {
+  return (
+    <View style={styles.dotsRow}>
+      {Array.from({ length: total }).map((_, i) => (
+        <View
+          key={i}
+          style={[
+            styles.dot,
+            i < current && styles.dotComplete,
+            i === current && styles.dotActive,
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
+```
+
+Total steps: 5 (Steps 2–5 show dots, Step 1 shows none since it's the entry screen).
+
+---
+
+## Step 1 — Who Are You?
+
+**No back button. No progress dots. No Continue button.**
+
+Full screen with:
+- Rhome logo + app name centered at top
+- Headline: **"Who are you?"**
+- Subheading: **"This shapes your entire Rhome experience"**
+- 2x2 grid of account type cards
+
+```typescript
+const ACCOUNT_TYPES = [
+  {
+    id: 'renter',
+    icon: 'search',
+    label: 'Renter',
+    description: 'Find a room or roommate',
+    color: '#6C63FF',
+  },
+  {
+    id: 'individual',
+    icon: 'home',
+    label: 'Individual Host',
+    description: 'Rent out your own property',
+    color: '#3B82F6',
+  },
+  {
+    id: 'agent',
+    icon: 'award',
+    label: 'Licensed Agent',
+    description: 'Real estate professional',
+    color: '#F59E0B',
+  },
+  {
+    id: 'company',
+    icon: 'briefcase',
+    label: 'Property Company',
+    description: 'Manage multiple properties',
+    color: '#22C55E',
+  },
+];
+```
+
+Tapping a card:
+1. Card highlights (colored border + tinted background) for 150ms
+2. Auto-slides left to Step 2
+
+For agent and company cards, show a small amber notice **below the grid** before the auto-advance:
+> "Agent accounts are host-only. To use Rhome as a renter, create a separate account."
+
+Show this notice for 600ms, then auto-advance.
+
+---
+
+## Step 2 — Create Your Account
+
+**Back chevron top left. Progress dot 1 of 5. Continue button.**
+
+Personalized headline:
+- Renter → **"Set up your profile"**
+- Individual Host → **"Set up your host account"**
+- Licensed Agent → **"Set up your agent account"**
+- Property Company → **"Set up your company account"**
+
+Fields:
+- Full Name
+- Email
+- Password
+- Confirm Password
+
+Below the Continue button:
+- OR CONTINUE WITH divider
+- Google / Apple SSO buttons
+- "Already have an account? Sign In" link
+
+On Continue: validate fields, then auto-slide to Step 3.
+
+On SSO (new user): complete auth, then auto-slide to Step 3.
+On SSO (returning user): skip all steps, auto-route to correct dashboard.
+
+---
+
+## Step 3 — Where Are You?
+
+**Back chevron. Progress dot 2 of 5. Auto-advances on selection.**
+
+**For Renter:**
+- Headline: **"Where are you looking?"**
+- City search input with autocomplete suggestions shown as tappable chips
+- Tapping a city chip auto-advances to Step 4
+
+**For Individual Host:**
+- Headline: **"Where is your property?"**
+- Same city search with autocomplete
+- Tapping a city auto-advances to Step 4
+
+**For Agent:**
+- Headline: **"Where do you work?"**
+- City search, tapping auto-advances
+
+**For Company:**
+- Headline: **"Where are your properties?"**
+- City search, tapping auto-advances
+
+---
+
+## Step 4 — Type-Specific Details
+
+**Back chevron. Progress dot 3 of 5.**
+
+This step is different depending on account type:
+
+**Renter — "What are you looking for?"**
+Single-choice cards (tap = auto-advance):
+- 🛏 Private Room
+- 🏠 Entire Place
+- 🤝 Either
+
+**Individual Host — "What type of property?"**
+Single-choice cards (tap = auto-advance):
+- 🛏 Private Room
+- 🏠 Entire Unit
+- 🏘 Shared Room
+
+**Agent — "Your license details"**
+Text input fields (Continue button):
+- License Number (required)
+- Agency Name (optional)
+
+**Company — "Your company details"**
+Text input fields (Continue button):
+- Company Name (required)
+- Number of properties: 1–10 / 11–50 / 51–200 / 200+ (tappable chips, auto-advance)
+
+---
+
+## Step 5 — Profile Photo
+
+**Back chevron. Progress dot 4 of 5. Skip button top right.**
+
+- Headline: **"Add a photo"**
+- Large circular placeholder with camera icon
+- "Choose from Library" button
+- "Take Photo" button
+- Skip link at bottom: "Skip for now"
+
+Tapping Skip or uploading a photo both advance to Step 6.
+
+---
+
+## Step 6 — All Done
+
+**No back button. Progress dot 5 of 5 (all filled).**
+
+- Large checkmark animation (Lottie or simple scale animation)
+- Headline: **"You're all set!"**
+- Subheading personalized by type:
+  - Renter → "Start finding your perfect roommate"
+  - Individual Host → "Let's set up your first listing"
+  - Agent → "Your professional dashboard is ready"
+  - Company → "Manage your portfolio with ease"
+- Single CTA button: **"Let's Go"**
+
+On "Let's Go": create the user account in Supabase (if not already created in Step 2), set role + host_type, then navigate:
+- Renter → RenterTabs
+- Individual Host → HostSubscription (choose a plan)
+- Agent → HostAgentSetup if license not entered, else HostSubscription
+- Company → HostSubscription
+
+---
+
+## Account Creation Timing
+
+Create the Supabase auth user at the end of Step 2 (after name/email/password are validated), but mark the profile as `onboarding_complete = false`. This way if the user drops off mid-flow, you have their account and can resume. Set `onboarding_complete = true` only when they hit "Let's Go" on the final step.
+
+---
+
+## Animation Spec
+
+All slide transitions:
+- Duration: 280ms
+- Easing: `Easing.out(Easing.cubic)`
+- Direction: forward = slide left, back = slide right
+- `useNativeDriver: true` on all animations
+
+Back swipe spring (when released without crossing threshold):
+- `tension: 120, friction: 10`
+
+---
+
+## Summary
+
+| Step | Screen | Advances By |
+|---|---|---|
+| 1 | Who are you? | Tap card (auto) |
+| 2 | Create account | Tap Continue |
+| 3 | Location | Tap city chip (auto) |
+| 4 | Type-specific details | Tap card (auto) or Continue for forms |
+| 5 | Profile photo | Upload or Skip |
+| 6 | All done | Tap Let's Go |
+
+Back navigation available on all steps except Step 1, via right swipe or back chevron.
