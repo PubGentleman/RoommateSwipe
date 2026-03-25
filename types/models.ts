@@ -646,6 +646,18 @@ export interface DailyQuestionOption {
   icon?: string;
 }
 
+export interface TeamMember {
+  id: string;
+  companyUserId: string;
+  memberUserId?: string;
+  email: string;
+  fullName?: string;
+  role: 'owner' | 'admin' | 'member';
+  status: 'pending' | 'active' | 'removed';
+  invitedAt: string;
+  joinedAt?: string;
+}
+
 export interface DailyQuestion {
   id: string;
   user_id: string;

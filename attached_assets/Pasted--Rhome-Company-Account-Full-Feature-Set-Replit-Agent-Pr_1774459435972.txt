@@ -1,0 +1,375 @@
+# Rhome — Company Account Full Feature Set
+## Replit Agent Prompt
+
+---
+
+## Overview
+
+This prompt implements all company account features:
+
+1. **Sign-up form** — Full Name + Company Name fields for company accounts
+2. **Multi-seat team access** — Owner can invite team members with their own logins
+3. **Team roles** — Owner, Admin, Member with different permission levels
+4. **Team management dashboard** — Invite, remove, and manage team members
+5. **Seat limits by plan** — Starter: 3 seats, Pro: 10 seats, Enterprise: unlimited
+
+---
+
+## Part 1 — Database Migration
+
+Create `033_company_teams.sql` and run it in the Supabase SQL Editor:
+
+```sql
+-- Add first_name, last_name, and company_name to users table
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS first_name TEXT,
+  ADD COLUMN IF NOT EXISTS last_name TEXT,
+  ADD COLUMN IF NOT EXISTS company_name TEXT;
+
+-- Team members table
+CREATE TABLE IF NOT EXISTS public.team_members (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  member_user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+  email TEXT NOT NULL,
+  full_name TEXT,
+  role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('owner', 'admin', 'member')),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'active', 'removed')),
+  invited_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  joined_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Index for fast lookups
+CREATE INDEX IF NOT EXISTS idx_team_members_company ON team_members(company_user_id);
+CREATE INDEX IF NOT EXISTS idx_team_members_email ON team_members(email);
+
+-- RLS
+ALTER TABLE public.team_members ENABLE ROW LEVEL SECURITY;
+
+-- Company owner can see all their team members
+CREATE POLICY "owner_see_team" ON public.team_members
+  FOR SELECT USING (company_user_id = auth.uid());
+
+-- Team member can see their own record
+CREATE POLICY "member_see_own" ON public.team_members
+  FOR SELECT USING (member_user_id = auth.uid());
+
+-- Only owner/admin can insert (invite)
+CREATE POLICY "owner_invite" ON public.team_members
+  FOR INSERT WITH CHECK (company_user_id = auth.uid());
+
+-- Only owner/admin can update
+CREATE POLICY "owner_update" ON public.team_members
+  FOR UPDATE USING (company_user_id = auth.uid());
+```
+
+---
+
+## Part 2 — Sign-Up Form: Add Full Name + Company Name
+
+In `screens/auth/SignUpScreen.tsx`, replace the single Full Name field with split First Name / Last Name fields for **all account types**. For company accounts, also add a Company Name field below the name row.
+
+```typescript
+// Name row — ALL account types (renter, individual, agent, company)
+<View style={styles.nameRow}>
+  <TextInput
+    style={[styles.input, styles.halfInput]}
+    placeholder="First name"
+    value={firstName}
+    onChangeText={setFirstName}
+  />
+  <TextInput
+    style={[styles.input, styles.halfInput]}
+    placeholder="Last name"
+    value={lastName}
+    onChangeText={setLastName}
+  />
+</View>
+
+// Company name — company account type only
+{accountType === 'company' && (
+  <TextInput
+    style={styles.input}
+    placeholder="Company name (e.g. Skyline Property Group)"
+    value={companyName}
+    onChangeText={setCompanyName}
+  />
+)}
+```
+
+Store `firstName` and `lastName` as separate fields on the user record. The **First Name** is used for personalized greetings throughout the app ("Hey Marcus!"). The **Company Name** is what renters see on listings and the company profile.
+
+---
+
+## Part 3 — Register Function: Save Company Name
+
+In `AuthContext.tsx`, update the `register` function to accept and save `companyName`:
+
+```typescript
+const register = async (
+  email: string,
+  password: string,
+  firstName: string,
+  lastName: string,
+  role: UserRole,
+  hostType?: 'individual' | 'agent' | 'company' | null,
+  companyName?: string,
+) => {
+  // ... existing auth signup ...
+
+  // Insert into users table:
+  await supabase.from('users').insert({
+    id: authUser.id,
+    email,
+    full_name: `${firstName} ${lastName}`,
+    first_name: firstName,
+    last_name: lastName,
+    role,
+    host_type: hostType ?? null,
+    company_name: companyName ?? null,
+  });
+};
+```
+
+Also update the `User` type in `types/` to include:
+```typescript
+firstName?: string;
+lastName?: string;
+companyName?: string;
+```
+
+And in `mapSupabaseToUser`:
+```typescript
+firstName: supabaseUser.first_name || undefined,
+lastName: supabaseUser.last_name || undefined,
+companyName: supabaseUser.company_name || undefined,
+```
+
+Use `firstName` for personalized greetings throughout the app (e.g. "Welcome back, Marcus!") instead of `name`.
+
+---
+
+## Part 4 — Team Members: AuthContext Functions
+
+Add these functions to `AuthContext.tsx`:
+
+```typescript
+// Get all team members for the current company account
+const getTeamMembers = async (): Promise<TeamMember[]> => {
+  if (!user || user.hostType !== 'company') return [];
+  const { data, error } = await supabase
+    .from('team_members')
+    .select('*')
+    .eq('company_user_id', user.id)
+    .neq('status', 'removed')
+    .order('created_at', { ascending: true });
+  if (error) return [];
+  return data as TeamMember[];
+};
+
+// Invite a new team member by email
+const inviteTeamMember = async (email: string, name: string, role: 'admin' | 'member'): Promise<void> => {
+  if (!user || user.hostType !== 'company') return;
+
+  // Check seat limit
+  const members = await getTeamMembers();
+  const seatLimit = getTeamSeatLimit(user.hostSubscription?.plan ?? 'free');
+  if (members.length >= seatLimit) {
+    throw new Error(`Your plan allows up to ${seatLimit} team members. Upgrade to add more.`);
+  }
+
+  await supabase.from('team_members').insert({
+    company_user_id: user.id,
+    email,
+    full_name: name,
+    role,
+    status: 'pending',
+  });
+
+  // TODO: Send invite email via Supabase Edge Function
+};
+
+// Remove a team member
+const removeTeamMember = async (memberId: string): Promise<void> => {
+  if (!user) return;
+  await supabase
+    .from('team_members')
+    .update({ status: 'removed' })
+    .eq('id', memberId)
+    .eq('company_user_id', user.id);
+};
+
+// Change a team member's role
+const updateTeamMemberRole = async (memberId: string, role: 'admin' | 'member'): Promise<void> => {
+  if (!user) return;
+  await supabase
+    .from('team_members')
+    .update({ role })
+    .eq('id', memberId)
+    .eq('company_user_id', user.id);
+};
+
+// Get seat limit based on plan
+function getTeamSeatLimit(plan: string): number {
+  switch (plan) {
+    case 'company_starter': return 3;
+    case 'company_pro': return 10;
+    case 'company_enterprise': return Infinity;
+    default: return 1; // free plan — owner only
+  }
+}
+```
+
+Add a `TeamMember` type:
+```typescript
+interface TeamMember {
+  id: string;
+  companyUserId: string;
+  memberUserId?: string;
+  email: string;
+  fullName?: string;
+  role: 'owner' | 'admin' | 'member';
+  status: 'pending' | 'active' | 'removed';
+  invitedAt: string;
+  joinedAt?: string;
+}
+```
+
+Export all four functions from `AuthContext`.
+
+---
+
+## Part 5 — Team Management Screen
+
+Create `screens/host/TeamManagementScreen.tsx`:
+
+**Header:**
+- Title: "Your Team"
+- Subtitle: "{activeCount} of {seatLimit} seats used"
+- "Invite Member" button (top right) — disabled if at seat limit
+
+**Member list:** Each row shows:
+- Avatar (initials if no photo)
+- Full name + email
+- Role badge (Owner / Admin / Member)
+- Status badge (Active / Pending)
+- Three-dot menu → Change Role / Remove (not shown for Owner row)
+
+**Seat limit banner** (shown when at limit):
+```typescript
+{atSeatLimit && (
+  <View style={styles.limitBanner}>
+    <Feather name="users" size={15} color="#F59E0B" />
+    <Text style={styles.limitText}>
+      You've reached your {seatLimit}-seat limit.{' '}
+      <Text style={styles.upgradeLink} onPress={() => navigation.navigate('HostSubscription')}>
+        Upgrade to add more
+      </Text>
+    </Text>
+  </View>
+)}
+```
+
+**Invite Modal** (bottom sheet):
+- Full Name field
+- Email field
+- Role selector: Admin / Member (with descriptions)
+  - Admin: "Can manage listings, respond to inquiries, and invite members"
+  - Member: "Can manage listings and respond to inquiries"
+- Send Invite button
+
+On Send Invite: call `inviteTeamMember`, show success toast, close modal.
+
+---
+
+## Part 6 — Role Permissions
+
+Enforce role-based permissions throughout the host dashboard:
+
+```typescript
+// In AuthContext, derive team role
+const teamRole = user?.hostType === 'company'
+  ? 'owner'  // master account is always owner
+  : teamMembership?.role ?? null;  // for team members logged into company account
+
+// Permission checks
+const canInviteMembers = teamRole === 'owner' || teamRole === 'admin';
+const canManageBilling = teamRole === 'owner';
+const canDeleteListings = teamRole === 'owner' || teamRole === 'admin';
+const canRespondToInquiries = true; // all roles
+```
+
+Hide billing-related UI from Admin and Member roles. Hide "Invite Members" from Member role.
+
+---
+
+## Part 7 — Add Team Tab to Company Dashboard
+
+In the host tab navigator, add a **Team** tab for company accounts only:
+
+```typescript
+{user?.hostType === 'company' && (
+  <Tab.Screen
+    name="Team"
+    component={TeamManagementScreen}
+    options={{
+      tabBarIcon: ({ color, size }) => (
+        <Feather name="users" size={size} color={color} />
+      ),
+    }}
+  />
+)}
+```
+
+---
+
+## Part 8 — Company Name on Listings
+
+Everywhere a host's name is displayed on a listing or profile, show the company name instead of the personal name for company accounts:
+
+```typescript
+function getDisplayName(user: User): string {
+  if (user.hostType === 'company' && user.companyName) {
+    return user.companyName;
+  }
+  return user.name;
+}
+```
+
+Use `getDisplayName(user)` in:
+- Listing cards
+- Listing detail screens
+- Inquiry threads
+- Host profile screen
+
+---
+
+## Part 9 — Company Setup Screen Update
+
+In `screens/host/onboarding/HostCompanySetupScreen.tsx`, add a **Company Name** field to the setup form (in addition to units managed). On save, call:
+
+```typescript
+await updateUser({
+  hostType: 'company',
+  companyName: values.companyName?.trim(),
+  unitsManaged: ...,
+  hostTypeLockedAt: new Date().toISOString(),
+});
+```
+
+---
+
+## Summary
+
+| Feature | Where |
+|---|---|
+| Full Name + Company Name at sign-up | `SignUpScreen.tsx` |
+| Company name saved to DB | `AuthContext.register()` + migration 033 |
+| Invite team members | `AuthContext.inviteTeamMember()` |
+| Remove/change role | `AuthContext.removeTeamMember/updateTeamMemberRole()` |
+| Team management UI | `TeamManagementScreen.tsx` |
+| Team tab in nav | `TabNavigator.tsx` (company only) |
+| Seat limits by plan | `getTeamSeatLimit()` in AuthContext |
+| Company name on listings | `getDisplayName()` helper |
+| Role permissions | `canInviteMembers`, `canManageBilling` etc. |

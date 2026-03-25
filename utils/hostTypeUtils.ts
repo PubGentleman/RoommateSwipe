@@ -53,3 +53,10 @@ export function hoursRemainingInGracePeriod(hostTypeLockedAt: string | null | un
   const hoursSinceLock = (now.getTime() - lockedAt.getTime()) / (1000 * 60 * 60);
   return Math.max(0, Math.ceil(24 - hoursSinceLock));
 }
+
+export function getDisplayName(user: { hostType?: HostType; companyName?: string; name: string }): string {
+  if (user.hostType === 'company' && user.companyName) {
+    return user.companyName;
+  }
+  return user.name;
+}

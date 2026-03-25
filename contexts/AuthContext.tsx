@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { AppState, AppStateStatus } from 'react-native';
 import { StorageService } from '../utils/storage';
 import { getDailyColdMessageLimit, getDailyColdMessageCount } from '../utils/messagingUtils';
-import { User, Notification } from '../types/models';
+import { User, Notification, TeamMember } from '../types/models';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import type { Session } from '@supabase/supabase-js';
 import { activateBoost as boostServiceActivateBoost, deactivateExpiredBoosts } from '../services/boostService';
@@ -14,7 +14,7 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name: string, role: UserRole) => Promise<void>;
+  register: (email: string, password: string, name: string, role: UserRole, hostType?: 'individual' | 'agent' | 'company' | null, companyName?: string) => Promise<void>;
   logout: () => Promise<void>;
   abandonSignup: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -77,6 +77,11 @@ interface AuthContextType {
   isFirstTimeHost: boolean;
   switchMode: (mode: 'renter' | 'host') => Promise<void>;
   completeHostOnboarding: () => Promise<void>;
+  getTeamMembers: () => Promise<TeamMember[]>;
+  inviteTeamMember: (email: string, name: string, role: 'admin' | 'member') => Promise<void>;
+  removeTeamMember: (memberId: string) => Promise<void>;
+  updateTeamMemberRole: (memberId: string, role: 'admin' | 'member') => Promise<void>;
+  getTeamSeatLimit: () => number;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -463,7 +468,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return null;
   };
 
-  const register = async (email: string, password: string, name: string, role: UserRole) => {
+  const register = async (email: string, password: string, name: string, role: UserRole, hostType?: 'individual' | 'agent' | 'company' | null, companyName?: string) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -471,6 +476,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         data: {
           full_name: name,
           role,
+          host_type: hostType ?? null,
+          company_name: companyName ?? null,
           city: 'New York',
           state: 'NY',
           neighborhood: 'Williamsburg',
@@ -492,6 +499,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           name,
           role,
           onboardingStep: 'profile',
+          hostType: hostType ?? undefined,
+          companyName: companyName ?? undefined,
           subscription: { plan: 'basic', status: 'active' },
           messageCount: 0,
           profileData: role === 'renter' ? {
@@ -2081,6 +2090,89 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(updated);
   };
 
+  function getTeamSeatLimitForPlan(plan: string): number {
+    switch (plan) {
+      case 'company_starter':
+      case 'starter': return 3;
+      case 'company_pro':
+      case 'pro': return 10;
+      case 'company_enterprise':
+      case 'business': return Infinity;
+      default: return 1;
+    }
+  }
+
+  const getTeamSeatLimit = (): number => {
+    const plan = user?.hostSubscription?.plan ?? 'free';
+    return getTeamSeatLimitForPlan(plan);
+  };
+
+  const getTeamMembers = async (): Promise<TeamMember[]> => {
+    if (!user || user.hostType !== 'company') return [];
+    if (isSupabaseConfigured) {
+      const { data, error } = await supabase
+        .from('team_members')
+        .select('*')
+        .eq('company_user_id', user.id)
+        .neq('status', 'removed')
+        .order('created_at', { ascending: true });
+      if (error || !data) return [];
+      return data.map((d: any) => ({
+        id: d.id,
+        companyUserId: d.company_user_id,
+        memberUserId: d.member_user_id ?? undefined,
+        email: d.email,
+        fullName: d.full_name ?? undefined,
+        role: d.role,
+        status: d.status,
+        invitedAt: d.invited_at,
+        joinedAt: d.joined_at ?? undefined,
+      }));
+    }
+    return [];
+  };
+
+  const inviteTeamMember = async (email: string, name: string, role: 'admin' | 'member'): Promise<void> => {
+    if (!user || user.hostType !== 'company') return;
+    const members = await getTeamMembers();
+    const seatLimit = getTeamSeatLimit();
+    if (members.length >= seatLimit) {
+      throw new Error(`Your plan allows up to ${seatLimit} team members. Upgrade to add more.`);
+    }
+    if (isSupabaseConfigured) {
+      const { error } = await supabase.from('team_members').insert({
+        company_user_id: user.id,
+        email,
+        full_name: name,
+        role,
+        status: 'pending',
+      });
+      if (error) throw new Error(error.message);
+    }
+  };
+
+  const removeTeamMember = async (memberId: string): Promise<void> => {
+    if (!user) return;
+    if (isSupabaseConfigured) {
+      await supabase
+        .from('team_members')
+        .update({ status: 'removed' })
+        .eq('id', memberId)
+        .eq('company_user_id', user.id);
+    }
+  };
+
+  const updateTeamMemberRole = async (memberId: string, role: 'admin' | 'member'): Promise<void> => {
+    if (!user) return;
+    if (isSupabaseConfigured) {
+      await supabase
+        .from('team_members')
+        .update({ role })
+        .eq('id', memberId)
+        .eq('company_user_id', user.id);
+    }
+  };
+
   const completeHostOnboarding = async () => {
     if (!user) return;
     if (isSupabaseConfigured) {
@@ -2106,7 +2198,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout, abandonSignup, resetPassword, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, cancelSubscriptionAtPeriodEnd, reactivateSubscription, getSubscriptionDetails, updateUser, blockUser: blockUserAction, unblockUser: unblockUserAction, reportUser: reportUserAction, isUserBlocked: isUserBlockedCheck, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike, watchAdForCredit, getAdCredits, useAdCredit, isBasicUser, canViewListing, useListingView, canSendInterest, canSendSuperInterest, useSuperInterestCredit, canSendColdMessage, useColdMessage, getSuperInterestCount, upgradeHostPlan, downgradeHostPlan, getHostPlan, canAddListing, canRespondToInquiry, useInquiryResponse, purchaseListingBoost, purchaseHostVerification, purchaseSuperInterest, completeOnboardingStep, cancelHostSubscriptionAtPeriodEnd, reactivateHostSubscription, softDeleteAccount, recoverDeletedAccount, updateLastActive, activeMode: effectiveMode, canSwitchMode, isFirstTimeHost, switchMode, completeHostOnboarding }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout, abandonSignup, resetPassword, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, cancelSubscriptionAtPeriodEnd, reactivateSubscription, getSubscriptionDetails, updateUser, blockUser: blockUserAction, unblockUser: unblockUserAction, reportUser: reportUserAction, isUserBlocked: isUserBlockedCheck, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike, watchAdForCredit, getAdCredits, useAdCredit, isBasicUser, canViewListing, useListingView, canSendInterest, canSendSuperInterest, useSuperInterestCredit, canSendColdMessage, useColdMessage, getSuperInterestCount, upgradeHostPlan, downgradeHostPlan, getHostPlan, canAddListing, canRespondToInquiry, useInquiryResponse, purchaseListingBoost, purchaseHostVerification, purchaseSuperInterest, completeOnboardingStep, cancelHostSubscriptionAtPeriodEnd, reactivateHostSubscription, softDeleteAccount, recoverDeletedAccount, updateLastActive, activeMode: effectiveMode, canSwitchMode, isFirstTimeHost, switchMode, completeHostOnboarding, getTeamMembers, inviteTeamMember, removeTeamMember, updateTeamMemberRole, getTeamSeatLimit }}>
       {children}
     </AuthContext.Provider>
   );
