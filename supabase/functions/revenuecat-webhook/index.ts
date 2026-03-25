@@ -10,6 +10,11 @@ const ENTITLEMENT_TO_PLAN: Record<string, { plan: string; planType: 'renter' | '
   host_starter: { plan: 'starter', planType: 'host' },
   host_pro: { plan: 'pro', planType: 'host' },
   host_business: { plan: 'business', planType: 'host' },
+  host_agent_starter: { plan: 'agent_starter', planType: 'host' },
+  host_agent_pro: { plan: 'agent_pro', planType: 'host' },
+  host_agent_business: { plan: 'agent_business', planType: 'host' },
+  host_company_starter: { plan: 'company_starter', planType: 'host' },
+  host_company_pro: { plan: 'company_pro', planType: 'host' },
 };
 
 serve(async (req) => {
@@ -38,7 +43,7 @@ serve(async (req) => {
     const entitlements = event?.entitlement_ids || [];
     let activePlan: { plan: string; planType: 'renter' | 'host' } | null = null;
 
-    for (const ent of ['elite', 'plus', 'host_business', 'host_pro', 'host_starter']) {
+    for (const ent of ['elite', 'plus', 'host_agent_business', 'host_agent_pro', 'host_agent_starter', 'host_company_pro', 'host_company_starter', 'host_business', 'host_pro', 'host_starter']) {
       if (entitlements.includes(ent)) {
         activePlan = ENTITLEMENT_TO_PLAN[ent];
         break;

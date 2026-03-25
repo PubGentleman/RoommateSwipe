@@ -12,6 +12,13 @@ import { HostPlanType, HostSubscriptionData } from '../../types/models';
 import { HOST_PLANS, AGENT_VERIFICATION_FEE, subscriptionFromPlan, calculateHostMonthlyCost, isFreePlan } from '../../utils/hostPricing';
 import { PurchaseConfirmModal } from '../../components/modals/PurchaseConfirmModal';
 import { HOST_PLAN_CONFIGS, HOST_DOWNGRADE_CONFIG } from '../../constants/purchaseConfig';
+import {
+  HostType,
+  getHostPlanDisplay,
+  getHostPlans,
+  HOST_TYPE_LABELS,
+  openEnterpriseSalesContact,
+} from '../../constants/hostPlansByType';
 
 const isDev = __DEV__;
 const BG = '#111';
@@ -35,7 +42,7 @@ interface PlanDisplayInfo {
   featuresLabel: string;
 }
 
-const PLAN_DISPLAY: PlanDisplayInfo[] = [
+const DEFAULT_PLAN_DISPLAY: PlanDisplayInfo[] = [
   {
     id: 'free',
     subtitle: 'Just getting started',
@@ -93,6 +100,19 @@ export const HostSubscriptionScreen = () => {
   const insets = useSafeAreaInsets();
   const { user, updateUser, cancelHostSubscriptionAtPeriodEnd, reactivateHostSubscription } = useAuth();
   const { confirm, alert: showAlert } = useConfirm();
+  const hostType = (user?.hostType as HostType) ?? 'individual';
+  const planDisplayItems = getHostPlanDisplay(hostType);
+  const PLAN_DISPLAY: PlanDisplayInfo[] = planDisplayItems.map(d => ({
+    id: d.id as HostPlanType,
+    subtitle: d.subtitle,
+    badge: d.badge,
+    badgeColor: d.badgeColor,
+    ctaLabel: d.ctaLabel,
+    isPopular: d.isPopular,
+    ctaStyle: d.ctaStyle,
+    icon: d.icon as PlanDisplayInfo['icon'],
+    featuresLabel: d.featuresLabel,
+  }));
   const [hostSub, setHostSub] = useState<HostSubscriptionData | null>(null);
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
@@ -109,12 +129,17 @@ export const HostSubscriptionScreen = () => {
     });
   }, [user]);
 
-  const handleSelectPlan = (plan: HostPlanType) => {
+  const handleSelectPlan = (plan: HostPlanType | string) => {
     if (!user || !hostSub) return;
+    const planDisplay = PLAN_DISPLAY.find(d => d.id === plan);
+    if (planDisplay?.ctaLabel === 'Contact Sales') {
+      openEnterpriseSalesContact();
+      return;
+    }
     if (plan === hostSub.plan) return;
-    if (isFreePlan(plan) && isFreePlan(hostSub.plan)) return;
+    if (isFreePlan(plan as HostPlanType) && isFreePlan(hostSub.plan)) return;
 
-    if (isFreePlan(plan)) {
+    if (isFreePlan(plan as HostPlanType)) {
       setShowDowngradeModal(true);
       return;
     }
@@ -227,17 +252,28 @@ export const HostSubscriptionScreen = () => {
 
   const currentPlanIsFree = isFreePlan(hostSub.plan);
 
+  const hostTypePlans = getHostPlans(hostType);
+
   const renderPlanCard = (display: PlanDisplayInfo) => {
     const planKey = display.id;
-    const plan = HOST_PLANS[planKey];
-    const isCurrentPlan = hostSub.plan === planKey || (isFreePlan(hostSub.plan) && isFreePlan(planKey));
-    const price = billingPrice(plan.price, billingCycle);
+    const hostPlanConfig = HOST_PLANS[planKey as HostPlanType];
+    const typePlanConfig = hostTypePlans.find(p => p.id === planKey);
+    const isContactSales = display.ctaLabel === 'Contact Sales';
+    const isCurrentPlan = hostSub.plan === planKey || (isFreePlan(hostSub.plan) && isFreePlan(planKey as HostPlanType));
 
-    const ctaText = isCurrentPlan
-      ? 'Current Plan'
-      : (isFreePlan(planKey) && !currentPlanIsFree)
-        ? 'Downgrade'
-        : display.ctaLabel;
+    const planLabel = typePlanConfig?.name ?? hostPlanConfig?.label ?? display.badge;
+    const planPrice = isContactSales ? 0 : (hostPlanConfig?.price ?? typePlanConfig?.monthlyPrice ?? 0);
+    const price = billingPrice(planPrice, billingCycle);
+    const planFeatures = hostPlanConfig?.features ?? { included: typePlanConfig?.features.filter(f => f.included).map(f => f.label) ?? [], locked: typePlanConfig?.features.filter(f => !f.included).map(f => f.label) ?? [] };
+    const listingsIncluded = hostPlanConfig?.listingsIncluded ?? 0;
+
+    const ctaText = isContactSales
+      ? 'Contact Sales'
+      : isCurrentPlan
+        ? 'Current Plan'
+        : (isFreePlan(planKey as HostPlanType) && !currentPlanIsFree)
+          ? 'Downgrade'
+          : display.ctaLabel;
 
     return (
       <View
@@ -267,42 +303,45 @@ export const HostSubscriptionScreen = () => {
           ) : null}
         </View>
 
-        <Text style={styles.planName}>{plan.label}</Text>
+        <Text style={styles.planName}>{planLabel}</Text>
         <Text style={styles.planSubtitle}>{display.subtitle}</Text>
 
         <View style={styles.priceRow}>
           <Text style={styles.planPrice}>
-            {price === 0 ? '$0' : `$${price}`}
+            {isContactSales ? 'Custom' : price === 0 ? '$0' : `$${price}`}
           </Text>
-          <Text style={styles.pricePeriod}>/mo</Text>
+          {isContactSales ? null : <Text style={styles.pricePeriod}>/mo</Text>}
         </View>
 
-        {isFreePlan(planKey) ? (
+        {isContactSales ? (
+          <Text style={styles.noCreditCard}>Custom pricing for your organization</Text>
+        ) : isFreePlan(planKey as HostPlanType) ? (
           <Text style={styles.noCreditCard}>No credit card required</Text>
         ) : (
-          <Text style={styles.noCreditCard}>No overage fees{planKey === 'business' ? '' : ''}</Text>
+          <Text style={styles.noCreditCard}>No overage fees</Text>
         )}
 
-        {planKey === 'business' ? (
+        {planKey === 'business' && hostType === 'individual' ? (
           <View style={styles.overageNote}>
             <Feather name="zap" size={12} color={GOLD} />
             <Text style={styles.overageNoteText}>+$5/listing/mo after 15</Text>
           </View>
         ) : null}
 
-        <View style={styles.listingCap}>
-          <Feather name="layers" size={16} color={display.badgeColor} />
-          <View>
-            <Text style={styles.listingCapStrong}>
-              {plan.listingsIncluded === 1 ? '1 Active Listing' : !isFinite(plan.listingsIncluded) ? 'Unlimited Active Listings' : `Up to ${plan.listingsIncluded} Active Listings`}
-            </Text>
-            <Text style={styles.listingCapSub}>
-              {isFreePlan(planKey) ? 'Post and receive inquiries' :
-               planKey === 'starter' ? 'Hard cap - upgrade to add more' :
-               'List as many properties as you need'}
-            </Text>
+        {!isContactSales ? (
+          <View style={styles.listingCap}>
+            <Feather name="layers" size={16} color={display.badgeColor} />
+            <View>
+              <Text style={styles.listingCapStrong}>
+                {listingsIncluded === 1 || (listingsIncluded === 0 && isFreePlan(planKey as HostPlanType)) ? '1 Active Listing' : !isFinite(listingsIncluded) || listingsIncluded === 0 ? 'Unlimited Active Listings' : `Up to ${listingsIncluded} Active Listings`}
+              </Text>
+              <Text style={styles.listingCapSub}>
+                {isFreePlan(planKey as HostPlanType) ? 'Post and receive inquiries' :
+                 'List as many properties as you need'}
+              </Text>
+            </View>
           </View>
-        </View>
+        ) : null}
 
         {isCurrentPlan ? (
           <View style={styles.ctaBtnDisabled}>
@@ -333,17 +372,17 @@ export const HostSubscriptionScreen = () => {
         <Text style={styles.featuresLabel}>{display.featuresLabel}</Text>
 
         <View style={styles.featureList}>
-          {plan.features.included.map((f, i) => (
+          {planFeatures.included.map((f, i) => (
             <View key={i} style={styles.featureRow}>
               <Feather
                 name="check"
                 size={14}
-                color={isFreePlan(planKey) ? '#555' : planKey === 'business' ? GOLD : ROOMDR_PURPLE}
+                color={isFreePlan(planKey as HostPlanType) ? '#555' : planKey.includes('business') || planKey.includes('enterprise') ? GOLD : ROOMDR_PURPLE}
               />
-              <Text style={[styles.featureText, isFreePlan(planKey) ? { color: 'rgba(255,255,255,0.5)' } : null]}>{f}</Text>
+              <Text style={[styles.featureText, isFreePlan(planKey as HostPlanType) ? { color: 'rgba(255,255,255,0.5)' } : null]}>{f}</Text>
             </View>
           ))}
-          {plan.features.locked.map((f, i) => (
+          {planFeatures.locked.map((f, i) => (
             <View key={`locked-${i}`} style={styles.featureRow}>
               <Feather name="x" size={14} color="rgba(255,255,255,0.15)" />
               <Text style={styles.lockedFeatureText}>{f}</Text>
@@ -351,7 +390,7 @@ export const HostSubscriptionScreen = () => {
           ))}
         </View>
 
-        {isFreePlan(planKey) && currentPlanIsFree ? (
+        {isFreePlan(planKey as HostPlanType) && currentPlanIsFree ? (
           <View style={styles.upgradeNudge}>
             <Feather name="info" size={14} color={ROOMDR_PURPLE} />
             <Text style={styles.upgradeNudgeText}>
@@ -376,14 +415,14 @@ export const HostSubscriptionScreen = () => {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.heroSection}>
           <View style={styles.heroEyebrow}>
-            <Text style={styles.heroEyebrowText}>HOST PLANS</Text>
+            <Text style={styles.heroEyebrowText}>{hostType === 'agent' ? 'AGENT PLANS' : hostType === 'company' ? 'COMPANY PLANS' : 'HOST PLANS'}</Text>
           </View>
           <Text style={styles.heroTitle}>
             Find great tenants.{'\n'}
             <Text style={{ color: ROOMDR_PURPLE }}>Pay for outcomes.</Text>
           </Text>
           <Text style={styles.heroSubtitle}>
-            From filling one spare room to managing a full portfolio - a plan built for how you operate.
+            {HOST_TYPE_LABELS[hostType] ? `Plans for ${HOST_TYPE_LABELS[hostType]}` : 'From filling one spare room to managing a full portfolio'} - a plan built for how you operate.
           </Text>
         </View>
 
@@ -491,6 +530,25 @@ export const HostSubscriptionScreen = () => {
             </View>
           </View>
         ) : null}
+
+        <Pressable
+          style={styles.restoreBtn}
+          onPress={async () => {
+            try {
+              const { restorePurchases } = await import('../../lib/revenueCat');
+              const result = await restorePurchases();
+              if (result.success) {
+                await showAlert({ title: 'Purchases Restored', message: 'Your previous purchases have been restored.', variant: 'success' });
+              } else if (result.error) {
+                await showAlert({ title: 'Restore Failed', message: result.error, variant: 'warning' });
+              }
+            } catch (e) {
+              await showAlert({ title: 'Error', message: 'Could not restore purchases. Please try again.', variant: 'warning' });
+            }
+          }}
+        >
+          <Text style={styles.restoreBtnText}>Restore Purchases</Text>
+        </Pressable>
 
         <View style={{ height: insets.bottom + 100 }} />
       </ScrollView>
@@ -828,6 +886,19 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   cancelBtnText: { fontSize: 13, fontWeight: '600', color: '#DC2626' },
+
+  restoreBtn: {
+    alignSelf: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    marginBottom: 8,
+  },
+  restoreBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.4)',
+    textDecorationLine: 'underline' as const,
+  },
 
   cancelOverlay: {
     position: 'absolute',

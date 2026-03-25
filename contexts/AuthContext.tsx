@@ -57,9 +57,9 @@ interface AuthContextType {
   canSendColdMessage: () => Promise<{ canSend: boolean; remaining: number; reason?: string }>;
   useColdMessage: () => Promise<void>;
   getSuperInterestCount: () => number;
-  upgradeHostPlan: (plan: 'starter' | 'pro' | 'business', billingCycle?: 'monthly' | '3month' | 'annual') => Promise<void>;
-  downgradeHostPlan: (plan: 'free' | 'starter' | 'pro') => Promise<void>;
-  getHostPlan: () => 'free' | 'starter' | 'pro' | 'business';
+  upgradeHostPlan: (plan: string, billingCycle?: 'monthly' | '3month' | 'annual') => Promise<void>;
+  downgradeHostPlan: (plan: string) => Promise<void>;
+  getHostPlan: () => string;
   canAddListing: (currentCount: number) => { allowed: boolean; limit: number; reason?: string };
   canRespondToInquiry: () => Promise<{ allowed: boolean; remaining: number; limit: number; reason?: string }>;
   useInquiryResponse: () => Promise<void>;
@@ -1885,15 +1885,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return plan;
   };
 
-  const upgradeHostPlan = async (plan: 'starter' | 'pro' | 'business', billingCycle: 'monthly' | '3month' | 'annual' = 'monthly') => {
+  const upgradeHostPlan = async (plan: string, billingCycle: 'monthly' | '3month' | 'annual' = 'monthly') => {
     if (!user) return;
     const expiresAt = getExpiryForCycle(billingCycle);
-    const hostPrices = {
+    const hostPrices: Record<string, Record<string, number>> = {
       starter: { monthly: 19.99, '3month': 53.97, annual: 191.88 },
       pro: { monthly: 49.99, '3month': 134.97, annual: 479.88 },
       business: { monthly: 99, '3month': 267.30, annual: 948.00 },
+      agent_starter: { monthly: 79, '3month': 213.30, annual: 758.40 },
+      agent_pro: { monthly: 149, '3month': 402.30, annual: 1430.40 },
+      agent_business: { monthly: 249, '3month': 672.30, annual: 2390.40 },
+      company_starter: { monthly: 199, '3month': 537.30, annual: 1910.40 },
+      company_pro: { monthly: 399, '3month': 1077.30, annual: 3830.40 },
     };
-    const amount = hostPrices[plan][billingCycle];
+    const amount = hostPrices[plan]?.[billingCycle] ?? 0;
     const prevHistory = user.hostSubscription?.billingHistory || [];
     const updated = {
       ...user,
@@ -1918,7 +1923,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(updated);
   };
 
-  const downgradeHostPlan = async (plan: 'free' | 'starter' | 'pro') => {
+  const downgradeHostPlan = async (plan: string) => {
     if (!user) return;
     const changeDate = user.hostSubscription?.expiresAt || new Date();
     const updated = {

@@ -1,0 +1,329 @@
+# Rhome — Host Pricing Filtered by Host Type
+## Replit Agent Prompt
+
+---
+
+## Overview
+
+When a user selects their host type during onboarding (individual, agent, or company), they should only ever see pricing plans that are relevant to them. Right now `HostSubscriptionScreen.tsx` and `HostPricingScreen.tsx` show all plans to everyone. This prompt filters the displayed plans based on the `hostType` stored in the user's auth context.
+
+**Rules:**
+- `individual` → sees **Starter**, **Pro**, **Business** (personal landlord tiers)
+- `agent` → sees **Agent Starter**, **Agent Pro**, **Agent Business** (agent-specific tiers)
+- `company` → sees **Company Starter**, **Company Pro**, **Company Enterprise** (company tiers)
+
+If for any reason `hostType` is undefined, default to showing individual plans.
+
+---
+
+## Part 1 — Read `hostType` from AuthContext
+
+In `contexts/AuthContext.tsx`, confirm that `hostType` is stored on the user/profile object and exported. It should already exist from the host onboarding flow. If it is on the `profiles` table, it will be something like:
+
+```typescript
+const hostType = profile?.host_type as 'individual' | 'agent' | 'company' | undefined;
+```
+
+Make sure `hostType` (or `host_type`) is included in the profile SELECT query and available via the auth context throughout the app.
+
+---
+
+## Part 2 — Update `HostSubscriptionScreen.tsx`
+
+### Step 2a — Import hostType
+
+At the top of the file, pull `hostType` from `useAuth()`:
+
+```typescript
+const { user, profile } = useAuth();
+const hostType = profile?.host_type as 'individual' | 'agent' | 'company' ?? 'individual';
+```
+
+### Step 2b — Define plan sets per host type
+
+Add this constant near the top of the component (or in a separate `constants/hostPlans.ts` file):
+
+```typescript
+const HOST_PLANS_BY_TYPE = {
+  individual: [
+    {
+      id: 'host_starter',
+      name: 'Starter',
+      price: '$29',
+      billingLabel: '/month',
+      description: 'Perfect for individual landlords with 1–3 listings',
+      features: [
+        'Up to 3 active listings',
+        'Basic renter matching',
+        'Standard listing visibility',
+        'Email support',
+      ],
+      cta: 'Start with Starter',
+      highlighted: false,
+    },
+    {
+      id: 'host_pro',
+      name: 'Pro',
+      price: '$59',
+      billingLabel: '/month',
+      description: 'For landlords scaling up to multiple properties',
+      features: [
+        'Up to 10 active listings',
+        'AI-powered renter matching',
+        'Boosted listing visibility',
+        'Background check access',
+        'Priority support',
+      ],
+      cta: 'Go Pro',
+      highlighted: true,
+    },
+    {
+      id: 'host_business',
+      name: 'Business',
+      price: '$99',
+      billingLabel: '/month',
+      description: 'Full-scale management for serious landlords',
+      features: [
+        'Unlimited active listings',
+        'Advanced AI matching',
+        'Maximum listing visibility',
+        'Bulk background checks',
+        'Analytics dashboard',
+        'Dedicated support',
+      ],
+      cta: 'Go Business',
+      highlighted: false,
+    },
+  ],
+
+  agent: [
+    {
+      id: 'host_agent_starter',
+      name: 'Agent Starter',
+      price: '$79',
+      billingLabel: '/month',
+      description: 'For new agents building their rental portfolio',
+      features: [
+        'Up to 10 active listings',
+        'Client management tools',
+        'AI-powered renter matching',
+        'Background check access',
+        'Agent profile badge',
+      ],
+      cta: 'Start as Agent',
+      highlighted: false,
+    },
+    {
+      id: 'host_agent_pro',
+      name: 'Agent Pro',
+      price: '$149',
+      billingLabel: '/month',
+      description: 'For established agents with active rosters',
+      features: [
+        'Up to 30 active listings',
+        'Advanced client management',
+        'Priority listing placement',
+        'Bulk background checks',
+        'Leads & referral tracking',
+        'Priority support',
+      ],
+      cta: 'Go Agent Pro',
+      highlighted: true,
+    },
+    {
+      id: 'host_agent_business',
+      name: 'Agent Business',
+      price: '$249',
+      billingLabel: '/month',
+      description: 'High-volume agents and brokers',
+      features: [
+        'Unlimited active listings',
+        'Full CRM integration',
+        'Maximum listing visibility',
+        'Unlimited background checks',
+        'Advanced analytics',
+        'Dedicated account manager',
+      ],
+      cta: 'Go Agent Business',
+      highlighted: false,
+    },
+  ],
+
+  company: [
+    {
+      id: 'host_company_starter',
+      name: 'Company Starter',
+      price: '$199',
+      billingLabel: '/month',
+      description: 'For small property management companies',
+      features: [
+        'Up to 25 active listings',
+        'Team member access (3 users)',
+        'AI-powered renter matching',
+        'Background check access',
+        'Company profile & branding',
+        'Analytics dashboard',
+      ],
+      cta: 'Start for Company',
+      highlighted: false,
+    },
+    {
+      id: 'host_company_pro',
+      name: 'Company Pro',
+      price: '$399',
+      billingLabel: '/month',
+      description: 'For growing property management firms',
+      features: [
+        'Up to 100 active listings',
+        'Team member access (10 users)',
+        'Priority listing placement',
+        'Bulk background checks',
+        'Advanced analytics & reporting',
+        'Priority support',
+      ],
+      cta: 'Go Company Pro',
+      highlighted: true,
+    },
+    {
+      id: 'host_company_enterprise',
+      name: 'Enterprise',
+      price: 'Custom',
+      billingLabel: '',
+      description: 'For large portfolios and enterprise firms',
+      features: [
+        'Unlimited active listings',
+        'Unlimited team members',
+        'Dedicated onboarding',
+        'Custom API access',
+        'SLA & compliance support',
+        'Dedicated account manager',
+      ],
+      cta: 'Contact Sales',
+      highlighted: false,
+    },
+  ],
+};
+```
+
+### Step 2c — Filter plans in the component
+
+Replace any hardcoded plan array with the filtered set:
+
+```typescript
+const plans = HOST_PLANS_BY_TYPE[hostType] ?? HOST_PLANS_BY_TYPE['individual'];
+```
+
+Then render `plans.map(...)` instead of the current hardcoded list.
+
+### Step 2d — Update the screen title to reflect host type
+
+Show a subtitle under the screen title so users know they're seeing the right plans:
+
+```typescript
+const hostTypeLabels = {
+  individual: 'Individual Landlord',
+  agent: 'Real Estate Agent',
+  company: 'Property Management Company',
+};
+
+// In the header:
+<Text style={styles.subtitle}>
+  Plans for {hostTypeLabels[hostType] ?? 'Hosts'}
+</Text>
+```
+
+---
+
+## Part 3 — Update `HostPricingScreen.tsx` (if separate)
+
+If `HostPricingScreen.tsx` exists separately from `HostSubscriptionScreen.tsx`, apply the same fix there:
+
+1. Import `hostType` from `useAuth()`
+2. Replace `HOST_STRIPE_PRICES` or any hardcoded plan array with `HOST_PLANS_BY_TYPE[hostType]`
+3. Pass the correct plan IDs to Stripe/RevenueCat when the user selects a plan
+
+For Stripe price IDs on the web version, create a mapping:
+
+```typescript
+const HOST_STRIPE_PRICE_IDS: Record<string, string> = {
+  host_starter: 'price_REPLACE_host_starter',
+  host_pro: 'price_REPLACE_host_pro',
+  host_business: 'price_REPLACE_host_business',
+  host_agent_starter: 'price_REPLACE_agent_starter',
+  host_agent_pro: 'price_REPLACE_agent_pro',
+  host_agent_business: 'price_REPLACE_agent_business',
+  host_company_starter: 'price_REPLACE_company_starter',
+  host_company_pro: 'price_REPLACE_company_pro',
+  // enterprise: handled via Contact Sales flow
+};
+```
+
+---
+
+## Part 4 — Handle Enterprise "Contact Sales"
+
+For company Enterprise tier, the CTA is "Contact Sales" rather than a payment button. When this plan is tapped:
+
+```typescript
+if (plan.id === 'host_company_enterprise') {
+  // Open email or navigate to contact screen
+  Linking.openURL('mailto:enterprise@rhomeapp.com?subject=Enterprise%20Plan%20Inquiry');
+  return;
+}
+```
+
+---
+
+## Part 5 — Update App Store Connect Products (Manual)
+
+The current `rhome-apple-iap-prompt.md` only defines individual host tiers. Add the agent and company products in App Store Connect → Subscriptions:
+
+**Subscription Group: "Rhome Agent"**
+| Product ID | Name | Price |
+|---|---|---|
+| `rhome_agent_starter_monthly` | Agent Starter Monthly | $79.99 |
+| `rhome_agent_pro_monthly` | Agent Pro Monthly | $149.99 |
+| `rhome_agent_business_monthly` | Agent Business Monthly | $249.99 |
+
+**Subscription Group: "Rhome Company"**
+| Product ID | Name | Price |
+|---|---|---|
+| `rhome_company_starter_monthly` | Company Starter Monthly | $199.99 |
+| `rhome_company_pro_monthly` | Company Pro Monthly | $399.99 |
+
+Enterprise is handled via direct contact, no in-app product needed.
+
+---
+
+## Part 6 — Update RevenueCat Entitlements
+
+In the RevenueCat dashboard, add new entitlements for agent and company tiers:
+
+- `host_agent_starter`
+- `host_agent_pro`
+- `host_agent_business`
+- `host_company_starter`
+- `host_company_pro`
+
+In `utils/revenueCatService.ts`, update the `syncSubscriptionToSupabase` function to map these new entitlements:
+
+```typescript
+// Add to the entitlement mapping block:
+else if (activeEntitlements.includes('host_agent_business')) { plan = 'agent_business'; planType = 'agent'; }
+else if (activeEntitlements.includes('host_agent_pro')) { plan = 'agent_pro'; planType = 'agent'; }
+else if (activeEntitlements.includes('host_agent_starter')) { plan = 'agent_starter'; planType = 'agent'; }
+else if (activeEntitlements.includes('host_company_pro')) { plan = 'company_pro'; planType = 'company'; }
+else if (activeEntitlements.includes('host_company_starter')) { plan = 'company_starter'; planType = 'company'; }
+```
+
+---
+
+## Summary
+
+| Host Type | Plans Shown | App Store Group |
+|---|---|---|
+| Individual | Starter · Pro · Business | Rhome Host |
+| Agent | Agent Starter · Agent Pro · Agent Business | Rhome Agent |
+| Company | Company Starter · Company Pro · Enterprise (contact) | Rhome Company |
+
+No host type ever sees another type's pricing. The filter happens at the component level using `hostType` from `AuthContext` — one line of logic, clean and maintainable.

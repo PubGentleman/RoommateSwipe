@@ -20,13 +20,15 @@ interface RevenueCatContextType {
   customerInfo: CustomerInfo | null;
   renterOffering: PurchasesOffering | null;
   hostOffering: PurchasesOffering | null;
-  purchase: (plan: string, billingCycle: 'monthly' | '3month' | 'annual', planType: 'renter' | 'host') => Promise<{ success: boolean; error?: string }>;
+  agentOffering: PurchasesOffering | null;
+  companyOffering: PurchasesOffering | null;
+  purchase: (plan: string, billingCycle: 'monthly' | '3month' | 'annual', planType: 'renter' | 'host' | 'agent' | 'company') => Promise<{ success: boolean; error?: string }>;
   restore: () => Promise<{ success: boolean; error?: string }>;
   refreshCustomerInfo: () => Promise<void>;
   identifyRevenueCatUser: (userId: string) => Promise<void>;
   logoutRevenueCatUser: () => Promise<void>;
   getActiveRenterPlan: () => 'free' | 'plus' | 'elite';
-  getActiveHostPlan: () => 'free' | 'starter' | 'pro' | 'business';
+  getActiveHostPlan: () => string;
 }
 
 const RevenueCatContext = createContext<RevenueCatContextType | undefined>(undefined);
@@ -36,6 +38,8 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
   const [renterOffering, setRenterOffering] = useState<PurchasesOffering | null>(null);
   const [hostOffering, setHostOffering] = useState<PurchasesOffering | null>(null);
+  const [agentOffering, setAgentOffering] = useState<PurchasesOffering | null>(null);
+  const [companyOffering, setCompanyOffering] = useState<PurchasesOffering | null>(null);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
 
   useEffect(() => {
@@ -63,6 +67,8 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const offerings = await getOfferings();
     if (offerings.renter) setRenterOffering(offerings.renter);
     if (offerings.host) setHostOffering(offerings.host);
+    if (offerings.agent) setAgentOffering(offerings.agent);
+    if (offerings.company) setCompanyOffering(offerings.company);
   };
 
   const identifyRevenueCatUser = useCallback(async (userId: string) => {
@@ -81,12 +87,18 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const purchase = useCallback(async (
     plan: string,
     billingCycle: 'monthly' | '3month' | 'annual',
-    planType: 'renter' | 'host'
+    planType: 'renter' | 'host' | 'agent' | 'company'
   ): Promise<{ success: boolean; error?: string }> => {
     if (Platform.OS === 'web') {
       return { success: false, error: 'In-app purchases not available on web' };
     }
-    const offering = planType === 'host' ? hostOffering : renterOffering;
+    const offeringMap: Record<string, PurchasesOffering | null> = {
+      renter: renterOffering,
+      host: hostOffering,
+      agent: agentOffering,
+      company: companyOffering,
+    };
+    const offering = offeringMap[planType] || hostOffering;
     const pkg = findPackage(offering || undefined, plan, billingCycle);
     if (!pkg) {
       return { success: false, error: 'This plan is not currently available. Please try again later.' };
@@ -96,7 +108,7 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setCustomerInfo(result.customerInfo);
     }
     return { success: result.success, error: result.error };
-  }, [renterOffering, hostOffering]);
+  }, [renterOffering, hostOffering, agentOffering, companyOffering]);
 
   const restore = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
     if (Platform.OS === 'web') {
@@ -124,11 +136,11 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return 'free';
   }, [customerInfo]);
 
-  const getActiveHostPlan = useCallback((): 'free' | 'starter' | 'pro' | 'business' => {
+  const getActiveHostPlan = useCallback((): string => {
     if (!customerInfo) return 'free';
     const active = getActivePlanFromEntitlements(customerInfo);
     if (active && active.planType === 'host') {
-      return active.plan as 'starter' | 'pro' | 'business';
+      return active.plan;
     }
     return 'free';
   }, [customerInfo]);
@@ -139,6 +151,8 @@ export const RevenueCatProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       customerInfo,
       renterOffering,
       hostOffering,
+      agentOffering,
+      companyOffering,
       purchase,
       restore,
       refreshCustomerInfo,
