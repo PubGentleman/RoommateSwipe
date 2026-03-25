@@ -33,16 +33,30 @@ interface SignUpState {
   lastName: string;
   email: string;
   password: string;
-  confirmPassword: string;
   city: string;
   licenseNumber: string;
   agencyName: string;
   companyName: string;
   propertyCount: string;
-  lookingFor: string;
+  budgetRange: string;
+  roomType: string;
   propertyType: string;
   profilePhoto: string | null;
 }
+
+const BUDGET_RANGES = ['Under $800', '$800-$1200', '$1200-$1800', '$1800-$2500', '$2500+'];
+const ROOM_TYPES = [
+  { id: 'private', icon: 'lock', label: 'Private Room' },
+  { id: 'shared', icon: 'users', label: 'Shared Room' },
+  { id: 'apartment', icon: 'home', label: 'Full Apartment' },
+];
+const PROPERTY_TYPES = [
+  { id: 'apartment', icon: 'home', label: 'Apartment' },
+  { id: 'house', icon: 'home', label: 'House' },
+  { id: 'condo', icon: 'grid', label: 'Condo' },
+  { id: 'townhouse', icon: 'layers', label: 'Townhouse' },
+  { id: 'studio', icon: 'square', label: 'Studio' },
+];
 
 const ACCOUNT_TYPES: { id: AccountType; icon: string; label: string; description: string; color: string; hostOnly?: boolean }[] = [
   { id: 'renter', icon: 'search', label: 'Renter', description: "I'm looking for a place to rent", color: '#6C63FF' },
@@ -80,13 +94,13 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
     lastName: '',
     email: '',
     password: '',
-    confirmPassword: '',
     city: '',
     licenseNumber: '',
     agencyName: '',
     companyName: '',
     propertyCount: '',
-    lookingFor: '',
+    budgetRange: '',
+    roomType: '',
     propertyType: '',
     profilePhoto: null,
   });
@@ -94,10 +108,7 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
   type StepId = 'accountType' | 'credentials' | 'location' | 'details' | 'photo' | 'complete';
 
   const getSteps = (): StepId[] => {
-    if (state.accountType === 'agent' || state.accountType === 'company') {
-      return ['accountType', 'credentials', 'location', 'details', 'photo', 'complete'];
-    }
-    return ['accountType', 'credentials', 'location', 'photo', 'complete'];
+    return ['accountType', 'credentials', 'location', 'details', 'photo', 'complete'];
   };
 
   const steps = getSteps();
@@ -106,7 +117,6 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [citySearch, setCitySearch] = useState('');
   const [agentNotice, setAgentNotice] = useState(false);
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
@@ -154,6 +164,11 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
     });
   }, [currentStep, slideAnim, dragAnim]);
 
+  const currentStepRef = useRef(currentStep);
+  currentStepRef.current = currentStep;
+  const goBackRef = useRef(goBack);
+  goBackRef.current = goBack;
+
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gs) => gs.dx > 10 && Math.abs(gs.dy) < 20,
@@ -161,8 +176,8 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
         if (gs.dx > 0) dragAnim.setValue(gs.dx);
       },
       onPanResponderRelease: (_, gs) => {
-        if (gs.dx > SWIPE_THRESHOLD && currentStep > 0) {
-          goBack();
+        if (gs.dx > SWIPE_THRESHOLD && currentStepRef.current > 0) {
+          goBackRef.current();
         } else {
           Animated.spring(dragAnim, {
             toValue: 0,
@@ -204,7 +219,6 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
     if (!state.email.trim()) { setError('Please enter your email'); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.email.trim())) { setError('Please enter a valid email'); return; }
     if (!state.password || state.password.length < 6) { setError('Password must be at least 6 characters'); return; }
-    if (state.password !== state.confirmPassword) { setError('Passwords do not match'); return; }
     goForward();
   };
 
@@ -215,15 +229,6 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
       setSelectedCard(null);
       goForward();
     }, 150);
-  };
-
-  const handleAgentDetailsSubmit = () => {
-    setError('');
-    if (state.accountType === 'agent' && !state.licenseNumber.trim()) {
-      setError('License number is required');
-      return;
-    }
-    goForward();
   };
 
   const handlePhotoUpload = async () => {
@@ -257,12 +262,6 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
   const filteredCities = citySearch.trim()
     ? CITIES.filter(c => c.toLowerCase().includes(citySearch.toLowerCase()))
     : CITIES;
-
-  const BackButton = () => (
-    <Pressable onPress={goBack} style={styles.backBtn} hitSlop={12}>
-      <Feather name="chevron-left" size={24} color="rgba(255,255,255,0.7)" />
-    </Pressable>
-  );
 
   const progressIndex = Math.max(0, currentStep - 1);
 
@@ -354,9 +353,9 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
     return (
       <View style={styles.stepContainer}>
         <View style={styles.stepTopBar}>
-          <BackButton />
+          <View style={styles.topBarSpacer} />
           <ProgressDots />
-          <View style={styles.backBtn} />
+          <View style={styles.topBarSpacer} />
         </View>
         <ScrollView
           style={styles.scrollArea}
@@ -445,25 +444,6 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
                 </Pressable>
               </View>
             </View>
-            <View style={styles.field}>
-              <Text style={styles.fieldLabel}>CONFIRM PASSWORD</Text>
-              <View style={styles.inputWrap}>
-                <Feather name="lock" size={16} color="rgba(255,255,255,0.35)" />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Confirm your password"
-                  placeholderTextColor="rgba(255,255,255,0.35)"
-                  value={state.confirmPassword}
-                  onChangeText={(v) => updateState({ confirmPassword: v })}
-                  secureTextEntry={!showConfirmPassword}
-                  textContentType="newPassword"
-                  autoComplete="new-password"
-                />
-                <Pressable onPress={() => setShowConfirmPassword(!showConfirmPassword)} hitSlop={8}>
-                  <Feather name={showConfirmPassword ? 'eye-off' : 'eye'} size={16} color="rgba(255,255,255,0.35)" />
-                </Pressable>
-              </View>
-            </View>
           </View>
           {error ? (
             <View style={styles.errorBox}>
@@ -515,9 +495,9 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
     return (
       <View style={styles.stepContainer}>
         <View style={styles.stepTopBar}>
-          <BackButton />
+          <View style={styles.topBarSpacer} />
           <ProgressDots />
-          <View style={styles.backBtn} />
+          <View style={styles.topBarSpacer} />
         </View>
         <View style={styles.stepContent}>
           <Text style={styles.headline}>{headlines[state.accountType!]}</Text>
@@ -559,137 +539,176 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
     );
   };
 
+  const handleDetailsSubmit = () => {
+    setError('');
+    if (state.accountType === 'agent' && !state.licenseNumber.trim()) {
+      setError('License number is required');
+      return;
+    }
+    goForward();
+  };
+
   const renderDetails = () => {
-    if (state.accountType === 'agent') {
-      return (
-        <View style={styles.stepContainer}>
-          <View style={styles.stepTopBar}>
-            <BackButton />
-            <ProgressDots />
-            <View style={styles.backBtn} />
-          </View>
-          <ScrollView
-            style={styles.scrollArea}
-            contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            <Text style={styles.headline}>Your license details</Text>
-            <View style={styles.formFields}>
-              <View style={styles.field}>
-                <Text style={styles.fieldLabel}>LICENSE NUMBER</Text>
-                <View style={styles.inputWrap}>
-                  <Feather name="hash" size={16} color="rgba(255,255,255,0.35)" />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Required"
-                    placeholderTextColor="rgba(255,255,255,0.35)"
-                    value={state.licenseNumber}
-                    onChangeText={(v) => updateState({ licenseNumber: v })}
-                    autoCapitalize="characters"
-                  />
-                </View>
-              </View>
-              <View style={styles.field}>
-                <Text style={styles.fieldLabel}>AGENCY NAME (OPTIONAL)</Text>
-                <View style={styles.inputWrap}>
-                  <Feather name="briefcase" size={16} color="rgba(255,255,255,0.35)" />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Your agency"
-                    placeholderTextColor="rgba(255,255,255,0.35)"
-                    value={state.agencyName}
-                    onChangeText={(v) => updateState({ agencyName: v })}
-                  />
-                </View>
-              </View>
-            </View>
-            {error ? (
-              <View style={styles.errorBox}>
-                <Feather name="alert-circle" size={14} color="#ff6b5b" />
-                <Text style={styles.errorText}>{error}</Text>
-              </View>
-            ) : null}
-            <Pressable onPress={handleAgentDetailsSubmit}>
-              <LinearGradient
-                colors={['#ff6b5b', '#e83a2a']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.continueBtn}
-              >
-                <Text style={styles.continueBtnText}>Continue</Text>
-                <Feather name="arrow-right" size={16} color="#FFFFFF" />
-              </LinearGradient>
-            </Pressable>
-          </ScrollView>
-        </View>
-      );
-    }
+    const headlines: Record<AccountType, string> = {
+      renter: 'Your preferences',
+      individual: 'Your property',
+      agent: 'Your license details',
+      company: 'Your company details',
+    };
 
-    if (state.accountType === 'company') {
-      return (
-        <View style={styles.stepContainer}>
-          <View style={styles.stepTopBar}>
-            <BackButton />
-            <ProgressDots />
-            <View style={styles.backBtn} />
-          </View>
-          <ScrollView
-            style={styles.scrollArea}
-            contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            <Text style={styles.headline}>Your company details</Text>
-            <View style={styles.formFields}>
-              <View style={styles.field}>
-                <Text style={styles.fieldLabel}>NUMBER OF PROPERTIES</Text>
-                <View style={styles.countChipRow}>
-                  {PROPERTY_COUNTS.map((count) => (
-                    <Pressable
-                      key={count}
-                      style={[styles.countChip, state.propertyCount === count ? styles.countChipActive : null]}
-                      onPress={() => updateState({ propertyCount: count })}
-                    >
-                      <Text style={[styles.countChipText, state.propertyCount === count ? styles.countChipTextActive : null]}>{count}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </View>
-            </View>
-            {error ? (
-              <View style={styles.errorBox}>
-                <Feather name="alert-circle" size={14} color="#ff6b5b" />
-                <Text style={styles.errorText}>{error}</Text>
-              </View>
-            ) : null}
-            <Pressable onPress={handleAgentDetailsSubmit}>
-              <LinearGradient
-                colors={['#ff6b5b', '#e83a2a']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.continueBtn}
+    const renderRenterDetails = () => (
+      <>
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>BUDGET RANGE</Text>
+          <View style={styles.countChipRow}>
+            {BUDGET_RANGES.map((range) => (
+              <Pressable
+                key={range}
+                style={[styles.countChip, state.budgetRange === range ? styles.countChipActive : null]}
+                onPress={() => updateState({ budgetRange: range })}
               >
-                <Text style={styles.continueBtnText}>Continue</Text>
-                <Feather name="arrow-right" size={16} color="#FFFFFF" />
-              </LinearGradient>
-            </Pressable>
-          </ScrollView>
+                <Text style={[styles.countChipText, state.budgetRange === range ? styles.countChipTextActive : null]}>{range}</Text>
+              </Pressable>
+            ))}
+          </View>
         </View>
-      );
-    }
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>ROOM TYPE PREFERENCE</Text>
+          <View style={styles.optionsList}>
+            {ROOM_TYPES.map((rt) => (
+              <Pressable
+                key={rt.id}
+                style={[styles.optionCard, state.roomType === rt.id ? styles.optionCardActive : null]}
+                onPress={() => updateState({ roomType: rt.id })}
+              >
+                <View style={styles.optionIconWrap}>
+                  <Feather name={rt.icon as any} size={20} color={state.roomType === rt.id ? '#ff6b5b' : 'rgba(255,255,255,0.5)'} />
+                </View>
+                <Text style={[styles.optionLabel, state.roomType === rt.id ? styles.optionLabelActive : null]}>{rt.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      </>
+    );
 
-    return null;
+    const renderIndividualDetails = () => (
+      <View style={styles.field}>
+        <Text style={styles.fieldLabel}>PROPERTY TYPE</Text>
+        <View style={styles.optionsList}>
+          {PROPERTY_TYPES.map((pt) => (
+            <Pressable
+              key={pt.id}
+              style={[styles.optionCard, state.propertyType === pt.id ? styles.optionCardActive : null]}
+              onPress={() => updateState({ propertyType: pt.id })}
+            >
+              <View style={styles.optionIconWrap}>
+                <Feather name={pt.icon as any} size={20} color={state.propertyType === pt.id ? '#ff6b5b' : 'rgba(255,255,255,0.5)'} />
+              </View>
+              <Text style={[styles.optionLabel, state.propertyType === pt.id ? styles.optionLabelActive : null]}>{pt.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+    );
+
+    const renderAgentDetails = () => (
+      <>
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>LICENSE NUMBER</Text>
+          <View style={styles.inputWrap}>
+            <Feather name="hash" size={16} color="rgba(255,255,255,0.35)" />
+            <TextInput
+              style={styles.input}
+              placeholder="Required"
+              placeholderTextColor="rgba(255,255,255,0.35)"
+              value={state.licenseNumber}
+              onChangeText={(v) => updateState({ licenseNumber: v })}
+              autoCapitalize="characters"
+            />
+          </View>
+        </View>
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>AGENCY NAME (OPTIONAL)</Text>
+          <View style={styles.inputWrap}>
+            <Feather name="briefcase" size={16} color="rgba(255,255,255,0.35)" />
+            <TextInput
+              style={styles.input}
+              placeholder="Your agency"
+              placeholderTextColor="rgba(255,255,255,0.35)"
+              value={state.agencyName}
+              onChangeText={(v) => updateState({ agencyName: v })}
+            />
+          </View>
+        </View>
+      </>
+    );
+
+    const renderCompanyDetails = () => (
+      <View style={styles.field}>
+        <Text style={styles.fieldLabel}>NUMBER OF PROPERTIES (OPTIONAL)</Text>
+        <View style={styles.countChipRow}>
+          {PROPERTY_COUNTS.map((count) => (
+            <Pressable
+              key={count}
+              style={[styles.countChip, state.propertyCount === count ? styles.countChipActive : null]}
+              onPress={() => updateState({ propertyCount: count })}
+            >
+              <Text style={[styles.countChipText, state.propertyCount === count ? styles.countChipTextActive : null]}>{count}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+    );
+
+    return (
+      <View style={styles.stepContainer}>
+        <View style={styles.stepTopBar}>
+          <View style={styles.topBarSpacer} />
+          <ProgressDots />
+          <View style={styles.topBarSpacer} />
+        </View>
+        <ScrollView
+          style={styles.scrollArea}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={styles.headline}>{headlines[state.accountType!]}</Text>
+          <View style={styles.formFields}>
+            {state.accountType === 'renter' ? renderRenterDetails() : null}
+            {state.accountType === 'individual' ? renderIndividualDetails() : null}
+            {state.accountType === 'agent' ? renderAgentDetails() : null}
+            {state.accountType === 'company' ? renderCompanyDetails() : null}
+          </View>
+          {error ? (
+            <View style={styles.errorBox}>
+              <Feather name="alert-circle" size={14} color="#ff6b5b" />
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : null}
+          <Pressable onPress={handleDetailsSubmit}>
+            <LinearGradient
+              colors={['#ff6b5b', '#e83a2a']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.continueBtn}
+            >
+              <Text style={styles.continueBtnText}>Continue</Text>
+              <Feather name="arrow-right" size={16} color="#FFFFFF" />
+            </LinearGradient>
+          </Pressable>
+        </ScrollView>
+      </View>
+    );
   };
 
   const renderPhoto = () => (
     <View style={styles.stepContainer}>
       <View style={styles.stepTopBar}>
-        <BackButton />
+        <View style={styles.topBarSpacer} />
         <ProgressDots />
-        <Pressable onPress={goForward} hitSlop={8} style={styles.skipBtn}>
-          <Text style={styles.skipText}>Skip</Text>
-        </Pressable>
+        <View style={styles.topBarSpacer} />
       </View>
       <View style={styles.stepContent}>
         <Text style={styles.headline}>Add a photo</Text>
@@ -727,9 +746,9 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
     return (
       <View style={styles.stepContainer}>
         <View style={styles.stepTopBar}>
-          <View style={styles.backBtn} />
+          <View style={styles.topBarSpacer} />
           <ProgressDots />
-          <View style={styles.backBtn} />
+          <View style={styles.topBarSpacer} />
         </View>
         <View style={[styles.stepContent, styles.stepContentCenter]}>
           <View style={styles.checkCircle}>
@@ -737,6 +756,23 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
           </View>
           <Text style={styles.headline}>You're all set!</Text>
           <Text style={styles.subheadline}>{subheadlines[state.accountType!]}</Text>
+          <View style={styles.summaryCard}>
+            <View style={styles.summaryRow}>
+              <Feather name="user" size={14} color="rgba(255,255,255,0.5)" />
+              <Text style={styles.summaryLabel}>Account</Text>
+              <Text style={styles.summaryValue}>{ACCOUNT_TYPES.find(t => t.id === state.accountType)?.label}</Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Feather name="map-pin" size={14} color="rgba(255,255,255,0.5)" />
+              <Text style={styles.summaryLabel}>Location</Text>
+              <Text style={styles.summaryValue}>{state.city || 'Not set'}</Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Feather name="mail" size={14} color="rgba(255,255,255,0.5)" />
+              <Text style={styles.summaryLabel}>Email</Text>
+              <Text style={styles.summaryValue}>{state.email}</Text>
+            </View>
+          </View>
           <Pressable onPress={handleComplete} disabled={isLoading} style={{ width: '100%', opacity: isLoading ? 0.5 : 1 }}>
             <LinearGradient
               colors={['#ff6b5b', '#e83a2a']}
@@ -819,22 +855,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingBottom: 32,
   },
-  backBtn: {
+  topBarSpacer: {
     width: 40,
     height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  skipBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  skipText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.5)',
   },
   dotsRow: {
     flexDirection: 'row',
@@ -1225,5 +1248,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 24,
+  },
+  summaryCard: {
+    width: '100%',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 16,
+    padding: 16,
+    gap: 12,
+    marginBottom: 8,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  summaryLabel: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.45)',
+    width: 70,
+  },
+  summaryValue: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.85)',
   },
 });
