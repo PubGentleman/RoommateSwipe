@@ -3,6 +3,7 @@ modules = ["nodejs-22"]
 
 [nix]
 channel = "stable-24_05"
+packages = ["supabase-cli"]
 
 [[ports]]
 localPort = 8081
