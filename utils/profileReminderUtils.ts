@@ -38,8 +38,18 @@ export const getProfileGaps = (user: User): ProfileGap[] => {
       label: 'Occupation',
       impact: 'Occupation helps match you with roommates who have compatible schedules',
       icon: 'briefcase',
+      screen: 'OccupationPicker',
+    });
+  }
+
+  if (!user.profileData?.bio || user.profileData.bio.trim().length < 20) {
+    gaps.push({
+      field: 'bio',
+      label: 'About You',
+      impact: 'A short bio lets people know who you are',
+      icon: 'file-text',
       screen: 'ProfileQuestionnaire',
-      screenParams: { missingSteps: ['budgetLocation'] },
+      screenParams: { missingSteps: ['basicInfo'] },
     });
   }
 
@@ -57,14 +67,13 @@ export const getProfileGaps = (user: User): ProfileGap[] => {
   }
 
   const prefs = user.profileData?.preferences;
-  if (!prefs?.cleanliness || !prefs?.noiseTolerance) {
+  if (!prefs?.cleanliness || !prefs?.noiseTolerance || !prefs?.sleepSchedule || !prefs?.guestPolicy) {
     gaps.push({
       field: 'living_style',
-      label: 'Living Style',
-      impact: 'Cleanliness and noise preferences are the top cause of roommate conflicts',
+      label: 'Lifestyle Preferences',
+      impact: 'Sleep schedule, cleanliness, and noise are the top causes of roommate conflicts',
       icon: 'home',
-      screen: 'ProfileQuestionnaire',
-      screenParams: { missingSteps: ['sleepCleanliness'] },
+      screen: 'LifestyleQuestions',
     });
   }
 
@@ -83,22 +92,30 @@ export const getProfileGaps = (user: User): ProfileGap[] => {
 };
 
 export const getCompletionPercentage = (user: User): number => {
+  const fields = [
+    !!(user.photos?.length || user.profilePicture),
+    !!(user.profileData?.occupation && user.profileData.occupation.trim().length > 0),
+    !!(user.profileData?.bio && user.profileData.bio.trim().length >= 20),
+    !!user.profileData?.budget,
+    !!user.profileData?.preferences?.sleepSchedule,
+    !!user.profileData?.preferences?.cleanliness,
+    !!user.profileData?.preferences?.noiseTolerance,
+    !!user.profileData?.preferences?.guestPolicy,
+    (Array.isArray(user.profileData?.interests) && user.profileData!.interests!.length >= 3),
+  ];
+
+  const weights = [15, 15, 15, 10, 10, 10, 10, 10, 5];
+  return fields.reduce((total, done, i) => total + (done ? weights[i] : 0), 0);
+};
+
+export const getHostCompletionPercentage = (user: User): number => {
   let score = 0;
-  const total = 100;
-  if (user.photos?.length || user.profilePicture) score += 10;
-  if (user.profileData?.bio && user.profileData.bio.trim().length >= 20) score += 10;
-  if (user.birthday) score += 10;
-  if (user.profileData?.occupation && user.profileData.occupation.trim().length > 0) score += 10;
-  const interests = user.profileData?.interests;
-  if (Array.isArray(interests) && interests.length >= 3) score += 15;
-  const prefs = user.profileData?.preferences;
-  if (prefs?.cleanliness && prefs?.noiseTolerance) score += 10;
-  if (prefs?.sleepSchedule) score += 5;
-  if (prefs?.smoking) score += 5;
-  if (prefs?.pets) score += 5;
-  if (prefs?.workLocation || prefs?.workSchedule) score += 10;
-  if (prefs?.moveInDate || user.profileData?.moveInDate) score += 10;
-  return Math.min(Math.round((score / total) * 100), 100);
+  if (user.photos?.length || user.profilePicture) score += 15;
+  if (user.profileData?.bio && user.profileData.bio.trim().length >= 20) score += 15;
+  if (user.licenseNumber) score += 30;
+  if (user.agencyName || user.companyName) score += 20;
+  if (user.hostType) score += 20;
+  return Math.min(score, 100);
 };
 
 export const validateInterestTags = (

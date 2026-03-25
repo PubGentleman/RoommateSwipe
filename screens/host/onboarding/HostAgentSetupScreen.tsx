@@ -31,6 +31,7 @@ export function HostAgentSetupScreen() {
     setSaving(true);
     try {
       await updateUser({
+        hostType: 'agent',
         licenseNumber: values.licenseNumber?.trim(),
         agencyName: values.agencyName?.trim() || undefined,
         hostTypeLockedAt: new Date().toISOString(),

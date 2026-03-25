@@ -31,6 +31,7 @@ export function HostCompanySetupScreen() {
     setSaving(true);
     try {
       await updateUser({
+        hostType: 'company',
         companyName: values.companyName?.trim(),
         unitsManaged: values.unitsManaged ? parseInt(values.unitsManaged, 10) : undefined,
         hostTypeLockedAt: new Date().toISOString(),

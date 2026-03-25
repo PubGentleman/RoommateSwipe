@@ -65,21 +65,7 @@ const CITIES = [
   'Philadelphia, PA',
 ];
 
-const RENTER_OPTIONS = [
-  { id: 'private', icon: 'lock', label: 'Private Room' },
-  { id: 'entire', icon: 'home', label: 'Entire Place' },
-  { id: 'either', icon: 'users', label: 'Either' },
-];
-
-const HOST_PROPERTY_TYPES = [
-  { id: 'private', icon: 'lock', label: 'Private Room' },
-  { id: 'entire', icon: 'home', label: 'Entire Unit' },
-  { id: 'shared', icon: 'users', label: 'Shared Room' },
-];
-
 const PROPERTY_COUNTS = ['1-10', '11-50', '51-200', '200+'];
-
-const TOTAL_PROGRESS_STEPS = 5;
 
 export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => {
   const { register } = useAuth();
@@ -102,6 +88,19 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
     propertyType: '',
     profilePhoto: null,
   });
+
+  type StepId = 'accountType' | 'credentials' | 'location' | 'details' | 'photo' | 'complete';
+
+  const getSteps = (): StepId[] => {
+    if (state.accountType === 'agent' || state.accountType === 'company') {
+      return ['accountType', 'credentials', 'location', 'details', 'photo', 'complete'];
+    }
+    return ['accountType', 'credentials', 'location', 'photo', 'complete'];
+  };
+
+  const steps = getSteps();
+  const currentStepId = steps[currentStep] || 'accountType';
+  const totalProgressSteps = steps.length - 1;
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -214,19 +213,6 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
     }, 150);
   };
 
-  const handleDetailsSelect = (value: string) => {
-    setSelectedCard(value);
-    if (state.accountType === 'renter') {
-      updateState({ lookingFor: value });
-    } else if (state.accountType === 'individual') {
-      updateState({ propertyType: value });
-    }
-    setTimeout(() => {
-      setSelectedCard(null);
-      goForward();
-    }, 150);
-  };
-
   const handleAgentDetailsSubmit = () => {
     setError('');
     if (state.accountType === 'agent' && !state.licenseNumber.trim()) {
@@ -275,15 +261,17 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
     </Pressable>
   );
 
-  const ProgressDots = ({ current }: { current: number }) => (
+  const progressIndex = Math.max(0, currentStep - 1);
+
+  const ProgressDots = () => (
     <View style={styles.dotsRow}>
-      {Array.from({ length: TOTAL_PROGRESS_STEPS }).map((_, i) => (
+      {Array.from({ length: totalProgressSteps }).map((_, i) => (
         <View
           key={i}
           style={[
             styles.dot,
-            i < current ? styles.dotComplete : null,
-            i === current ? styles.dotActive : null,
+            i < progressIndex ? styles.dotComplete : null,
+            i === progressIndex ? styles.dotActive : null,
           ]}
         />
       ))}
@@ -291,13 +279,13 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
   );
 
   const renderStep = () => {
-    switch (currentStep) {
-      case 0: return renderAccountType();
-      case 1: return renderCredentials();
-      case 2: return renderLocation();
-      case 3: return renderDetails();
-      case 4: return renderPhoto();
-      case 5: return renderComplete();
+    switch (currentStepId) {
+      case 'accountType': return renderAccountType();
+      case 'credentials': return renderCredentials();
+      case 'location': return renderLocation();
+      case 'details': return renderDetails();
+      case 'photo': return renderPhoto();
+      case 'complete': return renderComplete();
       default: return null;
     }
   };
@@ -359,7 +347,7 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
       <View style={styles.stepContainer}>
         <View style={styles.stepTopBar}>
           <BackButton />
-          <ProgressDots current={0} />
+          <ProgressDots />
           <View style={styles.backBtn} />
         </View>
         <ScrollView
@@ -489,7 +477,7 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
       <View style={styles.stepContainer}>
         <View style={styles.stepTopBar}>
           <BackButton />
-          <ProgressDots current={1} />
+          <ProgressDots />
           <View style={styles.backBtn} />
         </View>
         <View style={styles.stepContent}>
@@ -533,72 +521,12 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
   };
 
   const renderDetails = () => {
-    if (state.accountType === 'renter') {
-      return (
-        <View style={styles.stepContainer}>
-          <View style={styles.stepTopBar}>
-            <BackButton />
-            <ProgressDots current={2} />
-            <View style={styles.backBtn} />
-          </View>
-          <View style={styles.stepContent}>
-            <Text style={styles.headline}>What are you looking for?</Text>
-            <View style={styles.optionsList}>
-              {RENTER_OPTIONS.map((opt) => (
-                <Pressable
-                  key={opt.id}
-                  style={[styles.optionCard, selectedCard === opt.id ? styles.optionCardActive : null]}
-                  onPress={() => handleDetailsSelect(opt.id)}
-                >
-                  <View style={styles.optionIconWrap}>
-                    <Feather name={opt.icon as any} size={20} color={selectedCard === opt.id ? '#fff' : 'rgba(255,255,255,0.6)'} />
-                  </View>
-                  <Text style={[styles.optionLabel, selectedCard === opt.id ? styles.optionLabelActive : null]}>{opt.label}</Text>
-                  <Feather name="chevron-right" size={18} color={selectedCard === opt.id ? '#fff' : 'rgba(255,255,255,0.2)'} />
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        </View>
-      );
-    }
-
-    if (state.accountType === 'individual') {
-      return (
-        <View style={styles.stepContainer}>
-          <View style={styles.stepTopBar}>
-            <BackButton />
-            <ProgressDots current={2} />
-            <View style={styles.backBtn} />
-          </View>
-          <View style={styles.stepContent}>
-            <Text style={styles.headline}>What type of property?</Text>
-            <View style={styles.optionsList}>
-              {HOST_PROPERTY_TYPES.map((opt) => (
-                <Pressable
-                  key={opt.id}
-                  style={[styles.optionCard, selectedCard === opt.id ? styles.optionCardActive : null]}
-                  onPress={() => handleDetailsSelect(opt.id)}
-                >
-                  <View style={styles.optionIconWrap}>
-                    <Feather name={opt.icon as any} size={20} color={selectedCard === opt.id ? '#fff' : 'rgba(255,255,255,0.6)'} />
-                  </View>
-                  <Text style={[styles.optionLabel, selectedCard === opt.id ? styles.optionLabelActive : null]}>{opt.label}</Text>
-                  <Feather name="chevron-right" size={18} color={selectedCard === opt.id ? '#fff' : 'rgba(255,255,255,0.2)'} />
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        </View>
-      );
-    }
-
     if (state.accountType === 'agent') {
       return (
         <View style={styles.stepContainer}>
           <View style={styles.stepTopBar}>
             <BackButton />
-            <ProgressDots current={2} />
+            <ProgressDots />
             <View style={styles.backBtn} />
           </View>
           <ScrollView
@@ -664,7 +592,7 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
         <View style={styles.stepContainer}>
           <View style={styles.stepTopBar}>
             <BackButton />
-            <ProgressDots current={2} />
+            <ProgressDots />
             <View style={styles.backBtn} />
           </View>
           <ScrollView
@@ -732,7 +660,7 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
     <View style={styles.stepContainer}>
       <View style={styles.stepTopBar}>
         <BackButton />
-        <ProgressDots current={3} />
+        <ProgressDots />
         <Pressable onPress={goForward} hitSlop={8} style={styles.skipBtn}>
           <Text style={styles.skipText}>Skip</Text>
         </Pressable>
@@ -774,7 +702,7 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
       <View style={styles.stepContainer}>
         <View style={styles.stepTopBar}>
           <View style={styles.backBtn} />
-          <ProgressDots current={4} />
+          <ProgressDots />
           <View style={styles.backBtn} />
         </View>
         <View style={[styles.stepContent, styles.stepContentCenter]}>

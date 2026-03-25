@@ -14,6 +14,9 @@ import { ProfileReminderOverlay } from '../components/ProfileReminderOverlay';
 import { PlansScreen } from '../screens/shared/PlansScreen';
 import { PaymentScreen } from '../screens/shared/PaymentScreen';
 import { NotificationsScreen } from '../screens/shared/NotificationsScreen';
+import { ProfileCompletionScreen } from '../screens/shared/ProfileCompletionScreen';
+import { OccupationPickerScreen } from '../screens/shared/OccupationPickerScreen';
+import { LifestyleQuestionsScreen } from '../screens/shared/LifestyleQuestionsScreen';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useTheme } from '../hooks/useTheme';
 import { StorageService } from '../utils/storage';
@@ -29,6 +32,9 @@ export type RootStackParamList = {
   Plans: undefined;
   Payment: undefined;
   Notifications: undefined;
+  ProfileCompletion: undefined;
+  OccupationPicker: undefined;
+  LifestyleQuestions: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -134,6 +140,33 @@ export const RootNavigator = () => {
         <Stack.Screen
           name="Notifications"
           component={NotificationsScreen}
+          options={{
+            presentation: 'modal',
+            headerShown: false,
+            animation: 'slide_from_bottom',
+          }}
+        />
+        <Stack.Screen
+          name="ProfileCompletion"
+          component={ProfileCompletionScreen}
+          options={{
+            presentation: 'modal',
+            headerShown: false,
+            animation: 'slide_from_bottom',
+          }}
+        />
+        <Stack.Screen
+          name="OccupationPicker"
+          component={OccupationPickerScreen}
+          options={{
+            presentation: 'modal',
+            headerShown: false,
+            animation: 'slide_from_bottom',
+          }}
+        />
+        <Stack.Screen
+          name="LifestyleQuestions"
+          component={LifestyleQuestionsScreen}
           options={{
             presentation: 'modal',
             headerShown: false,

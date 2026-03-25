@@ -51,6 +51,11 @@ import { AIGroupSuggestionCard } from '../../components/AIGroupSuggestionCard';
 import { InstagramBadge } from '../../components/InstagramBadge';
 import { WhyThisMatchModal } from '../../components/WhyThisMatchModal';
 import { DailyQuestionCard } from '../../components/DailyQuestionCard';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getCompletionPercentage } from '../../utils/profileReminderUtils';
+
+const BANNER_DISMISS_KEY = 'rhome_completion_banner_dismissed';
+const FIRST_SESSION_DONE_KEY = 'rhome_first_session_done';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Limit card size for web/desktop viewing
@@ -108,6 +113,9 @@ export const RoommatesScreen = () => {
   const [selectedBoostTierId, setSelectedBoostTierId] = useState<RenterBoostOptionId>('standard');
   const [boostTimeLabel, setBoostTimeLabel] = useState('');
   const [userOpenGroup, setUserOpenGroup] = useState<Group | null>(null);
+  const [bannerDismissed, setBannerDismissed] = useState(true);
+  const [showFirstSessionPrompt, setShowFirstSessionPrompt] = useState(false);
+  const profileCompletion = user ? getCompletionPercentage(user) : 0;
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const rotation = useSharedValue(0);
@@ -132,6 +140,28 @@ export const RoommatesScreen = () => {
     };
     init();
   }, []);
+
+  useEffect(() => {
+    const checkBannerAndPrompt = async () => {
+      try {
+        const [dismissed, firstDone] = await Promise.all([
+          AsyncStorage.getItem(BANNER_DISMISS_KEY),
+          AsyncStorage.getItem(FIRST_SESSION_DONE_KEY),
+        ]);
+        const sessionKey = dismissed ? JSON.parse(dismissed) : null;
+        const today = new Date().toDateString();
+        if (sessionKey !== today && profileCompletion < 80) {
+          setBannerDismissed(false);
+        }
+        const isOnboarded = user?.onboardingStep === 'complete' || !user?.onboardingStep;
+        const hasNoOccupation = !user?.profileData?.occupation;
+        if (isOnboarded && hasNoOccupation && firstDone !== 'true') {
+          setShowFirstSessionPrompt(true);
+        }
+      } catch {}
+    };
+    if (user) checkBannerAndPrompt();
+  }, [user?.id]);
 
   useEffect(() => {
     if (cityInitialized && !activeCity) {
@@ -1234,6 +1264,42 @@ export const RoommatesScreen = () => {
 
       {renderCitySelector()}
 
+      {profileCompletion < 80 && !bannerDismissed ? (
+        <Pressable
+          style={styles.completionBannerWrap}
+          onPress={() => (navigation as any).navigate('ProfileCompletion')}
+        >
+          <View style={styles.completionBannerLeft}>
+            <ThemedText style={styles.completionBannerTitle}>Complete your profile</ThemedText>
+            <ThemedText style={styles.completionBannerSub}>
+              {profileCompletion}% done — better profiles get more matches
+            </ThemedText>
+            <View style={styles.completionBarTrack}>
+              <LinearGradient
+                colors={['#ff6b5b', '#e83a2a']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={[styles.completionBarFill, { width: `${Math.max(profileCompletion, 5)}%` }]}
+              />
+            </View>
+          </View>
+          <View style={styles.completionBannerRight}>
+            <Feather name="chevron-right" size={18} color="rgba(255,255,255,0.4)" />
+          </View>
+          <Pressable
+            style={styles.completionDismissBtn}
+            hitSlop={8}
+            onPress={async (e) => {
+              e.stopPropagation();
+              setBannerDismissed(true);
+              await AsyncStorage.setItem(BANNER_DISMISS_KEY, JSON.stringify(new Date().toDateString()));
+            }}
+          >
+            <Feather name="x" size={14} color="rgba(255,255,255,0.35)" />
+          </Pressable>
+        </Pressable>
+      ) : null}
+
       {activeFilterChips.length > 0 ? (
         <ScrollView
           horizontal
@@ -1686,6 +1752,47 @@ export const RoommatesScreen = () => {
         onUpgrade={handleUpgradeToPaid}
         onDismiss={() => setShowPaywall(false)}
       />
+
+      <Modal visible={showFirstSessionPrompt} transparent animationType="fade" onRequestClose={() => {}}>
+        <View style={styles.firstSessionOverlay}>
+          <View style={styles.firstSessionCard}>
+            <View style={styles.firstSessionIconWrap}>
+              <Feather name="user-check" size={36} color="#ff6b5b" />
+            </View>
+            <ThemedText style={styles.firstSessionTitle}>One more thing</ThemedText>
+            <ThemedText style={styles.firstSessionSub}>
+              Tell us a bit about yourself so we can find your best matches. Takes about 60 seconds.
+            </ThemedText>
+            <Pressable
+              style={styles.firstSessionPrimary}
+              onPress={async () => {
+                setShowFirstSessionPrompt(false);
+                await AsyncStorage.setItem(FIRST_SESSION_DONE_KEY, 'true');
+                (navigation as any).navigate('ProfileCompletion');
+              }}
+            >
+              <LinearGradient
+                colors={['#ff6b5b', '#e83a2a']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.firstSessionPrimaryGrad}
+              >
+                <ThemedText style={styles.firstSessionPrimaryText}>Complete Profile</ThemedText>
+                <Feather name="arrow-right" size={16} color="#FFFFFF" />
+              </LinearGradient>
+            </Pressable>
+            <Pressable
+              style={styles.firstSessionSkip}
+              onPress={async () => {
+                setShowFirstSessionPrompt(false);
+                await AsyncStorage.setItem(FIRST_SESSION_DONE_KEY, 'true');
+              }}
+            >
+              <ThemedText style={styles.firstSessionSkipText}>Skip for now</ThemedText>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={showBoostModal} animationType="slide" transparent onRequestClose={() => setShowBoostModal(false)}>
         <Pressable style={[styles.modalOverlay, { justifyContent: 'flex-end', padding: 0 }]} onPress={() => setShowBoostModal(false)}>
@@ -3512,5 +3619,115 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(255,255,255,0.5)',
     flex: 1,
+  },
+  completionBannerWrap: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    marginHorizontal: Spacing.md,
+    marginBottom: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255,107,91,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.15)',
+    borderRadius: 14,
+  },
+  completionBannerLeft: {
+    flex: 1,
+    gap: 4,
+  },
+  completionBannerTitle: {
+    fontSize: 14,
+    fontWeight: '700' as const,
+    color: '#FFFFFF',
+  },
+  completionBannerSub: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.55)',
+    marginBottom: 6,
+  },
+  completionBarTrack: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    overflow: 'hidden' as const,
+  },
+  completionBarFill: {
+    height: '100%' as any,
+    borderRadius: 2,
+  },
+  completionBannerRight: {
+    paddingLeft: 12,
+  },
+  completionDismissBtn: {
+    position: 'absolute' as const,
+    top: 8,
+    right: 8,
+    width: 24,
+    height: 24,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  firstSessionOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    paddingHorizontal: 32,
+  },
+  firstSessionCard: {
+    width: '100%' as any,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 24,
+    paddingVertical: 40,
+    paddingHorizontal: 28,
+    alignItems: 'center' as const,
+  },
+  firstSessionIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: 'rgba(255,107,91,0.12)',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    marginBottom: 20,
+  },
+  firstSessionTitle: {
+    fontSize: 22,
+    fontWeight: '800' as const,
+    color: '#FFFFFF',
+    marginBottom: 8,
+    textAlign: 'center' as const,
+  },
+  firstSessionSub: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.55)',
+    textAlign: 'center' as const,
+    lineHeight: 21,
+    marginBottom: 28,
+  },
+  firstSessionPrimary: {
+    width: '100%' as any,
+    marginBottom: 14,
+  },
+  firstSessionPrimaryGrad: {
+    height: 52,
+    borderRadius: 16,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 8,
+  },
+  firstSessionPrimaryText: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    color: '#FFFFFF',
+  },
+  firstSessionSkip: {
+    paddingVertical: 8,
+  },
+  firstSessionSkipText: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.4)',
   },
 });
