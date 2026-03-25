@@ -1,0 +1,87 @@
+# Rhome — Remove Role Toggle from Sign-In & Add Auto-Routing
+## Replit Agent Prompt
+
+---
+
+## Overview
+
+The sign-in screen currently shows a "I AM A" toggle (Renter / Host) that users must select before signing in. This should be removed entirely. The system already knows the user's role, host type, and last active mode from their Supabase profile — it should route them automatically to the correct dashboard after login without asking.
+
+---
+
+## Part 1 — Remove the Toggle from Sign-In Screen
+
+In `screens/auth/SignInScreen.tsx` (or wherever the sign-in screen lives):
+
+**Remove:**
+- The "I AM A" label
+- The Renter / Host segmented toggle component
+- Any state variable tracking the selected role (e.g. `selectedRole`, `userType`, `mode`)
+- Any logic that passes the selected role into the login function
+
+**Keep everything else intact** — email field, password field, forgot password, sign in button, Google/Apple SSO, sign up link.
+
+The screen should be clean: just the Rhome logo, "Welcome back" heading, email, password, and sign in options.
+
+---
+
+## Part 2 — Auto-Routing After Sign-In
+
+After a successful sign-in, route the user based on their stored profile data. This logic should live in `AuthContext.tsx` inside the `login` function (or wherever navigation happens post-auth).
+
+```typescript
+function getInitialRoute(user: User): string {
+  // Agents and companies always go to host dashboard
+  if (user.hostType === 'agent' || user.hostType === 'company') {
+    return 'HostTabs';
+  }
+
+  // Individual hosts go to whichever mode they were in last
+  if (user.hostType === 'individual' && user.role === 'host') {
+    const mode = user.activeMode ?? 'host';
+    return mode === 'renter' ? 'RenterTabs' : 'HostTabs';
+  }
+
+  // Pure renters (no host type) always go to renter dashboard
+  return 'RenterTabs';
+}
+```
+
+Call this function after the user profile is loaded from Supabase and use the result to drive `navigation.reset`:
+
+```typescript
+const route = getInitialRoute(mappedUser);
+navigation.reset({
+  index: 0,
+  routes: [{ name: route }],
+});
+```
+
+---
+
+## Part 3 — Keep Role Selection on Sign-Up Only
+
+The "I AM A" Renter / Host toggle belongs on the **Sign-Up screen only**, not sign-in. Do not remove it from `SignUpScreen.tsx`. On sign-up, this selection sets the user's initial role and determines which onboarding flow they enter.
+
+If the sign-up screen does not already have this toggle, do not add it — leave sign-up as-is.
+
+---
+
+## Part 4 — Google & Apple SSO Auto-Routing
+
+Apply the same auto-routing logic after Google and Apple sign-in. When a user authenticates via SSO:
+- If they are a **new user** (no existing profile), route them to the onboarding flow as a renter by default
+- If they are a **returning user**, use `getInitialRoute(user)` exactly as above
+
+---
+
+## Summary
+
+| Before | After |
+|---|---|
+| User sees "I AM A" Renter/Host toggle on sign-in | Toggle removed — clean sign-in screen |
+| User must manually pick their role every time | System reads role/hostType/activeMode from DB |
+| Wrong selection could route to wrong dashboard | Always routes correctly based on stored profile |
+| Agent could tap "Renter" and get confused | Agent always lands on Host dashboard automatically |
+
+No database changes required. No new migrations needed.
