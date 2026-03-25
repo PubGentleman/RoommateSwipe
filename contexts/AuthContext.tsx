@@ -82,6 +82,11 @@ interface AuthContextType {
   removeTeamMember: (memberId: string) => Promise<void>;
   updateTeamMemberRole: (memberId: string, role: 'admin' | 'member') => Promise<void>;
   getTeamSeatLimit: () => number;
+  teamRole: 'owner' | 'admin' | 'member' | null;
+  canInviteMembers: boolean;
+  canManageBilling: boolean;
+  canDeleteListings: boolean;
+  canRespondToInquiries: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -192,6 +197,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       id: supabaseUser.id,
       email: supabaseUser.email,
       name: supabaseUser.full_name || supabaseUser.email?.split('@')[0] || '',
+      firstName: supabaseUser.first_name || undefined,
+      lastName: supabaseUser.last_name || undefined,
       role: supabaseUser.role || 'renter',
       onboardingStep: supabaseUser.onboarding_step || 'profile',
       profilePicture: supabaseUser.avatar_url,
@@ -468,13 +475,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return null;
   };
 
-  const register = async (email: string, password: string, name: string, role: UserRole, hostType?: 'individual' | 'agent' | 'company' | null, companyName?: string) => {
+  const register = async (email: string, password: string, name: string, role: UserRole, hostType?: 'individual' | 'agent' | 'company' | null, companyName?: string, firstName?: string, lastName?: string) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
           full_name: name,
+          first_name: firstName ?? null,
+          last_name: lastName ?? null,
           role,
           host_type: hostType ?? null,
           company_name: companyName ?? null,
@@ -497,6 +506,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           id: data.user.id,
           email,
           name,
+          firstName: firstName ?? undefined,
+          lastName: lastName ?? undefined,
           role,
           onboardingStep: 'profile',
           hostType: hostType ?? undefined,
@@ -2198,8 +2209,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(updated);
   };
 
+  const teamRole: 'owner' | 'admin' | 'member' | null = user?.hostType === 'company' ? 'owner' : null;
+  const canInviteMembers = teamRole === 'owner' || teamRole === 'admin';
+  const canManageBilling = teamRole === 'owner';
+  const canDeleteListings = teamRole === 'owner' || teamRole === 'admin';
+  const canRespondToInquiries = teamRole !== null;
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout, abandonSignup, resetPassword, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, cancelSubscriptionAtPeriodEnd, reactivateSubscription, getSubscriptionDetails, updateUser, blockUser: blockUserAction, unblockUser: unblockUserAction, reportUser: reportUserAction, isUserBlocked: isUserBlockedCheck, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike, watchAdForCredit, getAdCredits, useAdCredit, isBasicUser, canViewListing, useListingView, canSendInterest, canSendSuperInterest, useSuperInterestCredit, canSendColdMessage, useColdMessage, getSuperInterestCount, upgradeHostPlan, downgradeHostPlan, getHostPlan, canAddListing, canRespondToInquiry, useInquiryResponse, purchaseListingBoost, purchaseHostVerification, purchaseSuperInterest, completeOnboardingStep, cancelHostSubscriptionAtPeriodEnd, reactivateHostSubscription, softDeleteAccount, recoverDeletedAccount, updateLastActive, activeMode: effectiveMode, canSwitchMode, isFirstTimeHost, switchMode, completeHostOnboarding, getTeamMembers, inviteTeamMember, removeTeamMember, updateTeamMemberRole, getTeamSeatLimit }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout, abandonSignup, resetPassword, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, cancelSubscriptionAtPeriodEnd, reactivateSubscription, getSubscriptionDetails, updateUser, blockUser: blockUserAction, unblockUser: unblockUserAction, reportUser: reportUserAction, isUserBlocked: isUserBlockedCheck, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike, watchAdForCredit, getAdCredits, useAdCredit, isBasicUser, canViewListing, useListingView, canSendInterest, canSendSuperInterest, useSuperInterestCredit, canSendColdMessage, useColdMessage, getSuperInterestCount, upgradeHostPlan, downgradeHostPlan, getHostPlan, canAddListing, canRespondToInquiry, useInquiryResponse, purchaseListingBoost, purchaseHostVerification, purchaseSuperInterest, completeOnboardingStep, cancelHostSubscriptionAtPeriodEnd, reactivateHostSubscription, softDeleteAccount, recoverDeletedAccount, updateLastActive, activeMode: effectiveMode, canSwitchMode, isFirstTimeHost, switchMode, completeHostOnboarding, getTeamMembers, inviteTeamMember, removeTeamMember, updateTeamMemberRole, getTeamSeatLimit, teamRole, canInviteMembers, canManageBilling, canDeleteListings, canRespondToInquiries }}>
       {children}
     </AuthContext.Provider>
   );

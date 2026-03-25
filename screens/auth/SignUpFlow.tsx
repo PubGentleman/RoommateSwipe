@@ -29,7 +29,8 @@ type AccountType = 'renter' | 'individual' | 'agent' | 'company';
 
 interface SignUpState {
   accountType: AccountType | null;
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
   password: string;
   confirmPassword: string;
@@ -75,7 +76,8 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
   const [currentStep, setCurrentStep] = useState(0);
   const [state, setState] = useState<SignUpState>({
     accountType: null,
-    name: '',
+    firstName: '',
+    lastName: '',
     email: '',
     password: '',
     confirmPassword: '',
@@ -196,7 +198,9 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
 
   const handleCredentialsSubmit = async () => {
     setError('');
-    if (!state.name.trim()) { setError('Please enter your name'); return; }
+    if (!state.firstName.trim()) { setError('Please enter your first name'); return; }
+    if (!state.lastName.trim()) { setError('Please enter your last name'); return; }
+    if (state.accountType === 'company' && !state.companyName.trim()) { setError('Please enter your company name'); return; }
     if (!state.email.trim()) { setError('Please enter your email'); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.email.trim())) { setError('Please enter a valid email'); return; }
     if (!state.password || state.password.length < 6) { setError('Password must be at least 6 characters'); return; }
@@ -217,10 +221,6 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
     setError('');
     if (state.accountType === 'agent' && !state.licenseNumber.trim()) {
       setError('License number is required');
-      return;
-    }
-    if (state.accountType === 'company' && !state.companyName.trim()) {
-      setError('Company name is required');
       return;
     }
     goForward();
@@ -245,7 +245,8 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
       const role = state.accountType === 'renter' ? 'renter' : 'host';
       const hostType = state.accountType === 'renter' ? null : (state.accountType as 'individual' | 'agent' | 'company');
       const companyName = state.accountType === 'company' && state.companyName.trim() ? state.companyName.trim() : undefined;
-      await register(state.email.trim(), state.password, state.name.trim(), role as any, hostType, companyName);
+      const fullName = `${state.firstName.trim()} ${state.lastName.trim()}`;
+      await register(state.email.trim(), state.password, fullName, role as any, hostType, companyName, state.firstName.trim(), state.lastName.trim());
     } catch (err: any) {
       await showAlert({ title: 'Error', message: err?.message || 'Failed to create account. Please try again.', variant: 'warning' });
     } finally {
@@ -360,20 +361,51 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
         >
           <Text style={styles.headline}>{headlines[state.accountType!]}</Text>
           <View style={styles.formFields}>
-            <View style={styles.field}>
-              <Text style={styles.fieldLabel}>FULL NAME</Text>
-              <View style={styles.inputWrap}>
-                <Feather name="user" size={16} color="rgba(255,255,255,0.35)" />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Your full name"
-                  placeholderTextColor="rgba(255,255,255,0.35)"
-                  value={state.name}
-                  onChangeText={(v) => updateState({ name: v })}
-                  autoCapitalize="words"
-                />
+            <View style={styles.nameRow}>
+              <View style={[styles.field, { flex: 1, marginRight: 6 }]}>
+                <Text style={styles.fieldLabel}>FIRST NAME</Text>
+                <View style={styles.inputWrap}>
+                  <Feather name="user" size={16} color="rgba(255,255,255,0.35)" />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="First name"
+                    placeholderTextColor="rgba(255,255,255,0.35)"
+                    value={state.firstName}
+                    onChangeText={(v) => updateState({ firstName: v })}
+                    autoCapitalize="words"
+                  />
+                </View>
+              </View>
+              <View style={[styles.field, { flex: 1, marginLeft: 6 }]}>
+                <Text style={styles.fieldLabel}>LAST NAME</Text>
+                <View style={styles.inputWrap}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Last name"
+                    placeholderTextColor="rgba(255,255,255,0.35)"
+                    value={state.lastName}
+                    onChangeText={(v) => updateState({ lastName: v })}
+                    autoCapitalize="words"
+                  />
+                </View>
               </View>
             </View>
+            {state.accountType === 'company' ? (
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>COMPANY NAME</Text>
+                <View style={styles.inputWrap}>
+                  <Feather name="briefcase" size={16} color="rgba(255,255,255,0.35)" />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. Skyline Property Group"
+                    placeholderTextColor="rgba(255,255,255,0.35)"
+                    value={state.companyName}
+                    onChangeText={(v) => updateState({ companyName: v })}
+                    autoCapitalize="words"
+                  />
+                </View>
+              </View>
+            ) : null}
             <View style={styles.field}>
               <Text style={styles.fieldLabel}>EMAIL</Text>
               <View style={styles.inputWrap}>
@@ -605,19 +637,6 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
           >
             <Text style={styles.headline}>Your company details</Text>
             <View style={styles.formFields}>
-              <View style={styles.field}>
-                <Text style={styles.fieldLabel}>COMPANY NAME</Text>
-                <View style={styles.inputWrap}>
-                  <Feather name="briefcase" size={16} color="rgba(255,255,255,0.35)" />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Required"
-                    placeholderTextColor="rgba(255,255,255,0.35)"
-                    value={state.companyName}
-                    onChangeText={(v) => updateState({ companyName: v })}
-                  />
-                </View>
-              </View>
               <View style={styles.field}>
                 <Text style={styles.fieldLabel}>NUMBER OF PROPERTIES</Text>
                 <View style={styles.countChipRow}>
@@ -903,6 +922,10 @@ const styles = StyleSheet.create({
     gap: 14,
     marginBottom: 18,
     marginTop: 8,
+  },
+  nameRow: {
+    flexDirection: 'row' as const,
+    gap: 0,
   },
   field: {
     gap: 7,
