@@ -40,7 +40,7 @@ export const LoginScreen = () => {
         if (!email.trim()) { setError('Please enter your email address'); setIsLoading(false); return; }
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setError('Please enter a valid email address'); setIsLoading(false); return; }
         if (!password || password.length < 6) { setError('Password must be at least 6 characters'); setIsLoading(false); return; }
-        await login(email.trim(), password, selectedRole);
+        await login(email.trim(), password);
       }
     } catch (err: any) {
       setError(err?.message || 'Something went wrong. Please try again.');
@@ -78,38 +78,41 @@ export const LoginScreen = () => {
         </View>
 
         <View style={styles.content}>
-          <Text style={styles.roleLabel}>I AM A</Text>
-          <View style={styles.roleSelector}>
-            {roles.map((role) => {
-              const isActive = selectedRole === role.value;
-              return (
-                <Pressable
-                  key={role.value}
-                  style={styles.roleBtnWrap}
-                  onPress={() => setSelectedRole(role.value)}
-                >
-                  {isActive ? (
-                    <LinearGradient
-                      colors={['#ff6b5b', '#e83a2a']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.roleBtn}
+          {isSignUp ? (
+            <>
+              <Text style={styles.roleLabel}>I AM A</Text>
+              <View style={styles.roleSelector}>
+                {roles.map((role) => {
+                  const isActive = selectedRole === role.value;
+                  return (
+                    <Pressable
+                      key={role.value}
+                      style={styles.roleBtnWrap}
+                      onPress={() => setSelectedRole(role.value)}
                     >
-                      <Feather name={role.icon} size={14} color="#FFFFFF" />
-                      <Text style={[styles.roleBtnText, { color: '#FFFFFF' }]}>{role.label}</Text>
-                    </LinearGradient>
-                  ) : (
-                    <View style={styles.roleBtn}>
-                      <Feather name={role.icon} size={14} color="rgba(255,255,255,0.5)" />
-                      <Text style={styles.roleBtnText}>{role.label}</Text>
-                    </View>
-                  )}
-                </Pressable>
-              );
-            })}
-          </View>
-
-          <View style={styles.divider} />
+                      {isActive ? (
+                        <LinearGradient
+                          colors={['#ff6b5b', '#e83a2a']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.roleBtn}
+                        >
+                          <Feather name={role.icon} size={14} color="#FFFFFF" />
+                          <Text style={[styles.roleBtnText, { color: '#FFFFFF' }]}>{role.label}</Text>
+                        </LinearGradient>
+                      ) : (
+                        <View style={styles.roleBtn}>
+                          <Feather name={role.icon} size={14} color="rgba(255,255,255,0.5)" />
+                          <Text style={styles.roleBtnText}>{role.label}</Text>
+                        </View>
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <View style={styles.divider} />
+            </>
+          ) : null}
 
           {isSignUp ? (
             <View style={styles.field}>
