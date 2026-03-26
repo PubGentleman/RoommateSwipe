@@ -11,6 +11,7 @@ import { StorageService } from '../../utils/storage';
 import { Property, HostSubscriptionData, ListingBoost } from '../../types/models';
 import { BOOST_OPTIONS, calculateBoostExpiry, isListingBoosted, getBoostTimeRemaining, isFreePlan, createBoostRecord } from '../../utils/hostPricing';
 import { getListing } from '../../services/listingService';
+import { getPlanLimits, type HostPlan } from '../../constants/planLimits';
 
 const isDev = __DEV__;
 const BG = '#111';
@@ -24,13 +25,13 @@ export const ListingBoostScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, getHostPlan } = useAuth();
   const { confirm, alert: showAlert } = useConfirm();
   const listingId = route.params?.listingId;
 
   const [listing, setListing] = useState<Property | null>(null);
   const [hostSub, setHostSub] = useState<HostSubscriptionData | null>(null);
-  const [existingBoost, setExistingBoost] = useState<ListingBoost | null>(null);
+  const [activeBoostCount, setActiveBoostCount] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -68,14 +69,17 @@ export const ListingBoostScreen = () => {
       if (found) setListing(found);
       const sub = await StorageService.getHostSubscription(user.id);
       setHostSub(sub);
-      const activeBoost = await StorageService.getActiveBoostForHost(user.id);
-      setExistingBoost(activeBoost);
+      const boostCount = await StorageService.getActiveBoostCountForHost(user.id);
+      setActiveBoostCount(boostCount);
     };
     loadData();
   }, [user, listingId]);
 
   const isBoosted = listing ? isListingBoosted(listing) : false;
-  const hasActiveBoostElsewhere = existingBoost && existingBoost.listingId !== listingId;
+  const planLimits = getPlanLimits(getHostPlan() as HostPlan);
+  const maxSimultaneous = planLimits.simultaneousBoosts;
+  const boostsExcludingThis = isBoosted ? activeBoostCount - 1 : activeBoostCount;
+  const hasReachedBoostLimit = maxSimultaneous > 0 && boostsExcludingThis >= maxSimultaneous;
   const hasFreeBoosts = hostSub && hostSub.freeBoostsRemaining > 0;
   const isOnFreePlan = hostSub && isFreePlan(hostSub.plan);
 
@@ -113,8 +117,8 @@ export const ListingBoostScreen = () => {
   const applyBoost = async (optionId: string, useFree: boolean) => {
     if (!user || !listing || !hostSub) return;
 
-    if (hasActiveBoostElsewhere) {
-      await showAlert({ title: 'Boost Active', message: 'You already have an active boost on another listing. Only one boost at a time is allowed.', variant: 'warning' });
+    if (hasReachedBoostLimit) {
+      await showAlert({ title: 'Boost Limit Reached', message: `Your ${planLimits.label} plan allows up to ${maxSimultaneous} simultaneous boost${maxSimultaneous !== 1 ? 's' : ''}. Upgrade your plan for more.`, variant: 'warning' });
       return;
     }
 
@@ -208,11 +212,11 @@ export const ListingBoostScreen = () => {
           </View>
         ) : null}
 
-        {hasActiveBoostElsewhere ? (
+        {hasReachedBoostLimit ? (
           <View style={styles.warningCard}>
             <Feather name="alert-circle" size={16} color={GOLD} />
             <Text style={styles.warningText}>
-              You have an active boost on another listing. Only one boost at a time is allowed.
+              You have reached your {maxSimultaneous} simultaneous boost limit. Upgrade your plan for more.
             </Text>
           </View>
         ) : null}
@@ -254,10 +258,10 @@ export const ListingBoostScreen = () => {
                     styles.optionCard,
                     isSelected ? { borderColor: PURPLE, borderWidth: 2 } : null,
                     option.highlight ? { borderColor: 'rgba(168,85,247,0.3)', borderWidth: 1.5 } : null,
-                    hasActiveBoostElsewhere ? { opacity: 0.5 } : null,
+                    hasReachedBoostLimit ? { opacity: 0.5 } : null,
                   ]}
                   onPress={() => {
-                    if (hasActiveBoostElsewhere) return;
+                    if (hasReachedBoostLimit) return;
                     setSelectedId(option.id);
                   }}
                 >
@@ -313,7 +317,7 @@ export const ListingBoostScreen = () => {
               );
             })}
 
-            {selectedId && !hasActiveBoostElsewhere ? (
+            {selectedId && !hasReachedBoostLimit ? (
               <Pressable onPress={() => applyBoost(selectedId, false)}>
                 <LinearGradient colors={[PURPLE, '#7c3aed']} style={styles.purchaseBtn}>
                   <Feather name="zap" size={16} color="#fff" />
@@ -343,7 +347,7 @@ export const ListingBoostScreen = () => {
         </View>
 
         <Text style={styles.notice}>
-          One boost active at a time. Boosts cannot be cancelled once applied.
+          Your plan allows up to {maxSimultaneous} simultaneous boost{maxSimultaneous !== 1 ? 's' : ''}. Boosts cannot be cancelled once applied.
         </Text>
 
         <View style={{ height: 40 }} />

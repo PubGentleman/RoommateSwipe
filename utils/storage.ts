@@ -1806,6 +1806,22 @@ export const StorageService = {
     }
   },
 
+  async getActiveBoostCountForHost(hostId: string): Promise<number> {
+    try {
+      const properties = await this.getProperties();
+      const hostProperties = properties.filter(p => p.hostId === hostId);
+      let count = 0;
+      for (const prop of hostProperties) {
+        if (prop.listingBoost?.isActive && new Date(prop.listingBoost.expiresAt) > new Date()) {
+          count++;
+        }
+      }
+      return count;
+    } catch {
+      return 0;
+    }
+  },
+
   async setApartmentPreferences(userId: string, prefs: any): Promise<void> {
     try {
       const key = `@rhome/apartment_prefs_${userId}`;

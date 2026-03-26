@@ -1998,17 +1998,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const canAddListing = (currentCount: number): { allowed: boolean; limit: number; reason?: string } => {
     const hostPlan = getHostPlan();
-    const planLimits: Record<string, number> = { free: 1, starter: 1, pro: 5, business: 15 };
-    const limit = planLimits[hostPlan] || 1;
-    if (hostPlan === 'business') {
-      if (currentCount >= limit) {
-        return { allowed: true, limit, reason: `This listing will add $5/mo overage to your Business plan.` };
-      }
-      return { allowed: true, limit };
+    const planLimitsMap: Record<string, number> = { free: 1, none: 1, starter: 5, pro: -1, business: -1 };
+    const limit = planLimitsMap[hostPlan] ?? 1;
+    if (limit === -1) {
+      return { allowed: true, limit: -1 };
     }
     if (currentCount >= limit) {
-      const nextPlan = hostPlan === 'free' ? 'Starter' : hostPlan === 'starter' ? 'Pro' : 'Business';
-      return { allowed: false, limit, reason: `${hostPlan === 'free' ? 'Free' : hostPlan.charAt(0).toUpperCase() + hostPlan.slice(1)} plan allows up to ${limit} active listing${limit > 1 ? 's' : ''}. Upgrade to ${nextPlan} for more.` };
+      const nextPlan = hostPlan === 'free' || hostPlan === 'none' ? 'Host Starter' : hostPlan === 'starter' ? 'Host Pro' : 'Host Business';
+      return { allowed: false, limit, reason: `Your ${hostPlan === 'free' || hostPlan === 'none' ? 'Free' : hostPlan.charAt(0).toUpperCase() + hostPlan.slice(1)} plan allows up to ${limit} active listing${limit > 1 ? 's' : ''}. Upgrade to ${nextPlan} to add more listings.` };
     }
     return { allowed: true, limit };
   };

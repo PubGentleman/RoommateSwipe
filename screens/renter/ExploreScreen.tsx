@@ -13,6 +13,7 @@ import { InterestConfirmationModal } from '../../components/InterestConfirmation
 import { PaywallSheet } from '../../components/PaywallSheet';
 import { LockedFeatureOverlay, PlanBadgeInline } from '../../components/LockedFeatureOverlay';
 import { normalizeRenterPlan, getRenterPlanLimits } from '../../constants/renterPlanLimits';
+import { getPlanLimits, type HostPlan } from '../../constants/planLimits';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCityContext } from '../../contexts/CityContext';
@@ -713,13 +714,13 @@ export const ExploreScreen = () => {
       });
     }
 
+    const PLACEMENT_PRIORITY: Record<string, number> = { featured: 4, top: 3, priority: 2, standard: 1 };
     const getHostPlanPriority = (property: Property) => {
       const host = property.hostProfileId ? hostProfiles.get(property.hostProfileId) : null;
       if (!host) return 0;
-      const plan = (host as any).hostPlan || 'starter';
-      if (plan === 'business') return 3;
-      if (plan === 'pro') return 2;
-      return 1;
+      const plan = (host as any).hostSubscription?.plan || (host as any).hostPlan || 'free';
+      const limits = getPlanLimits(plan as HostPlan);
+      return PLACEMENT_PRIORITY[limits.listingPlacement] || 1;
     };
 
     const isPropertyBoosted = (property: Property) => {
@@ -1068,7 +1069,7 @@ export const ExploreScreen = () => {
                     <Feather name="clock" size={10} color="#F59E0B" />
                     <Text style={[styles.verifiedHostText, { color: '#F59E0B' }]}>Pending</Text>
                   </View>
-                ) : hostUser?.purchases?.hostVerificationBadge === true || hostUser?.verifiedBusiness ? (
+                ) : hostUser?.purchases?.hostVerificationBadge === true || hostUser?.verifiedBusiness || ((hostUser as any)?.hostSubscription?.plan && (hostUser as any).hostSubscription.plan !== 'free' && (hostUser as any).hostSubscription.plan !== 'none') || (hostUser?.hostPlan && hostUser.hostPlan !== 'free' && hostUser.hostPlan !== 'none') ? (
                   <View style={styles.verifiedHostBadge}>
                     <Feather name="shield" size={10} color="#3ECF8E" />
                     <Text style={styles.verifiedHostText}>Verified</Text>
@@ -1890,7 +1891,7 @@ export const ExploreScreen = () => {
                         </Pressable>
                       ) : null}
 
-                      {detailHostUser?.verifiedBusiness || detailHostUser?.purchases?.hostVerificationBadge ? (
+                      {detailHostUser?.verifiedBusiness || detailHostUser?.purchases?.hostVerificationBadge || ((detailHostUser as any)?.hostSubscription?.plan && (detailHostUser as any).hostSubscription.plan !== 'free' && (detailHostUser as any).hostSubscription.plan !== 'none') || (detailHostUser?.hostPlan && detailHostUser.hostPlan !== 'free' && detailHostUser.hostPlan !== 'none') ? (
                         <View style={styles.pdChipRow}>
                           <View style={styles.pdVerifiedChip}>
                             <Feather name="check-circle" size={11} color="#22C55E" />

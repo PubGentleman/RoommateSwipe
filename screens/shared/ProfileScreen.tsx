@@ -231,7 +231,7 @@ export const ProfileScreen = () => {
                 <Feather name="clock" size={14} color="#F59E0B" />
                 <Text style={styles.pendingBadgeText}>Verification Pending</Text>
               </View>
-            ) : user?.purchases?.hostVerificationBadge === true ? (
+            ) : (user?.purchases?.hostVerificationBadge === true || (user?.role === 'host' && user?.hostSubscription?.plan && user.hostSubscription.plan !== 'free' && user.hostSubscription.plan !== 'none')) ? (
               <View style={styles.verifiedBadge}>
                 <Feather name="shield" size={14} color="#3ECF8E" />
                 <Text style={styles.verifiedBadgeText}>Verified</Text>

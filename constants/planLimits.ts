@@ -15,6 +15,10 @@ export interface PlanLimits {
   analyticsLevel: 'none' | 'basic' | 'advanced';
   hasCompanyBranding: boolean;
   hasDedicatedSupport: boolean;
+  hasVerifiedBadge: boolean;
+  hasBoosts: boolean;
+  freeBoostsPerMonth: number;
+  simultaneousBoosts: number;
 }
 
 export const PLAN_LIMITS: Record<HostPlan, PlanLimits> = {
@@ -33,6 +37,10 @@ export const PLAN_LIMITS: Record<HostPlan, PlanLimits> = {
     analyticsLevel: 'none',
     hasCompanyBranding: false,
     hasDedicatedSupport: false,
+    hasVerifiedBadge: false,
+    hasBoosts: false,
+    freeBoostsPerMonth: 0,
+    simultaneousBoosts: 0,
   },
   none: {
     plan: 'none',
@@ -49,6 +57,10 @@ export const PLAN_LIMITS: Record<HostPlan, PlanLimits> = {
     analyticsLevel: 'none',
     hasCompanyBranding: false,
     hasDedicatedSupport: false,
+    hasVerifiedBadge: false,
+    hasBoosts: false,
+    freeBoostsPerMonth: 0,
+    simultaneousBoosts: 0,
   },
   starter: {
     plan: 'starter',
@@ -65,6 +77,10 @@ export const PLAN_LIMITS: Record<HostPlan, PlanLimits> = {
     analyticsLevel: 'none',
     hasCompanyBranding: false,
     hasDedicatedSupport: false,
+    hasVerifiedBadge: true,
+    hasBoosts: true,
+    freeBoostsPerMonth: 1,
+    simultaneousBoosts: 1,
   },
   pro: {
     plan: 'pro',
@@ -81,6 +97,10 @@ export const PLAN_LIMITS: Record<HostPlan, PlanLimits> = {
     analyticsLevel: 'basic',
     hasCompanyBranding: false,
     hasDedicatedSupport: false,
+    hasVerifiedBadge: true,
+    hasBoosts: true,
+    freeBoostsPerMonth: 1,
+    simultaneousBoosts: 3,
   },
   business: {
     plan: 'business',
@@ -97,6 +117,10 @@ export const PLAN_LIMITS: Record<HostPlan, PlanLimits> = {
     analyticsLevel: 'advanced',
     hasCompanyBranding: true,
     hasDedicatedSupport: true,
+    hasVerifiedBadge: true,
+    hasBoosts: true,
+    freeBoostsPerMonth: 2,
+    simultaneousBoosts: 10,
   },
 };
 

@@ -890,7 +890,7 @@ export const HostDashboardScreen = () => {
           <Pressable style={styles.qaSecondary} onPress={() => navigation.navigate('Analytics')}>
             <Feather name="bar-chart-2" size={15} color="rgba(255,255,255,0.6)" />
             <Text style={styles.qaSecondaryText}>Analytics</Text>
-            {hostPlan === 'starter' ? (
+            {hostPlan === 'free' || hostPlan === 'none' || hostPlan === 'starter' ? (
               <View style={styles.proBadge}>
                 <Text style={styles.proBadgeText}>Pro</Text>
               </View>
@@ -900,7 +900,7 @@ export const HostDashboardScreen = () => {
             <Feather name="star" size={15} color={GOLD} />
             <Text style={styles.qaSecondaryText}>Plans</Text>
           </Pressable>
-          {user?.hostPlan === 'business' ? (
+          {hostPlan === 'business' ? (
             <Pressable style={styles.qaSecondary} onPress={() => {
               showAlert({
                 title: 'Dedicated Support',

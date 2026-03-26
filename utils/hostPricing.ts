@@ -184,10 +184,10 @@ export function canAddListingCheck(subscription: HostSubscriptionData): { allowe
     return { allowed: true, message: '' };
   }
   if (subscription.activeListingCount >= plan.listingsIncluded) {
-    const upgradeTo = isFreePlan(subscription.plan) ? 'Starter' : 'Pro';
+    const upgradeTo = isFreePlan(subscription.plan) ? 'Host Starter' : 'Host Pro';
     return {
       allowed: false,
-      message: `Your ${plan.label} plan allows up to ${plan.listingsIncluded} active listing${plan.listingsIncluded > 1 ? 's' : ''}. Upgrade to ${upgradeTo} to add more.`,
+      message: `Your ${plan.label} plan allows up to ${plan.listingsIncluded} active listing${plan.listingsIncluded > 1 ? 's' : ''}. Upgrade to ${upgradeTo} to add more listings.`,
       upgradeRequired: true,
     };
   }

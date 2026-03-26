@@ -275,8 +275,8 @@ export const BrowseRenterGroupsScreen = () => {
         <LockedFeatureWall
           icon="users"
           title="Renter Group Outreach"
-          description="Upgrade to Starter or higher to browse renter groups and message them directly with your listing."
-          requiredPlan="Starter"
+          description="Upgrade to Host Starter or higher to browse renter groups and message them directly with your listing."
+          requiredPlan="Host Starter"
           onUpgrade={() => navigation.navigate('Dashboard', { screen: 'HostSubscription' })}
         />
       </View>

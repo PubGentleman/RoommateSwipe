@@ -14,7 +14,9 @@ import { getMyListings, mapListingToProperty, updateListing, deleteListing as de
 import { getReceivedInterestCards } from '../../services/discoverService';
 import { RhomeAISheet } from '../../components/RhomeAISheet';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
-import { isListingBoosted, canAddListingCheck, isFreePlan } from '../../utils/hostPricing';
+import { isListingBoosted, canAddListingCheck } from '../../utils/hostPricing';
+import { canUseBoosts, hasVerifiedBadge as planHasVerifiedBadge } from '../../utils/planGates';
+import { type HostPlan } from '../../constants/planLimits';
 import { ListingLimitModal, OverageModal } from '../../components/ListingLimitModal';
 import { PropertyReviewsScreen } from '../shared/PropertyReviewsScreen';
 
@@ -242,8 +244,8 @@ export const MyListingsScreen = () => {
 
   const toggleFeatured = async (propertyId: string) => {
     if (!user) return;
-    const hostPlan = (user as any).hostPlan || 'starter';
-    if (hostPlan !== 'business') {
+    const currentPlan = getHostPlan() as HostPlan;
+    if (currentPlan !== 'business') {
       await showAlert({
         title: 'Business Plan Required',
         message: 'Featured listings are available exclusively for Business hosts. Upgrade your plan to feature your listings.',
@@ -335,7 +337,7 @@ export const MyListingsScreen = () => {
           <Pressable onPress={() => navigation.navigate('CreateEditListing', { propertyId: listing.id })}>
             <View style={styles.cardTitleRow}>
               <Text style={styles.cardTitle} numberOfLines={1}>{listing.title}</Text>
-              {user?.purchases?.hostVerificationBadge === true ? (
+              {(user?.purchases?.hostVerificationBadge === true || planHasVerifiedBadge(getHostPlan() as HostPlan)) ? (
                 <View style={styles.verifiedBadge}>
                   <Feather name="shield" size={11} color="#3ECF8E" />
                   <Text style={styles.verifiedBadgeText}>Verified</Text>
@@ -478,7 +480,7 @@ export const MyListingsScreen = () => {
             ) : null}
             {status === 'active' ? (
               <>
-                {!isFreePlan(getHostPlan() as any) ? (
+                {canUseBoosts(getHostPlan() as HostPlan) ? (
                   <Pressable
                     style={styles.actBoost}
                     onPress={() => navigation.navigate('ListingBoost', { listingId: listing.id })}
