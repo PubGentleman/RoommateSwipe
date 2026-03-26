@@ -49,6 +49,7 @@ The application is built using React Native, Expo, and TypeScript, employing Rea
 - **Location System:** The Explore screen uses search autocomplete for cities, neighborhoods, and ZIP codes via geocoding, supplemented by popular city chips and Google Places Autocomplete for onboarding.
 - **Area Info Cards:** Listing detail modals display area information (Transit, Restaurants, Grocery, Laundromat, Parks) powered by the Overpass API, with loading skeletons and graceful fallbacks.
 - **Renter/Host Mode Switch:** Allows individual hosts to toggle between modes.
+- **Affiliate Program:** Users can apply to become affiliates, receive unique referral codes (RHOME-XXXX format), and earn commissions ($10 for Plus, $20 for Elite referrals). Includes an affiliate dashboard with stats, referral history, PayPal email management, and native share integration. Referral codes can be entered during sign-up. Commission tracking triggers automatically on subscription upgrades.
 
 ## Backend (Supabase)
 

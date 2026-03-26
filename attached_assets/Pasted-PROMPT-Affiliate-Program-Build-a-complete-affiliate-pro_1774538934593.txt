@@ -1,0 +1,78 @@
+PROMPT: Affiliate Program
+Build a complete affiliate program into the app. Do this one piece at a time:
+
+1 — Affiliate Table (run this SQL in Supabase first)
+sqlCREATE TABLE IF NOT EXISTS public.affiliates (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  affiliate_code TEXT NOT NULL UNIQUE,
+  paypal_email TEXT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'suspended')),
+  total_referrals INTEGER DEFAULT 0,
+  total_earned NUMERIC DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.affiliate_referrals (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  affiliate_id UUID NOT NULL REFERENCES public.affiliates(id) ON DELETE CASCADE,
+  referred_user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  plan TEXT NOT NULL,
+  commission NUMERIC NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'paid')),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  paid_at TIMESTAMPTZ,
+  UNIQUE(referred_user_id)
+);
+
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS referred_by_code TEXT;
+
+2 — Affiliate Sign Up Flow
+Add an "Become an Affiliate" option in the app's Profile or Settings screen. When tapped, show a simple application form:
+
+Full name (pre-filled from profile)
+PayPal email address
+Why do you want to be an affiliate? (short text, optional)
+Submit button
+
+On submit, insert a row into the affiliates table with status: 'pending' and auto-generate a unique 8-character affiliate code (e.g. RHOME-X7K2). Show a confirmation: "Your application is under review. We'll notify you when approved."
+For now, auto-approve all applications — set status: 'approved' immediately on submit.
+
+3 — Affiliate Code Entry at Sign Up
+On the sign up screen, add an optional field at the bottom: "Have a referral code? (optional)". When a user enters a code and signs up, store it in users.referred_by_code.
+
+4 — Commission Trigger on Subscription
+When a user subscribes to Plus or Elite, check if users.referred_by_code is set:
+
+Look up the affiliate with that code in the affiliates table
+If found and status = 'approved':
+
+Insert a row into affiliate_referrals with:
+
+plan: 'plus' or 'elite'
+commission: 10 for Plus, 20 for Elite
+status: 'pending'
+
+
+Update affiliates.total_referrals + 1
+Update affiliates.total_earned + commission amount
+
+
+
+
+5 — Affiliate Dashboard Screen
+Add an "Affiliate Dashboard" screen accessible from Profile settings (only visible if user has an approved affiliate record). Show:
+
+Their affiliate code in a large copyable box with a share button
+Total referrals count
+Total earned amount
+A list of recent referrals (plan name, commission, date, paid/pending status)
+Their PayPal email with an edit button
+A "Share Your Code" button that opens the native share sheet with a pre-written message: "Join Rhome and find your perfect place! Use my code [CODE] to get started: https://rhomeapp.io"
+
+
+6 — Admin Payout Tracking
+In the Supabase dashboard (no in-app UI needed for now), the admin can view all affiliate_referrals with status = 'pending' to know who to pay via PayPal. After paying, manually update status to 'paid' and set paid_at to NOW().
+
+Paste into Replit and run the SQL in Supabase first. Let me know when both are done.

@@ -29,6 +29,8 @@ import { HostTypeSelectScreen } from '../screens/host/onboarding/HostTypeSelectS
 import { HostCompanySetupScreen } from '../screens/host/onboarding/HostCompanySetupScreen';
 import { HostAgentSetupScreen } from '../screens/host/onboarding/HostAgentSetupScreen';
 import ApartmentPreferencesScreen from '../screens/shared/ApartmentPreferencesScreen';
+import { AffiliateApplyScreen } from '../screens/shared/AffiliateApplyScreen';
+import { AffiliateDashboardScreen } from '../screens/shared/AffiliateDashboardScreen';
 
 export type ProfileStackParamList = {
   ProfileMain: undefined;
@@ -58,6 +60,8 @@ export type ProfileStackParamList = {
   MatchesList: undefined;
   WhoLikedMe: undefined;
   ApartmentPreferences: undefined;
+  AffiliateApply: undefined;
+  AffiliateDashboard: undefined;
 };
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
@@ -307,6 +311,16 @@ export const ProfileStackNavigator = () => {
       <Stack.Screen
         name="ApartmentPreferences"
         component={ApartmentPreferencesScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="AffiliateApply"
+        component={AffiliateApplyScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="AffiliateDashboard"
+        component={AffiliateDashboardScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>

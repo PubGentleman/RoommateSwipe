@@ -24,6 +24,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { LocationStep } from './components/LocationStep';
 import { PreferencesStep } from './components/PreferencesStep';
 import { getStateNameFromCode } from '../../utils/locationData';
+import { saveReferralCode } from '../../services/affiliateService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SWIPE_THRESHOLD = 80;
@@ -49,6 +50,7 @@ interface SignUpState {
   roomType: string;
   propertyType: string;
   profilePhoto: string | null;
+  referralCode: string;
 }
 
 const PROPERTY_TYPES = [
@@ -94,6 +96,7 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
     roomType: '',
     propertyType: '',
     profilePhoto: null,
+    referralCode: '',
   });
 
   type StepId = 'accountType' | 'credentials' | 'location' | 'details' | 'photo' | 'complete';
@@ -249,6 +252,15 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
       const companyName = state.accountType === 'company' && state.companyName.trim() ? state.companyName.trim() : undefined;
       const fullName = `${state.firstName.trim()} ${state.lastName.trim()}`;
       await register(state.email.trim().toLowerCase(), state.password, fullName, role as any, hostType, companyName, state.firstName.trim(), state.lastName.trim());
+      if (state.referralCode.trim()) {
+        try {
+          const { supabase } = await import('../../lib/supabase');
+          const { data: { user: authUser } } = await supabase.auth.getUser();
+          if (authUser) {
+            await saveReferralCode(authUser.id, state.referralCode.trim());
+          }
+        } catch (_) {}
+      }
     } catch (err: any) {
       await showAlert({ title: 'Error', message: err?.message || 'Failed to create account. Please try again.', variant: 'warning' });
     } finally {
@@ -436,6 +448,20 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
                 <Pressable onPress={() => setShowPassword(!showPassword)} hitSlop={8}>
                   <Feather name={showPassword ? 'eye-off' : 'eye'} size={16} color="rgba(255,255,255,0.35)" />
                 </Pressable>
+              </View>
+            </View>
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>REFERRAL CODE (OPTIONAL)</Text>
+              <View style={styles.inputWrap}>
+                <Feather name="gift" size={16} color="rgba(255,255,255,0.35)" />
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. RHOME-X7K2"
+                  placeholderTextColor="rgba(255,255,255,0.35)"
+                  value={state.referralCode}
+                  onChangeText={(v) => updateState({ referralCode: v.toUpperCase() })}
+                  autoCapitalize="characters"
+                />
               </View>
             </View>
           </View>

@@ -21,6 +21,7 @@ import { isHostTypeEditable, hoursRemainingInGracePeriod, getHostBadgeLabel, get
 import * as Linking from 'expo-linking';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { ModeSwitchToggle } from '../../components/ModeSwitchToggle';
+import { getAffiliateForUser } from '../../services/affiliateService';
 
 type ProfileScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'ProfileMain'>;
 
@@ -39,6 +40,7 @@ export const ProfileScreen = () => {
   const [devTapCount, setDevTapCount] = useState(0);
   const [devTapTimer, setDevTapTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
   const [safetyMode, setSafetyMode] = useState(false);
+  const [hasAffiliate, setHasAffiliate] = useState(false);
 
   const PROFILE_COLLAPSE_H = 280;
   const profileScrollY = useSharedValue(0);
@@ -125,6 +127,7 @@ export const ProfileScreen = () => {
             if (data?.safety_mode_enabled !== undefined) setSafetyMode(!!data.safety_mode_enabled);
           });
         }).catch(() => {});
+        getAffiliateForUser(user.id).then(aff => setHasAffiliate(!!aff)).catch(() => {});
       }
     }, [user, loadProfileStats])
   );
@@ -580,6 +583,15 @@ export const ProfileScreen = () => {
               title="Payment"
               subtitle="Manage payment methods"
               onPress={() => navigation.navigate('Payment')}
+            />
+            <SettingsItem
+              iconName="users"
+              iconColor="#ff6b5b"
+              iconBgColor="rgba(255,107,91,0.12)"
+              iconBorderColor="rgba(255,107,91,0.18)"
+              title="Affiliate Program"
+              subtitle={hasAffiliate ? 'View dashboard & earnings' : 'Earn by referring friends'}
+              onPress={() => navigation.navigate(hasAffiliate ? 'AffiliateDashboard' : 'AffiliateApply')}
             />
             <SettingsItem
               iconName="check-circle"

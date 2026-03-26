@@ -7,6 +7,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import type { Session } from '@supabase/supabase-js';
 import { activateBoost as boostServiceActivateBoost, deactivateExpiredBoosts } from '../services/boostService';
 import { identifyUser as rcIdentifyUser, logoutRevenueCat as rcLogout } from '../lib/revenueCat';
+import { processReferralCommission } from '../services/affiliateService';
 
 export type UserRole = 'renter' | 'host';
 
@@ -738,6 +739,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await supabase.from('subscriptions').update(updatePayload).eq('user_id', user.id);
     setUser(updatedUser);
     console.log('[Auth] Upgraded to Plus:', updatedUser.subscription);
+    processReferralCommission(user.id, 'plus').catch(() => {});
   };
 
   const upgradeToElite = async (billingCycle: 'monthly' | '3month' | 'annual' = 'monthly', stripeSubscriptionId?: string) => {
@@ -764,6 +766,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await supabase.from('subscriptions').update(updatePayload).eq('user_id', user.id);
     setUser(updatedUser);
     console.log('[Auth] Upgraded to Elite:', updatedUser.subscription);
+    processReferralCommission(user.id, 'elite').catch(() => {});
   };
 
   const downgradeToPlan = async (targetPlan: 'basic' | 'plus') => {
