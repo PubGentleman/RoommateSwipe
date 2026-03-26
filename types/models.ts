@@ -297,6 +297,9 @@ export interface Conversation {
   isSoloInquiry?: boolean;
   isSuperInterest?: boolean;
   matchId?: string;
+  last_renter_message_at?: string;
+  last_agent_response_at?: string;
+  response_status?: 'active' | 'delayed' | 'unresponsive' | 'critical';
 }
 
 export interface Application {

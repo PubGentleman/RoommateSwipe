@@ -18,6 +18,7 @@ import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { HostPlanBadge } from '../../components/HostPlanBadge';
 import { canAddListingCheck, isFreePlan } from '../../utils/hostPricing';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getAgentResponseAlerts } from '../../services/responseTrackingService';
 import { getHostCompletionPercentage } from '../../utils/profileReminderUtils';
 
 const BG = '#111';
@@ -94,6 +95,7 @@ export const HostDashboardScreen = () => {
   const [reassignListingId, setReassignListingId] = useState<string | null>(null);
   const [companyAgents, setCompanyAgents] = useState<{ id: string; full_name: string }[]>([]);
   const [unassignedListings, setUnassignedListings] = useState<Property[]>([]);
+  const [responseAlerts, setResponseAlerts] = useState<{ agentId: string; agentName: string; conversationId: string; renterName: string; status: string; hoursSinceMessage: number; listingTitle?: string; listingId?: string }[]>([]);
 
   const DASH_COLLAPSE_H = 50;
   const dashScrollY = useSharedValue(0);
@@ -192,6 +194,8 @@ export const HostDashboardScreen = () => {
           ? listings.filter(l => !l.assigned_agent_id && l.available)
           : [];
         setUnassignedListings(noAgent);
+        const alerts = await getAgentResponseAlerts(user.id);
+        setResponseAlerts(alerts);
       } catch {}
     }
   }, [user]);
@@ -600,6 +604,75 @@ export const HostDashboardScreen = () => {
               </Text>
             </View>
           </View>
+        ) : null}
+
+        {user?.hostType === 'company' && responseAlerts.length > 0 ? (
+          <>
+            <View style={[styles.sectionHeader, { marginTop: 6 }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Feather name="bell" size={14} color="#ff6b5b" />
+                <Text style={styles.sectionTitle}>RESPONSE ALERTS</Text>
+              </View>
+              <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>{responseAlerts.length} alert{responseAlerts.length !== 1 ? 's' : ''}</Text>
+            </View>
+            {responseAlerts.map((alertItem, idx) => {
+              const isCritical = alertItem.status === 'critical';
+              const isDelayed = alertItem.status === 'delayed';
+              const statusColor = isCritical ? '#ef4444' : isDelayed ? '#F59E0B' : '#f97316';
+              const statusLabel = isCritical ? 'Critical' : isDelayed ? 'Delayed' : 'Unresponsive';
+              return (
+                <Pressable
+                  key={`alert-${idx}`}
+                  style={{
+                    backgroundColor: isCritical ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)',
+                    borderWidth: 1,
+                    borderColor: isCritical ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.2)',
+                    borderRadius: 12, padding: 14, marginBottom: 8,
+                  }}
+                  onPress={() => {
+                    try {
+                      navigation.navigate('Chat' as any, {
+                        conversationId: alertItem.conversationId,
+                        readOnly: true,
+                      });
+                    } catch {}
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: statusColor }} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>{alertItem.agentName}</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 2 }}>
+                        {alertItem.renterName} waiting {Math.floor(alertItem.hoursSinceMessage)}h
+                        {alertItem.listingTitle ? ` · ${alertItem.listingTitle}` : ''}
+                      </Text>
+                    </View>
+                    <View style={{
+                      paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8,
+                      backgroundColor: statusColor + '20',
+                    }}>
+                      <Text style={{ color: statusColor, fontSize: 10, fontWeight: '700' }}>{statusLabel}</Text>
+                    </View>
+                    <Feather name="chevron-right" size={14} color="rgba(255,255,255,0.3)" />
+                  </View>
+                  {isCritical && alertItem.listingId ? (
+                    <Pressable
+                      style={{
+                        marginTop: 10, padding: 10, borderRadius: 8, alignItems: 'center',
+                        backgroundColor: 'rgba(239,68,68,0.15)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.3)',
+                      }}
+                      onPress={() => {
+                        setReassignListingId(alertItem.listingId!);
+                        setShowReassignModal(true);
+                      }}
+                    >
+                      <Text style={{ color: '#ef4444', fontSize: 12, fontWeight: '700' }}>Reassign Conversation</Text>
+                    </Pressable>
+                  ) : null}
+                </Pressable>
+              );
+            })}
+          </>
         ) : null}
 
         {user?.hostType === 'company' && agentStats.length > 0 ? (

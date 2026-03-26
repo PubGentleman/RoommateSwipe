@@ -26,6 +26,7 @@ import { getNeighborhoodsByCity, getAllCities, NEIGHBORHOODS } from '../../utils
 import { fetchAreaInfo, formatNearestAmenity, AreaInfo } from '../../services/neighborhoodService';
 import { getZodiacSymbol } from '../../utils/zodiacUtils';
 import { getBoostRotationIndex } from '../../utils/boostRotation';
+import { getAgentsWithCriticalStatus } from '../../services/responseTrackingService';
 import { shouldShowMatchScore, getHostBadgeLabel, getHostBadgeColor, getHostBadgeIcon } from '../../utils/hostTypeUtils';
 import type { HostType } from '../../utils/hostTypeUtils';
 import { PropertyMapView } from '../../components/PropertyMapView';
@@ -104,6 +105,7 @@ export const ExploreScreen = () => {
   const [filters, setFilters] = useState<PropertyFilter>({});
   const [tempFilters, setTempFilters] = useState<PropertyFilter>({});
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+  const [criticalAgentIds, setCriticalAgentIds] = useState<string[]>([]);
   const [showPropertyDetail, setShowPropertyDetail] = useState(false);
   const [showNeighborhoodSheet, setShowNeighborhoodSheet] = useState(false);
   const [photoIndex, setPhotoIndex] = useState(0);
@@ -225,6 +227,7 @@ export const ExploreScreen = () => {
           setProperties(mapped);
           setFilteredProperties(mapped);
           loadDiscoverableGroups(mapped);
+          getAgentsWithCriticalStatus().then(setCriticalAgentIds).catch(() => {});
           return;
         }
       } catch (supabaseErr) {
@@ -983,6 +986,12 @@ export const ExploreScreen = () => {
               <View style={styles.rhomeSelectBadge}>
                 <Feather name="award" size={10} color="#D4AF37" />
                 <Text style={styles.rhomeSelectText}>Rhome Select</Text>
+              </View>
+            ) : null}
+            {item.assigned_agent_id && criticalAgentIds.includes(item.assigned_agent_id) ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(245,158,11,0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)' }}>
+                <Feather name="clock" size={9} color="#F59E0B" />
+                <Text style={{ color: '#F59E0B', fontSize: 9, fontWeight: '700', letterSpacing: 0.3 }}>Response Delayed</Text>
               </View>
             ) : null}
           </View>

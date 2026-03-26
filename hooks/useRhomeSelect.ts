@@ -73,6 +73,16 @@ export function useRhomeSelect(hostId: string | undefined): RhomeSelectResult {
           setIsRhomeSelect(false); setLoading(false); return;
         }
 
+        const { data: userData } = await supabase
+          .from('users')
+          .select('response_rate')
+          .eq('id', hostId)
+          .single();
+
+        if (userData?.response_rate !== null && userData?.response_rate !== undefined && userData.response_rate < 90) {
+          setIsRhomeSelect(false); setLoading(false); return;
+        }
+
         if (!cancelled) {
           setIsRhomeSelect(true);
         }

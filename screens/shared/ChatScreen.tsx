@@ -32,6 +32,12 @@ import { VisitRequestModal } from '../../components/VisitRequestModal';
 import { BookingOfferModal } from '../../components/BookingOfferModal';
 import { sendStructuredMessage, updateMessageMetadata } from '../../services/messageService';
 import { createBooking } from '../../services/bookingService';
+import {
+  updateRenterMessageTimestamp,
+  updateAgentResponseTimestamp,
+  requestDifferentAgent,
+  getHoursSinceMessage,
+} from '../../services/responseTrackingService';
 
 type ChatScreenProps = {
   route: {
@@ -87,6 +93,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [chatAgentInfo, setChatAgentInfo] = useState<{ name?: string; isVerifiedAgent?: boolean; companyName?: string } | null>(null);
   const [chatGroupSize, setChatGroupSize] = useState<number>(0);
   const [isGroupLeader, setIsGroupLeader] = useState<boolean>(true);
+  const [responseDelayHours, setResponseDelayHours] = useState<number>(0);
+  const [requestedDifferentAgent, setRequestedDifferentAgent] = useState(false);
 
   const [inquiryStatus, setInquiryStatus] = useState<'pending' | 'accepted' | 'declined'>(
     inquiryGroup?.inquiryStatus || inquiryGroup?.inquiry_status || 'pending'
@@ -543,6 +551,25 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       setIsGroupLeader(myMember?.role === 'admin');
     }
 
+    if (isInquiryChat && conversation) {
+      const lastRenter = (conversation as any).last_renter_message_at;
+      const lastAgent = (conversation as any).last_agent_response_at;
+      if (lastRenter) {
+        const renterTime = new Date(lastRenter).getTime();
+        const agentTime = lastAgent ? new Date(lastAgent).getTime() : 0;
+        if (agentTime < renterTime) {
+          setResponseDelayHours(getHoursSinceMessage(lastRenter));
+        } else {
+          setResponseDelayHours(0);
+        }
+      } else {
+        setResponseDelayHours(0);
+      }
+    } else {
+      setResponseDelayHours(0);
+    }
+    setRequestedDifferentAgent(false);
+
     if (user && conversation) {
       const matches = await StorageService.getMatches();
       const hasMatch = matches.some(m =>
@@ -682,6 +709,14 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     await incrementMessageCount();
     dispatchInsightTrigger('message_activity');
     recordMessageActivity(conversationId).catch(() => {});
+
+    if (isInquiryChat && inquiryGroup?.hostId) {
+      if (user.id === inquiryGroup.hostId) {
+        updateAgentResponseTimestamp(conversationId).catch(() => {});
+      } else {
+        updateRenterMessageTimestamp(conversationId).catch(() => {});
+      }
+    }
 
     if (isFirstMessageFromUser) {
       await incrementActiveChatCount(conversationId);
@@ -1501,6 +1536,57 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           <ThemedText style={[Typography.caption, { color: theme.textSecondary, textAlign: 'center' }]}>
             Not matched yet · {coldMessagesRemaining >= 999 ? 'unlimited' : coldMessagesRemaining} message{coldMessagesRemaining !== 1 ? 's' : ''} left today
           </ThemedText>
+        </View>
+      ) : null}
+      {isInquiryChat && !isHost && responseDelayHours >= 48 && !requestedDifferentAgent && chatAgentInfo ? (
+        <Pressable
+          style={{
+            flexDirection: 'row', alignItems: 'center', gap: 8,
+            backgroundColor: 'rgba(245,158,11,0.1)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.25)',
+            marginHorizontal: 16, marginBottom: 8, padding: 12, borderRadius: 12,
+          }}
+          onPress={async () => {
+            const shouldRequest = await confirm({
+              title: 'Request Different Agent',
+              message: `${chatAgentInfo.name || 'This agent'} hasn't responded in ${Math.floor(responseDelayHours)} hours. Would you like to request a different agent from their company?`,
+              confirmText: 'Request',
+              cancelText: 'Cancel',
+              variant: 'warning',
+            });
+            if (shouldRequest) {
+              const hostId = inquiryGroup?.hostId;
+              if (hostId) {
+                const allUsers = await StorageService.getUsers();
+                const hostUser = allUsers.find(u => u.id === hostId);
+                const companyId = (hostUser as any)?.company_id || hostId;
+                await requestDifferentAgent(
+                  conversationId,
+                  companyId,
+                  user?.name || 'A renter',
+                  chatAgentInfo.name || 'Agent'
+                );
+                setRequestedDifferentAgent(true);
+                await alert({ title: 'Request Sent', message: 'The company admin has been notified. They will assign a different agent to assist you.' });
+              }
+            }
+          }}
+        >
+          <Feather name="alert-circle" size={16} color="#F59E0B" />
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: '#F59E0B', fontSize: 13, fontWeight: '600' }}>Response delayed ({Math.floor(responseDelayHours)}h)</Text>
+            <Text style={{ color: 'rgba(245,158,11,0.7)', fontSize: 11 }}>Tap to request a different agent</Text>
+          </View>
+          <Feather name="chevron-right" size={14} color="rgba(245,158,11,0.5)" />
+        </Pressable>
+      ) : null}
+      {requestedDifferentAgent ? (
+        <View style={{
+          flexDirection: 'row', alignItems: 'center', gap: 8,
+          backgroundColor: 'rgba(59,130,246,0.1)', borderWidth: 1, borderColor: 'rgba(59,130,246,0.25)',
+          marginHorizontal: 16, marginBottom: 8, padding: 12, borderRadius: 12,
+        }}>
+          <Feather name="check-circle" size={14} color="#3b82f6" />
+          <Text style={{ color: '#3b82f6', fontSize: 12, flex: 1 }}>Agent reassignment requested. The company admin has been notified.</Text>
         </View>
       ) : null}
       <View style={[styles.inputContainer, { backgroundColor: theme.backgroundRoot, paddingBottom: TAB_BAR_HEIGHT }]}>

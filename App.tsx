@@ -19,8 +19,14 @@ import { RevenueCatProvider } from "./contexts/RevenueCatContext";
 import { StorageService } from "./utils/storage";
 import { isDev } from "./utils/dataUtils";
 import { checkDailyTrigger } from "./utils/insightRefresh";
+import { useResponseTracking } from "./hooks/useResponseTracking";
 
 SplashScreen.preventAutoHideAsync();
+
+function ResponseTracker() {
+  useResponseTracking();
+  return null;
+}
 
 export default function App() {
   useEffect(() => {
@@ -61,6 +67,7 @@ export default function App() {
                         <RevenueCatProvider>
                           <NavigationContainer>
                             <RootNavigator />
+                            <ResponseTracker />
                           </NavigationContainer>
                           <StatusBar style="light" />
                         </RevenueCatProvider>
