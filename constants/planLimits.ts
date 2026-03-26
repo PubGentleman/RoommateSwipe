@@ -153,7 +153,7 @@ export const AGENT_PLAN_LIMITS: Record<AgentPlan, AgentPlanLimits> = {
   starter: {
     plan: 'starter',
     label: 'Agent Starter',
-    monthlyPrice: '$49.99',
+    monthlyPrice: '$49',
     placementFeeCents: 9900,
     shortlistLimit: 10,
     activeGroupsLimit: 1,
@@ -169,7 +169,7 @@ export const AGENT_PLAN_LIMITS: Record<AgentPlan, AgentPlanLimits> = {
   pro: {
     plan: 'pro',
     label: 'Agent Pro',
-    monthlyPrice: '$99.99',
+    monthlyPrice: '$99',
     placementFeeCents: 4900,
     shortlistLimit: 50,
     activeGroupsLimit: 5,
@@ -185,7 +185,7 @@ export const AGENT_PLAN_LIMITS: Record<AgentPlan, AgentPlanLimits> = {
   business: {
     plan: 'business',
     label: 'Agent Business',
-    monthlyPrice: '$199.99',
+    monthlyPrice: '$149',
     placementFeeCents: 2500,
     shortlistLimit: -1,
     activeGroupsLimit: -1,

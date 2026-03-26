@@ -131,9 +131,9 @@ const AGENT_PLANS: HostPlanTier[] = [
   {
     id: 'agent_starter',
     name: 'Agent Starter',
-    monthlyPrice: 79,
-    threeMonthPrice: 213.30,
-    annualPrice: 758.40,
+    monthlyPrice: 49,
+    threeMonthPrice: 132.30,
+    annualPrice: 470.40,
     monthlyNote: 'For new agents building their rental portfolio',
     features: [
       { label: 'Up to 10 active listings', included: true },
@@ -147,9 +147,9 @@ const AGENT_PLANS: HostPlanTier[] = [
   {
     id: 'agent_pro',
     name: 'Agent Pro',
-    monthlyPrice: 149,
-    threeMonthPrice: 402.30,
-    annualPrice: 1430.40,
+    monthlyPrice: 99,
+    threeMonthPrice: 267.30,
+    annualPrice: 950.40,
     recommended: true,
     monthlyNote: 'For established agents with active rosters',
     features: [
@@ -164,9 +164,9 @@ const AGENT_PLANS: HostPlanTier[] = [
   {
     id: 'agent_business',
     name: 'Agent Business',
-    monthlyPrice: 249,
-    threeMonthPrice: 672.30,
-    annualPrice: 2390.40,
+    monthlyPrice: 149,
+    threeMonthPrice: 402.30,
+    annualPrice: 1430.40,
     monthlyNote: 'High-volume agents and brokers',
     features: [
       { label: 'Unlimited active listings', included: true },
