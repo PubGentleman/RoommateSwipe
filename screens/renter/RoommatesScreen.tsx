@@ -31,8 +31,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { RhomeLogo } from '../../components/RhomeLogo';
 import { RoommateFilterSheet, MatchFilters, DEFAULT_FILTERS, getActiveFilterCount, getActiveFilterChips, removeFilterChip, loadSavedFilters, saveFilters, applyFiltersToProfiles } from '../../components/RoommateFilterSheet';
 import { PlanBadge } from '../../components/PlanBadge';
-import { normalizeRenterPlan, getRenterPlanLimits } from '../../constants/renterPlanLimits';
+import { normalizeRenterPlan, getRenterPlanLimits, canSwipe } from '../../constants/renterPlanLimits';
 import { PlanBadgeInline } from '../../components/LockedFeatureOverlay';
+import { getDailySwipeCount, incrementDailySwipeCount, decrementDailySwipeCount, getTimeUntilMidnight } from '../../utils/dailySwipeLimit';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { RhomeAISheet } from '../../components/RhomeAISheet';
 import type { ScreenContext } from '../../components/RhomeAISheet';
@@ -111,6 +112,8 @@ export const RoommatesScreen = () => {
   const [questionInjectedAtIndex, setQuestionInjectedAtIndex] = useState<number | null>(null);
   const [rightSwipeCount, setRightSwipeCount] = useState(0);
   const [totalSwipeCount, setTotalSwipeCount] = useState(0);
+  const [dailySwipesUsed, setDailySwipesUsed] = useState(-1);
+  const [showSwipeLimitModal, setShowSwipeLimitModal] = useState(false);
   const [bestMatch, setBestMatch] = useState<{ profile: any; score: number; reason: string } | null>(null);
   const [highlightedProfileId, setHighlightedProfileId] = useState<string | null>(null);
   const [showBoostModal, setShowBoostModal] = useState(false);
@@ -278,6 +281,8 @@ export const RoommatesScreen = () => {
         loadProfiles();
         lastLoadTime.current = now;
       }
+
+      getDailySwipeCount().then(count => setDailySwipesUsed(count)).catch(() => {});
 
       if (user) {
         (async () => {
@@ -533,6 +538,17 @@ export const RoommatesScreen = () => {
   const handleSwipeAction = async (action: 'like' | 'nope' | 'superlike') => {
     if (!currentProfile || !user || isAnimatingSwipe.value) return;
 
+    const effectiveSwipes = dailySwipesUsed === -1 ? 0 : dailySwipesUsed;
+    if (!canSwipe(renterPlan, effectiveSwipes)) {
+      setShowSwipeLimitModal(true);
+      return;
+    }
+
+    if (renterLimits.dailySwipes !== -1) {
+      const newCount = await incrementDailySwipeCount();
+      setDailySwipesUsed(newCount);
+    }
+
     if (action === 'superlike') {
       const superLikeCheck = canSuperLike();
       if (!superLikeCheck.canSuperLike) {
@@ -578,6 +594,10 @@ export const RoommatesScreen = () => {
     await undoLastSwipeAsync(lastSwipedProfile.profile.id, lastSwipedProfile.action);
     
     await useRewind();
+    if (renterLimits.dailySwipes !== -1) {
+      const newCount = await decrementDailySwipeCount();
+      setDailySwipesUsed(newCount);
+    }
     
     setCurrentIndex(prev => prev - 1);
     setLastSwipedProfile(null);
@@ -1773,6 +1793,44 @@ export const RoommatesScreen = () => {
         onUpgrade={handleUpgradeToPaid}
         onDismiss={() => setShowPaywall(false)}
       />
+
+      <Modal
+        visible={showSwipeLimitModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSwipeLimitModal(false)}
+      >
+        <View style={styles.swipeLimitOverlay}>
+          <View style={styles.swipeLimitCard}>
+            <View style={styles.swipeLimitIconWrap}>
+              <Feather name="zap-off" size={32} color="#ff6b5b" />
+            </View>
+            <ThemedText style={styles.swipeLimitTitle}>Daily Swipe Limit Reached</ThemedText>
+            <ThemedText style={styles.swipeLimitMessage}>
+              You've used all {renterLimits.dailySwipes} free swipes today. Upgrade to Plus for unlimited swipes.
+            </ThemedText>
+            <ThemedText style={styles.swipeLimitTimer}>
+              Swipes reset in {getTimeUntilMidnight()}
+            </ThemedText>
+            <Pressable
+              style={styles.swipeLimitUpgradeBtn}
+              onPress={() => {
+                setShowSwipeLimitModal(false);
+                (navigation as any).navigate('Plans');
+              }}
+            >
+              <Feather name="arrow-up-circle" size={18} color="#fff" />
+              <ThemedText style={styles.swipeLimitUpgradeBtnText}>Subscribe to Plus</ThemedText>
+            </Pressable>
+            <Pressable
+              style={styles.swipeLimitDismissBtn}
+              onPress={() => setShowSwipeLimitModal(false)}
+            >
+              <ThemedText style={styles.swipeLimitDismissText}>Maybe Later</ThemedText>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={showFirstSessionPrompt} transparent animationType="fade" onRequestClose={async () => {
         setShowFirstSessionPrompt(false);
@@ -3753,5 +3811,75 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700' as const,
     color: '#FFFFFF',
+  },
+  swipeLimitOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.88)',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    paddingHorizontal: 32,
+  },
+  swipeLimitCard: {
+    width: '100%' as any,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 24,
+    paddingVertical: 36,
+    paddingHorizontal: 28,
+    alignItems: 'center' as const,
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.15)',
+  },
+  swipeLimitIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(255,107,91,0.12)',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    marginBottom: 16,
+  },
+  swipeLimitTitle: {
+    fontSize: 20,
+    fontWeight: '700' as const,
+    color: '#fff',
+    textAlign: 'center' as const,
+    marginBottom: 8,
+  },
+  swipeLimitMessage: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.6)',
+    textAlign: 'center' as const,
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  swipeLimitTimer: {
+    fontSize: 13,
+    color: '#ff6b5b',
+    fontWeight: '600' as const,
+    marginBottom: 24,
+  },
+  swipeLimitUpgradeBtn: {
+    width: '100%' as any,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: '#ff6b5b',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 8,
+    marginBottom: 12,
+  },
+  swipeLimitUpgradeBtnText: {
+    fontSize: 16,
+    fontWeight: '700' as const,
+    color: '#fff',
+  },
+  swipeLimitDismissBtn: {
+    paddingVertical: 10,
+  },
+  swipeLimitDismissText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.4)',
+    fontWeight: '500' as const,
   },
 });
