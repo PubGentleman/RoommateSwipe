@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { Property } from '../types/models';
+import { StorageService } from '../utils/storage';
 
 export interface ListingData {
   title: string;
@@ -252,7 +253,12 @@ export async function getCompanyAgents(companyUserId: string): Promise<{ id: str
       .eq('company_user_id', companyUserId)
       .eq('status', 'active');
 
-    if (error || !data) return [];
+    if (error || !data || data.length === 0) {
+      const allUsers = await StorageService.getUsers();
+      return allUsers
+        .filter(u => u.hostType === 'agent' && ((u as any).company_id === companyUserId))
+        .map(u => ({ id: u.id, full_name: u.full_name || u.name || 'Agent', avatar_url: u.profilePicture }));
+    }
 
     const agentIds = data.filter(d => d.member_user_id).map(d => d.member_user_id);
     if (agentIds.length === 0) return [];
@@ -268,7 +274,10 @@ export async function getCompanyAgents(companyUserId: string): Promise<{ id: str
       avatar_url: u.avatar_url,
     }));
   } catch {
-    return [];
+    const allUsers = await StorageService.getUsers();
+    return allUsers
+      .filter(u => u.hostType === 'agent' && ((u as any).company_id === companyUserId))
+      .map(u => ({ id: u.id, full_name: u.full_name || u.name || 'Agent', avatar_url: u.profilePicture }));
   }
 }
 

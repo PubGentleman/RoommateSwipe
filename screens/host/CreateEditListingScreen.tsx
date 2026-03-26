@@ -725,7 +725,10 @@ export const CreateEditListingScreen = () => {
 
         {isCompanyHost ? (
           <View style={styles.fieldContainer}>
-            <Text style={styles.label}>Assign Agent</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={styles.label}>Assign Agent</Text>
+              <Text style={{ color: '#ef4444', fontSize: 12, fontWeight: '600' }}>Required</Text>
+            </View>
             <Text style={[styles.sectionSubtitle, { marginBottom: 8 }]}>
               Select an agent from your team to manage this listing
             </Text>
