@@ -134,10 +134,11 @@ export function AskAboutPersonModal({
 
     } catch (error) {
       console.error('[AskAboutPerson] error:', error);
+      const fallbackMsg = `I'm having trouble connecting right now, but I can still help. Try asking me about ${targetName}'s budget, schedule, lifestyle compatibility, or what you two have in common — I'll answer based on their profile data.`;
       setMessages(prev => [...prev, {
         id: 'error-' + Date.now(),
         role: 'assistant',
-        content: 'Something went wrong. Try again.',
+        content: fallbackMsg,
       }]);
     } finally {
       setLoading(false);

@@ -2,14 +2,94 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import Anthropic from 'https://esm.sh/@anthropic-ai/sdk@0.24.0';
 
-const anthropic = new Anthropic({ apiKey: Deno.env.get('ANTHROPIC_API_KEY')! });
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Content-Type': 'application/json',
+};
+
+function generateFallbackAnswer(
+  question: string,
+  myProfile: any,
+  targetProfile: any,
+  matchScore: any
+): string {
+  const name = targetProfile?.first_name || 'this person';
+  const q = question.toLowerCase();
+  const score = matchScore?.overall_score;
+
+  if (q.includes('compatible') || q.includes('match') || q.includes('good fit')) {
+    const parts: string[] = [];
+    if (score) parts.push(`Your compatibility score with ${name} is ${score}%.`);
+    if (myProfile?.budget_min && targetProfile?.budget_min) {
+      const budgetOverlap = myProfile.budget_max >= targetProfile.budget_min && targetProfile.budget_max >= myProfile.budget_min;
+      parts.push(budgetOverlap
+        ? `Your budgets overlap ($${myProfile.budget_min}-$${myProfile.budget_max} vs $${targetProfile.budget_min}-$${targetProfile.budget_max}).`
+        : `Your budgets don't overlap well ($${myProfile.budget_min}-$${myProfile.budget_max} vs $${targetProfile.budget_min}-$${targetProfile.budget_max}).`);
+    }
+    if (myProfile?.sleep_schedule && targetProfile?.sleep_schedule) {
+      parts.push(myProfile.sleep_schedule === targetProfile.sleep_schedule
+        ? `You both have ${myProfile.sleep_schedule} sleep schedules.`
+        : `Sleep schedules differ: you're ${myProfile.sleep_schedule}, ${name} is ${targetProfile.sleep_schedule}.`);
+    }
+    return parts.join(' ') || `Based on available data, ${name} could be a match worth exploring.`;
+  }
+
+  if (q.includes('red flag') || q.includes('concern') || q.includes('worry') || q.includes('dealbreaker')) {
+    const concerns: string[] = [];
+    if (myProfile?.cleanliness_level && targetProfile?.cleanliness_level) {
+      const diff = Math.abs(myProfile.cleanliness_level - targetProfile.cleanliness_level);
+      if (diff >= 2) concerns.push(`cleanliness expectations differ (you: ${myProfile.cleanliness_level}/5, ${name}: ${targetProfile.cleanliness_level}/5)`);
+    }
+    if (myProfile?.noise_level && targetProfile?.noise_level) {
+      const diff = Math.abs(myProfile.noise_level - targetProfile.noise_level);
+      if (diff >= 2) concerns.push(`noise preferences differ (you: ${myProfile.noise_level}/5, ${name}: ${targetProfile.noise_level}/5)`);
+    }
+    if (myProfile?.smoking_preference && targetProfile?.smoking_preference && myProfile.smoking_preference !== targetProfile.smoking_preference) {
+      concerns.push(`smoking preferences differ (you: ${myProfile.smoking_preference}, ${name}: ${targetProfile.smoking_preference})`);
+    }
+    return concerns.length > 0
+      ? `Potential concerns: ${concerns.join('; ')}.`
+      : `No obvious red flags based on ${name}'s profile data. Their cleanliness is ${targetProfile?.cleanliness_level || '?'}/5 and noise level is ${targetProfile?.noise_level || '?'}/5.`;
+  }
+
+  if (q.includes('schedule') || q.includes('sleep') || q.includes('routine')) {
+    return `${name}'s sleep schedule is ${targetProfile?.sleep_schedule || 'not specified'}, work style is ${targetProfile?.work_style || 'not specified'}. ${myProfile?.sleep_schedule === targetProfile?.sleep_schedule ? 'You share similar schedules.' : 'Your schedules differ, which is worth discussing.'}`;
+  }
+
+  if (q.includes('common') || q.includes('share') || q.includes('similar')) {
+    const shared: string[] = [];
+    if (myProfile?.sleep_schedule === targetProfile?.sleep_schedule) shared.push(`${myProfile.sleep_schedule} sleep schedules`);
+    if (myProfile?.work_style === targetProfile?.work_style) shared.push(`${myProfile.work_style} work styles`);
+    if (myProfile?.guest_preference === targetProfile?.guest_preference) shared.push(`similar guest preferences`);
+    if (myProfile?.pet_preference === targetProfile?.pet_preference) shared.push(`same pet preferences`);
+    return shared.length > 0
+      ? `You and ${name} share: ${shared.join(', ')}.`
+      : `Based on profiles, you and ${name} have different preferences in most categories, but that's not necessarily a dealbreaker.`;
+  }
+
+  if (q.includes('message') || q.includes('say') || q.includes('start') || q.includes('draft')) {
+    const topics: string[] = [];
+    if (targetProfile?.occupation) topics.push(`their work as ${targetProfile.occupation}`);
+    if (targetProfile?.neighborhoods?.length) topics.push(`the ${targetProfile.neighborhoods[0]} area`);
+    if (targetProfile?.bio) topics.push('something from their bio');
+    return `Try opening with something specific about ${topics.length > 0 ? topics[0] : `${name}'s profile`}. People respond better to personalized messages than generic greetings.`;
+  }
+
+  if (q.includes('budget') || q.includes('price') || q.includes('rent') || q.includes('afford')) {
+    return `${name}'s budget range is $${targetProfile?.budget_min || '?'}-$${targetProfile?.budget_max || '?'}/mo. ${myProfile?.budget_min ? `Yours is $${myProfile.budget_min}-$${myProfile.budget_max}/mo.` : ''}`;
+  }
+
+  const details: string[] = [];
+  if (targetProfile?.occupation) details.push(`works as ${targetProfile.occupation}`);
+  if (targetProfile?.sleep_schedule) details.push(`${targetProfile.sleep_schedule} schedule`);
+  if (targetProfile?.cleanliness_level) details.push(`cleanliness ${targetProfile.cleanliness_level}/5`);
+  if (targetProfile?.budget_min) details.push(`budget $${targetProfile.budget_min}-$${targetProfile.budget_max}`);
+  if (score) details.push(`${score}% compatible with you`);
+  return `Here's what I know about ${name}: ${details.join(', ') || 'limited profile data available'}. Try asking something more specific for a better answer.`;
+}
 
 serve(async (req) => {
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  };
-
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
@@ -21,16 +101,14 @@ serve(async (req) => {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'Missing authorization header' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401, headers: corsHeaders,
       });
     }
 
     const { data: { user } } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
     if (!user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401, headers: corsHeaders,
       });
     }
 
@@ -38,8 +116,7 @@ serve(async (req) => {
 
     if (!targetProfileId || !userMessage) {
       return new Response(JSON.stringify({ error: 'Missing targetProfileId or userMessage' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400, headers: corsHeaders,
       });
     }
 
@@ -182,32 +259,42 @@ Do NOT be a yes-machine. If there's a real compatibility concern based on the da
       { role: 'user', content: userMessage },
     ];
 
-    const response = await anthropic.messages.create({
-      model: 'claude-3-5-haiku-20241022',
-      max_tokens: 500,
-      system: systemPrompt,
-      messages,
-    });
+    let reply: string;
 
-    const reply = response.content[0].type === 'text' ? response.content[0].text : '';
+    try {
+      const anthropic = new Anthropic({ apiKey: Deno.env.get('ANTHROPIC_API_KEY')! });
+      const response = await anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 500,
+        system: systemPrompt,
+        messages,
+      });
+
+      reply = response.content[0].type === 'text' ? response.content[0].text : '';
+    } catch (aiError) {
+      console.error('Claude API error, using fallback:', aiError);
+      reply = generateFallbackAnswer(userMessage, myProfile, targetProfile, matchScore);
+    }
+
+    if (!reply) {
+      reply = generateFallbackAnswer(userMessage, myProfile, targetProfile, matchScore);
+    }
 
     return new Response(JSON.stringify({
       reply,
       targetName: targetProfile?.first_name,
       compatibilityScore: matchScore?.overall_score || null,
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    }), { headers: corsHeaders });
 
   } catch (error) {
     console.error('ai-ask-about-profile error:', error);
-    return new Response(JSON.stringify({ error: (error as Error).message }), {
-      status: 500,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-        'Content-Type': 'application/json',
-      },
-    });
+
+    const fallback = 'I can still help based on the profile data available. Try asking about compatibility, budget, schedule, or what you have in common.';
+
+    return new Response(JSON.stringify({
+      reply: fallback,
+      targetName: null,
+      compatibilityScore: null,
+    }), { headers: corsHeaders });
   }
 });
