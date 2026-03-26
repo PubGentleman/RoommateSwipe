@@ -2390,6 +2390,7 @@ export const ExploreScreen = () => {
           listingId={selectedProperty.id}
           address={`${selectedProperty.address}, ${selectedProperty.city}, ${selectedProperty.state}`}
           neighborhood={selectedProperty.neighborhood}
+          areaInfo={areaInfo}
         />
       ) : null}
       <Modal

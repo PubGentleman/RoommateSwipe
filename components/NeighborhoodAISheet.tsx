@@ -8,6 +8,7 @@ import { Feather } from './VectorIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../hooks/useTheme';
 import { supabase } from '../lib/supabase';
+import { AreaInfo } from '../services/neighborhoodService';
 
 interface ChatMessage {
   id: string;
@@ -21,20 +22,41 @@ interface Props {
   listingId: string;
   address: string;
   neighborhood?: string;
+  areaInfo?: AreaInfo | null;
 }
 
-const QUICK_PROMPTS = [
-  'Is it safe at night?',
-  "How's the commute?",
-  'Good for young professionals?',
-  "What's the nightlife like?",
-  'Is it walkable for groceries?',
-  'Any downsides I should know?',
-];
+function getSmartPrompts(areaInfo?: AreaInfo | null): string[] {
+  if (!areaInfo) {
+    return ['Is it safe at night?', "How's the commute?", "What's the nightlife like?"];
+  }
+
+  const candidates: string[] = [];
+  const transitCount = areaInfo.transit.length;
+  const restaurantCount = areaInfo.restaurants.length;
+  const parkCount = areaInfo.parks.length;
+  const nearestGrocery = areaInfo.grocery.length > 0 ? areaInfo.grocery[0] : null;
+  const nearestLaundry = areaInfo.laundry.length > 0 ? areaInfo.laundry[0] : null;
+
+  if (transitCount >= 3) candidates.push("How's the commute?");
+  if (restaurantCount >= 8) candidates.push("What's the nightlife like?");
+  if (parkCount >= 1) candidates.push('Is it family friendly?');
+  if (nearestGrocery && nearestGrocery.distanceKm > 0.4) candidates.push("Where's the nearest grocery?");
+  if (nearestLaundry && nearestLaundry.distanceKm > 0.4) candidates.push('Is there laundry nearby?');
+
+  while (candidates.length < 3) {
+    candidates.push('Is it safe at night?');
+    if (candidates.length < 3 && !candidates.includes("How's the commute?")) candidates.push("How's the commute?");
+    if (candidates.length < 3 && !candidates.includes("What's the nightlife like?")) candidates.push("What's the nightlife like?");
+    if (candidates.length < 3 && !candidates.includes('Any downsides I should know?')) candidates.push('Any downsides I should know?');
+    break;
+  }
+
+  return candidates.slice(0, 3);
+}
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://lnjupgvvsbdooomvdjho.supabase.co';
 
-export function NeighborhoodAISheet({ visible, onClose, listingId, address, neighborhood }: Props) {
+export function NeighborhoodAISheet({ visible, onClose, listingId, address, neighborhood, areaInfo: areaInfoProp }: Props) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -225,7 +247,7 @@ export function NeighborhoodAISheet({ visible, onClose, listingId, address, neig
             <FlatList
               horizontal
               showsHorizontalScrollIndicator={false}
-              data={QUICK_PROMPTS}
+              data={getSmartPrompts(areaInfoProp)}
               keyExtractor={(item) => item}
               contentContainerStyle={styles.quickPromptsList}
               renderItem={({ item }) => (
