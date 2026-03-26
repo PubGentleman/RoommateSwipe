@@ -1,6 +1,6 @@
 # Overview
 
-Rhome is a React Native mobile application designed to simplify housing and roommate searches. It connects renters and hosts through a role-based, swipe-based matching platform. The project aims to provide a comprehensive and intuitive solution, akin to "Airbnb for roommates," facilitating the discovery of compatible roommates and suitable properties. Key capabilities include AI-powered matching, property listings, group functionalities, and secure communication.
+Rhome is a React Native mobile application designed to simplify housing and roommate searches by connecting renters and hosts through a role-based, swipe-based matching platform. It aims to be a comprehensive and intuitive solution, offering AI-powered matching, property listings, group functionalities, and secure communication to facilitate the discovery of compatible roommates and suitable properties.
 
 # User Preferences
 
@@ -24,62 +24,52 @@ Preferred communication style: Simple, everyday language.
 
 ## Frontend
 
-The application is built using React Native, Expo, and TypeScript, utilizing React Navigation for role-based access (Renter, Host, Agent/Landlord). It supports light/dark modes, animations with React Native Reanimated, and state management via React Context API and AsyncStorage.
+The application is built using React Native, Expo, and TypeScript, employing React Navigation for role-based access (Renter, Host, Agent/Landlord). It supports light/dark modes, animations with React Native Reanimated, and state management via React Context API and AsyncStorage.
 
 **Key Features:**
-- **Matching & Profiles:** Features a compatibility algorithm, interest tags, and personality quizzes. Profile questionnaire removed from sign-up; replaced by a post-signup Profile Completion system (inline form in `screens/shared/ProfileCompletionScreen.tsx`).
+- **Matching & Profiles:** Features a compatibility algorithm, interest tags, personality quizzes, and a post-signup Profile Completion system.
 - **Role-Specific Features:**
     - **Renter:** Swipe-based matching, 1-on-1 messaging, group management, property exploration with advanced filters and transit integration, saved properties, AI Match Assistant, property reviews, chat scheduling (visit requests + booking offers), and notifications.
     - **Host:** Dashboard for listing management (create, edit, delete, boost), inquiry handling, analytics, property review management with host replies, and group matches monetization. Supports Individual, Company, and Agent host types with varying UI/features.
-    - **Property Reviews:** Renters can rate (1-5 stars) and review listings with optional text and tags (Clean, Responsive host, Great location, etc.). Reviews display in listing detail modal and full reviews screen. Hosts can reply to reviews. Rating badges appear on listing cards. DB: `property_reviews` table with RLS, `average_rating`/`review_count` on `listings`. Migration: `036_property_reviews.sql`. Files: `services/reviewService.ts`, `components/WriteReviewSheet.tsx`, `screens/shared/PropertyReviewsScreen.tsx`.
-    - **Chat Scheduling & Booking:** In accepted inquiry chats, a "+" action menu offers "Schedule Visit" (all users) and "Send Booking Offer" (host only). Visit requests and booking offers render as rich action cards inline in chat with Confirm/Decline/Propose New Time actions. Cards update status in real-time via message metadata. Booking acceptance creates a record in the `bookings` table. DB: `message_type`/`metadata` columns on `messages`, `bookings` table with RLS. Migration: `037_chat_cards_bookings.sql`. Files: `services/bookingService.ts`, `components/ChatActionCard.tsx`, `components/VisitRequestModal.tsx`, `components/BookingOfferModal.tsx`.
-    - **Rhome Select Badge:** Gold "award" badge displayed on listing cards and detail modal for top-rated hosts (average_rating >= 4.8 with 10+ reviews). Full eligibility model in `hooks/useRhomeSelect.ts` includes host tenure (3+ months), cancellation rate (<10%), and booking history. Badge appears on ExploreScreen cards and detail modal host section.
-    - **Company Teams:** Multi-seat team access for company accounts with Owner/Admin/Member roles, invite system, seat limits by plan (Starter: 3, Pro: 10, Enterprise: unlimited), team management dashboard, and role-based permissions.
-    - **Company Agent Assignment & Routing:** Company accounts can assign agents to listings via dropdown in CreateEditListingScreen. When a renter sends interest in a listing with `assigned_agent_id`, the interest card, conversation, and notification are routed to the assigned agent (not the company owner). The agent sees the inquiry in their normal messages tab. MessagesScreen host-mode filter enforces `hostId === user.id` ownership check on all inquiry conversations. Supabase path resolves `assigned_agent_id` in `createListingInquiryGroup`; local StorageService fallback also resolves it. HostDashboardScreen shows Team Activity section with agent stats, expandable rows with lazy-loaded agent detail (recent conversations + bookings read-only), filter buttons (All/Active/Pending/Confirmed), unassigned listing warning banner, and Reassign modal (supports both listing and conversation reassignment). `reassignConversation` updates group host_id, swaps group_members, and reassigns the listing. DB: `assigned_agent_id` on `listings`. Migration: `038_agent_assignment_group_bookings.sql`. Files: `services/listingService.ts` (getCompanyAgents, reassignListingAgent, getAgentStats, getCompanyListingsWithAgents, getAgentDetailData, reassignConversation), `services/groupService.ts` (routes to assigned agent), `screens/renter/ExploreScreen.tsx` (interest routing), `screens/shared/MessagesScreen.tsx` (ownership filter).
-    - **Verified Agent Badge:** Blue "Verified Agent" pill badge shown when `hostType=agent` AND `licenseVerified=true`. Displays in: listing detail host section (ExploreScreen), chat header (ChatScreen), visit request cards and booking offer cards (ChatActionCard). Company agents show company name below agent name on booking cards.
-    - **Group Bookings:** Visit/booking action cards show "Group of X" count when in group chats. Only group leader (admin) can accept/decline visit requests and booking offers; non-leaders see "Only the group leader can respond" note. Booking creation stores `group_id` when in a group context. DB: `group_id` on `bookings`. Migration: `038_agent_assignment_group_bookings.sql`. Files: `components/ChatActionCard.tsx`, `services/bookingService.ts`.
-    - **Agent Response Tracking & Company Alerts:** Tracks agent response times to renter messages in inquiry conversations. Status escalation: active (<24h), delayed (24h), unresponsive (48h), critical (72h). Renters see amber "Request a Different Agent" banner in chat at 48h+ with confirmation dialog. Company dashboard shows RESPONSE ALERTS section with yellow (delayed) and red (critical) indicators, agent name, wait time, listing info, and "Reassign Conversation" button for critical alerts. ExploreScreen listing cards show amber "Response Delayed" badge for agents with delayed/critical response status. Rhome Select eligibility requires response_rate >= 90%. Background hook runs hourly to check status, send notifications, and recalculate response rates. DB: `last_renter_message_at`, `last_agent_response_at`, `response_status`, `response_rate` on conversations/users. Migration: `039_response_tracking.sql`. Files: `services/responseTrackingService.ts`, `hooks/useResponseTracking.ts`, `screens/shared/ChatScreen.tsx`, `screens/host/HostDashboardScreen.tsx`, `screens/renter/ExploreScreen.tsx`, `hooks/useRhomeSelect.ts`.
-- **AI-Powered Enhancements:**
-    - **AI Assistant:** Context-aware assistant with persistent memory, powered by Claude via Supabase Edge Functions for personalized housing assistance and streaming responses.
-    - **Match Explanations:** AI-generated breakdowns of compatibility scores for matches.
-    - **Group & Listing Suggestions:** AI-driven renter suggestions for groups, "Best Match Today" banners, AI group health scores, and automated roommate/listing matching.
-    - **Agent & Company Tools:** AI-powered shortlisting, group composition, pairing, and vacancy filling.
-    - **Meetup Suggestions:** AI analyzes chat intent to suggest meetups at halfway points.
-    - **Question of the Day:** AI-generated daily compatibility questions personalized for users.
-    - **"Ask AI About This Person":** Multi-turn chat to inquire about other users with context-aware responses.
-    - **AI Neighborhood Intelligence:** Provides AI-generated neighborhood briefings with local data from Walk Score and Google Places, with follow-up chat capabilities.
-    - **Shareable Profile Notes:** Users can add free-text descriptions of themselves, which AI can leverage.
-- **Verification & Safety:** Instagram verification, multi-photo enforcement, chat leakage detection, Safety Mode with background checks (via Persona), identity verification (Stripe Identity SDK), References System, and Agent License Verification (free state board scraping, document upload, verified/pending badges).
-- **Agent License Verification:** State selector, license number input with helper text, optional document upload (PDF/photo via expo-document-picker) to private Supabase Storage bucket `license-documents` (stores object path, not public URL), free state licensing board scraping via Supabase Edge Function (`verify-agent-license`) covering 10 states (NY, FL, TX, CA, GA, NC, IL, AZ, NV, CO) with automatic fallback to manual review for unsupported states. Three verification result states: `verified` (green), `not_found` (red error with document upload prompt), `manual_review` (amber pending). DB fields: `license_state`, `license_document_url`, `license_verified`, `license_verified_at`, `license_verification_status`. Migrations: `034_agent_verification.sql`, `035_license_documents_bucket.sql`.
-- **Benefit Callouts:** All host onboarding screens (HostTypeSelectScreen, HostAgentSetupScreen, HostCompanySetupScreen) display role-specific benefit lists below form fields.
-- **Boost System:** Tier-based boosting for increased visibility of listings and profiles.
-- **Account Management:** Soft-delete functionality with a recovery window.
-- **Subscription Management:** Tiered subscription plans for renters, hosts, and agents, with bundled pricing and a hybrid payment architecture (RevenueCat for native, Stripe for web).
-- **UI/UX:** Consistent dark theme, collapsible/sticky headers, and platform-specific adaptations.
-- **Location System:** Explore screen location sheet uses search autocomplete (cities, neighborhoods, ZIP codes via expo-location geocoding) as primary input, with popular city chips as secondary discovery. Google Places Autocomplete used for onboarding and profile questionnaire via `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY`. `locationData.ts` provides local city/neighborhood data for instant search results.
-- **Area Info Cards:** Listing detail modal shows 5 area info category cards (Transit, Restaurants, Grocery, Laundromat, Parks) with real data from Overpass API (free, no key). Fetches nearby amenities within 500m radius using listing coordinates. Shows loading skeleton while fetching, graceful fallback on error. Results cached in memory. Laundromat card shows "In building" if listing has laundry amenity. Service: `services/neighborhoodService.ts`. Transit stops use Feather icons (no emojis).
+    - **Property Reviews:** Renters can rate and review listings, with hosts able to reply. Ratings and review counts are aggregated and displayed.
+    - **Chat Scheduling & Booking:** In-chat actions allow scheduling visits and sending booking offers, which render as rich action cards and create records in the `bookings` table upon acceptance.
+    - **Rhome Select Badge:** A gold badge awarded to top-rated hosts meeting specific criteria (average rating, review count, tenure, cancellation rate, booking history).
+    - **Company Teams:** Multi-seat team access for company accounts with role-based permissions, invite systems, and seat limits based on subscription plans.
+    - **Company Agent Assignment & Routing:** Allows company accounts to assign agents to listings, routing inquiries, conversations, and notifications directly to the assigned agent. Includes features for monitoring agent response times and reassigning conversations.
+    - **Verified Agent Badge:** A blue badge displayed for agents with verified licenses.
+    - **Group Bookings:** Visit/booking action cards support group contexts, with only group leaders able to accept/decline.
+    - **Agent Response Tracking & Company Alerts:** Tracks agent response times, escalates status, and provides alerts to companies for delayed or unresponsive agents, impacting Rhome Select eligibility.
+- **AI-Powered Enhancements:** Includes an AI Assistant for personalized housing help, AI-generated match explanations, group and listing suggestions, AI tools for agents/companies, AI-suggested meetups, AI-generated "Question of the Day," "Ask AI About This Person" multi-turn chat, and AI Neighborhood Intelligence providing localized information with follow-up chat capabilities.
+- **Verification & Safety:** Features Instagram verification, multi-photo enforcement, chat leakage detection, Safety Mode with background checks, identity verification, a References System, and Agent License Verification (including state board scraping, document upload, and verification statuses).
+- **Benefit Callouts:** Role-specific benefit lists are displayed during host onboarding.
+- **Boost System:** A tier-based system to increase visibility for listings and profiles.
+- **Account Management:** Includes soft-delete functionality with a recovery window.
+- **Subscription Management:** Tiered subscription plans for renters, hosts, and agents with a hybrid payment architecture (RevenueCat for native, Stripe for web).
+- **UI/UX:** Adheres to a consistent dark theme, uses collapsible/sticky headers, and adapts for platform-specific interactions.
+- **Location System:** The Explore screen uses search autocomplete for cities, neighborhoods, and ZIP codes via geocoding, supplemented by popular city chips and Google Places Autocomplete for onboarding.
+- **Area Info Cards:** Listing detail modals display area information (Transit, Restaurants, Grocery, Laundromat, Parks) powered by the Overpass API, with loading skeletons and graceful fallbacks.
 - **Renter/Host Mode Switch:** Allows individual hosts to toggle between modes.
 
 ## Backend (Supabase)
 
 Supabase provides the complete backend infrastructure:
 - **Auth:** Email/password authentication with Row Level Security (RLS).
-- **Database:** PostgreSQL with RLS, including computed columns for available rooms and a table for existing roommate preferences.
+- **Database:** PostgreSQL with RLS, including computed columns and preference tables.
 - **Realtime:** Subscriptions for messaging and notifications.
-- **Storage:** For media assets like photos.
-- **Edge Functions:** Used for webhooks (Stripe), verification, background checks, payments, references, AI operations (Claude), match score calculations, group-to-listing matching, and public forms.
+- **Storage:** For media assets.
+- **Edge Functions:** Utilized for webhooks, verification, background checks, payments, references, AI operations (Claude), match score calculations, group-to-listing matching, and public forms.
 
 ## Subscription & Paywall System
 
-A tiered subscription model exists for renters, hosts, and agents, complemented by one-time purchases. Host plans automatically include renter access. Payments are managed through RevenueCat for native iOS/Android (Apple IAP, Google Play Billing) and Stripe for web. RevenueCat webhooks sync subscription states to the Supabase database.
+A tiered subscription model exists for renters, hosts, and agents, with payments managed through RevenueCat for native platforms and Stripe for web. RevenueCat webhooks sync subscription states to the Supabase database.
 
 ## Data Layer
 
-Supabase PostgreSQL is the primary data store, with AsyncStorage for local caching. TypeScript interfaces define data models. A centralized `listingService.ts` manages CRUD operations. The group system handles roommate and listing inquiry groups with plan-based limits.
+Supabase PostgreSQL serves as the primary data store, complemented by AsyncStorage for local caching. TypeScript interfaces define data models. A centralized `listingService.ts` manages CRUD operations. The group system handles roommate and listing inquiry groups with plan-based limits.
 
 ## Technical Decisions
 
-The architecture includes a Babel module resolver, platform-specific UI, performance optimizations (React Native's New Architecture, React Compiler, Reanimated), and robust error handling. Navigation employs separate stack navigators with history behavior. Efficient data fetching prevents N+1 issues.
+The architecture incorporates a Babel module resolver, platform-specific UI, performance optimizations (React Native's New Architecture, React Compiler, Reanimated), and robust error handling. Navigation uses separate stack navigators with history behavior, and efficient data fetching prevents N+1 issues.
 
 # External Dependencies
 
@@ -105,7 +95,6 @@ The architecture includes a Babel module resolver, platform-specific UI, perform
 **Payments:**
 - `@stripe/stripe-react-native`
 - `react-native-purchases` (RevenueCat)
-- `@replit/revenuecat-sdk`
 
 **Storage & State:**
 - `@react-native-async-storage/async-storage`

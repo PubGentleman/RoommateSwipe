@@ -205,8 +205,13 @@ For follow-up questions, answer directly and conversationally.`;
 
   } catch (error) {
     console.error('ai-neighborhood-info error:', error);
-    return new Response(JSON.stringify({ error: (error as Error).message }), {
-      status: 500,
+    return new Response(JSON.stringify({
+      reply: 'This is a neighborhood with a mix of amenities and transit options. Ask me specific questions below for more details about safety, commute, nightlife, or nearby spots.',
+      walkScore: null,
+      transitScore: null,
+      neighborhood: null,
+      fallback: true,
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

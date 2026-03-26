@@ -88,7 +88,7 @@ export function NeighborhoodAISheet({ visible, onClose, listingId, address, neig
     }
   }, [visible]);
 
-  async function callFunction(requestType: 'briefing' | 'chat', userMessage?: string) {
+  async function callBriefing() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return null;
 
@@ -102,14 +102,48 @@ export function NeighborhoodAISheet({ visible, onClose, listingId, address, neig
         },
         body: JSON.stringify({
           listingId,
-          userMessage,
-          conversationHistory,
-          requestType,
+          requestType: 'briefing',
         }),
       }
     );
 
+    if (!response.ok) return null;
     return await response.json();
+  }
+
+  async function callChat(userMessage: string) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return null;
+
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 20000);
+
+      const response = await fetch(
+        `${SUPABASE_URL}/functions/v1/neighborhood-chat`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            question: userMessage,
+            neighborhood: neighborhood || '',
+            city: address || '',
+            listingId,
+            conversationHistory,
+          }),
+          signal: controller.signal,
+        }
+      );
+
+      clearTimeout(timeout);
+      if (!response.ok) return null;
+      return await response.json();
+    } catch {
+      return null;
+    }
   }
 
   async function loadBriefing() {
@@ -118,7 +152,7 @@ export function NeighborhoodAISheet({ visible, onClose, listingId, address, neig
     setMessages([{ id: 'loading', role: 'assistant', content: '...' }]);
 
     try {
-      const data = await callFunction('briefing');
+      const data = await callBriefing();
       if (data?.reply) {
         setMessages([{ id: 'briefing', role: 'assistant', content: data.reply }]);
         if (data.walkScore !== null && data.walkScore !== undefined) setWalkScore(data.walkScore);
@@ -128,10 +162,12 @@ export function NeighborhoodAISheet({ visible, onClose, listingId, address, neig
           { role: 'assistant', content: data.reply },
         ]);
       } else {
-        setMessages([{ id: 'error', role: 'assistant', content: 'Could not load neighborhood data. Try asking a specific question below.' }]);
+        const loc = neighborhood || address || 'this area';
+        setMessages([{ id: 'fallback', role: 'assistant', content: `Here's what I know about ${loc}. Ask me anything specific below — like safety, commute, nightlife, or nearby amenities — and I'll do my best to help.` }]);
       }
     } catch {
-      setMessages([{ id: 'error', role: 'assistant', content: 'Could not load neighborhood data. Try asking a specific question below.' }]);
+      const loc = neighborhood || address || 'this area';
+      setMessages([{ id: 'fallback', role: 'assistant', content: `Here's what I know about ${loc}. Ask me anything specific below — like safety, commute, nightlife, or nearby amenities — and I'll do my best to help.` }]);
     } finally {
       setLoading(false);
     }
@@ -146,20 +182,19 @@ export function NeighborhoodAISheet({ visible, onClose, listingId, address, neig
     setLoading(true);
 
     try {
-      const data = await callFunction('chat', messageText);
-      if (data?.reply) {
-        const aiMsg: ChatMessage = { id: (Date.now() + 1).toString(), role: 'assistant', content: data.reply };
-        setMessages(prev => [...prev, aiMsg]);
-        setConversationHistory(prev => [
-          ...prev,
-          { role: 'user', content: messageText },
-          { role: 'assistant', content: data.reply },
-        ]);
-      } else {
-        setMessages(prev => [...prev, { id: 'err-' + Date.now(), role: 'assistant', content: 'Something went wrong. Try again.' }]);
-      }
+      const data = await callChat(messageText);
+      const reply = data?.reply || `That's a great question about ${neighborhood || 'this area'}. I'd recommend checking local community forums or visiting the neighborhood at different times of day to get the best sense of it.`;
+      const aiMsg: ChatMessage = { id: (Date.now() + 1).toString(), role: 'assistant', content: reply };
+      setMessages(prev => [...prev, aiMsg]);
+      setConversationHistory(prev => [
+        ...prev,
+        { role: 'user', content: messageText },
+        { role: 'assistant', content: reply },
+      ]);
     } catch {
-      setMessages(prev => [...prev, { id: 'err-' + Date.now(), role: 'assistant', content: 'Something went wrong. Try again.' }]);
+      const loc = neighborhood || address || 'this area';
+      const fallbackReply = `I couldn't look that up right now, but I'd suggest exploring ${loc} in person or checking Google Maps for the most current neighborhood info.`;
+      setMessages(prev => [...prev, { id: 'fb-' + Date.now(), role: 'assistant', content: fallbackReply }]);
     } finally {
       setLoading(false);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);

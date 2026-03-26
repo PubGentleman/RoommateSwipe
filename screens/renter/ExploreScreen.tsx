@@ -1932,11 +1932,22 @@ export const ExploreScreen = () => {
                           ))}
                         </View>
                       ) : areaInfoError || !areaInfo ? (
-                        <View style={styles.pdAreaInfoFallback}>
-                          <Feather name="map" size={20} color="rgba(255,255,255,0.2)" />
-                          <Text style={styles.pdAreaInfoFallbackText}>
-                            {selectedProperty.coordinates ? 'Area details unavailable right now' : 'No location data for this listing'}
-                          </Text>
+                        <View style={styles.pdAreaInfoGrid}>
+                          {[
+                            { icon: 'navigation', label: 'Transit', text: 'Transit info unavailable' },
+                            { icon: 'coffee', label: 'Restaurants', text: 'Restaurant info unavailable' },
+                            { icon: 'shopping-bag', label: 'Grocery', text: 'Grocery info unavailable' },
+                            { icon: 'briefcase', label: 'Laundromat', text: 'Laundry info unavailable' },
+                            { icon: 'sun', label: 'Parks', text: 'Park info unavailable' },
+                          ].map((card) => (
+                            <View key={card.label} style={styles.pdAreaInfoCard}>
+                              <View style={[styles.pdAreaInfoIconWrap, { opacity: 0.4 }]}>
+                                <Feather name={card.icon as any} size={16} color={ACCENT} />
+                              </View>
+                              <Text style={styles.pdAreaInfoLabel}>{card.label}</Text>
+                              <Text style={[styles.pdAreaInfoValue, { opacity: 0.5 }]}>{card.text}</Text>
+                            </View>
+                          ))}
                         </View>
                       ) : (
                         <View style={styles.pdAreaInfoGrid}>

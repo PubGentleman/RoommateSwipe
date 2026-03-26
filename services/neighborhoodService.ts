@@ -62,41 +62,44 @@ function getTypeName(tags: Record<string, string>): string {
 }
 
 export async function fetchAreaInfo(lat: number, lng: number): Promise<AreaInfo | null> {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+
   const cacheKey = `${lat.toFixed(4)},${lng.toFixed(4)}`;
   const cached = areaInfoCache.get(cacheKey);
   if (cached) return cached;
 
-  const query = `[out:json][timeout:10];
-(
-  node["amenity"="subway_entrance"](around:500,${lat},${lng});
-  node["amenity"="bus_stop"](around:500,${lat},${lng});
-  node["amenity"="restaurant"](around:500,${lat},${lng});
-  node["amenity"="cafe"](around:500,${lat},${lng});
-  node["amenity"="supermarket"](around:500,${lat},${lng});
-  node["shop"="supermarket"](around:500,${lat},${lng});
-  node["amenity"="laundry"](around:500,${lat},${lng});
-  node["shop"="laundry"](around:500,${lat},${lng});
-  node["leisure"="park"](around:500,${lat},${lng});
-);
-out body;`;
+  const latStr = lat.toFixed(6);
+  const lngStr = lng.toFixed(6);
+
+  const query = `[out:json][timeout:10];(node["amenity"="subway_entrance"](around:500,${latStr},${lngStr});node["amenity"="bus_stop"](around:500,${latStr},${lngStr});node["amenity"="restaurant"](around:500,${latStr},${lngStr});node["amenity"="cafe"](around:500,${latStr},${lngStr});node["amenity"="supermarket"](around:500,${latStr},${lngStr});node["shop"="supermarket"](around:500,${latStr},${lngStr});node["amenity"="laundry"](around:500,${latStr},${lngStr});node["shop"="laundry"](around:500,${latStr},${lngStr});node["leisure"="park"](around:500,${latStr},${lngStr}););out body;`;
 
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12000);
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     const response = await fetch(OVERPASS_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
+      },
       body: `data=${encodeURIComponent(query)}`,
       signal: controller.signal,
     });
 
-    clearTimeout(timeout);
+    clearTimeout(timeoutId);
 
     if (!response.ok) return null;
 
-    const data = await response.json();
-    const elements: any[] = data.elements || [];
+    let data: any;
+    try {
+      const text = await response.text();
+      data = JSON.parse(text);
+    } catch {
+      return null;
+    }
+
+    const elements: any[] = data?.elements || [];
 
     const result: AreaInfo = {
       transit: [],
