@@ -11,6 +11,13 @@ interface ChatActionCardProps {
   onAcceptBooking?: (messageId: string, metadata: any) => void;
   onDeclineBooking?: (messageId: string) => void;
   actionLoading?: string | null;
+  agentInfo?: {
+    name?: string;
+    isVerifiedAgent?: boolean;
+    companyName?: string;
+  } | null;
+  groupSize?: number;
+  isGroupLeader?: boolean;
 }
 
 const GOLD = '#D4AF37';
@@ -24,6 +31,9 @@ export const ChatActionCard: React.FC<ChatActionCardProps> = ({
   onAcceptBooking,
   onDeclineBooking,
   actionLoading,
+  agentInfo,
+  groupSize,
+  isGroupLeader,
 }) => {
   const metadata = message.metadata || {};
   const isOwn = message.senderId === currentUserId || message.sender_id === currentUserId;
@@ -65,13 +75,22 @@ export const ChatActionCard: React.FC<ChatActionCardProps> = ({
           <Text style={s.cardTitle}>Visit Request</Text>
           {status !== 'pending' ? renderStatusBadge() : null}
         </View>
+        {agentInfo?.isVerifiedAgent ? (
+          <View style={s.verifiedBadge}>
+            <Feather name="check-circle" size={10} color="#3b82f6" />
+            <Text style={s.verifiedBadgeText}>Verified Agent</Text>
+          </View>
+        ) : null}
         <Text style={s.cardAddress} numberOfLines={2}>{metadata.address || 'Address pending'}</Text>
         <Text style={s.cardDateTime}>
           {proposedDate}{proposedTime ? ` \u00B7 ${proposedTime}` : ''}
         </Text>
+        {groupSize && groupSize > 1 ? (
+          <Text style={s.groupLabel}>Group of {groupSize}</Text>
+        ) : null}
         {metadata.note ? <Text style={s.cardNote}>{`"${metadata.note}"`}</Text> : null}
 
-        {status === 'pending' && !isOwn ? (
+        {status === 'pending' && !isOwn && (isGroupLeader !== false) ? (
           <View style={s.cardActions}>
             <Pressable
               style={[s.actionBtn, s.confirmBtn]}
@@ -98,6 +117,9 @@ export const ChatActionCard: React.FC<ChatActionCardProps> = ({
             </Pressable>
           </View>
         ) : null}
+        {status === 'pending' && isGroupLeader === false ? (
+          <Text style={s.readOnlyNote}>Only the group leader can respond</Text>
+        ) : null}
       </View>
     );
   }
@@ -120,6 +142,15 @@ export const ChatActionCard: React.FC<ChatActionCardProps> = ({
           <Text style={s.cardTitle}>Booking Offer</Text>
           {status !== 'pending' ? renderStatusBadge() : null}
         </View>
+        {agentInfo?.isVerifiedAgent ? (
+          <View style={s.verifiedBadge}>
+            <Feather name="check-circle" size={10} color="#3b82f6" />
+            <Text style={s.verifiedBadgeText}>Verified Agent</Text>
+          </View>
+        ) : null}
+        {agentInfo?.companyName ? (
+          <Text style={s.companyNameText}>{agentInfo.companyName}</Text>
+        ) : null}
         <Text style={s.cardAddress} numberOfLines={2}>{metadata.address || 'Property address'}</Text>
         <View style={s.bookingDetails}>
           <View style={s.bookingDetailRow}>
@@ -141,9 +172,15 @@ export const ChatActionCard: React.FC<ChatActionCardProps> = ({
             </View>
           ) : null}
         </View>
+        {groupSize && groupSize > 1 ? (
+          <View style={s.bookingDetailRow}>
+            <Text style={s.bookingLabel}>Group</Text>
+            <Text style={s.bookingValue}>Booking for a group of {groupSize}</Text>
+          </View>
+        ) : null}
         {metadata.note ? <Text style={s.cardNote}>{`"${metadata.note}"`}</Text> : null}
 
-        {status === 'pending' && !isOwn ? (
+        {status === 'pending' && !isOwn && (isGroupLeader !== false) ? (
           <View style={s.cardActions}>
             <Pressable
               style={[s.actionBtn, s.confirmBtn, { flex: 1 }]}
@@ -162,6 +199,9 @@ export const ChatActionCard: React.FC<ChatActionCardProps> = ({
               <Text style={s.declineBtnText}>Decline</Text>
             </Pressable>
           </View>
+        ) : null}
+        {status === 'pending' && isGroupLeader === false ? (
+          <Text style={s.readOnlyNote}>Only the group leader can respond</Text>
         ) : null}
       </View>
     );
@@ -309,5 +349,39 @@ const s = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  verifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(59,130,246,0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+    marginBottom: 6,
+  },
+  verifiedBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#3b82f6',
+  },
+  companyNameText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.45)',
+    marginBottom: 4,
+  },
+  groupLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#3b82f6',
+    marginBottom: 4,
+  },
+  readOnlyNote: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.35)',
+    fontStyle: 'italic',
+    marginTop: 8,
+    textAlign: 'center',
   },
 });

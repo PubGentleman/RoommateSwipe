@@ -147,6 +147,8 @@ export interface Property {
   };
   average_rating?: number | null;
   review_count?: number;
+  assigned_agent_id?: string;
+  hostType?: 'individual' | 'company' | 'agent';
 }
 
 export interface PropertyFilter {

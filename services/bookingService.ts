@@ -13,6 +13,7 @@ export interface Booking {
   cancellation_reason: string | null;
   cancelled_at: string | null;
   created_at: string;
+  group_id: string | null;
 }
 
 export async function createBooking(params: {
@@ -23,20 +24,24 @@ export async function createBooking(params: {
   leaseLength: string;
   monthlyRent: number;
   securityDeposit: number | null;
+  groupId?: string | null;
 }): Promise<{ success: boolean; booking?: Booking; error?: string }> {
   try {
+    const insertData: any = {
+      listing_id: params.listingId,
+      host_id: params.hostId,
+      renter_id: params.renterId,
+      move_in_date: params.moveInDate,
+      lease_length: params.leaseLength,
+      monthly_rent: params.monthlyRent,
+      security_deposit: params.securityDeposit,
+      status: 'confirmed',
+    };
+    if (params.groupId) insertData.group_id = params.groupId;
+
     const { data, error } = await supabase
       .from('bookings')
-      .insert({
-        listing_id: params.listingId,
-        host_id: params.hostId,
-        renter_id: params.renterId,
-        move_in_date: params.moveInDate,
-        lease_length: params.leaseLength,
-        monthly_rent: params.monthlyRent,
-        security_deposit: params.securityDeposit,
-        status: 'confirmed',
-      })
+      .insert(insertData)
       .select()
       .single();
 

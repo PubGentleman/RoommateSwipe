@@ -13,7 +13,7 @@ import { canAddListingCheck } from '../../utils/hostPricing';
 import { ListingLimitModal, OverageModal } from '../../components/ListingLimitModal';
 import { US_STATES } from '../../utils/locationData';
 import { Spacing, BorderRadius } from '../../constants/theme';
-import { createListing as createListingSupa, updateListing as updateListingSupa, getListing, deleteListing as deleteListingSupa, mapListingToProperty } from '../../services/listingService';
+import { createListing as createListingSupa, updateListing as updateListingSupa, getListing, deleteListing as deleteListingSupa, mapListingToProperty, getCompanyAgents } from '../../services/listingService';
 import { DatePickerModal } from '../../components/DatePickerModal';
 import { formatDate } from '../../utils/dateUtils';
 import { geocodeAddress, fetchNearbyTransit } from '../../utils/transitService';
@@ -91,6 +91,9 @@ export const CreateEditListingScreen = () => {
   const [requiresBackgroundCheck, setRequiresBackgroundCheck] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [assignedAgentId, setAssignedAgentId] = useState<string>('');
+  const [companyAgents, setCompanyAgents] = useState<{ id: string; full_name: string }[]>([]);
+  const isCompanyHost = user?.hostType === 'company';
   const [showLimitModal, setShowLimitModal] = useState(false);
   const [showOverageModal, setShowOverageModal] = useState(false);
   const [limitMessage, setLimitMessage] = useState('');
@@ -103,6 +106,9 @@ export const CreateEditListingScreen = () => {
     }
     if (user) {
       StorageService.getHostSubscription(user.id).then(sub => setHostSub(sub));
+      if (user.hostType === 'company') {
+        getCompanyAgents(user.id).then(agents => setCompanyAgents(agents));
+      }
     }
   }, [propertyId, user]);
 
@@ -148,6 +154,9 @@ export const CreateEditListingScreen = () => {
     }
     if (prop.coordinates) {
       setCoordinates(prop.coordinates);
+    }
+    if (prop.assigned_agent_id) {
+      setAssignedAgentId(prop.assigned_agent_id);
     }
 
     const descParts = prop.description.split('\n\nSecurity Deposit:');
@@ -221,6 +230,10 @@ export const CreateEditListingScreen = () => {
     }
     if (!city.trim()) {
       await showAlert({ title: 'Required', message: 'Please select a city', variant: 'warning' });
+      return;
+    }
+    if (isCompanyHost && !assignedAgentId) {
+      await showAlert({ title: 'Agent Required', message: 'Please assign an agent to this listing before publishing.', variant: 'warning' });
       return;
     }
 
@@ -319,6 +332,7 @@ export const CreateEditListingScreen = () => {
       };
       if (savedCoords) supaData.coordinates = savedCoords;
       if (transitInfo) supaData.transit_info = transitInfo;
+      if (isCompanyHost && assignedAgentId) supaData.assigned_agent_id = assignedAgentId;
 
       let createdListingId: string | null = null;
       try {
@@ -708,6 +722,52 @@ export const CreateEditListingScreen = () => {
             keyboardType="numeric"
           />
         </View>
+
+        {isCompanyHost ? (
+          <View style={styles.fieldContainer}>
+            <Text style={styles.label}>Assign Agent</Text>
+            <Text style={[styles.sectionSubtitle, { marginBottom: 8 }]}>
+              Select an agent from your team to manage this listing
+            </Text>
+            {companyAgents.length === 0 ? (
+              <View style={{ backgroundColor: 'rgba(245,158,11,0.1)', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(245,158,11,0.2)' }}>
+                <Text style={{ color: '#F59E0B', fontSize: 13 }}>
+                  No team members found. Add agents in Team Management first.
+                </Text>
+              </View>
+            ) : (
+              <View style={{ gap: 6 }}>
+                {companyAgents.map(agent => {
+                  const selected = assignedAgentId === agent.id;
+                  return (
+                    <Pressable
+                      key={agent.id}
+                      style={{
+                        flexDirection: 'row', alignItems: 'center', gap: 10,
+                        padding: 12, borderRadius: 10,
+                        backgroundColor: selected ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.05)',
+                        borderWidth: 1, borderColor: selected ? 'rgba(59,130,246,0.4)' : 'rgba(255,255,255,0.08)',
+                      }}
+                      onPress={() => setAssignedAgentId(selected ? '' : agent.id)}
+                    >
+                      <View style={{
+                        width: 32, height: 32, borderRadius: 16,
+                        backgroundColor: selected ? '#3b82f6' : 'rgba(255,255,255,0.1)',
+                        alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        <Feather name={selected ? 'check' : 'user'} size={14} color={selected ? '#fff' : 'rgba(255,255,255,0.5)'} />
+                      </View>
+                      <Text style={{ color: selected ? '#3b82f6' : 'rgba(255,255,255,0.7)', fontSize: 14, fontWeight: selected ? '600' : '400', flex: 1 }}>
+                        {agent.full_name}
+                      </Text>
+                      {selected ? <Feather name="check-circle" size={16} color="#3b82f6" /> : null}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.card}>

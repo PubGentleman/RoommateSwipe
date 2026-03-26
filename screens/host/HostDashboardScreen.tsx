@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { View, StyleSheet, Pressable, Text, ScrollView } from 'react-native';
+import { View, StyleSheet, Pressable, Text, ScrollView, Modal } from 'react-native';
 import Animated, { useSharedValue, useAnimatedScrollHandler, useAnimatedStyle, interpolate, Extrapolation } from 'react-native-reanimated';
 import { Feather } from '../../components/VectorIcons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -11,7 +11,7 @@ import { useConfirm } from '../../contexts/ConfirmContext';
 import { StorageService } from '../../utils/storage';
 import { Property, InterestCard, Message, Conversation, HostSubscriptionData } from '../../types/models';
 import { useNotificationContext } from '../../contexts/NotificationContext';
-import { getMyListings, mapListingToProperty } from '../../services/listingService';
+import { getMyListings, mapListingToProperty, getAgentStats, getCompanyAgents, reassignListingAgent, getCompanyListingsWithAgents } from '../../services/listingService';
 import { getReceivedInterestCards } from '../../services/discoverService';
 import { RhomeAISheet } from '../../components/RhomeAISheet';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
@@ -87,6 +87,13 @@ export const HostDashboardScreen = () => {
   const [showUpgradeBanner, setShowUpgradeBanner] = useState(false);
   const [completionBannerDismissed, setCompletionBannerDismissed] = useState(false);
   const hostCompletion = user ? getHostCompletionPercentage(user) : 100;
+  const [agentStats, setAgentStats] = useState<{ agentId: string; agentName: string; activeListings: number; pendingBookings: number }[]>([]);
+  const [expandedAgentId, setExpandedAgentId] = useState<string | null>(null);
+  const [teamFilter, setTeamFilter] = useState<'all' | 'active' | 'pending' | 'confirmed'>('all');
+  const [showReassignModal, setShowReassignModal] = useState(false);
+  const [reassignListingId, setReassignListingId] = useState<string | null>(null);
+  const [companyAgents, setCompanyAgents] = useState<{ id: string; full_name: string }[]>([]);
+  const [unassignedListings, setUnassignedListings] = useState<Property[]>([]);
 
   const DASH_COLLAPSE_H = 50;
   const dashScrollY = useSharedValue(0);
@@ -174,6 +181,19 @@ export const HostDashboardScreen = () => {
 
     const sub = await StorageService.getHostSubscription(user.id);
     setHostSub(sub);
+
+    if (user.hostType === 'company') {
+      try {
+        const stats = await getAgentStats(user.id);
+        setAgentStats(stats);
+        const agents = await getCompanyAgents(user.id);
+        setCompanyAgents(agents);
+        const noAgent = listings.length > 0
+          ? listings.filter(l => !l.assigned_agent_id && l.available)
+          : [];
+        setUnassignedListings(noAgent);
+      } catch {}
+    }
   }, [user]);
 
   useFocusEffect(
@@ -571,6 +591,88 @@ export const HostDashboardScreen = () => {
           </Pressable>
         ) : null}
 
+        {user?.hostType === 'company' && unassignedListings.length > 0 ? (
+          <View style={{ backgroundColor: 'rgba(245,158,11,0.1)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.25)', borderRadius: 12, padding: 14, marginBottom: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Feather name="alert-triangle" size={16} color="#F59E0B" />
+              <Text style={{ color: '#F59E0B', fontSize: 13, fontWeight: '600', flex: 1 }}>
+                {unassignedListings.length} listing{unassignedListings.length > 1 ? 's have' : ' has'} no assigned agent and won't receive messages until one is assigned.
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
+        {user?.hostType === 'company' && agentStats.length > 0 ? (
+          <>
+            <View style={[styles.sectionHeader, { marginTop: 6 }]}>
+              <Text style={styles.sectionTitle}>TEAM ACTIVITY</Text>
+              <Pressable onPress={() => navigation.navigate('TeamManagement')}>
+                <Text style={styles.sectionLink}>Manage</Text>
+              </Pressable>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+              <View style={{ flexDirection: 'row', gap: 6, paddingRight: 16 }}>
+                {(['all', 'active', 'pending', 'confirmed'] as const).map(f => (
+                  <Pressable
+                    key={f}
+                    onPress={() => setTeamFilter(f)}
+                    style={{
+                      paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
+                      backgroundColor: teamFilter === f ? ACCENT : 'rgba(255,255,255,0.06)',
+                      borderWidth: 1, borderColor: teamFilter === f ? ACCENT : 'rgba(255,255,255,0.1)',
+                    }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: teamFilter === f ? '#fff' : 'rgba(255,255,255,0.5)' }}>
+                      {f === 'all' ? 'All Agents' : f === 'active' ? 'Active Listings' : f === 'pending' ? 'Pending Requests' : 'Confirmed Bookings'}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </ScrollView>
+            {agentStats.filter(a => {
+              if (teamFilter === 'active') return a.activeListings > 0;
+              if (teamFilter === 'pending') return a.pendingBookings > 0;
+              if (teamFilter === 'confirmed') return a.pendingBookings > 0;
+              return true;
+            }).map(agent => {
+              const expanded = expandedAgentId === agent.agentId;
+              return (
+                <Pressable
+                  key={agent.agentId}
+                  style={{
+                    backgroundColor: CARD_BG, borderRadius: 12, padding: 14, marginBottom: 8,
+                    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+                  }}
+                  onPress={() => setExpandedAgentId(expanded ? null : agent.agentId)}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <View style={{
+                      width: 36, height: 36, borderRadius: 18,
+                      backgroundColor: 'rgba(59,130,246,0.15)', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <Feather name="user" size={16} color="#3b82f6" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>{agent.agentName}</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 2 }}>
+                        {agent.activeListings} active listing{agent.activeListings !== 1 ? 's' : ''} · {agent.pendingBookings} booking{agent.pendingBookings !== 1 ? 's' : ''}
+                      </Text>
+                    </View>
+                    <Feather name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color="rgba(255,255,255,0.3)" />
+                  </View>
+                  {expanded ? (
+                    <View style={{ marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)' }}>
+                      <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, fontStyle: 'italic' }}>
+                        Conversations and bookings are read-only. The agent handles all interactions directly.
+                      </Text>
+                    </View>
+                  ) : null}
+                </Pressable>
+              );
+            })}
+          </>
+        ) : null}
+
         <View style={[styles.sectionHeader, { marginTop: 6 }]}>
           <Text style={styles.sectionTitle}>QUICK ACTIONS</Text>
         </View>
@@ -651,6 +753,47 @@ export const HostDashboardScreen = () => {
           try { navigation.navigate(screen as any, params); } catch {}
         }}
       />
+      <Modal visible={showReassignModal} transparent animationType="fade" onRequestClose={() => setShowReassignModal(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <View style={{ backgroundColor: '#1a1a1a', borderRadius: 16, padding: 20, width: '100%', maxWidth: 360 }}>
+            <Text style={{ color: '#fff', fontSize: 17, fontWeight: '700', marginBottom: 4 }}>Reassign Agent</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginBottom: 16 }}>Select a new agent for this listing</Text>
+            {companyAgents.map(agent => (
+              <Pressable
+                key={agent.id}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 10,
+                  padding: 12, borderRadius: 10, marginBottom: 6,
+                  backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+                }}
+                onPress={async () => {
+                  if (reassignListingId) {
+                    const ok = await reassignListingAgent(reassignListingId, agent.id);
+                    if (ok) {
+                      showAlert({ title: 'Reassigned', message: `Listing reassigned to ${agent.full_name}. Future messages will go to them.`, variant: 'success' });
+                      loadData();
+                    }
+                  }
+                  setShowReassignModal(false);
+                  setReassignListingId(null);
+                }}
+              >
+                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(59,130,246,0.15)', alignItems: 'center', justifyContent: 'center' }}>
+                  <Feather name="user" size={14} color="#3b82f6" />
+                </View>
+                <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14, flex: 1 }}>{agent.full_name}</Text>
+                <Feather name="chevron-right" size={14} color="rgba(255,255,255,0.3)" />
+              </Pressable>
+            ))}
+            <Pressable
+              onPress={() => { setShowReassignModal(false); setReassignListingId(null); }}
+              style={{ marginTop: 8, padding: 12, borderRadius: 10, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.06)' }}
+            >
+              <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, fontWeight: '600' }}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };

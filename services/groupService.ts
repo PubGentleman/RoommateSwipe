@@ -187,6 +187,18 @@ export async function createListingInquiryGroup(
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
 
+    let effectiveHostId = hostId;
+    try {
+      const { data: listing } = await supabase
+        .from('listings')
+        .select('assigned_agent_id')
+        .eq('id', listingId)
+        .single();
+      if (listing?.assigned_agent_id) {
+        effectiveHostId = listing.assigned_agent_id;
+      }
+    } catch {}
+
     let renterIds: string[] = [];
 
     if (sourceGroupId) {
@@ -207,7 +219,7 @@ export async function createListingInquiryGroup(
         name: groupName,
         type: 'listing_inquiry',
         listing_id: listingId,
-        host_id: hostId,
+        host_id: effectiveHostId,
         listing_address: listingAddress,
         source_group_id: sourceGroupId,
         created_by: user.id,
@@ -228,7 +240,7 @@ export async function createListingInquiryGroup(
 
     memberInserts.push({
       group_id: group.id,
-      user_id: hostId,
+      user_id: effectiveHostId,
       role: 'member',
       is_host: true,
       status: 'active',

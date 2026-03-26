@@ -1776,6 +1776,12 @@ export const ExploreScreen = () => {
                           ) : detailHostType === 'agent' && detailHostUser?.agencyName ? (
                             <Text style={styles.pdHostMeta}>{detailHostUser.agencyName}</Text>
                           ) : null}
+                          {detailHostType === 'agent' && detailHostUser?.licenseVerified ? (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                              <Feather name="check-circle" size={10} color="#3b82f6" />
+                              <Text style={{ fontSize: 10, fontWeight: '700', color: '#3b82f6' }}>Verified Agent</Text>
+                            </View>
+                          ) : null}
                         </View>
                         {detailHostType !== 'individual' ? (
                           <View style={[styles.pdHostBadge, { backgroundColor: getHostBadgeColor(detailHostType) + '20', borderColor: getHostBadgeColor(detailHostType) + '40' }]}>

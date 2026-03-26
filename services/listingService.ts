@@ -32,6 +32,7 @@ export interface ListingData {
   host_profile_id?: string;
   existing_roommates?: any[];
   outreach_unlocked_at?: string;
+  assigned_agent_id?: string;
 }
 
 export function mapListingToProperty(l: any, fallbackHostName?: string): Property {
@@ -79,6 +80,7 @@ export function mapListingToProperty(l: any, fallbackHostName?: string): Propert
     transitScoreLabel: l.transit_score_label ?? undefined,
     average_rating: l.average_rating ?? null,
     review_count: l.review_count ?? 0,
+    assigned_agent_id: l.assigned_agent_id ?? undefined,
   };
 }
 
@@ -239,6 +241,107 @@ export async function getListingViewStats(listingIds: string[]): Promise<Listing
     });
   } catch {
     return listingIds.map(id => ({ listingId: id, totalViews: 0, last30Days: 0, last90Days: 0 }));
+  }
+}
+
+export async function getCompanyAgents(companyUserId: string): Promise<{ id: string; full_name: string; avatar_url?: string }[]> {
+  try {
+    const { data, error } = await supabase
+      .from('team_members')
+      .select('member_user_id, full_name, email')
+      .eq('company_user_id', companyUserId)
+      .eq('status', 'active');
+
+    if (error || !data) return [];
+
+    const agentIds = data.filter(d => d.member_user_id).map(d => d.member_user_id);
+    if (agentIds.length === 0) return [];
+
+    const { data: users } = await supabase
+      .from('users')
+      .select('id, full_name, avatar_url')
+      .in('id', agentIds);
+
+    return (users || []).map(u => ({
+      id: u.id,
+      full_name: u.full_name || 'Agent',
+      avatar_url: u.avatar_url,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function reassignListingAgent(listingId: string, newAgentId: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('listings')
+      .update({ assigned_agent_id: newAgentId })
+      .eq('id', listingId);
+
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+export async function getCompanyListingsWithAgents(companyUserId: string): Promise<any[]> {
+  try {
+    const { data: teamMembers } = await supabase
+      .from('team_members')
+      .select('member_user_id')
+      .eq('company_user_id', companyUserId)
+      .eq('status', 'active');
+
+    const agentIds = (teamMembers || []).filter(d => d.member_user_id).map(d => d.member_user_id);
+    const allHostIds = [companyUserId, ...agentIds];
+
+    const { data, error } = await supabase
+      .from('listings')
+      .select('*, host:users!host_id(id, full_name, avatar_url)')
+      .in('host_id', allHostIds)
+      .order('created_at', { ascending: false });
+
+    if (error) return [];
+    return data || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function getAgentStats(companyUserId: string): Promise<{
+  agentId: string;
+  agentName: string;
+  activeListings: number;
+  pendingBookings: number;
+}[]> {
+  try {
+    const agents = await getCompanyAgents(companyUserId);
+    if (agents.length === 0) return [];
+
+    const agentIds = agents.map(a => a.id);
+
+    const { data: listings } = await supabase
+      .from('listings')
+      .select('id, assigned_agent_id, is_active, is_rented, is_paused')
+      .in('assigned_agent_id', agentIds);
+
+    const { data: bookings } = await supabase
+      .from('bookings')
+      .select('id, host_id, status')
+      .in('host_id', agentIds)
+      .eq('status', 'confirmed');
+
+    return agents.map(agent => ({
+      agentId: agent.id,
+      agentName: agent.full_name,
+      activeListings: (listings || []).filter(l =>
+        l.assigned_agent_id === agent.id && l.is_active && !l.is_rented && !l.is_paused
+      ).length,
+      pendingBookings: (bookings || []).filter(b => b.host_id === agent.id).length,
+    }));
+  } catch {
+    return [];
   }
 }
 

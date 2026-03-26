@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Pressable, FlatList, TextInput, KeyboardAvoidingView, Platform, Modal, Linking } from 'react-native';
+import { View, StyleSheet, Pressable, FlatList, TextInput, KeyboardAvoidingView, Platform, Modal, Linking, Text } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
@@ -84,6 +84,9 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [showVisitModal, setShowVisitModal] = useState(false);
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [cardActionLoading, setCardActionLoading] = useState<string | null>(null);
+  const [chatAgentInfo, setChatAgentInfo] = useState<{ name?: string; isVerifiedAgent?: boolean; companyName?: string } | null>(null);
+  const [chatGroupSize, setChatGroupSize] = useState<number>(0);
+  const [isGroupLeader, setIsGroupLeader] = useState<boolean>(true);
 
   const [inquiryStatus, setInquiryStatus] = useState<'pending' | 'accepted' | 'declined'>(
     inquiryGroup?.inquiryStatus || inquiryGroup?.inquiry_status || 'pending'
@@ -522,6 +525,22 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       if (participantUser) {
         setOtherUserPlan(participantUser.subscription?.plan);
       }
+      const hostId = inquiryGroup?.hostId;
+      if (hostId) {
+        const hostUser = allUsers.find(u => u.id === hostId);
+        if (hostUser && hostUser.hostType === 'agent') {
+          setChatAgentInfo({
+            name: hostUser.full_name || hostUser.name,
+            isVerifiedAgent: !!hostUser.licenseVerified,
+            companyName: hostUser.companyName,
+          });
+        }
+      }
+    }
+    if (isGroupChatLoad && inquiryGroup?.members) {
+      setChatGroupSize(inquiryGroup.members.length);
+      const myMember = inquiryGroup.members.find((m: any) => m.userId === user?.id);
+      setIsGroupLeader(myMember?.role === 'admin');
     }
 
     if (user && conversation) {
@@ -848,6 +867,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           leaseLength: metadata.lease_length,
           monthlyRent: metadata.monthly_rent,
           securityDeposit: metadata.security_deposit || null,
+          groupId: chatGroupSize > 1 ? inquiryGroup?.id : null,
         });
         if (!bookingResult.success) {
           await alert({ title: 'Error', message: bookingResult.error || 'Failed to create booking.' });
@@ -903,6 +923,9 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           onAcceptBooking={handleAcceptBooking}
           onDeclineBooking={handleDeclineBooking}
           actionLoading={cardActionLoading}
+          agentInfo={chatAgentInfo}
+          groupSize={chatGroupSize}
+          isGroupLeader={isGroupLeader}
         />
       );
     }
@@ -1126,7 +1149,12 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
                     </ThemedText>
                     <PlanBadge plan={otherUserPlan} size={15} />
                   </View>
-                  {canSeeOnlineStatus() ? (
+                  {chatAgentInfo?.isVerifiedAgent ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 1 }}>
+                      <Feather name="check-circle" size={10} color="#3b82f6" />
+                      <Text style={{ fontSize: 10, fontWeight: '700', color: '#3b82f6' }}>Verified Agent</Text>
+                    </View>
+                  ) : canSeeOnlineStatus() ? (
                     <ThemedText style={[Typography.caption, { color: isOnline ? theme.success : theme.textSecondary }]}>
                       {isOnline ? 'Online' : 'Offline'}
                     </ThemedText>
