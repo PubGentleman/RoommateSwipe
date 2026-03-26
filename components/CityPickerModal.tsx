@@ -1,14 +1,92 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, Pressable, Modal, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useState, Component } from 'react';
+import { View, StyleSheet, Pressable, Modal, KeyboardAvoidingView, Platform, TextInput, Text } from 'react-native';
 import { Feather } from './VectorIcons';
 import { ThemedText } from './ThemedText';
 import { BorderRadius, Spacing } from '../constants/theme';
-import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import * as Haptics from 'expo-haptics';
 
 const GOOGLE_PLACES_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
 const POPULAR_CITIES = ['New York', 'Los Angeles', 'Chicago', 'Miami', 'Austin', 'Atlanta', 'Seattle', 'Boston'];
+
+let GooglePlacesAutocomplete: any = null;
+try {
+  const mod = require('react-native-google-places-autocomplete');
+  GooglePlacesAutocomplete = mod.GooglePlacesAutocomplete;
+} catch (e) {
+  // silently fail
+}
+
+type SearchErrorBoundaryState = { hasError: boolean };
+
+class SearchErrorBoundary extends Component<{ children: React.ReactNode; fallback: React.ReactNode }, SearchErrorBoundaryState> {
+  state: SearchErrorBoundaryState = { hasError: false };
+  static getDerivedStateFromError(): SearchErrorBoundaryState {
+    return { hasError: true };
+  }
+  componentDidCatch() {}
+  render() {
+    if (this.state.hasError) return this.props.fallback;
+    return this.props.children;
+  }
+}
+
+const FallbackSearchInput: React.FC<{ onCitySelect: (city: string) => void }> = ({ onCitySelect }) => {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<string[]>([]);
+
+  const handleChange = (text: string) => {
+    try {
+      setQuery(text);
+      if (!text.trim()) {
+        setResults([]);
+        return;
+      }
+      const lower = text.toLowerCase();
+      const matched = POPULAR_CITIES.filter(c => c.toLowerCase().includes(lower));
+      setResults(matched);
+    } catch {}
+  };
+
+  return (
+    <View>
+      <TextInput
+        style={fallbackStyles.input}
+        placeholder="Search city..."
+        placeholderTextColor="rgba(255,255,255,0.3)"
+        value={query}
+        onChangeText={handleChange}
+        returnKeyType="search"
+      />
+      {results.map(city => (
+        <Pressable key={city} style={fallbackStyles.resultRow} onPress={() => onCitySelect(city)}>
+          <Text style={fallbackStyles.resultText}>{city}</Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+};
+
+const fallbackStyles = StyleSheet.create({
+  input: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    color: '#FFFFFF',
+    borderRadius: BorderRadius.large,
+    paddingHorizontal: 14,
+    height: 44,
+    fontSize: 15,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  resultRow: {
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+  },
+  resultText: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 14,
+  },
+});
 
 interface CityPickerModalProps {
   visible: boolean;
@@ -29,34 +107,118 @@ export const CityPickerModal: React.FC<CityPickerModalProps> = ({
   onSubAreaSelect,
   onClose,
 }) => {
-  const [hasSearchResults, setHasSearchResults] = useState(false);
-
   const handleSelect = (city: string | null) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onCitySelect(city);
-    onSubAreaSelect?.(null);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    try {
+      onCitySelect(city);
+    } catch (e) {
+      console.warn('[CityPickerModal] onCitySelect error:', e);
+    }
+    if (onSubAreaSelect) {
+      try { onSubAreaSelect(null); } catch (e) {
+        console.warn('[CityPickerModal] onSubAreaSelect error:', e);
+      }
+    }
   };
 
   const handleClose = () => {
-    onClose();
+    try { onClose(); } catch {}
   };
 
   const handlePlaceSelect = (data: any, details: any) => {
-    if (!details) return;
-    const components = details.address_components || [];
-    let city = '';
-    for (const comp of components) {
-      const types: string[] = comp.types || [];
-      if (types.includes('locality')) {
-        city = comp.long_name;
-        break;
+    try {
+      if (!details) return;
+      const components = details?.address_components || [];
+      let city = '';
+      for (const comp of components) {
+        const types: string[] = comp?.types || [];
+        if (types.includes('locality')) {
+          city = comp.long_name || '';
+          break;
+        }
       }
+      if (!city) {
+        city = data?.description?.split(',')[0] || '';
+      }
+      if (city) {
+        handleSelect(city);
+        handleClose();
+      }
+    } catch {
+      // silently fail
     }
-    if (!city) {
-      city = data.description?.split(',')[0] || '';
-    }
+  };
+
+  const handleFallbackSelect = (city: string) => {
     handleSelect(city);
-    onClose();
+    handleClose();
+  };
+
+  const renderSearchSection = () => {
+    if (!GooglePlacesAutocomplete || !GOOGLE_PLACES_KEY) {
+      return (
+        <FallbackSearchInput onCitySelect={handleFallbackSelect} />
+      );
+    }
+
+    return (
+      <SearchErrorBoundary fallback={<FallbackSearchInput onCitySelect={handleFallbackSelect} />}>
+        <View style={styles.autocompleteWrap}>
+          <GooglePlacesAutocomplete
+            placeholder="Search city, neighborhood, or ZIP..."
+            fetchDetails={true}
+            onPress={handlePlaceSelect}
+            query={{
+              key: GOOGLE_PLACES_KEY,
+              language: 'en',
+              types: '(cities)',
+              components: 'country:us',
+            }}
+            textInputProps={{
+              placeholderTextColor: 'rgba(255,255,255,0.3)',
+              returnKeyType: 'search',
+              onFocus: () => {},
+            }}
+            onFail={() => {}}
+            onNotFound={() => {}}
+            styles={{
+              container: { flex: 0 },
+              textInputContainer: { backgroundColor: 'transparent' },
+              textInput: {
+                backgroundColor: 'rgba(255,255,255,0.06)',
+                color: '#FFFFFF',
+                borderRadius: BorderRadius.large,
+                paddingHorizontal: 14,
+                height: 44,
+                fontSize: 15,
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.1)',
+              },
+              listView: {
+                backgroundColor: 'rgba(30,30,30,0.98)',
+                borderRadius: BorderRadius.large,
+                marginTop: 4,
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.1)',
+                maxHeight: 200,
+              },
+              row: {
+                backgroundColor: 'transparent',
+                paddingHorizontal: 14,
+                paddingVertical: 13,
+              },
+              description: { color: 'rgba(255,255,255,0.85)', fontSize: 14 },
+              separator: { backgroundColor: 'rgba(255,255,255,0.06)' },
+              poweredContainer: { display: 'none' },
+            }}
+            enablePoweredByContainer={false}
+            debounce={300}
+          />
+        </View>
+      </SearchErrorBoundary>
+    );
   };
 
   return (
@@ -74,56 +236,7 @@ export const CityPickerModal: React.FC<CityPickerModalProps> = ({
 
           <View style={styles.section}>
             <ThemedText style={styles.sectionLabel}>Search</ThemedText>
-            <View style={styles.autocompleteWrap}>
-              <GooglePlacesAutocomplete
-                placeholder="Search city, neighborhood, or ZIP..."
-                fetchDetails={true}
-                onPress={handlePlaceSelect}
-                query={{
-                  key: GOOGLE_PLACES_KEY,
-                  language: 'en',
-                  types: '(cities)',
-                  components: 'country:us',
-                }}
-                textInputProps={{
-                  placeholderTextColor: 'rgba(255,255,255,0.3)',
-                  returnKeyType: 'search',
-                }}
-                onFail={() => setHasSearchResults(false)}
-                styles={{
-                  container: { flex: 0 },
-                  textInputContainer: { backgroundColor: 'transparent' },
-                  textInput: {
-                    backgroundColor: 'rgba(255,255,255,0.06)',
-                    color: '#FFFFFF',
-                    borderRadius: BorderRadius.large,
-                    paddingHorizontal: 14,
-                    height: 44,
-                    fontSize: 15,
-                    borderWidth: 1,
-                    borderColor: 'rgba(255,255,255,0.1)',
-                  },
-                  listView: {
-                    backgroundColor: 'rgba(30,30,30,0.98)',
-                    borderRadius: BorderRadius.large,
-                    marginTop: 4,
-                    borderWidth: 1,
-                    borderColor: 'rgba(255,255,255,0.1)',
-                    maxHeight: 200,
-                  },
-                  row: {
-                    backgroundColor: 'transparent',
-                    paddingHorizontal: 14,
-                    paddingVertical: 13,
-                  },
-                  description: { color: 'rgba(255,255,255,0.85)', fontSize: 14 },
-                  separator: { backgroundColor: 'rgba(255,255,255,0.06)' },
-                  poweredContainer: { display: 'none' },
-                }}
-                enablePoweredByContainer={false}
-                debounce={300}
-              />
-            </View>
+            {renderSearchSection()}
           </View>
 
           {recentCities.length > 0 ? (
@@ -189,7 +302,9 @@ export const CityPillButton: React.FC<{
     <Pressable
       style={styles.pillButton}
       onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        try {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        } catch {}
         onPress();
       }}
     >
