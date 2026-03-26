@@ -55,6 +55,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getCompletionPercentage } from '../../utils/profileReminderUtils';
 
 const PROFILE_PROMPT_KEY = 'hasSeenProfilePrompt';
+const PROFILE_PROMPT_DISMISS_KEY = 'profile_prompt_dismissed_date';
+const PROFILE_PROMPT_COOLDOWN_DAYS = 7;
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Limit card size for web/desktop viewing
@@ -143,9 +145,26 @@ export const RoommatesScreen = () => {
   useEffect(() => {
     const checkFirstSessionPrompt = async () => {
       try {
-        const seen = await AsyncStorage.getItem(PROFILE_PROMPT_KEY);
         const isOnboarded = user?.onboardingStep === 'complete' || !user?.onboardingStep;
-        if (isOnboarded && seen !== 'true') {
+        if (!isOnboarded) return;
+
+        const completion = user ? getCompletionPercentage(user) : 0;
+        if (completion > 50) return;
+
+        const dismissedDate = await AsyncStorage.getItem(PROFILE_PROMPT_DISMISS_KEY);
+        if (dismissedDate) {
+          const dismissed = new Date(dismissedDate);
+          if (!isNaN(dismissed.getTime())) {
+            const now = new Date();
+            const daysSince = (now.getTime() - dismissed.getTime()) / (1000 * 60 * 60 * 24);
+            if (daysSince < PROFILE_PROMPT_COOLDOWN_DAYS) return;
+          }
+        }
+
+        const seen = await AsyncStorage.getItem(PROFILE_PROMPT_KEY);
+        if (seen !== 'true') {
+          setShowFirstSessionPrompt(true);
+        } else if (!dismissedDate) {
           setShowFirstSessionPrompt(true);
         }
       } catch {}
@@ -1741,9 +1760,21 @@ export const RoommatesScreen = () => {
         onDismiss={() => setShowPaywall(false)}
       />
 
-      <Modal visible={showFirstSessionPrompt} transparent animationType="fade" onRequestClose={() => {}}>
+      <Modal visible={showFirstSessionPrompt} transparent animationType="fade" onRequestClose={async () => {
+        setShowFirstSessionPrompt(false);
+        await AsyncStorage.setItem(PROFILE_PROMPT_DISMISS_KEY, new Date().toISOString());
+      }}>
         <View style={styles.firstSessionOverlay}>
           <View style={styles.firstSessionCard}>
+            <Pressable
+              style={styles.firstSessionCloseBtn}
+              onPress={async () => {
+                setShowFirstSessionPrompt(false);
+                await AsyncStorage.setItem(PROFILE_PROMPT_DISMISS_KEY, new Date().toISOString());
+              }}
+            >
+              <Feather name="x" size={20} color="rgba(255,255,255,0.5)" />
+            </Pressable>
             <View style={styles.firstSessionIconWrap}>
               <Feather name="user-check" size={36} color="#ff6b5b" />
             </View>
@@ -3656,6 +3687,18 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
     paddingHorizontal: 28,
     alignItems: 'center' as const,
+  },
+  firstSessionCloseBtn: {
+    position: 'absolute' as const,
+    top: 14,
+    right: 14,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    zIndex: 1,
   },
   firstSessionIconWrap: {
     width: 72,
