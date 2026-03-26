@@ -17,6 +17,7 @@ import { getConversations as getSupabaseConversations, subscribeToAllMessages } 
 import { getMyInquiryGroups } from '../../services/groupService';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { Group } from '../../types/models';
+import { normalizeRenterPlan, getRenterPlanLimits } from '../../constants/renterPlanLimits';
 
 type MessagesScreenNavigationProp = NativeStackNavigationProp<MessagesStackParamList, 'MessagesList'>;
 
@@ -687,6 +688,25 @@ export const MessagesScreen = () => {
     );
   };
 
+  const renterPlan = normalizeRenterPlan(user?.subscription?.plan);
+  const renterLimits = getRenterPlanLimits(renterPlan);
+  const hasAIAccess = renterLimits.hasAIGroupSuggestions;
+  const aiBadgeLabel = renterPlan === 'elite' ? 'Elite' : renterPlan === 'plus' ? 'Plus' : 'Plus';
+  const aiBadgeLocked = !hasAIAccess;
+
+  const handleAIAssistantPress = async () => {
+    if (aiBadgeLocked) {
+      await alert({
+        title: 'Upgrade to Plus',
+        message: 'Upgrade to Plus to access your AI Match Assistant.',
+        confirmText: 'View Plans',
+      });
+      (navigation as any).navigate('Plans');
+      return;
+    }
+    (navigation as any).navigate('AIMatchAssistant');
+  };
+
   const renderHeader = () => {
     const showAI = chatFilter === 'all';
     const showInquiries = (chatFilter === 'all' || chatFilter === 'groups') && inquiryGroups.length > 0;
@@ -697,7 +717,7 @@ export const MessagesScreen = () => {
         {showAI ? (
           <Pressable
             style={styles.aiConvRow}
-            onPress={() => (navigation as any).navigate('AIMatchAssistant')}
+            onPress={handleAIAssistantPress}
           >
             <LinearGradient colors={['#ff6b5b', '#ff8c7a']} style={styles.aiConvAvatar}>
               <Feather name="cpu" size={22} color="#fff" />
@@ -705,8 +725,9 @@ export const MessagesScreen = () => {
             <View style={styles.aiConvContent}>
               <View style={styles.convTopRow}>
                 <Text style={styles.aiConvName}>AI Match Assistant</Text>
-                <View style={styles.proBadge}>
-                  <Text style={styles.proBadgeText}>PRO</Text>
+                <View style={[styles.proBadge, aiBadgeLocked ? styles.lockedBadge : null]}>
+                  {aiBadgeLocked ? <Feather name="lock" size={8} color="#a855f7" /> : null}
+                  <Text style={styles.proBadgeText}>{aiBadgeLabel.toUpperCase()}</Text>
                 </View>
               </View>
               <Text style={styles.aiConvSubtitle}>Find roommates, neighborhoods, zodiac tips...</Text>
@@ -1071,6 +1092,13 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderWidth: 1,
     borderColor: 'rgba(168,85,247,0.35)',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 3,
+  },
+  lockedBadge: {
+    backgroundColor: 'rgba(168,85,247,0.1)',
+    borderColor: 'rgba(168,85,247,0.25)',
   },
   proBadgeText: {
     fontSize: 9,

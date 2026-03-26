@@ -8,6 +8,7 @@ import { PromoteAdminScreen } from '../screens/shared/PromoteAdminScreen';
 import { ListingGroupsScreen } from '../screens/shared/ListingGroupsScreen';
 import { GroupInfoScreen } from '../screens/shared/GroupInfoScreen';
 import { RoommateProfile } from '../types/models';
+import { AIAssistantScreen } from '../screens/renter/AIAssistantScreen';
 
 export type MessagesStackParamList = {
   MessagesList: { role?: 'host' | 'renter' };
@@ -37,6 +38,7 @@ export type MessagesStackParamList = {
     groupId: string;
     groupName?: string;
   };
+  AIMatchAssistant: undefined;
 };
 
 const Stack = createNativeStackNavigator<MessagesStackParamList>();
@@ -51,6 +53,7 @@ export const MessagesStackNavigator = () => {
       <Stack.Screen name="PromoteAdmin" component={PromoteAdminScreen} />
       <Stack.Screen name="ListingGroups" component={ListingGroupsScreen} />
       <Stack.Screen name="GroupInfo" component={GroupInfoScreen} />
+      <Stack.Screen name="AIMatchAssistant" component={AIAssistantScreen} options={{ presentation: 'fullScreenModal', headerShown: false }} />
     </Stack.Navigator>
   );
 };

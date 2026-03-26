@@ -1,0 +1,48 @@
+REPLIT PROMPT — Paste this first:
+Fix all AI chat screens in the app. Every screen that uses Claude AI is returning "Something went wrong" because Claude is being called directly from the app. Fix all of them by creating Supabase Edge Functions and routing all AI calls through them.
+Create these 4 Edge Functions in supabase/functions/:
+1. supabase/functions/match-chat/index.ts
+
+Accepts POST with { question, currentUserId, matchedUserId }
+Fetches both users' profiles from the database
+Calls Claude using ANTHROPIC_API_KEY from Supabase secrets
+Returns a 2-3 sentence answer about compatibility
+Fallback: generate answer from profile data if Claude fails
+Never return an error to the app
+
+2. supabase/functions/explain-match/index.ts
+
+Accepts POST with { userId, matchedProfileId }
+Fetches both users' profiles from the database
+Calls Claude to explain why they are a good match
+Based on: budget, location, lifestyle, move-in date, room preferences
+Fallback: build explanation from profile data directly
+Never return an error to the app
+
+3. supabase/functions/neighborhood-chat/index.ts
+
+Accepts POST with { question, neighborhood, city, listingId, latitude, longitude }
+Fetches nearby amenities from Overpass API using lat/lng
+Fetches crime data from NYC Open Data API if city is New York
+Passes all real data as context to Claude
+Returns a specific helpful answer using real data
+Never say "check local forums" or give vague answers
+Fallback: answer using only amenity data if Claude fails
+
+4. supabase/functions/ai-match-assistant/index.ts
+
+Accepts POST with { question, userId }
+Fetches current user's full profile and preferences
+Calls Claude to answer general roommate and apartment questions
+Fallback: return helpful general advice if Claude fails
+Never return an error to the app
+
+Rules for ALL Edge Functions:
+
+Add CORS headers to every function
+Use Claude model: claude-3-5-haiku-20241022
+Wrap every Claude call in try/catch
+Set 10 second timeout on all external calls
+Always return a meaningful response — never return an error string
+
+Then update every AI chat screen in the app to call its corresponding Edge Function URL instead of calling Claude directly.
