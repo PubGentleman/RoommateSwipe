@@ -145,6 +145,8 @@ export interface Property {
     manualOverride?: string;
     fetchedAt: string;
   };
+  average_rating?: number | null;
+  review_count?: number;
 }
 
 export interface PropertyFilter {

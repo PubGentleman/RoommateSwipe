@@ -29,6 +29,9 @@ import type { HostType } from '../../utils/hostTypeUtils';
 import { PropertyMapView } from '../../components/PropertyMapView';
 import { RhomeAISheet } from '../../components/RhomeAISheet';
 import { NeighborhoodAISheet } from '../../components/NeighborhoodAISheet';
+import { PropertyReviewsScreen } from '../shared/PropertyReviewsScreen';
+import { WriteReviewSheet } from '../../components/WriteReviewSheet';
+import { getReviewSummary, submitReview, ReviewSummary } from '../../services/reviewService';
 
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
@@ -125,6 +128,10 @@ export const ExploreScreen = () => {
   const [interestNote, setInterestNote] = useState('');
   const [userGroups, setUserGroups] = useState<Group[]>([]);
   const [showGroupPickerModal, setShowGroupPickerModal] = useState(false);
+  const [showReviewsModal, setShowReviewsModal] = useState(false);
+  const [showWriteReview, setShowWriteReview] = useState(false);
+  const [reviewSummaryCache, setReviewSummaryCache] = useState<Map<string, ReviewSummary>>(new Map());
+  const [detailReviewSummary, setDetailReviewSummary] = useState<ReviewSummary | null>(null);
 
   const COLLAPSIBLE_HEIGHT = 120;
   const exploreScrollY = useSharedValue(0);
@@ -183,6 +190,32 @@ export const ExploreScreen = () => {
       console.error('Error loading properties:', err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedProperty && showPropertyDetail) {
+      getReviewSummary(selectedProperty.id).then(setDetailReviewSummary).catch(() => {});
+    } else {
+      setDetailReviewSummary(null);
+    }
+  }, [selectedProperty?.id, showPropertyDetail]);
+
+  const handleWriteReviewSubmit = async (data: { rating: number; reviewText: string; tags: string[] }) => {
+    if (!user || !selectedProperty) return;
+    const result = await submitReview({
+      listingId: selectedProperty.id,
+      reviewerId: user.id,
+      rating: data.rating,
+      reviewText: data.reviewText,
+      tags: data.tags,
+    });
+    if (result.success) {
+      setShowWriteReview(false);
+      getReviewSummary(selectedProperty.id).then(setDetailReviewSummary).catch(() => {});
+      await showAlert({ title: 'Review Submitted', message: 'Thank you for your review!' });
+    } else {
+      await showAlert({ title: 'Error', message: result.error || 'Could not submit review.' });
     }
   };
 
@@ -833,6 +866,13 @@ export const ExploreScreen = () => {
               <View style={[styles.matchScoreBadge, { backgroundColor: getHostBadgeColor(itemHostType) + '25', borderColor: getHostBadgeColor(itemHostType) + '50' }]}>
                 <Feather name={getHostBadgeIcon(itemHostType)} size={9} color={getHostBadgeColor(itemHostType)} />
                 <Text style={[styles.matchScoreText, { color: getHostBadgeColor(itemHostType) }]}>{getHostBadgeLabel(itemHostType)}</Text>
+              </View>
+            ) : null}
+            {item.average_rating && item.review_count ? (
+              <View style={styles.ratingBadge}>
+                <Feather name="star" size={10} color="#FFD700" />
+                <Text style={styles.ratingBadgeText}>{item.average_rating.toFixed(1)}</Text>
+                <Text style={styles.ratingBadgeCount}>({item.review_count})</Text>
               </View>
             ) : null}
           </View>
@@ -1787,11 +1827,65 @@ export const ExploreScreen = () => {
                       </View>
                     ) : null}
 
+                    <View style={styles.pdSection}>
+                      <View style={styles.pdReviewsHeader}>
+                        <Text style={styles.pdSectionTitle}>Reviews</Text>
+                        {detailReviewSummary && detailReviewSummary.reviewCount > 0 ? (
+                          <View style={styles.pdReviewsSummaryBadge}>
+                            <Feather name="star" size={14} color="#FFD700" />
+                            <Text style={styles.pdReviewsAvg}>{detailReviewSummary.averageRating?.toFixed(1)}</Text>
+                            <Text style={styles.pdReviewsCount}>({detailReviewSummary.reviewCount})</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                      {detailReviewSummary && detailReviewSummary.reviewCount > 0 ? (
+                        <Pressable
+                          style={styles.pdReviewsBtn}
+                          onPress={() => setShowReviewsModal(true)}
+                        >
+                          <Feather name="message-square" size={16} color="#ff6b5b" />
+                          <Text style={styles.pdReviewsBtnText}>
+                            See all {detailReviewSummary.reviewCount} review{detailReviewSummary.reviewCount !== 1 ? 's' : ''}
+                          </Text>
+                          <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.4)" />
+                        </Pressable>
+                      ) : (
+                        <Pressable
+                          style={styles.pdReviewsBtn}
+                          onPress={() => setShowWriteReview(true)}
+                        >
+                          <Feather name="edit-3" size={16} color="#ff6b5b" />
+                          <Text style={styles.pdReviewsBtnText}>Be the first to review</Text>
+                          <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.4)" />
+                        </Pressable>
+                      )}
+                    </View>
+
                     <View style={{ height: 100 }} />
                   </>
                 );
               })() : null}
             </ScrollView>
+
+            {selectedProperty ? (
+              <Modal visible={showReviewsModal} animationType="slide" presentationStyle="pageSheet">
+                <PropertyReviewsScreen
+                  listingId={selectedProperty.id}
+                  listingTitle={selectedProperty.title}
+                  hostId={selectedProperty.hostId || selectedProperty.hostProfileId || ''}
+                  onClose={() => {
+                    setShowReviewsModal(false);
+                    getReviewSummary(selectedProperty.id).then(setDetailReviewSummary).catch(() => {});
+                  }}
+                />
+              </Modal>
+            ) : null}
+
+            <WriteReviewSheet
+              visible={showWriteReview}
+              onClose={() => setShowWriteReview(false)}
+              onSubmit={handleWriteReviewSubmit}
+            />
 
             {selectedProperty ? (() => {
               const interest = interestMap.get(selectedProperty.id);
@@ -3740,5 +3834,61 @@ const styles = StyleSheet.create({
   breakdownBarFill: {
     height: '100%' as any,
     borderRadius: 3,
+  },
+  ratingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,215,0,0.15)',
+    borderColor: 'rgba(255,215,0,0.3)',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  ratingBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFD700',
+  },
+  ratingBadgeCount: {
+    fontSize: 10,
+    color: 'rgba(255,215,0,0.7)',
+  },
+  pdReviewsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  pdReviewsSummaryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  pdReviewsAvg: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFD700',
+  },
+  pdReviewsCount: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.4)',
+  },
+  pdReviewsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    padding: 14,
+  },
+  pdReviewsBtnText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.8)',
   },
 });

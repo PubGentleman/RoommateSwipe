@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, StyleSheet, Pressable, Text, ScrollView, Image } from 'react-native';
+import { View, StyleSheet, Pressable, Text, ScrollView, Image, Modal } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -16,6 +16,7 @@ import { RhomeAISheet } from '../../components/RhomeAISheet';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { isListingBoosted, canAddListingCheck, isFreePlan } from '../../utils/hostPricing';
 import { ListingLimitModal, OverageModal } from '../../components/ListingLimitModal';
+import { PropertyReviewsScreen } from '../shared/PropertyReviewsScreen';
 
 const BG = '#111';
 const CARD_BG = '#1a1a1a';
@@ -83,6 +84,8 @@ export const MyListingsScreen = () => {
   const [showOverageModal, setShowOverageModal] = useState(false);
   const [limitMessage, setLimitMessage] = useState('');
   const [overageMessage, setOverageMessage] = useState('');
+  const [reviewsListingId, setReviewsListingId] = useState<string | null>(null);
+  const [reviewsListingTitle, setReviewsListingTitle] = useState('');
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -432,6 +435,24 @@ export const MyListingsScreen = () => {
             </View>
           </View>
 
+          <Pressable
+            style={styles.reviewsRow}
+            onPress={() => {
+              setReviewsListingId(listing.id);
+              setReviewsListingTitle(listing.title);
+            }}
+          >
+            <View style={styles.reviewsRowLeft}>
+              <Feather name="star" size={14} color={listing.average_rating ? '#FFD700' : 'rgba(255,255,255,0.3)'} />
+              <Text style={styles.reviewsRowText}>
+                {listing.average_rating
+                  ? `${listing.average_rating.toFixed(1)} rating · ${listing.review_count || 0} review${(listing.review_count || 0) !== 1 ? 's' : ''}`
+                  : 'No reviews yet'}
+              </Text>
+            </View>
+            <Feather name="chevron-right" size={14} color="rgba(255,255,255,0.3)" />
+          </Pressable>
+
           <View style={styles.cardDivider} />
 
           <View style={styles.actionRow}>
@@ -639,6 +660,17 @@ export const MyListingsScreen = () => {
           navigation.navigate('CreateEditListing');
         }}
       />
+
+      {reviewsListingId ? (
+        <Modal visible animationType="slide" presentationStyle="pageSheet">
+          <PropertyReviewsScreen
+            listingId={reviewsListingId}
+            listingTitle={reviewsListingTitle}
+            hostId={user?.id || ''}
+            onClose={() => setReviewsListingId(null)}
+          />
+        </Modal>
+      ) : null}
     </View>
   );
 };
@@ -1092,5 +1124,23 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.25)',
     marginTop: 8,
     textAlign: 'center',
+  },
+  reviewsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 2,
+    marginTop: 4,
+  },
+  reviewsRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  reviewsRowText: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.6)',
+    fontWeight: '500',
   },
 });

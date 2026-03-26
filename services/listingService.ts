@@ -77,6 +77,8 @@ export function mapListingToProperty(l: any, fallbackHostName?: string): Propert
     walkScoreLabel: l.walk_score_label ?? undefined,
     transitScore: l.transit_score ?? undefined,
     transitScoreLabel: l.transit_score_label ?? undefined,
+    average_rating: l.average_rating ?? null,
+    review_count: l.review_count ?? 0,
   };
 }
 
