@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, Dimensions, ActivityIndicator, TextInput, ScrollView, Modal, Image } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Dimensions, ActivityIndicator, TextInput, ScrollView, Modal, Image, InteractionManager } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, useAnimatedScrollHandler, withSpring, withTiming, runOnJS, interpolate, Extrapolation } from 'react-native-reanimated';
 import { Feather } from '../../components/VectorIcons';
@@ -102,6 +102,8 @@ export const GroupsScreen = () => {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const rotation = useSharedValue(0);
+  const isAnimatingSwipe = useSharedValue(false);
+  const cardOpacity = useSharedValue(1);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -409,9 +411,21 @@ export const GroupsScreen = () => {
     await showAlert({ title: 'Request Sent', message: 'Join request sent! The admin will review it.', variant: 'success' });
   };
 
-  const handleSwipeAction = async (action: 'like' | 'skip') => {
-    if (!currentGroup) return;
+  const advanceGroupCard = () => {
+    InteractionManager.runAfterInteractions(() => {
+      setCurrentIndex(prev => prev + 1);
+      translateX.value = 0;
+      translateY.value = 0;
+      rotation.value = 0;
+      cardOpacity.value = 1;
+      isAnimatingSwipe.value = false;
+    });
+  };
 
+  const handleSwipeAction = async (action: 'like' | 'skip') => {
+    if (!currentGroup || isAnimatingSwipe.value) return;
+
+    isAnimatingSwipe.value = true;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     setLastSwipedGroup({ group: currentGroup, action });
@@ -420,11 +434,10 @@ export const GroupsScreen = () => {
     const toX = direction * SCREEN_WIDTH * 1.5;
     const exitDuration = 200;
 
+    cardOpacity.value = 0;
     translateX.value = withTiming(toX, { duration: exitDuration });
     rotation.value = withTiming(direction * 15, { duration: exitDuration }, () => {
-      translateX.value = 0;
-      rotation.value = 0;
-      runOnJS(setCurrentIndex)(currentIndex + 1);
+      runOnJS(advanceGroupCard)();
     });
 
     if (action === 'like') {
@@ -440,12 +453,16 @@ export const GroupsScreen = () => {
       return;
     }
     
-    if (!lastSwipedGroup) return;
+    if (!lastSwipedGroup || isAnimatingSwipe.value) return;
     
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     
     undoLastSwipeAsync(lastSwipedGroup.group.id, lastSwipedGroup.action);
     
+    translateX.value = 0;
+    translateY.value = 0;
+    rotation.value = 0;
+    cardOpacity.value = 1;
     setCurrentIndex(currentIndex - 1);
     setLastSwipedGroup(null);
   };
@@ -602,10 +619,12 @@ export const GroupsScreen = () => {
   const pan = Gesture.Pan()
     .minDistance(10)
     .onChange((event) => {
+      if (isAnimatingSwipe.value) return;
       translateX.value = event.translationX;
       rotation.value = event.translationX / 20;
     })
     .onEnd((event) => {
+      if (isAnimatingSwipe.value) return;
       if (Math.abs(event.translationX) > 80) {
         const action = event.translationX > 0 ? 'like' : 'skip';
         runOnJS(handleSwipeAction)(action);
@@ -624,6 +643,8 @@ export const GroupsScreen = () => {
         { translateX: translateX.value },
         { rotate },
       ],
+      opacity: cardOpacity.value,
+      zIndex: 10,
     };
   });
 
