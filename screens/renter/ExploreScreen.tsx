@@ -11,6 +11,8 @@ import { ThemedView } from '../../components/ThemedView';
 import { WalkScoreBadge } from '../../components/WalkScoreBadge';
 import { InterestConfirmationModal } from '../../components/InterestConfirmationModal';
 import { PaywallSheet } from '../../components/PaywallSheet';
+import { LockedFeatureOverlay, PlanBadgeInline } from '../../components/LockedFeatureOverlay';
+import { normalizeRenterPlan, getRenterPlanLimits } from '../../constants/renterPlanLimits';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCityContext } from '../../contexts/CityContext';
@@ -795,20 +797,12 @@ export const ExploreScreen = () => {
     setFilteredProperties(deduped);
   };
 
+  const renterPlan = normalizeRenterPlan(user?.subscription?.plan);
+  const renterLimits = getRenterPlanLimits(renterPlan);
+
   const handleFilterPress = () => {
-    const userPlan = user?.subscription?.plan || 'basic';
-    const userStatus = user?.subscription?.status || 'active';
-    const hasActiveSubscription = (userPlan === 'plus' || userPlan === 'elite') && userStatus === 'active';
-    
-    if (!hasActiveSubscription) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      setPaywallFeature('Advanced Filters');
-      setPaywallPlan('plus');
-      setShowPaywall(true);
-    } else {
-      setTempFilters({ ...filters, listingType: listingTypeFilter });
-      setShowFilterModal(true);
-    }
+    setTempFilters({ ...filters, listingType: listingTypeFilter });
+    setShowFilterModal(true);
   };
 
   const handleApplyFilters = () => {
@@ -890,7 +884,7 @@ export const ExploreScreen = () => {
     setListingTypeFilter(prev => prev === type ? 'any' : type);
   };
 
-  const isBasic = (user?.subscription?.plan || 'basic') === 'basic';
+  const isBasic = renterPlan === 'free';
 
 
   const renderProperty = ({ item }: { item: Property }) => {
@@ -1496,6 +1490,86 @@ export const ExploreScreen = () => {
                 );
               })}
             </View>
+
+            {!renterLimits.hasAdvancedFilters ? (
+              <Pressable
+                style={styles.fmLockedSection}
+                onPress={() => {
+                  setShowFilterModal(false);
+                  setPaywallFeature('Advanced Filters');
+                  setPaywallPlan('plus');
+                  setShowPaywall(true);
+                }}
+              >
+                <View style={styles.fmLockedRow}>
+                  <Text style={styles.fmSectionTitle}>Lifestyle Preferences</Text>
+                  <PlanBadgeInline plan="Plus" locked />
+                </View>
+                <Text style={styles.fmLockedDesc}>Cleanliness, noise level, social habits, pet preferences, smoking</Text>
+              </Pressable>
+            ) : (
+              <>
+                <Text style={styles.fmSectionTitle}>Lifestyle Preferences</Text>
+                <View style={styles.fmAmenitiesWrap}>
+                  {['Pet-Friendly', 'Non-Smoking', 'Quiet', 'Social', 'Clean', 'Early Bird', 'Night Owl'].map(tag => {
+                    const isSelected = tempFilters.lifestyleTags?.includes(tag) || false;
+                    return (
+                      <Pressable
+                        key={tag}
+                        style={[styles.fmAmenityChip, isSelected && styles.fmAmenityChipActive]}
+                        onPress={() => {
+                          const current = tempFilters.lifestyleTags || [];
+                          const updated = current.includes(tag) ? current.filter(t => t !== tag) : [...current, tag];
+                          setTempFilters(prev => ({ ...prev, lifestyleTags: updated }));
+                        }}
+                      >
+                        <Text style={[styles.fmAmenityText, isSelected && styles.fmAmenityTextActive]}>{tag}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </>
+            )}
+
+            {!renterLimits.hasTransitFiltering ? (
+              <Pressable
+                style={styles.fmLockedSection}
+                onPress={() => {
+                  setShowFilterModal(false);
+                  setPaywallFeature('Transit Filtering');
+                  setPaywallPlan('plus');
+                  setShowPaywall(true);
+                }}
+              >
+                <View style={styles.fmLockedRow}>
+                  <Text style={styles.fmSectionTitle}>Transit Proximity</Text>
+                  <PlanBadgeInline plan="Plus" locked />
+                </View>
+                <Text style={styles.fmLockedDesc}>Filter listings by subway, bus, and train stop proximity</Text>
+              </Pressable>
+            ) : (
+              <>
+                <Text style={styles.fmSectionTitle}>Transit Proximity</Text>
+                <View style={styles.fmAmenitiesWrap}>
+                  {['Near Subway', 'Near Bus', 'Near Train', 'Under 10 min walk'].map(tag => {
+                    const isSelected = tempFilters.transitTags?.includes(tag) || false;
+                    return (
+                      <Pressable
+                        key={tag}
+                        style={[styles.fmAmenityChip, isSelected && styles.fmAmenityChipActive]}
+                        onPress={() => {
+                          const current = tempFilters.transitTags || [];
+                          const updated = current.includes(tag) ? current.filter(t => t !== tag) : [...current, tag];
+                          setTempFilters(prev => ({ ...prev, transitTags: updated }));
+                        }}
+                      >
+                        <Text style={[styles.fmAmenityText, isSelected && styles.fmAmenityTextActive]}>{tag}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </>
+            )}
           </ScrollView>
 
           <View style={[styles.fmFooter, { paddingBottom: insets.bottom + 16 }]}>
@@ -1796,11 +1870,23 @@ export const ExploreScreen = () => {
                       {detailShowMatch && detailCompatibility !== null ? (
                         <Pressable
                           style={styles.pdMatchPill}
-                          onPress={() => setShowMatchBreakdown(true)}
+                          onPress={() => {
+                            if (!renterLimits.hasMatchBreakdown) {
+                              setPaywallFeature('Match Breakdown');
+                              setPaywallPlan('elite');
+                              setShowPaywall(true);
+                            } else {
+                              setShowMatchBreakdown(true);
+                            }
+                          }}
                         >
                           <Feather name="heart" size={13} color="#ff6b5b" />
                           <Text style={styles.pdMatchPillText}>{detailCompatibility}% Match</Text>
-                          <Feather name="chevron-right" size={14} color="#ff6b5b" />
+                          {renterLimits.hasMatchBreakdown ? (
+                            <Feather name="chevron-right" size={14} color="#ff6b5b" />
+                          ) : (
+                            <PlanBadgeInline plan="Elite" locked />
+                          )}
                         </Pressable>
                       ) : null}
 
@@ -3410,6 +3496,25 @@ const styles = StyleSheet.create({
   },
   fmAmenityTextActive: {
     color: '#fff',
+  },
+  fmLockedSection: {
+    marginTop: 8,
+    padding: 16,
+    backgroundColor: 'rgba(168,85,247,0.06)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(168,85,247,0.15)',
+  },
+  fmLockedRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    marginBottom: 4,
+  },
+  fmLockedDesc: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.35)',
+    marginTop: 2,
   },
   fmFooter: {
     paddingHorizontal: 20,

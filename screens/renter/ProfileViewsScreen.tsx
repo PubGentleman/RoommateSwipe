@@ -8,6 +8,7 @@ import { StorageService } from '@/utils/storage';
 import { Typography, Spacing } from '@/constants/theme';
 import { Feather } from '../../components/VectorIcons';
 import { useNavigation } from '@react-navigation/native';
+import { normalizeRenterPlan, getRenterPlanLimits } from '../../constants/renterPlanLimits';
 
 interface LikeItem {
   likerId: string;
@@ -24,8 +25,9 @@ export const ProfileViewsScreen = () => {
   const [likes, setLikes] = useState<LikeItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const userPlan = user?.subscription?.plan || 'basic';
-  const canSeeLikes = userPlan === 'plus' || userPlan === 'elite';
+  const renterPlan = normalizeRenterPlan(user?.subscription?.plan);
+  const renterLimits = getRenterPlanLimits(renterPlan);
+  const canSeeLikes = renterLimits.canSeeWhoLiked;
 
   useEffect(() => {
     loadLikes();

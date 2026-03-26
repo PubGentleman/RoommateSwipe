@@ -24,6 +24,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { getGroupsHealth, GroupHealthResult } from '../../utils/groupHealthScore';
 import { getAllGroupQuickStats, GroupQuickStats } from '../../utils/groupQuickStats';
+import { normalizeRenterPlan, getRenterPlanLimits } from '../../constants/renterPlanLimits';
+import { PlanBadgeInline } from '../../components/LockedFeatureOverlay';
 import { useCityContext } from '../../contexts/CityContext';
 import { CityPickerModal, CityPillButton } from '../../components/CityPickerModal';
 import { RhomeAISheet } from '../../components/RhomeAISheet';
@@ -40,6 +42,8 @@ export const GroupsScreen = () => {
   const { theme } = useTheme();
   const { user, purchaseUndoPass, hasActiveUndoPass } = useAuth();
   const { confirm, alert: showAlert } = useConfirm();
+  const renterPlan = normalizeRenterPlan(user?.subscription?.plan);
+  const renterLimits = getRenterPlanLimits(renterPlan);
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const [activeTab, setActiveTab] = useState<Tab>('discover');
@@ -1111,12 +1115,19 @@ export const GroupsScreen = () => {
               {groupQuickStats[group.id].matchingApartmentCount > 0 ? (
                 <Pressable
                   style={styles.quickStatChip}
-                  onPress={() => navigation.navigate('GroupApartmentSuggestions', { groupId: group.id })}
+                  onPress={() => {
+                    if (renterLimits.hasAIApartmentSuggestions) {
+                      navigation.navigate('GroupApartmentSuggestions', { groupId: group.id });
+                    } else {
+                      navigation.navigate('Plans');
+                    }
+                  }}
                 >
-                  <Feather name="home" size={11} color="#3498db" />
-                  <Text style={[styles.quickStatText, { color: '#3498db' }]}>
+                  <Feather name={renterLimits.hasAIApartmentSuggestions ? "home" : "lock"} size={11} color={renterLimits.hasAIApartmentSuggestions ? "#3498db" : "rgba(168,85,247,0.6)"} />
+                  <Text style={[styles.quickStatText, { color: renterLimits.hasAIApartmentSuggestions ? '#3498db' : 'rgba(168,85,247,0.6)' }]}>
                     {groupQuickStats[group.id].matchingApartmentCount} apt{groupQuickStats[group.id].matchingApartmentCount !== 1 ? 's' : ''} match
                   </Text>
+                  {!renterLimits.hasAIApartmentSuggestions ? <PlanBadgeInline plan="Plus" locked /> : null}
                 </Pressable>
               ) : null}
             </View>

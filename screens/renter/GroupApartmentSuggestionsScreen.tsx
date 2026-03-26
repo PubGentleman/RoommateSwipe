@@ -19,6 +19,8 @@ import { Property, RoommateProfile } from '../../types/models';
 import { StorageService } from '../../utils/storage';
 import { scoreListing, ListingSuggestion, detectGroupConflicts } from '../../utils/transitMatching';
 import { NEIGHBORHOOD_TRAINS } from '../../constants/transitData';
+import { normalizeRenterPlan, getRenterPlanLimits } from '../../constants/renterPlanLimits';
+import { PlanBadgeInline } from '../../components/LockedFeatureOverlay';
 
 const CORAL = '#ff6b5b';
 const BG = '#111';
@@ -30,6 +32,8 @@ export default function GroupApartmentSuggestionsScreen() {
   const { theme } = useTheme();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
+  const renterPlan = normalizeRenterPlan(user?.subscription?.plan);
+  const renterLimits = getRenterPlanLimits(renterPlan);
 
   const groupId = route.params?.groupId ?? '';
   const isNewlyComplete = route.params?.isNewlyComplete ?? false;
@@ -106,6 +110,22 @@ export default function GroupApartmentSuggestionsScreen() {
 
   const renderConflictBanner = () => {
     if (conflicts.length === 0) return null;
+    if (!renterLimits.hasConflictDetection) {
+      return (
+        <Animated.View entering={FadeInDown.duration(300)} style={[styles.conflictBanner, { opacity: 0.6 }]}>
+          <View style={styles.conflictHeader}>
+            <Feather name="alert-triangle" size={18} color="rgba(255,184,0,0.4)" />
+            <ThemedText style={[styles.conflictTitle, { color: 'rgba(255,255,255,0.4)' }]}>
+              Potential Conflicts
+            </ThemedText>
+            <PlanBadgeInline plan="Elite" locked />
+          </View>
+          <ThemedText style={[styles.conflictText, { color: 'rgba(255,255,255,0.3)' }]}>
+            Upgrade to Elite to see group preference conflicts
+          </ThemedText>
+        </Animated.View>
+      );
+    }
     return (
       <Animated.View entering={FadeInDown.duration(300)} style={styles.conflictBanner}>
         <View style={styles.conflictHeader}>
@@ -202,35 +222,48 @@ export default function GroupApartmentSuggestionsScreen() {
             <ThemedText style={styles.aiReasonText}>{item.aiReason}</ThemedText>
           </View>
 
-          <View style={styles.voteRow}>
+          {renterLimits.hasGroupVoting ? (
+            <View style={styles.voteRow}>
+              <Pressable
+                style={[styles.voteBtn, myVote === 'yes' && styles.voteBtnYes]}
+                onPress={() => handleVote(item.listing.id, 'yes')}
+              >
+                <Feather name="thumbs-up" size={16} color={myVote === 'yes' ? '#fff' : '#888'} />
+                <ThemedText style={[styles.voteLabel, myVote === 'yes' && { color: '#fff' }]}>
+                  {yesCount > 0 ? yesCount.toString() : 'Love it'}
+                </ThemedText>
+              </Pressable>
+              <Pressable
+                style={[styles.voteBtn, myVote === 'maybe' && styles.voteBtnMaybe]}
+                onPress={() => handleVote(item.listing.id, 'maybe')}
+              >
+                <Feather name="minus" size={16} color={myVote === 'maybe' ? '#fff' : '#888'} />
+                <ThemedText style={[styles.voteLabel, myVote === 'maybe' && { color: '#fff' }]}>
+                  Maybe
+                </ThemedText>
+              </Pressable>
+              <Pressable
+                style={[styles.voteBtn, myVote === 'no' && styles.voteBtnNo]}
+                onPress={() => handleVote(item.listing.id, 'no')}
+              >
+                <Feather name="thumbs-down" size={16} color={myVote === 'no' ? '#fff' : '#888'} />
+                <ThemedText style={[styles.voteLabel, myVote === 'no' && { color: '#fff' }]}>
+                  {noCount > 0 ? noCount.toString() : 'Not for us'}
+                </ThemedText>
+              </Pressable>
+            </View>
+          ) : (
             <Pressable
-              style={[styles.voteBtn, myVote === 'yes' && styles.voteBtnYes]}
-              onPress={() => handleVote(item.listing.id, 'yes')}
+              style={[styles.voteRow, { justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(168,85,247,0.2)', borderRadius: 10 }]}
+              onPress={() => (navigation as any).navigate('Plans')}
             >
-              <Feather name="thumbs-up" size={16} color={myVote === 'yes' ? '#fff' : '#888'} />
-              <ThemedText style={[styles.voteLabel, myVote === 'yes' && { color: '#fff' }]}>
-                {yesCount > 0 ? yesCount.toString() : 'Love it'}
+              <Feather name="lock" size={14} color="rgba(255,255,255,0.3)" />
+              <ThemedText style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginLeft: 6 }}>
+                Group Voting
               </ThemedText>
+              <PlanBadgeInline plan="Plus" locked />
             </Pressable>
-            <Pressable
-              style={[styles.voteBtn, myVote === 'maybe' && styles.voteBtnMaybe]}
-              onPress={() => handleVote(item.listing.id, 'maybe')}
-            >
-              <Feather name="minus" size={16} color={myVote === 'maybe' ? '#fff' : '#888'} />
-              <ThemedText style={[styles.voteLabel, myVote === 'maybe' && { color: '#fff' }]}>
-                Maybe
-              </ThemedText>
-            </Pressable>
-            <Pressable
-              style={[styles.voteBtn, myVote === 'no' && styles.voteBtnNo]}
-              onPress={() => handleVote(item.listing.id, 'no')}
-            >
-              <Feather name="thumbs-down" size={16} color={myVote === 'no' ? '#fff' : '#888'} />
-              <ThemedText style={[styles.voteLabel, myVote === 'no' && { color: '#fff' }]}>
-                {noCount > 0 ? noCount.toString() : 'Not for us'}
-              </ThemedText>
-            </Pressable>
-          </View>
+          )}
         </View>
       </Animated.View>
     );

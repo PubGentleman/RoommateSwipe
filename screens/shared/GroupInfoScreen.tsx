@@ -17,6 +17,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Image } from 'expo-image';
 import { getSuggestedGroupMembers } from '../../utils/groupSuggestions';
 import { getGroupHealth, GroupHealthResult } from '../../utils/groupHealthScore';
+import { normalizeRenterPlan, getRenterPlanLimits } from '../../constants/renterPlanLimits';
+import { PlanBadgeInline } from '../../components/LockedFeatureOverlay';
 import {
   getGroupDetails,
   removeMember,
@@ -98,6 +100,8 @@ export function GroupInfoScreen({ route, navigation }: Props) {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const { confirm, alert } = useConfirm();
+  const renterPlan = normalizeRenterPlan(user?.subscription?.plan);
+  const renterLimits = getRenterPlanLimits(renterPlan);
 
   const [group, setGroup] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -741,40 +745,69 @@ export function GroupInfoScreen({ route, navigation }: Props) {
 
         {health && isRenter ? (
           <Animated.View entering={FadeInDown.duration(400)} style={styles.healthSection}>
-            <View style={styles.healthSummary}>
-              <View style={styles.healthScoreBlock}>
-                <ThemedText style={[styles.healthBigScore, { color: health.statusColor }]}>
-                  {health.score}%
-                </ThemedText>
-                <ThemedText style={[styles.healthStatusLabel, { color: health.statusColor }]}>
-                  {health.statusLabel}
-                </ThemedText>
-              </View>
-              <View style={styles.healthSummaryRight}>
-                <ThemedText style={styles.healthTitle}>Group Compatibility</ThemedText>
-                {health.readyToSearch ? (
-                  <ThemedText style={styles.readyText}>Ready to apartment search</ThemedText>
-                ) : (
-                  <ThemedText style={styles.notReadyText}>Complete preferences to search</ThemedText>
-                )}
-                {health.sharedNeighborhoods.length > 0 ? (
-                  <ThemedText style={styles.neighborhoodsText}>
-                    Works in: {health.sharedNeighborhoods.slice(0, 3).join(', ')}
+            {renterLimits.hasCompatibilityBreakdown ? (
+              <View style={styles.healthSummary}>
+                <View style={styles.healthScoreBlock}>
+                  <ThemedText style={[styles.healthBigScore, { color: health.statusColor }]}>
+                    {health.score}%
                   </ThemedText>
-                ) : null}
+                  <ThemedText style={[styles.healthStatusLabel, { color: health.statusColor }]}>
+                    {health.statusLabel}
+                  </ThemedText>
+                </View>
+                <View style={styles.healthSummaryRight}>
+                  <ThemedText style={styles.healthTitle}>Group Compatibility</ThemedText>
+                  {health.readyToSearch ? (
+                    <ThemedText style={styles.readyText}>Ready to apartment search</ThemedText>
+                  ) : (
+                    <ThemedText style={styles.notReadyText}>Complete preferences to search</ThemedText>
+                  )}
+                  {health.sharedNeighborhoods.length > 0 ? (
+                    <ThemedText style={styles.neighborhoodsText}>
+                      Works in: {health.sharedNeighborhoods.slice(0, 3).join(', ')}
+                    </ThemedText>
+                  ) : null}
+                </View>
               </View>
-            </View>
+            ) : (
+              <Pressable onPress={() => navigation.navigate('Plans' as never)} style={[styles.healthSummary, { opacity: 0.5 }]}>
+                <View style={styles.healthScoreBlock}>
+                  <Feather name="lock" size={22} color="rgba(255,255,255,0.3)" />
+                </View>
+                <View style={styles.healthSummaryRight}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <ThemedText style={styles.healthTitle}>Group Compatibility</ThemedText>
+                    <PlanBadgeInline plan="Elite" locked />
+                  </View>
+                  <ThemedText style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 2 }}>
+                    Upgrade to see compatibility scores
+                  </ThemedText>
+                </View>
+              </Pressable>
+            )}
 
             {health.conflicts.length > 0 ? (
-              <View style={styles.conflictsBlock}>
-                <ThemedText style={styles.conflictsTitle}>Conflicts to resolve</ThemedText>
-                {health.conflicts.map((c, i) => (
-                  <View key={i} style={styles.conflictRow}>
-                    <Feather name="alert-circle" size={13} color="#e74c3c" />
-                    <ThemedText style={styles.conflictText}>{c}</ThemedText>
+              renterLimits.hasConflictDetection ? (
+                <View style={styles.conflictsBlock}>
+                  <ThemedText style={styles.conflictsTitle}>Conflicts to resolve</ThemedText>
+                  {health.conflicts.map((c, i) => (
+                    <View key={i} style={styles.conflictRow}>
+                      <Feather name="alert-circle" size={13} color="#e74c3c" />
+                      <ThemedText style={styles.conflictText}>{c}</ThemedText>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <Pressable onPress={() => navigation.navigate('Plans' as never)} style={[styles.conflictsBlock, { opacity: 0.5 }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <ThemedText style={[styles.conflictsTitle, { color: 'rgba(255,255,255,0.4)' }]}>Conflicts to resolve</ThemedText>
+                    <PlanBadgeInline plan="Elite" locked />
                   </View>
-                ))}
-              </View>
+                  <ThemedText style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12, marginTop: 4 }}>
+                    Upgrade to Elite to see group conflicts
+                  </ThemedText>
+                </Pressable>
+              )
             ) : null}
 
             {health.suggestions.length > 0 ? (
@@ -798,13 +831,24 @@ export function GroupInfoScreen({ route, navigation }: Props) {
             ) : null}
 
             {health.readyToSearch ? (
-              <Pressable
-                style={styles.searchCTA}
-                onPress={() => navigation.navigate('GroupApartmentSuggestions' as never, { groupId } as never)}
-              >
-                <Feather name="search" size={15} color="#fff" />
-                <ThemedText style={styles.searchCTAText}>See AI Apartment Suggestions</ThemedText>
-              </Pressable>
+              renterLimits.hasAIApartmentSuggestions ? (
+                <Pressable
+                  style={styles.searchCTA}
+                  onPress={() => navigation.navigate('GroupApartmentSuggestions' as never, { groupId } as never)}
+                >
+                  <Feather name="search" size={15} color="#fff" />
+                  <ThemedText style={styles.searchCTAText}>See AI Apartment Suggestions</ThemedText>
+                </Pressable>
+              ) : (
+                <Pressable
+                  style={[styles.searchCTA, { backgroundColor: 'rgba(168,85,247,0.12)', borderWidth: 1, borderColor: 'rgba(168,85,247,0.25)' }]}
+                  onPress={() => navigation.navigate('Plans' as never)}
+                >
+                  <Feather name="lock" size={14} color="#a855f7" />
+                  <ThemedText style={[styles.searchCTAText, { color: '#a855f7' }]}>AI Apartment Suggestions</ThemedText>
+                  <PlanBadgeInline plan="Plus" locked />
+                </Pressable>
+              )
             ) : null}
 
             <ThemedText style={styles.aiFooter}>Powered by Rhome AI</ThemedText>

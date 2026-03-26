@@ -22,6 +22,8 @@ import * as Linking from 'expo-linking';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { ModeSwitchToggle } from '../../components/ModeSwitchToggle';
 import { getAffiliateForUser } from '../../services/affiliateService';
+import { normalizeRenterPlan, getRenterPlanLimits } from '../../constants/renterPlanLimits';
+import { PlanBadgeInline } from '../../components/LockedFeatureOverlay';
 
 type ProfileScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'ProfileMain'>;
 
@@ -74,6 +76,8 @@ export const ProfileScreen = () => {
 
   const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : 'U';
   const isHost = activeMode === 'host';
+  const renterPlan = normalizeRenterPlan(user?.subscription?.plan);
+  const renterLimits = getRenterPlanLimits(renterPlan);
   const [matchCount, setMatchCount] = useState(0);
   const [profileViewCount, setProfileViewCount] = useState(0);
   const [likesCount, setLikesCount] = useState(0);
@@ -294,7 +298,7 @@ export const ProfileScreen = () => {
                 <Text style={styles.boostBtnText}>Manage Plan</Text>
               </View>
             </TouchableOpacity>
-          ) : (
+          ) : renterLimits.hasProfileBoost ? (
             <TouchableOpacity activeOpacity={0.7} onPress={handleBoostPress} style={styles.boostBtnWrap}>
               {boostIsActive ? (
                 <View style={styles.boostActiveBtn}>
@@ -307,6 +311,14 @@ export const ProfileScreen = () => {
                   <Text style={styles.boostBtnText}>Boost Profile</Text>
                 </View>
               )}
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.navigate('Plans')} style={styles.boostBtnWrap}>
+              <View style={[styles.boostBtn, { backgroundColor: 'rgba(168,85,247,0.15)', borderWidth: 1, borderColor: 'rgba(168,85,247,0.3)' }]}>
+                <Feather name="lock" size={12} color="#a855f7" />
+                <Text style={[styles.boostBtnText, { color: '#a855f7' }]}>Boost Profile</Text>
+                <PlanBadgeInline plan="Elite" locked />
+              </View>
             </TouchableOpacity>
           )}
         </View>
@@ -601,8 +613,57 @@ export const ProfileScreen = () => {
               title="Verify Identity"
               subtitle="Phone, ID, social verification"
               onPress={() => navigation.navigate('Verification')}
-              isLast={!(isHost && getHostPlan() === 'business')}
             />
+            {!isHost ? (
+              <Pressable
+                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, paddingHorizontal: 16, backgroundColor: renterLimits.hasIncognito ? '#1a1a2e' : 'rgba(168,85,247,0.04)', borderRadius: 12, marginBottom: 8, borderWidth: renterLimits.hasIncognito ? 0 : 1, borderColor: 'rgba(168,85,247,0.12)' }}
+                onPress={() => {
+                  if (!renterLimits.hasIncognito) {
+                    navigation.navigate('Plans');
+                  }
+                }}
+              >
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Feather name="eye-off" size={18} color={renterLimits.hasIncognito ? '#667eea' : 'rgba(255,255,255,0.3)'} />
+                    <Text style={{ color: renterLimits.hasIncognito ? '#fff' : 'rgba(255,255,255,0.4)', fontSize: 15, fontWeight: '600' }}>Incognito Mode</Text>
+                    {!renterLimits.hasIncognito ? <PlanBadgeInline plan="Elite" locked /> : null}
+                  </View>
+                  <Text style={{ color: '#999', fontSize: 12, marginTop: 4, marginLeft: 26 }}>Browse profiles without being seen</Text>
+                </View>
+                {renterLimits.hasIncognito ? (
+                  <Switch
+                    value={false}
+                    onValueChange={() => {}}
+                    trackColor={{ false: '#333', true: '#667eea' }}
+                    thumbColor="#fff"
+                  />
+                ) : null}
+              </Pressable>
+            ) : null}
+            {!isHost ? (
+              <SettingsItem
+                iconName="headphones"
+                iconColor={renterLimits.hasDedicatedSupport ? '#667eea' : 'rgba(255,255,255,0.3)'}
+                iconBgColor={renterLimits.hasDedicatedSupport ? 'rgba(102,126,234,0.15)' : 'rgba(168,85,247,0.06)'}
+                iconBorderColor={renterLimits.hasDedicatedSupport ? 'rgba(102,126,234,0.2)' : 'rgba(168,85,247,0.12)'}
+                title="Dedicated Support"
+                subtitle={renterLimits.hasDedicatedSupport ? 'Priority support for Elite members' : 'Priority email support'}
+                onPress={async () => {
+                  if (!renterLimits.hasDedicatedSupport) {
+                    navigation.navigate('Plans');
+                    return;
+                  }
+                  await alert({
+                    title: 'Dedicated Support',
+                    message: 'As an Elite member, you have access to priority support.\n\nEmail: hello@rhomeapp.io\nResponse time: Within 2 hours\n\nOur dedicated team is here to help you.',
+                    variant: 'info',
+                  });
+                }}
+                isLast={!isHost || !(isHost && getHostPlan() === 'business')}
+                rightElement={!renterLimits.hasDedicatedSupport ? <PlanBadgeInline plan="Elite" locked /> : undefined}
+              />
+            ) : null}
             {isHost && getHostPlan() === 'business' ? (
               <SettingsItem
                 iconName="headphones"
@@ -905,7 +966,7 @@ export const ProfileScreen = () => {
   );
 };
 
-const SettingsItem = ({ iconName, iconColor, iconBgColor, iconBorderColor, title, subtitle, onPress, badge, isLast }: any) => (
+const SettingsItem = ({ iconName, iconColor, iconBgColor, iconBorderColor, title, subtitle, onPress, badge, isLast, rightElement }: any) => (
   <Pressable style={[styles.settingsItem, isLast ? null : styles.settingsItemBorder]} onPress={onPress}>
     <View style={[styles.settingsIcon, { backgroundColor: iconBgColor, borderColor: iconBorderColor, borderWidth: 1 }]}>
       <Feather name={iconName} size={16} color={iconColor} />
@@ -914,6 +975,7 @@ const SettingsItem = ({ iconName, iconColor, iconBgColor, iconBorderColor, title
       <Text style={styles.settingsTitle}>{title}</Text>
       <Text style={styles.settingsSubtitle}>{subtitle}</Text>
     </View>
+    {rightElement ? rightElement : null}
     {badge > 0 ? (
       <View style={styles.navBadge}>
         <Text style={styles.navBadgeText}>{badge > 99 ? '99+' : badge}</Text>

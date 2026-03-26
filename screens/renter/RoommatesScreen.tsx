@@ -31,6 +31,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { RhomeLogo } from '../../components/RhomeLogo';
 import { RoommateFilterSheet, MatchFilters, DEFAULT_FILTERS, getActiveFilterCount, getActiveFilterChips, removeFilterChip, loadSavedFilters, saveFilters, applyFiltersToProfiles } from '../../components/RoommateFilterSheet';
 import { PlanBadge } from '../../components/PlanBadge';
+import { normalizeRenterPlan, getRenterPlanLimits } from '../../constants/renterPlanLimits';
+import { PlanBadgeInline } from '../../components/LockedFeatureOverlay';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { RhomeAISheet } from '../../components/RhomeAISheet';
 import type { ScreenContext } from '../../components/RhomeAISheet';
@@ -70,6 +72,8 @@ export const RoommatesScreen = () => {
   const insets = useSafeAreaInsets();
   const { refreshUnreadCount } = useNotificationContext();
   const { confirm, alert: showAlert } = useConfirm();
+  const renterPlan = normalizeRenterPlan(user?.subscription?.plan);
+  const renterLimits = getRenterPlanLimits(renterPlan);
   const [profiles, setProfiles] = useState<RoommateProfile[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showMatch, setShowMatch] = useState(false);
@@ -1529,13 +1533,23 @@ export const RoommatesScreen = () => {
                   <Feather name="heart" size={12} color="#ff8070" />
                   <ThemedText style={styles.tagMatchText}>{currentProfile.compatibility || 50}% Match</ThemedText>
                 </View>
-                <Pressable
-                  style={styles.whyMatchButton}
-                  onPress={() => setShowWhyModal(true)}
-                >
-                  <ThemedText style={styles.whyMatchText}>Why?</ThemedText>
-                  <Feather name="zap" size={12} color="#FF6B6B" />
-                </Pressable>
+                {renterLimits.hasMatchBreakdown ? (
+                  <Pressable
+                    style={styles.whyMatchButton}
+                    onPress={() => setShowWhyModal(true)}
+                  >
+                    <ThemedText style={styles.whyMatchText}>Why?</ThemedText>
+                    <Feather name="zap" size={12} color="#FF6B6B" />
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    style={[styles.whyMatchButton, { borderColor: 'rgba(168,85,247,0.3)' }]}
+                    onPress={() => (navigation as any).navigate('Plans')}
+                  >
+                    <Feather name="lock" size={10} color="#a855f7" />
+                    <ThemedText style={[styles.whyMatchText, { color: '#a855f7', marginLeft: 3 }]}>Why?</ThemedText>
+                  </Pressable>
+                )}
                 <Pressable
                   style={styles.askAIPill}
                   onPress={() => {

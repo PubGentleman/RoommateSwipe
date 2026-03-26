@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { ReportBlockModal } from '../../components/ReportBlockModal';
 import { PlanBadge } from '../../components/PlanBadge';
+import { PlanBadgeInline } from '../../components/LockedFeatureOverlay';
 import { RhomeAISheet, ScreenContext } from '../../components/RhomeAISheet';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { useNotificationContext } from '../../contexts/NotificationContext';
@@ -113,6 +114,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const dailyCount = user ? getDailyMessageCount(user) : 0;
   const dailyLimit = MESSAGING_LIMITS[userPlan].dailyMessages;
   const isEliteUser = () => userPlan === 'elite';
+  const showLockedReadReceipt = !isEliteUser();
 
   const handleAcceptInquiry = async () => {
     if (!inquiryGroup?.id) return;
@@ -967,6 +969,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
 
     const isOwnMessage = item.senderId === user?.id;
     const showReadReceipt = isOwnMessage && isEliteUser();
+    const showLockedReceipt = isOwnMessage && showLockedReadReceipt;
     const isRead = item.readAt || item.read;
     const isHostMessage = isInquiryChat && inquiryGroup?.hostId && item.senderId === inquiryGroup.hostId;
     return (
@@ -1023,6 +1026,14 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
               {isRead ? 'Read' : 'Sent'}
             </ThemedText>
           </View>
+        ) : showLockedReceipt ? (
+          <Pressable
+            style={styles.readReceiptContainer}
+            onPress={() => (navigation as any).navigate('Plans')}
+          >
+            <Feather name="check" size={12} color="rgba(255,255,255,0.2)" />
+            <PlanBadgeInline plan="Elite" locked />
+          </Pressable>
         ) : null}
       </View>
     );
