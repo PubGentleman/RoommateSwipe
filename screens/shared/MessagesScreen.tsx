@@ -208,7 +208,7 @@ export const MessagesScreen = () => {
 
         if (isHostMode) {
           return (
-            c.id.startsWith('conv-interest-') ||
+            (c.id.startsWith('conv-interest-') && c.hostId === user.id) ||
             (c.isInquiryThread && c.hostId === user.id)
           );
         } else {

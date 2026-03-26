@@ -428,12 +428,19 @@ export const ExploreScreen = () => {
       if (user.profileData?.preferences?.sleepSchedule === 'late_sleeper') tags.push('Night Owl');
       if (user.profileData?.preferences?.workLocation === 'wfh_fulltime') tags.push('Remote Worker');
 
+      const effectiveHostId = selectedProperty.assigned_agent_id || selectedProperty.hostId;
+      const agentProfile = effectiveHostId !== selectedProperty.hostId
+        ? hostProfiles.get(effectiveHostId)
+        : null;
+      const effectiveHostName = agentProfile?.name || selectedProperty.hostName || 'Host';
+      const effectiveHostPhoto = agentProfile?.profilePicture || (selectedProperty.hostProfileId ? hostProfiles.get(selectedProperty.hostProfileId)?.profilePicture : undefined) || '';
+
       const interestRecord: InterestCard = {
         id: interestId,
         renterId: user.id,
         renterName: user.name,
         renterPhoto: user.profilePicture || '',
-        hostId: selectedProperty.hostId,
+        hostId: effectiveHostId,
         propertyId: selectedProperty.id,
         propertyTitle: selectedProperty.title,
         compatibilityScore: compatibility,
@@ -453,9 +460,9 @@ export const ExploreScreen = () => {
       const conversation: Conversation = {
         id: conversationId,
         participant: {
-          id: selectedProperty.hostId,
-          name: selectedProperty.hostName || 'Host',
-          photo: (selectedProperty.hostProfileId ? hostProfiles.get(selectedProperty.hostProfileId)?.profilePicture : undefined) || '',
+          id: effectiveHostId,
+          name: effectiveHostName,
+          photo: effectiveHostPhoto,
           online: false,
         },
         lastMessage: isSuperInterest ? 'Super Interest sent' : 'Interest sent — awaiting response',
@@ -476,8 +483,8 @@ export const ExploreScreen = () => {
         listingTitle: selectedProperty.title,
         listingPhoto: selectedProperty.photos?.[0] || '',
         listingPrice: selectedProperty.price,
-        hostName: selectedProperty.hostName || 'Host',
-        hostId: selectedProperty.hostId,
+        hostName: effectiveHostName,
+        hostId: effectiveHostId,
         propertyId: selectedProperty.id,
         isSoloInquiry: true,
       };
@@ -485,7 +492,7 @@ export const ExploreScreen = () => {
 
       await StorageService.addNotification({
         id: `notif_interest_${Date.now()}`,
-        userId: selectedProperty.hostId,
+        userId: effectiveHostId,
         type: 'interest_received',
         title: isSuperInterest ? 'Super Interest!' : 'New Interest!',
         body: `${user.name} is interested in ${selectedProperty.title}`,

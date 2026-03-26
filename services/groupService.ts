@@ -251,12 +251,21 @@ export async function createListingInquiryGroup(
     return group;
   } catch (supaError) {
     console.warn('[groupService] Supabase createListingInquiryGroup failed, using local fallback:', supaError);
+    const { StorageService } = await import('../utils/storage');
+    let fallbackHostId = hostId;
+    try {
+      const listings = await StorageService.getListings();
+      const listing = listings.find((l: any) => l.id === listingId);
+      if (listing?.assigned_agent_id) {
+        fallbackHostId = listing.assigned_agent_id;
+      }
+    } catch {}
     const localGroup = {
       id: `local-inquiry-${Date.now()}`,
       name: groupName,
       type: 'listing_inquiry' as const,
       listing_id: listingId,
-      host_id: hostId,
+      host_id: fallbackHostId,
       listing_address: listingAddress,
       source_group_id: sourceGroupId,
       created_by: 'local',
@@ -265,7 +274,6 @@ export async function createListingInquiryGroup(
       members: [],
       inquiry_status: 'pending',
     };
-    const { StorageService } = await import('../utils/storage');
     const existingGroups = await StorageService.getGroups();
     existingGroups.push(localGroup as any);
     await StorageService.setGroups(existingGroups);
