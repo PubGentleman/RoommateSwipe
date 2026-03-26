@@ -11,7 +11,7 @@ import { useConfirm } from '../../contexts/ConfirmContext';
 import { StorageService } from '../../utils/storage';
 import { Property, InterestCard, Message, Conversation, HostSubscriptionData } from '../../types/models';
 import { useNotificationContext } from '../../contexts/NotificationContext';
-import { getMyListings, mapListingToProperty, getAgentStats, getCompanyAgents, reassignListingAgent, getCompanyListingsWithAgents } from '../../services/listingService';
+import { getMyListings, mapListingToProperty, getAgentStats, getCompanyAgents, reassignListingAgent, getCompanyListingsWithAgents, getAgentDetailData, reassignConversation, AgentConversationSummary, AgentBookingSummary } from '../../services/listingService';
 import { getReceivedInterestCards } from '../../services/discoverService';
 import { RhomeAISheet } from '../../components/RhomeAISheet';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
@@ -96,6 +96,9 @@ export const HostDashboardScreen = () => {
   const [companyAgents, setCompanyAgents] = useState<{ id: string; full_name: string }[]>([]);
   const [unassignedListings, setUnassignedListings] = useState<Property[]>([]);
   const [responseAlerts, setResponseAlerts] = useState<{ agentId: string; agentName: string; conversationId: string; renterName: string; status: string; hoursSinceMessage: number; listingTitle?: string; listingId?: string }[]>([]);
+  const [agentDetailMap, setAgentDetailMap] = useState<Map<string, { conversations: AgentConversationSummary[]; bookings: AgentBookingSummary[]; loading: boolean }>>(new Map());
+  const [reassignConvId, setReassignConvId] = useState<string | null>(null);
+  const [reassignConvListingId, setReassignConvListingId] = useState<string | null>(null);
 
   const DASH_COLLAPSE_H = 50;
   const dashScrollY = useSharedValue(0);
@@ -709,14 +712,53 @@ export const HostDashboardScreen = () => {
               return true;
             }).map(agent => {
               const expanded = expandedAgentId === agent.agentId;
+              const detail = agentDetailMap.get(agent.agentId);
+              const handleExpand = async () => {
+                if (expanded) {
+                  setExpandedAgentId(null);
+                  return;
+                }
+                setExpandedAgentId(agent.agentId);
+                if (!agentDetailMap.has(agent.agentId)) {
+                  setAgentDetailMap(prev => {
+                    const next = new Map(prev);
+                    next.set(agent.agentId, { conversations: [], bookings: [], loading: true });
+                    return next;
+                  });
+                  const data = await getAgentDetailData(agent.agentId);
+                  setAgentDetailMap(prev => {
+                    const next = new Map(prev);
+                    next.set(agent.agentId, { ...data, loading: false });
+                    return next;
+                  });
+                }
+              };
+              const statusColor = (s: string) => {
+                if (s === 'accepted' || s === 'confirmed') return '#22c55e';
+                if (s === 'declined' || s === 'cancelled_by_host' || s === 'cancelled_by_renter') return '#ef4444';
+                return '#f59e0b';
+              };
+              const statusLabel = (s: string) => {
+                if (s === 'cancelled_by_host') return 'Cancelled';
+                if (s === 'cancelled_by_renter') return 'Cancelled';
+                return s.charAt(0).toUpperCase() + s.slice(1);
+              };
+              const timeAgo = (dateStr: string) => {
+                const diff = Date.now() - new Date(dateStr).getTime();
+                const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                if (days === 0) return 'Today';
+                if (days === 1) return 'Yesterday';
+                if (days < 7) return `${days}d ago`;
+                return `${Math.floor(days / 7)}w ago`;
+              };
               return (
                 <Pressable
                   key={agent.agentId}
                   style={{
                     backgroundColor: CARD_BG, borderRadius: 12, padding: 14, marginBottom: 8,
-                    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+                    borderWidth: 1, borderColor: expanded ? 'rgba(59,130,246,0.2)' : 'rgba(255,255,255,0.06)',
                   }}
-                  onPress={() => setExpandedAgentId(expanded ? null : agent.agentId)}
+                  onPress={handleExpand}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                     <View style={{
@@ -735,9 +777,72 @@ export const HostDashboardScreen = () => {
                   </View>
                   {expanded ? (
                     <View style={{ marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)' }}>
-                      <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, fontStyle: 'italic' }}>
-                        Conversations and bookings are read-only. The agent handles all interactions directly.
-                      </Text>
+                      {detail?.loading ? (
+                        <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12, textAlign: 'center', paddingVertical: 12 }}>Loading...</Text>
+                      ) : (
+                        <>
+                          <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '700', letterSpacing: 0.5, marginBottom: 8 }}>RECENT CONVERSATIONS</Text>
+                          {(detail?.conversations || []).length === 0 ? (
+                            <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12, fontStyle: 'italic', marginBottom: 12 }}>No conversations yet</Text>
+                          ) : (
+                            (detail?.conversations || []).map(conv => (
+                              <View key={conv.id} style={{ backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: 10, marginBottom: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)' }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                                    <Feather name="message-circle" size={12} color="rgba(255,255,255,0.3)" />
+                                    <Text style={{ color: '#fff', fontSize: 13, fontWeight: '500' }} numberOfLines={1}>{conv.renterName}</Text>
+                                  </View>
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <View style={{ backgroundColor: `${statusColor(conv.status)}20`, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                      <Text style={{ color: statusColor(conv.status), fontSize: 10, fontWeight: '600' }}>{statusLabel(conv.status)}</Text>
+                                    </View>
+                                    <Pressable
+                                      onPress={(e) => {
+                                        e.stopPropagation?.();
+                                        setReassignConvId(conv.id);
+                                        setReassignConvListingId(conv.listingId);
+                                        setShowReassignModal(true);
+                                      }}
+                                      style={{ backgroundColor: 'rgba(59,130,246,0.1)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}
+                                    >
+                                      <Text style={{ color: '#3b82f6', fontSize: 10, fontWeight: '600' }}>Reassign</Text>
+                                    </Pressable>
+                                  </View>
+                                </View>
+                                <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, marginTop: 4 }} numberOfLines={1}>
+                                  {conv.listingTitle} · {timeAgo(conv.lastActivity)}
+                                </Text>
+                              </View>
+                            ))
+                          )}
+
+                          <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '700', letterSpacing: 0.5, marginTop: 10, marginBottom: 8 }}>BOOKINGS</Text>
+                          {(detail?.bookings || []).length === 0 ? (
+                            <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12, fontStyle: 'italic' }}>No bookings yet</Text>
+                          ) : (
+                            (detail?.bookings || []).map(bk => (
+                              <View key={bk.id} style={{ backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: 10, marginBottom: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)' }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                                    <Feather name="calendar" size={12} color="rgba(255,255,255,0.3)" />
+                                    <Text style={{ color: '#fff', fontSize: 13, fontWeight: '500' }} numberOfLines={1}>{bk.renterName}</Text>
+                                  </View>
+                                  <View style={{ backgroundColor: `${statusColor(bk.status)}20`, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                    <Text style={{ color: statusColor(bk.status), fontSize: 10, fontWeight: '600' }}>{statusLabel(bk.status)}</Text>
+                                  </View>
+                                </View>
+                                <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, marginTop: 4 }} numberOfLines={1}>
+                                  {bk.listingTitle} · ${bk.monthlyRent}/mo · Move-in {bk.moveInDate ? new Date(bk.moveInDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'TBD'}
+                                </Text>
+                              </View>
+                            ))
+                          )}
+
+                          <Text style={{ color: 'rgba(255,255,255,0.25)', fontSize: 10, fontStyle: 'italic', marginTop: 8, textAlign: 'center' }}>
+                            Read-only view. The agent handles all interactions directly.
+                          </Text>
+                        </>
+                      )}
                     </View>
                   ) : null}
                 </Pressable>
@@ -826,11 +931,17 @@ export const HostDashboardScreen = () => {
           try { navigation.navigate(screen as any, params); } catch {}
         }}
       />
-      <Modal visible={showReassignModal} transparent animationType="fade" onRequestClose={() => setShowReassignModal(false)}>
+      <Modal visible={showReassignModal} transparent animationType="fade" onRequestClose={() => { setShowReassignModal(false); setReassignListingId(null); setReassignConvId(null); setReassignConvListingId(null); }}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
           <View style={{ backgroundColor: '#1a1a1a', borderRadius: 16, padding: 20, width: '100%', maxWidth: 360 }}>
-            <Text style={{ color: '#fff', fontSize: 17, fontWeight: '700', marginBottom: 4 }}>Reassign Agent</Text>
-            <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginBottom: 16 }}>Select a new agent for this listing</Text>
+            <Text style={{ color: '#fff', fontSize: 17, fontWeight: '700', marginBottom: 4 }}>
+              {reassignConvId ? 'Reassign Conversation' : 'Reassign Agent'}
+            </Text>
+            <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginBottom: 16 }}>
+              {reassignConvId
+                ? 'Select a new agent for this conversation. The listing will also be reassigned.'
+                : 'Select a new agent for this listing'}
+            </Text>
             {companyAgents.map(agent => (
               <Pressable
                 key={agent.id}
@@ -840,7 +951,16 @@ export const HostDashboardScreen = () => {
                   backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
                 }}
                 onPress={async () => {
-                  if (reassignListingId) {
+                  if (reassignConvId) {
+                    const ok = await reassignConversation(reassignConvId, reassignConvListingId || '', agent.id);
+                    if (ok) {
+                      showAlert({ title: 'Reassigned', message: `Conversation reassigned to ${agent.full_name}. They will handle all future interactions.`, variant: 'success' });
+                      setAgentDetailMap(new Map());
+                      loadData();
+                    } else {
+                      showAlert({ title: 'Error', message: 'Failed to reassign conversation. Please try again.', variant: 'warning' });
+                    }
+                  } else if (reassignListingId) {
                     const ok = await reassignListingAgent(reassignListingId, agent.id);
                     if (ok) {
                       showAlert({ title: 'Reassigned', message: `Listing reassigned to ${agent.full_name}. Future messages will go to them.`, variant: 'success' });
@@ -849,6 +969,8 @@ export const HostDashboardScreen = () => {
                   }
                   setShowReassignModal(false);
                   setReassignListingId(null);
+                  setReassignConvId(null);
+                  setReassignConvListingId(null);
                 }}
               >
                 <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(59,130,246,0.15)', alignItems: 'center', justifyContent: 'center' }}>
@@ -859,7 +981,7 @@ export const HostDashboardScreen = () => {
               </Pressable>
             ))}
             <Pressable
-              onPress={() => { setShowReassignModal(false); setReassignListingId(null); }}
+              onPress={() => { setShowReassignModal(false); setReassignListingId(null); setReassignConvId(null); setReassignConvListingId(null); }}
               style={{ marginTop: 8, padding: 12, borderRadius: 10, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.06)' }}
             >
               <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, fontWeight: '600' }}>Cancel</Text>

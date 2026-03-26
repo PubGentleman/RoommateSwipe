@@ -354,6 +354,162 @@ export async function getAgentStats(companyUserId: string): Promise<{
   }
 }
 
+export interface AgentConversationSummary {
+  id: string;
+  renterName: string;
+  listingTitle: string;
+  listingId: string;
+  status: string;
+  lastActivity: string;
+}
+
+export interface AgentBookingSummary {
+  id: string;
+  renterName: string;
+  listingTitle: string;
+  listingId: string;
+  status: string;
+  moveInDate: string;
+  monthlyRent: number;
+  createdAt: string;
+}
+
+export async function getAgentDetailData(agentId: string): Promise<{
+  conversations: AgentConversationSummary[];
+  bookings: AgentBookingSummary[];
+}> {
+  try {
+    const { data: groups } = await supabase
+      .from('groups')
+      .select(`
+        id, inquiry_status, created_at,
+        listing:listings(id, title),
+        members:group_members(user_id, is_host)
+      `)
+      .eq('host_id', agentId)
+      .eq('type', 'listing_inquiry')
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    const conversations: AgentConversationSummary[] = [];
+    if (groups) {
+      const renterIds = groups
+        .flatMap((g: any) => (g.members || []).filter((m: any) => !m.is_host).map((m: any) => m.user_id))
+        .filter(Boolean);
+
+      const uniqueRenterIds = [...new Set(renterIds)];
+      let renterNames: Map<string, string> = new Map();
+      if (uniqueRenterIds.length > 0) {
+        const { data: renters } = await supabase
+          .from('users')
+          .select('id, full_name')
+          .in('id', uniqueRenterIds);
+        if (renters) {
+          renters.forEach((r: any) => renterNames.set(r.id, r.full_name || 'Renter'));
+        }
+      }
+
+      for (const g of groups as any[]) {
+        const renterMember = (g.members || []).find((m: any) => !m.is_host);
+        conversations.push({
+          id: g.id,
+          renterName: renterMember ? (renterNames.get(renterMember.user_id) || 'Renter') : 'Renter',
+          listingTitle: g.listing?.title || 'Listing',
+          listingId: g.listing?.id || '',
+          status: g.inquiry_status || 'pending',
+          lastActivity: g.created_at,
+        });
+      }
+    }
+
+    const { data: bookingData } = await supabase
+      .from('bookings')
+      .select(`
+        id, status, move_in_date, monthly_rent, created_at, listing_id, renter_id,
+        listing:listings(id, title),
+        renter:users!renter_id(id, full_name)
+      `)
+      .eq('host_id', agentId)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    const bookings: AgentBookingSummary[] = (bookingData || []).map((b: any) => ({
+      id: b.id,
+      renterName: b.renter?.full_name || 'Renter',
+      listingTitle: b.listing?.title || 'Listing',
+      listingId: b.listing?.id || b.listing_id || '',
+      status: b.status,
+      moveInDate: b.move_in_date,
+      monthlyRent: b.monthly_rent,
+      createdAt: b.created_at,
+    }));
+
+    return { conversations, bookings };
+  } catch {
+    const { StorageService } = await import('../utils/storage');
+    const interestCards = await StorageService.getInterestCards();
+    const agentCards = interestCards.filter((c: any) => c.hostId === agentId);
+    const conversations: AgentConversationSummary[] = agentCards.slice(0, 10).map((c: any) => ({
+      id: c.id,
+      renterName: c.renterName || 'Renter',
+      listingTitle: c.propertyTitle || 'Listing',
+      listingId: c.propertyId || '',
+      status: c.status || 'pending',
+      lastActivity: c.createdAt || new Date().toISOString(),
+    }));
+    return { conversations, bookings: [] };
+  }
+}
+
+export async function reassignConversation(
+  groupId: string,
+  listingId: string,
+  newAgentId: string
+): Promise<boolean> {
+  try {
+    const { error: groupErr } = await supabase
+      .from('groups')
+      .update({ host_id: newAgentId })
+      .eq('id', groupId);
+    if (groupErr) throw groupErr;
+
+    const { data: oldMembers, error: fetchErr } = await supabase
+      .from('group_members')
+      .select('id, user_id, is_host')
+      .eq('group_id', groupId)
+      .eq('is_host', true);
+    if (fetchErr) throw fetchErr;
+
+    if (oldMembers && oldMembers.length > 0) {
+      const oldHostMemberIds = oldMembers.map(m => m.id);
+      const { error: delErr } = await supabase.from('group_members').delete().in('id', oldHostMemberIds);
+      if (delErr) throw delErr;
+    }
+
+    const { error: insertErr } = await supabase.from('group_members').insert({
+      group_id: groupId,
+      user_id: newAgentId,
+      role: 'member',
+      is_host: true,
+      status: 'active',
+    });
+    if (insertErr) throw insertErr;
+
+    if (listingId) {
+      const { error: listingErr } = await supabase
+        .from('listings')
+        .update({ assigned_agent_id: newAgentId })
+        .eq('id', listingId);
+      if (listingErr) throw listingErr;
+    }
+
+    return true;
+  } catch (err) {
+    console.warn('[listingService] reassignConversation failed:', err);
+    return false;
+  }
+}
+
 export async function uploadListingPhoto(uri: string, fileName: string) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
