@@ -183,7 +183,7 @@ export function NeighborhoodAISheet({ visible, onClose, listingId, address, neig
 
     try {
       const data = await callChat(messageText);
-      const reply = data?.reply || `That's a great question about ${neighborhood || 'this area'}. I'd recommend checking local community forums or visiting the neighborhood at different times of day to get the best sense of it.`;
+      const reply = data?.reply || `Based on what I know about ${neighborhood || 'this area'}, I'd need a bit more data to give you a detailed answer. Try asking about specific topics like transit options, grocery stores, parks, or safety — I can pull real data for those.`;
       const aiMsg: ChatMessage = { id: (Date.now() + 1).toString(), role: 'assistant', content: reply };
       setMessages(prev => [...prev, aiMsg]);
       setConversationHistory(prev => [
@@ -193,7 +193,7 @@ export function NeighborhoodAISheet({ visible, onClose, listingId, address, neig
       ]);
     } catch {
       const loc = neighborhood || address || 'this area';
-      const fallbackReply = `I couldn't look that up right now, but I'd suggest exploring ${loc} in person or checking Google Maps for the most current neighborhood info.`;
+      const fallbackReply = `I'm having trouble looking up ${loc} right now. Try asking again in a moment — I'll pull transit, amenity, and safety data for you.`;
       setMessages(prev => [...prev, { id: 'fb-' + Date.now(), role: 'assistant', content: fallbackReply }]);
     } finally {
       setLoading(false);

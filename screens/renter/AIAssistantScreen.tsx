@@ -182,7 +182,7 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
       setIsTyping(false);
       setMessages(prev => prev.map(m =>
         m.id === aiMessageId
-          ? { ...m, text: 'Something went wrong. Please try again.' }
+          ? { ...m, text: "I'm having a bit of trouble connecting right now. Try sending your message again in a moment — I should be back up shortly." }
           : m
       ));
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);

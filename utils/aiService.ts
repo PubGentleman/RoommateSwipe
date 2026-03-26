@@ -97,6 +97,11 @@ export async function sendAIMessage(
   );
 
   if (!response.ok) {
+    if (onChunk) {
+      onChunk("I'm having a bit of trouble connecting right now. Try sending your message again in a moment.");
+      onComplete?.(0, 'unknown');
+      return { reply: "I'm having a bit of trouble connecting right now. Try sending your message again in a moment.", remainingMessages: 0, plan: 'unknown' };
+    }
     const errBody = await response.text().catch(() => '');
     throw new Error(errBody || 'AI request failed');
   }

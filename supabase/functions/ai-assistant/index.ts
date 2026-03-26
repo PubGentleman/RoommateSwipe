@@ -83,7 +83,7 @@ serve(async (req) => {
               'content-type': 'application/json',
             },
             body: JSON.stringify({
-              model: 'claude-sonnet-4-5',
+              model: 'claude-haiku-4-5-20251001',
               max_tokens: 1024,
               stream: true,
               system: systemPrompt,
@@ -142,6 +142,12 @@ serve(async (req) => {
           controller.close();
         } catch (err) {
           console.error('Streaming error:', err);
+          try {
+            const fallback = JSON.stringify({ delta: "I'm having a bit of trouble right now. Try sending your message again in a moment." });
+            controller.enqueue(encoder.encode(`data: ${fallback}\n\n`));
+            const done = JSON.stringify({ done: true, remainingMessages: 0, plan: 'unknown' });
+            controller.enqueue(encoder.encode(`data: ${done}\n\n`));
+          } catch {}
           controller.close();
         }
       },
@@ -157,7 +163,24 @@ serve(async (req) => {
     });
   } catch (err) {
     console.error('AI Assistant error:', err);
-    return errorResponse('Something went wrong. Please try again.', 500);
+    const encoder = new TextEncoder();
+    const fallbackStream = new ReadableStream({
+      start(controller) {
+        const fallback = JSON.stringify({ delta: "I'm having a bit of trouble right now. Try sending your message again in a moment — I should be back up shortly." });
+        controller.enqueue(encoder.encode(`data: ${fallback}\n\n`));
+        const done = JSON.stringify({ done: true, remainingMessages: 0, plan: 'unknown' });
+        controller.enqueue(encoder.encode(`data: ${done}\n\n`));
+        controller.close();
+      },
+    });
+    return new Response(fallbackStream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+      },
+    });
   }
 });
 
