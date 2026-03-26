@@ -1,19 +1,12 @@
-import React, { useState, useMemo } from 'react';
-import { View, StyleSheet, Pressable, ScrollView, TextInput } from 'react-native';
+import React, { useRef } from 'react';
+import { View, StyleSheet, Pressable, Platform } from 'react-native';
 import { Feather } from './VectorIcons';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import { ThemedText } from './ThemedText';
 import { useTheme } from '../hooks/useTheme';
 import { Spacing, BorderRadius, Typography } from '../constants/theme';
-import {
-  US_STATES,
-  getStatesWithData,
-  getCitiesByState,
-  getNeighborhoodsByCity,
-  getCoordinatesFromNeighborhood,
-  getStateFromNeighborhood,
-  getCityFromNeighborhood,
-} from '../utils/locationData';
+import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
+
+const GOOGLE_PLACES_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
 interface LocationPickerProps {
   selectedState?: string;
@@ -35,237 +28,140 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
   showNeighborhood = true,
 }) => {
   const { theme } = useTheme();
-  const [stateSearch, setStateSearch] = useState('');
-  const [citySearch, setCitySearch] = useState('');
-  const [neighborhoodSearch, setNeighborhoodSearch] = useState('');
+  const ref = useRef<any>(null);
 
-  const statesWithData = useMemo(() => getStatesWithData(), []);
+  const hasSelection = !!(selectedState && selectedCity);
 
-  const allStates = useMemo(() => {
-    if (!stateSearch.trim()) return statesWithData;
-    const q = stateSearch.toLowerCase();
-    return statesWithData.filter(
-      s => s.name.toLowerCase().includes(q) || s.code.toLowerCase().includes(q)
-    );
-  }, [statesWithData, stateSearch]);
+  const handlePlaceSelect = (data: any, details: any) => {
+    if (!details) return;
+    const components = details.address_components || [];
+    let city = '';
+    let stateCode = '';
+    let neighborhood = '';
 
-  const cities = useMemo(() => {
-    if (!selectedState) return [];
-    const c = getCitiesByState(selectedState);
-    if (!citySearch.trim()) return c;
-    const q = citySearch.toLowerCase();
-    return c.filter(city => city.toLowerCase().includes(q));
-  }, [selectedState, citySearch]);
+    for (const comp of components) {
+      const types: string[] = comp.types || [];
+      if (types.includes('locality')) city = comp.long_name;
+      if (types.includes('administrative_area_level_1')) stateCode = comp.short_name;
+      if (types.includes('neighborhood')) neighborhood = comp.long_name;
+      if (!neighborhood && (types.includes('sublocality') || types.includes('sublocality_level_1'))) {
+        neighborhood = comp.long_name;
+      }
+    }
 
-  const neighborhoods = useMemo(() => {
-    if (!selectedCity) return [];
-    const n = getNeighborhoodsByCity(selectedCity);
-    if (!neighborhoodSearch.trim()) return n;
-    const q = neighborhoodSearch.toLowerCase();
-    return n.filter(nb => nb.toLowerCase().includes(q));
-  }, [selectedCity, neighborhoodSearch]);
+    if (!city) city = data.description?.split(',')[0] || '';
 
-  const handleStateSelect = (code: string) => {
-    onStateChange(code);
+    onStateChange(stateCode);
+    onCityChange(city);
+    if (showNeighborhood) {
+      onNeighborhoodChange(neighborhood || '');
+    }
+  };
+
+  const handleClear = () => {
+    onStateChange('');
     onCityChange('');
     onNeighborhoodChange('');
-    setCitySearch('');
-    setNeighborhoodSearch('');
+    ref.current?.clear();
+    ref.current?.setAddressText('');
   };
 
-  const handleCitySelect = (city: string) => {
-    onCityChange(city);
-    onNeighborhoodChange('');
-    setNeighborhoodSearch('');
-  };
-
-  const renderSearchInput = (
-    value: string,
-    onChange: (text: string) => void,
-    placeholder: string
-  ) => (
-    <View style={[styles.searchContainer, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
-      <Feather name="search" size={16} color={theme.textSecondary} />
-      <TextInput
-        style={[styles.searchInput, { color: theme.text }]}
-        value={value}
-        onChangeText={onChange}
-        placeholder={placeholder}
-        placeholderTextColor={theme.textSecondary}
-        autoCapitalize="none"
-        autoCorrect={false}
-      />
-      {value.length > 0 ? (
-        <Pressable onPress={() => onChange('')}>
-          <Feather name="x" size={16} color={theme.textSecondary} />
-        </Pressable>
-      ) : null}
-    </View>
-  );
-
-  const renderOption = (
-    label: string,
-    subtitle: string | undefined,
-    isSelected: boolean,
-    onPress: () => void,
-    index: number,
-    icon: keyof typeof Feather.glyphMap
-  ) => (
-    <Animated.View key={label} entering={FadeInDown.delay(Math.min(index * 40, 300)).duration(250)}>
-      <Pressable
-        style={[
-          styles.option,
-          {
-            backgroundColor: isSelected ? theme.primary + '12' : theme.backgroundDefault,
-            borderColor: isSelected ? theme.primary : theme.border,
-            borderWidth: isSelected ? 2 : 1,
-          },
-        ]}
-        onPress={onPress}
-      >
-        <View style={[styles.optionIcon, { backgroundColor: isSelected ? theme.primary + '20' : theme.backgroundSecondary }]}>
-          <Feather name={icon} size={18} color={isSelected ? theme.primary : theme.textSecondary} />
-        </View>
-        <View style={styles.optionText}>
-          <ThemedText style={[Typography.body, { fontWeight: isSelected ? '600' : '400', color: theme.text }]}>
-            {label}
-          </ThemedText>
-          {subtitle ? (
-            <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
-              {subtitle}
-            </ThemedText>
-          ) : null}
-        </View>
-        {isSelected ? (
-          <View style={[styles.checkmark, { backgroundColor: theme.primary }]}>
-            <Feather name="check" size={14} color="#fff" />
-          </View>
-        ) : null}
-      </Pressable>
-    </Animated.View>
-  );
-
-  if (!selectedState) {
-    return (
-      <View style={styles.container}>
-        <ThemedText style={[Typography.h3, { color: theme.text, marginBottom: Spacing.sm }]}>
-          Select State
-        </ThemedText>
-        <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.md }]}>
-          Choose the state where you want to live
-        </ThemedText>
-        {renderSearchInput(stateSearch, setStateSearch, 'Search states...')}
-        <ScrollView style={styles.optionsList} showsVerticalScrollIndicator={false} nestedScrollEnabled>
-          {allStates.map((s, i) =>
-            renderOption(s.name, s.code, selectedState === s.code, () => handleStateSelect(s.code), i, 'map-pin')
-          )}
-          {allStates.length === 0 ? (
-            <ThemedText style={[Typography.body, { color: theme.textSecondary, textAlign: 'center', marginTop: Spacing.lg }]}>
-              No states match your search
-            </ThemedText>
-          ) : null}
-        </ScrollView>
-      </View>
-    );
-  }
-
-  if (!selectedCity) {
-    const stateName = US_STATES.find(s => s.code === selectedState)?.name || selectedState;
-    return (
-      <View style={styles.container}>
-        <Pressable style={styles.breadcrumb} onPress={() => handleStateSelect('')}>
-          <Feather name="chevron-left" size={18} color={theme.primary} />
-          <ThemedText style={[Typography.caption, { color: theme.primary }]}>
-            Change State
-          </ThemedText>
-        </Pressable>
-        <ThemedText style={[Typography.h3, { color: theme.text, marginBottom: Spacing.sm }]}>
-          Select City in {stateName}
-        </ThemedText>
-        {cities.length > 4 ? renderSearchInput(citySearch, setCitySearch, 'Search cities...') : null}
-        <ScrollView style={styles.optionsList} showsVerticalScrollIndicator={false} nestedScrollEnabled>
-          {cities.map((city, i) =>
-            renderOption(city, selectedState, selectedCity === city, () => handleCitySelect(city), i, 'home')
-          )}
-          {cities.length === 0 ? (
-            <ThemedText style={[Typography.body, { color: theme.textSecondary, textAlign: 'center', marginTop: Spacing.lg }]}>
-              No cities found in this state
-            </ThemedText>
-          ) : null}
-        </ScrollView>
-      </View>
-    );
-  }
-
-  if (showNeighborhood && !selectedNeighborhood) {
-    return (
-      <View style={styles.container}>
-        <Pressable style={styles.breadcrumb} onPress={() => handleCitySelect('')}>
-          <Feather name="chevron-left" size={18} color={theme.primary} />
-          <ThemedText style={[Typography.caption, { color: theme.primary }]}>
-            Change City
-          </ThemedText>
-        </Pressable>
-        <ThemedText style={[Typography.h3, { color: theme.text, marginBottom: Spacing.sm }]}>
-          Select Neighborhood in {selectedCity}
-        </ThemedText>
-        {neighborhoods.length > 6 ? renderSearchInput(neighborhoodSearch, setNeighborhoodSearch, 'Search neighborhoods...') : null}
-        <ScrollView style={styles.optionsList} showsVerticalScrollIndicator={false} nestedScrollEnabled>
-          {neighborhoods.map((nb, i) =>
-            renderOption(nb, selectedCity, selectedNeighborhood === nb, () => onNeighborhoodChange(nb), i, 'navigation')
-          )}
-        </ScrollView>
-      </View>
-    );
-  }
-
-  const selectedStateName = US_STATES.find(s => s.code === selectedState)?.name || selectedState;
   return (
     <View style={styles.container}>
-      <ThemedText style={[Typography.h3, { color: theme.text, marginBottom: Spacing.md }]}>
-        Your Location
+      <ThemedText style={[Typography.h3, { color: theme.text, marginBottom: Spacing.sm }]}>
+        {hasSelection ? 'Your Location' : 'Select Location'}
       </ThemedText>
-      <View style={[styles.summaryCard, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
-        <Pressable style={styles.summaryRow} onPress={() => handleStateSelect('')}>
-          <View style={styles.summaryLabel}>
-            <Feather name="map" size={16} color={theme.textSecondary} />
-            <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>State</ThemedText>
-          </View>
-          <View style={styles.summaryValue}>
-            <ThemedText style={[Typography.body, { color: theme.text, fontWeight: '600' }]}>{selectedStateName}</ThemedText>
-            <Feather name="chevron-right" size={16} color={theme.textSecondary} />
-          </View>
-        </Pressable>
-        <View style={[styles.divider, { backgroundColor: theme.border }]} />
-        <Pressable style={styles.summaryRow} onPress={() => handleCitySelect('')}>
-          <View style={styles.summaryLabel}>
-            <Feather name="home" size={16} color={theme.textSecondary} />
-            <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>City</ThemedText>
-          </View>
-          <View style={styles.summaryValue}>
-            <ThemedText style={[Typography.body, { color: theme.text, fontWeight: '600' }]}>{selectedCity}</ThemedText>
-            <Feather name="chevron-right" size={16} color={theme.textSecondary} />
-          </View>
-        </Pressable>
-        {showNeighborhood && selectedNeighborhood ? (
-          <>
-            <View style={[styles.divider, { backgroundColor: theme.border }]} />
-            <Pressable style={styles.summaryRow} onPress={() => onNeighborhoodChange('')}>
-              <View style={styles.summaryLabel}>
-                <Feather name="navigation" size={16} color={theme.textSecondary} />
-                <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Neighborhood</ThemedText>
-              </View>
-              <View style={styles.summaryValue}>
-                <ThemedText style={[Typography.body, { color: theme.text, fontWeight: '600' }]}>{selectedNeighborhood}</ThemedText>
-                <Feather name="chevron-right" size={16} color={theme.textSecondary} />
-              </View>
-            </Pressable>
-          </>
-        ) : null}
+      <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.md }]}>
+        Search by city, neighborhood, or ZIP code
+      </ThemedText>
+
+      <View style={styles.autocompleteWrap}>
+        <GooglePlacesAutocomplete
+          ref={ref}
+          placeholder="Search city, neighborhood, or ZIP..."
+          fetchDetails={true}
+          onPress={handlePlaceSelect}
+          query={{
+            key: GOOGLE_PLACES_KEY,
+            language: 'en',
+            types: '(regions)',
+            components: 'country:us',
+          }}
+          textInputProps={{
+            placeholderTextColor: theme.textSecondary,
+            returnKeyType: 'search',
+          }}
+          styles={{
+            container: { flex: 0 },
+            textInputContainer: { backgroundColor: 'transparent' },
+            textInput: {
+              backgroundColor: theme.backgroundDefault,
+              color: theme.text,
+              borderRadius: BorderRadius.medium,
+              paddingHorizontal: Spacing.md,
+              height: 48,
+              fontSize: 15,
+              borderWidth: 1,
+              borderColor: theme.border,
+            },
+            listView: {
+              backgroundColor: theme.backgroundDefault,
+              borderRadius: BorderRadius.medium,
+              marginTop: 4,
+              borderWidth: 1,
+              borderColor: theme.border,
+              ...(Platform.OS === 'web' ? { zIndex: 1000 } : {}),
+            },
+            row: {
+              backgroundColor: 'transparent',
+              paddingHorizontal: Spacing.md,
+              paddingVertical: 13,
+            },
+            description: { color: theme.text, fontSize: 14 },
+            separator: { backgroundColor: theme.border },
+            poweredContainer: { display: 'none' },
+          }}
+          enablePoweredByContainer={false}
+          debounce={300}
+        />
       </View>
-      <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginTop: Spacing.sm, textAlign: 'center' }]}>
-        Tap any field above to change it
-      </ThemedText>
+
+      {hasSelection ? (
+        <View style={[styles.summaryCard, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryLabel}>
+              <Feather name="map" size={16} color={theme.textSecondary} />
+              <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>State</ThemedText>
+            </View>
+            <ThemedText style={[Typography.body, { color: theme.text, fontWeight: '600' }]}>{selectedState}</ThemedText>
+          </View>
+          <View style={[styles.divider, { backgroundColor: theme.border }]} />
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryLabel}>
+              <Feather name="home" size={16} color={theme.textSecondary} />
+              <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>City</ThemedText>
+            </View>
+            <ThemedText style={[Typography.body, { color: theme.text, fontWeight: '600' }]}>{selectedCity}</ThemedText>
+          </View>
+          {showNeighborhood && selectedNeighborhood ? (
+            <>
+              <View style={[styles.divider, { backgroundColor: theme.border }]} />
+              <View style={styles.summaryRow}>
+                <View style={styles.summaryLabel}>
+                  <Feather name="navigation" size={16} color={theme.textSecondary} />
+                  <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>Neighborhood</ThemedText>
+                </View>
+                <ThemedText style={[Typography.body, { color: theme.text, fontWeight: '600' }]}>{selectedNeighborhood}</ThemedText>
+              </View>
+            </>
+          ) : null}
+          <View style={[styles.divider, { backgroundColor: theme.border }]} />
+          <Pressable style={styles.clearRow} onPress={handleClear}>
+            <Feather name="x-circle" size={16} color={theme.primary} />
+            <ThemedText style={[Typography.caption, { color: theme.primary, fontWeight: '600' }]}>Change Location</ThemedText>
+          </Pressable>
+        </View>
+      ) : null}
     </View>
   );
 };
@@ -274,60 +170,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+  autocompleteWrap: {
+    zIndex: 100,
     marginBottom: Spacing.md,
-    gap: Spacing.sm,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    paddingVertical: 2,
-  },
-  optionsList: {
-    maxHeight: 320,
-  },
-  option: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.md,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.xs,
-  },
-  optionIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: BorderRadius.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: Spacing.md,
-  },
-  optionText: {
-    flex: 1,
-  },
-  checkmark: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  breadcrumb: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: Spacing.md,
-    gap: 4,
   },
   summaryCard: {
     borderWidth: 1,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.large,
     overflow: 'hidden',
+    marginTop: Spacing.sm,
   },
   summaryRow: {
     flexDirection: 'row',
@@ -341,13 +192,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.sm,
   },
-  summaryValue: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-  },
   divider: {
     height: 1,
     marginHorizontal: Spacing.lg,
+  },
+  clearRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.md,
   },
 });

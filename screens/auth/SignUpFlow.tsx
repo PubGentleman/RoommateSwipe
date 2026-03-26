@@ -212,7 +212,7 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
     goForward();
   };
 
-  const handleLocationSelect = (location: { state: string; city: string; borough?: string; neighborhood?: string }) => {
+  const handleLocationSelect = (location: { state: string; city: string; borough?: string; neighborhood?: string; lat?: number; lng?: number }) => {
     const displayCity = `${location.city}, ${location.state}`;
     updateState({
       city: displayCity,

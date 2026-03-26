@@ -1,0 +1,63 @@
+Yes, Google Places API is much better than a hardcoded zip code list — it handles zip codes, neighborhoods, cities, and full addresses automatically with real autocomplete.
+
+Paste this into Replit:
+
+---
+
+**Replace hardcoded location search with Google Places API**
+
+Remove all hardcoded city/zip code lists. Replace the location search bar with Google Places Autocomplete.
+
+**Install the package:**
+```
+npx expo install react-native-google-places-autocomplete
+```
+
+**Get the API key:**
+You need a Google Maps API key with **Places API** enabled. Go to [console.cloud.google.com](https://console.cloud.google.com), create a key, enable the Places API, and add it to your Replit Secrets as `GOOGLE_PLACES_API_KEY`. Then reference it in the app as:
+```typescript
+const GOOGLE_PLACES_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
+```
+Add `EXPO_PUBLIC_GOOGLE_PLACES_API_KEY=your_key_here` to your `.env` file in Replit.
+
+**Replace the city/location search input** in `components/CityPickerModal.tsx`, `components/LocationPicker.tsx`, and the onboarding `LocationStep.tsx` with:
+
+```typescript
+import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
+
+<GooglePlacesAutocomplete
+  placeholder="Search by city, neighborhood, or ZIP..."
+  onPress={(data, details) => {
+    const city = data.description;
+    const lat = details?.geometry?.location?.lat;
+    const lng = details?.geometry?.location?.lng;
+    onLocationSelected({ city, lat, lng });
+  }}
+  query={{
+    key: GOOGLE_PLACES_KEY,
+    language: 'en',
+    types: '(regions)',
+    components: 'country:us',
+  }}
+  fetchDetails={true}
+  styles={{
+    container: { flex: 0 },
+    textInput: { backgroundColor: '#1a1a1a', color: '#fff', borderRadius: 12, paddingHorizontal: 16, height: 48, fontSize: 15 },
+    listView: { backgroundColor: '#1a1a1a', borderRadius: 12, marginTop: 4 },
+    row: { backgroundColor: '#1a1a1a', paddingHorizontal: 16, paddingVertical: 13 },
+    description: { color: '#fff', fontSize: 14 },
+    separator: { backgroundColor: 'rgba(255,255,255,0.06)' },
+  }}
+  enablePoweredByContainer={false}
+/>
+```
+
+This handles city names, neighborhoods, zip codes, and full addresses all in one input. No hardcoded data needed.
+
+**Store the selected location** (city name + lat/lng) in the user's profile via `updateUser` as before.
+
+No DB changes needed.
+
+---
+
+Do you have a Google Cloud account already, or do you need to create one?

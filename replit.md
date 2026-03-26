@@ -49,7 +49,7 @@ The application is built using React Native, Expo, and TypeScript, utilizing Rea
 - **Account Management:** Soft-delete functionality with a recovery window.
 - **Subscription Management:** Tiered subscription plans for renters, hosts, and agents, with bundled pricing and a hybrid payment architecture (RevenueCat for native, Stripe for web).
 - **UI/UX:** Consistent dark theme, collapsible/sticky headers, and platform-specific adaptations.
-- **Location System:** Supports multiple US cities with sub-area filtering.
+- **Location System:** Google Places Autocomplete for location search (onboarding, browse filtering, profile questionnaire). Supports cities, neighborhoods, ZIP codes, and full addresses via `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY`. Popular cities quick-select retained in browse filter. Legacy hardcoded `locationData.ts` still available but no longer used for primary location selection UI.
 - **Renter/Host Mode Switch:** Allows individual hosts to toggle between modes.
 
 ## Backend (Supabase)

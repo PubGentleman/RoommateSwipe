@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Pressable, Modal, TextInput, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, StyleSheet, Pressable, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { Feather } from './VectorIcons';
 import { ThemedText } from './ThemedText';
 import { BorderRadius, Spacing } from '../constants/theme';
-import { getAllCities, getSubAreasForCity, getSubAreaLabel } from '../utils/locationData';
+import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import * as Haptics from 'expo-haptics';
+
+const GOOGLE_PLACES_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
 const POPULAR_CITIES = ['New York', 'Los Angeles', 'Chicago', 'Miami', 'Austin', 'Atlanta', 'Seattle', 'Boston'];
 
@@ -27,34 +29,35 @@ export const CityPickerModal: React.FC<CityPickerModalProps> = ({
   onSubAreaSelect,
   onClose,
 }) => {
-  const [citySearch, setCitySearch] = useState('');
-
-  const allCitiesForSearch = getAllCities();
-  const filteredSearchCities = citySearch.trim()
-    ? allCitiesForSearch.filter(c => c.toLowerCase().includes(citySearch.trim().toLowerCase()))
-    : [];
+  const [hasSearchResults, setHasSearchResults] = useState(false);
 
   const handleSelect = (city: string | null) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onCitySelect(city);
     onSubAreaSelect?.(null);
-    setCitySearch('');
-  };
-
-  const handleSubAreaSelect = (subArea: string | null) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onSubAreaSelect?.(subArea);
-    onClose();
-    setCitySearch('');
   };
 
   const handleClose = () => {
-    setCitySearch('');
     onClose();
   };
 
-  const currentSubAreas = activeCity ? getSubAreasForCity(activeCity) : null;
-  const subAreaLabel = activeCity ? getSubAreaLabel(activeCity) : 'Area';
+  const handlePlaceSelect = (data: any, details: any) => {
+    if (!details) return;
+    const components = details.address_components || [];
+    let city = '';
+    for (const comp of components) {
+      const types: string[] = comp.types || [];
+      if (types.includes('locality')) {
+        city = comp.long_name;
+        break;
+      }
+    }
+    if (!city) {
+      city = data.description?.split(',')[0] || '';
+    }
+    handleSelect(city);
+    onClose();
+  };
 
   return (
     <Modal
@@ -66,20 +69,92 @@ export const CityPickerModal: React.FC<CityPickerModalProps> = ({
       <Pressable style={styles.overlay} onPress={handleClose} />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.keyboardView}>
         <View style={styles.sheet}>
-        <View style={styles.handle} />
-        <ThemedText style={styles.title}>Choose a City</ThemedText>
+          <View style={styles.handle} />
+          <ThemedText style={styles.title}>Choose a City</ThemedText>
 
-        {recentCities.length > 0 ? (
           <View style={styles.section}>
-            <ThemedText style={styles.sectionLabel}>Recently Viewed</ThemedText>
+            <ThemedText style={styles.sectionLabel}>Search</ThemedText>
+            <View style={styles.autocompleteWrap}>
+              <GooglePlacesAutocomplete
+                placeholder="Search city, neighborhood, or ZIP..."
+                fetchDetails={true}
+                onPress={handlePlaceSelect}
+                query={{
+                  key: GOOGLE_PLACES_KEY,
+                  language: 'en',
+                  types: '(cities)',
+                  components: 'country:us',
+                }}
+                textInputProps={{
+                  placeholderTextColor: 'rgba(255,255,255,0.3)',
+                  returnKeyType: 'search',
+                }}
+                onFail={() => setHasSearchResults(false)}
+                styles={{
+                  container: { flex: 0 },
+                  textInputContainer: { backgroundColor: 'transparent' },
+                  textInput: {
+                    backgroundColor: 'rgba(255,255,255,0.06)',
+                    color: '#FFFFFF',
+                    borderRadius: BorderRadius.large,
+                    paddingHorizontal: 14,
+                    height: 44,
+                    fontSize: 15,
+                    borderWidth: 1,
+                    borderColor: 'rgba(255,255,255,0.1)',
+                  },
+                  listView: {
+                    backgroundColor: 'rgba(30,30,30,0.98)',
+                    borderRadius: BorderRadius.large,
+                    marginTop: 4,
+                    borderWidth: 1,
+                    borderColor: 'rgba(255,255,255,0.1)',
+                    maxHeight: 200,
+                  },
+                  row: {
+                    backgroundColor: 'transparent',
+                    paddingHorizontal: 14,
+                    paddingVertical: 13,
+                  },
+                  description: { color: 'rgba(255,255,255,0.85)', fontSize: 14 },
+                  separator: { backgroundColor: 'rgba(255,255,255,0.06)' },
+                  poweredContainer: { display: 'none' },
+                }}
+                enablePoweredByContainer={false}
+                debounce={300}
+              />
+            </View>
+          </View>
+
+          {recentCities.length > 0 ? (
+            <View style={styles.section}>
+              <ThemedText style={styles.sectionLabel}>Recently Viewed</ThemedText>
+              <View style={styles.chips}>
+                {recentCities.map(city => (
+                  <Pressable
+                    key={`recent-${city}`}
+                    style={[styles.chip, activeCity === city && !activeSubArea ? styles.chipActive : null]}
+                    onPress={() => handleSelect(city)}
+                  >
+                    <Feather name="clock" size={13} color={activeCity === city && !activeSubArea ? '#fff' : 'rgba(255,255,255,0.5)'} />
+                    <ThemedText style={[styles.chipText, activeCity === city && !activeSubArea ? styles.chipTextActive : null]}>
+                      {city}
+                    </ThemedText>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          ) : null}
+
+          <View style={styles.section}>
+            <ThemedText style={styles.sectionLabel}>Popular Cities</ThemedText>
             <View style={styles.chips}>
-              {recentCities.map(city => (
+              {POPULAR_CITIES.map(city => (
                 <Pressable
-                  key={`recent-${city}`}
+                  key={`popular-${city}`}
                   style={[styles.chip, activeCity === city && !activeSubArea ? styles.chipActive : null]}
                   onPress={() => handleSelect(city)}
                 >
-                  <Feather name="clock" size={13} color={activeCity === city && !activeSubArea ? '#fff' : 'rgba(255,255,255,0.5)'} />
                   <ThemedText style={[styles.chipText, activeCity === city && !activeSubArea ? styles.chipTextActive : null]}>
                     {city}
                   </ThemedText>
@@ -87,109 +162,14 @@ export const CityPickerModal: React.FC<CityPickerModalProps> = ({
               ))}
             </View>
           </View>
-        ) : null}
 
-        <View style={styles.section}>
-          <ThemedText style={styles.sectionLabel}>Popular Cities</ThemedText>
-          <View style={styles.chips}>
-            {POPULAR_CITIES.map(city => (
-              <Pressable
-                key={`popular-${city}`}
-                style={[styles.chip, activeCity === city && !activeSubArea ? styles.chipActive : null]}
-                onPress={() => handleSelect(city)}
-              >
-                <ThemedText style={[styles.chipText, activeCity === city && !activeSubArea ? styles.chipTextActive : null]}>
-                  {city}
-                </ThemedText>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-
-        {currentSubAreas && currentSubAreas.length > 0 ? (
-          <View style={styles.section}>
-            <ThemedText style={styles.sectionLabel}>
-              {activeCity} — Filter by {subAreaLabel}
-            </ThemedText>
-            <View style={styles.chips}>
-              <Pressable
-                style={[styles.chip, activeCity && !activeSubArea ? styles.chipActiveOutline : null]}
-                onPress={() => handleSubAreaSelect(null)}
-              >
-                <Feather name="globe" size={13} color={!activeSubArea ? '#ff4d4d' : 'rgba(255,255,255,0.5)'} />
-                <ThemedText style={[styles.chipText, !activeSubArea ? styles.chipTextActiveOutline : null]}>
-                  All {activeCity}
-                </ThemedText>
-              </Pressable>
-              {currentSubAreas.map(area => {
-                const isActive = activeSubArea === area;
-                return (
-                  <Pressable
-                    key={`sub-${area}`}
-                    style={[styles.chip, isActive ? styles.chipActive : null]}
-                    onPress={() => handleSubAreaSelect(area)}
-                  >
-                    <Feather name="map-pin" size={13} color={isActive ? '#fff' : 'rgba(255,255,255,0.5)'} />
-                    <ThemedText style={[styles.chipText, isActive ? styles.chipTextActive : null]}>
-                      {area}
-                    </ThemedText>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-        ) : null}
-
-        <View style={styles.section}>
-          <ThemedText style={styles.sectionLabel}>Search</ThemedText>
-          <View style={styles.searchContainer}>
-            <Feather name="search" size={16} color="rgba(255,255,255,0.4)" />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Type any city..."
-              placeholderTextColor="rgba(255,255,255,0.3)"
-              value={citySearch}
-              onChangeText={setCitySearch}
-              autoCorrect={false}
-            />
-            {citySearch.length > 0 ? (
-              <Pressable onPress={() => setCitySearch('')}>
-                <Feather name="x" size={16} color="rgba(255,255,255,0.4)" />
-              </Pressable>
-            ) : null}
-          </View>
-          {filteredSearchCities.length > 0 ? (
-            <ScrollView style={styles.searchResults} keyboardShouldPersistTaps="handled">
-              {filteredSearchCities.map(city => (
-                <Pressable
-                  key={`search-${city}`}
-                  style={styles.searchResultItem}
-                  onPress={() => handleSelect(city)}
-                >
-                  <Feather name="map-pin" size={14} color="rgba(255,255,255,0.5)" />
-                  <ThemedText style={styles.searchResultText}>{city}</ThemedText>
-                  {activeCity === city ? (
-                    <Feather name="check" size={16} color="#ff4d4d" />
-                  ) : null}
-                </Pressable>
-              ))}
-            </ScrollView>
-          ) : citySearch.trim().length > 0 ? (
-            <View style={styles.searchEmpty}>
-              <ThemedText style={styles.searchEmptyText}>
-                No cities found for "{citySearch}"
-              </ThemedText>
-            </View>
-          ) : null}
-        </View>
-
-        <Pressable
-          style={styles.allCitiesBtn}
-          onPress={() => handleSelect(null)}
-        >
-          <Feather name="globe" size={16} color="#ff4d4d" />
-          <ThemedText style={styles.allCitiesBtnText}>Show All Cities</ThemedText>
-        </Pressable>
+          <Pressable
+            style={styles.allCitiesBtn}
+            onPress={() => handleSelect(null)}
+          >
+            <Feather name="globe" size={16} color="#ff4d4d" />
+            <ThemedText style={styles.allCitiesBtnText}>Show All Cities</ThemedText>
+          </Pressable>
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -264,6 +244,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     marginBottom: 10,
   },
+  autocompleteWrap: {
+    zIndex: 100,
+  },
   chips: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -284,10 +267,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#ff4d4d',
     borderColor: '#ff4d4d',
   },
-  chipActiveOutline: {
-    borderColor: '#ff4d4d',
-    backgroundColor: 'rgba(255,77,77,0.1)',
-  },
   chipText: {
     fontSize: 14,
     fontWeight: '500',
@@ -297,62 +276,13 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '600',
   },
-  chipTextActiveOutline: {
-    color: '#ff4d4d',
-    fontWeight: '600',
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    paddingHorizontal: 12,
-    height: 44,
-    gap: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: '#FFFFFF',
-    height: '100%',
-  },
-  searchResults: {
-    maxHeight: 160,
-    marginTop: 8,
-    borderRadius: BorderRadius.lg,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-  },
-  searchResultItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
-  },
-  searchResultText: {
-    flex: 1,
-    fontSize: 15,
-    color: '#FFFFFF',
-  },
-  searchEmpty: {
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  searchEmptyText: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.4)',
-  },
   allCitiesBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 14,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.large,
     borderWidth: 1,
     borderColor: 'rgba(255,77,77,0.3)',
     backgroundColor: 'rgba(255,77,77,0.08)',
