@@ -20,8 +20,9 @@ import { getDiscoverableGroupsForListing } from '../../services/groupService';
 import { Property, PropertyFilter, User, RoommateProfile, InterestCard, Conversation, Group } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import * as Location from 'expo-location';
 import { formatMoveInDate, calculateCompatibility, getMatchQualityColor, getGenderSymbol, formatLocation } from '../../utils/matchingAlgorithm';
-import { getNeighborhoodsByCity, getAllCities } from '../../utils/locationData';
+import { getNeighborhoodsByCity, getAllCities, NEIGHBORHOODS } from '../../utils/locationData';
 import { getZodiacSymbol } from '../../utils/zodiacUtils';
 import { getBoostRotationIndex } from '../../utils/boostRotation';
 import { shouldShowMatchScore, getHostBadgeLabel, getHostBadgeColor, getHostBadgeIcon } from '../../utils/hostTypeUtils';
@@ -132,6 +133,9 @@ export const ExploreScreen = () => {
   const [showWriteReview, setShowWriteReview] = useState(false);
   const [reviewSummaryCache, setReviewSummaryCache] = useState<Map<string, ReviewSummary>>(new Map());
   const [detailReviewSummary, setDetailReviewSummary] = useState<ReviewSummary | null>(null);
+  const [locationSearchQuery, setLocationSearchQuery] = useState('');
+  const [locationSearchResults, setLocationSearchResults] = useState<Array<{ label: string; city: string; neighborhood: string | null; type: 'city' | 'neighborhood' | 'zip' }>>([]);
+  const [isGeocodingZip, setIsGeocodingZip] = useState(false);
 
   const COLLAPSIBLE_HEIGHT = 120;
   const exploreScrollY = useSharedValue(0);
@@ -498,6 +502,60 @@ export const ExploreScreen = () => {
     };
     return map[cleanliness] || 5;
   };
+
+  const handleLocationSearch = useCallback(async (query: string) => {
+    setLocationSearchQuery(query);
+    const trimmed = query.trim().toLowerCase();
+    if (!trimmed) {
+      setLocationSearchResults([]);
+      return;
+    }
+
+    const results: Array<{ label: string; city: string; neighborhood: string | null; type: 'city' | 'neighborhood' | 'zip' }> = [];
+
+    const allCities = getAllCities();
+    allCities.forEach(city => {
+      if (city.toLowerCase().includes(trimmed)) {
+        results.push({ label: city, city, neighborhood: null, type: 'city' });
+      }
+    });
+
+    Object.entries(NEIGHBORHOODS).forEach(([name, data]) => {
+      if (name.toLowerCase().includes(trimmed)) {
+        results.push({ label: `${name}, ${data.city}`, city: data.city, neighborhood: name, type: 'neighborhood' });
+      }
+    });
+
+    if (/^\d{5}$/.test(trimmed)) {
+      setIsGeocodingZip(true);
+      try {
+        const geocoded = await Location.geocodeAsync(trimmed);
+        if (geocoded.length > 0) {
+          const { latitude, longitude } = geocoded[0];
+          const reverseResult = await Location.reverseGeocodeAsync({ latitude, longitude });
+          if (reverseResult.length > 0) {
+            const place = reverseResult[0];
+            const cityName = place.city || place.subregion || '';
+            if (cityName) {
+              results.unshift({ label: `${trimmed} - ${cityName}`, city: cityName, neighborhood: null, type: 'zip' });
+            }
+          }
+        }
+      } catch {}
+      setIsGeocodingZip(false);
+    }
+
+    setLocationSearchResults(results.slice(0, 10));
+  }, []);
+
+  const selectLocationResult = useCallback((result: { label: string; city: string; neighborhood: string | null; type: 'city' | 'neighborhood' | 'zip' }) => {
+    setActiveCity(result.city);
+    setSelectedNeighborhood(result.neighborhood);
+    setActiveSubArea(null);
+    setLocationSearchQuery('');
+    setLocationSearchResults([]);
+    setShowLocationSheet(false);
+  }, [setActiveCity, setActiveSubArea]);
 
   const applyFilters = () => {
     let filtered = [...properties];
@@ -1777,9 +1835,13 @@ export const ExploreScreen = () => {
                             <Text style={styles.pdTransitTitle}>Nearby Transit</Text>
                             {selectedProperty.transitInfo.stops.slice(0, 3).map((stop: any, index: number) => (
                               <View key={index} style={styles.pdTransitRow}>
-                                <Text style={{ fontSize: 15, width: 22 }}>
-                                  {stop.type === 'subway' ? '\u{1F687}' : stop.type === 'bus' ? '\u{1F68C}' : stop.type === 'train' ? '\u{1F686}' : '\u{1F68F}'}
-                                </Text>
+                                <View style={styles.pdTransitIcon}>
+                                  <Feather
+                                    name={stop.type === 'subway' ? 'navigation' : stop.type === 'bus' ? 'truck' : stop.type === 'train' ? 'navigation' : 'map-pin'}
+                                    size={12}
+                                    color={ACCENT}
+                                  />
+                                </View>
                                 <Text style={styles.pdTransitName} numberOfLines={1}>{stop.name}</Text>
                                 <Text style={styles.pdTransitDist}>{stop.distanceMiles} mi</Text>
                               </View>
@@ -1789,6 +1851,30 @@ export const ExploreScreen = () => {
                       </View>
                     ) : null}
 
+                    <View style={styles.pdSection}>
+                      <Text style={styles.pdSectionTitle}>Area Info</Text>
+                      <View style={styles.pdAreaInfoGrid}>
+                        {[
+                          { icon: 'navigation' as const, label: 'Transit', value: selectedProperty.transitInfo?.stops?.length ? `${selectedProperty.transitInfo.stops.length} stops nearby` : 'Check availability' },
+                          { icon: 'shopping-bag' as const, label: 'Grocery', value: 'Nearby stores' },
+                          { icon: 'coffee' as const, label: 'Dining', value: 'Restaurants & cafes' },
+                          { icon: 'sun' as const, label: 'Parks', value: 'Green spaces' },
+                        ].map((item, idx) => (
+                          <Pressable
+                            key={idx}
+                            style={styles.pdAreaInfoCard}
+                            onPress={() => { setSelectedProperty(selectedProperty); setShowNeighborhoodSheet(true); }}
+                          >
+                            <View style={styles.pdAreaInfoIconWrap}>
+                              <Feather name={item.icon} size={16} color={ACCENT} />
+                            </View>
+                            <Text style={styles.pdAreaInfoLabel}>{item.label}</Text>
+                            <Text style={styles.pdAreaInfoValue}>{item.value}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </View>
+
                     <Pressable
                       onPress={() => setShowNeighborhoodSheet(true)}
                       style={styles.pdNeighborhoodBtn}
@@ -1796,7 +1882,7 @@ export const ExploreScreen = () => {
                       <Feather name="cpu" size={16} color="#ff6b5b" />
                       <View style={{ flex: 1 }}>
                         <Text style={styles.pdNeighborhoodBtnTitle}>
-                          Ask AI about this neighborhood
+                          Get detailed neighborhood insights
                         </Text>
                         <Text style={styles.pdNeighborhoodBtnSub}>
                           Safety, walkability, transit, nearby spots
@@ -2089,86 +2175,94 @@ export const ExploreScreen = () => {
         visible={showLocationSheet}
         animationType="slide"
         transparent
-        onRequestClose={() => setShowLocationSheet(false)}
+        onRequestClose={() => { setShowLocationSheet(false); setLocationSearchQuery(''); setLocationSearchResults([]); }}
       >
-        <Pressable style={styles.locSheetOverlay} onPress={() => setShowLocationSheet(false)} />
+        <Pressable style={styles.locSheetOverlay} onPress={() => { setShowLocationSheet(false); setLocationSearchQuery(''); setLocationSearchResults([]); }} />
         <View style={styles.locSheet}>
           <View style={styles.locSheetHandle} />
-          <Text style={styles.locSheetTitle}>Choose Location</Text>
+          <Text style={styles.locSheetTitle}>Search Location</Text>
 
-          <Text style={styles.locSheetSectionLabel}>City</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={{ overflow: 'visible' }}
-            contentContainerStyle={styles.locCityScroll}
-          >
-            <Pressable
-              style={[styles.locCityChip, !activeCity && styles.locCityChipActive]}
-              onPress={() => {
-                setActiveCity(null);
-                setSelectedNeighborhood(null);
-                setActiveSubArea(null);
-              }}
-            >
-              <Text style={[styles.locCityText, !activeCity && styles.locCityTextActive]}>All Cities</Text>
-            </Pressable>
-            {getAllCities().map((city) => (
-              <Pressable
-                key={city}
-                style={[styles.locCityChip, activeCity === city && styles.locCityChipActive]}
-                onPress={() => {
-                  setActiveCity(city);
-                  setSelectedNeighborhood(null);
-                  setActiveSubArea(null);
-                }}
-              >
-                <Text style={[styles.locCityText, activeCity === city && styles.locCityTextActive]}>
-                  {city}
-                </Text>
+          <View style={styles.locSearchInputWrap}>
+            <Feather name="search" size={16} color="rgba(255,255,255,0.4)" />
+            <TextInput
+              style={styles.locSearchInput}
+              placeholder="City, neighborhood, or zip code"
+              placeholderTextColor="rgba(255,255,255,0.3)"
+              value={locationSearchQuery}
+              onChangeText={handleLocationSearch}
+              autoFocus
+              returnKeyType="search"
+            />
+            {locationSearchQuery.length > 0 ? (
+              <Pressable onPress={() => { setLocationSearchQuery(''); setLocationSearchResults([]); }}>
+                <Feather name="x" size={16} color="rgba(255,255,255,0.4)" />
               </Pressable>
-            ))}
-          </ScrollView>
+            ) : null}
+          </View>
 
-          <Text style={styles.locSheetSectionLabel}>Neighborhood</Text>
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.locNeighborhoodGrid}
-            style={{ maxHeight: 300 }}
-          >
-            <Pressable
-              style={[
-                styles.locHoodChip,
-                styles.locHoodChipAll,
-                selectedNeighborhood === null && styles.locHoodChipActive,
-              ]}
-              onPress={() => {
-                setSelectedNeighborhood(null);
-                setShowLocationSheet(false);
-              }}
-            >
-              <Text style={[styles.locHoodText, selectedNeighborhood === null && styles.locHoodTextActive]}>
-                All Neighborhoods
-              </Text>
-            </Pressable>
-            {(activeCity ? getNeighborhoodsByCity(activeCity) : []).map((hood) => (
-              <Pressable
-                key={hood}
-                style={[
-                  styles.locHoodChip,
-                  selectedNeighborhood === hood && styles.locHoodChipActive,
-                ]}
-                onPress={() => {
-                  setSelectedNeighborhood(hood);
-                  setShowLocationSheet(false);
-                }}
-              >
-                <Text style={[styles.locHoodText, selectedNeighborhood === hood && styles.locHoodTextActive]}>
-                  {hood}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
+          {isGeocodingZip ? (
+            <View style={styles.locSearchLoading}>
+              <ActivityIndicator size="small" color={ACCENT} />
+              <Text style={styles.locSearchLoadingText}>Looking up zip code...</Text>
+            </View>
+          ) : null}
+
+          {locationSearchResults.length > 0 ? (
+            <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              {locationSearchResults.map((result, idx) => (
+                <Pressable key={`${result.label}-${idx}`} style={styles.locSearchResult} onPress={() => selectLocationResult(result)}>
+                  <Feather
+                    name={result.type === 'city' ? 'map' : result.type === 'zip' ? 'hash' : 'map-pin'}
+                    size={16}
+                    color={ACCENT}
+                  />
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={styles.locSearchResultLabel}>{result.label}</Text>
+                    <Text style={styles.locSearchResultType}>
+                      {result.type === 'city' ? 'City' : result.type === 'zip' ? 'Zip Code' : 'Neighborhood'}
+                    </Text>
+                  </View>
+                  <Feather name="chevron-right" size={14} color="rgba(255,255,255,0.2)" />
+                </Pressable>
+              ))}
+            </ScrollView>
+          ) : locationSearchQuery.length === 0 ? (
+            <View style={{ paddingHorizontal: 20 }}>
+              <Text style={styles.locSheetSectionLabel}>Popular Cities</Text>
+              <View style={styles.locNeighborhoodGrid}>
+                {getAllCities().slice(0, 8).map((city) => (
+                  <Pressable
+                    key={city}
+                    style={[styles.locCityChip, activeCity === city && styles.locCityChipActive]}
+                    onPress={() => selectLocationResult({ label: city, city, neighborhood: null, type: 'city' })}
+                  >
+                    <Text style={[styles.locCityText, activeCity === city && styles.locCityTextActive]}>{city}</Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              {activeCity ? (
+                <Pressable
+                  style={styles.locClearBtn}
+                  onPress={() => {
+                    setActiveCity(null);
+                    setSelectedNeighborhood(null);
+                    setActiveSubArea(null);
+                    setShowLocationSheet(false);
+                  }}
+                >
+                  <Feather name="x-circle" size={14} color={ACCENT} />
+                  <Text style={styles.locClearBtnText}>Clear location filter</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : !isGeocodingZip ? (
+            <View style={styles.locSearchEmpty}>
+              <Feather name="search" size={24} color="rgba(255,255,255,0.15)" />
+              <Text style={styles.locSearchEmptyText}>No results found</Text>
+              <Text style={styles.locSearchEmptyHint}>Try a different city, neighborhood, or 5-digit zip code</Text>
+            </View>
+          ) : null}
         </View>
       </Modal>
 
@@ -2428,6 +2522,127 @@ const styles = StyleSheet.create({
   locHoodTextActive: {
     color: '#fff',
     fontWeight: '700',
+  },
+  locSearchInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginHorizontal: 20,
+    marginBottom: 16,
+    gap: 10,
+  },
+  locSearchInput: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  locSearchResult: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  locSearchResultLabel: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  locSearchResultType: {
+    color: 'rgba(255,255,255,0.35)',
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  locSearchLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 10,
+  },
+  locSearchLoadingText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  locSearchEmpty: {
+    alignItems: 'center',
+    paddingVertical: 40,
+    gap: 8,
+  },
+  locSearchEmptyText: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  locSearchEmptyHint: {
+    color: 'rgba(255,255,255,0.25)',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  locClearBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    marginTop: 16,
+    gap: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.3)',
+    backgroundColor: 'rgba(255,107,91,0.08)',
+  },
+  locClearBtnText: {
+    color: ACCENT,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  pdTransitIcon: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(255,107,91,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pdAreaInfoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  pdAreaInfoCard: {
+    width: '47%' as any,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  pdAreaInfoIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,107,91,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  pdAreaInfoLabel: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 3,
+  },
+  pdAreaInfoValue: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 12,
+    fontWeight: '500',
   },
   tabsRow: {
     flexDirection: 'row',

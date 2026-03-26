@@ -1,0 +1,34 @@
+PROMPT: Fix Explore Location Search + Area Info Section
+Three fixes needed for the Explore screen location/filter flow:
+
+FIX 1 — Replace City/Neighborhood Chip Grid with Search Autocomplete
+The "Choose Location" bottom sheet currently shows all cities and neighborhoods as chip grids upfront. Remove all of that. Replace with a single clean search input:
+
+One text input at the top labeled "Search by city, neighborhood, or zip code"
+Input has a search icon on the left and a clear (✕) button when text is present
+As the user types, show a dropdown list of matching results below the input (autocomplete)
+Results should match against: city names, neighborhood names, and zip codes from your existing data
+For zip codes (5-digit number input): use expo-location geocoding (Location.geocodeAsync then Location.reverseGeocodeAsync) to resolve to a city + neighborhood and show that as the result
+Tapping a result selects it, closes the dropdown, and applies the filter
+Do not show any chips, grids, or pre-populated lists — the screen should be mostly empty until the user starts typing
+Keep the "All Cities" / reset option as a single small text link at the bottom: "Clear location filter"
+
+
+FIX 2 — Area Info Section (Nearby Amenities)
+There is already an "Area Info" section on the listing detail screen but it shows nothing when tapped. Fix it so it displays real nearby amenity data:
+Use the listing's latitude and longitude fields to query nearby places using Apple Maps / expo-location or the device's local geocoding. For each listing, fetch and display these categories in a horizontal scrollable row of cards (icon + label + count or nearest distance):
+
+🚇 Transit — nearest subway/bus stop name and walking distance
+🌳 Parks — nearest park name and distance
+🍽️ Restaurants — count within 0.25 miles (e.g. "12 nearby")
+🛒 Grocery — nearest grocery store name and walking distance
+👕 Laundromat — nearest laundromat and distance (mark as "In building" if listing has laundry_in_unit: true or laundry_in_building: true)
+
+Since we're using Apple Maps (no Google Maps API), use Linking.openURL('maps://?...') or the react-native-maps region data — but for actual nearby POI data without a paid API, use the Foursquare Places API free tier (no billing required for basic searches).
+If Foursquare is not set up yet, fall back to showing the section with a "Checking area..." skeleton loader and log a TODO: connect Foursquare API key comment. The section should never be blank/invisible — if data isn't available, show a friendly message: "Area details coming soon for this listing."
+The area info cards should be visible on the listing detail screen by default (not hidden behind a tap). If there was a collapsed section, expand it by default.
+
+FIX 3 — Zip Code Search Visibility
+Make sure the location search input (from Fix 1) clearly supports zip codes. The placeholder text should read:
+"City, neighborhood, or zip code..."
+And when a valid 5-digit zip is entered, immediately trigger the geocode lookup and show the resolved location as an autocomplete result (e.g. "11211 → Williamsburg, Brooklyn, NY"). The user taps that result to apply it as their location filter.
