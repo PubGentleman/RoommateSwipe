@@ -980,6 +980,206 @@ export const RoommatesScreen = () => {
     </View>
   );
 
+  const renderBoostModal = () => (
+    <Modal visible={showBoostModal} animationType="slide" transparent onRequestClose={() => setShowBoostModal(false)}>
+      <Pressable style={[styles.modalOverlay, { justifyContent: 'flex-end', padding: 0 }]} onPress={() => setShowBoostModal(false)}>
+        <Pressable style={styles.boostSheet} onPress={() => {}}>
+          <View style={styles.boostSheetHandle} />
+          {(() => {
+            const plan = user?.subscription?.plan || 'basic';
+            const boostCheck = canBoost();
+            const duration = getBoostDuration(plan);
+            const boostActive = user?.boostData?.isBoosted && user?.boostData?.boostExpiresAt && !isBoostExpired(String(user.boostData.boostExpiresAt));
+
+            const handleBoostConfirm = async (paid?: boolean) => {
+              setProcessingBoost(true);
+              const selectedOption = RENTER_BOOST_OPTIONS.find(o => o.id === selectedBoostTierId)!;
+              const freeDuration = plan === 'elite' ? 24 : plan === 'plus' ? 12 : 6;
+              const result = paid
+                ? await purchaseBoost(selectedOption.price, selectedOption.durationHours)
+                : await activateBoost(freeDuration);
+              setProcessingBoost(false);
+              if (result.success) {
+                setShowBoostModal(false);
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              } else {
+                showAlert({ title: 'Cannot Boost', message: result.message, variant: 'warning' });
+              }
+            };
+
+            if (boostActive) {
+              return (
+                <>
+                  <View style={styles.boostSheetHeader}>
+                    <View style={styles.boostSheetIconWrap}>
+                      <Feather name="zap" size={28} color="#FFD700" />
+                    </View>
+                    <Text style={styles.boostSheetTitle}>Boost Already Active</Text>
+                    <Text style={styles.boostSheetDesc}>{boostTimeLabel}</Text>
+                  </View>
+                  {plan === 'elite' ? (
+                    <Text style={styles.boostSheetNote}>You can activate a new boost once this one expires</Text>
+                  ) : null}
+                  <Pressable style={styles.boostSheetDismiss} onPress={() => setShowBoostModal(false)}>
+                    <Text style={styles.boostSheetDismissText}>Got it</Text>
+                  </Pressable>
+                </>
+              );
+            }
+
+            if (plan === 'basic') {
+              const selOpt = RENTER_BOOST_OPTIONS.find(o => o.id === selectedBoostTierId)!;
+              return (
+                <>
+                  <View style={styles.boostSheetHeader}>
+                    <View style={styles.boostSheetIconWrap}>
+                      <Feather name="zap" size={28} color="#ff6b5b" />
+                    </View>
+                    <Text style={styles.boostSheetTitle}>Boost Your Profile</Text>
+                    <Text style={styles.boostSheetDesc}>Your profile appears near the top of swipe decks</Text>
+                  </View>
+                  <View style={{ marginBottom: 16 }}>
+                    {RENTER_BOOST_OPTIONS.map(option => (
+                      <Pressable
+                        key={option.id}
+                        onPress={() => setSelectedBoostTierId(option.id)}
+                        style={[
+                          styles.boostTierRow,
+                          selectedBoostTierId === option.id && styles.boostTierRowSelected,
+                        ]}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <Text style={styles.boostTierLabel}>{option.label}</Text>
+                            {option.badge ? (
+                              <View style={[styles.boostTierBadge, { backgroundColor: option.highlight ? '#FF6B6B' : '#22C55E' }]}>
+                                <Text style={styles.boostTierBadgeText}>{option.badge}</Text>
+                              </View>
+                            ) : null}
+                          </View>
+                          <Text style={styles.boostTierSub}>Priority placement for {option.label.toLowerCase()}</Text>
+                        </View>
+                        <Text style={styles.boostTierPrice}>${option.price.toFixed(2)}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                  <Pressable
+                    style={[styles.boostSheetCta, { opacity: processingBoost ? 0.7 : 1 }]}
+                    onPress={() => handleBoostConfirm(true)}
+                    disabled={processingBoost}
+                  >
+                    <LinearGradient colors={['#ff6b5b', '#e83a2a']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.boostSheetCtaGrad}>
+                      <Text style={styles.boostSheetCtaText}>{processingBoost ? 'Processing...' : `Boost for $${selOpt.price.toFixed(2)}`}</Text>
+                    </LinearGradient>
+                  </Pressable>
+                  <Pressable style={styles.boostSheetDismiss} onPress={() => setShowBoostModal(false)}>
+                    <Text style={styles.boostSheetDismissText}>Cancel</Text>
+                  </Pressable>
+                </>
+              );
+            }
+
+            if (plan === 'plus') {
+              const hasFree = boostCheck.hasFreeBoost;
+              const selOpt = RENTER_BOOST_OPTIONS.find(o => o.id === selectedBoostTierId)!;
+              return (
+                <>
+                  <View style={styles.boostSheetHeader}>
+                    <View style={styles.boostSheetIconWrap}>
+                      <Feather name="zap" size={28} color={hasFree ? '#3ECF8E' : '#FFD700'} />
+                    </View>
+                    <Text style={styles.boostSheetTitle}>{hasFree ? 'Boost Your Profile — Free with Plus' : 'Free Boost Used'}</Text>
+                    <Text style={styles.boostSheetDesc}>
+                      {hasFree
+                        ? `Your profile appears near the top of swipe decks for ${duration} hours`
+                        : boostCheck.nextAvailableAt
+                          ? `Your next free boost is available on ${new Date(boostCheck.nextAvailableAt).toLocaleDateString()}`
+                          : 'Your free boost is on cooldown'}
+                    </Text>
+                  </View>
+                  {hasFree ? (
+                    <Pressable
+                      style={[styles.boostSheetCta, { opacity: processingBoost ? 0.7 : 1 }]}
+                      onPress={() => handleBoostConfirm(false)}
+                      disabled={processingBoost}
+                    >
+                      <LinearGradient colors={['#3ECF8E', '#2bb878']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.boostSheetCtaGrad}>
+                        <Text style={styles.boostSheetCtaText}>{processingBoost ? 'Activating...' : `Activate Free Boost (${duration}h)`}</Text>
+                      </LinearGradient>
+                    </Pressable>
+                  ) : (
+                    <>
+                      <View style={{ marginBottom: 16 }}>
+                        {RENTER_BOOST_OPTIONS.map(option => (
+                          <Pressable
+                            key={option.id}
+                            onPress={() => setSelectedBoostTierId(option.id)}
+                            style={[
+                              styles.boostTierRow,
+                              selectedBoostTierId === option.id && styles.boostTierRowSelected,
+                            ]}
+                          >
+                            <View style={{ flex: 1 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <Text style={styles.boostTierLabel}>{option.label}</Text>
+                                {option.badge ? (
+                                  <View style={[styles.boostTierBadge, { backgroundColor: option.highlight ? '#FF6B6B' : '#22C55E' }]}>
+                                    <Text style={styles.boostTierBadgeText}>{option.badge}</Text>
+                                  </View>
+                                ) : null}
+                              </View>
+                              <Text style={styles.boostTierSub}>Priority placement for {option.label.toLowerCase()}</Text>
+                            </View>
+                            <Text style={styles.boostTierPrice}>${option.price.toFixed(2)}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                      <Pressable
+                        style={[styles.boostSheetCta, { opacity: processingBoost ? 0.7 : 1 }]}
+                        onPress={() => handleBoostConfirm(true)}
+                        disabled={processingBoost}
+                      >
+                        <LinearGradient colors={['#ff6b5b', '#e83a2a']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.boostSheetCtaGrad}>
+                          <Text style={styles.boostSheetCtaText}>{processingBoost ? 'Processing...' : `Boost for $${selOpt.price.toFixed(2)}`}</Text>
+                        </LinearGradient>
+                      </Pressable>
+                    </>
+                  )}
+                  <Pressable style={styles.boostSheetDismiss} onPress={() => setShowBoostModal(false)}>
+                    <Text style={styles.boostSheetDismissText}>Cancel</Text>
+                  </Pressable>
+                </>
+              );
+            }
+
+            return (
+              <>
+                <View style={styles.boostSheetHeader}>
+                  <View style={[styles.boostSheetIconWrap, { backgroundColor: 'rgba(255,215,0,0.15)' }]}>
+                    <Feather name="zap" size={28} color="#FFD700" />
+                  </View>
+                  <Text style={styles.boostSheetTitle}>Boost Your Profile — Unlimited with Elite</Text>
+                  <Text style={styles.boostSheetDesc}>Your profile appears near the top of swipe decks for {duration} hours</Text>
+                </View>
+                <Pressable
+                  style={[styles.boostSheetCta, { opacity: processingBoost ? 0.7 : 1 }]}
+                  onPress={() => handleBoostConfirm(false)}
+                  disabled={processingBoost}
+                >
+                  <LinearGradient colors={['#FFD700', '#f0c000']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.boostSheetCtaGrad}>
+                    <Text style={[styles.boostSheetCtaText, { color: '#000' }]}>{processingBoost ? 'Activating...' : 'Activate Boost'}</Text>
+                  </LinearGradient>
+                </Pressable>
+                <Pressable style={styles.boostSheetDismiss} onPress={() => setShowBoostModal(false)}>
+                  <Text style={styles.boostSheetDismissText}>Cancel</Text>
+                </Pressable>
+              </>
+            );
+          })()}
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
 
   if (showCityPrompt && !activeCity) {
     return (
@@ -1054,6 +1254,19 @@ export const RoommatesScreen = () => {
         <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
           <RhomeLogo variant="horizontal" size="sm" />
           <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Pressable onPress={() => {
+              if (user?.boostData?.isBoosted && user?.boostData?.boostExpiresAt && !isBoostExpired(String(user.boostData.boostExpiresAt))) {
+                setBoostTimeLabel(getBoostTimeRemaining(user.boostData.boostExpiresAt));
+              }
+              setShowBoostModal(true);
+            }} style={styles.navIconBtn}>
+              <View style={[styles.navIconBtnInner, user?.boostData?.isBoosted && user?.boostData?.boostExpiresAt && !isBoostExpired(String(user.boostData.boostExpiresAt))
+                ? { backgroundColor: '#FFD700' }
+                : { backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }
+              ]}>
+                <Feather name="zap" size={18} color={user?.boostData?.isBoosted && user?.boostData?.boostExpiresAt && !isBoostExpired(String(user.boostData.boostExpiresAt)) ? '#000000' : '#FFD700'} />
+              </View>
+            </Pressable>
             <Pressable onPress={() => (navigation as any).navigate('Notifications')} style={styles.navIconBtn}>
               <View style={[styles.navIconBtnInner, { backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }]}>
                 <Feather name="bell" size={18} color="#FFFFFF" />
@@ -1120,6 +1333,7 @@ export const RoommatesScreen = () => {
           allProfiles={unfilteredProfiles}
           userPlan={user?.subscription?.plan || 'basic'}
         />
+        {renderBoostModal()}
       </View>
     );
   }
@@ -1876,204 +2090,7 @@ export const RoommatesScreen = () => {
         </View>
       </Modal>
 
-      <Modal visible={showBoostModal} animationType="slide" transparent onRequestClose={() => setShowBoostModal(false)}>
-        <Pressable style={[styles.modalOverlay, { justifyContent: 'flex-end', padding: 0 }]} onPress={() => setShowBoostModal(false)}>
-          <Pressable style={styles.boostSheet} onPress={() => {}}>
-            <View style={styles.boostSheetHandle} />
-            {(() => {
-              const plan = user?.subscription?.plan || 'basic';
-              const boostCheck = canBoost();
-              const duration = getBoostDuration(plan);
-              const boostActive = user?.boostData?.isBoosted && user?.boostData?.boostExpiresAt && !isBoostExpired(String(user.boostData.boostExpiresAt));
-
-              const handleBoostConfirm = async (paid?: boolean) => {
-                setProcessingBoost(true);
-                const selectedOption = RENTER_BOOST_OPTIONS.find(o => o.id === selectedBoostTierId)!;
-                const freeDuration = plan === 'elite' ? 24 : plan === 'plus' ? 12 : 6;
-                const result = paid
-                  ? await purchaseBoost(selectedOption.price, selectedOption.durationHours)
-                  : await activateBoost(freeDuration);
-                setProcessingBoost(false);
-                if (result.success) {
-                  setShowBoostModal(false);
-                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                } else {
-                  showAlert({ title: 'Cannot Boost', message: result.message, variant: 'warning' });
-                }
-              };
-
-              if (boostActive) {
-                return (
-                  <>
-                    <View style={styles.boostSheetHeader}>
-                      <View style={styles.boostSheetIconWrap}>
-                        <Feather name="zap" size={28} color="#FFD700" />
-                      </View>
-                      <Text style={styles.boostSheetTitle}>Boost Already Active</Text>
-                      <Text style={styles.boostSheetDesc}>{boostTimeLabel}</Text>
-                    </View>
-                    {plan === 'elite' ? (
-                      <Text style={styles.boostSheetNote}>You can activate a new boost once this one expires</Text>
-                    ) : null}
-                    <Pressable style={styles.boostSheetDismiss} onPress={() => setShowBoostModal(false)}>
-                      <Text style={styles.boostSheetDismissText}>Got it</Text>
-                    </Pressable>
-                  </>
-                );
-              }
-
-              if (plan === 'basic') {
-                const selOpt = RENTER_BOOST_OPTIONS.find(o => o.id === selectedBoostTierId)!;
-                return (
-                  <>
-                    <View style={styles.boostSheetHeader}>
-                      <View style={styles.boostSheetIconWrap}>
-                        <Feather name="zap" size={28} color="#ff6b5b" />
-                      </View>
-                      <Text style={styles.boostSheetTitle}>Boost Your Profile</Text>
-                      <Text style={styles.boostSheetDesc}>Your profile appears near the top of swipe decks</Text>
-                    </View>
-                    <View style={{ marginBottom: 16 }}>
-                      {RENTER_BOOST_OPTIONS.map(option => (
-                        <Pressable
-                          key={option.id}
-                          onPress={() => setSelectedBoostTierId(option.id)}
-                          style={[
-                            styles.boostTierRow,
-                            selectedBoostTierId === option.id && styles.boostTierRowSelected,
-                          ]}
-                        >
-                          <View style={{ flex: 1 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                              <Text style={styles.boostTierLabel}>{option.label}</Text>
-                              {option.badge ? (
-                                <View style={[styles.boostTierBadge, { backgroundColor: option.highlight ? '#FF6B6B' : '#22C55E' }]}>
-                                  <Text style={styles.boostTierBadgeText}>{option.badge}</Text>
-                                </View>
-                              ) : null}
-                            </View>
-                            <Text style={styles.boostTierSub}>Priority placement for {option.label.toLowerCase()}</Text>
-                          </View>
-                          <Text style={styles.boostTierPrice}>${option.price.toFixed(2)}</Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                    <Pressable
-                      style={[styles.boostSheetCta, { opacity: processingBoost ? 0.7 : 1 }]}
-                      onPress={() => handleBoostConfirm(true)}
-                      disabled={processingBoost}
-                    >
-                      <LinearGradient colors={['#ff6b5b', '#e83a2a']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.boostSheetCtaGrad}>
-                        <Text style={styles.boostSheetCtaText}>{processingBoost ? 'Processing...' : `Boost for $${selOpt.price.toFixed(2)}`}</Text>
-                      </LinearGradient>
-                    </Pressable>
-                    <Pressable style={styles.boostSheetDismiss} onPress={() => setShowBoostModal(false)}>
-                      <Text style={styles.boostSheetDismissText}>Cancel</Text>
-                    </Pressable>
-                  </>
-                );
-              }
-
-              if (plan === 'plus') {
-                const hasFree = boostCheck.hasFreeBoost;
-                const selOpt = RENTER_BOOST_OPTIONS.find(o => o.id === selectedBoostTierId)!;
-                return (
-                  <>
-                    <View style={styles.boostSheetHeader}>
-                      <View style={styles.boostSheetIconWrap}>
-                        <Feather name="zap" size={28} color={hasFree ? '#3ECF8E' : '#FFD700'} />
-                      </View>
-                      <Text style={styles.boostSheetTitle}>{hasFree ? 'Boost Your Profile — Free with Plus' : 'Free Boost Used'}</Text>
-                      <Text style={styles.boostSheetDesc}>
-                        {hasFree
-                          ? `Your profile appears near the top of swipe decks for ${duration} hours`
-                          : boostCheck.nextAvailableAt
-                            ? `Your next free boost is available on ${new Date(boostCheck.nextAvailableAt).toLocaleDateString()}`
-                            : 'Your free boost is on cooldown'}
-                      </Text>
-                    </View>
-                    {hasFree ? (
-                      <Pressable
-                        style={[styles.boostSheetCta, { opacity: processingBoost ? 0.7 : 1 }]}
-                        onPress={() => handleBoostConfirm(false)}
-                        disabled={processingBoost}
-                      >
-                        <LinearGradient colors={['#3ECF8E', '#2bb878']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.boostSheetCtaGrad}>
-                          <Text style={styles.boostSheetCtaText}>{processingBoost ? 'Activating...' : `Activate Free Boost (${duration}h)`}</Text>
-                        </LinearGradient>
-                      </Pressable>
-                    ) : (
-                      <>
-                        <View style={{ marginBottom: 16 }}>
-                          {RENTER_BOOST_OPTIONS.map(option => (
-                            <Pressable
-                              key={option.id}
-                              onPress={() => setSelectedBoostTierId(option.id)}
-                              style={[
-                                styles.boostTierRow,
-                                selectedBoostTierId === option.id && styles.boostTierRowSelected,
-                              ]}
-                            >
-                              <View style={{ flex: 1 }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                  <Text style={styles.boostTierLabel}>{option.label}</Text>
-                                  {option.badge ? (
-                                    <View style={[styles.boostTierBadge, { backgroundColor: option.highlight ? '#FF6B6B' : '#22C55E' }]}>
-                                      <Text style={styles.boostTierBadgeText}>{option.badge}</Text>
-                                    </View>
-                                  ) : null}
-                                </View>
-                                <Text style={styles.boostTierSub}>Priority placement for {option.label.toLowerCase()}</Text>
-                              </View>
-                              <Text style={styles.boostTierPrice}>${option.price.toFixed(2)}</Text>
-                            </Pressable>
-                          ))}
-                        </View>
-                        <Pressable
-                          style={[styles.boostSheetCta, { opacity: processingBoost ? 0.7 : 1 }]}
-                          onPress={() => handleBoostConfirm(true)}
-                          disabled={processingBoost}
-                        >
-                          <LinearGradient colors={['#ff6b5b', '#e83a2a']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.boostSheetCtaGrad}>
-                            <Text style={styles.boostSheetCtaText}>{processingBoost ? 'Processing...' : `Boost for $${selOpt.price.toFixed(2)}`}</Text>
-                          </LinearGradient>
-                        </Pressable>
-                      </>
-                    )}
-                    <Pressable style={styles.boostSheetDismiss} onPress={() => setShowBoostModal(false)}>
-                      <Text style={styles.boostSheetDismissText}>Cancel</Text>
-                    </Pressable>
-                  </>
-                );
-              }
-
-              return (
-                <>
-                  <View style={styles.boostSheetHeader}>
-                    <View style={[styles.boostSheetIconWrap, { backgroundColor: 'rgba(255,215,0,0.15)' }]}>
-                      <Feather name="zap" size={28} color="#FFD700" />
-                    </View>
-                    <Text style={styles.boostSheetTitle}>Boost Your Profile — Unlimited with Elite</Text>
-                    <Text style={styles.boostSheetDesc}>Your profile appears near the top of swipe decks for {duration} hours</Text>
-                  </View>
-                  <Pressable
-                    style={[styles.boostSheetCta, { opacity: processingBoost ? 0.7 : 1 }]}
-                    onPress={() => handleBoostConfirm(false)}
-                    disabled={processingBoost}
-                  >
-                    <LinearGradient colors={['#FFD700', '#f0c000']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.boostSheetCtaGrad}>
-                      <Text style={[styles.boostSheetCtaText, { color: '#000' }]}>{processingBoost ? 'Activating...' : 'Activate Boost'}</Text>
-                    </LinearGradient>
-                  </Pressable>
-                  <Pressable style={styles.boostSheetDismiss} onPress={() => setShowBoostModal(false)}>
-                    <Text style={styles.boostSheetDismissText}>Cancel</Text>
-                  </Pressable>
-                </>
-              );
-            })()}
-          </Pressable>
-        </Pressable>
-      </Modal>
+      {renderBoostModal()}
 
       <Modal
         visible={showUndoUpgradeModal}
