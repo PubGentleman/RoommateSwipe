@@ -428,7 +428,9 @@ export const GroupsScreen = () => {
     });
 
     if (action === 'like') {
-      await handleLikeGroup(currentGroup);
+      handleLikeGroup(currentGroup).catch(err =>
+        console.warn('[GroupsScreen] Background like error:', err)
+      );
     }
   };
 
