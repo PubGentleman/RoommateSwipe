@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, StyleSheet, Modal, Pressable, ScrollView, Platform, Text } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import { Feather } from './VectorIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemedText } from './ThemedText';
@@ -21,7 +22,7 @@ export interface MatchFilters {
 
 export const DEFAULT_FILTERS: MatchFilters = {
   budgetMin: 500,
-  budgetMax: 5000,
+  budgetMax: 5001,
   moveInDate: null,
   roomTypes: [],
   lifestyle: [],
@@ -31,7 +32,32 @@ export const DEFAULT_FILTERS: MatchFilters = {
 
 const BUDGET_MIN = 500;
 const BUDGET_MAX = 5000;
-const BUDGET_STEP = 100;
+
+const MIN_BUDGET_OPTIONS = [
+  { label: '$500', value: 500 },
+  { label: '$750', value: 750 },
+  { label: '$1,000', value: 1000 },
+  { label: '$1,250', value: 1250 },
+  { label: '$1,500', value: 1500 },
+  { label: '$1,750', value: 1750 },
+  { label: '$2,000', value: 2000 },
+  { label: '$2,500', value: 2500 },
+  { label: '$3,000', value: 3000 },
+  { label: '$3,500', value: 3500 },
+];
+
+const MAX_BUDGET_OPTIONS = [
+  { label: '$1,000', value: 1000 },
+  { label: '$1,500', value: 1500 },
+  { label: '$2,000', value: 2000 },
+  { label: '$2,500', value: 2500 },
+  { label: '$3,000', value: 3000 },
+  { label: '$3,500', value: 3500 },
+  { label: '$4,000', value: 4000 },
+  { label: '$4,500', value: 4500 },
+  { label: '$5,000', value: 5000 },
+  { label: '$5,000+', value: 5001 },
+];
 
 const MOVE_IN_OPTIONS = [
   { label: 'ASAP', value: 'asap' },
@@ -64,7 +90,7 @@ const COMPATIBILITY_OPTIONS = [
 
 export const getActiveFilterCount = (filters: MatchFilters): number => {
   let count = 0;
-  if (filters.budgetMin > BUDGET_MIN || filters.budgetMax < BUDGET_MAX) count++;
+  if (filters.budgetMin > BUDGET_MIN || filters.budgetMax <= BUDGET_MAX) count++;
   if (filters.moveInDate) count++;
   if (filters.roomTypes.length > 0) count += filters.roomTypes.length;
   if (filters.lifestyle.length > 0) count += filters.lifestyle.length;
@@ -75,8 +101,9 @@ export const getActiveFilterCount = (filters: MatchFilters): number => {
 
 export const getActiveFilterChips = (filters: MatchFilters): { label: string; key: string }[] => {
   const chips: { label: string; key: string }[] = [];
-  if (filters.budgetMin > BUDGET_MIN || filters.budgetMax < BUDGET_MAX) {
-    chips.push({ label: `$${filters.budgetMin.toLocaleString()}-$${filters.budgetMax.toLocaleString()}`, key: 'budget' });
+  if (filters.budgetMin > BUDGET_MIN || filters.budgetMax <= BUDGET_MAX) {
+    const maxLabel = filters.budgetMax > BUDGET_MAX ? '$5,000+' : `$${filters.budgetMax.toLocaleString()}`;
+    chips.push({ label: `$${filters.budgetMin.toLocaleString()}-${maxLabel}`, key: 'budget' });
   }
   if (filters.moveInDate) {
     const label = MOVE_IN_OPTIONS.find(o => o.value === filters.moveInDate)?.label || filters.moveInDate;
@@ -98,7 +125,7 @@ export const removeFilterChip = (filters: MatchFilters, key: string): MatchFilte
   const updated = { ...filters };
   if (key === 'budget') {
     updated.budgetMin = BUDGET_MIN;
-    updated.budgetMax = BUDGET_MAX;
+    updated.budgetMax = 5001;
   } else if (key === 'moveIn') {
     updated.moveInDate = null;
   } else if (key.startsWith('room-')) {
@@ -113,10 +140,34 @@ export const removeFilterChip = (filters: MatchFilters, key: string): MatchFilte
   return updated;
 };
 
+const normalizeToPickerValue = (val: number, options: { value: number }[]): number => {
+  let closest = options[0].value;
+  let minDiff = Math.abs(val - closest);
+  for (const opt of options) {
+    const diff = Math.abs(val - opt.value);
+    if (diff < minDiff) {
+      minDiff = diff;
+      closest = opt.value;
+    }
+  }
+  return closest;
+};
+
 export const loadSavedFilters = async (): Promise<MatchFilters> => {
   try {
     const saved = await AsyncStorage.getItem(FILTERS_KEY);
-    if (saved) return { ...DEFAULT_FILTERS, ...JSON.parse(saved) };
+    if (saved) {
+      const parsed = { ...DEFAULT_FILTERS, ...JSON.parse(saved) };
+      parsed.budgetMin = normalizeToPickerValue(parsed.budgetMin, MIN_BUDGET_OPTIONS);
+      parsed.budgetMax = parsed.budgetMax > BUDGET_MAX
+        ? 5001
+        : normalizeToPickerValue(parsed.budgetMax, MAX_BUDGET_OPTIONS);
+      if (parsed.budgetMax <= parsed.budgetMin) {
+        const nextMax = MAX_BUDGET_OPTIONS.find(o => o.value > parsed.budgetMin);
+        parsed.budgetMax = nextMax ? nextMax.value : 5001;
+      }
+      return parsed;
+    }
   } catch {}
   return { ...DEFAULT_FILTERS };
 };
@@ -130,8 +181,8 @@ export const saveFilters = async (filters: MatchFilters) => {
 
 export const applyFiltersToProfiles = (profiles: any[], filters: MatchFilters): any[] => {
   return profiles.filter(p => {
-    if (filters.budgetMin > BUDGET_MIN || filters.budgetMax < BUDGET_MAX) {
-      if (p.budget && (p.budget < filters.budgetMin || p.budget > filters.budgetMax)) return false;
+    if (filters.budgetMin > BUDGET_MIN || filters.budgetMax <= BUDGET_MAX) {
+      if (p.budget && (p.budget < filters.budgetMin || (filters.budgetMax <= BUDGET_MAX && p.budget > filters.budgetMax))) return false;
     }
     if (filters.moveInDate && p.preferences?.moveInDate) {
       const profileDate = new Date(p.preferences.moveInDate);
@@ -210,14 +261,27 @@ export const RoommateFilterSheet: React.FC<Props> = ({ visible, onClose, onApply
     }
   };
 
-  const budgetSteps = Math.round((BUDGET_MAX - BUDGET_MIN) / BUDGET_STEP);
+  const availableMaxOptions = MAX_BUDGET_OPTIONS.filter(o => o.value > filters.budgetMin);
+
+  const handleMinChange = useCallback((val: number) => {
+    setFilters(f => {
+      const newMax = f.budgetMax <= val ? (availableMaxOptions.find(o => o.value > val)?.value || val + 500) : f.budgetMax;
+      return { ...f, budgetMin: val, budgetMax: newMax };
+    });
+  }, [availableMaxOptions]);
+
+  const handleMaxChange = useCallback((val: number) => {
+    setFilters(f => ({ ...f, budgetMax: val }));
+  }, []);
+
+  const formatBudgetDisplay = (val: number) => val > 5000 ? '$5,000+' : `$${val.toLocaleString()}`;
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={s.overlay} onPress={onClose} />
       <View style={s.sheet}>
         <View style={s.handle} />
-        <ScrollView showsVerticalScrollIndicator={false} style={s.scrollContent}>
+        <ScrollView showsVerticalScrollIndicator={false} style={s.scrollContent} nestedScrollEnabled>
           <ThemedText style={s.title}>Filters</ThemedText>
 
           <View style={s.filterCountBar}>
@@ -230,64 +294,43 @@ export const RoommateFilterSheet: React.FC<Props> = ({ visible, onClose, onApply
           <View style={s.section}>
             <SectionLabel icon="dollar-sign" title="Budget Range" />
             <ThemedText style={s.budgetDisplay}>
-              ${filters.budgetMin.toLocaleString()} — ${filters.budgetMax.toLocaleString()}/mo
+              {formatBudgetDisplay(filters.budgetMin)} — {formatBudgetDisplay(filters.budgetMax)}/mo
             </ThemedText>
-            <View style={s.sliderRow}>
-              <ThemedText style={s.sliderLabel}>Min</ThemedText>
-              <View style={s.sliderTrack}>
-                <View style={[s.sliderFill, {
-                  left: `${((filters.budgetMin - BUDGET_MIN) / (BUDGET_MAX - BUDGET_MIN)) * 100}%`,
-                  right: `${100 - ((filters.budgetMax - BUDGET_MIN) / (BUDGET_MAX - BUDGET_MIN)) * 100}%`,
-                }]} />
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={s.sliderTicks}
-                  scrollEnabled={false}
-                >
-                  {Array.from({ length: budgetSteps + 1 }, (_, i) => {
-                    const val = BUDGET_MIN + i * BUDGET_STEP;
-                    const isInRange = val >= filters.budgetMin && val <= filters.budgetMax;
-                    return (
-                      <Pressable
-                        key={val}
-                        style={[s.sliderTick, isInRange ? s.sliderTickActive : null]}
-                        onPress={() => {
-                          if (val <= filters.budgetMax) setFilters(f => ({ ...f, budgetMin: val }));
-                        }}
-                      />
-                    );
-                  })}
-                </ScrollView>
+            <View style={s.pickerRow}>
+              <View style={s.pickerColumn}>
+                <ThemedText style={s.pickerLabel}>Min</ThemedText>
+                <View style={s.pickerWrap}>
+                  <Picker
+                    selectedValue={filters.budgetMin}
+                    onValueChange={handleMinChange}
+                    style={s.picker}
+                    itemStyle={s.pickerItem}
+                  >
+                    {MIN_BUDGET_OPTIONS.map(opt => (
+                      <Picker.Item key={opt.value} label={opt.label} value={opt.value} color={Platform.OS === 'web' ? '#ffffff' : undefined} />
+                    ))}
+                  </Picker>
+                  <View style={s.selectionBand} pointerEvents="none" />
+                </View>
               </View>
-            </View>
-            <View style={s.sliderRow}>
-              <ThemedText style={s.sliderLabel}>Max</ThemedText>
-              <View style={s.sliderTrack}>
-                <View style={[s.sliderFill, {
-                  left: `${((filters.budgetMin - BUDGET_MIN) / (BUDGET_MAX - BUDGET_MIN)) * 100}%`,
-                  right: `${100 - ((filters.budgetMax - BUDGET_MIN) / (BUDGET_MAX - BUDGET_MIN)) * 100}%`,
-                }]} />
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={s.sliderTicks}
-                  scrollEnabled={false}
-                >
-                  {Array.from({ length: budgetSteps + 1 }, (_, i) => {
-                    const val = BUDGET_MIN + i * BUDGET_STEP;
-                    const isInRange = val >= filters.budgetMin && val <= filters.budgetMax;
-                    return (
-                      <Pressable
-                        key={val}
-                        style={[s.sliderTick, isInRange ? s.sliderTickActive : null]}
-                        onPress={() => {
-                          if (val >= filters.budgetMin) setFilters(f => ({ ...f, budgetMax: val }));
-                        }}
-                      />
-                    );
-                  })}
-                </ScrollView>
+              <View style={s.dashSeparator}>
+                <ThemedText style={s.dashText}>{'\u2014'}</ThemedText>
+              </View>
+              <View style={s.pickerColumn}>
+                <ThemedText style={s.pickerLabel}>Max</ThemedText>
+                <View style={s.pickerWrap}>
+                  <Picker
+                    selectedValue={filters.budgetMax}
+                    onValueChange={handleMaxChange}
+                    style={s.picker}
+                    itemStyle={s.pickerItem}
+                  >
+                    {availableMaxOptions.map(opt => (
+                      <Picker.Item key={opt.value} label={opt.label} value={opt.value} color={Platform.OS === 'web' ? '#ffffff' : undefined} />
+                    ))}
+                  </Picker>
+                  <View style={s.selectionBand} pointerEvents="none" />
+                </View>
               </View>
             </View>
             <View style={s.budgetPresets}>
@@ -295,7 +338,7 @@ export const RoommateFilterSheet: React.FC<Props> = ({ visible, onClose, onApply
                 { label: '$500-$1,000', min: 500, max: 1000 },
                 { label: '$1,000-$2,000', min: 1000, max: 2000 },
                 { label: '$2,000-$3,500', min: 2000, max: 3500 },
-                { label: '$3,500+', min: 3500, max: 5000 },
+                { label: '$3,500+', min: 3500, max: 5001 },
               ].map(preset => {
                 const isActive = filters.budgetMin === preset.min && filters.budgetMax === preset.max;
                 return (
@@ -529,46 +572,61 @@ const s = StyleSheet.create({
     color: ACCENT,
     marginBottom: 12,
   },
-  sliderRow: {
+  pickerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
+    marginBottom: 14,
   },
-  sliderLabel: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.4)',
-    width: 28,
-  },
-  sliderTrack: {
+  pickerColumn: {
     flex: 1,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  pickerLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.5)',
+    textAlign: 'center',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  pickerWrap: {
+    backgroundColor: '#111111',
+    borderRadius: 14,
     overflow: 'hidden',
+    height: 140,
+    justifyContent: 'center',
   },
-  sliderFill: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    backgroundColor: ACCENT,
-    borderRadius: 3,
+  picker: {
+    width: '100%',
+    height: 140,
+    backgroundColor: 'transparent',
+    color: '#ffffff',
   },
-  sliderTicks: {
+  pickerItem: {
+    color: '#ffffff',
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  selectionBand: {
     position: 'absolute',
-    top: 0,
     left: 0,
     right: 0,
-    bottom: 0,
+    top: '50%',
+    height: 36,
+    marginTop: -18,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 8,
   },
-  sliderTick: {
-    width: 4,
-    height: 6,
-    marginRight: 2,
-    backgroundColor: 'transparent',
+  dashSeparator: {
+    width: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 22,
   },
-  sliderTickActive: {
-    backgroundColor: 'transparent',
+  dashText: {
+    fontSize: 18,
+    color: 'rgba(255,255,255,0.4)',
+    fontWeight: '600',
   },
   budgetPresets: {
     flexDirection: 'row',
