@@ -58,6 +58,10 @@ export function normalizeToOption(val: number, options: { value: number }[]): nu
   return closest;
 }
 
+const isIOS = Platform.OS === 'ios';
+const isAndroid = Platform.OS === 'android';
+const isWeb = Platform.OS === 'web';
+
 interface PricePickerPairProps {
   minValue: number;
   maxValue: number;
@@ -73,7 +77,7 @@ export const PricePickerPair: React.FC<PricePickerPairProps> = ({
   onMinChange,
   onMaxChange,
   showDisplay = true,
-  height = 140,
+  height = 150,
 }) => {
   const availableMaxOptions = STANDARD_MAX_OPTIONS.filter(o => o.value > minValue);
 
@@ -109,19 +113,24 @@ export const PricePickerPair: React.FC<PricePickerPairProps> = ({
             <Picker
               selectedValue={minValue}
               onValueChange={handleMinChange}
-              style={[s.picker, { height }]}
-              itemStyle={s.item}
+              style={[
+                s.picker,
+                { height },
+                isAndroid && s.androidPicker,
+              ]}
+              itemStyle={[s.item, { height }]}
+              {...(isAndroid ? { mode: 'dropdown' as const } : {})}
             >
               {STANDARD_MIN_OPTIONS.map(opt => (
                 <Picker.Item
                   key={opt.value}
                   label={opt.label}
                   value={opt.value}
-                  color={Platform.OS === 'web' ? '#ffffff' : undefined}
+                  color={isWeb ? '#ffffff' : isAndroid ? '#ffffff' : undefined}
                 />
               ))}
             </Picker>
-            <View style={s.band} pointerEvents="none" />
+            {isIOS ? <View style={s.band} pointerEvents="none" /> : null}
           </View>
         </View>
         <View style={s.dash}>
@@ -133,19 +142,24 @@ export const PricePickerPair: React.FC<PricePickerPairProps> = ({
             <Picker
               selectedValue={maxValue}
               onValueChange={handleMaxChange}
-              style={[s.picker, { height }]}
-              itemStyle={s.item}
+              style={[
+                s.picker,
+                { height },
+                isAndroid && s.androidPicker,
+              ]}
+              itemStyle={[s.item, { height }]}
+              {...(isAndroid ? { mode: 'dropdown' as const } : {})}
             >
               {availableMaxOptions.map(opt => (
                 <Picker.Item
                   key={opt.value}
                   label={opt.label}
                   value={opt.value}
-                  color={Platform.OS === 'web' ? '#ffffff' : undefined}
+                  color={isWeb ? '#ffffff' : isAndroid ? '#ffffff' : undefined}
                 />
               ))}
             </Picker>
-            <View style={s.band} pointerEvents="none" />
+            {isIOS ? <View style={s.band} pointerEvents="none" /> : null}
           </View>
         </View>
       </View>
@@ -166,7 +180,7 @@ export const SinglePricePicker: React.FC<SinglePricePickerProps> = ({
   onChange,
   options,
   label,
-  height = 140,
+  height = 150,
 }) => (
   <View style={s.singleCol}>
     {label ? <ThemedText style={s.label}>{label}</ThemedText> : null}
@@ -174,19 +188,24 @@ export const SinglePricePicker: React.FC<SinglePricePickerProps> = ({
       <Picker
         selectedValue={value}
         onValueChange={onChange}
-        style={[s.picker, { height }]}
-        itemStyle={s.item}
+        style={[
+          s.picker,
+          { height },
+          isAndroid && s.androidPicker,
+        ]}
+        itemStyle={[s.item, { height }]}
+        {...(isAndroid ? { mode: 'dropdown' as const } : {})}
       >
         {options.map(opt => (
           <Picker.Item
             key={opt.value}
             label={opt.label}
             value={opt.value}
-            color={Platform.OS === 'web' ? '#ffffff' : undefined}
+            color={isWeb ? '#ffffff' : isAndroid ? '#ffffff' : undefined}
           />
         ))}
       </Picker>
-      <View style={s.band} pointerEvents="none" />
+      {isIOS ? <View style={s.band} pointerEvents="none" /> : null}
     </View>
   </View>
 );
@@ -233,7 +252,7 @@ const s = StyleSheet.create({
     letterSpacing: 0.5,
   },
   wrap: {
-    backgroundColor: '#111111',
+    backgroundColor: 'transparent',
     borderRadius: 14,
     overflow: 'hidden',
     justifyContent: 'center',
@@ -243,10 +262,15 @@ const s = StyleSheet.create({
     backgroundColor: 'transparent',
     color: '#ffffff',
   },
+  androidPicker: {
+    backgroundColor: '#1C1C1E',
+    color: '#ffffff',
+  },
   item: {
     color: '#ffffff',
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '600',
+    backgroundColor: 'transparent',
   },
   band: {
     position: 'absolute',
