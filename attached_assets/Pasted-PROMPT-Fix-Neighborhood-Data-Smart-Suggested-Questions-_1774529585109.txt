@@ -1,0 +1,38 @@
+PROMPT: Fix Neighborhood Data + Smart Suggested Questions
+Part 1 — Fix neighborhood data using Overpass API (no API key needed)
+Replace whatever API the neighborhood screen is currently using with the Overpass API (free, no key required). Base URL: https://overpass-api.de/api/interpreter
+Use the listing's latitude and longitude to query within 500 meters:
+[out:json][timeout:10];
+(
+  node["amenity"="subway_entrance"](around:500,LAT,LNG);
+  node["amenity"="bus_stop"](around:500,LAT,LNG);
+  node["amenity"="restaurant"](around:500,LAT,LNG);
+  node["amenity"="cafe"](around:500,LAT,LNG);
+  node["shop"="supermarket"](around:500,LAT,LNG);
+  node["amenity"="supermarket"](around:500,LAT,LNG);
+  node["amenity"="laundry"](around:500,LAT,LNG);
+  node["shop"="laundry"](around:500,LAT,LNG);
+  node["leisure"="park"](around:500,LAT,LNG);
+);
+out body;
+Parse results and display these cards:
+
+🚇 Transit — count of subway + bus stops (e.g. "4 stops nearby")
+🍽️ Restaurants — count of restaurants + cafes (e.g. "12 nearby")
+🛒 Grocery — nearest supermarket name + walking distance
+👕 Laundromat — nearest laundry name + distance (show "In building" if listing has laundry_in_unit: true)
+🌳 Parks — nearest park name + distance
+
+Use the Haversine formula to calculate distance from the listing to each result. Show a skeleton loader while fetching. Cache results in memory so it doesn't re-fetch on every open. If fetch fails, show "Area details unavailable right now" — never show an error or blank screen.
+
+Part 2 — Smart rotating suggested questions (3 chips max)
+The suggested question chips at the bottom of the neighborhood screen should always show exactly 3 chips at a time. Choose which 3 to show based on the Overpass results:
+
+If transit count ≥ 3 → include "How's the commute?"
+If restaurant count ≥ 8 → include "What's the nightlife like?"
+If park count ≥ 1 → include "Is it family friendly?"
+If grocery is far (> 400m) → include "Where's the nearest grocery?"
+If laundromat is far (> 400m) → include "Is there laundry nearby?"
+Always include "Is it safe at night?" as a fallback if fewer than 3 context-aware questions apply
+
+Never show more than 3 chips. Pick the most relevant 3 based on what the data shows about that specific neighborhood.

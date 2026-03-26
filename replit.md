@@ -53,7 +53,7 @@ The application is built using React Native, Expo, and TypeScript, utilizing Rea
 - **Subscription Management:** Tiered subscription plans for renters, hosts, and agents, with bundled pricing and a hybrid payment architecture (RevenueCat for native, Stripe for web).
 - **UI/UX:** Consistent dark theme, collapsible/sticky headers, and platform-specific adaptations.
 - **Location System:** Explore screen location sheet uses search autocomplete (cities, neighborhoods, ZIP codes via expo-location geocoding) as primary input, with popular city chips as secondary discovery. Google Places Autocomplete used for onboarding and profile questionnaire via `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY`. `locationData.ts` provides local city/neighborhood data for instant search results.
-- **Area Info Cards:** Listing detail modal shows 4 area info category cards (Transit, Grocery, Dining, Parks) that tap to open the AI Neighborhood sheet for detailed info. Transit stops use Feather icons (no emojis).
+- **Area Info Cards:** Listing detail modal shows 5 area info category cards (Transit, Restaurants, Grocery, Laundromat, Parks) with real data from Overpass API (free, no key). Fetches nearby amenities within 500m radius using listing coordinates. Shows loading skeleton while fetching, graceful fallback on error. Results cached in memory. Laundromat card shows "In building" if listing has laundry amenity. Service: `services/neighborhoodService.ts`. Transit stops use Feather icons (no emojis).
 - **Renter/Host Mode Switch:** Allows individual hosts to toggle between modes.
 
 ## Backend (Supabase)

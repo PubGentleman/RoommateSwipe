@@ -23,6 +23,7 @@ import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import { formatMoveInDate, calculateCompatibility, getMatchQualityColor, getGenderSymbol, formatLocation } from '../../utils/matchingAlgorithm';
 import { getNeighborhoodsByCity, getAllCities, NEIGHBORHOODS } from '../../utils/locationData';
+import { fetchAreaInfo, formatNearestAmenity, AreaInfo } from '../../services/neighborhoodService';
 import { getZodiacSymbol } from '../../utils/zodiacUtils';
 import { getBoostRotationIndex } from '../../utils/boostRotation';
 import { shouldShowMatchScore, getHostBadgeLabel, getHostBadgeColor, getHostBadgeIcon } from '../../utils/hostTypeUtils';
@@ -136,6 +137,10 @@ export const ExploreScreen = () => {
   const [locationSearchQuery, setLocationSearchQuery] = useState('');
   const [locationSearchResults, setLocationSearchResults] = useState<Array<{ label: string; city: string; neighborhood: string | null; type: 'city' | 'neighborhood' | 'zip' }>>([]);
   const [isGeocodingZip, setIsGeocodingZip] = useState(false);
+  const [areaInfo, setAreaInfo] = useState<AreaInfo | null>(null);
+  const [areaInfoLoading, setAreaInfoLoading] = useState(false);
+  const [areaInfoError, setAreaInfoError] = useState(false);
+  const [areaInfoListingId, setAreaInfoListingId] = useState<string | null>(null);
 
   const COLLAPSIBLE_HEIGHT = 120;
   const exploreScrollY = useSharedValue(0);
@@ -164,6 +169,47 @@ export const ExploreScreen = () => {
   useEffect(() => {
     applyFilters();
   }, [properties, filters, viewMode, saved, activeCity, activeSubArea, selectedNeighborhood, activeQuickFilters, listingTypeFilter]);
+
+  useEffect(() => {
+    if (!showPropertyDetail || !selectedProperty) {
+      return;
+    }
+
+    if (!selectedProperty.coordinates) {
+      setAreaInfo(null);
+      setAreaInfoLoading(false);
+      setAreaInfoError(false);
+      setAreaInfoListingId(selectedProperty.id);
+      return;
+    }
+
+    if (selectedProperty.id === areaInfoListingId) return;
+
+    let cancelled = false;
+    const listingId = selectedProperty.id;
+    setAreaInfoLoading(true);
+    setAreaInfoError(false);
+    setAreaInfo(null);
+    setAreaInfoListingId(listingId);
+
+    fetchAreaInfo(selectedProperty.coordinates.lat, selectedProperty.coordinates.lng)
+      .then(result => {
+        if (cancelled) return;
+        if (result) {
+          setAreaInfo(result);
+        } else {
+          setAreaInfoError(true);
+        }
+        setAreaInfoLoading(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setAreaInfoError(true);
+        setAreaInfoLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [showPropertyDetail, selectedProperty?.id]);
 
   const loadProperties = async () => {
     try {
@@ -1853,26 +1899,74 @@ export const ExploreScreen = () => {
 
                     <View style={styles.pdSection}>
                       <Text style={styles.pdSectionTitle}>Area Info</Text>
-                      <View style={styles.pdAreaInfoGrid}>
-                        {[
-                          { icon: 'navigation' as const, label: 'Transit', value: selectedProperty.transitInfo?.stops?.length ? `${selectedProperty.transitInfo.stops.length} stops nearby` : 'Check availability' },
-                          { icon: 'shopping-bag' as const, label: 'Grocery', value: 'Nearby stores' },
-                          { icon: 'coffee' as const, label: 'Dining', value: 'Restaurants & cafes' },
-                          { icon: 'sun' as const, label: 'Parks', value: 'Green spaces' },
-                        ].map((item, idx) => (
-                          <Pressable
-                            key={idx}
-                            style={styles.pdAreaInfoCard}
-                            onPress={() => { setSelectedProperty(selectedProperty); setShowNeighborhoodSheet(true); }}
-                          >
-                            <View style={styles.pdAreaInfoIconWrap}>
-                              <Feather name={item.icon} size={16} color={ACCENT} />
+                      {areaInfoLoading ? (
+                        <View style={styles.pdAreaInfoGrid}>
+                          {[0, 1, 2, 3, 4].map(i => (
+                            <View key={i} style={styles.pdAreaInfoCard}>
+                              <View style={[styles.pdAreaInfoIconWrap, { backgroundColor: 'rgba(255,255,255,0.04)' }]} />
+                              <View style={{ width: '60%', height: 14, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 4, marginBottom: 6 }} />
+                              <View style={{ width: '80%', height: 11, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 4 }} />
                             </View>
-                            <Text style={styles.pdAreaInfoLabel}>{item.label}</Text>
-                            <Text style={styles.pdAreaInfoValue}>{item.value}</Text>
-                          </Pressable>
-                        ))}
-                      </View>
+                          ))}
+                        </View>
+                      ) : areaInfoError || !areaInfo ? (
+                        <View style={styles.pdAreaInfoFallback}>
+                          <Feather name="map" size={20} color="rgba(255,255,255,0.2)" />
+                          <Text style={styles.pdAreaInfoFallbackText}>
+                            {selectedProperty.coordinates ? 'Area details unavailable right now' : 'No location data for this listing'}
+                          </Text>
+                        </View>
+                      ) : (
+                        <View style={styles.pdAreaInfoGrid}>
+                          <View style={styles.pdAreaInfoCard}>
+                            <View style={styles.pdAreaInfoIconWrap}>
+                              <Feather name="navigation" size={16} color={ACCENT} />
+                            </View>
+                            <Text style={styles.pdAreaInfoLabel}>Transit</Text>
+                            <Text style={styles.pdAreaInfoValue}>
+                              {areaInfo.transit.length > 0 ? `${areaInfo.transit.length} stop${areaInfo.transit.length !== 1 ? 's' : ''} nearby` : 'None found nearby'}
+                            </Text>
+                          </View>
+                          <View style={styles.pdAreaInfoCard}>
+                            <View style={styles.pdAreaInfoIconWrap}>
+                              <Feather name="coffee" size={16} color={ACCENT} />
+                            </View>
+                            <Text style={styles.pdAreaInfoLabel}>Restaurants</Text>
+                            <Text style={styles.pdAreaInfoValue}>
+                              {areaInfo.restaurants.length > 0 ? `${areaInfo.restaurants.length} nearby` : 'None found nearby'}
+                            </Text>
+                          </View>
+                          <View style={styles.pdAreaInfoCard}>
+                            <View style={styles.pdAreaInfoIconWrap}>
+                              <Feather name="shopping-bag" size={16} color={ACCENT} />
+                            </View>
+                            <Text style={styles.pdAreaInfoLabel}>Grocery</Text>
+                            <Text style={styles.pdAreaInfoValue}>
+                              {formatNearestAmenity(areaInfo.grocery)}
+                            </Text>
+                          </View>
+                          <View style={styles.pdAreaInfoCard}>
+                            <View style={styles.pdAreaInfoIconWrap}>
+                              <Feather name="briefcase" size={16} color={ACCENT} />
+                            </View>
+                            <Text style={styles.pdAreaInfoLabel}>Laundromat</Text>
+                            <Text style={styles.pdAreaInfoValue}>
+                              {selectedProperty.amenities?.some(a => a.toLowerCase().includes('laundry') && a.toLowerCase().includes('unit'))
+                                ? 'In building'
+                                : formatNearestAmenity(areaInfo.laundry)}
+                            </Text>
+                          </View>
+                          <View style={styles.pdAreaInfoCard}>
+                            <View style={styles.pdAreaInfoIconWrap}>
+                              <Feather name="sun" size={16} color={ACCENT} />
+                            </View>
+                            <Text style={styles.pdAreaInfoLabel}>Parks</Text>
+                            <Text style={styles.pdAreaInfoValue}>
+                              {formatNearestAmenity(areaInfo.parks)}
+                            </Text>
+                          </View>
+                        </View>
+                      )}
                     </View>
 
                     <Pressable
@@ -2642,6 +2736,22 @@ const styles = StyleSheet.create({
   pdAreaInfoValue: {
     color: 'rgba(255,255,255,0.4)',
     fontSize: 12,
+    fontWeight: '500',
+  },
+  pdAreaInfoFallback: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 24,
+    gap: 10,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  pdAreaInfoFallbackText: {
+    color: 'rgba(255,255,255,0.35)',
+    fontSize: 13,
     fontWeight: '500',
   },
   tabsRow: {
