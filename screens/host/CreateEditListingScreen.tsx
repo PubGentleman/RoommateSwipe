@@ -10,7 +10,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { StorageService } from '../../utils/storage';
 import { Property, HostSubscriptionData } from '../../types/models';
-import { canAddListingCheck } from '../../utils/hostPricing';
 import { ListingLimitModal, OverageModal } from '../../components/ListingLimitModal';
 import { US_STATES } from '../../utils/locationData';
 import { Spacing, BorderRadius } from '../../constants/theme';
@@ -51,7 +50,7 @@ export const CreateEditListingScreen = () => {
   const navigation = useNavigation();
   const route = useRoute<RouteProp<RouteParams, 'CreateEditListing'>>();
   const { theme } = useTheme();
-  const { user, getHostPlan } = useAuth();
+  const { user, getHostPlan, canAddListing } = useAuth();
   const { confirm, alert: showAlert } = useConfirm();
 
   const propertyId = route.params?.propertyId;
@@ -250,21 +249,11 @@ export const CreateEditListingScreen = () => {
         await showAlert({ title: 'Unable to verify plan', message: 'Please try again in a moment.', variant: 'warning' });
         return;
       }
-      const capResult = canAddListingCheck(hostSub);
+      const capResult = canAddListing(hostSub.activeListingCount || 0);
       if (!capResult.allowed) {
-        setLimitMessage(capResult.message);
+        setLimitMessage(capResult.reason || 'You have reached your listing limit.');
         setShowLimitModal(true);
         return;
-      }
-      if (capResult.message) {
-        setOverageMessage(capResult.message);
-        setShowOverageModal(true);
-        const confirmed = await new Promise<boolean>((resolve) => {
-          setOverageResolve(() => resolve);
-        });
-        setShowOverageModal(false);
-        setOverageResolve(null);
-        if (!confirmed) return;
       }
     }
 

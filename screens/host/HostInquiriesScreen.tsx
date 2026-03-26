@@ -15,6 +15,7 @@ import { useNotificationContext } from '../../contexts/NotificationContext';
 import { getReceivedInterestCards, acceptInterestCard, rejectInterestCard } from '../../services/discoverService';
 import { updateGroup } from '../../services/groupService';
 import { RhomeAISheet } from '../../components/RhomeAISheet';
+import { getAgentPlanLimits, type AgentPlan } from '../../constants/planLimits';
 
 type FilterStatus = 'all' | 'pending' | 'accepted' | 'passed';
 
@@ -26,6 +27,10 @@ export const HostInquiriesScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const insets = useSafeAreaInsets();
+  const isAgent = user?.hostType === 'agent';
+  const agentPlan = isAgent ? (user?.agentPlan as AgentPlan) || 'pay_per_use' : null;
+  const agentLimits = agentPlan ? getAgentPlanLimits(agentPlan) : null;
+  const canUseAI = isAgent ? (agentLimits?.hasAIChat ?? false) : true;
   const [interestCards, setInterestCards] = useState<InterestCard[]>([]);
   const [activeFilter, setActiveFilter] = useState<FilterStatus>(route.params?.filter || 'all');
   const [showAISheet, setShowAISheet] = useState(false);
@@ -428,17 +433,19 @@ export const HostInquiriesScreen = () => {
             <Feather name="chevron-left" size={26} color="#fff" />
           </Pressable>
           <Text style={styles.headerTitle}>Inquiries</Text>
-          <Pressable style={styles.aiBtn} onPress={() => setShowAISheet(true)}>
-            <LinearGradient
-              colors={['#ff6b5b', '#ff8c7a']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.aiBtnInner}
-            >
-              <Feather name="cpu" size={13} color="#fff" />
-              <Text style={styles.aiBtnText}>AI Sort</Text>
-            </LinearGradient>
-          </Pressable>
+          {canUseAI ? (
+            <Pressable style={styles.aiBtn} onPress={() => setShowAISheet(true)}>
+              <LinearGradient
+                colors={['#ff6b5b', '#ff8c7a']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.aiBtnInner}
+              >
+                <Feather name="cpu" size={13} color="#fff" />
+                <Text style={styles.aiBtnText}>AI Sort</Text>
+              </LinearGradient>
+            </Pressable>
+          ) : null}
         </View>
 
         <View style={styles.statsRow}>
@@ -517,7 +524,7 @@ export const HostInquiriesScreen = () => {
           </View>
         )}
       </View>
-      <RhomeAISheet
+      {canUseAI ? <RhomeAISheet
         visible={showAISheet}
         onDismiss={() => setShowAISheet(false)}
         screenContext="host_inquiries"
@@ -534,7 +541,7 @@ export const HostInquiriesScreen = () => {
         onNavigate={(screen, params) => {
           try { navigation.navigate(screen as any, params); } catch {}
         }}
-      />
+      /> : null}
     </ScreenScrollView>
   );
 };

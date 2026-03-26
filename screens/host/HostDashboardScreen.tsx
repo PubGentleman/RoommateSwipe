@@ -16,7 +16,8 @@ import { getReceivedInterestCards } from '../../services/discoverService';
 import { RhomeAISheet } from '../../components/RhomeAISheet';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { HostPlanBadge } from '../../components/HostPlanBadge';
-import { canAddListingCheck, isFreePlan } from '../../utils/hostPricing';
+import { isFreePlan } from '../../utils/hostPricing';
+import { getAgentPlanLimits, type AgentPlan } from '../../constants/planLimits';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getAgentResponseAlerts } from '../../services/responseTrackingService';
 import { getHostCompletionPercentage } from '../../utils/profileReminderUtils';
@@ -74,10 +75,14 @@ function formatBudget(range?: string): string {
 }
 
 export const HostDashboardScreen = () => {
-  const { user, getHostPlan } = useAuth();
+  const { user, getHostPlan, canAddListing } = useAuth();
   const { confirm, alert: showAlert } = useConfirm();
   const { refreshUnreadCount } = useNotificationContext();
   const hostPlan = getHostPlan();
+  const isAgent = user?.hostType === 'agent';
+  const agentPlan = isAgent ? (user?.agentPlan as AgentPlan) || 'pay_per_use' : null;
+  const agentLimits = agentPlan ? getAgentPlanLimits(agentPlan) : null;
+  const canUseAI = isAgent ? (agentLimits?.hasAIChat ?? false) : true;
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const [listings, setListings] = useState<Property[]>([]);
@@ -349,7 +354,7 @@ export const HostDashboardScreen = () => {
           <Text style={styles.greetingTitle}>Host Dashboard</Text>
         </View>
         <View style={styles.navActions}>
-          <AIFloatingButton onPress={() => setShowAISheet(true)} position="inline" />
+          {canUseAI ? <AIFloatingButton onPress={() => setShowAISheet(true)} position="inline" /> : null}
           <Pressable style={styles.iconBtn} onPress={() => {
             navigation.navigate('Notifications');
           }}>
@@ -856,20 +861,18 @@ export const HostDashboardScreen = () => {
         </View>
         <View style={styles.quickActions}>
           <Pressable style={styles.qaPrimary} onPress={() => {
-            if (hostSub) {
-              const result = canAddListingCheck({ ...hostSub, activeListingCount: activeCount });
-              if (!result.allowed) {
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-                confirm({
-                  title: 'Listing Limit Reached',
-                  message: result.message,
-                  confirmText: 'Upgrade Plan',
-                  variant: 'warning',
-                }).then(confirmed => {
-                  if (confirmed) navigation.navigate('HostSubscription');
-                });
-                return;
-              }
+            const result = canAddListing(activeCount);
+            if (!result.allowed) {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+              confirm({
+                title: 'Listing Limit Reached',
+                message: result.reason || 'You have reached your listing limit.',
+                confirmText: 'Upgrade Plan',
+                variant: 'warning',
+              }).then(confirmed => {
+                if (confirmed) navigation.navigate(isAgent ? 'AgentSubscription' : 'HostSubscription');
+              });
+              return;
             }
             navigation.navigate('CreateEditListing');
           }}>
@@ -914,7 +917,7 @@ export const HostDashboardScreen = () => {
           ) : null}
         </View>
       </AnimatedScrollView>
-      <RhomeAISheet
+      {canUseAI ? <RhomeAISheet
         visible={showAISheet}
         onDismiss={() => setShowAISheet(false)}
         screenContext="host_dashboard"
@@ -930,7 +933,7 @@ export const HostDashboardScreen = () => {
         onNavigate={(screen, params) => {
           try { navigation.navigate(screen as any, params); } catch {}
         }}
-      />
+      /> : null}
       <Modal visible={showReassignModal} transparent animationType="fade" onRequestClose={() => { setShowReassignModal(false); setReassignListingId(null); setReassignConvId(null); setReassignConvListingId(null); }}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
           <View style={{ backgroundColor: '#1a1a1a', borderRadius: 16, padding: 20, width: '100%', maxWidth: 360 }}>

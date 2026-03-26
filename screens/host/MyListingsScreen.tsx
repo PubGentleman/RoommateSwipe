@@ -14,9 +14,9 @@ import { getMyListings, mapListingToProperty, updateListing, deleteListing as de
 import { getReceivedInterestCards } from '../../services/discoverService';
 import { RhomeAISheet } from '../../components/RhomeAISheet';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
-import { isListingBoosted, canAddListingCheck } from '../../utils/hostPricing';
+import { isListingBoosted } from '../../utils/hostPricing';
 import { canUseBoosts, hasVerifiedBadge as planHasVerifiedBadge } from '../../utils/planGates';
-import { type HostPlan } from '../../constants/planLimits';
+import { type HostPlan, getAgentPlanLimits, type AgentPlan } from '../../constants/planLimits';
 import { ListingLimitModal, OverageModal } from '../../components/ListingLimitModal';
 import { PropertyReviewsScreen } from '../shared/PropertyReviewsScreen';
 
@@ -72,10 +72,14 @@ function formatListedAgo(listing: Property): string {
 }
 
 export const MyListingsScreen = () => {
-  const { user, getHostPlan } = useAuth();
+  const { user, getHostPlan, canAddListing } = useAuth();
   const { confirm, alert: showAlert } = useConfirm();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
+  const isAgent = user?.hostType === 'agent';
+  const agentPlan = isAgent ? (user?.agentPlan as AgentPlan) || 'pay_per_use' : null;
+  const agentLimits = agentPlan ? getAgentPlanLimits(agentPlan) : null;
+  const canUseAI = isAgent ? (agentLimits?.hasAIChat ?? false) : true;
   const [listings, setListings] = useState<Property[]>([]);
   const [inquiries, setInquiries] = useState<InterestCard[]>([]);
   const [filter, setFilter] = useState<FilterStatus>('all');
@@ -539,22 +543,14 @@ export const MyListingsScreen = () => {
           </Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <AIFloatingButton onPress={() => setShowAISheet(true)} position="inline" />
+          {canUseAI ? <AIFloatingButton onPress={() => setShowAISheet(true)} position="inline" /> : null}
         <Pressable onPress={() => {
-          if (hostSub) {
-            const updatedSub = { ...hostSub, activeListingCount: activeCount };
-            const result = canAddListingCheck(updatedSub);
-            if (!result.allowed) {
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-              setLimitMessage(result.message);
-              setShowLimitModal(true);
-              return;
-            }
-            if (result.message) {
-              setOverageMessage(result.message);
-              setShowOverageModal(true);
-              return;
-            }
+          const result = canAddListing(activeCount);
+          if (!result.allowed) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            setLimitMessage(result.reason || 'You have reached your listing limit.');
+            setShowLimitModal(true);
+            return;
           }
           navigation.navigate('CreateEditListing');
         }}>
@@ -608,7 +604,7 @@ export const MyListingsScreen = () => {
         )}
       </ScrollView>
 
-      <RhomeAISheet
+      {canUseAI ? <RhomeAISheet
         visible={showAISheet}
         onDismiss={() => setShowAISheet(false)}
         screenContext="host_listings"
@@ -625,7 +621,7 @@ export const MyListingsScreen = () => {
         onNavigate={(screen, params) => {
           try { navigation.navigate(screen as any, params); } catch {}
         }}
-      />
+      /> : null}
       <PaywallSheet
         visible={showHostPaywall}
         featureName="More Listings"

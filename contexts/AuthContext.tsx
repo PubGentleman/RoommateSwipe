@@ -6,6 +6,7 @@ import { User, Notification, TeamMember } from '../types/models';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import type { Session } from '@supabase/supabase-js';
 import { activateBoost as boostServiceActivateBoost, deactivateExpiredBoosts } from '../services/boostService';
+import { getAgentPlanLimits, getAgentListingLimitMessage, type AgentPlan } from '../constants/planLimits';
 import { identifyUser as rcIdentifyUser, logoutRevenueCat as rcLogout } from '../lib/revenueCat';
 import { processReferralCommission } from '../services/affiliateService';
 
@@ -1997,6 +1998,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const canAddListing = (currentCount: number): { allowed: boolean; limit: number; reason?: string } => {
+    if (user?.hostType === 'agent') {
+      const agPlan = (user.agentPlan as AgentPlan) || 'pay_per_use';
+      const agentLimits = getAgentPlanLimits(agPlan);
+      const limit = agentLimits.listingLimit;
+      if (limit === -1) return { allowed: true, limit: -1 };
+      if (currentCount >= limit) {
+        return { allowed: false, limit, reason: getAgentListingLimitMessage(agPlan) };
+      }
+      return { allowed: true, limit };
+    }
     const hostPlan = getHostPlan();
     const planLimitsMap: Record<string, number> = { free: 1, none: 1, starter: 5, pro: -1, business: -1 };
     const limit = planLimitsMap[hostPlan] ?? 1;

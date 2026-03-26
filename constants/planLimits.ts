@@ -148,12 +148,14 @@ export interface AgentPlanLimits {
   shortlistLimit: number;
   activeGroupsLimit: number;
   monthlyPlacementLimit: number;
+  listingLimit: number;
   hasAISuggestions: boolean;
   hasAIGroupSuggestions: boolean;
   hasCompatibilityMatrix: boolean;
   hasAIChat: boolean;
   hasPriorityVisibility: boolean;
   hasAdvancedAnalytics: boolean;
+  hasClientManagement: boolean;
   teamSeats: number;
 }
 
@@ -166,12 +168,14 @@ export const AGENT_PLAN_LIMITS: Record<AgentPlan, AgentPlanLimits> = {
     shortlistLimit: 5,
     activeGroupsLimit: 1,
     monthlyPlacementLimit: -1,
+    listingLimit: 1,
     hasAISuggestions: false,
     hasAIGroupSuggestions: false,
     hasCompatibilityMatrix: false,
     hasAIChat: false,
     hasPriorityVisibility: false,
     hasAdvancedAnalytics: false,
+    hasClientManagement: false,
     teamSeats: 1,
   },
   starter: {
@@ -182,12 +186,14 @@ export const AGENT_PLAN_LIMITS: Record<AgentPlan, AgentPlanLimits> = {
     shortlistLimit: 10,
     activeGroupsLimit: 1,
     monthlyPlacementLimit: 2,
+    listingLimit: 5,
     hasAISuggestions: false,
     hasAIGroupSuggestions: false,
     hasCompatibilityMatrix: false,
     hasAIChat: false,
     hasPriorityVisibility: false,
     hasAdvancedAnalytics: false,
+    hasClientManagement: true,
     teamSeats: 1,
   },
   pro: {
@@ -198,12 +204,14 @@ export const AGENT_PLAN_LIMITS: Record<AgentPlan, AgentPlanLimits> = {
     shortlistLimit: 50,
     activeGroupsLimit: 5,
     monthlyPlacementLimit: 10,
+    listingLimit: -1,
     hasAISuggestions: true,
     hasAIGroupSuggestions: true,
     hasCompatibilityMatrix: true,
     hasAIChat: true,
     hasPriorityVisibility: false,
     hasAdvancedAnalytics: false,
+    hasClientManagement: true,
     teamSeats: 1,
   },
   business: {
@@ -214,18 +222,33 @@ export const AGENT_PLAN_LIMITS: Record<AgentPlan, AgentPlanLimits> = {
     shortlistLimit: -1,
     activeGroupsLimit: -1,
     monthlyPlacementLimit: -1,
+    listingLimit: -1,
     hasAISuggestions: true,
     hasAIGroupSuggestions: true,
     hasCompatibilityMatrix: true,
     hasAIChat: true,
     hasPriorityVisibility: true,
     hasAdvancedAnalytics: true,
+    hasClientManagement: true,
     teamSeats: 5,
   },
 };
 
 export function getAgentPlanLimits(plan: AgentPlan): AgentPlanLimits {
   return AGENT_PLAN_LIMITS[plan] ?? AGENT_PLAN_LIMITS.pay_per_use;
+}
+
+export function canAgentAddListing(plan: AgentPlan, currentCount: number): boolean {
+  const { listingLimit } = getAgentPlanLimits(plan);
+  if (listingLimit === -1) return true;
+  return currentCount < listingLimit;
+}
+
+export function getAgentListingLimitMessage(plan: AgentPlan): string {
+  const limits = getAgentPlanLimits(plan);
+  if (limits.listingLimit === -1) return '';
+  const nextPlan = plan === 'pay_per_use' ? 'Agent Starter' : plan === 'starter' ? 'Agent Pro' : 'Agent Business';
+  return `Your ${limits.label} plan allows up to ${limits.listingLimit} active listing${limits.listingLimit > 1 ? 's' : ''}. Upgrade to ${nextPlan} to add more.`;
 }
 
 export function canAgentShortlist(plan: AgentPlan, currentCount: number): boolean {
