@@ -7,36 +7,173 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-function buildFallbackAnswer(question: string, neighborhood: string, city: string): string {
-  const q = question.toLowerCase();
-  const loc = neighborhood || city || 'this area';
+interface CrimeSummary {
+  total: number;
+  categories: Record<string, number>;
+  period: string;
+}
 
-  if (q.includes('safe') || q.includes('crime') || q.includes('night')) {
-    return `${loc} is a mixed neighborhood like most urban areas. It's generally advisable to stay aware of your surroundings, especially late at night. Check local crime maps and talk to current residents for the most up-to-date picture.`;
+async function fetchNYCCrimeData(lat: number, lng: number): Promise<CrimeSummary | null> {
+  try {
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    const dateStr = ninetyDaysAgo.toISOString().split('T')[0];
+    const url = `https://data.cityofnewyork.us/resource/5uac-w243.json?$where=within_circle(latitude,longitude,${lat},${lng},500) AND cmplnt_fr_dt > '${dateStr}'&$limit=200`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) return null;
+    const categories: Record<string, number> = {};
+    for (const incident of data) {
+      const cat = incident.ofns_desc || incident.pd_desc || 'Other';
+      const normalized = cat.charAt(0).toUpperCase() + cat.slice(1).toLowerCase();
+      categories[normalized] = (categories[normalized] || 0) + 1;
+    }
+    return { total: data.length, categories, period: '90 days' };
+  } catch {
+    return null;
   }
-  if (q.includes('commute') || q.includes('transit') || q.includes('train') || q.includes('bus') || q.includes('subway')) {
-    return `${loc} has public transit options that connect to the broader ${city} network. Check Google Maps or a transit app for specific route times from the listing address to your workplace for the most accurate commute estimate.`;
+}
+
+async function fetchWalkScore(address: string, lat: number, lng: number): Promise<{ walk: number | null; transit: number | null; bike: number | null } | null> {
+  try {
+    const wsKey = Deno.env.get('WALKSCORE_API_KEY');
+    if (!wsKey) return null;
+    const url = `https://api.walkscore.com/score?format=json&address=${encodeURIComponent(address)}&lat=${lat}&lon=${lng}&transit=1&bike=1&wsapikey=${wsKey}`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return {
+      walk: data.walkscore ?? null,
+      transit: data.transit?.score ?? null,
+      bike: data.bike?.score ?? null,
+    };
+  } catch {
+    return null;
   }
-  if (q.includes('nightlife') || q.includes('bar') || q.includes('restaurant') || q.includes('food') || q.includes('eat')) {
-    return `${loc} has a variety of dining and nightlife options within walking distance or a short ride. Explore Google Maps or Yelp for the latest restaurant ratings and hours in the area.`;
+}
+
+async function fetchOverpassAmenities(lat: number, lng: number): Promise<{
+  transitStops: number;
+  restaurants: number;
+  grocery: { name: string; distance: number }[];
+  parks: number;
+  cafes: number;
+  laundromats: number;
+} | null> {
+  try {
+    const latStr = lat.toFixed(6);
+    const lngStr = lng.toFixed(6);
+    const query = `[out:json][timeout:10];(node["amenity"="subway_entrance"](around:800,${latStr},${lngStr});node["highway"="bus_stop"](around:800,${latStr},${lngStr});node["amenity"="bus_station"](around:800,${latStr},${lngStr});node["railway"="station"](around:800,${latStr},${lngStr});node["amenity"="restaurant"](around:500,${latStr},${lngStr});node["amenity"="cafe"](around:500,${latStr},${lngStr});node["amenity"="supermarket"](around:800,${latStr},${lngStr});node["shop"="supermarket"](around:800,${latStr},${lngStr});node["amenity"="laundry"](around:500,${latStr},${lngStr});node["shop"="laundry"](around:500,${latStr},${lngStr});node["leisure"="park"](around:500,${latStr},${lngStr}););out body;`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    const res = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      body: `data=${encodeURIComponent(query)}`,
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const elements = data.elements || [];
+    let transitStops = 0;
+    let restaurants = 0;
+    let cafes = 0;
+    let parks = 0;
+    let laundromats = 0;
+    const groceryList: { name: string; distance: number }[] = [];
+    for (const el of elements) {
+      const tags = el.tags || {};
+      const amenity = tags.amenity || '';
+      const shop = tags.shop || '';
+      const leisure = tags.leisure || '';
+      const highway = tags.highway || '';
+      const railway = tags.railway || '';
+      if (amenity === 'subway_entrance' || highway === 'bus_stop' || amenity === 'bus_station' || railway === 'station') transitStops++;
+      else if (amenity === 'restaurant') restaurants++;
+      else if (amenity === 'cafe') cafes++;
+      else if (leisure === 'park') parks++;
+      else if (amenity === 'laundry' || shop === 'laundry') laundromats++;
+      else if (amenity === 'supermarket' || shop === 'supermarket') {
+        const dLat = (el.lat - lat) * 111320;
+        const dLng = (el.lon - lng) * 111320 * Math.cos(lat * Math.PI / 180);
+        const dist = Math.round(Math.sqrt(dLat * dLat + dLng * dLng));
+        groceryList.push({ name: tags.name || 'Grocery store', distance: dist });
+      }
+    }
+    groceryList.sort((a, b) => a.distance - b.distance);
+    return { transitStops, restaurants, cafes, grocery: groceryList.slice(0, 3), parks, laundromats };
+  } catch {
+    return null;
   }
-  if (q.includes('family') || q.includes('kid') || q.includes('school') || q.includes('child')) {
-    return `${loc} has nearby schools and parks that families use. Check GreatSchools.org for school ratings and visit the neighborhood on a weekend to get a feel for the family-friendliness.`;
+}
+
+function isNYCArea(city: string, state: string, lat: number, lng: number): boolean {
+  const cityLower = (city || '').toLowerCase();
+  const stateLower = (state || '').toLowerCase();
+  if (stateLower === 'ny' || stateLower === 'new york') {
+    if (cityLower.includes('new york') || cityLower.includes('brooklyn') ||
+        cityLower.includes('queens') || cityLower.includes('bronx') ||
+        cityLower.includes('manhattan') || cityLower.includes('staten island')) {
+      return true;
+    }
   }
-  if (q.includes('grocery') || q.includes('shop') || q.includes('store')) {
-    return `${loc} has grocery stores and shops accessible by foot or short drive. Use Google Maps to search for supermarkets near the listing address for the closest options.`;
-  }
-  if (q.includes('park') || q.includes('outdoor') || q.includes('green')) {
-    return `${loc} has green spaces and parks within the surrounding area. Check Google Maps for the nearest parks and trails to the listing address.`;
-  }
-  if (q.includes('noise') || q.includes('quiet') || q.includes('loud')) {
-    return `Noise levels in ${loc} vary by block and time of day. Visit the area during different hours to get a realistic sense. Street-facing units tend to be louder than courtyard-facing ones.`;
-  }
-  if (q.includes('parking') || q.includes('car') || q.includes('drive')) {
-    return `Parking availability in ${loc} depends on the specific block. Many ${city} neighborhoods have a mix of street parking and garage options. Check with the landlord about dedicated spots.`;
+  if (lat >= 40.4 && lat <= 40.95 && lng >= -74.3 && lng <= -73.7) return true;
+  return false;
+}
+
+function buildDataContext(
+  crime: CrimeSummary | null,
+  walkScores: { walk: number | null; transit: number | null; bike: number | null } | null,
+  amenities: Awaited<ReturnType<typeof fetchOverpassAmenities>>,
+  isNYC: boolean,
+): string {
+  const sections: string[] = [];
+
+  if (walkScores) {
+    const parts: string[] = [];
+    if (walkScores.walk !== null) parts.push(`Walk Score: ${walkScores.walk}/100`);
+    if (walkScores.transit !== null) parts.push(`Transit Score: ${walkScores.transit}/100`);
+    if (walkScores.bike !== null) parts.push(`Bike Score: ${walkScores.bike}/100`);
+    if (parts.length > 0) sections.push(parts.join(' | '));
   }
 
-  return `${loc} is an established neighborhood in ${city} with a range of amenities and transit options nearby. For specific details, I'd recommend visiting the area and exploring on foot to get the best sense of day-to-day life there.`;
+  if (crime) {
+    const topCats = Object.entries(crime.categories)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([cat, count]) => `${cat}: ${count}`)
+      .join(', ');
+    sections.push(`Crime incidents within 500m (last ${crime.period}): ${crime.total} total. Top categories: ${topCats}`);
+  } else if (isNYC) {
+    sections.push('Crime data: No incidents found within 500m in the last 90 days, or data temporarily unavailable.');
+  }
+
+  if (amenities) {
+    const parts: string[] = [];
+    if (amenities.transitStops > 0) parts.push(`Transit stops nearby: ${amenities.transitStops}`);
+    if (amenities.restaurants > 0) parts.push(`Restaurants within walking distance: ${amenities.restaurants}`);
+    if (amenities.cafes > 0) parts.push(`Cafes nearby: ${amenities.cafes}`);
+    if (amenities.parks > 0) parts.push(`Parks nearby: ${amenities.parks}`);
+    if (amenities.laundromats > 0) parts.push(`Laundromats nearby: ${amenities.laundromats}`);
+    if (amenities.grocery.length > 0) {
+      const nearest = amenities.grocery[0];
+      parts.push(`Nearest grocery: ${nearest.name} (~${nearest.distance}m away)`);
+    }
+    if (parts.length > 0) sections.push(parts.join('\n'));
+  }
+
+  if (sections.length === 0) {
+    return 'Limited neighborhood data available for this area.';
+  }
+
+  return sections.join('\n\n');
 }
 
 serve(async (req) => {
@@ -70,49 +207,73 @@ serve(async (req) => {
     let listingContext = '';
     let neighborhoodName = neighborhood || '';
     let cityName = city || '';
+    let lat: number | null = null;
+    let lng: number | null = null;
+    let fullAddress = '';
 
     if (listingId) {
       const { data: listing } = await supabase
         .from('listings')
-        .select('address, city, state, zip, neighborhood, rent, bedrooms, bathrooms, title')
+        .select('address, city, state, zip, neighborhood, rent, bedrooms, bathrooms, title, lat, lng')
         .eq('id', listingId)
         .single();
 
       if (listing) {
         neighborhoodName = neighborhoodName || listing.neighborhood || listing.city || '';
         cityName = cityName || listing.city || '';
-        listingContext = `
-LISTING: ${listing.title || `${listing.address}, ${listing.city}`}
-Address: ${listing.address}, ${listing.city}, ${listing.state} ${listing.zip}
+        lat = listing.lat;
+        lng = listing.lng;
+        fullAddress = `${listing.address}, ${listing.city}, ${listing.state} ${listing.zip}`;
+        listingContext = `LISTING: ${listing.title || fullAddress}
+Address: ${fullAddress}
 Neighborhood: ${neighborhoodName}
-Rent: $${listing.rent}/mo | ${listing.bedrooms}bd/${listing.bathrooms}ba`.trim();
+Rent: $${listing.rent}/mo | ${listing.bedrooms}bd/${listing.bathrooms}ba`;
       }
+    }
+
+    let dataContext = 'No real-time neighborhood data available for this area.';
+
+    if (lat && lng) {
+      const nyc = isNYCArea(cityName, '', lat, lng);
+
+      const [crimeData, walkScores, amenities] = await Promise.all([
+        nyc ? fetchNYCCrimeData(lat, lng) : Promise.resolve(null),
+        fetchWalkScore(fullAddress || `${neighborhoodName}, ${cityName}`, lat, lng),
+        fetchOverpassAmenities(lat, lng),
+      ]);
+
+      dataContext = buildDataContext(crimeData, walkScores, amenities, nyc);
     }
 
     const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
     if (!apiKey) {
-      const fallback = buildFallbackAnswer(question, neighborhoodName, cityName);
-      return new Response(JSON.stringify({ reply: fallback }), {
+      return new Response(JSON.stringify({
+        reply: `Based on available data for ${neighborhoodName || 'this area'}: ${dataContext.split('\n')[0]}. For more specific details, I'd recommend visiting the neighborhood at different times of day.`,
+      }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    try {
-      const anthropic = new Anthropic({ apiKey });
-
-      const systemPrompt = `You are Rhome AI, a helpful neighborhood advisor for renters.
+    const systemPrompt = `You are Rhome AI, a neighborhood expert for Rhome, a rental housing app.
+You answer questions about ${neighborhoodName || 'this neighborhood'}${cityName ? ` in ${cityName}` : ''}.
 
 ${listingContext}
 
-You are answering questions about ${neighborhoodName || 'this neighborhood'}${cityName ? ` in ${cityName}` : ''}.
+REAL DATA ABOUT THIS AREA:
+${dataContext}
 
 RULES:
-- Give honest, practical answers in 2-3 sentences
-- Be specific to the neighborhood when possible
-- Don't sensationalize or sugarcoat
-- If you're unsure about specific details, say so honestly and suggest how the renter can find out
-- Never say "I don't know" without offering a helpful alternative or suggestion
-- Keep it conversational and concise`;
+- Give a specific, honest 2-3 sentence answer based on the real data above
+- Reference actual numbers, scores, and place names from the data
+- NEVER say "check local forums" or give vague advice like "visit the area" or "look it up online"
+- If crime data is available, use it honestly — don't sensationalize but don't sugarcoat
+- If Walk Score is available, reference it to characterize walkability
+- For cities where crime data isn't available, use Walk Score and amenity data and be transparent: "Based on walkability and amenity data for this area..."
+- Keep it conversational and concise
+- If asked about something the data doesn't cover, give your best informed answer based on the neighborhood characteristics shown in the data, and be upfront about what you're inferring vs what you know`;
+
+    try {
+      const anthropic = new Anthropic({ apiKey });
 
       const messages: { role: 'user' | 'assistant'; content: string }[] = [
         ...(conversationHistory || []),
@@ -129,8 +290,9 @@ RULES:
       const reply = response.content[0].type === 'text' ? response.content[0].text : '';
 
       if (!reply) {
-        const fallback = buildFallbackAnswer(question, neighborhoodName, cityName);
-        return new Response(JSON.stringify({ reply: fallback }), {
+        return new Response(JSON.stringify({
+          reply: `For ${neighborhoodName || 'this area'}: ${dataContext.split('\n')[0]}. Feel free to ask me a more specific question.`,
+        }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
@@ -141,8 +303,9 @@ RULES:
 
     } catch (claudeError) {
       console.error('Claude API error in neighborhood-chat:', claudeError);
-      const fallback = buildFallbackAnswer(question, neighborhoodName, cityName);
-      return new Response(JSON.stringify({ reply: fallback }), {
+      return new Response(JSON.stringify({
+        reply: `Based on data for ${neighborhoodName || 'this area'}: ${dataContext.split('\n')[0]}. I'm having trouble with a detailed analysis right now, but feel free to try again.`,
+      }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -150,7 +313,7 @@ RULES:
   } catch (error) {
     console.error('neighborhood-chat error:', error);
     return new Response(JSON.stringify({
-      reply: 'I couldn\'t look that up right now, but you can check Google Maps or local forums for neighborhood-specific info.',
+      reply: 'I ran into an issue looking that up. Try asking again in a moment.',
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

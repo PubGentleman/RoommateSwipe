@@ -1,0 +1,83 @@
+PROMPT: Fix iOS Spinner Pickers — Remove All Dropdown Boxes
+The budget pickers are still showing as ugly dropdown boxes instead of iOS spinner wheels. Find every file that has a budget or price picker and make these exact changes:
+
+Find every instance of <Picker> or any dropdown/select component used for price or budget selection
+Replace ALL of them with this exact implementation:
+
+tsximport { Picker } from '@react-native-picker/picker';
+
+<View style={{ flexDirection: 'row', justifyContent: 'space-around' }}>
+  <View style={{ flex: 1, alignItems: 'center' }}>
+    <Text style={{ color: '#888', fontSize: 12, marginBottom: 4 }}>MIN</Text>
+    <Picker
+      selectedValue={minBudget}
+      onValueChange={(val) => setMinBudget(val)}
+      style={{ width: '100%', color: '#FFFFFF', backgroundColor: 'transparent' }}
+      itemStyle={{ color: '#FFFFFF', fontSize: 16, backgroundColor: 'transparent' }}
+      mode="dropdown"
+    >
+      {MIN_OPTIONS.map(opt => (
+        <Picker.Item key={opt} label={`$${opt.toLocaleString()}`} value={opt} color="#FFFFFF" />
+      ))}
+    </Picker>
+  </View>
+
+  <Text style={{ color: '#888', alignSelf: 'center' }}>—</Text>
+
+  <View style={{ flex: 1, alignItems: 'center' }}>
+    <Text style={{ color: '#888', fontSize: 12, marginBottom: 4 }}>MAX</Text>
+    <Picker
+      selectedValue={maxBudget}
+      onValueChange={(val) => setMaxBudget(val)}
+      style={{ width: '100%', color: '#FFFFFF', backgroundColor: 'transparent' }}
+      itemStyle={{ color: '#FFFFFF', fontSize: 16, backgroundColor: 'transparent' }}
+      mode="dropdown"
+    >
+      {MAX_OPTIONS.map(opt => (
+        <Picker.Item key={opt} label={opt === 10000 ? '$10,000+' : `$${opt.toLocaleString()}`} value={opt} color="#FFFFFF" />
+      ))}
+    </Picker>
+  </View>
+</View>
+
+Use these exact option arrays everywhere:
+
+tsxconst MIN_OPTIONS = [500, 750, 1000, 1250, 1500, 1750, 2000, 2500, 3000, 3500, 4000, 4500, 5000];
+const MAX_OPTIONS = [1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 7000, 8000, 10000];
+
+On iOS specifically, wrap the Picker in this container to force the spinner wheel style:
+
+tsximport { Platform } from 'react-native';
+
+{Platform.OS === 'ios' ? (
+  <Picker
+    selectedValue={value}
+    onValueChange={setValue}
+    style={{ height: 150, backgroundColor: 'transparent' }}
+    itemStyle={{ color: '#FFFFFF', fontSize: 16, height: 150 }}
+  >
+    {OPTIONS.map(opt => (
+      <Picker.Item key={opt} label={`$${opt.toLocaleString()}`} value={opt} />
+    ))}
+  </Picker>
+) : (
+  <Picker
+    selectedValue={value}
+    onValueChange={setValue}
+    style={{ color: '#FFFFFF', backgroundColor: '#1C1C1E' }}
+  >
+    {OPTIONS.map(opt => (
+      <Picker.Item key={opt} label={`$${opt.toLocaleString()}`} value={opt} color="#FFFFFF" />
+    ))}
+  </Picker>
+)}
+
+Apply this fix to ALL of these screens:
+
+Roommate filter screen budget pickers
+Onboarding preferences step budget pickers
+Explore/listing filter screen price pickers
+Any other screen with a price or budget picker
+
+
+Make sure the selected min value never exceeds max and vice versa — auto-correct if needed
