@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, Modal, ActivityIndicator } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,6 +8,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { useStripePayment } from '../../hooks/useStripePayment';
 import { useRevenueCat } from '../../contexts/RevenueCatContext';
+import { getHostPlans, HostType } from '../../constants/hostPlansByType';
 
 const BG = '#111111';
 const CARD_BG = '#1a1a1a';
@@ -79,71 +80,25 @@ const RENTER_PLANS: PlanOption[] = [
   },
 ];
 
-const HOST_PLANS: PlanOption[] = [
-  {
-    id: 'free',
-    name: 'Host Free',
-    monthlyPrice: 0,
-    threeMonthPrice: 0,
-    annualPrice: 0,
-    isFree: true,
-    features: [
-      { text: '1 active listing', included: true },
-      { text: 'Basic inquiry management', included: true },
-      { text: 'Standard placement in search', included: true },
-      { text: 'Renter group browsing', included: false },
-      { text: 'AI assistant', included: false },
-      { text: 'Listing boosts', included: false },
-      { text: 'Verified host badge', included: false },
-    ],
-  },
-  {
-    id: 'starter',
-    name: 'Host Starter',
-    monthlyPrice: 19.99,
-    threeMonthPrice: 53.97,
-    annualPrice: 191.88,
-    features: [
-      { text: '1 active listing', included: true },
-      { text: 'Renter group browsing', included: true },
-      { text: 'AI assistant (host modes)', included: true },
-      { text: '1 free 24-hr boost/mo', included: true },
-      { text: 'Verified host badge', included: true },
-    ],
-  },
-  {
-    id: 'pro',
-    name: 'Host Pro',
-    monthlyPrice: 49.99,
-    threeMonthPrice: 134.97,
-    annualPrice: 479.88,
-    badge: 'MOST POPULAR',
-    badgeColor: ACCENT,
-    features: [
-      { text: 'Up to 5 active listings', included: true },
-      { text: 'Priority placement in search', included: true },
-      { text: '2 free 72-hr boosts/mo', included: true },
-      { text: 'Advanced analytics dashboard', included: true },
-      { text: '3 simultaneous boosts', included: true },
-    ],
-  },
-  {
-    id: 'business',
-    name: 'Host Business',
-    monthlyPrice: 99,
-    threeMonthPrice: 267.30,
-    annualPrice: 948.00,
-    badge: 'BEST VALUE',
-    badgeColor: GOLD,
-    features: [
-      { text: 'Up to 15 listings (+$5 overage)', included: true },
-      { text: '2 free 7-day boosts/mo', included: true },
-      { text: '10 simultaneous boosts', included: true },
-      { text: 'Full analytics suite', included: true },
-      { text: 'Priority support', included: true },
-    ],
-  },
-];
+function buildHostPlans(hostType: HostType): PlanOption[] {
+  const tiers = getHostPlans(hostType);
+  return tiers.map((tier, idx) => {
+    const isFree = tier.monthlyPrice === 0 && !tier.isContactSales;
+    const isLast = idx === tiers.length - 1;
+    return {
+      id: tier.id,
+      name: tier.name,
+      monthlyPrice: tier.monthlyPrice,
+      threeMonthPrice: tier.threeMonthPrice,
+      annualPrice: tier.annualPrice,
+      isFree: isFree || undefined,
+      badge: tier.recommended ? 'MOST POPULAR' : (isLast && !tier.isContactSales ? 'BEST VALUE' : undefined),
+      badgeColor: tier.recommended ? ACCENT : (isLast && !tier.isContactSales ? GOLD : undefined),
+      isContactSales: tier.isContactSales,
+      features: tier.features.map(f => ({ text: f.label, included: f.included })),
+    } as PlanOption;
+  });
+}
 
 const getPrice = (plan: PlanOption, cycle: BillingCycle): number => {
   if (cycle === 'monthly') return plan.monthlyPrice;
@@ -171,7 +126,8 @@ export const PlanSelectionScreen = () => {
   const [processing, setProcessing] = useState(false);
 
   const isHost = user?.role === 'host';
-  const plans = isHost ? HOST_PLANS : RENTER_PLANS;
+  const hostType = (user?.hostType as HostType) ?? 'individual';
+  const plans = useMemo(() => isHost ? buildHostPlans(hostType) : RENTER_PLANS, [isHost, hostType]);
 
   const handleSelectPlan = (planId: string) => {
     setSelectedPlanId(planId);
@@ -205,7 +161,7 @@ export const PlanSelectionScreen = () => {
     } catch {}
 
     try {
-      const stripePlan = isHost ? `host_${planId}` : planId;
+      const stripePlan = planId;
       const { success, subscriptionId } = await processPayment(user.id, user.email || '', stripePlan, billingCycle);
 
       if (!success) {
@@ -215,9 +171,7 @@ export const PlanSelectionScreen = () => {
       }
 
       if (isHost) {
-        if (planId === 'starter') await upgradeHostPlan('starter', billingCycle);
-        else if (planId === 'pro') await upgradeHostPlan('pro', billingCycle);
-        else if (planId === 'business') await upgradeHostPlan('business', billingCycle);
+        await upgradeHostPlan(planId, billingCycle);
       } else {
         if (planId === 'plus') await upgradeToPlus(billingCycle, subscriptionId);
         else if (planId === 'elite') await upgradeToElite(billingCycle, subscriptionId);

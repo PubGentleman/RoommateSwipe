@@ -1,0 +1,79 @@
+Paste this into Replit:
+
+---
+
+**Fix: PlanSelectionScreen showing wrong plans for agents and companies**
+
+There are 3 bugs to fix in `screens/shared/PlanSelectionScreen.tsx`:
+
+**Bug 1 — Load plans based on hostType, not just role**
+
+Replace the hardcoded `HOST_PLANS` local array and this line:
+```typescript
+const isHost = user?.role === 'host';
+const plans = isHost ? HOST_PLANS : RENTER_PLANS;
+```
+
+With dynamic plan loading based on `hostType`:
+```typescript
+import { getHostPlans, getHostPlanDisplay, HostType } from '../../constants/hostPlansByType';
+
+const isHost = user?.role === 'host';
+const hostType = (user?.hostType as HostType) ?? 'individual';
+const plans = isHost ? getHostPlans(hostType) : RENTER_PLANS;
+```
+
+Remove the entire local `HOST_PLANS` array from this file — it is no longer needed. The plans now come from `hostPlansByType.ts` which already has the correct individual, agent, and company tiers.
+
+---
+
+**Bug 2 — Fix handleConfirmPlan to handle all host plan IDs**
+
+Replace the current plan mapping block:
+```typescript
+if (isHost) {
+  if (planId === 'starter') await upgradeHostPlan('starter', billingCycle);
+  else if (planId === 'pro') await upgradeHostPlan('pro', billingCycle);
+  else if (planId === 'business') await upgradeHostPlan('business', billingCycle);
+}
+```
+
+With a single dynamic call that handles all plan IDs including agent and company:
+```typescript
+if (isHost) {
+  await upgradeHostPlan(planId, billingCycle);
+}
+```
+
+Also fix the Stripe plan ID passed to `processPayment`:
+```typescript
+const stripePlan = isHost ? planId : planId;
+```
+Just pass `planId` directly — agent/company plan IDs like `agent_starter`, `agent_pro`, `company_starter`, `company_pro` are already the correct Stripe plan identifiers.
+
+---
+
+**Bug 3 — Fix price mismatch on Individual Host Business plan**
+
+In `constants/hostPlansByType.ts`, the business plan has `monthlyPrice: 99`. In `constants/purchaseConfig.ts` and `utils/hostPricing.ts` it says `$99.99`. Standardize all three files to use **$99.99** for the Individual Host Business plan monthly price.
+
+In `hostPlansByType.ts` update:
+```typescript
+monthlyPrice: 99.99,
+threeMonthPrice: 269.97,
+annualPrice: 959.88,
+```
+
+In `hostPricing.ts` update:
+```typescript
+business: {
+  price: 99.99,
+  ...
+}
+```
+
+In `purchaseConfig.ts` the business plan already says `$99.99` so no change needed there.
+
+---
+
+No DB changes needed. No new migrations needed.

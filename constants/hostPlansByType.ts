@@ -94,9 +94,9 @@ const INDIVIDUAL_PLANS: HostPlanTier[] = [
   {
     id: 'business',
     name: 'Host Business',
-    monthlyPrice: 99,
-    threeMonthPrice: 267.30,
-    annualPrice: 948.00,
+    monthlyPrice: 99.99,
+    threeMonthPrice: 269.97,
+    annualPrice: 959.88,
     monthlyNote: 'Up to 15 listings, bulk tools & priority support',
     features: [
       { label: 'Up to 15 active listings', included: true },
