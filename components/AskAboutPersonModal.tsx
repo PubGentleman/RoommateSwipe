@@ -101,7 +101,7 @@ export function AskAboutPersonModal({
       }
 
       const response = await fetch(
-        `${SUPABASE_URL}/functions/v1/ai-ask-about-profile`,
+        `${SUPABASE_URL}/functions/v1/match-chat`,
         {
           method: 'POST',
           headers: {
@@ -109,8 +109,8 @@ export function AskAboutPersonModal({
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            targetProfileId,
-            userMessage: messageText,
+            question: messageText,
+            matchedUserId: targetProfileId,
             conversationHistory,
             entryPoint,
           }),

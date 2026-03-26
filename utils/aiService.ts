@@ -85,7 +85,7 @@ export async function sendAIMessage(
   if (!session) throw new Error('Not authenticated');
 
   const response = await fetch(
-    `${supabaseUrl}/functions/v1/ai-assistant`,
+    `${supabaseUrl}/functions/v1/ai-match-assistant`,
     {
       method: 'POST',
       headers: {
