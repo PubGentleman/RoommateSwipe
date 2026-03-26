@@ -36,7 +36,7 @@ export const WhyThisMatchModal: React.FC<Props> = ({
     setError(null);
     try {
       const response = await supabase.functions.invoke('explain-match', {
-        body: { targetProfileId: profileId },
+        body: { matchedProfileId: profileId, targetProfileId: profileId },
       });
       if (response.error) throw new Error(response.error.message);
       setResult(response.data);
