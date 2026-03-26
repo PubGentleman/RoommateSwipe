@@ -1,11 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, StyleSheet, Modal, Pressable, ScrollView, Platform, Text } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
 import { Feather } from './VectorIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemedText } from './ThemedText';
 import { Spacing, BorderRadius } from '../constants/theme';
 import { dispatchInsightTrigger } from '../utils/insightRefresh';
+import {
+  PricePickerPair,
+  STANDARD_MIN_OPTIONS,
+  STANDARD_MAX_OPTIONS,
+  STANDARD_MAX_VALUE,
+  formatPriceDisplay,
+  normalizeToOption,
+} from './PricePicker';
 
 const ACCENT = '#ff6b5b';
 const FILTERS_KEY = 'rhome_match_filters';
@@ -20,44 +27,18 @@ export interface MatchFilters {
   minCompatibility: number;
 }
 
+const BUDGET_MIN = 500;
+const BUDGET_MAX = 10000;
+
 export const DEFAULT_FILTERS: MatchFilters = {
-  budgetMin: 500,
-  budgetMax: 5001,
+  budgetMin: BUDGET_MIN,
+  budgetMax: STANDARD_MAX_VALUE,
   moveInDate: null,
   roomTypes: [],
   lifestyle: [],
   searchRadius: 5,
   minCompatibility: 0,
 };
-
-const BUDGET_MIN = 500;
-const BUDGET_MAX = 5000;
-
-const MIN_BUDGET_OPTIONS = [
-  { label: '$500', value: 500 },
-  { label: '$750', value: 750 },
-  { label: '$1,000', value: 1000 },
-  { label: '$1,250', value: 1250 },
-  { label: '$1,500', value: 1500 },
-  { label: '$1,750', value: 1750 },
-  { label: '$2,000', value: 2000 },
-  { label: '$2,500', value: 2500 },
-  { label: '$3,000', value: 3000 },
-  { label: '$3,500', value: 3500 },
-];
-
-const MAX_BUDGET_OPTIONS = [
-  { label: '$1,000', value: 1000 },
-  { label: '$1,500', value: 1500 },
-  { label: '$2,000', value: 2000 },
-  { label: '$2,500', value: 2500 },
-  { label: '$3,000', value: 3000 },
-  { label: '$3,500', value: 3500 },
-  { label: '$4,000', value: 4000 },
-  { label: '$4,500', value: 4500 },
-  { label: '$5,000', value: 5000 },
-  { label: '$5,000+', value: 5001 },
-];
 
 const MOVE_IN_OPTIONS = [
   { label: 'ASAP', value: 'asap' },
@@ -90,7 +71,7 @@ const COMPATIBILITY_OPTIONS = [
 
 export const getActiveFilterCount = (filters: MatchFilters): number => {
   let count = 0;
-  if (filters.budgetMin > BUDGET_MIN || filters.budgetMax <= BUDGET_MAX) count++;
+  if (filters.budgetMin > BUDGET_MIN || filters.budgetMax < STANDARD_MAX_VALUE) count++;
   if (filters.moveInDate) count++;
   if (filters.roomTypes.length > 0) count += filters.roomTypes.length;
   if (filters.lifestyle.length > 0) count += filters.lifestyle.length;
@@ -101,9 +82,8 @@ export const getActiveFilterCount = (filters: MatchFilters): number => {
 
 export const getActiveFilterChips = (filters: MatchFilters): { label: string; key: string }[] => {
   const chips: { label: string; key: string }[] = [];
-  if (filters.budgetMin > BUDGET_MIN || filters.budgetMax <= BUDGET_MAX) {
-    const maxLabel = filters.budgetMax > BUDGET_MAX ? '$5,000+' : `$${filters.budgetMax.toLocaleString()}`;
-    chips.push({ label: `$${filters.budgetMin.toLocaleString()}-${maxLabel}`, key: 'budget' });
+  if (filters.budgetMin > BUDGET_MIN || filters.budgetMax < STANDARD_MAX_VALUE) {
+    chips.push({ label: `${formatPriceDisplay(filters.budgetMin)}-${formatPriceDisplay(filters.budgetMax)}`, key: 'budget' });
   }
   if (filters.moveInDate) {
     const label = MOVE_IN_OPTIONS.find(o => o.value === filters.moveInDate)?.label || filters.moveInDate;
@@ -125,7 +105,7 @@ export const removeFilterChip = (filters: MatchFilters, key: string): MatchFilte
   const updated = { ...filters };
   if (key === 'budget') {
     updated.budgetMin = BUDGET_MIN;
-    updated.budgetMax = 5001;
+    updated.budgetMax = STANDARD_MAX_VALUE;
   } else if (key === 'moveIn') {
     updated.moveInDate = null;
   } else if (key.startsWith('room-')) {
@@ -140,31 +120,18 @@ export const removeFilterChip = (filters: MatchFilters, key: string): MatchFilte
   return updated;
 };
 
-const normalizeToPickerValue = (val: number, options: { value: number }[]): number => {
-  let closest = options[0].value;
-  let minDiff = Math.abs(val - closest);
-  for (const opt of options) {
-    const diff = Math.abs(val - opt.value);
-    if (diff < minDiff) {
-      minDiff = diff;
-      closest = opt.value;
-    }
-  }
-  return closest;
-};
-
 export const loadSavedFilters = async (): Promise<MatchFilters> => {
   try {
     const saved = await AsyncStorage.getItem(FILTERS_KEY);
     if (saved) {
       const parsed = { ...DEFAULT_FILTERS, ...JSON.parse(saved) };
-      parsed.budgetMin = normalizeToPickerValue(parsed.budgetMin, MIN_BUDGET_OPTIONS);
+      parsed.budgetMin = normalizeToOption(parsed.budgetMin, STANDARD_MIN_OPTIONS);
       parsed.budgetMax = parsed.budgetMax > BUDGET_MAX
-        ? 5001
-        : normalizeToPickerValue(parsed.budgetMax, MAX_BUDGET_OPTIONS);
+        ? STANDARD_MAX_VALUE
+        : normalizeToOption(parsed.budgetMax, STANDARD_MAX_OPTIONS);
       if (parsed.budgetMax <= parsed.budgetMin) {
-        const nextMax = MAX_BUDGET_OPTIONS.find(o => o.value > parsed.budgetMin);
-        parsed.budgetMax = nextMax ? nextMax.value : 5001;
+        const nextMax = STANDARD_MAX_OPTIONS.find(o => o.value > parsed.budgetMin);
+        parsed.budgetMax = nextMax ? nextMax.value : STANDARD_MAX_VALUE;
       }
       return parsed;
     }
@@ -181,8 +148,8 @@ export const saveFilters = async (filters: MatchFilters) => {
 
 export const applyFiltersToProfiles = (profiles: any[], filters: MatchFilters): any[] => {
   return profiles.filter(p => {
-    if (filters.budgetMin > BUDGET_MIN || filters.budgetMax <= BUDGET_MAX) {
-      if (p.budget && (p.budget < filters.budgetMin || (filters.budgetMax <= BUDGET_MAX && p.budget > filters.budgetMax))) return false;
+    if (filters.budgetMin > BUDGET_MIN || filters.budgetMax < STANDARD_MAX_VALUE) {
+      if (p.budget && (p.budget < filters.budgetMin || (filters.budgetMax < STANDARD_MAX_VALUE && p.budget > filters.budgetMax))) return false;
     }
     if (filters.moveInDate && p.preferences?.moveInDate) {
       const profileDate = new Date(p.preferences.moveInDate);
@@ -261,20 +228,13 @@ export const RoommateFilterSheet: React.FC<Props> = ({ visible, onClose, onApply
     }
   };
 
-  const availableMaxOptions = MAX_BUDGET_OPTIONS.filter(o => o.value > filters.budgetMin);
-
   const handleMinChange = useCallback((val: number) => {
-    setFilters(f => {
-      const newMax = f.budgetMax <= val ? (availableMaxOptions.find(o => o.value > val)?.value || val + 500) : f.budgetMax;
-      return { ...f, budgetMin: val, budgetMax: newMax };
-    });
-  }, [availableMaxOptions]);
+    setFilters(f => ({ ...f, budgetMin: val }));
+  }, []);
 
   const handleMaxChange = useCallback((val: number) => {
     setFilters(f => ({ ...f, budgetMax: val }));
   }, []);
-
-  const formatBudgetDisplay = (val: number) => val > 5000 ? '$5,000+' : `$${val.toLocaleString()}`;
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -293,52 +253,18 @@ export const RoommateFilterSheet: React.FC<Props> = ({ visible, onClose, onApply
 
           <View style={s.section}>
             <SectionLabel icon="dollar-sign" title="Budget Range" />
-            <ThemedText style={s.budgetDisplay}>
-              {formatBudgetDisplay(filters.budgetMin)} — {formatBudgetDisplay(filters.budgetMax)}/mo
-            </ThemedText>
-            <View style={s.pickerRow}>
-              <View style={s.pickerColumn}>
-                <ThemedText style={s.pickerLabel}>Min</ThemedText>
-                <View style={s.pickerWrap}>
-                  <Picker
-                    selectedValue={filters.budgetMin}
-                    onValueChange={handleMinChange}
-                    style={s.picker}
-                    itemStyle={s.pickerItem}
-                  >
-                    {MIN_BUDGET_OPTIONS.map(opt => (
-                      <Picker.Item key={opt.value} label={opt.label} value={opt.value} color={Platform.OS === 'web' ? '#ffffff' : undefined} />
-                    ))}
-                  </Picker>
-                  <View style={s.selectionBand} pointerEvents="none" />
-                </View>
-              </View>
-              <View style={s.dashSeparator}>
-                <ThemedText style={s.dashText}>{'\u2014'}</ThemedText>
-              </View>
-              <View style={s.pickerColumn}>
-                <ThemedText style={s.pickerLabel}>Max</ThemedText>
-                <View style={s.pickerWrap}>
-                  <Picker
-                    selectedValue={filters.budgetMax}
-                    onValueChange={handleMaxChange}
-                    style={s.picker}
-                    itemStyle={s.pickerItem}
-                  >
-                    {availableMaxOptions.map(opt => (
-                      <Picker.Item key={opt.value} label={opt.label} value={opt.value} color={Platform.OS === 'web' ? '#ffffff' : undefined} />
-                    ))}
-                  </Picker>
-                  <View style={s.selectionBand} pointerEvents="none" />
-                </View>
-              </View>
-            </View>
+            <PricePickerPair
+              minValue={filters.budgetMin}
+              maxValue={filters.budgetMax}
+              onMinChange={handleMinChange}
+              onMaxChange={handleMaxChange}
+            />
             <View style={s.budgetPresets}>
               {[
                 { label: '$500-$1,000', min: 500, max: 1000 },
                 { label: '$1,000-$2,000', min: 1000, max: 2000 },
                 { label: '$2,000-$3,500', min: 2000, max: 3500 },
-                { label: '$3,500+', min: 3500, max: 5001 },
+                { label: '$3,500+', min: 3500, max: STANDARD_MAX_VALUE },
               ].map(preset => {
                 const isActive = filters.budgetMin === preset.min && filters.budgetMax === preset.max;
                 return (
@@ -565,63 +491,6 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 0,
-  },
-  budgetDisplay: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: ACCENT,
-    marginBottom: 12,
-  },
-  pickerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  pickerColumn: {
-    flex: 1,
-  },
-  pickerLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.5)',
-    textAlign: 'center',
-    marginBottom: 6,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  pickerWrap: {
-    backgroundColor: '#111111',
-    borderRadius: 14,
-    overflow: 'hidden',
-    height: 140,
-    justifyContent: 'center',
-  },
-  picker: {
-    width: '100%',
-    height: 140,
-    backgroundColor: 'transparent',
-    color: '#ffffff',
-  },
-  pickerItem: {
-    color: '#ffffff',
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  selectionBand: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: '50%',
-    height: 36,
-    marginTop: -18,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 8,
-  },
-  dashSeparator: {
-    width: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 22,
   },
   dashText: {
     fontSize: 18,

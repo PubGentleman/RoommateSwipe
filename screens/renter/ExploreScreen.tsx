@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, Image, Pressable, FlatList, Modal, TextInput, ScrollView, Switch, ActivityIndicator, KeyboardAvoidingView, Platform, Dimensions } from 'react-native';
+import { PricePickerPair, STANDARD_MAX_VALUE } from '../../components/PricePicker';
 import Animated, { useSharedValue, useAnimatedScrollHandler, useAnimatedStyle, interpolate, Extrapolation } from 'react-native-reanimated';
 import { Feather } from '../../components/VectorIcons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -1430,37 +1431,13 @@ export const ExploreScreen = () => {
             </View>
 
             <Text style={styles.fmSectionTitle}>Budget Range</Text>
-            <View style={styles.fmBudgetRow}>
-              <View style={styles.fmBudgetBox}>
-                <Text style={styles.fmBudgetLabel}>Min</Text>
-                <TextInput
-                  style={styles.fmBudgetValue}
-                  placeholder="$0"
-                  placeholderTextColor="rgba(255,255,255,0.3)"
-                  keyboardType="numeric"
-                  value={tempFilters.minPrice ? `$${tempFilters.minPrice}` : ''}
-                  onChangeText={text => {
-                    const num = text.replace(/[^0-9]/g, '');
-                    setTempFilters({ ...tempFilters, minPrice: num ? parseInt(num) : undefined });
-                  }}
-                />
-              </View>
-              <Text style={styles.fmBudgetDash}>—</Text>
-              <View style={styles.fmBudgetBox}>
-                <Text style={styles.fmBudgetLabel}>Max</Text>
-                <TextInput
-                  style={styles.fmBudgetValue}
-                  placeholder="$5000"
-                  placeholderTextColor="rgba(255,255,255,0.3)"
-                  keyboardType="numeric"
-                  value={tempFilters.maxPrice ? `$${tempFilters.maxPrice}` : ''}
-                  onChangeText={text => {
-                    const num = text.replace(/[^0-9]/g, '');
-                    setTempFilters({ ...tempFilters, maxPrice: num ? parseInt(num) : undefined });
-                  }}
-                />
-              </View>
-            </View>
+            <PricePickerPair
+              minValue={tempFilters.minPrice || 500}
+              maxValue={tempFilters.maxPrice || STANDARD_MAX_VALUE}
+              onMinChange={val => setTempFilters(prev => ({ ...prev, minPrice: val > 500 ? val : undefined }))}
+              onMaxChange={val => setTempFilters(prev => ({ ...prev, maxPrice: val < STANDARD_MAX_VALUE ? val : undefined }))}
+              height={120}
+            />
 
             <Text style={styles.fmSectionTitle}>Rooms</Text>
             <View style={styles.fmRoomsRow}>

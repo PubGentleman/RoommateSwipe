@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, StyleSheet, Pressable, Image, ScrollView, ActivityIndicator } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
+import { SinglePricePicker, RENT_OPTIONS, DEPOSIT_OPTIONS, formatPriceDisplay, normalizeToOption } from '../../components/PricePicker';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { ScreenKeyboardAwareScrollView } from '../../components/ScreenKeyboardAwareScrollView';
 import { ThemedText } from '../../components/ThemedText';
@@ -59,8 +60,8 @@ export const CreateEditListingScreen = () => {
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [price, setPrice] = useState('');
-  const [securityDeposit, setSecurityDeposit] = useState('');
+  const [price, setPrice] = useState(2000);
+  const [securityDeposit, setSecurityDeposit] = useState(0);
   const [bedrooms, setBedrooms] = useState(1);
   const [bathrooms, setBathrooms] = useState(1);
   const [sqft, setSqft] = useState('');
@@ -131,7 +132,7 @@ export const CreateEditListingScreen = () => {
 
     setTitle(prop.title);
     setDescription(prop.description);
-    setPrice(prop.price.toString());
+    setPrice(normalizeToOption(prop.price || 2000, RENT_OPTIONS));
     setBedrooms(prop.bedrooms);
     setBathrooms(prop.bathrooms);
     setSqft(prop.sqft.toString());
@@ -163,7 +164,8 @@ export const CreateEditListingScreen = () => {
     if (descParts.length > 1) {
       setDescription(descParts[0]);
       const afterDeposit = descParts[1].split('\n\nHouse Rules:');
-      setSecurityDeposit(afterDeposit[0].trim().replace('$', ''));
+      const depVal = parseInt(afterDeposit[0].trim().replace('$', '').replace(/,/g, ''));
+      setSecurityDeposit(isNaN(depVal) ? 0 : normalizeToOption(depVal, DEPOSIT_OPTIONS));
       if (afterDeposit.length > 1) {
         setHouseRules(afterDeposit[1].trim());
       }
@@ -224,7 +226,7 @@ export const CreateEditListingScreen = () => {
       await showAlert({ title: 'Required', message: 'Please enter a title', variant: 'warning' });
       return;
     }
-    if (!price.trim() || isNaN(Number(price))) {
+    if (!price || price <= 0) {
       await showAlert({ title: 'Required', message: 'Please enter a valid price', variant: 'warning' });
       return;
     }
@@ -269,8 +271,8 @@ export const CreateEditListingScreen = () => {
     setSaving(true);
     try {
       let fullDescription = description.trim();
-      if (securityDeposit.trim()) {
-        fullDescription += `\n\nSecurity Deposit: $${securityDeposit.trim()}`;
+      if (securityDeposit > 0) {
+        fullDescription += `\n\nSecurity Deposit: $${securityDeposit.toLocaleString()}`;
       }
       if (houseRules.trim()) {
         fullDescription += `\n\nHouse Rules: ${houseRules.trim()}`;
@@ -308,7 +310,7 @@ export const CreateEditListingScreen = () => {
       const supaData: any = {
         title: title.trim(),
         description: fullDescription,
-        rent: Number(price),
+        rent: price,
         bedrooms,
         bathrooms,
         host_lives_in: hostLivesIn,
@@ -347,7 +349,7 @@ export const CreateEditListingScreen = () => {
           id: propertyId || `prop_${Date.now()}`,
           title: title.trim(),
           description: fullDescription,
-          price: Number(price),
+          price: price,
           bedrooms,
           bathrooms,
           sqft: Number(sqft) || 0,
@@ -436,7 +438,7 @@ export const CreateEditListingScreen = () => {
   const completionFields = [
     title.trim(),
     description.trim(),
-    price.trim(),
+    price > 0 ? String(price) : '',
     city.trim(),
     address.trim(),
     availableDate,
@@ -588,31 +590,23 @@ export const CreateEditListingScreen = () => {
         <View style={styles.row}>
           <View style={[styles.fieldContainer, { flex: 1, marginRight: Spacing.sm }]}>
             <ThemedText style={styles.label}>Price/month</ThemedText>
-            <View style={styles.inputWithPrefix}>
-              <ThemedText style={styles.inputPrefix}>$</ThemedText>
-              <TextInput
-                style={styles.inputInner}
-                value={price}
-                onChangeText={setPrice}
-                placeholder="2500"
-                placeholderTextColor="#666"
-                keyboardType="numeric"
-              />
-            </View>
+            <ThemedText style={styles.priceDisplay}>{formatPriceDisplay(price)}</ThemedText>
+            <SinglePricePicker
+              value={price}
+              onChange={setPrice}
+              options={RENT_OPTIONS}
+              height={130}
+            />
           </View>
           <View style={[styles.fieldContainer, { flex: 1, marginLeft: Spacing.sm }]}>
             <ThemedText style={styles.label}>Security Deposit</ThemedText>
-            <View style={styles.inputWithPrefix}>
-              <ThemedText style={styles.inputPrefix}>$</ThemedText>
-              <TextInput
-                style={styles.inputInner}
-                value={securityDeposit}
-                onChangeText={setSecurityDeposit}
-                placeholder="2500"
-                placeholderTextColor="#666"
-                keyboardType="numeric"
-              />
-            </View>
+            <ThemedText style={styles.priceDisplay}>{securityDeposit === 0 ? 'None' : formatPriceDisplay(securityDeposit)}</ThemedText>
+            <SinglePricePicker
+              value={securityDeposit}
+              onChange={setSecurityDeposit}
+              options={DEPOSIT_OPTIONS}
+              height={130}
+            />
           </View>
         </View>
 
@@ -1227,6 +1221,13 @@ const styles = StyleSheet.create({
     color: '#555',
     textAlign: 'right',
     marginTop: 4,
+  },
+  priceDisplay: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FF6B6B',
+    textAlign: 'center',
+    marginBottom: 4,
   },
   inputWithPrefix: {
     flexDirection: 'row',

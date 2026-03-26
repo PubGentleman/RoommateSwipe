@@ -2,16 +2,18 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
+  TextInput,
   StyleSheet,
   Pressable,
-  TextInput,
   Modal,
   ActivityIndicator,
   Platform,
+  ScrollView,
 } from 'react-native';
 import { Feather } from './VectorIcons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Haptics from 'expo-haptics';
+import { SinglePricePicker, RENT_OPTIONS, DEPOSIT_OPTIONS, formatPriceDisplay, normalizeToOption } from './PricePicker';
 
 const LEASE_OPTIONS = [
   { value: 'month-to-month', label: 'Month-to-Month' },
@@ -43,8 +45,8 @@ export const BookingOfferModal: React.FC<BookingOfferModalProps> = ({
 }) => {
   const [moveInDate, setMoveInDate] = useState<Date>(new Date(Date.now() + 30 * 86400000));
   const [leaseLength, setLeaseLength] = useState('12 months');
-  const [rent, setRent] = useState(defaultRent.toString());
-  const [deposit, setDeposit] = useState((defaultRent * 2).toString());
+  const [rent, setRent] = useState(() => normalizeToOption(defaultRent || 2000, RENT_OPTIONS));
+  const [deposit, setDeposit] = useState(() => normalizeToOption((defaultRent || 2000) * 2, DEPOSIT_OPTIONS));
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -54,17 +56,15 @@ export const BookingOfferModal: React.FC<BookingOfferModalProps> = ({
 
   const handleSubmit = async () => {
     if (submitting) return;
-    const rentVal = parseFloat(rent);
-    const depositVal = parseFloat(deposit);
-    if (isNaN(rentVal) || rentVal <= 0) return;
+    if (!rent || rent <= 0) return;
     setSubmitting(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       await onSubmit({
         moveInDate: moveInDate.toISOString().split('T')[0],
         leaseLength,
-        monthlyRent: rentVal,
-        securityDeposit: isNaN(depositVal) ? 0 : depositVal,
+        monthlyRent: rent,
+        securityDeposit: deposit,
         note: note.trim(),
       });
       setNote('');
@@ -79,6 +79,7 @@ export const BookingOfferModal: React.FC<BookingOfferModalProps> = ({
       <View style={s.sheet}>
         <View style={s.handle} />
         <Text style={s.title}>Send Booking Offer</Text>
+        <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled>
 
         <Text style={s.label}>Property</Text>
         <View style={s.readOnlyField}>
@@ -123,31 +124,23 @@ export const BookingOfferModal: React.FC<BookingOfferModalProps> = ({
         <View style={s.moneyRow}>
           <View style={s.moneyField}>
             <Text style={s.label}>Monthly Rent</Text>
-            <View style={s.moneyInput}>
-              <Text style={s.dollarSign}>$</Text>
-              <TextInput
-                style={s.moneyTextInput}
-                value={rent}
-                onChangeText={setRent}
-                keyboardType="numeric"
-                placeholder="0"
-                placeholderTextColor="rgba(255,255,255,0.3)"
-              />
-            </View>
+            <Text style={s.moneyDisplay}>{formatPriceDisplay(rent)}</Text>
+            <SinglePricePicker
+              value={rent}
+              onChange={setRent}
+              options={RENT_OPTIONS}
+              height={120}
+            />
           </View>
           <View style={s.moneyField}>
             <Text style={s.label}>Security Deposit</Text>
-            <View style={s.moneyInput}>
-              <Text style={s.dollarSign}>$</Text>
-              <TextInput
-                style={s.moneyTextInput}
-                value={deposit}
-                onChangeText={setDeposit}
-                keyboardType="numeric"
-                placeholder="0"
-                placeholderTextColor="rgba(255,255,255,0.3)"
-              />
-            </View>
+            <Text style={s.moneyDisplay}>{deposit === 0 ? 'None' : formatPriceDisplay(deposit)}</Text>
+            <SinglePricePicker
+              value={deposit}
+              onChange={setDeposit}
+              options={DEPOSIT_OPTIONS}
+              height={120}
+            />
           </View>
         </View>
 
@@ -169,6 +162,7 @@ export const BookingOfferModal: React.FC<BookingOfferModalProps> = ({
             <Text style={s.submitBtnText}>Send Booking Offer</Text>
           )}
         </Pressable>
+        </ScrollView>
       </View>
     </Modal>
   );
@@ -215,13 +209,10 @@ const s = StyleSheet.create({
   leaseChipTextActive: { color: '#ff6b5b', fontWeight: '600' },
   moneyRow: { flexDirection: 'row', gap: 12 },
   moneyField: { flex: 1 },
-  moneyInput: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 12,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 12,
+  moneyDisplay: {
+    fontSize: 16, fontWeight: '700', color: '#FF6B6B',
+    textAlign: 'center', marginBottom: 6,
   },
-  dollarSign: { fontSize: 16, color: 'rgba(255,255,255,0.4)', marginRight: 4 },
-  moneyTextInput: { flex: 1, color: '#FFFFFF', fontSize: 16, paddingVertical: 12 },
   textInput: {
     backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)', borderRadius: 12,
