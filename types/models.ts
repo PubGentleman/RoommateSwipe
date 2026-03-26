@@ -265,6 +265,8 @@ export interface Message {
   timestamp: Date;
   read?: boolean;
   readAt?: Date;
+  message_type?: string;
+  metadata?: Record<string, any>;
 }
 
 export interface Conversation {

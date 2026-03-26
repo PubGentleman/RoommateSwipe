@@ -875,6 +875,12 @@ export const ExploreScreen = () => {
                 <Text style={styles.ratingBadgeCount}>({item.review_count})</Text>
               </View>
             ) : null}
+            {(item.average_rating || 0) >= 4.8 && (item.review_count || 0) >= 10 ? (
+              <View style={styles.rhomeSelectBadge}>
+                <Feather name="award" size={10} color="#D4AF37" />
+                <Text style={styles.rhomeSelectText}>Rhome Select</Text>
+              </View>
+            ) : null}
           </View>
         </View>
         <View style={styles.cardDetails}>
@@ -1676,6 +1682,13 @@ export const ExploreScreen = () => {
                           </View>
                         ) : null}
                       </View>
+                      {(selectedProperty.average_rating || 0) >= 4.8 && (selectedProperty.review_count || 0) >= 10 ? (
+                        <View style={styles.rhomeSelectDetailBadge}>
+                          <Feather name="award" size={14} color="#D4AF37" />
+                          <Text style={styles.rhomeSelectDetailText}>Rhome Select Host</Text>
+                          <Text style={styles.rhomeSelectDetailSubtext}>Top-rated, trusted host on Rhome</Text>
+                        </View>
+                      ) : null}
 
                       {detailShowMatch && detailCompatibility !== null ? (
                         <Pressable
@@ -3854,6 +3867,47 @@ const styles = StyleSheet.create({
   ratingBadgeCount: {
     fontSize: 10,
     color: 'rgba(255,215,0,0.7)',
+  },
+  rhomeSelectBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(212,175,55,0.12)',
+    borderColor: 'rgba(212,175,55,0.3)',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  rhomeSelectText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#D4AF37',
+    letterSpacing: 0.3,
+  },
+  rhomeSelectDetailBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(212,175,55,0.08)',
+    borderColor: 'rgba(212,175,55,0.2)',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    flexWrap: 'wrap',
+  },
+  rhomeSelectDetailText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#D4AF37',
+    flex: 1,
+  },
+  rhomeSelectDetailSubtext: {
+    fontSize: 12,
+    color: 'rgba(212,175,55,0.7)',
+    width: '100%',
+    marginLeft: 22,
   },
   pdReviewsHeader: {
     flexDirection: 'row',

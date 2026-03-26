@@ -82,6 +82,51 @@ export async function sendMessage(matchId: string, content: string) {
   return data;
 }
 
+export async function sendStructuredMessage(
+  matchId: string,
+  messageType: string,
+  metadata: Record<string, any>,
+  displayContent: string
+) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { data, error } = await supabase
+    .from('messages')
+    .insert({
+      match_id: matchId,
+      sender_id: user.id,
+      content: displayContent,
+      message_type: messageType,
+      metadata,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function updateMessageMetadata(
+  messageId: string,
+  metadataUpdates: Record<string, any>
+) {
+  const { data: existing } = await supabase
+    .from('messages')
+    .select('metadata')
+    .eq('id', messageId)
+    .single();
+
+  const merged = { ...(existing?.metadata || {}), ...metadataUpdates };
+
+  const { error } = await supabase
+    .from('messages')
+    .update({ metadata: merged })
+    .eq('id', messageId);
+
+  if (error) throw error;
+}
+
 export async function markMessagesAsRead(matchId: string) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;

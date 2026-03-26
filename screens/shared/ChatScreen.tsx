@@ -27,6 +27,11 @@ import { dispatchInsightTrigger } from '../../utils/insightRefresh';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import MeetupSuggestionCard from '../../components/MeetupSuggestionCard';
 import { AskAboutPersonModal } from '../../components/AskAboutPersonModal';
+import { ChatActionCard } from '../../components/ChatActionCard';
+import { VisitRequestModal } from '../../components/VisitRequestModal';
+import { BookingOfferModal } from '../../components/BookingOfferModal';
+import { sendStructuredMessage, updateMessageMetadata } from '../../services/messageService';
+import { createBooking } from '../../services/bookingService';
 
 type ChatScreenProps = {
   route: {
@@ -75,6 +80,10 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [meetupSuggestion, setMeetupSuggestion] = useState<any>(null);
   const [suggestionDismissed, setSuggestionDismissed] = useState(false);
   const [leakageDetected, setLeakageDetected] = useState(false);
+  const [showChatActions, setShowChatActions] = useState(false);
+  const [showVisitModal, setShowVisitModal] = useState(false);
+  const [showBookingModal, setShowBookingModal] = useState(false);
+  const [cardActionLoading, setCardActionLoading] = useState<string | null>(null);
 
   const [inquiryStatus, setInquiryStatus] = useState<'pending' | 'accepted' | 'declined'>(
     inquiryGroup?.inquiryStatus || inquiryGroup?.inquiry_status || 'pending'
@@ -306,6 +315,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           timestamp: new Date(newMsg.created_at),
           read: newMsg.read || false,
           readAt: newMsg.read_at ? new Date(newMsg.read_at) : undefined,
+          message_type: newMsg.message_type || 'text',
+          metadata: newMsg.metadata || undefined,
         };
         setMessages(prev => [...prev, mapped]);
         setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
@@ -429,6 +440,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             timestamp: new Date(msg.created_at),
             read: msg.read || false,
             readAt: msg.read_at ? new Date(msg.read_at) : undefined,
+            message_type: msg.message_type || 'text',
+            metadata: msg.metadata || undefined,
           }));
           loadedFromSupabase = true;
           try { markSupabaseMessagesAsRead(matchIdFromConversation); } catch (_e) {}
@@ -701,6 +714,172 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     });
   };
 
+  const handleSendVisitRequest = async (data: { proposedDate: string; proposedTime: string; note: string }) => {
+    if (!user) return;
+    const address = addressRevealed
+      ? (inquiryGroup?.listingAddress || 'Address pending')
+      : (inquiryGroup?.listingAddress?.split(',').slice(-2).join(',').trim() || 'Address pending');
+    try {
+      const metadata = {
+        proposed_date: data.proposedDate,
+        proposed_time: data.proposedTime,
+        note: data.note,
+        address,
+        listing_id: inquiryGroup?.listingId,
+        status: 'pending',
+        sender_name: user.name || 'User',
+      };
+      const displayContent = `Visit request for ${address} on ${data.proposedDate}`;
+      let dbId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+      try {
+        const result = await sendStructuredMessage(
+          matchIdFromConversation || conversationId,
+          'visit_request',
+          metadata,
+          displayContent
+        );
+        if (result?.id) dbId = result.id;
+      } catch (_e) {}
+      const newMsg: Message = {
+        id: dbId,
+        senderId: user.id,
+        text: displayContent,
+        content: displayContent,
+        timestamp: new Date(),
+        read: false,
+        message_type: 'visit_request',
+        metadata,
+      };
+      setMessages(prev => [...prev, newMsg]);
+      setShowVisitModal(false);
+    } catch (err) {
+      console.error('Failed to send visit request:', err);
+      await alert({ title: 'Error', message: 'Failed to send visit request. Please try again.' });
+    }
+  };
+
+  const handleSendBookingOffer = async (data: {
+    moveInDate: string; leaseLength: string; monthlyRent: number; securityDeposit: number; note: string;
+  }) => {
+    if (!user) return;
+    const address = inquiryGroup?.listingAddress || 'Property';
+    try {
+      const metadata = {
+        move_in_date: data.moveInDate,
+        lease_length: data.leaseLength,
+        monthly_rent: data.monthlyRent,
+        security_deposit: data.securityDeposit,
+        note: data.note,
+        address,
+        listing_id: inquiryGroup?.listingId,
+        status: 'pending',
+        sender_name: user.name || 'Host',
+      };
+      const displayContent = `Booking offer: $${data.monthlyRent}/mo, move-in ${data.moveInDate}`;
+      let dbId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+      try {
+        const result = await sendStructuredMessage(
+          matchIdFromConversation || conversationId,
+          'booking_offer',
+          metadata,
+          displayContent
+        );
+        if (result?.id) dbId = result.id;
+      } catch (_e) {}
+      const newMsg: Message = {
+        id: dbId,
+        senderId: user.id,
+        text: displayContent,
+        content: displayContent,
+        timestamp: new Date(),
+        read: false,
+        message_type: 'booking_offer',
+        metadata,
+      };
+      setMessages(prev => [...prev, newMsg]);
+      setShowBookingModal(false);
+    } catch (err) {
+      console.error('Failed to send booking offer:', err);
+      await alert({ title: 'Error', message: 'Failed to send booking offer. Please try again.' });
+    }
+  };
+
+  const handleConfirmVisit = async (messageId: string) => {
+    setCardActionLoading(messageId);
+    try {
+      await updateMessageMetadata(messageId, { status: 'confirmed' });
+      setMessages(prev => prev.map(m =>
+        m.id === messageId ? { ...m, metadata: { ...(m as any).metadata, status: 'confirmed' } } : m
+      ));
+    } catch (err) {
+      console.error('Failed to confirm visit:', err);
+    } finally {
+      setCardActionLoading(null);
+    }
+  };
+
+  const handleDeclineVisit = async (messageId: string) => {
+    setCardActionLoading(messageId);
+    try {
+      await updateMessageMetadata(messageId, { status: 'declined' });
+      setMessages(prev => prev.map(m =>
+        m.id === messageId ? { ...m, metadata: { ...(m as any).metadata, status: 'declined' } } : m
+      ));
+    } catch (err) {
+      console.error('Failed to decline visit:', err);
+    } finally {
+      setCardActionLoading(null);
+    }
+  };
+
+  const handleProposeNewTime = (messageId: string, _metadata: any) => {
+    setShowVisitModal(true);
+  };
+
+  const handleAcceptBooking = async (messageId: string, metadata: any) => {
+    setCardActionLoading(messageId);
+    try {
+      if (metadata.listing_id && inquiryGroup?.hostId) {
+        const bookingResult = await createBooking({
+          listingId: metadata.listing_id,
+          hostId: inquiryGroup.hostId,
+          renterId: user?.id || '',
+          moveInDate: metadata.move_in_date,
+          leaseLength: metadata.lease_length,
+          monthlyRent: metadata.monthly_rent,
+          securityDeposit: metadata.security_deposit || null,
+        });
+        if (!bookingResult.success) {
+          await alert({ title: 'Error', message: bookingResult.error || 'Failed to create booking.' });
+          return;
+        }
+      }
+      await updateMessageMetadata(messageId, { status: 'accepted' });
+      setMessages(prev => prev.map(m =>
+        m.id === messageId ? { ...m, metadata: { ...(m as any).metadata, status: 'accepted' } } : m
+      ));
+    } catch (err) {
+      console.error('Failed to accept booking:', err);
+      await alert({ title: 'Error', message: 'Something went wrong. Please try again.' });
+    } finally {
+      setCardActionLoading(null);
+    }
+  };
+
+  const handleDeclineBooking = async (messageId: string) => {
+    setCardActionLoading(messageId);
+    try {
+      await updateMessageMetadata(messageId, { status: 'declined' });
+      setMessages(prev => prev.map(m =>
+        m.id === messageId ? { ...m, metadata: { ...(m as any).metadata, status: 'declined' } } : m
+      ));
+    } catch (err) {
+      console.error('Failed to decline booking:', err);
+    } finally {
+      setCardActionLoading(null);
+    }
+  };
+
   const renderMessage = ({ item }: { item: Message }) => {
     if (item.senderId === 'system' || item.senderId === null || (item as any).is_system_message) {
       return (
@@ -711,6 +890,23 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         </View>
       );
     }
+
+    const msgType = (item as any).message_type;
+    if (msgType === 'visit_request' || msgType === 'booking_offer') {
+      return (
+        <ChatActionCard
+          message={item}
+          currentUserId={user?.id || ''}
+          onConfirmVisit={handleConfirmVisit}
+          onDeclineVisit={handleDeclineVisit}
+          onProposeNewTime={handleProposeNewTime}
+          onAcceptBooking={handleAcceptBooking}
+          onDeclineBooking={handleDeclineBooking}
+          actionLoading={cardActionLoading}
+        />
+      );
+    }
+
     const isOwnMessage = item.senderId === user?.id;
     const showReadReceipt = isOwnMessage && isEliteUser();
     const isRead = item.readAt || item.read;
@@ -1280,6 +1476,14 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         </View>
       ) : null}
       <View style={[styles.inputContainer, { backgroundColor: theme.backgroundRoot, paddingBottom: TAB_BAR_HEIGHT }]}>
+        {isInquiryChat && inquiryStatus === 'accepted' ? (
+          <Pressable
+            onPress={() => setShowChatActions(true)}
+            style={[styles.chatActionBtn, { backgroundColor: theme.backgroundSecondary }]}
+          >
+            <Feather name="plus" size={22} color="#ff6b5b" />
+          </Pressable>
+        ) : null}
         <TextInput
           style={[
             styles.input,
@@ -1381,6 +1585,67 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           compatibilityScore={otherUser.compatibility}
         />
       ) : null}
+
+      <Modal visible={showChatActions} transparent animationType="fade" onRequestClose={() => setShowChatActions(false)}>
+        <Pressable style={styles.menuOverlay} onPress={() => setShowChatActions(false)}>
+          <View style={[styles.menuSheet, { backgroundColor: theme.backgroundSecondary }]}>
+            <View style={[styles.menuHandle, { backgroundColor: theme.border }]} />
+            <Pressable
+              style={[styles.menuItem, { borderBottomColor: theme.border }]}
+              onPress={() => { setShowChatActions(false); setShowVisitModal(true); }}
+            >
+              <View style={[styles.menuIconCircle, { backgroundColor: 'rgba(255,107,91,0.15)' }]}>
+                <Feather name="home" size={18} color="#ff6b5b" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <ThemedText style={[Typography.body, { fontWeight: '600' }]}>Schedule Visit</ThemedText>
+                <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
+                  Request a tour of this property
+                </ThemedText>
+              </View>
+            </Pressable>
+            {isHost ? (
+              <Pressable
+                style={[styles.menuItem, { borderBottomColor: theme.border }]}
+                onPress={() => { setShowChatActions(false); setShowBookingModal(true); }}
+              >
+                <View style={[styles.menuIconCircle, { backgroundColor: 'rgba(255,215,0,0.15)' }]}>
+                  <Feather name="key" size={18} color="#D4AF37" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <ThemedText style={[Typography.body, { fontWeight: '600' }]}>Send Booking Offer</ThemedText>
+                  <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
+                    Offer a lease to this renter
+                  </ThemedText>
+                </View>
+              </Pressable>
+            ) : null}
+            <Pressable
+              style={styles.menuCancelBtn}
+              onPress={() => setShowChatActions(false)}
+            >
+              <ThemedText style={[Typography.body, { color: theme.textSecondary, textAlign: 'center' }]}>Cancel</ThemedText>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      <VisitRequestModal
+        visible={showVisitModal}
+        onClose={() => setShowVisitModal(false)}
+        onSubmit={handleSendVisitRequest}
+        address={addressRevealed
+          ? (inquiryGroup?.listingAddress || 'Address pending')
+          : (inquiryGroup?.listingAddress?.split(',').slice(-2).join(',').trim() || 'Address pending')}
+      />
+
+      <BookingOfferModal
+        visible={showBookingModal}
+        onClose={() => setShowBookingModal(false)}
+        onSubmit={handleSendBookingOffer}
+        address={inquiryGroup?.listingAddress || 'Property'}
+        defaultRent={inquiryGroup?.listingPrice || 0}
+      />
 
       <Modal visible={showDailyLimitModal} transparent animationType="fade" onRequestClose={() => setShowDailyLimitModal(false)}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
@@ -1805,5 +2070,13 @@ const styles = StyleSheet.create({
     marginTop: Spacing.lg,
     paddingVertical: 14,
     borderRadius: 14,
+  },
+  chatActionBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
   },
 });

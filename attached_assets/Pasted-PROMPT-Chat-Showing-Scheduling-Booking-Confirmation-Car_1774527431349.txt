@@ -1,0 +1,104 @@
+PROMPT: Chat Showing Scheduling, Booking Confirmation Cards & Rhome Select Badge
+We need to add two types of action cards into the chat system, plus a "Rhome Select" prestige badge for top hosts. Do not change the existing chat UI layout, message bubbles, or any other part of the app.
+
+PART 1 — CHAT ACTION MENU
+In the existing chat screen (screens/shared/ChatScreen.tsx or equivalent), add two new buttons to the chat input toolbar area (next to the send button or in an action menu + button):
+
+"Schedule Visit" — opens a Visit Request modal
+"Send Booking" — opens a Booking Offer modal (host only — only show this button if the current user is the host in this conversation)
+
+
+PART 2 — VISIT REQUEST CARD (Showing)
+When the host or renter taps "Schedule Visit", show a modal to fill in:
+
+Proposed date (date picker)
+Proposed time (time picker)
+Brief note / message (optional text input)
+Address (auto-filled from the listing tied to this conversation, read-only)
+
+On submit, insert a special message into the chat with message_type: 'visit_request' and a JSON payload in the metadata field containing: { listing_id, address, proposed_date, proposed_time, note, status: 'pending', proposed_by: userId }.
+Render this message as a styled card inside the chat (not a plain text bubble):
+┌─────────────────────────────────────┐
+│  🏠  Visit Request                  │
+│  123 Main St, Brooklyn, NY          │
+│  Thursday, April 10 · 2:00 PM       │
+│  "Can we do a quick walkthrough?"   │
+│                                     │
+│  [Confirm]  [Propose New Time]  [Decline] │
+└─────────────────────────────────────┘
+
+If the recipient taps Confirm: update metadata.status to 'confirmed', hide the buttons, show a green "Visit Confirmed ✓" label on the card.
+If they tap Propose New Time: open the same modal pre-filled, sends a new visit_request card with their proposed time (the old card updates to status: 'counter_proposed').
+If they tap Decline: update metadata.status to 'declined', show a gray "Visit Declined" label.
+The sender sees the card but their buttons are disabled while status is pending.
+
+
+PART 3 — BOOKING OFFER CARD
+When the host taps "Send Booking", show a modal to fill in:
+
+Move-in date (date picker)
+Lease length (dropdown: month-to-month, 3 months, 6 months, 12 months)
+Monthly rent (number input, pre-filled from listing price)
+Security deposit (number input)
+Brief note (optional)
+
+On submit, insert a message with message_type: 'booking_offer' and metadata: { listing_id, address, move_in_date, lease_length, monthly_rent, security_deposit, note, status: 'pending' }.
+Render as a styled card:
+┌─────────────────────────────────────┐
+│  🔑  Booking Offer                  │
+│  123 Main St, Apt 4B, Brooklyn NY   │
+│  Move-in: May 1, 2025               │
+│  Lease: 12 months                   │
+│  Rent: $2,400/mo · Deposit: $4,800  │
+│  "Looking forward to having you!"   │
+│                                     │
+│  [Accept Booking]    [Decline]      │
+└─────────────────────────────────────┘
+
+If renter taps Accept Booking:
+
+Update metadata.status to 'accepted'
+Insert a row into a new bookings table:
+
+
+
+sql     CREATE TABLE IF NOT EXISTS public.bookings (
+       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+       listing_id UUID NOT NULL REFERENCES public.properties(id) ON DELETE CASCADE,
+       host_id UUID NOT NULL REFERENCES public.users(id),
+       renter_id UUID NOT NULL REFERENCES public.users(id),
+       move_in_date DATE NOT NULL,
+       lease_length TEXT NOT NULL,
+       monthly_rent NUMERIC NOT NULL,
+       security_deposit NUMERIC,
+       status TEXT NOT NULL DEFAULT 'confirmed' CHECK (status IN ('confirmed','cancelled_by_host','cancelled_by_renter')),
+       cancellation_reason TEXT,
+       cancelled_at TIMESTAMPTZ,
+       created_at TIMESTAMPTZ DEFAULT NOW()
+     );
+
+Show a green "Booking Confirmed ✓" state on the card with a confetti animation (use react-native-confetti-cannon if available, otherwise a simple animated checkmark).
+
+
+If renter taps Decline: update metadata.status to 'declined', show "Booking Declined" on card.
+If host later needs to cancel a confirmed booking: add a "Cancel Booking" button in the host's booking management screen (or long-press the confirmed booking card in chat) — update bookings.status to 'cancelled_by_host', set cancelled_at and optionally cancellation_reason.
+
+
+PART 4 — RHOME SELECT BADGE
+Create a useRhomeSelect(hostId) hook that queries:
+
+users table: created_at (must be 3+ months ago)
+property_reviews table: average_rating >= 4.8 AND review_count >= 10
+messages / bookings table for response rate (replied within 24h on 90%+ of threads in last 30 days)
+bookings table: at least 1 booking with status = 'confirmed' (not cancelled)
+bookings table: host cancellation rate < 10% (cancelled_by_host / total confirmed)
+
+If ALL conditions pass → isRhomeSelect: true.
+Display the badge in these three places:
+
+Listing/Explore card — small gold badge in the top-left corner of the property image: a pill that says ✦ Rhome Select in gold text on a dark semi-transparent background. Do NOT change the existing card layout, size, or any other elements — only overlay this badge.
+Host profile screen — below the host name, show the badge pill plus a one-line description: "This host meets Rhome's highest standards for quality, reliability, and guest experience."
+Listing detail screen — in the host info section, show the badge next to the host's name/avatar.
+
+Badge colors: background #1a1a1a with border rgba(212, 175, 55, 0.4), text color #D4AF37 (gold), font weight 700.
+Do not call it "Superhost", "Premier", or any Airbnb-style name. Always use "Rhome Select".
