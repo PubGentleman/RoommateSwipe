@@ -29,11 +29,13 @@ export const CompanyGroupInviteScreen = () => {
   const [hostInfo, setHostInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [responding, setResponding] = useState(false);
+  const [offline, setOffline] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
       if (!isSupabaseConfigured) {
         setLoading(false);
+        setOffline(true);
         return;
       }
       try {
@@ -45,7 +47,7 @@ export const CompanyGroupInviteScreen = () => {
 
         setListing(listingRes.data);
         setInvite(inviteRes.data);
-        setMembers(membersRes.data?.map((m: any) => m.users) || []);
+        setMembers(membersRes.data?.map((m: any) => Array.isArray(m.users) ? m.users[0] : m.users).filter(Boolean) || []);
 
         if (listingRes.data?.host_id) {
           const { data: hostData } = await supabase
@@ -91,6 +93,20 @@ export const CompanyGroupInviteScreen = () => {
     return (
       <View style={[styles.centered, { backgroundColor: BG }]}>
         <ActivityIndicator size="large" color={ACCENT} />
+      </View>
+    );
+  }
+
+  if (offline) {
+    return (
+      <View style={[styles.centered, { backgroundColor: BG }]}>
+        <Feather name="wifi-off" size={40} color="#555" />
+        <Text style={styles.offlineText}>
+          Connect to Supabase to view property invites.
+        </Text>
+        <Pressable onPress={() => navigation.goBack()} style={styles.offlineBackBtn}>
+          <Text style={styles.offlineBackText}>Go Back</Text>
+        </Pressable>
       </View>
     );
   }
@@ -278,4 +294,24 @@ const styles = StyleSheet.create({
   acceptText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   declineButton: { padding: 14, alignItems: 'center' },
   declineText: { color: '#888', fontSize: 14 },
+  offlineText: {
+    color: '#888',
+    textAlign: 'center',
+    padding: 24,
+    fontSize: 15,
+    lineHeight: 22,
+    marginTop: 12,
+  },
+  offlineBackBtn: {
+    marginTop: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: '#222',
+  },
+  offlineBackText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
 });

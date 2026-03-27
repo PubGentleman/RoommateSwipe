@@ -5,6 +5,8 @@ import {
   Pressable,
   FlatList,
   ActivityIndicator,
+  Image,
+  Text,
 } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -17,6 +19,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Spacing, Typography } from '../../constants/theme';
 import { Property, RoommateProfile } from '../../types/models';
 import { StorageService } from '../../utils/storage';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { mapListingToProperty } from '../../services/listingService';
 import { scoreListing, ListingSuggestion, detectGroupConflicts } from '../../utils/transitMatching';
 import { NEIGHBORHOOD_TRAINS } from '../../constants/transitData';
 import { normalizeRenterPlan, getRenterPlanLimits } from '../../constants/renterPlanLimits';
@@ -37,7 +41,9 @@ export default function GroupApartmentSuggestionsScreen() {
 
   const groupId = route.params?.groupId ?? '';
   const isNewlyComplete = route.params?.isNewlyComplete ?? false;
+  const highlightListingId = route.params?.highlightListingId ?? '';
   const [suggestions, setSuggestions] = useState<ListingSuggestion[]>([]);
+  const [highlightedListing, setHighlightedListing] = useState<Property | null>(null);
   const [loading, setLoading] = useState(true);
   const [members, setMembers] = useState<RoommateProfile[]>([]);
   const [conflicts, setConflicts] = useState<string[]>([]);
@@ -51,52 +57,163 @@ export default function GroupApartmentSuggestionsScreen() {
   const loadSuggestions = async () => {
     setLoading(true);
     try {
-      const groups = await StorageService.getGroups();
-      const group = groups.find((g: any) => g.id === groupId);
-      if (!group) { setLoading(false); return; }
-
-      const profiles = await StorageService.getRoommateProfiles();
-      const memberIds: string[] = (group.members ?? []).map((m: any) =>
-        typeof m === 'string' ? m : (m.userId ?? m.id)
-      );
-      const memberProfiles = profiles.filter((p: RoommateProfile) =>
-        memberIds.includes(p.id)
-      );
-      setMembers(memberProfiles);
-
-      if (memberProfiles.length >= 2) {
-        const conflictResult = detectGroupConflicts(memberProfiles);
-        setConflicts(conflictResult.conflicts);
-        setSharedNeighborhoods(conflictResult.sharedNeighborhoods);
+      if (isSupabaseConfigured) {
+        await loadFromSupabase();
+      } else {
+        await loadFromLocal();
       }
-
-      const allListings = await StorageService.getProperties();
-      const scored = allListings
-        .filter((l: Property) => l.available)
-        .map((l: Property) => scoreListing(l, memberProfiles))
-        .filter((s): s is ListingSuggestion => s !== null && s.totalScore > 20)
-        .sort((a, b) => b.totalScore - a.totalScore)
-        .slice(0, 5);
-
-      setSuggestions(scored);
-
-      const existingVotes = await StorageService.getGroupApartmentVotes(groupId);
-      const voteMap: Record<string, Record<string, string>> = {};
-      for (const v of existingVotes) {
-        if (!voteMap[v.listingId]) voteMap[v.listingId] = {};
-        voteMap[v.listingId][v.userId] = v.vote;
-      }
-      setVotes(voteMap);
     } catch (error) {
       console.error('Error loading suggestions:', error);
+      try {
+        await loadFromLocal();
+      } catch (fallbackErr) {
+        console.error('Fallback also failed:', fallbackErr);
+      }
     }
     setLoading(false);
+  };
+
+  const loadFromSupabase = async () => {
+    const { data: groupData, error: groupErr } = await supabase
+      .from('groups')
+      .select('*, group_members(user_id)')
+      .eq('id', groupId)
+      .single();
+
+    if (groupErr || !groupData) {
+      await loadFromLocal();
+      return;
+    }
+
+    const memberIds: string[] = (groupData.group_members ?? []).map((m: any) => m.user_id);
+
+    const { data: memberData } = await supabase
+      .from('users')
+      .select('*')
+      .in('id', memberIds);
+
+    const memberProfiles: RoommateProfile[] = (memberData || []).map((u: any) => ({
+      id: u.id,
+      name: u.full_name || u.name || 'User',
+      age: u.age,
+      occupation: u.occupation,
+      budget: u.budget,
+      preferredNeighborhoods: u.preferred_neighborhoods || [],
+      commuteDestination: u.commute_destination,
+      requiredTrainLines: u.required_train_lines || [],
+      amenityPreferences: u.amenity_preferences || [],
+      profilePicture: u.avatar_url,
+      photos: u.photos || [],
+    }));
+    setMembers(memberProfiles);
+
+    if (memberProfiles.length >= 2) {
+      const conflictResult = detectGroupConflicts(memberProfiles);
+      setConflicts(conflictResult.conflicts);
+      setSharedNeighborhoods(conflictResult.sharedNeighborhoods);
+    }
+
+    if (highlightListingId) {
+      const { data: hlData } = await supabase
+        .from('listings')
+        .select('*')
+        .eq('id', highlightListingId)
+        .single();
+      if (hlData) {
+        setHighlightedListing(mapListingToProperty(hlData));
+      }
+    }
+
+    const { data: listingsData } = await supabase
+      .from('listings')
+      .select('*')
+      .eq('is_active', true);
+
+    const allListings = (listingsData || []).map((l: any) => mapListingToProperty(l));
+    const scored = allListings
+      .filter((l: Property) => l.available && l.id !== highlightListingId)
+      .map((l: Property) => scoreListing(l, memberProfiles))
+      .filter((s): s is ListingSuggestion => s !== null && s.totalScore > 20)
+      .sort((a, b) => b.totalScore - a.totalScore)
+      .slice(0, 5);
+
+    setSuggestions(scored);
+
+    const { data: voteData } = await supabase
+      .from('group_apartment_votes')
+      .select('*')
+      .eq('group_id', groupId);
+
+    const voteMap: Record<string, Record<string, string>> = {};
+    for (const v of (voteData || [])) {
+      const lid = v.listing_id || v.listingId;
+      const uid = v.user_id || v.userId;
+      if (!voteMap[lid]) voteMap[lid] = {};
+      voteMap[lid][uid] = v.vote;
+    }
+    setVotes(voteMap);
+  };
+
+  const loadFromLocal = async () => {
+    const groups = await StorageService.getGroups();
+    const group = groups.find((g: any) => g.id === groupId);
+    if (!group) return;
+
+    const profiles = await StorageService.getRoommateProfiles();
+    const memberIds: string[] = (group.members ?? []).map((m: any) =>
+      typeof m === 'string' ? m : (m.userId ?? m.id)
+    );
+    const memberProfiles = profiles.filter((p: RoommateProfile) =>
+      memberIds.includes(p.id)
+    );
+    setMembers(memberProfiles);
+
+    if (memberProfiles.length >= 2) {
+      const conflictResult = detectGroupConflicts(memberProfiles);
+      setConflicts(conflictResult.conflicts);
+      setSharedNeighborhoods(conflictResult.sharedNeighborhoods);
+    }
+
+    if (highlightListingId) {
+      const allProps = await StorageService.getProperties();
+      const hl = allProps.find((p: Property) => p.id === highlightListingId);
+      if (hl) setHighlightedListing(hl);
+    }
+
+    const allListings = await StorageService.getProperties();
+    const scored = allListings
+      .filter((l: Property) => l.available && l.id !== highlightListingId)
+      .map((l: Property) => scoreListing(l, memberProfiles))
+      .filter((s): s is ListingSuggestion => s !== null && s.totalScore > 20)
+      .sort((a, b) => b.totalScore - a.totalScore)
+      .slice(0, 5);
+
+    setSuggestions(scored);
+
+    const existingVotes = await StorageService.getGroupApartmentVotes(groupId);
+    const voteMap: Record<string, Record<string, string>> = {};
+    for (const v of existingVotes) {
+      if (!voteMap[v.listingId]) voteMap[v.listingId] = {};
+      voteMap[v.listingId][v.userId] = v.vote;
+    }
+    setVotes(voteMap);
   };
 
   const handleVote = async (listingId: string, vote: 'yes' | 'no' | 'maybe') => {
     if (!user) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await StorageService.submitGroupApartmentVote(groupId, listingId, user.id, vote);
+
+    if (isSupabaseConfigured) {
+      await supabase.from('group_apartment_votes').upsert({
+        group_id: groupId,
+        listing_id: listingId,
+        user_id: user.id,
+        vote,
+      }, { onConflict: 'group_id,listing_id,user_id' });
+    } else {
+      await StorageService.submitGroupApartmentVote(groupId, listingId, user.id, vote);
+    }
+
     setVotes(prev => ({
       ...prev,
       [listingId]: { ...(prev[listingId] ?? {}), [user.id]: vote },
@@ -164,6 +281,127 @@ export default function GroupApartmentSuggestionsScreen() {
           })}
         </View>
       </View>
+    );
+  };
+
+  const renderHighlightedListing = () => {
+    if (!highlightedListing) return null;
+    const myVote = votes[highlightedListing.id]?.[user?.id ?? ''];
+    const yesCount = getVoteCount(highlightedListing.id, 'yes');
+    const noCount = getVoteCount(highlightedListing.id, 'no');
+    const listing = highlightedListing;
+    const scored = scoreListing(listing, members);
+
+    return (
+      <Animated.View entering={FadeInDown.duration(400)}>
+        <View style={styles.highlightBanner}>
+          <Feather name="briefcase" size={14} color={CORAL} />
+          <ThemedText style={styles.highlightBannerText}>
+            Company Selected This For Your Group
+          </ThemedText>
+        </View>
+        <View style={[styles.card, styles.highlightCard]}>
+          {listing.photos?.[0] ? (
+            <Image
+              source={{ uri: listing.photos[0] }}
+              style={styles.highlightPhoto}
+              resizeMode="cover"
+            />
+          ) : null}
+          <View style={styles.cardHeader}>
+            <View style={{ flex: 1 }}>
+              <ThemedText style={styles.cardTitle}>
+                {listing.bedrooms}BR{listing.rooms_available ? ` · ${listing.rooms_available} open` : ''} in {listing.neighborhood ?? listing.city}
+              </ThemedText>
+              <ThemedText style={styles.cardPrice}>
+                ${listing.price?.toLocaleString()}/mo
+              </ThemedText>
+            </View>
+            {scored ? (
+              <View style={styles.scoreBadge}>
+                <ThemedText style={styles.scoreText}>{scored.totalScore}%</ThemedText>
+              </View>
+            ) : null}
+          </View>
+
+          {scored ? (
+            <>
+              <ThemedText style={styles.perPerson}>
+                ${scored.perPersonRent.toLocaleString()}/person
+              </ThemedText>
+              {scored.trainsNearby.length > 0 ? (
+                <View style={styles.trainRow}>
+                  <Feather name="navigation" size={14} color={CORAL} />
+                  <ThemedText style={styles.trainText}>
+                    {scored.trainsNearby.slice(0, 5).join(', ')} train{scored.trainsNearby.length > 1 ? 's' : ''} nearby
+                  </ThemedText>
+                </View>
+              ) : null}
+              <View style={styles.breakdownRow}>
+                <View style={styles.breakdownItem}>
+                  <ThemedText style={styles.breakdownLabel}>Transit</ThemedText>
+                  <ThemedText style={styles.breakdownValue}>{scored.breakdown.trainScore}%</ThemedText>
+                </View>
+                <View style={styles.breakdownItem}>
+                  <ThemedText style={styles.breakdownLabel}>Budget</ThemedText>
+                  <ThemedText style={styles.breakdownValue}>{scored.breakdown.budgetScore}%</ThemedText>
+                </View>
+                <View style={styles.breakdownItem}>
+                  <ThemedText style={styles.breakdownLabel}>Amenities</ThemedText>
+                  <ThemedText style={styles.breakdownValue}>{scored.breakdown.amenityScore}%</ThemedText>
+                </View>
+              </View>
+              <View style={styles.aiReasonBox}>
+                <Feather name="cpu" size={14} color={CORAL} />
+                <ThemedText style={styles.aiReasonText}>{scored.aiReason}</ThemedText>
+              </View>
+            </>
+          ) : null}
+
+          {renterLimits.hasGroupVoting ? (
+            <View style={styles.voteRow}>
+              <Pressable
+                style={[styles.voteBtn, myVote === 'yes' && styles.voteBtnYes]}
+                onPress={() => handleVote(listing.id, 'yes')}
+              >
+                <Feather name="thumbs-up" size={16} color={myVote === 'yes' ? '#fff' : '#888'} />
+                <ThemedText style={[styles.voteLabel, myVote === 'yes' && { color: '#fff' }]}>
+                  {yesCount > 0 ? yesCount.toString() : 'Love it'}
+                </ThemedText>
+              </Pressable>
+              <Pressable
+                style={[styles.voteBtn, myVote === 'maybe' && styles.voteBtnMaybe]}
+                onPress={() => handleVote(listing.id, 'maybe')}
+              >
+                <Feather name="minus" size={16} color={myVote === 'maybe' ? '#fff' : '#888'} />
+                <ThemedText style={[styles.voteLabel, myVote === 'maybe' && { color: '#fff' }]}>
+                  Maybe
+                </ThemedText>
+              </Pressable>
+              <Pressable
+                style={[styles.voteBtn, myVote === 'no' && styles.voteBtnNo]}
+                onPress={() => handleVote(listing.id, 'no')}
+              >
+                <Feather name="thumbs-down" size={16} color={myVote === 'no' ? '#fff' : '#888'} />
+                <ThemedText style={[styles.voteLabel, myVote === 'no' && { color: '#fff' }]}>
+                  {noCount > 0 ? noCount.toString() : 'Not for us'}
+                </ThemedText>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable
+              style={[styles.voteRow, { justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(168,85,247,0.2)', borderRadius: 10 }]}
+              onPress={() => (navigation as any).navigate('Plans')}
+            >
+              <Feather name="lock" size={14} color="rgba(255,255,255,0.3)" />
+              <ThemedText style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginLeft: 6 }}>
+                Group Voting
+              </ThemedText>
+              <PlanBadgeInline plan="Plus" locked />
+            </Pressable>
+          )}
+        </View>
+      </Animated.View>
     );
   };
 
@@ -305,22 +543,25 @@ export default function GroupApartmentSuggestionsScreen() {
                 </ThemedText>
               </Animated.View>
             ) : null}
+            {renderHighlightedListing()}
             {renderConflictBanner()}
             {renderSharedAreas()}
             {suggestions.length > 0 ? (
               <ThemedText style={styles.resultsLabel}>
-                Top {suggestions.length} matches for your group
+                {highlightedListing ? 'More matches for your group' : `Top ${suggestions.length} matches for your group`}
               </ThemedText>
             ) : null}
           </>
         }
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Feather name="search" size={48} color="#444" />
-            <ThemedText style={styles.emptyText}>
-              No matching apartments found. Try adjusting your preferences.
-            </ThemedText>
-          </View>
+          highlightedListing ? null : (
+            <View style={styles.emptyState}>
+              <Feather name="search" size={48} color="#444" />
+              <ThemedText style={styles.emptyText}>
+                No matching apartments found. Try adjusting your preferences.
+              </ThemedText>
+            </View>
+          )
         }
       />
     </View>
@@ -340,6 +581,35 @@ const styles = StyleSheet.create({
     backgroundColor: '#1c1c1c', justifyContent: 'center', alignItems: 'center',
   },
   headerTitle: { fontSize: 17, fontWeight: '700', color: '#fff' },
+  highlightBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255,107,91,0.12)',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.3)',
+  },
+  highlightBannerText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: CORAL,
+    flex: 1,
+  },
+  highlightCard: {
+    borderColor: CORAL + '40',
+    borderWidth: 1.5,
+    marginBottom: Spacing.lg,
+  },
+  highlightPhoto: {
+    width: '100%',
+    height: 160,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
   conflictBanner: {
     backgroundColor: 'rgba(255,184,0,0.1)', borderRadius: 14,
     padding: Spacing.md, marginBottom: Spacing.lg,

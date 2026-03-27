@@ -1,0 +1,192 @@
+# Company Flow Audit — Renter-Side Logic
+
+## The Intended Flow
+
+```
+Company host browses renters
+  → Shortlists candidates
+  → Runs AI pairing for a listing
+  → Sends group invite (company-auto-invite edge function)
+    ↓
+Each group member gets a push notification (company_group_invite)
+  → Taps notification → CompanyGroupInviteScreen
+  → Sees: listing details, match score, AI reason, group members
+  → Taps "View This Apartment"
+    ↓
+GroupApartmentSuggestionsScreen
+  → Group votes on apartments (yes / maybe / no)
+  → Conflict detection, shared neighborhoods
+```
+
+---
+
+## Bug 1 — CRITICAL: `highlightListingId` is passed but never used
+
+**File:** `screens/renter/GroupApartmentSuggestionsScreen.tsx`
+
+`CompanyGroupInviteScreen` (line 79) does:
+```ts
+navigation.replace('GroupApartmentSuggestions', { groupId, highlightListingId: listingId });
+```
+
+But `GroupApartmentSuggestionsScreen` only reads:
+```ts
+const groupId = route.params?.groupId ?? '';
+const isNewlyComplete = route.params?.isNewlyComplete ?? false;
+// highlightListingId is never read
+```
+
+**Impact:** When a renter accepts a company invite for a specific apartment, they land on a generic AI suggestions list. The specific listing the company selected for them is not pinned, not highlighted, and may not even appear in the list (it only shows top 5 by score). The renter has no idea which apartment the company was actually referring to.
+
+**Fix:** Read `highlightListingId` from route params. Fetch that listing directly from Supabase (or StorageService) and pin it at the top of the list with a "Company Selected This For Your Group" banner before the AI suggestions.
+
+---
+
+## Bug 2 — CRITICAL: `GroupApartmentSuggestionsScreen` uses local storage only, not Supabase
+
+**File:** `screens/renter/GroupApartmentSuggestionsScreen.tsx` (lines 54, 58, 73, 83)
+
+All data fetching uses `StorageService`:
+```ts
+const groups = await StorageService.getGroups();        // local only
+const profiles = await StorageService.getRoommateProfiles(); // local only
+const allListings = await StorageService.getProperties(); // local only
+const existingVotes = await StorageService.getGroupApartmentVotes(groupId); // local only
+```
+
+**Impact:** For real Supabase users:
+- The group may not be found → screen shows empty
+- Member profiles won't load → conflict detection and shared neighborhoods fail
+- Listings won't include real Supabase listings → the company-invited listing never appears
+- Votes are stored locally only — each member sees only their own vote, not their teammates' votes. Group voting is completely broken in production.
+
+**Fix:** Replace all `StorageService` calls with Supabase queries:
+- `groups` → `supabase.from('groups').select('*, group_members(...)').eq('id', groupId).single()`
+- `member profiles` → `supabase.from('users').select('*').in('id', memberIds)`
+- `listings` → `supabase.from('listings').select('*').eq('is_active', true)`
+- `votes` → `supabase.from('group_apartment_votes').select('*').eq('group_id', groupId)`
+
+---
+
+## Bug 3 — HIGH: Company property invites are invisible in the Groups tab
+
+**File:** `screens/renter/GroupsScreen.tsx` / `services/groupService.ts`
+
+`getMyPendingInvites()` only queries the `group_invites` table:
+```ts
+supabase.from('group_invites').select(...).eq('invited_user_id', user.id).eq('status', 'pending')
+```
+
+The `company_group_invites` table is **never queried** in the Groups tab. The only discovery path for a company property invite is:
+1. The push notification (easy to miss or dismiss)
+2. Tapping the notification in the Notifications screen
+
+If a user dismisses the notification without tapping it, the company invite disappears from their view permanently — there's no way to find it again from the Groups tab.
+
+**Fix:** Add a second Supabase query to also fetch pending `company_group_invites` for the current user (via their group memberships) and show them as a separate "Property Invites" card section in the My Groups tab — distinct from regular group member invites.
+
+---
+
+## Bug 4 — HIGH: `total_invites_sent` resets to 1 instead of incrementing
+
+**File:** `supabase/functions/company-auto-invite/index.ts` (lines 82–86)
+
+```ts
+await supabase.from('listing_fill_pipeline').upsert({
+  listing_id: listingId,
+  total_invites_sent: 1,   // ← hardcoded to 1, overwrites on every invite
+  last_updated: new Date().toISOString(),
+}, { onConflict: 'listing_id' });
+```
+
+**Impact:** Every time an invite is sent for a listing, the pipeline counter resets to 1 instead of incrementing. A company that sent 10 invites shows `1` in their dashboard.
+
+**Fix:** Use a Postgres RPC increment or raw SQL:
+```ts
+await supabase.rpc('increment_invite_count', { listing_id_param: listingId });
+```
+Or use a Supabase update with arithmetic:
+```ts
+await supabase.from('listing_fill_pipeline')
+  .upsert({ listing_id: listingId, total_invites_sent: 1, last_updated: new Date().toISOString() }, { onConflict: 'listing_id' });
+// Then separately increment:
+await supabase.rpc('increment_column', { table: 'listing_fill_pipeline', column: 'total_invites_sent', row_id: listingId });
+```
+Simplest fix: use a raw Postgres function that does `total_invites_sent = total_invites_sent + 1`.
+
+---
+
+## Bug 5 — MEDIUM: No visual indicator on group cards for pending company invites
+
+**File:** `screens/renter/GroupsScreen.tsx`
+
+When a company sends an invite to a group, the group card in My Groups has no badge, banner, or indicator showing "You have a pending property invite." The group card looks identical to any other group with no pending action.
+
+**Fix:** After fetching `company_group_invites` (Bug 3 fix), check whether any of the user's groups have a pending invite. If so, render a small coral banner at the bottom of that group's card: `🏠 A property manager selected your group`. Tapping the banner navigates to `CompanyGroupInvite`.
+
+---
+
+## Bug 6 — MEDIUM: Member photos may fail in `CompanyGroupInviteScreen`
+
+**File:** `screens/shared/CompanyGroupInviteScreen.tsx` (line 43, 48)
+
+Supabase query:
+```ts
+supabase.from('group_members')
+  .select('user_id, users!group_members_user_id_fkey(full_name, avatar_url)')
+  .eq('group_id', groupId)
+```
+
+Result mapped as:
+```ts
+setMembers(membersRes.data?.map((m: any) => m.users) || []);
+```
+
+Then rendered as `m?.full_name` and `m?.avatar_url`. This works **if** Supabase returns the foreign key join as a single object. But with this join alias syntax, Supabase may return an array, in which case `m?.full_name` would be `undefined`.
+
+**Fix:** Use a safer mapping:
+```ts
+setMembers(membersRes.data?.map((m: any) => Array.isArray(m.users) ? m.users[0] : m.users).filter(Boolean) || []);
+```
+
+---
+
+## Bug 7 — LOW: No offline fallback in `CompanyGroupInviteScreen`
+
+**File:** `screens/shared/CompanyGroupInviteScreen.tsx` (lines 35–38)
+
+```ts
+if (!isSupabaseConfigured) {
+  setLoading(false);
+  return;
+}
+```
+
+Screen renders completely blank if Supabase isn't configured. No message, no fallback.
+
+**Fix:** Show an explanatory empty state:
+```tsx
+if (!isSupabaseConfigured) {
+  return (
+    <View style={styles.centered}>
+      <Text style={{ color: '#888', textAlign: 'center', padding: 24 }}>
+        Connect to Supabase to view property invites.
+      </Text>
+    </View>
+  );
+}
+```
+
+---
+
+## Summary Table
+
+| # | Bug | Severity | File |
+|---|---|---|---|
+| 1 | `highlightListingId` passed but never used — invited listing not shown | 🔴 Critical | `GroupApartmentSuggestionsScreen.tsx` |
+| 2 | All data uses StorageService (local) — Supabase users get empty screen + broken votes | 🔴 Critical | `GroupApartmentSuggestionsScreen.tsx` |
+| 3 | Company invites not shown in Groups tab — disappear if notification dismissed | 🟠 High | `GroupsScreen.tsx` + `groupService.ts` |
+| 4 | `total_invites_sent` resets to 1 instead of incrementing | 🟠 High | `company-auto-invite/index.ts` |
+| 5 | No visual badge on group cards for pending property invites | 🟡 Medium | `GroupsScreen.tsx` |
+| 6 | Member photos may silently fail (Supabase FK join ambiguity) | 🟡 Medium | `CompanyGroupInviteScreen.tsx` |
+| 7 | Blank screen when Supabase not configured — no fallback message | 🟢 Low | `CompanyGroupInviteScreen.tsx` |

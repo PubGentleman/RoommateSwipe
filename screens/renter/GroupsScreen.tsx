@@ -9,7 +9,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { Group, RoommateProfile, GroupType } from '../../types/models';
 import { StorageService } from '../../utils/storage';
-import { getGroups as getGroupsFromSupabase, getMyGroups as getMyGroupsFromSupabase, getMyInquiryGroups as getMyInquiryGroupsFromSupabase, joinGroup as joinGroupSupabase, leaveGroup as leaveGroupSupabase, archiveGroup as archiveGroupSupabase, getMemberLimit, getMyPendingInvites, respondToInvite, joinGroupByCode, updateGroup as updateGroupSupabase } from '../../services/groupService';
+import { getGroups as getGroupsFromSupabase, getMyGroups as getMyGroupsFromSupabase, getMyInquiryGroups as getMyInquiryGroupsFromSupabase, joinGroup as joinGroupSupabase, leaveGroup as leaveGroupSupabase, archiveGroup as archiveGroupSupabase, getMemberLimit, getMyPendingInvites, getMyPendingCompanyInvites, respondToInvite, joinGroupByCode, updateGroup as updateGroupSupabase } from '../../services/groupService';
 import { getMyListings } from '../../services/listingService';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -83,6 +83,7 @@ export const GroupsScreen = () => {
   const [inquiryGroups, setInquiryGroups] = useState<any[]>([]);
   const [showPastInquiries, setShowPastInquiries] = useState(false);
   const [pendingInvites, setPendingInvites] = useState<any[]>([]);
+  const [companyInvites, setCompanyInvites] = useState<any[]>([]);
   const [codeInput, setCodeInput] = useState('');
   const [joiningByCode, setJoiningByCode] = useState(false);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
@@ -111,6 +112,9 @@ export const GroupsScreen = () => {
           .catch(() => {
             StorageService.getPendingGroupInvites(user.id).then(setPendingInvites).catch(() => {});
           });
+        getMyPendingCompanyInvites()
+          .then(setCompanyInvites)
+          .catch(() => setCompanyInvites([]));
       }
       if (user?.role === 'host') {
         getMyListings().catch(() => {});
@@ -993,6 +997,20 @@ export const GroupsScreen = () => {
             ) : null}
           </View>
 
+          {companyInvites.some(ci => ci.groupId === group.id) ? (
+            <Pressable
+              style={styles.companyInviteBadge}
+              onPress={() => {
+                const ci = companyInvites.find(c => c.groupId === group.id);
+                if (ci) navigation.navigate('CompanyGroupInvite', { listingId: ci.listingId, groupId: ci.groupId });
+              }}
+            >
+              <Feather name="briefcase" size={12} color="#ff6b5b" />
+              <Text style={styles.companyInviteBadgeText}>A property manager selected your group</Text>
+              <Feather name="chevron-right" size={12} color="#ff6b5b" />
+            </Pressable>
+          ) : null}
+
           {groupHealthScores[group.id] ? (
             <View style={styles.healthRow}>
               <View style={[styles.healthDot, { backgroundColor: groupHealthScores[group.id].statusColor }]} />
@@ -1102,6 +1120,37 @@ export const GroupsScreen = () => {
           onScroll={grpScrollHandler}
           scrollEventThrottle={16}
         >
+          {companyInvites.length > 0 ? (
+            <View style={styles.invitesSection}>
+              <View style={styles.sectionHeader}>
+                <Feather name="briefcase" size={16} color="#ff6b5b" />
+                <ThemedText style={[Typography.h3, { marginLeft: 8 }]}>Property Invites</ThemedText>
+              </View>
+              {companyInvites.map(ci => (
+                <Pressable
+                  key={ci.id}
+                  style={[styles.inviteCard, { borderLeftWidth: 3, borderLeftColor: '#ff6b5b' }]}
+                  onPress={() => navigation.navigate('CompanyGroupInvite', { listingId: ci.listingId, groupId: ci.groupId })}
+                >
+                  <View style={styles.inviteInfo}>
+                    <Feather name="home" size={16} color="#ff6b5b" />
+                    <View style={{ marginLeft: 10, flex: 1 }}>
+                      <ThemedText style={styles.inviteGroupName}>
+                        {ci.listingBedrooms}BR in {ci.listingNeighborhood || 'Available'}
+                      </ThemedText>
+                      <ThemedText style={styles.inviteFrom}>
+                        ${ci.listingPrice?.toLocaleString()}/mo{ci.matchScore > 0 ? ` · ${ci.matchScore}% match` : ''}
+                      </ThemedText>
+                    </View>
+                  </View>
+                  <View style={{ paddingLeft: 8 }}>
+                    <Feather name="chevron-right" size={18} color="#888" />
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
+
           {pendingInvites.length > 0 ? (
             <View style={styles.invitesSection}>
               <View style={styles.sectionHeader}>
@@ -3264,6 +3313,24 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  companyInviteBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,107,91,0.1)',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.25)',
+  },
+  companyInviteBadgeText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#ff6b5b',
   },
   healthRow: {
     flexDirection: 'row',

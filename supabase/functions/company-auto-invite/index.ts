@@ -77,13 +77,17 @@ serve(async (req) => {
       });
     }
 
-    await supabase
-      .from('listing_fill_pipeline')
-      .upsert({
-        listing_id: listingId,
-        total_invites_sent: 1,
-        last_updated: new Date().toISOString(),
-      }, { onConflict: 'listing_id' });
+    await supabase.rpc('increment_pipeline_invites', { p_listing_id: listingId }).then(async (res) => {
+      if (res.error) {
+        await supabase
+          .from('listing_fill_pipeline')
+          .upsert({
+            listing_id: listingId,
+            total_invites_sent: 1,
+            last_updated: new Date().toISOString(),
+          }, { onConflict: 'listing_id' });
+      }
+    });
 
     return new Response(JSON.stringify({ success: true, notified: memberIds.length }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

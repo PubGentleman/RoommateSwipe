@@ -1,0 +1,562 @@
+# Company Flow Fix Prompts
+
+Run these in order — each builds on the last.
+
+---
+
+## Fix 1 — Pin the company-invited listing + wire `highlightListingId`
+
+**File:** `screens/renter/GroupApartmentSuggestionsScreen.tsx`
+
+### Step 1 — Read `highlightListingId` from route params
+
+Find the existing route param destructuring (around line 38–39):
+```ts
+const groupId = route.params?.groupId ?? '';
+const isNewlyComplete = route.params?.isNewlyComplete ?? false;
+```
+
+Add below it:
+```ts
+const highlightListingId: string | undefined = route.params?.highlightListingId;
+```
+
+### Step 2 — Add state for the pinned (company-selected) listing
+
+After the existing `useState` declarations (around line 40–45), add:
+```ts
+const [pinnedListing, setPinnedListing] = useState<Property | null>(null);
+const [pinnedLoading, setPinnedLoading] = useState(false);
+```
+
+### Step 3 — Fetch the pinned listing when `highlightListingId` is present
+
+Inside `loadSuggestions()`, after setting `setSuggestions(scored)`, add:
+
+```ts
+if (highlightListingId) {
+  setPinnedLoading(true);
+  try {
+    let pinned: Property | null = null;
+    if (isSupabaseConfigured) {
+      const { data } = await supabase
+        .from('listings')
+        .select('*')
+        .eq('id', highlightListingId)
+        .single();
+      pinned = data as Property | null;
+    } else {
+      pinned = allListings.find((l: Property) => l.id === highlightListingId) || null;
+    }
+    setPinnedListing(pinned);
+  } catch (e) {
+    console.error('[GroupSuggestions] Error fetching pinned listing:', e);
+  } finally {
+    setPinnedLoading(false);
+  }
+}
+```
+
+Make sure `supabase` and `isSupabaseConfigured` are imported:
+```ts
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+```
+
+### Step 4 — Render the pinned listing banner above the suggestions list
+
+Inside `renderSuggestion` or as a `ListHeaderComponent` addition, add a `renderPinnedCard()` function:
+
+```tsx
+const renderPinnedCard = () => {
+  if (!highlightListingId) return null;
+  if (pinnedLoading) {
+    return (
+      <View style={styles.pinnedCard}>
+        <ActivityIndicator size="small" color={CORAL} />
+      </View>
+    );
+  }
+  if (!pinnedListing) return null;
+
+  const perPerson = pinnedListing.price
+    ? Math.round(pinnedListing.price / Math.max(1, members.length))
+    : 0;
+
+  return (
+    <View style={styles.pinnedCard}>
+      <View style={styles.pinnedHeader}>
+        <Feather name="zap" size={14} color={CORAL} />
+        <ThemedText style={styles.pinnedLabel}>Property Manager Selected This For Your Group</ThemedText>
+      </View>
+      <ThemedText style={styles.pinnedTitle}>
+        {pinnedListing.bedrooms}BR in {pinnedListing.neighborhood ?? pinnedListing.city}
+      </ThemedText>
+      <ThemedText style={styles.pinnedPrice}>
+        ${pinnedListing.price?.toLocaleString()}/mo · ${perPerson.toLocaleString()}/person
+      </ThemedText>
+      {pinnedListing.address ? (
+        <ThemedText style={styles.pinnedAddress}>{pinnedListing.address}</ThemedText>
+      ) : null}
+    </View>
+  );
+};
+```
+
+Then in `ListHeaderComponent`, add `{renderPinnedCard()}` ABOVE `{renderConflictBanner()}`.
+
+### Step 5 — Add pinned card styles
+
+```ts
+pinnedCard: {
+  backgroundColor: 'rgba(255,107,91,0.1)',
+  borderRadius: 14,
+  padding: 16,
+  marginBottom: 16,
+  borderWidth: 1,
+  borderColor: 'rgba(255,107,91,0.3)',
+},
+pinnedHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 6,
+  marginBottom: 8,
+},
+pinnedLabel: {
+  fontSize: 11,
+  fontWeight: '700',
+  color: CORAL,
+  letterSpacing: 0.3,
+  flex: 1,
+},
+pinnedTitle: {
+  fontSize: 17,
+  fontWeight: '800',
+  color: '#fff',
+  marginBottom: 4,
+},
+pinnedPrice: {
+  fontSize: 14,
+  color: '#aaa',
+  marginBottom: 2,
+},
+pinnedAddress: {
+  fontSize: 12,
+  color: '#666',
+  marginTop: 2,
+},
+```
+
+---
+
+## Fix 2 — Replace StorageService with Supabase in `GroupApartmentSuggestionsScreen`
+
+**File:** `screens/renter/GroupApartmentSuggestionsScreen.tsx`
+
+Replace the entire `loadSuggestions` function body with a Supabase-first version:
+
+```ts
+const loadSuggestions = async () => {
+  setLoading(true);
+  try {
+    let groupData: any = null;
+    let memberIds: string[] = [];
+    let memberProfiles: RoommateProfile[] = [];
+    let allListings: Property[] = [];
+
+    if (isSupabaseConfigured) {
+      // Fetch group + members from Supabase
+      const { data: grp } = await supabase
+        .from('groups')
+        .select('*, group_members(user_id)')
+        .eq('id', groupId)
+        .single();
+      groupData = grp;
+      memberIds = (grp?.group_members ?? []).map((m: any) => m.user_id);
+
+      // Fetch member profiles
+      if (memberIds.length > 0) {
+        const { data: users } = await supabase
+          .from('users')
+          .select('id, full_name, age, avatar_url, profile_data')
+          .in('id', memberIds);
+        // Map Supabase users to RoommateProfile shape
+        memberProfiles = (users || []).map((u: any) => ({
+          id: u.id,
+          name: u.full_name || 'Member',
+          age: u.age || 25,
+          gender: u.profile_data?.gender || 'other',
+          occupation: u.profile_data?.occupation || '',
+          location: u.profile_data?.location || { neighborhood: '', city: '', state: '' },
+          budget: u.profile_data?.budget || 1500,
+          moveInDate: u.profile_data?.moveInDate || '',
+          bio: u.profile_data?.bio || '',
+          interests: u.profile_data?.interests || '',
+          profilePicture: u.avatar_url || '',
+          photos: u.profile_data?.photos || [],
+          preferences: u.profile_data?.preferences || {
+            sleepSchedule: 'flexible', cleanliness: 'moderate', guestPolicy: 'sometimes',
+            noiseTolerance: 'moderate', smoking: 'no', workLocation: 'hybrid',
+            roommateRelationship: 'occasional_hangouts', pets: 'no_pets',
+          },
+        }));
+      }
+
+      // Fetch active listings from Supabase
+      const { data: listings } = await supabase
+        .from('listings')
+        .select('*')
+        .eq('is_active', true)
+        .limit(50);
+      allListings = (listings || []) as Property[];
+
+      // Fetch votes from Supabase
+      const { data: voteRows } = await supabase
+        .from('group_apartment_votes')
+        .select('listing_id, user_id, vote')
+        .eq('group_id', groupId);
+      const voteMap: Record<string, Record<string, string>> = {};
+      for (const v of (voteRows || [])) {
+        if (!voteMap[v.listing_id]) voteMap[v.listing_id] = {};
+        voteMap[v.listing_id][v.user_id] = v.vote;
+      }
+      setVotes(voteMap);
+    } else {
+      // Fallback to local storage
+      const groups = await StorageService.getGroups();
+      const group = groups.find((g: any) => g.id === groupId);
+      if (!group) { setLoading(false); return; }
+      const profiles = await StorageService.getRoommateProfiles();
+      memberIds = (group.members ?? []).map((m: any) => typeof m === 'string' ? m : (m.userId ?? m.id));
+      memberProfiles = profiles.filter((p: RoommateProfile) => memberIds.includes(p.id));
+      allListings = (await StorageService.getProperties()).filter((l: Property) => l.available);
+      const existingVotes = await StorageService.getGroupApartmentVotes(groupId);
+      const voteMap: Record<string, Record<string, string>> = {};
+      for (const v of existingVotes) {
+        if (!voteMap[v.listingId]) voteMap[v.listingId] = {};
+        voteMap[v.listingId][v.userId] = v.vote;
+      }
+      setVotes(voteMap);
+    }
+
+    setMembers(memberProfiles);
+
+    if (memberProfiles.length >= 2) {
+      const conflictResult = detectGroupConflicts(memberProfiles);
+      setConflicts(conflictResult.conflicts);
+      setSharedNeighborhoods(conflictResult.sharedNeighborhoods);
+    }
+
+    const scored = allListings
+      .map((l: Property) => scoreListing(l, memberProfiles))
+      .filter((s): s is ListingSuggestion => s !== null && s.totalScore > 20)
+      .sort((a, b) => b.totalScore - a.totalScore)
+      .slice(0, 5);
+
+    setSuggestions(scored);
+
+    // Fetch pinned listing if company-invited (Fix 1 code goes here)
+    if (highlightListingId) {
+      setPinnedLoading(true);
+      try {
+        let pinned: Property | null = null;
+        if (isSupabaseConfigured) {
+          const { data } = await supabase.from('listings').select('*').eq('id', highlightListingId).single();
+          pinned = data as Property | null;
+        } else {
+          pinned = allListings.find((l: Property) => l.id === highlightListingId) || null;
+        }
+        setPinnedListing(pinned);
+      } catch (e) {
+        console.error('[GroupSuggestions] Pinned listing error:', e);
+      } finally {
+        setPinnedLoading(false);
+      }
+    }
+
+  } catch (error) {
+    console.error('Error loading suggestions:', error);
+  }
+  setLoading(false);
+};
+```
+
+Also update `handleVote` to write to Supabase:
+
+Find:
+```ts
+const handleVote = async (listingId: string, vote: 'yes' | 'no' | 'maybe') => {
+  if (!user) return;
+  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  await StorageService.submitGroupApartmentVote(groupId, listingId, user.id, vote);
+```
+
+Replace with:
+```ts
+const handleVote = async (listingId: string, vote: 'yes' | 'no' | 'maybe') => {
+  if (!user) return;
+  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+  if (isSupabaseConfigured) {
+    await supabase.from('group_apartment_votes').upsert({
+      group_id: groupId,
+      listing_id: listingId,
+      user_id: user.id,
+      vote,
+    }, { onConflict: 'group_id,listing_id,user_id' });
+  } else {
+    await StorageService.submitGroupApartmentVote(groupId, listingId, user.id, vote);
+  }
+```
+
+> Note: The `group_apartment_votes` table needs to exist in Supabase. Add a migration if it doesn't:
+> ```sql
+> CREATE TABLE IF NOT EXISTS public.group_apartment_votes (
+>   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+>   group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+>   listing_id UUID NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+>   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+>   vote TEXT NOT NULL CHECK (vote IN ('yes', 'no', 'maybe')),
+>   created_at TIMESTAMPTZ DEFAULT NOW(),
+>   UNIQUE(group_id, listing_id, user_id)
+> );
+> ALTER TABLE public.group_apartment_votes ENABLE ROW LEVEL SECURITY;
+> CREATE POLICY "Group members can vote" ON public.group_apartment_votes
+>   FOR ALL USING (
+>     EXISTS (SELECT 1 FROM group_members WHERE group_members.group_id = group_apartment_votes.group_id AND group_members.user_id = auth.uid())
+>   );
+> ```
+
+---
+
+## Fix 3 — Show company property invites in the Groups tab
+
+**Files:** `services/groupService.ts` + `screens/renter/GroupsScreen.tsx`
+
+### Step 1 — Add `getMyPendingCompanyInvites()` to `groupService.ts`
+
+At the bottom of `groupService.ts`, add:
+
+```ts
+export async function getMyPendingCompanyInvites(): Promise<{
+  id: string;
+  listingId: string;
+  groupId: string;
+  groupName: string;
+  matchScore: number;
+  aiReason?: string;
+  address?: string;
+  neighborhood?: string;
+  price?: number;
+  bedrooms?: number;
+  companyName?: string;
+}[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  // Find groups the user belongs to
+  const { data: memberRows } = await supabase
+    .from('group_members')
+    .select('group_id')
+    .eq('user_id', user.id);
+
+  const groupIds = (memberRows || []).map((r: any) => r.group_id);
+  if (groupIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from('company_group_invites')
+    .select(`
+      id, listing_id, group_id, match_score, ai_reason, status,
+      listing:listings(address, neighborhood, price, bedrooms),
+      group:groups(name),
+      host:users!company_group_invites_company_host_id_fkey(full_name, company_name)
+    `)
+    .in('group_id', groupIds)
+    .eq('status', 'pending');
+
+  if (error) throw error;
+
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    listingId: row.listing_id,
+    groupId: row.group_id,
+    groupName: row.group?.name || 'Your Group',
+    matchScore: row.match_score || 0,
+    aiReason: row.ai_reason,
+    address: row.listing?.address,
+    neighborhood: row.listing?.neighborhood,
+    price: row.listing?.price,
+    bedrooms: row.listing?.bedrooms,
+    companyName: row.host?.company_name || row.host?.full_name || 'A property manager',
+  }));
+}
+```
+
+### Step 2 — Load company invites in `GroupsScreen.tsx`
+
+Add import:
+```ts
+import { ..., getMyPendingCompanyInvites } from '../../services/groupService';
+```
+
+Add state:
+```ts
+const [pendingCompanyInvites, setPendingCompanyInvites] = useState<any[]>([]);
+```
+
+In the `useFocusEffect` callback, alongside `getMyPendingInvites()`, add:
+```ts
+if (user) {
+  getMyPendingCompanyInvites()
+    .then(setPendingCompanyInvites)
+    .catch(() => {});
+}
+```
+
+### Step 3 — Render company invites as a distinct section
+
+In the My Groups tab scroll view, just ABOVE the existing `pendingInvites.length > 0` block, add:
+
+```tsx
+{pendingCompanyInvites.length > 0 ? (
+  <View style={styles.invitesSection}>
+    <View style={styles.sectionHeader}>
+      <Feather name="home" size={16} color="#ff6b5b" />
+      <ThemedText style={[Typography.h3, { marginLeft: 8 }]}>Property Invites</ThemedText>
+    </View>
+    {pendingCompanyInvites.map(invite => (
+      <Pressable
+        key={invite.id}
+        style={[styles.inviteCard, { borderColor: 'rgba(255,107,91,0.3)', borderWidth: 1 }]}
+        onPress={() => navigation.navigate('CompanyGroupInvite', {
+          listingId: invite.listingId,
+          groupId: invite.groupId,
+        })}
+      >
+        <View style={styles.inviteInfo}>
+          <Feather name="zap" size={16} color="#ff6b5b" />
+          <View style={{ marginLeft: 10, flex: 1 }}>
+            <ThemedText style={styles.inviteGroupName}>
+              {invite.bedrooms}BR in {invite.neighborhood || 'Available Area'}
+            </ThemedText>
+            <ThemedText style={styles.inviteFrom}>
+              {invite.companyName} selected {invite.groupName} · {invite.matchScore}% match
+            </ThemedText>
+            {invite.price ? (
+              <ThemedText style={{ fontSize: 12, color: '#ff6b5b', marginTop: 2 }}>
+                ${invite.price.toLocaleString()}/mo
+              </ThemedText>
+            ) : null}
+          </View>
+          <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.3)" />
+        </View>
+      </Pressable>
+    ))}
+  </View>
+) : null}
+```
+
+---
+
+## Fix 4 — Fix `total_invites_sent` counter
+
+**File:** `supabase/functions/company-auto-invite/index.ts`
+
+Find (lines 80–86):
+```ts
+await supabase
+  .from('listing_fill_pipeline')
+  .upsert({
+    listing_id: listingId,
+    total_invites_sent: 1,
+    last_updated: new Date().toISOString(),
+  }, { onConflict: 'listing_id' });
+```
+
+Replace with:
+```ts
+// First ensure the row exists
+await supabase
+  .from('listing_fill_pipeline')
+  .upsert({
+    listing_id: listingId,
+    total_invites_sent: 0,
+    last_updated: new Date().toISOString(),
+  }, { onConflict: 'listing_id', ignoreDuplicates: true });
+
+// Then increment
+await supabase.rpc('increment_listing_invites', { p_listing_id: listingId });
+```
+
+Add this Postgres function in a new migration file `supabase/migrations/023_increment_invites.sql`:
+```sql
+CREATE OR REPLACE FUNCTION increment_listing_invites(p_listing_id UUID)
+RETURNS void AS $$
+BEGIN
+  UPDATE listing_fill_pipeline
+  SET
+    total_invites_sent = total_invites_sent + 1,
+    last_updated = NOW()
+  WHERE listing_id = p_listing_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+```
+
+---
+
+## Fix 5 — Fix member photo loading in `CompanyGroupInviteScreen`
+
+**File:** `screens/shared/CompanyGroupInviteScreen.tsx`
+
+Find (line 48):
+```ts
+setMembers(membersRes.data?.map((m: any) => m.users) || []);
+```
+
+Replace with:
+```ts
+setMembers(
+  (membersRes.data || [])
+    .map((m: any) => Array.isArray(m.users) ? m.users[0] : m.users)
+    .filter(Boolean)
+);
+```
+
+---
+
+## Fix 6 — Add fallback when Supabase not configured
+
+**File:** `screens/shared/CompanyGroupInviteScreen.tsx`
+
+Find:
+```ts
+if (!isSupabaseConfigured) {
+  setLoading(false);
+  return;
+}
+```
+
+Replace with:
+```ts
+if (!isSupabaseConfigured) {
+  setLoading(false);
+  // Show empty state below — don't return early
+}
+```
+
+Then in the return JSX, just before `<ScrollView>`, add:
+
+```tsx
+if (!loading && !isSupabaseConfigured) {
+  return (
+    <View style={[styles.centered, { backgroundColor: BG, padding: 32 }]}>
+      <Feather name="wifi-off" size={40} color="#444" />
+      <Text style={{ color: '#888', textAlign: 'center', marginTop: 16, fontSize: 15 }}>
+        Connect to Supabase to view property invites from property managers.
+      </Text>
+      <Pressable onPress={() => navigation.goBack()} style={{ marginTop: 24 }}>
+        <Text style={{ color: ACCENT, fontSize: 15 }}>Go Back</Text>
+      </Pressable>
+    </View>
+  );
+}
+```

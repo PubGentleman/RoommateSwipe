@@ -803,6 +803,55 @@ export async function getMyPendingInvites(): Promise<{
   }));
 }
 
+export async function getMyPendingCompanyInvites(): Promise<{
+  id: string;
+  listingId: string;
+  groupId: string;
+  matchScore: number;
+  aiReason: string | null;
+  listingAddress: string;
+  listingNeighborhood: string;
+  listingPrice: number;
+  listingBedrooms: number;
+  createdAt: string;
+}[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: myMemberships } = await supabase
+    .from('group_members')
+    .select('group_id')
+    .eq('user_id', user.id);
+
+  if (!myMemberships?.length) return [];
+
+  const groupIds = myMemberships.map(m => m.group_id);
+
+  const { data, error } = await supabase
+    .from('company_group_invites')
+    .select(`
+      id, listing_id, group_id, match_score, ai_reason, created_at,
+      listings ( address, neighborhood, rent, bedrooms )
+    `)
+    .in('group_id', groupIds)
+    .eq('status', 'pending');
+
+  if (error) throw error;
+
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    listingId: row.listing_id,
+    groupId: row.group_id,
+    matchScore: row.match_score || 0,
+    aiReason: row.ai_reason,
+    listingAddress: row.listings?.address || 'Address not available',
+    listingNeighborhood: row.listings?.neighborhood || '',
+    listingPrice: row.listings?.rent || 0,
+    listingBedrooms: row.listings?.bedrooms || 0,
+    createdAt: row.created_at,
+  }));
+}
+
 // ─── METHOD C: Shareable Invite Code ─────────────────────────────────────────
 
 function generateInviteCode(): string {
