@@ -421,7 +421,7 @@ export const RoommatesScreen = () => {
       setUnfilteredCount(profilesWithCompatibility.length);
       setUnfilteredProfiles(profilesWithCompatibility);
 
-      const filteredProfiles = usedSupabase ? profilesWithCompatibility : applyFiltersToProfiles(profilesWithCompatibility, matchFilters);
+      const filteredProfiles = applyFiltersToProfiles(profilesWithCompatibility, matchFilters);
 
       const userMap = profileUsers.size > 0 ? profileUsers : new Map(allUsers.map((u: any) => [u.id, u]));
 
@@ -498,7 +498,14 @@ export const RoommatesScreen = () => {
     return canSee;
   };
   
-  const isProfileOnline = currentProfile ? Math.random() > 0.5 : false;
+  const isProfileOnline = currentProfile
+    ? (() => {
+        const lastActive = currentProfileUser?.last_active_at || currentProfile?.lastActiveAt;
+        if (!lastActive) return false;
+        const minutesAgo = (Date.now() - new Date(lastActive).getTime()) / 60000;
+        return minutesAgo < 30;
+      })()
+    : false;
 
   const advanceCard = () => {
     InteractionManager.runAfterInteractions(() => {
@@ -1340,7 +1347,7 @@ export const RoommatesScreen = () => {
 
   const handleUpgradeToPaid = () => {
     setShowPaywall(false);
-    (navigation as any).navigate('Payment');
+    (navigation as any).navigate('Plans');
   };
 
 
@@ -1356,7 +1363,7 @@ export const RoommatesScreen = () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } else {
       if (result.message.includes('payment method')) {
-        (navigation as any).navigate('Payment');
+        (navigation as any).navigate('Plans');
         setShowUndoUpgradeModal(false);
       }
     }

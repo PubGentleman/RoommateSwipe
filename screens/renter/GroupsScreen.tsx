@@ -196,7 +196,7 @@ export const GroupsScreen = () => {
           hostId: g.host_id,
           listingAddress: g.listing_address,
           isArchived: g.is_archived || false,
-          memberCount: g.members?.[0]?.count || 0,
+          memberCount: Array.isArray(g.members) ? g.members.length : 0,
           hostName: g.host?.full_name || g.creator?.full_name || 'Host',
           listingPhoto: g.listing?.photos?.[0] || undefined,
           inquiryStatus: g.inquiry_status || 'pending',

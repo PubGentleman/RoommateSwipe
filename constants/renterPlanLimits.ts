@@ -59,7 +59,7 @@ export const RENTER_PLAN_LIMITS: Record<RenterPlan, RenterPlanLimits> = {
     hasAdvancedFilters: true,
     canSeeWhoLiked: true,
     hasVerifiedBadge: true,
-    hasMatchBreakdown: false,
+    hasMatchBreakdown: true,
     hasProfileBoost: false,
     hasPriorityInSearch: false,
     hasReadReceipts: false,

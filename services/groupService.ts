@@ -26,7 +26,7 @@ export async function getGroups(city?: string, type?: GroupType) {
     .from('groups')
     .select(`
       *,
-      members:group_members(user_id, count),
+      members:group_members(user_id),
       creator:users!created_by(id, full_name, avatar_url)
     `)
     .order('created_at', { ascending: false });
@@ -131,7 +131,7 @@ export async function getMyGroups(type?: GroupType) {
     .from('groups')
     .select(`
       *,
-      members:group_members(user_id, count),
+      members:group_members(user_id),
       creator:users!created_by(id, full_name, avatar_url),
       listing:listings(id, title, photos, rent),
       host:users!host_id(id, full_name, avatar_url)
@@ -939,7 +939,7 @@ export async function getGroupWithListing(groupId: string) {
     .from('groups')
     .select(`
       *,
-      members:group_members(user_id, count),
+      members:group_members(user_id),
       listing:listings(id, title, address, city, state, rent, photos)
     `)
     .eq('id', groupId)

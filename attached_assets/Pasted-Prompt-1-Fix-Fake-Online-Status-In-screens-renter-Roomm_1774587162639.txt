@@ -1,0 +1,40 @@
+Prompt 1 — Fix Fake Online Status
+In screens/renter/RoommatesScreen.tsx, find this line:
+javascriptconst isProfileOnline = currentProfile ? Math.random() > 0.5 : false;
+Replace it with:
+javascriptconst isProfileOnline = currentProfile
+  ? (() => {
+      const lastActive = currentProfileUser?.last_active_at || currentProfile?.lastActiveAt;
+      if (!lastActive) return false;
+      const minutesAgo = (Date.now() - new Date(lastActive).getTime()) / 60000;
+      return minutesAgo < 30;
+    })()
+  : false;
+This shows the green dot only if the user was active in the last 30 minutes based on real last_active_at data.
+
+Prompt 2 — Apply All Filters When Using Supabase Deck
+In screens/renter/RoommatesScreen.tsx, find this line:
+javascriptconst filteredProfiles = usedSupabase ? profilesWithCompatibility : applyFiltersToProfiles(profilesWithCompatibility, matchFilters);
+Change it to:
+javascriptconst filteredProfiles = applyFiltersToProfiles(profilesWithCompatibility, matchFilters);
+Always run applyFiltersToProfiles regardless of whether profiles came from Supabase or local storage. This ensures lifestyle, move-in date, search radius, and compatibility filters are always respected.
+
+Prompt 3 — Give Plus Users Basic "Why?" Access
+In constants/renterPlanLimits.ts, find the Plus plan limits and change:
+javascripthasMatchBreakdown: false,
+To:
+javascripthasMatchBreakdown: true,
+Plus users should be able to see the "Why?" match explanation. Elite users already have it. Only free/basic users should see the locked version.
+
+Prompt 4 — Fix Upgrade Navigation Consistency
+In screens/renter/RoommatesScreen.tsx, find every instance of:
+javascriptnavigation.navigate('Payment')
+And replace with:
+javascriptnavigation.navigate('Plans')
+All upgrade prompts across the swipe screen should navigate to 'Plans' not 'Payment'.
+
+Prompt 5 — Lower Photo Minimum to 1
+In services/discoverService.ts, find:
+javascriptconst photos = p.profile?.photos || p.photos || [];
+return Array.isArray(photos) && photos.length >= 3;
+Change >= 3 to >= 1. Requiring 3 photos silently removes new users from the deck. 1 photo minimum is enough to show a profile.

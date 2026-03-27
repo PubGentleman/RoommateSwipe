@@ -40,7 +40,7 @@ export async function getSwipeDeck(city?: string, filters?: {
 
   let profiles = (data || []).filter(p => {
     const photos = p.profile?.photos || p.photos || [];
-    return Array.isArray(photos) && photos.length >= 3;
+    return Array.isArray(photos) && photos.length >= 1;
   });
 
   if (filters?.budgetMin || filters?.budgetMax) {
