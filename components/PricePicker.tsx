@@ -118,7 +118,7 @@ export const PricePickerPair: React.FC<PricePickerPairProps> = ({
                 { height },
                 isAndroid && s.androidPicker,
               ]}
-              itemStyle={[s.item, { height }]}
+              itemStyle={[s.item, { height: 44 }]}
               {...(isAndroid ? { mode: 'dialog' as const } : {})}
               {...(isWeb ? {} : { display: 'spinner' as any })}
             >
@@ -148,7 +148,7 @@ export const PricePickerPair: React.FC<PricePickerPairProps> = ({
                 { height },
                 isAndroid && s.androidPicker,
               ]}
-              itemStyle={[s.item, { height }]}
+              itemStyle={[s.item, { height: 44 }]}
               {...(isAndroid ? { mode: 'dialog' as const } : {})}
               {...(isWeb ? {} : { display: 'spinner' as any })}
             >
@@ -195,7 +195,7 @@ export const SinglePricePicker: React.FC<SinglePricePickerProps> = ({
           { height },
           isAndroid && s.androidPicker,
         ]}
-        itemStyle={[s.item, { height }]}
+        itemStyle={[s.item, { height: 44 }]}
         {...(isAndroid ? { mode: 'dialog' as const } : {})}
         {...(isWeb ? {} : { display: 'spinner' as any })}
       >
