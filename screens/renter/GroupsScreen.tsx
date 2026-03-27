@@ -64,6 +64,7 @@ export const GroupsScreen = () => {
   const [avatarsExpanded, setAvatarsExpanded] = useState(false);
   const { activeCity, activeSubArea, recentCities, setActiveCity, setActiveSubArea } = useCityContext();
   const [showCityPicker, setShowCityPicker] = useState(false);
+  const [hasApartmentPrefs, setHasApartmentPrefs] = useState(false);
   const [showAISheet, setShowAISheet] = useState(false);
   const GRP_COLLAPSE_H = 52;
   const grpScrollY = useSharedValue(0);
@@ -105,6 +106,11 @@ export const GroupsScreen = () => {
     React.useCallback(() => {
       loadGroups();
       loadLikedGroupState();
+      if (user) {
+        StorageService.getApartmentPreferences(user.id).then(prefs => {
+          setHasApartmentPrefs(!!(prefs?.apartmentPrefsComplete || prefs?.budgetPerPersonMin));
+        }).catch(() => {});
+      }
       if (user) {
         getMyPendingInvites()
           .then(setPendingInvites)
@@ -1265,7 +1271,7 @@ export const GroupsScreen = () => {
     }
 
     if (activeTab === 'discover') {
-      const hasPreferences = user?.profileData?.budgetMin || user?.profileData?.budget;
+      const hasPreferences = hasApartmentPrefs || user?.profileData?.budgetMin || user?.profileData?.budget;
       if (!hasPreferences) {
         return (
           <View style={styles.emptyState}>
