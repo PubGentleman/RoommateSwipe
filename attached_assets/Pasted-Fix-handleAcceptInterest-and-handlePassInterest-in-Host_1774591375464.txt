@@ -1,0 +1,127 @@
+Fix handleAcceptInterest and handlePassInterest in HostDashboardScreen.tsx. Currently they only write to StorageService and never call the Supabase services that HostInquiriesScreen correctly uses.
+
+FILE: screens/host/HostDashboardScreen.tsx
+
+1. Add these imports at the top of the file alongside the existing service imports:
+   import { acceptInterestCard, rejectInterestCard } from '../../services/discoverService';
+   import { updateGroup } from '../../services/groupService';
+
+2. Replace the entire handleAcceptInterest function with:
+
+   const handleAcceptInterest = async (card: InterestCard) => {
+     if (!user) return;
+     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+     const now = new Date();
+
+     let supabaseMatchId: string | undefined;
+     try {
+       const result = await acceptInterestCard(card.id, card.renterId);
+       supabaseMatchId = result?.match?.id;
+     } catch {
+       await StorageService.updateInterestCard(card.id, {
+         status: 'accepted',
+         respondedAt: now.toISOString(),
+       });
+     }
+
+     if ((card as any).groupId) {
+       try {
+         await updateGroup((card as any).groupId, { address_revealed: true, inquiry_status: 'accepted' });
+       } catch {}
+     }
+
+     const conversationId = `conv-interest-${card.id}`;
+     const acceptedMessage: Message = {
+       id: `msg-accept-${Date.now()}`,
+       senderId: 'system',
+       text: `${user.name} accepted your interest! You can now message each other.`,
+       content: `${user.name} accepted your interest! You can now message each other.`,
+       timestamp: now,
+       read: false,
+     };
+     const existingConvs = await StorageService.getConversations();
+     const existingConv = existingConvs.find(c => c.id === conversationId);
+     const priorMessages = existingConv?.messages || [];
+     const conversation: Conversation = {
+       id: conversationId,
+       participant: { id: card.renterId, name: card.renterName, photo: card.renterPhoto, online: false },
+       lastMessage: acceptedMessage.text || '',
+       timestamp: now,
+       unread: 0,
+       messages: [...priorMessages, acceptedMessage],
+       isInquiryThread: true,
+       isSuperInterest: card.isSuperInterest || false,
+       inquiryStatus: 'accepted',
+       inquiryId: card.id,
+       listingTitle: card.propertyTitle,
+       hostId: user.id,
+       hostName: user.name,
+       propertyId: card.propertyId,
+       matchId: supabaseMatchId,
+     };
+     await StorageService.addOrUpdateConversation(conversation);
+
+     await StorageService.addNotification({
+       id: `notif-${Date.now()}-accept-renter`,
+       userId: card.renterId,
+       type: 'interest_accepted',
+       title: "It's a Match!",
+       body: `${user.name} accepted your interest for ${card.propertyTitle}. You can now message each other`,
+       isRead: false,
+       createdAt: now,
+       data: { interestCardId: card.id, conversationId, propertyId: card.propertyId, fromUserId: user.id, fromUserName: user.name, fromUserPhoto: user.profilePicture },
+     });
+
+     await refreshUnreadCount();
+     setInquiries(prev =>
+       prev.map(c => c.id === card.id ? { ...c, status: 'accepted' as const, respondedAt: now.toISOString() } : c)
+     );
+   };
+
+3. Replace the entire handlePassInterest function with:
+
+   const handlePassInterest = async (card: InterestCard) => {
+     if (!user) return;
+     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+     const now = new Date();
+
+     try {
+       await rejectInterestCard(card.id);
+     } catch {
+       await StorageService.updateInterestCard(card.id, {
+         status: 'passed',
+         respondedAt: now.toISOString(),
+       });
+     }
+
+     if ((card as any).groupId) {
+       try {
+         await updateGroup((card as any).groupId, { inquiry_status: 'declined' });
+       } catch {}
+       await StorageService.updateConversation(`inquiry-conv-${(card as any).groupId}`, {
+         inquiryStatus: 'declined',
+         lastMessage: 'The host passed on this inquiry.',
+       });
+     }
+
+     await StorageService.updateConversation(`conv-interest-${card.id}`, {
+       inquiryStatus: 'declined',
+       lastMessage: 'The host passed on this inquiry.',
+     });
+
+     await StorageService.addNotification({
+       id: `notif-${Date.now()}-pass`,
+       userId: card.renterId,
+       type: 'interest_passed',
+       title: 'Interest Update',
+       body: `They passed this time for ${card.propertyTitle}`,
+       isRead: false,
+       createdAt: now,
+       data: { interestCardId: card.id, propertyId: card.propertyId, fromUserId: user.id, fromUserName: user.name },
+     });
+
+     await refreshUnreadCount();
+     setInquiries(prev =>
+       prev.map(c => c.id === card.id ? { ...c, status: 'passed' as const, respondedAt: now.toISOString() } : c)
+     );
+   };

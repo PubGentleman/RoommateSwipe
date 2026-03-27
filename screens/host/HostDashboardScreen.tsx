@@ -12,7 +12,8 @@ import { StorageService } from '../../utils/storage';
 import { Property, InterestCard, Message, Conversation, HostSubscriptionData } from '../../types/models';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { getMyListings, mapListingToProperty, getAgentStats, getCompanyAgents, reassignListingAgent, getCompanyListingsWithAgents, getAgentDetailData, reassignConversation, AgentConversationSummary, AgentBookingSummary } from '../../services/listingService';
-import { getReceivedInterestCards } from '../../services/discoverService';
+import { getReceivedInterestCards, acceptInterestCard, rejectInterestCard } from '../../services/discoverService';
+import { updateGroup } from '../../services/groupService';
 import { RhomeAISheet } from '../../components/RhomeAISheet';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { HostPlanBadge } from '../../components/HostPlanBadge';
@@ -230,34 +231,53 @@ export const HostDashboardScreen = () => {
   const handleAcceptInterest = async (card: InterestCard) => {
     if (!user) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const now = new Date();
 
-    await StorageService.updateInterestCard(card.id, {
-      status: 'accepted',
-      respondedAt: new Date().toISOString(),
-    });
+    let supabaseMatchId: string | undefined;
+    try {
+      const result = await acceptInterestCard(card.id, card.renterId);
+      supabaseMatchId = result?.match?.id;
+    } catch {
+      await StorageService.updateInterestCard(card.id, {
+        status: 'accepted',
+        respondedAt: now.toISOString(),
+      });
+    }
+
+    if ((card as any).groupId) {
+      try {
+        await updateGroup((card as any).groupId, { address_revealed: true, inquiry_status: 'accepted' });
+      } catch {}
+    }
 
     const conversationId = `conv-interest-${card.id}`;
-    const now = new Date();
-    const initialMessage: Message = {
-      id: `msg-${Date.now()}`,
+    const acceptedMessage: Message = {
+      id: `msg-accept-${Date.now()}`,
       senderId: 'system',
-      text: 'Interest accepted! Start chatting.',
-      content: 'Interest accepted! Start chatting.',
+      text: `${user.name} accepted your interest! You can now message each other.`,
+      content: `${user.name} accepted your interest! You can now message each other.`,
       timestamp: now,
       read: false,
     };
+    const existingConvs = await StorageService.getConversations();
+    const existingConv = existingConvs.find(c => c.id === conversationId);
+    const priorMessages = existingConv?.messages || [];
     const conversation: Conversation = {
       id: conversationId,
-      participant: {
-        id: card.renterId,
-        name: card.renterName,
-        photo: card.renterPhoto,
-        online: false,
-      },
-      lastMessage: initialMessage.text || '',
+      participant: { id: card.renterId, name: card.renterName, photo: card.renterPhoto, online: false },
+      lastMessage: acceptedMessage.text || '',
       timestamp: now,
       unread: 0,
-      messages: [initialMessage],
+      messages: [...priorMessages, acceptedMessage],
+      isInquiryThread: true,
+      isSuperInterest: card.isSuperInterest || false,
+      inquiryStatus: 'accepted',
+      inquiryId: card.id,
+      listingTitle: card.propertyTitle,
+      hostId: user.id,
+      hostName: user.name,
+      propertyId: card.propertyId,
+      matchId: supabaseMatchId,
     };
     await StorageService.addOrUpdateConversation(conversation);
 
@@ -266,21 +286,10 @@ export const HostDashboardScreen = () => {
       userId: card.renterId,
       type: 'interest_accepted',
       title: "It's a Match!",
-      body: `${user.name} accepted your interest for ${card.propertyTitle}`,
+      body: `${user.name} accepted your interest for ${card.propertyTitle}. You can now message each other`,
       isRead: false,
       createdAt: now,
       data: { interestCardId: card.id, conversationId, propertyId: card.propertyId, fromUserId: user.id, fromUserName: user.name, fromUserPhoto: user.profilePicture },
-    });
-
-    await StorageService.addNotification({
-      id: `notif-${Date.now()}-accept-host`,
-      userId: user.id,
-      type: 'interest_accepted',
-      title: 'Interest Accepted',
-      body: `You accepted ${card.renterName}'s interest for ${card.propertyTitle}`,
-      isRead: false,
-      createdAt: now,
-      data: { interestCardId: card.id, conversationId, propertyId: card.propertyId, fromUserId: card.renterId, fromUserName: card.renterName, fromUserPhoto: card.renterPhoto },
     });
 
     await refreshUnreadCount();
@@ -292,13 +301,32 @@ export const HostDashboardScreen = () => {
   const handlePassInterest = async (card: InterestCard) => {
     if (!user) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const now = new Date();
 
-    await StorageService.updateInterestCard(card.id, {
-      status: 'passed',
-      respondedAt: new Date().toISOString(),
+    try {
+      await rejectInterestCard(card.id);
+    } catch {
+      await StorageService.updateInterestCard(card.id, {
+        status: 'passed',
+        respondedAt: now.toISOString(),
+      });
+    }
+
+    if ((card as any).groupId) {
+      try {
+        await updateGroup((card as any).groupId, { inquiry_status: 'declined' });
+      } catch {}
+      await StorageService.updateConversation(`inquiry-conv-${(card as any).groupId}`, {
+        inquiryStatus: 'declined',
+        lastMessage: 'The host passed on this inquiry.',
+      });
+    }
+
+    await StorageService.updateConversation(`conv-interest-${card.id}`, {
+      inquiryStatus: 'declined',
+      lastMessage: 'The host passed on this inquiry.',
     });
 
-    const now = new Date();
     await StorageService.addNotification({
       id: `notif-${Date.now()}-pass`,
       userId: card.renterId,
