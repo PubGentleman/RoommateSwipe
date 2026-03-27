@@ -807,31 +807,33 @@ export async function getMyPendingCompanyInvites(): Promise<{
   id: string;
   listingId: string;
   groupId: string;
+  groupName: string;
   matchScore: number;
-  aiReason: string | null;
-  listingAddress: string;
-  listingNeighborhood: string;
-  listingPrice: number;
-  listingBedrooms: number;
-  createdAt: string;
+  aiReason?: string;
+  address?: string;
+  neighborhood?: string;
+  price?: number;
+  bedrooms?: number;
+  companyName?: string;
 }[]> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return [];
 
-  const { data: myMemberships } = await supabase
+  const { data: memberRows } = await supabase
     .from('group_members')
     .select('group_id')
     .eq('user_id', user.id);
 
-  if (!myMemberships?.length) return [];
-
-  const groupIds = myMemberships.map(m => m.group_id);
+  const groupIds = (memberRows || []).map((r: any) => r.group_id);
+  if (groupIds.length === 0) return [];
 
   const { data, error } = await supabase
     .from('company_group_invites')
     .select(`
-      id, listing_id, group_id, match_score, ai_reason, created_at,
-      listings ( address, neighborhood, rent, bedrooms )
+      id, listing_id, group_id, match_score, ai_reason, status,
+      listing:listings(address, neighborhood, rent, bedrooms),
+      group:groups(name),
+      host:users!company_group_invites_company_host_id_fkey(full_name, company_name)
     `)
     .in('group_id', groupIds)
     .eq('status', 'pending');
@@ -842,13 +844,14 @@ export async function getMyPendingCompanyInvites(): Promise<{
     id: row.id,
     listingId: row.listing_id,
     groupId: row.group_id,
+    groupName: row.group?.name || 'Your Group',
     matchScore: row.match_score || 0,
     aiReason: row.ai_reason,
-    listingAddress: row.listings?.address || 'Address not available',
-    listingNeighborhood: row.listings?.neighborhood || '',
-    listingPrice: row.listings?.rent || 0,
-    listingBedrooms: row.listings?.bedrooms || 0,
-    createdAt: row.created_at,
+    address: row.listing?.address,
+    neighborhood: row.listing?.neighborhood,
+    price: row.listing?.rent || 0,
+    bedrooms: row.listing?.bedrooms,
+    companyName: row.host?.company_name || row.host?.full_name || 'A property manager',
   }));
 }
 

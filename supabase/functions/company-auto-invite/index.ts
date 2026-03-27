@@ -40,7 +40,7 @@ serve(async (req) => {
 
     const { data: listing } = await supabase
       .from('listings')
-      .select('address, neighborhood, price, bedrooms')
+      .select('address, neighborhood, rent, bedrooms')
       .eq('id', listingId)
       .single();
 
@@ -68,7 +68,7 @@ serve(async (req) => {
         user_id: userId,
         type: 'company_group_invite',
         title: 'A property matched your group!',
-        body: `${listing?.bedrooms}BR in ${listing?.neighborhood} — $${listing?.price}/mo. A property manager selected your group.`,
+        body: `${listing?.bedrooms}BR in ${listing?.neighborhood} — $${listing?.rent}/mo. A property manager selected your group.`,
         data: JSON.stringify({
           type: 'company_group_invite',
           listingId,
@@ -77,17 +77,15 @@ serve(async (req) => {
       });
     }
 
-    await supabase.rpc('increment_pipeline_invites', { p_listing_id: listingId }).then(async (res) => {
-      if (res.error) {
-        await supabase
-          .from('listing_fill_pipeline')
-          .upsert({
-            listing_id: listingId,
-            total_invites_sent: 1,
-            last_updated: new Date().toISOString(),
-          }, { onConflict: 'listing_id' });
-      }
-    });
+    await supabase
+      .from('listing_fill_pipeline')
+      .upsert({
+        listing_id: listingId,
+        total_invites_sent: 0,
+        last_updated: new Date().toISOString(),
+      }, { onConflict: 'listing_id', ignoreDuplicates: true });
+
+    await supabase.rpc('increment_listing_invites', { p_listing_id: listingId });
 
     return new Response(JSON.stringify({ success: true, notified: memberIds.length }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

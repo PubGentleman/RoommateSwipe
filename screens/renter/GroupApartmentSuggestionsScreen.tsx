@@ -41,9 +41,10 @@ export default function GroupApartmentSuggestionsScreen() {
 
   const groupId = route.params?.groupId ?? '';
   const isNewlyComplete = route.params?.isNewlyComplete ?? false;
-  const highlightListingId = route.params?.highlightListingId ?? '';
+  const highlightListingId: string | undefined = route.params?.highlightListingId;
   const [suggestions, setSuggestions] = useState<ListingSuggestion[]>([]);
-  const [highlightedListing, setHighlightedListing] = useState<Property | null>(null);
+  const [pinnedListing, setPinnedListing] = useState<Property | null>(null);
+  const [pinnedLoading, setPinnedLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [members, setMembers] = useState<RoommateProfile[]>([]);
   const [conflicts, setConflicts] = useState<string[]>([]);
@@ -94,16 +95,26 @@ export default function GroupApartmentSuggestionsScreen() {
 
     const memberProfiles: RoommateProfile[] = (memberData || []).map((u: any) => ({
       id: u.id,
-      name: u.full_name || u.name || 'User',
-      age: u.age,
-      occupation: u.occupation,
-      budget: u.budget,
+      name: u.full_name || 'Member',
+      age: u.age || 25,
+      gender: u.profile_data?.gender || 'other',
+      occupation: u.profile_data?.occupation || u.occupation || '',
+      location: u.profile_data?.location || { neighborhood: '', city: '', state: '' },
+      budget: u.profile_data?.budget || u.budget || 1500,
+      moveInDate: u.profile_data?.moveInDate || '',
+      bio: u.profile_data?.bio || '',
+      interests: u.profile_data?.interests || '',
+      profilePicture: u.avatar_url || '',
+      photos: u.profile_data?.photos || u.photos || [],
+      preferences: u.profile_data?.preferences || {
+        sleepSchedule: 'flexible', cleanliness: 'moderate', guestPolicy: 'sometimes',
+        noiseTolerance: 'moderate', smoking: 'no', workLocation: 'hybrid',
+        roommateRelationship: 'occasional_hangouts', pets: 'no_pets',
+      },
       preferredNeighborhoods: u.preferred_neighborhoods || [],
       commuteDestination: u.commute_destination,
       requiredTrainLines: u.required_train_lines || [],
       amenityPreferences: u.amenity_preferences || [],
-      profilePicture: u.avatar_url,
-      photos: u.photos || [],
     }));
     setMembers(memberProfiles);
 
@@ -114,13 +125,20 @@ export default function GroupApartmentSuggestionsScreen() {
     }
 
     if (highlightListingId) {
-      const { data: hlData } = await supabase
-        .from('listings')
-        .select('*')
-        .eq('id', highlightListingId)
-        .single();
-      if (hlData) {
-        setHighlightedListing(mapListingToProperty(hlData));
+      setPinnedLoading(true);
+      try {
+        const { data: hlData } = await supabase
+          .from('listings')
+          .select('*')
+          .eq('id', highlightListingId)
+          .single();
+        if (hlData) {
+          setPinnedListing(mapListingToProperty(hlData));
+        }
+      } catch (e) {
+        console.error('[GroupSuggestions] Pinned listing error:', e);
+      } finally {
+        setPinnedLoading(false);
       }
     }
 
@@ -175,9 +193,16 @@ export default function GroupApartmentSuggestionsScreen() {
     }
 
     if (highlightListingId) {
-      const allProps = await StorageService.getProperties();
-      const hl = allProps.find((p: Property) => p.id === highlightListingId);
-      if (hl) setHighlightedListing(hl);
+      setPinnedLoading(true);
+      try {
+        const allProps = await StorageService.getProperties();
+        const hl = allProps.find((p: Property) => p.id === highlightListingId);
+        if (hl) setPinnedListing(hl);
+      } catch (e) {
+        console.error('[GroupSuggestions] Pinned listing error:', e);
+      } finally {
+        setPinnedLoading(false);
+      }
     }
 
     const allListings = await StorageService.getProperties();
@@ -284,21 +309,27 @@ export default function GroupApartmentSuggestionsScreen() {
     );
   };
 
-  const renderHighlightedListing = () => {
-    if (!highlightedListing) return null;
-    const myVote = votes[highlightedListing.id]?.[user?.id ?? ''];
-    const yesCount = getVoteCount(highlightedListing.id, 'yes');
-    const noCount = getVoteCount(highlightedListing.id, 'no');
-    const listing = highlightedListing;
+  const renderPinnedCard = () => {
+    if (!highlightListingId) return null;
+    if (pinnedLoading) {
+      return (
+        <View style={styles.pinnedCard}>
+          <ActivityIndicator size="small" color={CORAL} />
+        </View>
+      );
+    }
+    if (!pinnedListing) return null;
+    const myVote = votes[pinnedListing.id]?.[user?.id ?? ''];
+    const yesCount = getVoteCount(pinnedListing.id, 'yes');
+    const noCount = getVoteCount(pinnedListing.id, 'no');
+    const listing = pinnedListing;
     const scored = scoreListing(listing, members);
 
     return (
       <Animated.View entering={FadeInDown.duration(400)}>
-        <View style={styles.highlightBanner}>
-          <Feather name="briefcase" size={14} color={CORAL} />
-          <ThemedText style={styles.highlightBannerText}>
-            Company Selected This For Your Group
-          </ThemedText>
+        <View style={styles.pinnedHeader}>
+          <Feather name="zap" size={14} color={CORAL} />
+          <ThemedText style={styles.pinnedLabel}>Property Manager Selected This For Your Group</ThemedText>
         </View>
         <View style={[styles.card, styles.highlightCard]}>
           {listing.photos?.[0] ? (
@@ -543,18 +574,18 @@ export default function GroupApartmentSuggestionsScreen() {
                 </ThemedText>
               </Animated.View>
             ) : null}
-            {renderHighlightedListing()}
+            {renderPinnedCard()}
             {renderConflictBanner()}
             {renderSharedAreas()}
             {suggestions.length > 0 ? (
               <ThemedText style={styles.resultsLabel}>
-                {highlightedListing ? 'More matches for your group' : `Top ${suggestions.length} matches for your group`}
+                {pinnedListing ? 'More matches for your group' : `Top ${suggestions.length} matches for your group`}
               </ThemedText>
             ) : null}
           </>
         }
         ListEmptyComponent={
-          highlightedListing ? null : (
+          pinnedListing ? null : (
             <View style={styles.emptyState}>
               <Feather name="search" size={48} color="#444" />
               <ThemedText style={styles.emptyText}>
@@ -581,22 +612,25 @@ const styles = StyleSheet.create({
     backgroundColor: '#1c1c1c', justifyContent: 'center', alignItems: 'center',
   },
   headerTitle: { fontSize: 17, fontWeight: '700', color: '#fff' },
-  highlightBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(255,107,91,0.12)',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 8,
+  pinnedCard: {
+    backgroundColor: 'rgba(255,107,91,0.1)',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: 'rgba(255,107,91,0.3)',
   },
-  highlightBannerText: {
-    fontSize: 13,
+  pinnedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  pinnedLabel: {
+    fontSize: 11,
     fontWeight: '700',
     color: CORAL,
+    letterSpacing: 0.3,
     flex: 1,
   },
   highlightCard: {

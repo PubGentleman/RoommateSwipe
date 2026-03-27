@@ -1123,28 +1123,34 @@ export const GroupsScreen = () => {
           {companyInvites.length > 0 ? (
             <View style={styles.invitesSection}>
               <View style={styles.sectionHeader}>
-                <Feather name="briefcase" size={16} color="#ff6b5b" />
+                <Feather name="home" size={16} color="#ff6b5b" />
                 <ThemedText style={[Typography.h3, { marginLeft: 8 }]}>Property Invites</ThemedText>
               </View>
-              {companyInvites.map(ci => (
+              {companyInvites.map(invite => (
                 <Pressable
-                  key={ci.id}
-                  style={[styles.inviteCard, { borderLeftWidth: 3, borderLeftColor: '#ff6b5b' }]}
-                  onPress={() => navigation.navigate('CompanyGroupInvite', { listingId: ci.listingId, groupId: ci.groupId })}
+                  key={invite.id}
+                  style={[styles.inviteCard, { borderColor: 'rgba(255,107,91,0.3)', borderWidth: 1 }]}
+                  onPress={() => navigation.navigate('CompanyGroupInvite', {
+                    listingId: invite.listingId,
+                    groupId: invite.groupId,
+                  })}
                 >
                   <View style={styles.inviteInfo}>
-                    <Feather name="home" size={16} color="#ff6b5b" />
+                    <Feather name="zap" size={16} color="#ff6b5b" />
                     <View style={{ marginLeft: 10, flex: 1 }}>
                       <ThemedText style={styles.inviteGroupName}>
-                        {ci.listingBedrooms}BR in {ci.listingNeighborhood || 'Available'}
+                        {invite.bedrooms}BR in {invite.neighborhood || 'Available Area'}
                       </ThemedText>
                       <ThemedText style={styles.inviteFrom}>
-                        ${ci.listingPrice?.toLocaleString()}/mo{ci.matchScore > 0 ? ` · ${ci.matchScore}% match` : ''}
+                        {invite.companyName} selected {invite.groupName} · {invite.matchScore}% match
                       </ThemedText>
+                      {invite.price ? (
+                        <ThemedText style={{ fontSize: 12, color: '#ff6b5b', marginTop: 2 }}>
+                          ${invite.price.toLocaleString()}/mo
+                        </ThemedText>
+                      ) : null}
                     </View>
-                  </View>
-                  <View style={{ paddingLeft: 8 }}>
-                    <Feather name="chevron-right" size={18} color="#888" />
+                    <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.3)" />
                   </View>
                 </Pressable>
               ))}
