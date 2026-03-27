@@ -1,0 +1,77 @@
+Add specific laundry amenity options for hosts when creating listings, show a laundry chip on the listing card in Explore, and add laundry filter options to the filter panel.
+
+FILE: screens/host/CreateEditListingScreen.tsx
+
+1. Find the AMENITIES_LIST array (around line 27-30):
+   FROM:
+     const AMENITIES_LIST = [
+       'WiFi', 'Parking', 'Laundry', 'AC', 'Heating', 'Dishwasher',
+       'Gym', 'Pool', 'Pet Friendly', 'Furnished', 'Balcony', 'Storage',
+     ];
+   TO:
+     const AMENITIES_LIST = [
+       'WiFi', 'Parking', 'In-unit Laundry', 'In-building Laundry', 'AC', 'Heating', 'Dishwasher',
+       'Gym', 'Pool', 'Pet Friendly', 'Furnished', 'Balcony', 'Storage',
+     ];
+
+FILE: screens/renter/ExploreScreen.tsx
+
+2. Find the COMMON_AMENITIES array (around line 46-49):
+   FROM:
+     const COMMON_AMENITIES = [
+       'Parking', 'Gym', 'Pool', 'Laundry', 'Pet Friendly',
+       'Air Conditioning', 'Dishwasher', 'Balcony',
+     ];
+   TO:
+     const COMMON_AMENITIES = [
+       'Parking', 'Gym', 'Pool', 'In-unit Laundry', 'In-building Laundry', 'Pet Friendly',
+       'Air Conditioning', 'Dishwasher', 'Balcony',
+     ];
+
+3. Find the applyFiltersToProfiles amenities filter block (around line 668-674):
+   FROM:
+     if (filters.amenities && filters.amenities.length > 0) {
+       filtered = filtered.filter(p =>
+         filters.amenities!.every(amenity =>
+           p.amenities.some(a => a.toLowerCase() === amenity.toLowerCase())
+         )
+       );
+     }
+   TO:
+     if (filters.amenities && filters.amenities.length > 0) {
+       filtered = filtered.filter(p =>
+         filters.amenities!.every(amenity => {
+           const amenityLower = amenity.toLowerCase();
+           return p.amenities.some(a => {
+             const aLower = a.toLowerCase();
+             // Fuzzy match for laundry so old listings with generic 'laundry' still get caught
+             if (amenityLower.includes('laundry')) {
+               return aLower.includes('laundry');
+             }
+             return aLower === amenityLower;
+           });
+         })
+       );
+     }
+
+4. Around line 898, directly after the isPetFriendly variable declaration, add:
+   const laundryType = item.amenities?.find(a =>
+     a.toLowerCase().includes('in-unit') || a.toLowerCase().includes('in unit') ||
+     a.toLowerCase().includes('washer') || a.toLowerCase().includes('dryer')
+   )
+     ? 'In-unit'
+     : item.amenities?.find(a =>
+         a.toLowerCase().includes('in-building') || a.toLowerCase().includes('laundry room') ||
+         a.toLowerCase().includes('shared laundry') || a.toLowerCase() === 'laundry'
+       )
+       ? 'Laundry'
+       : null;
+
+5. In the card JSX, directly after the isPetFriendly chip block (around line 1031-1035), add:
+   {laundryType ? (
+     <View style={styles.availBadge}>
+       <Text style={styles.availBadgeText}>{laundryType === 'In-unit' ? 'W/D In-unit' : 'Laundry'}</Text>
+     </View>
+   ) : null}
+
+No new styles needed. Old listings that had the generic 'Laundry' amenity saved will still match the filter and display the chip correctly.

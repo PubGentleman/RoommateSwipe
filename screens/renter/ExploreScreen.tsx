@@ -44,7 +44,7 @@ import { useNotificationContext } from '../../contexts/NotificationContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 
 const COMMON_AMENITIES = [
-  'Parking', 'Gym', 'Pool', 'Laundry', 'Pet Friendly',
+  'Parking', 'Gym', 'Pool', 'In-unit Laundry', 'In-building Laundry', 'Pet Friendly',
   'Air Conditioning', 'Dishwasher', 'Balcony',
 ];
 
@@ -706,9 +706,16 @@ export const ExploreScreen = () => {
     }
     if (filters.amenities && filters.amenities.length > 0) {
       filtered = filtered.filter(p =>
-        filters.amenities!.every(amenity =>
-          p.amenities.some(a => a.toLowerCase() === amenity.toLowerCase())
-        )
+        filters.amenities!.every(amenity => {
+          const amenityLower = amenity.toLowerCase();
+          return p.amenities.some(a => {
+            const aLower = a.toLowerCase();
+            if (amenityLower.includes('laundry')) {
+              return aLower.includes('laundry');
+            }
+            return aLower === amenityLower;
+          });
+        })
       );
     }
 
