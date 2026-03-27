@@ -257,7 +257,6 @@ const s = StyleSheet.create({
   wrap: {
     backgroundColor: 'transparent',
     borderRadius: 14,
-    overflow: 'hidden',
     justifyContent: 'center',
   },
   picker: {
