@@ -227,6 +227,16 @@ export const NotificationsScreen = () => {
       case 'property_rented':
         (navigation as any).navigate('Explore');
         break;
+      case 'movein_checkin':
+        if (notification.data?.bookingId) {
+          (navigation as any).navigate('Profile', {
+            screen: 'MoveInCheckin',
+            params: { bookingId: notification.data.bookingId },
+          });
+        } else {
+          (navigation as any).navigate('Profile');
+        }
+        break;
       default:
         break;
     }

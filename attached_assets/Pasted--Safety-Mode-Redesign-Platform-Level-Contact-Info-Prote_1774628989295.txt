@@ -1,0 +1,276 @@
+# Safety Mode Redesign — Platform-Level Contact Info Protection
+
+## The New Rule (Simple Version)
+
+- **Free users** → contact info is always blurred. No toggle, no option to turn it off.
+- **Paid users (Plus / Elite renters, Business hosts)** → contact info always visible. No toggle needed.
+- **Everyone** → contact info auto-unlocks for a specific conversation the moment a showing or booking is confirmed in that thread. This overrides the free user restriction for that conversation only.
+
+There is no longer a Safety Mode toggle anywhere in the app. The protection is automatic and the unlock is earned through commitment, not a settings menu.
+
+---
+
+## Why We're Removing the Toggle
+
+The old toggle was opt-in, buried in Profile Settings, and almost nobody turned it on. That meant phone numbers and social handles flowed freely until someone got scammed. Making it a platform default protects every free user without them having to do anything. Paid users — who have verified more trust signals by paying — get contact info freely as part of their subscription value. The toggle is removed entirely.
+
+---
+
+## Current State (What to Change)
+
+### `screens/shared/ProfileScreen.tsx`
+There is a Safety Mode section with a Switch component that reads and writes `profiles.safety_mode_enabled`. This entire section must be deleted — the state variable, the Supabase read, the Switch, and the SettingsItem row.
+
+Search for `safety_mode_enabled`, `safetyMode`, and `SafeMode` in this file and remove all references.
+
+### `components/SafeMessageText.tsx`
+The component already detects and blurs phone numbers, @handles, and social app patterns. The blurring logic is correct. Two things need to change:
+1. It currently blurs both sent and received messages. It should only blur **received** messages (you don't need to hide your own number from yourself).
+2. The "Tap to reveal contact info" button should be replaced with actionable CTAs: **Book a Showing** and **Upgrade to Plus**.
+
+### `screens/shared/ChatScreen.tsx`
+Currently passes `safetyMode={safetyModeEnabled}` where `safetyModeEnabled` comes from the user's profile toggle state. This will be replaced with a computed value based on plan and booking/showing status.
+
+---
+
+## Step 1 — Add `canSeeContactInfo` to Plan Limits
+
+**File:** `services/planLimitsService.ts` (or wherever `renterPlanLimits` / `normalizeRenterPlan` is defined)
+
+Add to the returned limits object:
+
+```ts
+canSeeContactInfo: plan === 'plus' || plan === 'elite',
+```
+
+For hosts, add the same check against their host plan:
+
+```ts
+canSeeContactInfo: hostPlan === 'business',
+```
+
+Free renters and Standard hosts always get `canSeeContactInfo: false` by default. This can be overridden per-conversation by a booking/showing confirmation (Step 3).
+
+Also update the `RenterPlanLimits` TypeScript interface to include:
+
+```ts
+canSeeContactInfo: boolean;
+```
+
+---
+
+## Step 2 — Update `SafeMessageText` Component
+
+**File:** `components/SafeMessageText.tsx`
+
+### 2a — Add new props
+
+```tsx
+interface Props {
+  text: string
+  safetyMode: boolean
+  isOwnMessage: boolean          // NEW — only blur received messages
+  style?: StyleProp<TextStyle>
+  onBookShowingPress?: () => void  // NEW — CTA callback
+  onUpgradePress?: () => void      // NEW — CTA callback
+}
+```
+
+### 2b — Guard blur on received messages only
+
+Wrap the entire blurring logic with:
+
+```tsx
+const shouldBlur = safetyMode && !isOwnMessage;
+```
+
+Use `shouldBlur` everywhere `safetyMode` was used previously inside the component. If `isOwnMessage` is true, render the text as plain regardless of `safetyMode`.
+
+### 2c — Replace reveal button with actionable CTAs
+
+Remove the existing "Tap to reveal contact info" `Pressable`. Replace with:
+
+```tsx
+<View style={styles.lockBanner}>
+  <Feather name="lock" size={13} color="#FF6B6B" />
+  <ThemedText style={styles.lockText}>Contact info hidden</ThemedText>
+</View>
+
+<View style={styles.ctaRow}>
+  {onBookShowingPress && (
+    <Pressable style={styles.ctaButton} onPress={onBookShowingPress}>
+      <ThemedText style={styles.ctaText}>Book a Showing</ThemedText>
+    </Pressable>
+  )}
+  {onUpgradePress && (
+    <Pressable style={[styles.ctaButton, styles.ctaUpgrade]} onPress={onUpgradePress}>
+      <Feather name="zap" size={12} color="#667eea" />
+      <ThemedText style={[styles.ctaText, { color: '#667eea' }]}>Upgrade to Plus</ThemedText>
+    </Pressable>
+  )}
+</View>
+```
+
+### 2d — New styles
+
+```ts
+lockBanner: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 5,
+  marginBottom: 6,
+},
+lockText: {
+  color: '#FF6B6B',
+  fontSize: 12,
+  fontWeight: '600',
+},
+ctaRow: {
+  flexDirection: 'row',
+  gap: 8,
+  flexWrap: 'wrap',
+},
+ctaButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 4,
+  backgroundColor: 'rgba(255, 107, 107, 0.12)',
+  paddingHorizontal: 10,
+  paddingVertical: 5,
+  borderRadius: 8,
+},
+ctaUpgrade: {
+  backgroundColor: 'rgba(102, 126, 234, 0.12)',
+},
+ctaText: {
+  color: '#FF6B6B',
+  fontSize: 12,
+  fontWeight: '600',
+},
+```
+
+---
+
+## Step 3 — Compute Contact Visibility in ChatScreen
+
+**File:** `screens/shared/ChatScreen.tsx`
+
+### 3a — Replace the old `safetyModeEnabled` logic
+
+Remove any code that reads `safety_mode_enabled` from the user profile. Replace with:
+
+```ts
+const isPaidUser = renterLimits.canSeeContactInfo; // true for Plus/Elite renters and Business hosts
+
+const [hasConfirmedEvent, setHasConfirmedEvent] = useState(false);
+```
+
+### 3b — Detect showing or booking confirmation in the thread
+
+Add this inside the effect that loads or watches messages:
+
+```ts
+// Check messages for a confirmed showing or booking event
+const confirmed = messages.some(m =>
+  ['showing_confirmed', 'showing_accepted', 'booking_confirmed'].includes(m.type ?? '')
+);
+setHasConfirmedEvent(confirmed);
+```
+
+If showings/bookings are tracked in a Supabase table rather than as message types, query it instead:
+
+```ts
+const { data: showing } = await supabase
+  .from('showings')
+  .select('id')
+  .eq('conversation_id', conversationId)
+  .in('status', ['confirmed', 'completed', 'accepted'])
+  .maybeSingle();
+
+setHasConfirmedEvent(!!showing);
+```
+
+### 3c — Compute final visibility
+
+```ts
+const contactInfoVisible = isPaidUser || hasConfirmedEvent;
+```
+
+### 3d — Pass to SafeMessageText
+
+In the message render function, find where `SafeMessageText` is used and update the props:
+
+```tsx
+<SafeMessageText
+  text={message.content}
+  safetyMode={!contactInfoVisible}
+  isOwnMessage={message.senderId === user?.id}
+  onBookShowingPress={!contactInfoVisible ? () => {
+    // Scroll to or open the showing request flow
+    // e.g. setShowingModalOpen(true) or navigation.navigate('BookShowing', { listingId })
+  } : undefined}
+  onUpgradePress={!contactInfoVisible ? () => navigation.navigate('Plans') : undefined}
+  style={messageTextStyle}
+/>
+```
+
+Note: when `contactInfoVisible` is true, both CTA callbacks are `undefined` — the component renders the text as plain without any lock UI.
+
+### 3e — Show unlock confirmation when a showing is booked
+
+When `hasConfirmedEvent` flips from false to true mid-conversation (a showing was just confirmed), inject a one-time system message into the local messages list:
+
+```ts
+// Add to local message state — do NOT save to database
+const unlockMessage = {
+  id: 'contact-unlock-notice',
+  type: 'system',
+  content: '🔓 Contact info is now visible in this conversation.',
+  timestamp: new Date(),
+};
+```
+
+Render system messages as center-aligned gray text with no bubble background.
+
+---
+
+## Step 4 — Remove Safety Mode from ProfileScreen
+
+**File:** `screens/shared/ProfileScreen.tsx`
+
+Delete everything related to Safety Mode:
+
+1. The `safetyMode` / `safetyModeEnabled` state variable
+2. The `.select()` field for `safety_mode_enabled` in the Supabase fetch
+3. The Supabase `.update()` call that wrote `safety_mode_enabled`
+4. The entire SettingsItem / Switch row for Safety Mode in the UI
+5. If the Safety Mode row was the only item in its card/section, delete the card too
+
+Search terms to find and remove: `safety_mode_enabled`, `safetyMode`, `safetyModeEnabled`, `SafeMode`.
+
+---
+
+## Step 5 — No Database Migration Required
+
+The `profiles.safety_mode_enabled` column can stay in the database — it just won't be read or written anymore. The contact visibility logic is now computed entirely from plan type and booking/showing status.
+
+If you want a clean schema, you can drop the column in a future migration:
+
+```sql
+ALTER TABLE profiles DROP COLUMN IF EXISTS safety_mode_enabled;
+```
+
+But this is not urgent and can wait.
+
+---
+
+## Summary of Changes
+
+| File | Change |
+|---|---|
+| `components/SafeMessageText.tsx` | Add `isOwnMessage` prop; only blur received messages; replace "Tap to reveal" with Book a Showing + Upgrade CTAs |
+| `screens/shared/ChatScreen.tsx` | Compute `contactInfoVisible` from plan + showing/booking status; pass `isOwnMessage` and CTA callbacks to SafeMessageText |
+| `screens/shared/ProfileScreen.tsx` | Remove Safety Mode toggle, state, and Supabase read/write entirely |
+| `services/planLimitsService.ts` | Add `canSeeContactInfo: boolean` to plan limits |
+| `types/` (RenterPlanLimits) | Add `canSeeContactInfo: boolean` to interface |
+| Supabase schema | No migration needed; `safety_mode_enabled` column becomes unused |

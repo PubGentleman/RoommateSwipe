@@ -1,0 +1,220 @@
+# Activity Decay Ranking — Inactive Users Sink in Match / Explore / Groups
+
+## What This Is
+
+Users who haven't opened the app in a while should sink toward the bottom of every discovery surface — the Match queue, the Explore swipe stack, and the Groups Discover feed. This keeps active users front and center and creates a natural incentive to stay engaged.
+
+The decay is score-based: a `recency_score` multiplier is applied to each profile's existing match/compatibility score. The longer someone has been away, the lower the multiplier. Users who are completely inactive for 30+ days are hidden entirely from new discovery (but not deleted — existing connections still work).
+
+---
+
+## Decay Curve
+
+| Days since last active | Multiplier | Effect |
+|---|---|---|
+| 0–3 days | 1.0 | No penalty |
+| 4–7 days | 0.8 | Slight drop |
+| 8–14 days | 0.5 | Noticeable drop |
+| 15–30 days | 0.2 | Near bottom |
+| 30+ days | 0.0 | Hidden from discovery |
+
+---
+
+## Database Changes
+
+**File:** New migration `supabase/migrations/043_activity_decay.sql`
+
+```sql
+-- Track last app open time on the profiles table
+ALTER TABLE profiles
+  ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ DEFAULT NOW();
+
+-- Computed recency score view (optional — can compute in app instead)
+CREATE OR REPLACE VIEW profile_recency_scores AS
+SELECT
+  user_id,
+  last_active_at,
+  CASE
+    WHEN last_active_at >= NOW() - INTERVAL '3 days'  THEN 1.0
+    WHEN last_active_at >= NOW() - INTERVAL '7 days'  THEN 0.8
+    WHEN last_active_at >= NOW() - INTERVAL '14 days' THEN 0.5
+    WHEN last_active_at >= NOW() - INTERVAL '30 days' THEN 0.2
+    ELSE 0.0
+  END AS recency_score
+FROM profiles;
+```
+
+---
+
+## Step 1 — Update `last_active_at` on App Open
+
+**File:** `App.tsx` or the root navigator / auth context
+
+Every time the app comes to foreground (or at session start), update `last_active_at` for the signed-in user:
+
+```ts
+// In the AppState change handler or auth session setup:
+import { AppState } from 'react-native';
+
+AppState.addEventListener('change', async (nextState) => {
+  if (nextState === 'active') {
+    const { supabase } = await import('./lib/supabase');
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase.from('profiles')
+        .update({ last_active_at: new Date().toISOString() })
+        .eq('user_id', user.id);
+    }
+  }
+});
+```
+
+This is a fire-and-forget write — no need to await the result or handle errors in the UI.
+
+---
+
+## Step 2 — Apply Decay in ExploreScreen (Swipe Stack)
+
+**File:** `screens/renter/ExploreScreen.tsx`
+
+When fetching profiles for the swipe stack, join with `last_active_at` and filter + sort:
+
+```ts
+const { data: profiles } = await supabase
+  .from('profiles')
+  .select('*, last_active_at')
+  .eq('role', 'renter')
+  .eq('search_paused', false)
+  .neq('user_id', user.id)
+  // Hide users inactive for 30+ days
+  .gte('last_active_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+  .order('last_active_at', { ascending: false }); // Most recently active first as base sort
+```
+
+If profiles also have a compatibility/match score, apply the multiplier in JS after fetching:
+
+```ts
+const getRecencyMultiplier = (lastActiveAt: string): number => {
+  const daysSince = (Date.now() - new Date(lastActiveAt).getTime()) / (1000 * 60 * 60 * 24);
+  if (daysSince <= 3) return 1.0;
+  if (daysSince <= 7) return 0.8;
+  if (daysSince <= 14) return 0.5;
+  if (daysSince <= 30) return 0.2;
+  return 0.0;
+};
+
+const scoredProfiles = profiles
+  .map(p => ({
+    ...p,
+    displayScore: (p.compatibilityScore ?? 1) * getRecencyMultiplier(p.last_active_at),
+  }))
+  .filter(p => p.displayScore > 0)
+  .sort((a, b) => b.displayScore - a.displayScore);
+```
+
+---
+
+## Step 3 — Apply Decay in RoommatesScreen (Match Queue)
+
+**File:** `screens/renter/RoommatesScreen.tsx`
+
+Same pattern as ExploreScreen. When loading matched profiles (mutual swipes or AI-suggested matches), filter out 30+-day inactive users and sort by `displayScore`.
+
+Also apply the filter when loading the swipe card stack — anyone who would appear in the Match queue should be subject to decay.
+
+---
+
+## Step 4 — Apply Decay in Groups Discover
+
+**File:** `screens/renter/GroupsScreen.tsx` (the Discover tab)
+
+When fetching groups to display in the Discover feed, join group data with the `last_active_at` of the group creator or the most recently active member:
+
+```ts
+// Option A: Filter by group's own last_active_at (if groups have this field)
+.gte('last_active_at', cutoff)
+
+// Option B: Filter by creator's last_active_at via join
+const { data: groups } = await supabase
+  .from('groups')
+  .select('*, profiles!groups_creator_id_fkey(last_active_at)')
+  .eq('is_visible', true)
+  // ... existing filters
+```
+
+Then in JS:
+```ts
+const visibleGroups = groups
+  .filter(g => {
+    const lastActive = g.profiles?.last_active_at;
+    if (!lastActive) return false;
+    const daysSince = (Date.now() - new Date(lastActive).getTime()) / (1000 * 60 * 60 * 24);
+    return daysSince <= 30;
+  })
+  .sort((a, b) => {
+    const scoreA = getRecencyMultiplier(a.profiles.last_active_at);
+    const scoreB = getRecencyMultiplier(b.profiles.last_active_at);
+    return scoreB - scoreA;
+  });
+```
+
+---
+
+## Step 5 — Re-engagement Notification Before Hiding
+
+Before a user crosses the 30-day threshold and gets hidden, send a push notification at day 14 (when their score hits 0.5) to bring them back:
+
+**File:** New Supabase Edge Function or scheduled cron `supabase/functions/activity-nudge/index.ts`
+
+```ts
+// Run daily (cron: '0 9 * * *')
+// Find users whose last_active_at is between 13-14 days ago and who haven't received this notification recently
+
+const { data: inactiveUsers } = await supabase
+  .from('profiles')
+  .select('user_id')
+  .lt('last_active_at', new Date(Date.now() - 13 * 24 * 60 * 60 * 1000).toISOString())
+  .gte('last_active_at', new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString())
+  .eq('search_paused', false);
+
+for (const profile of inactiveUsers ?? []) {
+  await supabase.from('notifications').insert({
+    user_id: profile.user_id,
+    type: 'activity_nudge',
+    title: 'New roommate matches are waiting',
+    body: "You have new people to connect with. Come see who's looking in your area.",
+    data: JSON.stringify({ type: 'activity_nudge', screen: 'Explore' }),
+  });
+}
+```
+
+This is a one-time notification per inactivity period. Do not spam — if they open the app (updating `last_active_at`), they exit the decay window and won't be targeted again until they go inactive again.
+
+---
+
+## Step 6 — Host-Side Renter Search
+
+**File:** `services/companyMatchmakerService.ts` or any host-facing query that fetches renters
+
+Apply the same 30-day cutoff and decay sort when hosts browse renters for shortlisting:
+
+```ts
+.gte('last_active_at', cutoff)
+.order('last_active_at', { ascending: false })
+```
+
+Hosts should not waste time shortlisting people who haven't opened the app in a month.
+
+---
+
+## Summary of Changes
+
+| File | Change |
+|---|---|
+| `supabase/migrations/043_activity_decay.sql` | Add `last_active_at` to profiles; create `profile_recency_scores` view |
+| `App.tsx` (root) | Update `last_active_at` on every app foreground event |
+| `screens/renter/ExploreScreen.tsx` | Filter 30+ day inactive; sort by `displayScore = compatibility × recency` |
+| `screens/renter/RoommatesScreen.tsx` | Same filter and sort |
+| `screens/renter/GroupsScreen.tsx` | Same filter applied to Groups Discover feed |
+| `services/companyMatchmakerService.ts` | Same cutoff for host-facing renter search |
+| `supabase/functions/activity-nudge/index.ts` | New daily cron: push notification at day 14 before user goes hidden |

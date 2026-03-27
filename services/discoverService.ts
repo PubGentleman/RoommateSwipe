@@ -39,6 +39,7 @@ export async function getSwipeDeck(city?: string, filters?: {
   if (error) throw error;
 
   let profiles = (data || []).filter(p => {
+    if (p.profile?.search_paused === true) return false;
     const photos = p.profile?.photos || p.photos || [];
     return Array.isArray(photos) && photos.length >= 1;
   });

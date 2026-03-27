@@ -193,14 +193,20 @@ export const ProfileScreen = () => {
       const { supabase } = await import('../../lib/supabase');
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (authUser) {
-        await supabase.from('profiles').update({
+        const { error } = await supabase.from('profiles').update({
           search_paused: true,
           search_paused_at: new Date().toISOString(),
           search_paused_reason: 'manual',
         }).eq('user_id', authUser.id);
+        if (error) {
+          setSearchPaused(false);
+          setSearchPausedAt(null);
+          await alert({ title: 'Error', message: 'Could not pause your search. Please try again.', variant: 'warning' });
+        }
       }
     } catch (_e) {
       setSearchPaused(false);
+      setSearchPausedAt(null);
     }
   };
 
@@ -212,11 +218,15 @@ export const ProfileScreen = () => {
       const { supabase } = await import('../../lib/supabase');
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (authUser) {
-        await supabase.from('profiles').update({
+        const { error } = await supabase.from('profiles').update({
           search_paused: false,
           search_paused_at: null,
           search_paused_reason: null,
         }).eq('user_id', authUser.id);
+        if (error) {
+          setSearchPaused(true);
+          await alert({ title: 'Error', message: 'Could not resume your search. Please try again.', variant: 'warning' });
+        }
       }
     } catch (_e) {
       setSearchPaused(true);
@@ -447,23 +457,23 @@ export const ProfileScreen = () => {
                     <Feather name="pause-circle" size={20} color="#667eea" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <ThemedText style={styles.pauseTitle}>Your search is paused</ThemedText>
-                    <ThemedText style={styles.pauseSubtitle}>
+                    <Text style={styles.pauseTitle}>Your search is paused</Text>
+                    <Text style={styles.pauseSubtitle}>
                       You're not visible in searches or matches
-                    </ThemedText>
+                    </Text>
                   </View>
                 </View>
                 {renterPlan === 'plus' || renterPlan === 'elite' ? (
-                  <ThemedText style={styles.pauseSubscriptionNote}>
+                  <Text style={styles.pauseSubscriptionNote}>
                     Your {renterPlan === 'elite' ? 'Elite' : 'Plus'} subscription is still active — your benefits are preserved.
-                  </ThemedText>
+                  </Text>
                 ) : null}
                 <Pressable
                   style={styles.resumeButton}
                   onPress={handleResumeSearch}
                 >
                   <Feather name="search" size={15} color="#fff" />
-                  <ThemedText style={styles.resumeButtonText}>Resume Search</ThemedText>
+                  <Text style={styles.resumeButtonText}>Resume Search</Text>
                 </Pressable>
               </>
             ) : (
@@ -473,17 +483,17 @@ export const ProfileScreen = () => {
                     <Feather name="home" size={20} color="#4CAF50" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <ThemedText style={styles.pauseTitle}>Found your place?</ThemedText>
-                    <ThemedText style={styles.pauseSubtitle}>
+                    <Text style={styles.pauseTitle}>Found your place?</Text>
+                    <Text style={styles.pauseSubtitle}>
                       Pause your profile — you can always come back
-                    </ThemedText>
+                    </Text>
                   </View>
                 </View>
                 <Pressable
                   style={styles.foundPlaceButton}
                   onPress={handleFoundPlace}
                 >
-                  <ThemedText style={styles.foundPlaceButtonText}>I Found a Place</ThemedText>
+                  <Text style={styles.foundPlaceButtonText}>I Found a Place</Text>
                 </Pressable>
               </>
             )}

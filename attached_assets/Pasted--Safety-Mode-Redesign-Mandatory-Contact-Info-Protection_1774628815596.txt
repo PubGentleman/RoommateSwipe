@@ -1,0 +1,250 @@
+# Safety Mode Redesign — Mandatory Contact Info Protection
+
+## What We're Changing and Why
+
+The current Safety Mode is an opt-in toggle in Profile Settings. This means most users never turn it on, so phone numbers and social handles flow freely until someone gets scammed or harassed. The fix is to make contact info protection a platform-level default, with clear unlock paths based on trust events (booking/showing) or a paid subscription.
+
+**New behavior in one sentence:** Free users never see raw contact info — it's always blurred with a clear prompt to book a showing or upgrade. Paid users (Plus/Elite) see contact info freely. All users auto-unlock contact info for a specific conversation once they confirm a showing or booking in that thread.
+
+---
+
+## Current State
+
+**File:** `components/SafeMessageText.tsx`
+
+The `SafeMessageText` component already handles the blurring correctly — regex detection, dot replacement, "Tap to reveal" button. The problem is upstream:
+
+1. It only activates when `safetyModeEnabled` is `true` and the user manually turned it on
+2. It blurs the sender's own messages (wrong — should only blur received messages)
+3. The toggle lives in Profile Settings — buried, optional, unknown to most users
+
+**File:** `screens/shared/ProfileScreen.tsx`
+
+Lines ~600–620: Safety Mode toggle renders a Switch that reads/writes `profiles.safety_mode_enabled`. This entire section will be removed.
+
+**File:** `screens/shared/ChatScreen.tsx`
+
+Lines ~1001–1003: `SafeMessageText` is rendered with `safetyMode={safetyModeEnabled}` where `safetyModeEnabled` comes from user profile state. This will change to a computed value based on plan + booking status.
+
+---
+
+## New Architecture
+
+### Three states for a conversation:
+
+| User Plan | Showing/Booking Confirmed in This Thread | Contact Info Visible? |
+|---|---|---|
+| Free | No | ❌ Blurred |
+| Free | Yes | ✅ Visible |
+| Plus / Elite | Any | ✅ Visible |
+
+### New prop logic in ChatScreen
+
+Replace the single `safetyModeEnabled` boolean with a computed value:
+
+```ts
+// At the top of ChatScreen (or in the hook that loads the conversation):
+
+const isPaidUser = renterLimits.canSeeContactInfo; // or hostPlan === 'business'
+const [hasBookingInThread, setHasBookingInThread] = useState(false);
+
+// Load booking status for this specific conversation
+// Look for a message of type 'showing_confirmed' or 'booking_confirmed' in conversation.messages
+// OR query showings/bookings table where conversation_id = currentConversationId
+useEffect(() => {
+  if (!isPaidUser) {
+    const hasConfirmed = messages.some(
+      m => m.type === 'showing_confirmed' || m.type === 'booking_confirmed'
+    );
+    setHasBookingInThread(hasConfirmed);
+  }
+}, [messages, isPaidUser]);
+
+const contactInfoVisible = isPaidUser || hasBookingInThread;
+```
+
+Then in the message render:
+
+```tsx
+<SafeMessageText
+  text={message.content}
+  safetyMode={!contactInfoVisible && message.senderId !== user?.id}
+  style={...}
+  onUpgradePress={() => navigation.navigate('Plans')}
+  onBookShowingPress={() => { /* scroll to or open showing request */ }}
+/>
+```
+
+---
+
+## Step 1 — Update `SafeMessageText` Props
+
+**File:** `components/SafeMessageText.tsx`
+
+Add two optional callback props and replace the generic "Tap to reveal" button with a contextual CTA:
+
+```tsx
+interface Props {
+  text: string
+  safetyMode: boolean
+  style?: StyleProp<TextStyle>
+  onUpgradePress?: () => void
+  onBookShowingPress?: () => void
+}
+```
+
+Replace the reveal button section (lines 39–45):
+
+```tsx
+{/* Instead of "Tap to reveal", show actionable prompts */}
+<View style={styles.lockBanner}>
+  <Feather name="lock" size={13} color="#FF6B6B" />
+  <ThemedText style={styles.lockText}>Contact info hidden</ThemedText>
+</View>
+<View style={styles.ctaRow}>
+  {onBookShowingPress && (
+    <Pressable style={styles.ctaButton} onPress={onBookShowingPress}>
+      <ThemedText style={styles.ctaText}>Book a Showing</ThemedText>
+    </Pressable>
+  )}
+  {onUpgradePress && (
+    <Pressable style={[styles.ctaButton, styles.ctaUpgrade]} onPress={onUpgradePress}>
+      <Feather name="zap" size={12} color="#667eea" />
+      <ThemedText style={[styles.ctaText, { color: '#667eea' }]}>Upgrade</ThemedText>
+    </Pressable>
+  )}
+</View>
+```
+
+Add new styles:
+
+```ts
+lockBanner: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 5,
+  marginBottom: 6,
+},
+lockText: {
+  color: '#FF6B6B',
+  fontSize: 12,
+  fontWeight: '600',
+},
+ctaRow: {
+  flexDirection: 'row',
+  gap: 8,
+},
+ctaButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 4,
+  backgroundColor: 'rgba(255, 107, 107, 0.12)',
+  paddingHorizontal: 10,
+  paddingVertical: 5,
+  borderRadius: 8,
+},
+ctaUpgrade: {
+  backgroundColor: 'rgba(102, 126, 234, 0.12)',
+},
+ctaText: {
+  color: '#FF6B6B',
+  fontSize: 12,
+  fontWeight: '600',
+},
+```
+
+---
+
+## Step 2 — Remove Safety Mode Toggle from ProfileScreen
+
+**File:** `screens/shared/ProfileScreen.tsx`
+
+Delete the entire Safety Mode section — the `safetyMode` state, the Supabase read, the Switch component, and the settings card item. Search for `safety_mode_enabled`, `safetyMode`, and `SafeMode` and remove all references.
+
+The feature is no longer user-controlled. No toggle is needed.
+
+Also delete the `profiles.safety_mode_enabled` column reference from Supabase queries (the column itself can remain for now with no active reads/writes — it becomes dead data).
+
+---
+
+## Step 3 — Add `canSeeContactInfo` to Plan Limits
+
+**File:** `services/planLimitsService.ts` (or wherever `renterPlanLimits` is computed)
+
+Add:
+
+```ts
+canSeeContactInfo: plan === 'plus' || plan === 'elite',
+```
+
+For hosts:
+```ts
+canSeeContactInfo: hostPlan === 'business',
+```
+
+Basic/free renters and Standard hosts always have `canSeeContactInfo: false` by default (overridden by booking/showing confirmation).
+
+---
+
+## Step 4 — Add Booking Confirmation Detection
+
+**File:** `screens/shared/ChatScreen.tsx`
+
+The booking/showing confirmation can be detected two ways — use whichever matches the existing data model:
+
+**Option A — Message type flag** (if showing requests send a typed message):
+```ts
+const hasConfirmedEvent = messages.some(
+  m => ['showing_confirmed', 'booking_confirmed', 'showing_accepted'].includes(m.type ?? '')
+);
+```
+
+**Option B — Supabase query** (if showings are tracked in a separate table):
+```ts
+const { data: showing } = await supabase
+  .from('showings')
+  .select('id, status')
+  .eq('conversation_id', conversationId)
+  .in('status', ['confirmed', 'completed'])
+  .maybeSingle();
+
+const hasConfirmedEvent = !!showing;
+```
+
+Load this in `useFocusEffect` or the main conversation loader. Store as `hasBookingInThread` in local state.
+
+---
+
+## Step 5 — Wire the Auto-Unlock Notification
+
+When `hasBookingInThread` flips from `false` to `true` (a booking was just confirmed), show a one-time in-chat system message:
+
+```tsx
+// Injected into the messages array as a local system item (not stored in DB):
+{
+  id: 'contact-unlock',
+  type: 'system',
+  content: '🔓 Contact info is now visible in this conversation.',
+  timestamp: new Date(),
+}
+```
+
+Render system messages in `ChatScreen.tsx` in the message list using a distinct center-aligned style (gray text, no bubble).
+
+---
+
+## Step 6 — Update Database
+
+No schema changes required for the new behavior. The `profiles.safety_mode_enabled` column can be left as-is or removed in a future cleanup migration. The contact visibility logic is now computed entirely from `plan` and booking status — no stored toggle.
+
+---
+
+## Summary of Changes
+
+| File | Change |
+|---|---|
+| `components/SafeMessageText.tsx` | Replace "Tap to reveal" with Book a Showing / Upgrade CTAs |
+| `screens/shared/ChatScreen.tsx` | Compute `contactInfoVisible` from plan + booking status; scope blur to received messages only |
+| `screens/shared/ProfileScreen.tsx` | Remove Safety Mode toggle entirely |
+| `services/planLimitsService.ts` | Add `canSeeContactInfo` to plan limits |
+| Supabase | No migration needed; `safety_mode_enabled` column becomes unused |
