@@ -1,11 +1,9 @@
-import React, { useRef, useCallback, useEffect } from 'react';
-import { View, StyleSheet, Platform, ScrollView, Pressable, Text } from 'react-native';
+import React from 'react';
+import { View, StyleSheet, Platform, Pressable, Text } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { ThemedText } from './ThemedText';
 
 const ACCENT = '#FF6B6B';
-const ITEM_HEIGHT = 44;
-const VISIBLE_ITEMS = 3;
 
 export const STANDARD_MIN_OPTIONS = [
   { label: '$500', value: 500 },
@@ -71,131 +69,74 @@ interface WebSpinnerProps {
   height?: number;
 }
 
-const WebSpinnerPicker: React.FC<WebSpinnerProps> = ({ options, selectedValue, onValueChange, height = 150 }) => {
-  const scrollRef = useRef<ScrollView>(null);
-  const isScrollingRef = useRef(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+const WebSpinnerPicker: React.FC<WebSpinnerProps> = ({ options, selectedValue, onValueChange }) => {
   const selectedIdx = options.findIndex(o => o.value === selectedValue);
   const activeIdx = selectedIdx >= 0 ? selectedIdx : 0;
-  const paddingItems = Math.floor(VISIBLE_ITEMS / 2);
+  const canGoUp = activeIdx > 0;
+  const canGoDown = activeIdx < options.length - 1;
 
-  useEffect(() => {
-    if (!isScrollingRef.current) {
-      const timer = setTimeout(() => {
-        scrollRef.current?.scrollTo({ y: activeIdx * ITEM_HEIGHT, animated: false });
-      }, 50);
-      return () => clearTimeout(timer);
-    }
-  }, [activeIdx, options.length]);
-
-  const handleScrollEnd = useCallback((yOffset: number) => {
-    const idx = Math.round(yOffset / ITEM_HEIGHT);
-    const clampedIdx = Math.max(0, Math.min(idx, options.length - 1));
-    if (options[clampedIdx] && options[clampedIdx].value !== selectedValue) {
-      onValueChange(options[clampedIdx].value);
-    }
-    scrollRef.current?.scrollTo({ y: clampedIdx * ITEM_HEIGHT, animated: true });
-    isScrollingRef.current = false;
-  }, [options, selectedValue, onValueChange]);
-
-  const handleScroll = useCallback((e: any) => {
-    isScrollingRef.current = true;
-    const yOffset = e.nativeEvent.contentOffset.y;
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(() => handleScrollEnd(yOffset), 80);
-  }, [handleScrollEnd]);
-
-  const containerHeight = VISIBLE_ITEMS * ITEM_HEIGHT;
+  const goUp = () => {
+    if (canGoUp) onValueChange(options[activeIdx - 1].value);
+  };
+  const goDown = () => {
+    if (canGoDown) onValueChange(options[activeIdx + 1].value);
+  };
 
   return (
-    <View style={[webStyles.container, { height: containerHeight }]}>
-      <View style={webStyles.selectionBand} pointerEvents="none" />
-      <View style={webStyles.topFade} pointerEvents="none" />
-      <View style={webStyles.bottomFade} pointerEvents="none" />
-      <ScrollView
-        ref={scrollRef}
-        showsVerticalScrollIndicator={false}
-        snapToInterval={ITEM_HEIGHT}
-        decelerationRate="fast"
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
-        contentContainerStyle={{
-          paddingTop: paddingItems * ITEM_HEIGHT,
-          paddingBottom: paddingItems * ITEM_HEIGHT,
-        }}
+    <View style={webStyles.container}>
+      <Pressable
+        onPress={goUp}
+        style={[webStyles.arrowBtn, !canGoUp && webStyles.arrowDisabled]}
       >
-        {options.map((opt, i) => {
-          const isSelected = opt.value === selectedValue;
-          return (
-            <Pressable
-              key={opt.value}
-              style={webStyles.item}
-              onPress={() => {
-                onValueChange(opt.value);
-                scrollRef.current?.scrollTo({ y: i * ITEM_HEIGHT, animated: true });
-              }}
-            >
-              <Text style={[
-                webStyles.itemText,
-                isSelected ? webStyles.itemTextSelected : webStyles.itemTextDimmed,
-              ]}>
-                {opt.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+        <Text style={[webStyles.arrow, !canGoUp && webStyles.arrowTextDisabled]}>{'\u25B2'}</Text>
+      </Pressable>
+      <View style={webStyles.valueRow}>
+        <Text style={webStyles.valueText}>{options[activeIdx]?.label ?? ''}</Text>
+      </View>
+      <Pressable
+        onPress={goDown}
+        style={[webStyles.arrowBtn, !canGoDown && webStyles.arrowDisabled]}
+      >
+        <Text style={[webStyles.arrow, !canGoDown && webStyles.arrowTextDisabled]}>{'\u25BC'}</Text>
+      </Pressable>
     </View>
   );
 };
 
 const webStyles = StyleSheet.create({
   container: {
-    overflow: 'hidden',
     borderRadius: 12,
-    backgroundColor: 'transparent',
-    position: 'relative',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    paddingVertical: 4,
   },
-  selectionBand: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: ITEM_HEIGHT,
-    height: ITEM_HEIGHT,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 8,
-    zIndex: 1,
-  },
-  topFade: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: ITEM_HEIGHT,
-    zIndex: 2,
-  },
-  bottomFade: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: ITEM_HEIGHT,
-    zIndex: 2,
-  },
-  item: {
-    height: ITEM_HEIGHT,
-    justifyContent: 'center',
+  arrowBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 20,
     alignItems: 'center',
   },
-  itemText: {
-    fontSize: 16,
-    fontWeight: '600',
+  arrowDisabled: {
+    opacity: 0.2,
   },
-  itemTextSelected: {
+  arrow: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.6)',
+  },
+  arrowTextDisabled: {
+    color: 'rgba(255,255,255,0.2)',
+  },
+  valueRow: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 8,
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  valueText: {
+    fontSize: 17,
+    fontWeight: '700',
     color: '#ffffff',
-  },
-  itemTextDimmed: {
-    color: 'rgba(255,255,255,0.45)',
   },
 });
 
