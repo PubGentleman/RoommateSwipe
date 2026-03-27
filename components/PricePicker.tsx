@@ -153,7 +153,7 @@ const webStyles = StyleSheet.create({
   container: {
     overflow: 'hidden',
     borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: 'transparent',
     position: 'relative',
   },
   selectionBand: {
@@ -195,7 +195,7 @@ const webStyles = StyleSheet.create({
     color: '#ffffff',
   },
   itemTextDimmed: {
-    color: 'rgba(255,255,255,0.3)',
+    color: 'rgba(255,255,255,0.45)',
   },
 });
 
