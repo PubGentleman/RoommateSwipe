@@ -694,7 +694,19 @@ export const ProfileScreen = () => {
               title="Verify Identity"
               subtitle="Phone, ID, social verification"
               onPress={() => navigation.navigate('Verification')}
+              isLast
             />
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleRow}>
+              <View style={styles.sectionTitleBar} />
+              <Text style={styles.sectionTitle}>Support</Text>
+            </View>
+          </View>
+          <View style={styles.settingsCard}>
             <SettingsItem
                 iconName="mail"
                 iconColor="#667eea"
@@ -724,7 +736,7 @@ export const ProfileScreen = () => {
                   const url = `mailto:${emailAddress}?subject=${subject}`;
                   try {
                     if (Platform.OS === 'web') {
-                      window.open(url);
+                      window.location.href = url;
                     } else {
                       await Linking.openURL(url);
                     }
@@ -736,19 +748,7 @@ export const ProfileScreen = () => {
                     });
                   }
                 }}
-                isLast
               />
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleRow}>
-              <View style={styles.sectionTitleBar} />
-              <Text style={styles.sectionTitle}>Support</Text>
-            </View>
-          </View>
-          <View style={styles.settingsCard}>
             <SettingsItem
               iconName="file-text"
               iconColor="rgba(255,255,255,0.5)"
