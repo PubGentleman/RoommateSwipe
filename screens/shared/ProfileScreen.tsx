@@ -43,6 +43,8 @@ export const ProfileScreen = () => {
   const [devTapTimer, setDevTapTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
   const [safetyMode, setSafetyMode] = useState(false);
   const [hasAffiliate, setHasAffiliate] = useState(false);
+  const [searchPaused, setSearchPaused] = useState(false);
+  const [searchPausedAt, setSearchPausedAt] = useState<string | null>(null);
 
   const PROFILE_COLLAPSE_H = 280;
   const profileScrollY = useSharedValue(0);
@@ -127,8 +129,10 @@ export const ProfileScreen = () => {
           setPendingInterestCount(cards.filter(c => c.status === 'pending').length);
         });
         import('../../lib/supabase').then(({ supabase }) => {
-          supabase.from('profiles').select('safety_mode_enabled').eq('user_id', user.id).single().then(({ data }) => {
+          supabase.from('profiles').select('safety_mode_enabled, search_paused, search_paused_at').eq('user_id', user.id).single().then(({ data }) => {
             if (data?.safety_mode_enabled !== undefined) setSafetyMode(!!data.safety_mode_enabled);
+            if (data?.search_paused !== undefined) setSearchPaused(!!data.search_paused);
+            if (data?.search_paused_at) setSearchPausedAt(data.search_paused_at);
           });
         }).catch(() => {});
         getAffiliateForUser(user.id).then(aff => setHasAffiliate(!!aff)).catch(() => {});
@@ -170,6 +174,52 @@ export const ProfileScreen = () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } else {
       await alert({ title: 'Cannot Boost', message: result.message, variant: 'warning' });
+    }
+  };
+
+  const handleFoundPlace = async () => {
+    const confirmed = await confirm({
+      title: 'Pause your search?',
+      message: "You'll stop appearing in Match, Explore, and Groups. Your conversations and account stay active.",
+      confirmText: 'Yes, pause it',
+      cancelText: 'Cancel',
+    });
+    if (!confirmed) return;
+
+    setSearchPaused(true);
+    setSearchPausedAt(new Date().toISOString());
+
+    try {
+      const { supabase } = await import('../../lib/supabase');
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (authUser) {
+        await supabase.from('profiles').update({
+          search_paused: true,
+          search_paused_at: new Date().toISOString(),
+          search_paused_reason: 'manual',
+        }).eq('user_id', authUser.id);
+      }
+    } catch (_e) {
+      setSearchPaused(false);
+    }
+  };
+
+  const handleResumeSearch = async () => {
+    setSearchPaused(false);
+    setSearchPausedAt(null);
+
+    try {
+      const { supabase } = await import('../../lib/supabase');
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (authUser) {
+        await supabase.from('profiles').update({
+          search_paused: false,
+          search_paused_at: null,
+          search_paused_reason: null,
+        }).eq('user_id', authUser.id);
+      }
+    } catch (_e) {
+      setSearchPaused(true);
     }
   };
 
@@ -385,6 +435,58 @@ export const ProfileScreen = () => {
                 <Feather name="chevron-right" size={20} color="#999" />
               )}
             </Pressable>
+          </View>
+        ) : null}
+
+        {!isHost ? (
+          <View style={styles.pauseCard}>
+            {searchPaused ? (
+              <>
+                <View style={styles.pauseCardHeader}>
+                  <View style={styles.pauseIconWrap}>
+                    <Feather name="pause-circle" size={20} color="#667eea" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <ThemedText style={styles.pauseTitle}>Your search is paused</ThemedText>
+                    <ThemedText style={styles.pauseSubtitle}>
+                      You're not visible in searches or matches
+                    </ThemedText>
+                  </View>
+                </View>
+                {renterPlan === 'plus' || renterPlan === 'elite' ? (
+                  <ThemedText style={styles.pauseSubscriptionNote}>
+                    Your {renterPlan === 'elite' ? 'Elite' : 'Plus'} subscription is still active — your benefits are preserved.
+                  </ThemedText>
+                ) : null}
+                <Pressable
+                  style={styles.resumeButton}
+                  onPress={handleResumeSearch}
+                >
+                  <Feather name="search" size={15} color="#fff" />
+                  <ThemedText style={styles.resumeButtonText}>Resume Search</ThemedText>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <View style={styles.pauseCardHeader}>
+                  <View style={[styles.pauseIconWrap, { backgroundColor: 'rgba(76,175,80,0.12)' }]}>
+                    <Feather name="home" size={20} color="#4CAF50" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <ThemedText style={styles.pauseTitle}>Found your place?</ThemedText>
+                    <ThemedText style={styles.pauseSubtitle}>
+                      Pause your profile — you can always come back
+                    </ThemedText>
+                  </View>
+                </View>
+                <Pressable
+                  style={styles.foundPlaceButton}
+                  onPress={handleFoundPlace}
+                >
+                  <ThemedText style={styles.foundPlaceButtonText}>I Found a Place</ThemedText>
+                </Pressable>
+              </>
+            )}
           </View>
         ) : null}
 
@@ -1735,5 +1837,71 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 12,
+  },
+  pauseCard: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    padding: 16,
+    marginHorizontal: 20,
+    marginBottom: 16,
+  },
+  pauseCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+  pauseIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: 'rgba(102, 126, 234, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pauseTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  pauseSubtitle: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.5)',
+    marginTop: 2,
+  },
+  pauseSubscriptionNote: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.45)',
+    marginBottom: 12,
+    lineHeight: 17,
+  },
+  resumeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    backgroundColor: '#667eea',
+    borderRadius: 10,
+    paddingVertical: 10,
+  },
+  resumeButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  foundPlaceButton: {
+    backgroundColor: 'rgba(76, 175, 80, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(76, 175, 80, 0.3)',
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  foundPlaceButtonText: {
+    color: '#4CAF50',
+    fontWeight: '700',
+    fontSize: 14,
   },
 });

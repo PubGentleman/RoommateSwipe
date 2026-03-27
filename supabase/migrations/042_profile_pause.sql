@@ -1,0 +1,8 @@
+ALTER TABLE profiles
+  ADD COLUMN IF NOT EXISTS search_paused BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS search_paused_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS search_paused_reason TEXT;
+
+ALTER TABLE bookings
+  ADD COLUMN IF NOT EXISTS checkin_sent_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS checkin_response TEXT;

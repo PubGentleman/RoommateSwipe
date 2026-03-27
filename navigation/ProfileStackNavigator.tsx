@@ -31,6 +31,8 @@ import { HostAgentSetupScreen } from '../screens/host/onboarding/HostAgentSetupS
 import ApartmentPreferencesScreen from '../screens/shared/ApartmentPreferencesScreen';
 import { AffiliateApplyScreen } from '../screens/shared/AffiliateApplyScreen';
 import { AffiliateDashboardScreen } from '../screens/shared/AffiliateDashboardScreen';
+import MoveInCheckinScreen from '../screens/renter/MoveInCheckinScreen';
+import MoveInSuccessScreen from '../screens/renter/MoveInSuccessScreen';
 
 export type ProfileStackParamList = {
   ProfileMain: undefined;
@@ -62,6 +64,8 @@ export type ProfileStackParamList = {
   ApartmentPreferences: undefined;
   AffiliateApply: undefined;
   AffiliateDashboard: undefined;
+  MoveInCheckin: { bookingId: string };
+  MoveInSuccess: undefined;
 };
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
@@ -321,6 +325,16 @@ export const ProfileStackNavigator = () => {
       <Stack.Screen
         name="AffiliateDashboard"
         component={AffiliateDashboardScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="MoveInCheckin"
+        component={MoveInCheckinScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="MoveInSuccess"
+        component={MoveInSuccessScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>

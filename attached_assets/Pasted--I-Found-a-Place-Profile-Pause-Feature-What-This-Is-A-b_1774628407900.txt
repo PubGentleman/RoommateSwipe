@@ -1,0 +1,488 @@
+# "I Found a Place" — Profile Pause Feature
+
+## What This Is
+
+A button on the renter's profile that lets them pause their presence in the app without deleting their account. When paused:
+- Their profile card disappears from Match queue, Explore, and Groups Discover
+- Their existing conversations remain active (they can still message people they've already connected with)
+- Their subscription keeps running — no cancellation prompt
+- They see a clear banner on their Profile tab confirming they're paused
+- A "Resume Search" button re-activates them instantly
+
+The goal is to give users a graceful off-ramp so they don't just delete the app. A paused account is infinitely better than churn — they'll come back when they need to move again.
+
+---
+
+## Trigger Points
+
+The pause can be initiated in two ways:
+
+1. **Manual** — "I Found a Place" button on the Profile tab (always visible for renters)
+2. **Automatic move-in check-in** — On the renter's move-in date (pulled from the confirmed booking), the app sends a check-in notification: *"How's your new apartment? 🏠"* If they respond positively (Great / Love it), their profile is automatically paused. If they say it didn't work out, no action is taken — they stay visible and can keep searching. This is more accurate than prompting immediately after booking, because bookings fall through and a response on move-in day reflects reality.
+
+---
+
+## Database Changes
+
+**File:** New migration `supabase/migrations/042_profile_pause.sql`
+
+```sql
+ALTER TABLE profiles
+  ADD COLUMN IF NOT EXISTS search_paused BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS search_paused_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS search_paused_reason TEXT; -- 'manual' | 'moved_in' | 'no_response'
+
+-- Track move-in check-in state on the bookings table
+ALTER TABLE bookings
+  ADD COLUMN IF NOT EXISTS checkin_sent_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS checkin_response TEXT; -- 'great' | 'okay' | 'no' | null (no response yet)
+```
+
+---
+
+## Step 1 — Add Pause State to ProfileScreen
+
+**File:** `screens/shared/ProfileScreen.tsx`
+
+Add state alongside existing profile state (near line 44):
+
+```ts
+const [searchPaused, setSearchPaused] = useState(false);
+const [searchPausedAt, setSearchPausedAt] = useState<string | null>(null);
+```
+
+Load from Supabase in the existing `useFocusEffect` data fetch (extend the `.select()`):
+
+```ts
+.select('safety_mode_enabled, incognito_enabled, search_paused, search_paused_at')
+```
+
+Then:
+```ts
+if (data?.search_paused !== undefined) setSearchPaused(!!data.search_paused);
+if (data?.search_paused_at) setSearchPausedAt(data.search_paused_at);
+```
+
+---
+
+## Step 2 — "I Found a Place" Button in ProfileScreen
+
+**File:** `screens/shared/ProfileScreen.tsx`
+
+Add this card **above** the settings sections, below the profile completion card. Only show it for renters (check `userRole === 'renter'`):
+
+```tsx
+{userRole === 'renter' && (
+  <View style={styles.pauseCard}>
+    {searchPaused ? (
+      // PAUSED STATE
+      <>
+        <View style={styles.pauseCardHeader}>
+          <View style={styles.pauseIconWrap}>
+            <Feather name="pause-circle" size={20} color="#667eea" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <ThemedText style={styles.pauseTitle}>Your search is paused</ThemedText>
+            <ThemedText style={styles.pauseSubtitle}>
+              You're not visible in searches or matches
+            </ThemedText>
+          </View>
+        </View>
+        {renterLimits.plan === 'plus' || renterLimits.plan === 'elite' ? (
+          <ThemedText style={styles.pauseSubscriptionNote}>
+            Your {renterLimits.plan === 'elite' ? 'Elite' : 'Plus'} subscription is still active — your benefits are preserved.
+          </ThemedText>
+        ) : null}
+        <Pressable
+          style={styles.resumeButton}
+          onPress={handleResumeSearch}
+        >
+          <Feather name="search" size={15} color="#fff" />
+          <ThemedText style={styles.resumeButtonText}>Resume Search</ThemedText>
+        </Pressable>
+      </>
+    ) : (
+      // ACTIVE STATE
+      <>
+        <View style={styles.pauseCardHeader}>
+          <View style={styles.pauseIconWrap}>
+            <Feather name="home" size={20} color="#4CAF50" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <ThemedText style={styles.pauseTitle}>Found your place?</ThemedText>
+            <ThemedText style={styles.pauseSubtitle}>
+              Pause your profile — you can always come back
+            </ThemedText>
+          </View>
+        </View>
+        <Pressable
+          style={styles.foundPlaceButton}
+          onPress={handleFoundPlace}
+        >
+          <ThemedText style={styles.foundPlaceButtonText}>I Found a Place 🎉</ThemedText>
+        </Pressable>
+      </>
+    )}
+  </View>
+)}
+```
+
+---
+
+## Step 3 — Pause / Resume Handlers
+
+**File:** `screens/shared/ProfileScreen.tsx`
+
+```ts
+const handleFoundPlace = async () => {
+  // Confirm before pausing
+  const confirmed = await new Promise<boolean>((resolve) => {
+    Alert.alert(
+      'Pause your search?',
+      "You'll stop appearing in Match, Explore, and Groups. Your conversations and account stay active.",
+      [
+        { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+        { text: 'Yes, pause it', style: 'default', onPress: () => resolve(true) },
+      ]
+    );
+  });
+
+  if (!confirmed) return;
+
+  setSearchPaused(true);
+  setSearchPausedAt(new Date().toISOString());
+
+  try {
+    const { supabase } = await import('../../lib/supabase');
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (authUser) {
+      await supabase.from('profiles').update({
+        search_paused: true,
+        search_paused_at: new Date().toISOString(),
+        search_paused_reason: 'manual',
+      }).eq('user_id', authUser.id);
+    }
+  } catch (_e) {
+    // Revert on error
+    setSearchPaused(false);
+  }
+};
+
+const handleResumeSearch = async () => {
+  setSearchPaused(false);
+  setSearchPausedAt(null);
+
+  try {
+    const { supabase } = await import('../../lib/supabase');
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (authUser) {
+      await supabase.from('profiles').update({
+        search_paused: false,
+        search_paused_at: null,
+        search_paused_reason: null,
+      }).eq('user_id', authUser.id);
+    }
+  } catch (_e) {
+    setSearchPaused(true); // Revert on error
+  }
+};
+```
+
+---
+
+## Step 4 — Filter Paused Users from Match Queue
+
+**File:** `screens/renter/ExploreScreen.tsx` or wherever roommate profiles / swipe cards are loaded
+
+When fetching profiles to display, add a filter:
+
+```ts
+const { data: profiles } = await supabase
+  .from('profiles')
+  .select('*')
+  .eq('role', 'renter')
+  .eq('search_paused', false)   // ← exclude paused users
+  .neq('user_id', user.id)
+  // ... existing filters
+```
+
+Apply the same `.eq('search_paused', false)` filter in:
+- `RoommatesScreen.tsx` (if separate from ExploreScreen)
+- Any Groups Discover query that fetches renter profiles for matching
+- Any swipe card data loader
+- Any host-facing search for renters (e.g., company matchmaker shortlist)
+
+---
+
+## Step 5 — Move-In Day Check-In (Auto-Pause Trigger)
+
+This replaces any prompt at the moment of booking confirmation. We do not ask the user anything when they accept a booking — that's premature. Instead we wait until the actual move-in date.
+
+### 5a — Supabase Edge Function Cron (runs daily at 10am)
+
+**File:** `supabase/functions/movein-checkin/index.ts`
+
+```ts
+// Cron schedule: '0 10 * * *'
+// Finds bookings where move_in_date = today, status = 'confirmed',
+// and checkin_sent_at is null (not already sent)
+
+const today = new Date().toISOString().split('T')[0]; // 'YYYY-MM-DD'
+
+const { data: bookings } = await supabase
+  .from('bookings')
+  .select('id, renter_id, listing_id')
+  .eq('status', 'confirmed')
+  .eq('move_in_date', today)
+  .is('checkin_sent_at', null);
+
+for (const booking of bookings ?? []) {
+  // Send push notification to renter
+  await supabase.from('notifications').insert({
+    user_id: booking.renter_id,
+    type: 'movein_checkin',
+    title: '🏠 How\'s your new apartment?',
+    body: 'Hope the move went smoothly! Let us know how you\'re settling in.',
+    data: JSON.stringify({
+      type: 'movein_checkin',
+      bookingId: booking.id,
+      screen: 'MoveInCheckin',
+    }),
+  });
+
+  // Mark notification as sent
+  await supabase.from('bookings')
+    .update({ checkin_sent_at: new Date().toISOString() })
+    .eq('id', booking.id);
+}
+```
+
+### 5b — Move-In Check-In Screen
+
+**File:** `screens/renter/MoveInCheckinScreen.tsx` (new file)
+
+This is a simple full-screen card that opens when the user taps the move-in day notification. It asks one question with three response options.
+
+```tsx
+export default function MoveInCheckinScreen({ route, navigation }) {
+  const { bookingId } = route.params;
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleResponse = async (response: 'great' | 'okay' | 'no') => {
+    setSubmitting(true);
+    const { supabase } = await import('../../lib/supabase');
+    const { data: { user } } = await supabase.auth.getUser();
+
+    // Save response on the booking
+    await supabase.from('bookings')
+      .update({ checkin_response: response })
+      .eq('id', bookingId);
+
+    // Auto-pause if they're happy
+    if (response === 'great' || response === 'okay') {
+      await supabase.from('profiles')
+        .update({
+          search_paused: true,
+          search_paused_at: new Date().toISOString(),
+          search_paused_reason: 'moved_in',
+        })
+        .eq('user_id', user!.id);
+
+      navigation.replace('MoveInSuccess'); // go to the celebratory screen
+    } else {
+      // 'no' — booking fell through, stay visible
+      navigation.goBack();
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <ThemedText style={styles.emoji}>🏠</ThemedText>
+      <ThemedText style={styles.title}>How's your new apartment?</ThemedText>
+      <ThemedText style={styles.subtitle}>
+        Hope the move went smoothly! Let us know how you're settling in.
+      </ThemedText>
+
+      <Pressable style={styles.optionGreat} onPress={() => handleResponse('great')} disabled={submitting}>
+        <ThemedText style={styles.optionText}>❤️ Love it!</ThemedText>
+      </Pressable>
+
+      <Pressable style={styles.optionOkay} onPress={() => handleResponse('okay')} disabled={submitting}>
+        <ThemedText style={styles.optionText}>👍 It's good</ThemedText>
+      </Pressable>
+
+      <Pressable style={styles.optionNo} onPress={() => handleResponse('no')} disabled={submitting}>
+        <ThemedText style={[styles.optionText, { color: 'rgba(255,255,255,0.4)' }]}>
+          😬 Actually, it didn't work out
+        </ThemedText>
+      </Pressable>
+    </View>
+  );
+}
+```
+
+Add styles: `container` (full screen, centered, dark background), `emoji` (font size 56, centered), `title` (24px bold), `subtitle` (14px muted, centered, max-width 280), `optionGreat/optionOkay` (card buttons, green/blue tint), `optionNo` (ghost button, no border, bottom of screen).
+
+### 5c — Move-In Success Screen
+
+**File:** `screens/renter/MoveInSuccessScreen.tsx` (new file)
+
+A brief celebratory screen shown after a positive check-in response.
+
+```tsx
+export default function MoveInSuccessScreen({ navigation }) {
+  return (
+    <View style={styles.container}>
+      <ThemedText style={styles.emoji}>🎉</ThemedText>
+      <ThemedText style={styles.title}>Congrats on your new place!</ThemedText>
+      <ThemedText style={styles.subtitle}>
+        Your profile is now paused — you won't appear in searches or matches.
+        Come back anytime to resume your search.
+      </ThemedText>
+      {/* If Plus/Elite subscriber: */}
+      <View style={styles.subscriptionNote}>
+        <Feather name="zap" size={14} color="#667eea" />
+        <ThemedText style={styles.subscriptionText}>
+          Your subscription stays active — your benefits are preserved.
+        </ThemedText>
+      </View>
+      <Pressable style={styles.doneButton} onPress={() => navigation.navigate('Profile')}>
+        <ThemedText style={styles.doneButtonText}>Go to Profile</ThemedText>
+      </Pressable>
+    </View>
+  );
+}
+```
+
+### 5d — Register New Screens in Navigator
+
+**File:** `navigation/RenterNavigator.tsx` (or your app's navigation file)
+
+Add `MoveInCheckin` and `MoveInSuccess` to the stack:
+
+```ts
+<Stack.Screen name="MoveInCheckin" component={MoveInCheckinScreen} options={{ headerShown: false }} />
+<Stack.Screen name="MoveInSuccess" component={MoveInSuccessScreen} options={{ headerShown: false }} />
+```
+
+Handle the deep link from the notification's `data.screen = 'MoveInCheckin'` in your notification handler, passing `bookingId` as a route param.
+
+### 5e — What Happens If They Don't Respond
+
+If `checkin_response` is still `null` after 7 days:
+- Do nothing — don't auto-pause, don't harass them
+- The profile stays visible
+- A second nudge is optional at day 7: *"Still settling in? Let us know how it's going."* — but only send once, and only if they never responded
+
+Track this with a `checkin_followup_sent_at` column on `bookings` if desired.
+
+---
+
+## Step 6 — Subscription Handling
+
+**No subscription changes are triggered when a user pauses.** The subscription continues running as-is.
+
+Display a subscription status note in the paused state card (Step 2 above already includes this for Plus/Elite users):
+
+> "Your Elite subscription is still active — your benefits are preserved."
+
+**30-day inactivity follow-up:** After a user has been paused for 30+ days with no app opens, send a push notification (via an existing scheduled job or Supabase Edge Function cron):
+
+```
+Title: "Still not looking for a place?"
+Body: "Your profile has been paused for a month. You can resume anytime — or pause your subscription to save money."
+```
+
+This notification opens the Profile tab. It should be sent at most once per pause period. Track with a `pause_notification_sent_at` column or a `notifications` table entry.
+
+No in-app forced cancellation flow. Users cancel or modify their subscription themselves via the Plans screen if they choose to.
+
+---
+
+## Styles to Add
+
+```ts
+pauseCard: {
+  backgroundColor: 'rgba(255,255,255,0.05)',
+  borderRadius: 16,
+  borderWidth: 1,
+  borderColor: 'rgba(255,255,255,0.08)',
+  padding: 16,
+  marginHorizontal: 20,
+  marginBottom: 16,
+},
+pauseCardHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 12,
+  marginBottom: 12,
+},
+pauseIconWrap: {
+  width: 40,
+  height: 40,
+  borderRadius: 10,
+  backgroundColor: 'rgba(102, 126, 234, 0.12)',
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+pauseTitle: {
+  fontSize: 15,
+  fontWeight: '700',
+  color: '#fff',
+},
+pauseSubtitle: {
+  fontSize: 12,
+  color: 'rgba(255,255,255,0.5)',
+  marginTop: 2,
+},
+pauseSubscriptionNote: {
+  fontSize: 12,
+  color: 'rgba(255,255,255,0.45)',
+  marginBottom: 12,
+  lineHeight: 17,
+},
+resumeButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 7,
+  backgroundColor: '#667eea',
+  borderRadius: 10,
+  paddingVertical: 10,
+},
+resumeButtonText: {
+  color: '#fff',
+  fontWeight: '700',
+  fontSize: 14,
+},
+foundPlaceButton: {
+  backgroundColor: 'rgba(76, 175, 80, 0.15)',
+  borderWidth: 1,
+  borderColor: 'rgba(76, 175, 80, 0.3)',
+  borderRadius: 10,
+  paddingVertical: 10,
+  alignItems: 'center',
+},
+foundPlaceButtonText: {
+  color: '#4CAF50',
+  fontWeight: '700',
+  fontSize: 14,
+},
+```
+
+---
+
+## Summary of Changes
+
+| File | Change |
+|---|---|
+| `supabase/migrations/042_profile_pause.sql` | Add `search_paused`, `search_paused_at`, `search_paused_reason` to profiles; add `checkin_sent_at`, `checkin_response` to bookings |
+| `screens/shared/ProfileScreen.tsx` | Add pause card UI + pause/resume handlers + Supabase read/write |
+| `screens/renter/MoveInCheckinScreen.tsx` | New screen — 3-option check-in card opened from move-in day notification |
+| `screens/renter/MoveInSuccessScreen.tsx` | New screen — celebration + paused confirmation shown after positive response |
+| `navigation/RenterNavigator.tsx` | Register MoveInCheckin + MoveInSuccess screens; handle notification deep link |
+| `supabase/functions/movein-checkin/index.ts` | New daily cron — fires check-in push on move-in date for confirmed bookings |
+| `screens/renter/ExploreScreen.tsx` | Filter `.eq('search_paused', false)` from all profile queries |
+| `screens/renter/RoommatesScreen.tsx` | Same filter |
+| Any host-facing renter search | Same filter |
+| Subscription logic | No changes — subscription continues silently |
