@@ -13,6 +13,7 @@ import { Property, InterestCard, Message, Conversation, HostSubscriptionData } f
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { getMyListings, mapListingToProperty, getAgentStats, getCompanyAgents, reassignListingAgent, getCompanyListingsWithAgents, getAgentDetailData, reassignConversation, AgentConversationSummary, AgentBookingSummary } from '../../services/listingService';
 import { getReceivedInterestCards, acceptInterestCard, rejectInterestCard } from '../../services/discoverService';
+import { supabase } from '../../lib/supabase';
 import { updateGroup } from '../../services/groupService';
 import { RhomeAISheet } from '../../components/RhomeAISheet';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
@@ -159,8 +160,19 @@ export const HostDashboardScreen = () => {
       setListings(myListings);
     }
 
-    const allConvos = await StorageService.getConversations();
-    const unreadMessages = allConvos.reduce((sum, c) => sum + (c.unread || 0), 0);
+    let unreadMessages = 0;
+    try {
+      const { data: msgData } = await supabase
+        .from('messages')
+        .select('id')
+        .eq('read', false)
+        .neq('sender_id', user.id)
+        .limit(100);
+      unreadMessages = msgData?.length || 0;
+    } catch {
+      const allConvos = await StorageService.getConversations();
+      unreadMessages = allConvos.reduce((sum, c) => sum + (c.unread || 0), 0);
+    }
     setMessageCount(unreadMessages);
 
     try {
