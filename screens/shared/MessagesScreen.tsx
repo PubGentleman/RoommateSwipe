@@ -38,7 +38,7 @@ const ICE_BREAKERS = [
   { icon: 'home' as const, text: 'Ask about their place' },
 ];
 
-type ChatFilterKey = 'all' | 'matches' | 'groups' | 'direct';
+type ChatFilterKey = 'all' | 'people' | 'direct' | 'groups';
 
 export const MessagesScreen = () => {
   const navigation = useNavigation<MessagesScreenNavigationProp>();
@@ -518,18 +518,27 @@ export const MessagesScreen = () => {
     );
   };
 
-  const getConvType = (conv: Conversation): 'matches' | 'groups' | 'direct' => {
-    if (conv.isInquiryThread) return 'groups';
-    if (conv.matchType === 'cold') return 'direct';
-    return 'matches';
+  const getConvType = (conv: Conversation): 'people' | 'direct' | 'groups' => {
+    if (conv.isInquiryThread) return 'direct';
+    return 'people';
   };
 
   const totalUnread = conversations.reduce((sum, c) => sum + (c.unread || 0), 0);
-  const matchUnread = conversations.filter(c => getConvType(c) === 'matches').reduce((sum, c) => sum + (c.unread || 0), 0);
-  const groupUnread = conversations.filter(c => getConvType(c) === 'groups').reduce((sum, c) => sum + (c.unread || 0), 0);
+  const peopleUnread = conversations.filter(c => getConvType(c) === 'people').reduce((sum, c) => sum + (c.unread || 0), 0);
   const directUnread = conversations.filter(c => getConvType(c) === 'direct').reduce((sum, c) => sum + (c.unread || 0), 0);
+  const groupUnread = conversations.filter(c => getConvType(c) === 'groups').reduce((sum, c) => sum + (c.unread || 0), 0);
 
-  const renderConversation = ({ item, index }: { item: Conversation; index: number }) => {
+  const renderConversation = ({ item, index }: { item: any; index: number }) => {
+    if (item.__isDivider) {
+      return (
+        <View style={styles.coldDivider}>
+          <View style={styles.coldDividerLine} />
+          <Text style={styles.coldDividerLabel}>DIRECT MESSAGES</Text>
+          <View style={styles.coldDividerLine} />
+        </View>
+      );
+    }
+
     if (item.isInquiryThread && item.matchType !== 'cold' && item.matchType !== 'mutual') {
       return renderInquiryConversation(item);
     }
@@ -589,7 +598,14 @@ export const MessagesScreen = () => {
             ) : null}
           </View>
 
-          {!isUnmatched ? (
+          {isUnmatched ? (
+            <View style={styles.convTagRow}>
+              <View style={styles.coldTag}>
+                <Feather name="send" size={9} color="rgba(255,255,255,0.4)" />
+                <Text style={styles.coldTagText}>Direct</Text>
+              </View>
+            </View>
+          ) : (
             <View style={styles.convTagRow}>
               {compatibility !== null ? (
                 <View style={styles.matchTag}>
@@ -604,7 +620,7 @@ export const MessagesScreen = () => {
                 </View>
               ) : null}
             </View>
-          ) : null}
+          )}
 
           {isNew && !isUnmatched ? (
             <View style={styles.iceRow}>
@@ -708,7 +724,7 @@ export const MessagesScreen = () => {
   const renderHeader = () => {
     const showAI = chatFilter === 'all';
     const showInquiries = (chatFilter === 'all' || chatFilter === 'groups') && inquiryGroups.length > 0;
-    const showMatches = (chatFilter === 'all' || chatFilter === 'matches') && !isHostMode && newMatches.length > 0;
+    const showMatches = (chatFilter === 'all' || chatFilter === 'people') && !isHostMode && newMatches.length > 0;
 
     return (
       <View>
@@ -737,7 +753,7 @@ export const MessagesScreen = () => {
         {showInquiries ? (
           <>
             <View style={styles.sectionLabelWrap}>
-              <Text style={styles.sectionLabelText}>LISTING INQUIRIES</Text>
+              <Text style={styles.sectionLabelText}>YOUR GROUPS</Text>
             </View>
             {inquiryGroups.map(g => renderInquiryItem(g))}
           </>
@@ -791,15 +807,15 @@ export const MessagesScreen = () => {
       </View>
       <Text style={styles.chatEmptyTitle}>No conversations yet</Text>
       <Text style={styles.chatEmptySubtitle}>
-        {chatFilter === 'matches'
+        {chatFilter === 'people'
           ? 'Match with someone to start chatting'
+          : chatFilter === 'direct'
+          ? 'No listing conversations yet'
           : chatFilter === 'groups'
           ? 'Join or create a group to start a group chat'
-          : chatFilter === 'direct'
-          ? 'Send a direct message from a profile'
           : isHostMode
           ? "Accept renters' inquiries to start a conversation"
-          : 'Start a conversation from a listing or profile'}
+          : 'No conversations yet'}
       </Text>
       <Pressable style={styles.chatEmptyCta} onPress={() => (navigation as any).navigate('Explore')}>
         <Text style={styles.chatEmptyCtaText}>Browse Listings</Text>
@@ -822,6 +838,8 @@ export const MessagesScreen = () => {
     }
   };
 
+  const DIVIDER_ITEM = { id: '__cold_divider__', __isDivider: true } as any;
+
   const filteredConversations = (() => {
     let convs = conversations;
     if (searchQuery.trim()) {
@@ -830,6 +848,17 @@ export const MessagesScreen = () => {
         (c.lastMessage && c.lastMessage.toLowerCase().includes(searchQuery.toLowerCase()))
       );
     }
+
+    if (chatFilter === 'people') {
+      const peopleConvs = convs.filter(c => getConvType(c) === 'people');
+      const matched = peopleConvs.filter(c => c.matchType !== 'cold');
+      const cold = peopleConvs.filter(c => c.matchType === 'cold');
+      if (matched.length > 0 && cold.length > 0) {
+        return [...matched, DIVIDER_ITEM, ...cold];
+      }
+      return peopleConvs;
+    }
+
     if (chatFilter !== 'all') {
       convs = convs.filter(c => getConvType(c) === chatFilter);
     }
@@ -837,10 +866,10 @@ export const MessagesScreen = () => {
   })();
 
   const FILTER_TABS: { key: ChatFilterKey; label: string; count: number }[] = [
-    { key: 'all', label: 'All', count: totalUnread },
-    { key: 'matches', label: 'Matches', count: matchUnread },
-    { key: 'groups', label: 'Groups', count: groupUnread },
-    { key: 'direct', label: 'Direct', count: directUnread },
+    { key: 'all',    label: 'All',     count: totalUnread },
+    { key: 'people', label: 'People',  count: peopleUnread },
+    { key: 'direct', label: 'Direct',  count: directUnread },
+    { key: 'groups', label: 'Groups',  count: groupUnread },
   ];
 
   return (
@@ -919,7 +948,7 @@ export const MessagesScreen = () => {
       <AnimatedFlatList
         data={filteredConversations}
         renderItem={renderConversation}
-        keyExtractor={(item: any) => item.id}
+        keyExtractor={(item: any) => item.__isDivider ? '__cold_divider__' : item.id}
         ListHeaderComponent={!isSearchVisible ? renderHeader : null}
         ListFooterComponent={!isSearchVisible ? renderFooterNudge : null}
         ListEmptyComponent={!isLoading ? renderEmptyState : null}
@@ -1525,5 +1554,37 @@ const styles = StyleSheet.create({
     color: '#FFD700',
     fontSize: 10,
     fontWeight: '700',
+  },
+  coldTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  coldTagText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.35)',
+  },
+  coldDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+  },
+  coldDividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+  },
+  coldDividerLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.2)',
+    letterSpacing: 0.8,
   },
 });

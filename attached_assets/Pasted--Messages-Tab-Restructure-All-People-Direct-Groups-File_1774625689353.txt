@@ -1,0 +1,375 @@
+# Messages Tab Restructure: All / People / Direct / Groups
+
+**File:** `screens/shared/MessagesScreen.tsx`
+
+**Goal:** Reorganize the 4 chat filter tabs so each tab has a clear, singular purpose:
+
+| Tab | Shows |
+|---|---|
+| **All** | Everything (unchanged) |
+| **People** | Mutual matches + cold/unmatched outreach (all 1-on-1 person chats) |
+| **Direct** | Renter ↔ host conversations about a specific listing (`isInquiryThread: true`) |
+| **Groups** | Multi-person roommate group entities from the Groups feature |
+
+Cold/unmatched messages (`matchType: 'cold'`) move OUT of Direct and INTO People — with a visual "Direct" pill badge so users can still tell them apart from matched conversations.
+
+---
+
+## Step 1 — Update the `ChatFilterKey` type
+
+Find:
+```ts
+type ChatFilterKey = 'all' | 'matches' | 'groups' | 'direct';
+```
+
+Replace with:
+```ts
+type ChatFilterKey = 'all' | 'people' | 'direct' | 'groups';
+```
+
+---
+
+## Step 2 — Update `chatFilter` initial state
+
+Find:
+```ts
+const [chatFilter, setChatFilter] = useState<ChatFilterKey>('all');
+```
+
+No change needed to the value, but make sure TypeScript is satisfied after the type change above.
+
+---
+
+## Step 3 — Rewrite `getConvType()`
+
+Find:
+```ts
+const getConvType = (conv: Conversation): 'matches' | 'groups' | 'direct' => {
+  if (conv.isInquiryThread) return 'groups';
+  if (conv.matchType === 'cold') return 'direct';
+  return 'matches';
+};
+```
+
+Replace with:
+```ts
+const getConvType = (conv: Conversation): 'people' | 'direct' | 'groups' => {
+  if (conv.isInquiryThread) return 'direct';   // listing inquiry threads → Direct tab
+  return 'people';                              // all 1-on-1 chats (mutual + cold) → People tab
+};
+```
+
+> Cold messages (`matchType: 'cold'`) now fall through to `'people'` instead of `'direct'`. They will be visually distinguished inside the People tab with a badge (Step 6).
+
+---
+
+## Step 4 — Update unread count calculations
+
+Find:
+```ts
+const totalUnread = conversations.reduce((sum, c) => sum + (c.unread || 0), 0);
+const matchUnread = conversations.filter(c => getConvType(c) === 'matches').reduce((sum, c) => sum + (c.unread || 0), 0);
+const groupUnread = conversations.filter(c => getConvType(c) === 'groups').reduce((sum, c) => sum + (c.unread || 0), 0);
+const directUnread = conversations.filter(c => getConvType(c) === 'direct').reduce((sum, c) => sum + (c.unread || 0), 0);
+```
+
+Replace with:
+```ts
+const totalUnread = conversations.reduce((sum, c) => sum + (c.unread || 0), 0);
+const peopleUnread = conversations.filter(c => getConvType(c) === 'people').reduce((sum, c) => sum + (c.unread || 0), 0);
+const directUnread = conversations.filter(c => getConvType(c) === 'direct').reduce((sum, c) => sum + (c.unread || 0), 0);
+const groupUnread = conversations.filter(c => getConvType(c) === 'groups').reduce((sum, c) => sum + (c.unread || 0), 0);
+```
+
+---
+
+## Step 5 — Update `FILTER_TABS` array
+
+Find:
+```ts
+const FILTER_TABS: { key: ChatFilterKey; label: string; count: number }[] = [
+  { key: 'all', label: 'All', count: totalUnread },
+  { key: 'matches', label: 'Matches', count: matchUnread },
+  { key: 'groups', label: 'Groups', count: groupUnread },
+  { key: 'direct', label: 'Direct', count: directUnread },
+];
+```
+
+Replace with:
+```ts
+const FILTER_TABS: { key: ChatFilterKey; label: string; count: number }[] = [
+  { key: 'all',    label: 'All',     count: totalUnread },
+  { key: 'people', label: 'People',  count: peopleUnread },
+  { key: 'direct', label: 'Direct',  count: directUnread },
+  { key: 'groups', label: 'Groups',  count: groupUnread },
+];
+```
+
+---
+
+## Step 6 — Update `filteredConversations` and inject a section divider for cold messages in People tab
+
+Find the `filteredConversations` block:
+```ts
+const filteredConversations = (() => {
+  let convs = conversations;
+  if (searchQuery.trim()) {
+    convs = convs.filter(c =>
+      c.participant.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (c.lastMessage && c.lastMessage.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+  }
+  if (chatFilter !== 'all') {
+    convs = convs.filter(c => getConvType(c) === chatFilter);
+  }
+  return convs;
+})();
+```
+
+Replace with:
+```ts
+const DIVIDER_ITEM = { id: '__cold_divider__', __isDivider: true } as any;
+
+const filteredConversations = (() => {
+  let convs = conversations;
+  if (searchQuery.trim()) {
+    convs = convs.filter(c =>
+      c.participant.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (c.lastMessage && c.lastMessage.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+  }
+
+  // For People tab (or All tab showing people), separate matched vs cold with a divider
+  if (chatFilter === 'people' || chatFilter === 'all') {
+    const peopleConvs = chatFilter === 'people'
+      ? convs.filter(c => getConvType(c) === 'people')
+      : convs;
+
+    if (chatFilter === 'people') {
+      const matched = peopleConvs.filter(c => c.matchType !== 'cold');
+      const cold = peopleConvs.filter(c => c.matchType === 'cold');
+      // Only inject divider if there are both matched AND cold conversations
+      if (matched.length > 0 && cold.length > 0) {
+        return [...matched, DIVIDER_ITEM, ...cold];
+      }
+      return peopleConvs;
+    }
+  }
+
+  if (chatFilter !== 'all') {
+    convs = convs.filter(c => getConvType(c) === chatFilter);
+  }
+  return convs;
+})();
+```
+
+---
+
+## Step 7 — Update `renderConversation()` to handle the divider item and show the "Direct" badge on cold rows
+
+Find the `renderConversation` function opening:
+```ts
+const renderConversation = ({ item, index }: { item: Conversation; index: number }) => {
+  if (item.isInquiryThread && item.matchType !== 'cold' && item.matchType !== 'mutual') {
+    return renderInquiryConversation(item);
+  }
+```
+
+Replace the entire opening guard block with:
+```ts
+const renderConversation = ({ item, index }: { item: any; index: number }) => {
+  // Render the section divider between matched and cold conversations
+  if (item.__isDivider) {
+    return (
+      <View style={styles.coldDivider}>
+        <View style={styles.coldDividerLine} />
+        <Text style={styles.coldDividerLabel}>DIRECT MESSAGES</Text>
+        <View style={styles.coldDividerLine} />
+      </View>
+    );
+  }
+
+  if (item.isInquiryThread && item.matchType !== 'cold' && item.matchType !== 'mutual') {
+    return renderInquiryConversation(item);
+  }
+```
+
+Now find the tag row inside `renderConversation` — the block that currently shows match % and Super Interest tags:
+```tsx
+{!isUnmatched ? (
+  <View style={styles.convTagRow}>
+    {compatibility !== null ? (
+      <View style={styles.matchTag}>
+        <Feather name="heart" size={9} color="#ff6b5b" />
+        <Text style={styles.matchTagText}>{compatibility}% match</Text>
+      </View>
+    ) : null}
+    {convMatchType === 'super_interest' ? (
+      <View style={[styles.matchTag, { backgroundColor: 'rgba(255,215,0,0.12)' }]}>
+        <Feather name="zap" size={9} color="#FFD700" />
+        <Text style={[styles.matchTagText, { color: '#FFD700' }]}>Super Interest</Text>
+      </View>
+    ) : null}
+  </View>
+) : null}
+```
+
+Replace with:
+```tsx
+{isUnmatched ? (
+  // Cold/unmatched — show "Direct" badge instead of match %
+  <View style={styles.convTagRow}>
+    <View style={styles.coldTag}>
+      <Feather name="send" size={9} color="rgba(255,255,255,0.4)" />
+      <Text style={styles.coldTagText}>Direct</Text>
+    </View>
+  </View>
+) : (
+  <View style={styles.convTagRow}>
+    {compatibility !== null ? (
+      <View style={styles.matchTag}>
+        <Feather name="heart" size={9} color="#ff6b5b" />
+        <Text style={styles.matchTagText}>{compatibility}% match</Text>
+      </View>
+    ) : null}
+    {convMatchType === 'super_interest' ? (
+      <View style={[styles.matchTag, { backgroundColor: 'rgba(255,215,0,0.12)' }]}>
+        <Feather name="zap" size={9} color="#FFD700" />
+        <Text style={[styles.matchTagText, { color: '#FFD700' }]}>Super Interest</Text>
+      </View>
+    ) : null}
+  </View>
+)}
+```
+
+---
+
+## Step 8 — Update `renderHeader()` to respect new tab names
+
+Find:
+```ts
+const showAI = chatFilter === 'all';
+const showInquiries = (chatFilter === 'all' || chatFilter === 'groups') && inquiryGroups.length > 0;
+const showMatches = (chatFilter === 'all' || chatFilter === 'matches') && !isHostMode && newMatches.length > 0;
+```
+
+Replace with:
+```ts
+const showAI = chatFilter === 'all';
+const showInquiries = (chatFilter === 'all' || chatFilter === 'groups') && inquiryGroups.length > 0;
+const showMatches = (chatFilter === 'all' || chatFilter === 'people') && !isHostMode && newMatches.length > 0;
+```
+
+Also find the "LISTING INQUIRIES" section label inside `renderHeader()`:
+```tsx
+<Text style={styles.sectionLabelText}>LISTING INQUIRIES</Text>
+```
+
+Replace with:
+```tsx
+<Text style={styles.sectionLabelText}>YOUR GROUPS</Text>
+```
+
+---
+
+## Step 9 — Update empty state messages for the renamed tabs
+
+Find:
+```ts
+{chatFilter === 'matches'
+  ? 'Match with someone to start chatting'
+  : chatFilter === 'groups'
+  ? 'Join or create a group to start a group chat'
+  : chatFilter === 'direct'
+  ? 'Send a direct message from a profile'
+  : ...}
+```
+
+Replace with:
+```ts
+{chatFilter === 'people'
+  ? 'Match with someone to start chatting'
+  : chatFilter === 'direct'
+  ? 'No listing conversations yet'
+  : chatFilter === 'groups'
+  ? 'Join or create a group to start a group chat'
+  : 'No conversations yet'}
+```
+
+---
+
+## Step 10 — Add new styles
+
+At the bottom of the `StyleSheet.create({...})` block, add:
+
+```ts
+coldTag: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 4,
+  backgroundColor: 'rgba(255,255,255,0.06)',
+  borderRadius: 10,
+  paddingHorizontal: 8,
+  paddingVertical: 3,
+},
+coldTagText: {
+  fontSize: 10,
+  fontWeight: '600',
+  color: 'rgba(255,255,255,0.35)',
+},
+coldDivider: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 10,
+  paddingHorizontal: 20,
+  paddingVertical: 14,
+},
+coldDividerLine: {
+  flex: 1,
+  height: 1,
+  backgroundColor: 'rgba(255,255,255,0.07)',
+},
+coldDividerLabel: {
+  fontSize: 10,
+  fontWeight: '700',
+  color: 'rgba(255,255,255,0.2)',
+  letterSpacing: 0.8,
+},
+```
+
+---
+
+## Step 11 — Fix the FlatList `keyExtractor` to handle the divider item
+
+Find:
+```tsx
+keyExtractor={(item: any) => item.id}
+```
+
+Replace with:
+```tsx
+keyExtractor={(item: any) => item.__isDivider ? '__cold_divider__' : item.id}
+```
+
+---
+
+## What the People tab looks like after this change
+
+```
+People tab
+┌─────────────────────────────────────┐
+│ [avatar] Sarah K.        Yesterday  │
+│ Are you still looking?              │
+│ ♥ 84% match                         │
+├─────────────────────────────────────┤
+│ [avatar] Marcus T.       2:14 PM   │
+│ Hey there, saw your profile         │
+│ ⚡ Super Interest                    │
+├──────── DIRECT MESSAGES ────────────┤  ← divider
+│ [avatar — dimmed] Jordan L.  Tue   │
+│ Hi, found you on Explore            │
+│ ✉ Direct                            │
+└─────────────────────────────────────┘
+```
+
+Users immediately understand: mutual/super-interest matches are at the top, unsolicited messages are clearly labeled below the divider.
