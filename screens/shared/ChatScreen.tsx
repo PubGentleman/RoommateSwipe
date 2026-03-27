@@ -221,8 +221,22 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       const hasConfirmed = messages.some(
         (m: any) => ['accepted', 'confirmed'].includes(m.metadata?.status) && (m.message_type === 'visit_request' || m.message_type === 'booking_offer')
       );
-      if (hasConfirmed !== hasBookingInThread) {
-        setHasBookingInThread(hasConfirmed);
+      if (hasConfirmed && !hasBookingInThread) {
+        setHasBookingInThread(true);
+        const alreadyHasNotice = messages.some((m: any) => m.id === 'contact-unlock-notice');
+        if (!alreadyHasNotice) {
+          setMessages(prev => [...prev, {
+            id: 'contact-unlock-notice',
+            conversationId,
+            senderId: 'system',
+            text: 'Contact info is now visible in this conversation.',
+            timestamp: new Date(),
+            read: true,
+            type: 'system',
+          } as any]);
+        }
+      } else if (!hasConfirmed && hasBookingInThread) {
+        setHasBookingInThread(false);
       }
     }
   }, [messages, isPaidUser]);
@@ -1055,7 +1069,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
             ]}
             onUpgradePress={() => navigation.navigate('Plans' as any)}
             onBookShowingPress={isInquiryChat ? () => {
-              flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+              setShowVisitModal(true);
             } : undefined}
           />
         </View>
