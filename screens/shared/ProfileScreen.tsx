@@ -594,7 +594,7 @@ export const ProfileScreen = () => {
               iconBorderColor="rgba(102,126,234,0.2)"
               title="Payment"
               subtitle="Manage payment methods"
-              onPress={() => navigation.navigate('Payment')}
+              onPress={() => navigation.navigate('Plans')}
             />
             <SettingsItem
               iconName="users"

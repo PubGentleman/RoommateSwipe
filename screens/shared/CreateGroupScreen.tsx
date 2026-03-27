@@ -104,7 +104,7 @@ export const CreateGroupScreen = ({ navigation, route }: any) => {
           confirmText: 'View Groups',
           variant: 'success',
         });
-        navigation.navigate('Groups');
+        navigation.goBack();
       }
     } catch (error) {
       console.error('Error creating group:', error);

@@ -1423,7 +1423,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       {!isInquiryChat && !canSeeOnlineStatus() ? (
         <Pressable
           style={[styles.premiumBanner, { backgroundColor: theme.backgroundSecondary }]}
-          onPress={() => (navigation as any).navigate('Payment')}
+          onPress={() => setShowPaywall(true)}
         >
           <Feather name="zap" size={18} color={theme.primary} />
           <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginLeft: Spacing.sm, flex: 1 }]}>
@@ -1817,7 +1817,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
               style={{ backgroundColor: theme.primary, paddingVertical: 14, borderRadius: 12, alignItems: 'center', marginBottom: 12 }}
               onPress={() => {
                 setShowDailyLimitModal(false);
-                (navigation as any).navigate('Payment');
+                (navigation as any).navigate('Plans');
               }}
             >
               <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
@@ -1853,7 +1853,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
               style={{ backgroundColor: theme.primary, paddingVertical: 14, borderRadius: 12, alignItems: 'center', marginBottom: 12 }}
               onPress={() => {
                 setShowChatLimitModal(false);
-                (navigation as any).navigate('Payment');
+                (navigation as any).navigate('Plans');
               }}
             >
               <ThemedText style={[Typography.h3, { color: '#FFFFFF' }]}>
