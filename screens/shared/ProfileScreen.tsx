@@ -695,47 +695,45 @@ export const ProfileScreen = () => {
               subtitle="Phone, ID, social verification"
               onPress={() => navigation.navigate('Verification')}
             />
-            {!isHost ? (
-              <SettingsItem
-                iconName="headphones"
-                iconColor={renterLimits.hasDedicatedSupport ? '#667eea' : 'rgba(255,255,255,0.3)'}
-                iconBgColor={renterLimits.hasDedicatedSupport ? 'rgba(102,126,234,0.15)' : 'rgba(168,85,247,0.06)'}
-                iconBorderColor={renterLimits.hasDedicatedSupport ? 'rgba(102,126,234,0.2)' : 'rgba(168,85,247,0.12)'}
-                title="Dedicated Support"
-                subtitle={renterLimits.hasDedicatedSupport ? 'Priority support for Elite members' : 'Priority email support'}
-                onPress={async () => {
-                  if (!renterLimits.hasDedicatedSupport) {
-                    navigation.navigate('Plans');
-                    return;
-                  }
-                  await alert({
-                    title: 'Dedicated Support',
-                    message: 'As an Elite member, you have access to priority support.\n\nEmail: hello@rhomeapp.io\nResponse time: Within 2 hours\n\nOur dedicated team is here to help you.',
-                    variant: 'info',
-                  });
-                }}
-                isLast={!isHost || !(isHost && getHostPlan() === 'business')}
-                rightElement={!renterLimits.hasDedicatedSupport ? <PlanBadgeInline plan="Elite" locked /> : undefined}
-              />
-            ) : null}
-            {isHost && getHostPlan() === 'business' ? (
-              <SettingsItem
-                iconName="headphones"
+            <SettingsItem
+                iconName="mail"
                 iconColor="#667eea"
                 iconBgColor="rgba(102,126,234,0.15)"
                 iconBorderColor="rgba(102,126,234,0.2)"
-                title="Dedicated Support"
-                subtitle="Priority support for Business hosts"
+                title="Contact Support"
+                subtitle={
+                  isHost
+                    ? (getHostPlan() === 'business' || user?.role === 'company'
+                      ? 'Priority support — we respond faster'
+                      : "We'll get back to you as soon as possible")
+                    : (renterLimits.plan === 'elite' || renterLimits.plan === 'plus'
+                      ? 'Priority support — we respond faster'
+                      : "We'll get back to you as soon as possible")
+                }
                 onPress={async () => {
-                  await alert({
-                    title: 'Dedicated Support',
-                    message: 'As a Business host, you have access to priority support.\n\nEmail: support@rhome.com\nResponse time: Within 2 hours\n\nOur dedicated team is here to help you with any questions or issues.',
-                    variant: 'info',
-                  });
+                  const emailAddress = isHost ? 'hosts@rhome.com' : 'support@rhome.com';
+                  let subject: string;
+                  if (isHost) {
+                    const plan = getHostPlan() || 'standard';
+                    const role = user?.role === 'company' ? 'COMPANY' : 'AGENT';
+                    subject = encodeURIComponent(`[${role}][${plan.toUpperCase()}] Support Request`);
+                  } else {
+                    const plan = renterLimits.plan ?? 'free';
+                    subject = encodeURIComponent(`[${plan.toUpperCase()}] Support Request`);
+                  }
+                  const url = `mailto:${emailAddress}?subject=${subject}`;
+                  try {
+                    await Linking.openURL(url);
+                  } catch {
+                    await alert({
+                      title: 'Email not available',
+                      message: `Please email us at ${emailAddress}`,
+                      variant: 'info',
+                    });
+                  }
                 }}
                 isLast
               />
-            ) : null}
           </View>
         </View>
 

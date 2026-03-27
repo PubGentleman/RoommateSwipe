@@ -57,7 +57,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const { conversationId, otherUser: routeOtherUser, inquiryGroup, matchId: routeMatchId } = route.params;
   const isInquiryChat = !!inquiryGroup || conversationId.startsWith('inquiry_');
   const { theme } = useTheme();
-  const { user, incrementMessageCount, canSendMessage, canStartNewChat, incrementActiveChatCount, watchAdForCredit, isBasicUser, blockUser, reportUser, canSendColdMessage, useColdMessage } = useAuth();
+  const { user, incrementMessageCount, canSendMessage, canStartNewChat, incrementActiveChatCount, watchAdForCredit, isBasicUser, blockUser, reportUser, canSendColdMessage, useColdMessage, getHostPlan } = useAuth();
   const insets = useSafeAreaInsets();
   const { confirm, alert } = useConfirm();
   const { refreshUnreadCount } = useNotificationContext();
@@ -121,7 +121,11 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const dailyLimit = MESSAGING_LIMITS[userPlan].dailyMessages;
   const isEliteUser = () => userPlan === 'elite';
   const showLockedReadReceipt = !isEliteUser();
-  const isPaidUser = renterLimits.canSeeContactInfo;
+  const userRole = user?.role || 'renter';
+  const hostPlan = getHostPlan();
+  const isPaidUser = userRole === 'renter'
+    ? renterLimits.canSeeContactInfo
+    : (hostPlan === 'business' || userRole === 'company');
   const contactInfoVisible = isPaidUser || hasBookingInThread;
 
   const handleAcceptInquiry = async () => {
