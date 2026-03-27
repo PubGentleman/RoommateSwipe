@@ -66,7 +66,6 @@ const PLAN_FEATURES: Record<RenterPlan, { icon: string; label: string }[]> = {
     { icon: 'bar-chart-2', label: 'Full match breakdown' },
     { icon: 'trending-up', label: 'Profile boost — appear higher in searches' },
     { icon: 'eye', label: 'Read receipts on messages' },
-    { icon: 'eye-off', label: 'Incognito mode' },
     { icon: 'headphones', label: 'Dedicated support' },
   ],
 };

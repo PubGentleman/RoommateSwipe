@@ -276,7 +276,6 @@ export const RENTER_PLAN_CONFIGS: Record<string, PurchaseConfig> = {
       'Full match breakdown details',
       'Profile boost — appear higher in searches',
       'Read receipts on messages',
-      'Incognito mode — browse without being seen',
       'Dedicated support',
     ],
   },

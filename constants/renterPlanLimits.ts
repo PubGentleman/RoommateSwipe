@@ -13,7 +13,6 @@ export interface RenterPlanLimits {
   hasProfileBoost: boolean;
   hasPriorityInSearch: boolean;
   hasReadReceipts: boolean;
-  hasIncognito: boolean;
   hasDedicatedSupport: boolean;
   hasApartmentPreferences: boolean;
   hasTransitFiltering: boolean;
@@ -40,7 +39,6 @@ export const RENTER_PLAN_LIMITS: Record<RenterPlan, RenterPlanLimits> = {
     hasProfileBoost: false,
     hasPriorityInSearch: false,
     hasReadReceipts: false,
-    hasIncognito: false,
     hasDedicatedSupport: false,
     hasApartmentPreferences: true,
     hasTransitFiltering: false,
@@ -65,7 +63,6 @@ export const RENTER_PLAN_LIMITS: Record<RenterPlan, RenterPlanLimits> = {
     hasProfileBoost: false,
     hasPriorityInSearch: false,
     hasReadReceipts: false,
-    hasIncognito: false,
     hasDedicatedSupport: false,
     hasApartmentPreferences: true,
     hasTransitFiltering: true,
@@ -90,7 +87,6 @@ export const RENTER_PLAN_LIMITS: Record<RenterPlan, RenterPlanLimits> = {
     hasProfileBoost: true,
     hasPriorityInSearch: true,
     hasReadReceipts: true,
-    hasIncognito: true,
     hasDedicatedSupport: true,
     hasApartmentPreferences: true,
     hasTransitFiltering: true,

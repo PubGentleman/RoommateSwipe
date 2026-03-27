@@ -696,33 +696,6 @@ export const ProfileScreen = () => {
               onPress={() => navigation.navigate('Verification')}
             />
             {!isHost ? (
-              <Pressable
-                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, paddingHorizontal: 16, backgroundColor: renterLimits.hasIncognito ? '#1a1a2e' : 'rgba(168,85,247,0.04)', borderRadius: 12, marginBottom: 8, borderWidth: renterLimits.hasIncognito ? 0 : 1, borderColor: 'rgba(168,85,247,0.12)' }}
-                onPress={() => {
-                  if (!renterLimits.hasIncognito) {
-                    navigation.navigate('Plans');
-                  }
-                }}
-              >
-                <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Feather name="eye-off" size={18} color={renterLimits.hasIncognito ? '#667eea' : 'rgba(255,255,255,0.3)'} />
-                    <Text style={{ color: renterLimits.hasIncognito ? '#fff' : 'rgba(255,255,255,0.4)', fontSize: 15, fontWeight: '600' }}>Incognito Mode</Text>
-                    {!renterLimits.hasIncognito ? <PlanBadgeInline plan="Elite" locked /> : null}
-                  </View>
-                  <Text style={{ color: '#999', fontSize: 12, marginTop: 4, marginLeft: 26 }}>Browse profiles without being seen</Text>
-                </View>
-                {renterLimits.hasIncognito ? (
-                  <Switch
-                    value={false}
-                    onValueChange={() => {}}
-                    trackColor={{ false: '#333', true: '#667eea' }}
-                    thumbColor="#fff"
-                  />
-                ) : null}
-              </Pressable>
-            ) : null}
-            {!isHost ? (
               <SettingsItem
                 iconName="headphones"
                 iconColor={renterLimits.hasDedicatedSupport ? '#667eea' : 'rgba(255,255,255,0.3)'}

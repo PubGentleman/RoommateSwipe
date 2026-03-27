@@ -2,7 +2,6 @@ import { getRenterPlanLimits, type RenterPlan } from '../constants/renterPlanLim
 
 export const canSeeWhoLiked = (p: RenterPlan) => getRenterPlanLimits(p).canSeeWhoLiked;
 export const canSeeMatchBreakdown = (p: RenterPlan) => getRenterPlanLimits(p).hasMatchBreakdown;
-export const canBrowseIncognito = (p: RenterPlan) => getRenterPlanLimits(p).hasIncognito;
 export const hasProfileBoost = (p: RenterPlan) => getRenterPlanLimits(p).hasProfileBoost;
 export const hasReadReceipts = (p: RenterPlan) => getRenterPlanLimits(p).hasReadReceipts;
 export const hasAdvancedFilters = (p: RenterPlan) => getRenterPlanLimits(p).hasAdvancedFilters;
