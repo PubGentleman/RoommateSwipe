@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { applyBoostRotation } from '../utils/boostRotation';
+import { getRecencyMultiplier, isWithinActivityCutoff } from '../utils/activityDecay';
 
 export async function getSwipeDeck(city?: string, filters?: {
   budgetMin?: number;
@@ -60,28 +61,15 @@ export async function getSwipeDeck(city?: string, filters?: {
     );
   }
 
-  const INACTIVE_THRESHOLD_MS = 14 * 24 * 60 * 60 * 1000;
-  const now = Date.now();
+  const decayScored = profiles
+    .filter((p: any) => isWithinActivityCutoff(p.last_active_at))
+    .map((p: any) => ({
+      ...p,
+      _decayScore: (p.profile?.compatibility ?? 1) * getRecencyMultiplier(p.last_active_at),
+    }))
+    .sort((a: any, b: any) => b._decayScore - a._decayScore);
 
-  const activeProfiles = profiles.filter((p: any) => {
-    if (!p.last_active_at) return true;
-    return now - new Date(p.last_active_at).getTime() < INACTIVE_THRESHOLD_MS;
-  });
-  const inactiveProfiles = profiles.filter((p: any) => {
-    if (!p.last_active_at) return false;
-    return now - new Date(p.last_active_at).getTime() >= INACTIVE_THRESHOLD_MS;
-  });
-
-  const sortByActivity = (arr: any[]) =>
-    arr.sort((a, b) => {
-      const aTime = a.last_active_at ? new Date(a.last_active_at).getTime() : 0;
-      const bTime = b.last_active_at ? new Date(b.last_active_at).getTime() : 0;
-      return bTime - aTime;
-    });
-
-  const sortedActive = sortByActivity(activeProfiles);
-  const sortedInactive = sortByActivity(inactiveProfiles);
-  const sortedProfiles = [...sortedActive, ...sortedInactive];
+  const sortedProfiles = decayScored;
 
   const boosted = sortedProfiles.filter(p =>
     p.boost?.some((b: any) => b.is_active && new Date(b.expires_at) > new Date())

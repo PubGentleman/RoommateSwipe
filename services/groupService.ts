@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { GroupType, GroupMember } from '../types/models';
+import { isWithinActivityCutoff, getRecencyMultiplier } from '../utils/activityDecay';
 
 export interface GroupData {
   name: string;
@@ -27,7 +28,7 @@ export async function getGroups(city?: string, type?: GroupType) {
     .select(`
       *,
       members:group_members(user_id),
-      creator:users!created_by(id, full_name, avatar_url)
+      creator:users!created_by(id, full_name, avatar_url, last_active_at)
     `)
     .order('created_at', { ascending: false });
 
@@ -36,7 +37,18 @@ export async function getGroups(city?: string, type?: GroupType) {
 
   const { data, error } = await query;
   if (error) throw error;
-  return data || [];
+
+  const groups = data || [];
+  return groups
+    .filter((g: any) => {
+      const creatorLastActive = g.creator?.last_active_at;
+      return isWithinActivityCutoff(creatorLastActive);
+    })
+    .sort((a: any, b: any) => {
+      const scoreA = getRecencyMultiplier(a.creator?.last_active_at);
+      const scoreB = getRecencyMultiplier(b.creator?.last_active_at);
+      return scoreB - scoreA;
+    });
 }
 
 export async function getGroup(id: string) {

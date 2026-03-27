@@ -237,6 +237,9 @@ export const NotificationsScreen = () => {
           (navigation as any).navigate('Profile');
         }
         break;
+      case 'activity_nudge':
+        (navigation as any).navigate('Explore');
+        break;
       default:
         break;
     }
@@ -292,6 +295,8 @@ export const NotificationsScreen = () => {
       case 'group_complete':
       case 'group_match':
         return 'check-circle';
+      case 'activity_nudge':
+        return 'zap';
       default:
         return 'bell';
     }

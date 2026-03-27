@@ -1,5 +1,5 @@
-import React, { useEffect } from "react";
-import { StyleSheet } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { AppState, StyleSheet } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
@@ -20,6 +20,7 @@ import { StorageService } from "./utils/storage";
 import { isDev } from "./utils/dataUtils";
 import { checkDailyTrigger } from "./utils/insightRefresh";
 import { useResponseTracking } from "./hooks/useResponseTracking";
+import { supabase } from "./lib/supabase";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -29,8 +30,25 @@ function ResponseTracker() {
 }
 
 export default function App() {
+  const appState = useRef(AppState.currentState);
+
   useEffect(() => {
     SplashScreen.hideAsync();
+  }, []);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', async (nextState) => {
+      if (appState.current.match(/inactive|background/) && nextState === 'active') {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            await supabase.from('users').update({ last_active_at: new Date().toISOString() }).eq('id', user.id);
+          }
+        } catch {}
+      }
+      appState.current = nextState;
+    });
+    return () => sub.remove();
   }, []);
 
   useEffect(() => {

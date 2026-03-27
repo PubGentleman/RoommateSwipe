@@ -30,6 +30,7 @@ import {
   filterRentersForListing,
   TransitFilterSummary,
 } from '../../utils/transitMatching';
+import { isWithinActivityCutoff, getRecencyMultiplier } from '../../utils/activityDecay';
 import {
   shortlistRenter as companyShortlistRenter,
   removeFromShortlist as companyRemoveFromShortlist,
@@ -98,7 +99,12 @@ export const BrowseRentersScreen = () => {
           .neq('id', user?.id || '')
           .limit(100);
 
-        const renterData = supaRenters || [];
+        const renterData = (supaRenters || []).filter((u: any) => isWithinActivityCutoff(u.last_active_at));
+        renterData.sort((a: any, b: any) => {
+          const scoreA = getRecencyMultiplier(a.last_active_at);
+          const scoreB = getRecencyMultiplier(b.last_active_at);
+          return scoreB - scoreA;
+        });
         mapped = renterData.map((u: any) => {
           const p = Array.isArray(u.profile) ? u.profile[0] : u.profile;
           return {
