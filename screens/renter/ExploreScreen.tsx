@@ -170,7 +170,7 @@ export const ExploreScreen = () => {
     loadSavedProperties();
     loadHostProfiles();
     loadUserGroups();
-  }, []);
+  }, [activeCity]);
 
   useEffect(() => {
     applyFilters();
@@ -323,30 +323,55 @@ export const ExploreScreen = () => {
 
   const loadUserGroups = async () => {
     try {
+      if (!user?.id) { setUserGroups([]); return; }
+      const { getMyGroups } = await import('../../services/groupService');
+      const supabaseGroups = await getMyGroups('roommate');
+      if (supabaseGroups && supabaseGroups.length > 0) {
+        const mapped = supabaseGroups.map((g: any) => ({
+          id: g.id,
+          name: g.name,
+          type: 'roommate',
+          members: [],
+          listingId: g.listing_id || null,
+          maxMembers: g.max_members || 4,
+          createdBy: g.created_by,
+        }));
+        setUserGroups(mapped as any);
+        return;
+      }
+    } catch {}
+    try {
       const groups = await StorageService.getGroups();
       if (!user?.id) { setUserGroups([]); return; }
-      const mine = groups.filter(g => {
-        const memberIds = Array.isArray(g.members)
-          ? g.members.map((m: any) => typeof m === 'string' ? m : m.userId || m.id)
-          : [];
-        return g.createdBy === user.id || memberIds.includes(user.id);
-      });
+      const mine = groups.filter(g => g.createdBy === user.id);
       setUserGroups(mine);
-    } catch (err) {
+    } catch {
       setUserGroups([]);
     }
   };
 
-  const handleInquireAsGroup = (group: Group) => {
+  const handleInquireAsGroup = async (group: Group) => {
     setShowGroupPickerModal(false);
     setShowPropertyDetail(false);
-    if (selectedProperty) {
-      (navigation as any).navigate('Messages', {
-        screen: 'CreateGroup',
-        params: {
-          preselectedListingId: selectedProperty.id,
-        },
+    if (!selectedProperty || !user) return;
+
+    try {
+      const { createListingInquiryGroup } = await import('../../services/groupService');
+      await createListingInquiryGroup(
+        selectedProperty.id,
+        selectedProperty.hostId,
+        selectedProperty.address || selectedProperty.title,
+        group.id,
+        group.name
+      );
+      await showAlert({
+        title: 'Inquiry Sent!',
+        message: `Your group "${group.name}" has sent an inquiry for ${selectedProperty.title}.`,
+        variant: 'success',
       });
+      await loadInterestCards();
+    } catch (err) {
+      await showAlert({ title: 'Error', message: 'Could not send group inquiry. Try again.', variant: 'warning' });
     }
   };
 
@@ -456,6 +481,20 @@ export const ExploreScreen = () => {
         isSuperInterest,
         createdAt: new Date().toISOString(),
       };
+      try {
+        const { supabase } = await import('../../lib/supabase');
+        await supabase.from('interest_cards').insert({
+          sender_id: user.id,
+          recipient_id: effectiveHostId,
+          listing_id: selectedProperty.id,
+          action: 'interest',
+          is_super_interest: isSuperInterest,
+          personal_note: note,
+          status: 'pending',
+        });
+      } catch (supabaseErr) {
+        console.warn('[ExploreScreen] Supabase interest insert failed, using local fallback:', supabaseErr);
+      }
       await StorageService.addInterestCard(interestRecord);
 
       const systemMessageText = isSuperInterest
