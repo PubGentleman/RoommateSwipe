@@ -53,7 +53,7 @@ type ChatScreenProps = {
 };
 
 export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
-  const { conversationId, otherUser: routeOtherUser, inquiryGroup } = route.params;
+  const { conversationId, otherUser: routeOtherUser, inquiryGroup, matchId: routeMatchId } = route.params;
   const isInquiryChat = !!inquiryGroup || conversationId.startsWith('inquiry_');
   const { theme } = useTheme();
   const { user, incrementMessageCount, canSendMessage, canStartNewChat, incrementActiveChatCount, watchAdForCredit, isBasicUser, blockUser, reportUser, canSendColdMessage, useColdMessage } = useAuth();
@@ -198,7 +198,13 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     return (userPlan === 'plus' || userPlan === 'elite') && userStatus === 'active';
   };
 
-  const matchIdFromConversation = conversationId.startsWith('conv_') ? conversationId.slice(5) : conversationId;
+  const matchIdFromConversation = routeMatchId
+    ?? (conversationId.startsWith('conv-interest-')
+      ? null
+      : conversationId.startsWith('conv_')
+        ? conversationId.slice(5)
+        : conversationId);
+  const [conversationListingId, setConversationListingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadMessages();
@@ -320,7 +326,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   }, [conversationId, user?.id]);
 
   useEffect(() => {
-    if (!matchIdFromConversation || conversationId.startsWith('group-')) return;
+    if (!matchIdFromConversation || conversationId.startsWith('group-') || conversationId.startsWith('conv-interest-')) return;
     const unsubscribe = subscribeToMessages(matchIdFromConversation, (newMsg: any) => {
       if (newMsg.sender_id !== user?.id || newMsg.sender_id === null || newMsg.is_system_message) {
         const mapped: Message = {
@@ -490,6 +496,9 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
 
     setMessages(loadedMessages);
 
+    if (conversation?.propertyId && !conversationListingId) {
+      setConversationListingId(conversation.propertyId);
+    }
     if (conversationId.startsWith('conv-interest-') && conversation?.inquiryId) {
       try {
         const cards = await StorageService.getInterestCards();
@@ -853,10 +862,14 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         security_deposit: data.securityDeposit,
         note: data.note,
         address,
-        listing_id: inquiryGroup?.listingId,
+        listing_id: inquiryGroup?.listingId ?? conversationListingId ?? null,
         status: 'pending',
         sender_name: user.name || 'Host',
       };
+      if (!metadata.listing_id) {
+        await alert({ title: 'Missing Listing', message: 'Please select a listing for this booking offer.', variant: 'warning' });
+        return;
+      }
       const displayContent = `Booking offer: $${data.monthlyRent}/mo, move-in ${data.moveInDate}`;
       let dbId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
       try {
@@ -921,10 +934,12 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const handleAcceptBooking = async (messageId: string, metadata: any) => {
     setCardActionLoading(messageId);
     try {
-      if (metadata.listing_id && inquiryGroup?.hostId) {
+      const bookingHostId = inquiryGroup?.hostId ?? otherUser?.id;
+      const bookingListingId = metadata.listing_id || inquiryGroup?.listingId || conversationListingId;
+      if (bookingListingId && bookingHostId) {
         const bookingResult = await createBooking({
-          listingId: metadata.listing_id,
-          hostId: inquiryGroup.hostId,
+          listingId: bookingListingId,
+          hostId: bookingHostId,
           renterId: user?.id || '',
           moveInDate: metadata.move_in_date,
           leaseLength: metadata.lease_length,

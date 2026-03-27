@@ -302,6 +302,25 @@ export const HostDashboardScreen = () => {
       data: { interestCardId: card.id, conversationId, propertyId: card.propertyId, fromUserId: user.id, fromUserName: user.name, fromUserPhoto: user.profilePicture },
     });
 
+    try {
+      await supabase.from('notifications').insert({
+        user_id: card.renterId,
+        type: 'match',
+        title: "It's a Match!",
+        message: `${user.name} accepted your interest for ${card.propertyTitle}`,
+        metadata: {
+          match_id: supabaseMatchId,
+          listing_id: card.propertyId,
+          host_id: user.id,
+          conversation_id: conversationId,
+        },
+        is_read: false,
+        created_at: now.toISOString(),
+      });
+    } catch (e) {
+      console.warn('Failed to insert Supabase match notification:', e);
+    }
+
     await refreshUnreadCount();
     setInquiries(prev =>
       prev.map(c => c.id === card.id ? { ...c, status: 'accepted' as const, respondedAt: now.toISOString() } : c)
