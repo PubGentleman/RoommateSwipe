@@ -82,6 +82,7 @@ export function mapListingToProperty(l: any, fallbackHostName?: string): Propert
     average_rating: l.average_rating ?? null,
     review_count: l.review_count ?? 0,
     assigned_agent_id: l.assigned_agent_id ?? undefined,
+    hostType: l.host?.host_type || l.host_type || undefined,
   };
 }
 
@@ -94,7 +95,7 @@ export async function getListings(filters?: {
 }) {
   let query = supabase
     .from('listings')
-    .select('*, host:users!host_id(id, full_name, avatar_url)')
+    .select('*, host:users!host_id(id, full_name, avatar_url, host_type)')
     .eq('is_active', true)
     .eq('is_rented', false)
     .eq('is_paused', false)
@@ -114,7 +115,7 @@ export async function getListings(filters?: {
 export async function getListing(id: string) {
   const { data, error } = await supabase
     .from('listings')
-    .select('*, host:users!host_id(id, full_name, avatar_url, bio)')
+    .select('*, host:users!host_id(id, full_name, avatar_url, bio, host_type)')
     .eq('id', id)
     .single();
 
@@ -307,7 +308,7 @@ export async function getCompanyListingsWithAgents(companyUserId: string): Promi
 
     const { data, error } = await supabase
       .from('listings')
-      .select('*, host:users!host_id(id, full_name, avatar_url)')
+      .select('*, host:users!host_id(id, full_name, avatar_url, host_type)')
       .in('host_id', allHostIds)
       .order('created_at', { ascending: false });
 
