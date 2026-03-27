@@ -18,6 +18,7 @@ import { getMyInquiryGroups } from '../../services/groupService';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { Group } from '../../types/models';
 import { normalizeRenterPlan, getRenterPlanLimits } from '../../constants/renterPlanLimits';
+import { PaywallSheet } from '../../components/PaywallSheet';
 
 type MessagesScreenNavigationProp = NativeStackNavigationProp<MessagesStackParamList, 'MessagesList'>;
 
@@ -174,7 +175,7 @@ export const MessagesScreen = () => {
                   id: otherProfile.id,
                   name: otherProfile.name,
                   photo: otherProfile.photos?.[0],
-                  online: Math.random() > 0.5,
+                  online: false,
                 },
                 lastMessage: localConv?.lastMessage || 'You matched!',
                 timestamp: localConv?.timestamp || match.matchedAt,
@@ -335,7 +336,7 @@ export const MessagesScreen = () => {
           id: profile.id,
           name: profile.name,
           photo: profile.photos?.[0],
-          online: Math.random() > 0.5,
+          online: false,
         },
         lastMessage: 'You matched!',
         timestamp: match.matchedAt,
@@ -694,14 +695,11 @@ export const MessagesScreen = () => {
   const aiBadgeLabel = renterPlan === 'elite' ? 'Elite' : renterPlan === 'plus' ? 'Plus' : 'Plus';
   const aiBadgeLocked = !hasAIAccess;
 
+  const [showPaywall, setShowPaywall] = useState(false);
+
   const handleAIAssistantPress = async () => {
     if (aiBadgeLocked) {
-      await alert({
-        title: 'Upgrade to Plus',
-        message: 'Upgrade to Plus to access your AI Match Assistant.',
-        confirmText: 'View Plans',
-      });
-      (navigation as any).navigate('Plans');
+      setShowPaywall(true);
       return;
     }
     (navigation as any).navigate('AIMatchAssistant');
@@ -934,6 +932,14 @@ export const MessagesScreen = () => {
         scrollEventThrottle={16}
       />
 
+      <PaywallSheet
+        visible={showPaywall}
+        featureName="AI Match Assistant"
+        requiredPlan="plus"
+        role="renter"
+        onUpgrade={() => { setShowPaywall(false); (navigation as any).navigate('Plans'); }}
+        onDismiss={() => setShowPaywall(false)}
+      />
     </View>
   );
 };

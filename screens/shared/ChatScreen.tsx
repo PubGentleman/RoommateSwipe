@@ -12,6 +12,7 @@ import { Image } from 'expo-image';
 import { ReportBlockModal } from '../../components/ReportBlockModal';
 import { PlanBadge } from '../../components/PlanBadge';
 import { PlanBadgeInline } from '../../components/LockedFeatureOverlay';
+import { PaywallSheet } from '../../components/PaywallSheet';
 import { RhomeAISheet, ScreenContext } from '../../components/RhomeAISheet';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { useNotificationContext } from '../../contexts/NotificationContext';
@@ -62,7 +63,9 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [showGroupOption, setShowGroupOption] = useState(true);
-  const [isOnline, setIsOnline] = useState(Math.random() > 0.5);
+  const [isOnline, setIsOnline] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [paywallFeature, setPaywallFeature] = useState<string>('');
   const [safetyModeEnabled, setSafetyModeEnabled] = useState(false);
   const [otherUser, setOtherUser] = useState<RoommateProfile | null>(routeOtherUser || null);
   const flatListRef = useRef<FlatList>(null);
@@ -529,6 +532,28 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
       }
     }
 
+    if (otherUser || conversation?.participant?.id) {
+      const participantId = otherUser?.id || conversation?.participant?.id;
+      if (participantId) {
+        try {
+          const { data: participantData } = await supabase
+            .from('users')
+            .select('last_active_at')
+            .eq('id', participantId)
+            .maybeSingle();
+          if (participantData?.last_active_at) {
+            const lastActive = new Date(participantData.last_active_at);
+            const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000);
+            setIsOnline(lastActive > thirtyMinsAgo);
+          } else {
+            setIsOnline(false);
+          }
+        } catch (_e) {
+          setIsOnline(false);
+        }
+      }
+    }
+
     if (conversation?.participant) {
       const allUsers = await StorageService.getUsers();
       const participantUser = allUsers.find(u => u.id === conversation.participant.id);
@@ -602,7 +627,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           variant: 'warning',
         });
         if (shouldUpgrade) {
-          (navigation as any).navigate('Plans');
+          setPaywallFeature('More Messages');
+          setShowPaywall(true);
         }
         return;
       }
@@ -1029,7 +1055,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         ) : showLockedReceipt ? (
           <Pressable
             style={styles.readReceiptContainer}
-            onPress={() => (navigation as any).navigate('Plans')}
+            onPress={() => { setPaywallFeature('Read Receipts'); setShowPaywall(true); }}
           >
             <Feather name="check" size={12} color="rgba(255,255,255,0.2)" />
             <PlanBadgeInline plan="Elite" locked />
@@ -1921,6 +1947,14 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           </Pressable>
         </Pressable>
       </Modal>
+      <PaywallSheet
+        visible={showPaywall}
+        featureName={paywallFeature}
+        requiredPlan="elite"
+        role="renter"
+        onUpgrade={() => { setShowPaywall(false); (navigation as any).navigate('Plans'); }}
+        onDismiss={() => setShowPaywall(false)}
+      />
     </KeyboardAvoidingView>
   );
 };
