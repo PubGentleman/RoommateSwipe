@@ -1,0 +1,327 @@
+# Rhome — Gate "Leave a Review" to Confirmed Bookings & Showings Only
+
+**Files:** `services/reviewService.ts`, `screens/renter/ExploreScreen.tsx`
+
+---
+
+## What This Changes
+
+- **Everyone** can still see all reviews for a listing (no change)
+- **Only users who have a confirmed booking OR a confirmed showing** for that specific listing can leave a review
+- Ineligible users see a locked state instead of the write button, with a clear explanation
+- The `submitReview` function enforces this server-side as well (defense in depth — UI gating alone is not enough)
+
+---
+
+## How Eligibility Is Determined
+
+**Confirmed booking** — a row in the `bookings` table where `renter_id = currentUser.id`, `listing_id = listing.id`, and `status = 'confirmed'`.
+
+**Confirmed showing** — a `visit_request` message in the `messages` table where `metadata.status = 'confirmed'` linked to a conversation that is associated with this listing (via the `matches` or `interests` table, which links `listing_id` to a `conversation_id`).
+
+---
+
+## Fix 1 — `services/reviewService.ts`: Add eligibility check + server-side guard
+
+### Step 1 — Add `checkReviewEligibility` function
+
+Add this new exported function at the bottom of `reviewService.ts`:
+
+```ts
+/**
+ * Returns true if the user is eligible to leave a review for this listing.
+ * Eligibility requires either:
+ *   - A confirmed booking (bookings table, status = 'confirmed')
+ *   - A confirmed showing (visit_request message with status = 'confirmed'
+ *     linked to a conversation/match for this listing)
+ */
+export async function checkReviewEligibility(
+  userId: string,
+  listingId: string
+): Promise<{ eligible: boolean; reason: 'booking' | 'showing' | 'none' }> {
+  try {
+    // 1. Check for a confirmed booking
+    const { data: booking } = await supabase
+      .from('bookings')
+      .select('id')
+      .eq('renter_id', userId)
+      .eq('listing_id', listingId)
+      .eq('status', 'confirmed')
+      .limit(1)
+      .maybeSingle();
+
+    if (booking) {
+      return { eligible: true, reason: 'booking' };
+    }
+
+    // 2. Check for a confirmed showing via matches/interests linked to this listing.
+    //    The matches/interests table connects listing_id → conversation_id.
+    //    Messages in that conversation with message_type='visit_request' and
+    //    metadata->status='confirmed' signal a completed showing.
+    const { data: matches } = await supabase
+      .from('matches')
+      .select('conversation_id')
+      .eq('listing_id', listingId)
+      .eq('renter_id', userId);
+
+    // Also check interests table (some flows use interests instead of matches)
+    const { data: interests } = await supabase
+      .from('interests')
+      .select('conversation_id')
+      .eq('listing_id', listingId)
+      .eq('renter_id', userId);
+
+    const conversationIds = [
+      ...(matches || []).map((m: any) => m.conversation_id),
+      ...(interests || []).map((i: any) => i.conversation_id),
+    ].filter(Boolean);
+
+    if (conversationIds.length > 0) {
+      const { data: visitMessages } = await supabase
+        .from('messages')
+        .select('id, metadata')
+        .in('conversation_id', conversationIds)
+        .eq('message_type', 'visit_request');
+
+      const hasConfirmedVisit = (visitMessages || []).some(
+        (msg: any) => msg.metadata?.status === 'confirmed'
+      );
+
+      if (hasConfirmedVisit) {
+        return { eligible: true, reason: 'showing' };
+      }
+    }
+
+    return { eligible: false, reason: 'none' };
+  } catch (e) {
+    console.warn('[ReviewService] checkReviewEligibility error:', e);
+    // Fail closed — if the check errors, don't allow the review
+    return { eligible: false, reason: 'none' };
+  }
+}
+```
+
+### Step 2 — Add server-side eligibility guard to `submitReview`
+
+In the existing `submitReview` function, add an eligibility check BEFORE the insert so that even if someone bypasses the UI, the server rejects the review:
+
+```ts
+export async function submitReview(params: {
+  listingId: string;
+  reviewerId: string;
+  rating: number;
+  reviewText?: string;
+  tags?: string[];
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Server-side eligibility guard
+    const eligibility = await checkReviewEligibility(params.reviewerId, params.listingId);
+    if (!eligibility.eligible) {
+      return {
+        success: false,
+        error: 'You can only review a listing after a confirmed stay or showing.',
+      };
+    }
+
+    const { error } = await supabase.from('property_reviews').insert({
+      listing_id: params.listingId,
+      reviewer_id: params.reviewerId,
+      rating: params.rating,
+      review_text: params.reviewText || null,
+      tags: params.tags || [],
+    });
+
+    if (error) {
+      if (error.code === '23505') {
+        return { success: false, error: 'You have already reviewed this listing.' };
+      }
+      throw error;
+    }
+
+    await recalculateRating(params.listingId);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Failed to submit review' };
+  }
+}
+```
+
+---
+
+## Fix 2 — `screens/renter/ExploreScreen.tsx`: Load eligibility + gate the UI
+
+### Step 1 — Add eligibility state
+
+Add near the other review state variables (around line 140):
+
+```ts
+const [canReviewListing, setCanReviewListing] = useState(false);
+const [reviewEligibilityLoaded, setReviewEligibilityLoaded] = useState(false);
+```
+
+Add the import for `checkReviewEligibility`:
+```ts
+import { submitReview, getReviewSummary, checkReviewEligibility } from '../../services/reviewService';
+```
+
+### Step 2 — Load eligibility when listing detail opens
+
+Find the existing `useEffect` that loads `detailReviewSummary` when the listing detail opens (around line 253):
+
+```ts
+useEffect(() => {
+  if (selectedProperty && showPropertyDetail) {
+    getReviewSummary(selectedProperty.id).then(setDetailReviewSummary).catch(() => {});
+  } else {
+    setDetailReviewSummary(null);
+  }
+}, [selectedProperty?.id, showPropertyDetail]);
+```
+
+Replace it with:
+
+```ts
+useEffect(() => {
+  if (selectedProperty && showPropertyDetail) {
+    getReviewSummary(selectedProperty.id).then(setDetailReviewSummary).catch(() => {});
+
+    // Check if current user is eligible to leave a review
+    if (user?.id) {
+      setReviewEligibilityLoaded(false);
+      setCanReviewListing(false);
+      checkReviewEligibility(user.id, selectedProperty.id)
+        .then(({ eligible }) => {
+          setCanReviewListing(eligible);
+          setReviewEligibilityLoaded(true);
+        })
+        .catch(() => {
+          setCanReviewListing(false);
+          setReviewEligibilityLoaded(true);
+        });
+    } else {
+      setCanReviewListing(false);
+      setReviewEligibilityLoaded(true);
+    }
+  } else {
+    setDetailReviewSummary(null);
+    setCanReviewListing(false);
+    setReviewEligibilityLoaded(false);
+  }
+}, [selectedProperty?.id, showPropertyDetail]);
+```
+
+### Step 3 — Update the Reviews section UI
+
+Find the Reviews section in the listing detail (around line 2120). Replace the entire block that shows either "See all reviews" or "Be the first to review":
+
+```tsx
+<View style={styles.pdSection}>
+  <View style={styles.pdReviewsHeader}>
+    <Text style={styles.pdSectionTitle}>Reviews</Text>
+    {detailReviewSummary && detailReviewSummary.reviewCount > 0 ? (
+      <View style={styles.pdReviewsSummaryBadge}>
+        <Feather name="star" size={14} color="#FFD700" />
+        <Text style={styles.pdReviewsAvg}>{detailReviewSummary.averageRating?.toFixed(1)}</Text>
+        <Text style={styles.pdReviewsCount}>({detailReviewSummary.reviewCount})</Text>
+      </View>
+    ) : null}
+  </View>
+
+  {/* See all reviews — visible to everyone when reviews exist */}
+  {detailReviewSummary && detailReviewSummary.reviewCount > 0 ? (
+    <Pressable
+      style={styles.pdReviewsBtn}
+      onPress={() => setShowReviewsModal(true)}
+    >
+      <Feather name="message-square" size={16} color="#ff6b5b" />
+      <Text style={styles.pdReviewsBtnText}>
+        See all {detailReviewSummary.reviewCount} review{detailReviewSummary.reviewCount !== 1 ? 's' : ''}
+      </Text>
+      <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.4)" />
+    </Pressable>
+  ) : null}
+
+  {/* Write review — gated to confirmed bookings/showings only */}
+  {reviewEligibilityLoaded ? (
+    canReviewListing ? (
+      // Eligible — show the write review button
+      <Pressable
+        style={[styles.pdReviewsBtn, { marginTop: detailReviewSummary?.reviewCount ? 8 : 0 }]}
+        onPress={() => setShowWriteReview(true)}
+      >
+        <Feather name="edit-3" size={16} color="#ff6b5b" />
+        <Text style={styles.pdReviewsBtnText}>
+          {detailReviewSummary && detailReviewSummary.reviewCount > 0
+            ? 'Write a review'
+            : 'Be the first to review'}
+        </Text>
+        <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.4)" />
+      </Pressable>
+    ) : (
+      // Not eligible — show locked state (only when there are no reviews to show yet, otherwise the section is still useful)
+      detailReviewSummary?.reviewCount === 0 ? (
+        <View style={styles.pdReviewsLocked}>
+          <Feather name="lock" size={14} color="rgba(255,255,255,0.25)" />
+          <Text style={styles.pdReviewsLockedText}>
+            Reviews can only be left after a confirmed stay or showing
+          </Text>
+        </View>
+      ) : null
+    )
+  ) : (
+    // Loading eligibility — show nothing (avoid layout flash)
+    null
+  )}
+</View>
+```
+
+### Step 4 — Add `pdReviewsLocked` and `pdReviewsLockedText` styles
+
+Add these to the `StyleSheet.create({...})` at the bottom of `ExploreScreen.tsx`:
+
+```ts
+pdReviewsLocked: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 8,
+  paddingVertical: 14,
+  paddingHorizontal: 16,
+  borderRadius: 12,
+  backgroundColor: 'rgba(255,255,255,0.03)',
+  borderWidth: 1,
+  borderColor: 'rgba(255,255,255,0.07)',
+},
+pdReviewsLockedText: {
+  flex: 1,
+  fontSize: 13,
+  color: 'rgba(255,255,255,0.35)',
+  lineHeight: 18,
+},
+```
+
+---
+
+## Schema Note
+
+This fix assumes the following table/column names in Supabase. Adjust if yours differ:
+
+| Table | Key Columns Used |
+|-------|-----------------|
+| `bookings` | `renter_id`, `listing_id`, `status` |
+| `matches` | `renter_id`, `listing_id`, `conversation_id` |
+| `interests` | `renter_id`, `listing_id`, `conversation_id` |
+| `messages` | `conversation_id`, `message_type`, `metadata` |
+
+If your app uses only `matches` (not `interests`) or uses a different column name (e.g. `user_id` instead of `renter_id`), update the Supabase queries in `checkReviewEligibility` accordingly.
+
+---
+
+## Result After Fix
+
+| User type | Reviews section |
+|-----------|----------------|
+| Never interacted with listing | Sees existing reviews. Locked state shown if 0 reviews. No write button. |
+| Had a pending visit request (not confirmed) | Same as above — pending visits don't qualify |
+| Host confirmed their showing | Sees reviews + "Write a review" / "Be the first to review" button |
+| Has a confirmed booking | Sees reviews + "Write a review" / "Be the first to review" button |
+| Already left a review | Write button still shown; `submitReview` returns "You have already reviewed" error |

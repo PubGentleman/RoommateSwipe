@@ -88,6 +88,8 @@ export const RoommatesScreen = () => {
   const [processingUndoPass, setProcessingUndoPass] = useState(false);
   const [showProfileDetail, setShowProfileDetail] = useState(false);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const [showPhotoGrid, setShowPhotoGrid] = useState(false);
+  const [photoGridIndex, setPhotoGridIndex] = useState(0);
   const [showSuperLikeUpgradeModal, setShowSuperLikeUpgradeModal] = useState(false);
   const [showSuperInterestUpsell, setShowSuperInterestUpsell] = useState(false);
   const [showSuperInterestConfirm, setShowSuperInterestConfirm] = useState(false);
@@ -2399,7 +2401,7 @@ export const RoommatesScreen = () => {
         visible={showProfileDetail}
         animationType="slide"
         transparent={false}
-        onRequestClose={() => setShowProfileDetail(false)}
+        onRequestClose={() => { setShowProfileDetail(false); setShowPhotoGrid(false); }}
       >
         <View style={{ flex: 1, backgroundColor: '#111' }}>
           {(() => {
@@ -2479,7 +2481,35 @@ export const RoommatesScreen = () => {
                     </View>
                   ) : null}
 
-                  <Pressable style={[styles.pdCloseBtn, { top: Math.max(14, insets.top + 6) }]} onPress={() => setShowProfileDetail(false)}>
+                  {photosArray.length > 1 ? (
+                    <Pressable
+                      style={{
+                        position: 'absolute',
+                        bottom: 16,
+                        right: 16,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 5,
+                        backgroundColor: 'rgba(0,0,0,0.55)',
+                        paddingHorizontal: 10,
+                        paddingVertical: 6,
+                        borderRadius: 20,
+                        borderWidth: 1,
+                        borderColor: 'rgba(255,255,255,0.15)',
+                      }}
+                      onPress={() => {
+                        setPhotoGridIndex(currentPhotoIndex);
+                        setShowPhotoGrid(true);
+                      }}
+                    >
+                      <Feather name="grid" size={12} color="#FFFFFF" />
+                      <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '600' }}>
+                        {photosArray.length} photos
+                      </Text>
+                    </Pressable>
+                  ) : null}
+
+                  <Pressable style={[styles.pdCloseBtn, { top: Math.max(14, insets.top + 6) }]} onPress={() => { setShowProfileDetail(false); setShowPhotoGrid(false); }}>
                     <Feather name="x" size={18} color="#fff" />
                   </Pressable>
                 </View>
@@ -2551,21 +2581,91 @@ export const RoommatesScreen = () => {
 
                   <View style={styles.pdSection}>
                     <Text style={styles.pdSectionLabel}>Lifestyle</Text>
-                    <View style={styles.pdPillWrap}>
+                    <View style={{ gap: 8 }}>
                       {([
-                        { icon: 'star' as const, value: getCleanlinessLabel(currentProfile.lifestyle?.cleanliness), color: '#ff6b5b' },
-                        { icon: 'users' as const, value: getSocialLevelLabel(currentProfile.lifestyle?.socialLevel), color: '#ff6b5b' },
-                        { icon: 'briefcase' as const, value: getWorkScheduleLabel(currentProfile.lifestyle?.workSchedule), color: '#ff6b5b' },
-                        currentProfile.lifestyle?.pets ? { icon: 'heart' as const, value: 'Has Pets', color: '#f39c12' } : null,
-                        currentProfile.lifestyle?.smoking ? { icon: 'wind' as const, value: 'Smoking OK', color: 'rgba(255,255,255,0.35)' } : null,
-                        !currentProfile.lifestyle?.smoking ? { icon: 'x' as const, value: 'No Smoking', color: 'rgba(255,255,255,0.35)' } : null,
-                        currentProfile.preferences?.privateBathroom ? { icon: 'droplet' as const, value: 'Private Bath', color: '#ff6b5b' } : null,
-                      ] as (null | { icon: any; value: string; color: string })[]).filter(Boolean).map((tag, i) => (
-                        <View key={i} style={styles.pdLifestylePill}>
-                          <Feather name={tag!.icon} size={12} color={tag!.color} />
-                          <Text style={styles.pdLifestylePillText}>{tag!.value}</Text>
-                        </View>
-                      ))}
+                        {
+                          icon: 'star' as const,
+                          value: getCleanlinessLabel(currentProfile.lifestyle?.cleanliness),
+                          sub: (() => {
+                            const v = currentProfile.lifestyle?.cleanliness ?? 3;
+                            if (v >= 4.5) return 'Keeps shared spaces spotless';
+                            if (v >= 3.5) return 'Tidies up regularly';
+                            if (v >= 2.5) return 'Moderately tidy';
+                            if (v >= 1.5) return 'Relaxed about mess';
+                            return 'Very laid-back about cleanliness';
+                          })(),
+                          color: '#ff6b5b',
+                        },
+                        {
+                          icon: 'users' as const,
+                          value: getSocialLevelLabel(currentProfile.lifestyle?.socialLevel),
+                          sub: (() => {
+                            const v = currentProfile.lifestyle?.socialLevel ?? 3;
+                            if (v >= 4.5) return 'Loves having people over';
+                            if (v >= 3.5) return 'Enjoys socializing at home';
+                            if (v >= 2.5) return 'Balanced — social but values quiet time';
+                            if (v >= 1.5) return 'Prefers a quieter home';
+                            return 'Needs a very quiet environment';
+                          })(),
+                          color: '#ff6b5b',
+                        },
+                        {
+                          icon: 'briefcase' as const,
+                          value: getWorkScheduleLabel(currentProfile.lifestyle?.workSchedule),
+                          sub: (() => {
+                            const s = currentProfile.lifestyle?.workSchedule;
+                            if (s === 'wfh' || s === 'wfh_fulltime' || s === 'remote') return 'Home most of the day';
+                            if (s === 'office' || s === 'office_fulltime') return 'Out of the apartment 9\u20135';
+                            if (s === 'hybrid') return 'Mix of home and office days';
+                            if (s === 'night_shift') return 'Works nights — sleeps during the day';
+                            if (s === 'irregular') return 'Varied schedule — hours change often';
+                            if (s === 'student') return 'On campus most days';
+                            if (s === 'freelance') return 'Works from home on flexible hours';
+                            return 'Schedule varies';
+                          })(),
+                          color: '#ff6b5b',
+                        },
+                        currentProfile.lifestyle?.pets
+                          ? { icon: 'heart' as const, value: 'Has Pets', sub: 'Will bring a pet to the apartment', color: '#f39c12' }
+                          : null,
+                        currentProfile.lifestyle?.smoking
+                          ? { icon: 'wind' as const, value: 'Smoking OK', sub: 'Open to smoking in shared spaces', color: 'rgba(255,255,255,0.5)' }
+                          : { icon: 'x' as const, value: 'No Smoking', sub: 'Prefers a smoke-free home', color: 'rgba(255,255,255,0.35)' },
+                        currentProfile.preferences?.privateBathroom
+                          ? { icon: 'droplet' as const, value: 'Needs Private Bath', sub: 'Requires their own bathroom', color: '#ff6b5b' }
+                          : null,
+                      ] as (null | { icon: any; value: string; sub: string; color: string })[])
+                        .filter(Boolean)
+                        .map((tag, i) => (
+                          <View key={i} style={{
+                            flexDirection: 'row',
+                            alignItems: 'flex-start',
+                            gap: 12,
+                            paddingVertical: 10,
+                            paddingHorizontal: 14,
+                            backgroundColor: 'rgba(255,255,255,0.04)',
+                            borderRadius: 12,
+                            borderWidth: 1,
+                            borderColor: 'rgba(255,255,255,0.07)',
+                          }}>
+                            <View style={{
+                              width: 32, height: 32, borderRadius: 10,
+                              backgroundColor: 'rgba(255,107,91,0.1)',
+                              alignItems: 'center', justifyContent: 'center',
+                              marginTop: 1,
+                            }}>
+                              <Feather name={tag!.icon} size={14} color={tag!.color} />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 14, fontWeight: '600', color: '#FFFFFF' }}>
+                                {tag!.value}
+                              </Text>
+                              <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
+                                {tag!.sub}
+                              </Text>
+                            </View>
+                          </View>
+                        ))}
                     </View>
                   </View>
 
@@ -2633,11 +2733,103 @@ export const RoommatesScreen = () => {
                   ) : null}
                 </ScrollView>
 
+                <View style={{
+                  flexDirection: 'row',
+                  gap: 10,
+                  paddingHorizontal: 16,
+                  paddingTop: 10,
+                  paddingBottom: 6,
+                  backgroundColor: '#111',
+                }}>
+                  {renterLimits.hasMatchBreakdown ? (
+                    <Pressable
+                      style={{
+                        flex: 1,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        paddingVertical: 11,
+                        borderRadius: 12,
+                        backgroundColor: 'rgba(255,107,91,0.1)',
+                        borderWidth: 1,
+                        borderColor: 'rgba(255,107,91,0.2)',
+                      }}
+                      onPress={() => setShowWhyModal(true)}
+                    >
+                      <Feather name="zap" size={14} color="#ff6b5b" />
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: '#ff6b5b' }}>
+                        Why this match?
+                      </Text>
+                    </Pressable>
+                  ) : (
+                    <Pressable
+                      style={{
+                        flex: 1,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        paddingVertical: 11,
+                        borderRadius: 12,
+                        backgroundColor: 'rgba(168,85,247,0.1)',
+                        borderWidth: 1,
+                        borderColor: 'rgba(168,85,247,0.2)',
+                      }}
+                      onPress={() => {
+                        setShowProfileDetail(false);
+                        setShowPhotoGrid(false);
+                        setTimeout(() => (navigation as any).navigate('Plans'), 200);
+                      }}
+                    >
+                      <Feather name="lock" size={13} color="#a855f7" />
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: '#a855f7' }}>
+                        Why this match?
+                      </Text>
+                    </Pressable>
+                  )}
+
+                  <Pressable
+                    style={{
+                      flex: 1,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      paddingVertical: 11,
+                      borderRadius: 12,
+                      backgroundColor: 'rgba(255,107,91,0.08)',
+                      borderWidth: 1,
+                      borderColor: 'rgba(255,107,91,0.18)',
+                    }}
+                    onPress={() => {
+                      setShowProfileDetail(false);
+                      setShowPhotoGrid(false);
+                      setTimeout(() => {
+                        setAskAboutTarget({
+                          id: currentProfile.id,
+                          name: currentProfile.name,
+                          age: currentProfile.age,
+                          compatibility: currentProfile.compatibility,
+                          entryPoint: 'match_screen',
+                        });
+                        setAskAboutVisible(true);
+                      }, 300);
+                    }}
+                  >
+                    <Feather name="cpu" size={14} color="#ff6b5b" />
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#ff6b5b' }}>
+                      Ask AI about {currentProfile.name?.split(' ')[0] || 'them'}
+                    </Text>
+                  </Pressable>
+                </View>
+
                 <View style={[styles.pdActionBar, { paddingBottom: Math.max(14, insets.bottom + 6) }]}>
                   <Pressable
                     style={styles.pdActionPass}
                     onPress={() => {
                       setShowProfileDetail(false);
+                      setShowPhotoGrid(false);
                       handleSwipeAction('nope');
                     }}
                   >
@@ -2648,6 +2840,7 @@ export const RoommatesScreen = () => {
                     style={styles.pdActionInterested}
                     onPress={() => {
                       setShowProfileDetail(false);
+                      setShowPhotoGrid(false);
                       handleSwipeAction('like');
                     }}
                   >
@@ -2666,6 +2859,7 @@ export const RoommatesScreen = () => {
                       );
                       if (hasMatch) {
                         setShowProfileDetail(false);
+                        setShowPhotoGrid(false);
                         setTimeout(() => handleSendDirectMessage(false), 200);
                       } else {
                         const coldCheck = await canSendColdMessage();
@@ -2681,6 +2875,7 @@ export const RoommatesScreen = () => {
                           return;
                         }
                         setShowProfileDetail(false);
+                        setShowPhotoGrid(false);
                         setTimeout(() => handleSendDirectMessage(true), 200);
                       }
                     }}
@@ -2688,6 +2883,107 @@ export const RoommatesScreen = () => {
                     <Feather name="message-circle" size={22} color="rgba(255,255,255,0.6)" />
                   </Pressable>
                 </View>
+              </>
+            );
+          })()}
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showPhotoGrid}
+        animationType="fade"
+        transparent={false}
+        onRequestClose={() => setShowPhotoGrid(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: '#000' }}>
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 16,
+            paddingTop: Math.max(16, insets.top + 8),
+            paddingBottom: 12,
+          }}>
+            <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '700' }}>
+              {currentProfile?.name?.split(' ')[0]}'s Photos
+            </Text>
+            <Pressable
+              onPress={() => setShowPhotoGrid(false)}
+              style={{
+                width: 32, height: 32, borderRadius: 16,
+                backgroundColor: 'rgba(255,255,255,0.1)',
+                alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <Feather name="x" size={18} color="#fff" />
+            </Pressable>
+          </View>
+
+          {(() => {
+            const gridPhotos = Array.isArray(currentProfile?.photos)
+              ? currentProfile.photos
+              : currentProfile?.photos
+              ? [currentProfile.photos]
+              : [];
+
+            if (gridPhotos.length === 0) {
+              return (
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14 }}>No photos available</Text>
+                </View>
+              );
+            }
+
+            return (
+              <>
+                <View style={{ width: '100%', height: 340, marginBottom: 12 }}>
+                  <Image
+                    source={{ uri: gridPhotos[photoGridIndex] || '' }}
+                    style={{ width: '100%', height: '100%' }}
+                    resizeMode="cover"
+                  />
+                  <View style={{
+                    position: 'absolute',
+                    bottom: 10,
+                    right: 12,
+                    backgroundColor: 'rgba(0,0,0,0.55)',
+                    paddingHorizontal: 10,
+                    paddingVertical: 4,
+                    borderRadius: 12,
+                  }}>
+                    <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>
+                      {photoGridIndex + 1} / {gridPhotos.length}
+                    </Text>
+                  </View>
+                </View>
+
+                <ScrollView contentContainerStyle={{
+                  flexDirection: 'row',
+                  flexWrap: 'wrap',
+                  gap: 3,
+                  paddingHorizontal: 3,
+                }}>
+                  {gridPhotos.map((uri: string, i: number) => (
+                    <Pressable
+                      key={i}
+                      onPress={() => setPhotoGridIndex(i)}
+                      style={{
+                        width: '32.5%',
+                        aspectRatio: 1,
+                        borderRadius: 4,
+                        overflow: 'hidden',
+                        borderWidth: photoGridIndex === i ? 2 : 0,
+                        borderColor: '#ff6b5b',
+                      }}
+                    >
+                      <Image
+                        source={{ uri }}
+                        style={{ width: '100%', height: '100%' }}
+                        resizeMode="cover"
+                      />
+                    </Pressable>
+                  ))}
+                </ScrollView>
               </>
             );
           })()}
