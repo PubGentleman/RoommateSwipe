@@ -147,24 +147,25 @@ interface SpinnerPickerProps {
   height?: number;
 }
 
+const NATIVE_HEIGHT = 50;
+
 const SpinnerPicker: React.FC<SpinnerPickerProps> = ({ options, selectedValue, onValueChange, height = 150 }) => {
   if (isWeb) {
     return <WebSpinnerPicker options={options} selectedValue={selectedValue} onValueChange={onValueChange} height={height} />;
   }
 
   return (
-    <View style={[s.wrap, { height }]}>
+    <View style={[s.wrap, { height: NATIVE_HEIGHT, overflow: 'hidden' }]}>
       <Picker
         selectedValue={selectedValue}
         onValueChange={onValueChange}
         style={[
           s.picker,
-          { height },
+          { height: NATIVE_HEIGHT },
           isAndroid && s.androidPicker,
         ]}
-        itemStyle={[s.item, { height: 44 }]}
+        itemStyle={[s.item, { height: NATIVE_HEIGHT }]}
         {...(isAndroid ? { mode: 'dialog' as const } : {})}
-        display={'spinner' as any}
       >
         {options.map(opt => (
           <Picker.Item
@@ -175,7 +176,6 @@ const SpinnerPicker: React.FC<SpinnerPickerProps> = ({ options, selectedValue, o
           />
         ))}
       </Picker>
-      {isIOS ? <View style={s.band} pointerEvents="none" /> : null}
     </View>
   );
 };
