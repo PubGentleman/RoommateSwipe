@@ -41,8 +41,20 @@ function categorizeElement(tags: Record<string, string>): NearbyAmenity['categor
   const amenity = tags.amenity || '';
   const shop = tags.shop || '';
   const leisure = tags.leisure || '';
+  const railway = tags.railway || '';
+  const highway = tags.highway || '';
+  const publicTransport = tags.public_transport || '';
 
-  if (amenity === 'subway_entrance' || amenity === 'bus_stop') return 'transit';
+  if (
+    amenity === 'subway_entrance' ||
+    amenity === 'bus_stop' ||
+    railway === 'subway_entrance' ||
+    railway === 'station' ||
+    railway === 'halt' ||
+    highway === 'bus_stop' ||
+    (publicTransport === 'stop_position' && railway)
+  ) return 'transit';
+
   if (amenity === 'restaurant' || amenity === 'cafe') return 'restaurant';
   if (amenity === 'supermarket' || shop === 'supermarket') return 'grocery';
   if (amenity === 'laundry' || shop === 'laundry') return 'laundry';
@@ -51,8 +63,9 @@ function categorizeElement(tags: Record<string, string>): NearbyAmenity['categor
 }
 
 function getTypeName(tags: Record<string, string>): string {
-  if (tags.amenity === 'subway_entrance') return 'Subway';
-  if (tags.amenity === 'bus_stop') return 'Bus Stop';
+  if (tags.amenity === 'subway_entrance' || tags.railway === 'subway_entrance') return 'Subway';
+  if (tags.railway === 'station' || tags.railway === 'halt') return 'Train Station';
+  if (tags.amenity === 'bus_stop' || tags.highway === 'bus_stop') return 'Bus Stop';
   if (tags.amenity === 'restaurant') return 'Restaurant';
   if (tags.amenity === 'cafe') return 'Cafe';
   if (tags.amenity === 'supermarket' || tags.shop === 'supermarket') return 'Supermarket';
@@ -71,7 +84,22 @@ export async function fetchAreaInfo(lat: number, lng: number): Promise<AreaInfo 
   const latStr = lat.toFixed(6);
   const lngStr = lng.toFixed(6);
 
-  const query = `[out:json][timeout:10];(node["amenity"="subway_entrance"](around:500,${latStr},${lngStr});node["amenity"="bus_stop"](around:500,${latStr},${lngStr});node["amenity"="restaurant"](around:500,${latStr},${lngStr});node["amenity"="cafe"](around:500,${latStr},${lngStr});node["amenity"="supermarket"](around:500,${latStr},${lngStr});node["shop"="supermarket"](around:500,${latStr},${lngStr});node["amenity"="laundry"](around:500,${latStr},${lngStr});node["shop"="laundry"](around:500,${latStr},${lngStr});node["leisure"="park"](around:500,${latStr},${lngStr}););out body;`;
+  const query = `[out:json][timeout:15];(
+  node["amenity"="subway_entrance"](around:600,${latStr},${lngStr});
+  node["railway"="subway_entrance"](around:600,${latStr},${lngStr});
+  node["railway"="station"](around:600,${latStr},${lngStr});
+  node["railway"="halt"](around:600,${latStr},${lngStr});
+  node["public_transport"="stop_position"]["railway"](around:600,${latStr},${lngStr});
+  node["amenity"="bus_stop"](around:600,${latStr},${lngStr});
+  node["highway"="bus_stop"](around:600,${latStr},${lngStr});
+  node["amenity"="restaurant"](around:500,${latStr},${lngStr});
+  node["amenity"="cafe"](around:500,${latStr},${lngStr});
+  node["amenity"="supermarket"](around:500,${latStr},${lngStr});
+  node["shop"="supermarket"](around:500,${latStr},${lngStr});
+  node["amenity"="laundry"](around:500,${latStr},${lngStr});
+  node["shop"="laundry"](around:500,${latStr},${lngStr});
+  node["leisure"="park"](around:500,${latStr},${lngStr});
+);out body;`;
 
   try {
     const controller = new AbortController();

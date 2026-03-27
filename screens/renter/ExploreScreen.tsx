@@ -147,6 +147,7 @@ export const ExploreScreen = () => {
   const [areaInfoLoading, setAreaInfoLoading] = useState(false);
   const [areaInfoError, setAreaInfoError] = useState(false);
   const [areaInfoListingId, setAreaInfoListingId] = useState<string | null>(null);
+  const [showTransitModal, setShowTransitModal] = useState(false);
 
   const COLLAPSIBLE_HEIGHT = 120;
   const exploreScrollY = useSharedValue(0);
@@ -186,6 +187,7 @@ export const ExploreScreen = () => {
       setAreaInfoLoading(false);
       setAreaInfoError(false);
       setAreaInfoListingId(selectedProperty.id);
+      setShowTransitModal(false);
       return;
     }
 
@@ -2054,24 +2056,6 @@ export const ExploreScreen = () => {
                           );
                         })()}
 
-                        {selectedProperty.transitInfo?.stops?.length > 0 ? (
-                          <View style={styles.pdTransitSection}>
-                            <Text style={styles.pdTransitTitle}>Nearby Transit</Text>
-                            {selectedProperty.transitInfo.stops.slice(0, 3).map((stop: any, index: number) => (
-                              <View key={index} style={styles.pdTransitRow}>
-                                <View style={styles.pdTransitIcon}>
-                                  <Feather
-                                    name={stop.type === 'subway' ? 'navigation' : stop.type === 'bus' ? 'truck' : stop.type === 'train' ? 'navigation' : 'map-pin'}
-                                    size={12}
-                                    color={ACCENT}
-                                  />
-                                </View>
-                                <Text style={styles.pdTransitName} numberOfLines={1}>{stop.name}</Text>
-                                <Text style={styles.pdTransitDist}>{stop.distanceMiles} mi</Text>
-                              </View>
-                            ))}
-                          </View>
-                        ) : null}
                       </View>
                     ) : null}
 
@@ -2107,15 +2091,30 @@ export const ExploreScreen = () => {
                         </View>
                       ) : (
                         <View style={styles.pdAreaInfoGrid}>
-                          <View style={styles.pdAreaInfoCard}>
+                          <Pressable
+                            style={styles.pdAreaInfoCard}
+                            onPress={() => {
+                              if (areaInfo && areaInfo.transit.length > 0) {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                setShowTransitModal(true);
+                              }
+                            }}
+                          >
                             <View style={styles.pdAreaInfoIconWrap}>
                               <Feather name="navigation" size={16} color={ACCENT} />
                             </View>
                             <Text style={styles.pdAreaInfoLabel}>Transit</Text>
                             <Text style={styles.pdAreaInfoValue}>
-                              {areaInfo.transit.length > 0 ? `${areaInfo.transit.length} stop${areaInfo.transit.length !== 1 ? 's' : ''} nearby` : 'None found nearby'}
+                              {areaInfo.transit.length > 0
+                                ? formatNearestAmenity(areaInfo.transit)
+                                : 'None found nearby'}
                             </Text>
-                          </View>
+                            {areaInfo.transit.length > 0 ? (
+                              <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 3 }}>
+                                {areaInfo.transit.length} stop{areaInfo.transit.length !== 1 ? 's' : ''} · tap to see all
+                              </Text>
+                            ) : null}
+                          </Pressable>
                           <View style={styles.pdAreaInfoCard}>
                             <View style={styles.pdAreaInfoIconWrap}>
                               <Feather name="coffee" size={16} color={ACCENT} />
@@ -2572,6 +2571,73 @@ export const ExploreScreen = () => {
         }}
       />
 
+      <Modal
+        visible={showTransitModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowTransitModal(false)}
+      >
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' }}
+          onPress={() => setShowTransitModal(false)}
+        />
+        <View style={{
+          backgroundColor: '#1e1e1e',
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
+          paddingHorizontal: 20,
+          paddingBottom: 40,
+          maxHeight: '70%',
+        }}>
+          <View style={{
+            width: 40, height: 4, borderRadius: 2,
+            backgroundColor: 'rgba(255,255,255,0.2)',
+            alignSelf: 'center', marginTop: 12, marginBottom: 16,
+          }} />
+          <Text style={{ fontSize: 18, fontWeight: '700', color: '#FFFFFF', marginBottom: 4 }}>
+            Nearby Transit
+          </Text>
+          <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginBottom: 20 }}>
+            {selectedProperty?.neighborhood || selectedProperty?.city}
+          </Text>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {(areaInfo?.transit || []).map((stop, index) => (
+              <View key={index} style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingVertical: 14,
+                borderBottomWidth: 1,
+                borderBottomColor: 'rgba(255,255,255,0.07)',
+                gap: 14,
+              }}>
+                <View style={{
+                  width: 36, height: 36, borderRadius: 18,
+                  backgroundColor: 'rgba(255,77,77,0.12)',
+                  alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Feather
+                    name={stop.type === 'Bus Stop' ? 'truck' : 'navigation'}
+                    size={15}
+                    color={ACCENT}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#FFFFFF' }} numberOfLines={1}>
+                    {stop.name}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
+                    {stop.type}
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: ACCENT }}>
+                  {stop.distanceMi} mi
+                </Text>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      </Modal>
+
       {selectedProperty ? (
         <NeighborhoodAISheet
           visible={showNeighborhoodSheet}
@@ -2886,14 +2952,6 @@ const styles = StyleSheet.create({
     color: ACCENT,
     fontSize: 14,
     fontWeight: '600',
-  },
-  pdTransitIcon: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: 'rgba(255,107,91,0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   pdAreaInfoGrid: {
     flexDirection: 'row',
@@ -3971,32 +4029,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: 'rgba(255,255,255,0.4)',
     marginTop: 2,
-  },
-  pdTransitSection: {
-    marginTop: 8,
-  },
-  pdTransitTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.35)',
-    letterSpacing: 0.4,
-    marginBottom: 8,
-  },
-  pdTransitRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 5,
-  },
-  pdTransitName: {
-    flex: 1,
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.7)',
-    fontWeight: '500',
-  },
-  pdTransitDist: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.3)',
   },
   pdAmenitiesWrap: {
     flexDirection: 'row',

@@ -1,0 +1,240 @@
+# Rhome — Transit Section Consolidation Fix
+
+**Files:** `screens/renter/ExploreScreen.tsx`, `services/neighborhoodService.ts`
+
+---
+
+## Background
+
+The listing detail view currently has two separate transit sections that contradict each other:
+
+**Section 1 — "Nearby Transit" list** (above Area Info): Renders from `selectedProperty.transitInfo?.stops` — hardcoded mock data baked into `mockData.ts`. Real Supabase listings have no `transitInfo` field, so this section is invisible for real listings.
+
+**Section 2 — "Area Info" Transit card**: Renders from `areaInfo.transit` — a live Overpass API call via `fetchAreaInfo()` in `neighborhoodService.ts`. This is real data, but currently shows "X stops nearby" with no station names, and the card is not tappable.
+
+Additionally, `neighborhoodService.ts` only queries `amenity=subway_entrance` — but NYC subway stations in OpenStreetMap are predominantly tagged as `railway=subway_entrance`, not `amenity=subway_entrance`. This is why the Transit card returns zero results even in transit-dense areas like the Financial District.
+
+---
+
+## Fix 1 — `services/neighborhoodService.ts`: Add missing OSM transit tags to Overpass query
+
+The current query misses most NYC and major US subway stations. Replace the Overpass query string to include all common transit tags:
+
+Find the `query` variable in `fetchAreaInfo` (the long string starting with `[out:json][timeout:10]`). Replace the entire query with:
+
+```ts
+const query = `[out:json][timeout:15];(
+  node["amenity"="subway_entrance"](around:600,${latStr},${lngStr});
+  node["railway"="subway_entrance"](around:600,${latStr},${lngStr});
+  node["railway"="station"](around:600,${latStr},${lngStr});
+  node["railway"="halt"](around:600,${latStr},${lngStr});
+  node["public_transport"="stop_position"]["railway"](around:600,${latStr},${lngStr});
+  node["amenity"="bus_stop"](around:600,${latStr},${lngStr});
+  node["highway"="bus_stop"](around:600,${latStr},${lngStr});
+  node["amenity"="restaurant"](around:500,${latStr},${lngStr});
+  node["amenity"="cafe"](around:500,${latStr},${lngStr});
+  node["amenity"="supermarket"](around:500,${latStr},${lngStr});
+  node["shop"="supermarket"](around:500,${latStr},${lngStr});
+  node["amenity"="laundry"](around:500,${latStr},${lngStr});
+  node["shop"="laundry"](around:500,${latStr},${lngStr});
+  node["leisure"="park"](around:500,${latStr},${lngStr});
+);out body;`;
+```
+
+Also update `categorizeElement` to handle the new tags:
+```ts
+function categorizeElement(tags: Record<string, string>): NearbyAmenity['category'] | null {
+  const amenity = tags.amenity || '';
+  const shop = tags.shop || '';
+  const leisure = tags.leisure || '';
+  const railway = tags.railway || '';
+  const highway = tags.highway || '';
+  const publicTransport = tags.public_transport || '';
+
+  if (
+    amenity === 'subway_entrance' ||
+    amenity === 'bus_stop' ||
+    railway === 'subway_entrance' ||
+    railway === 'station' ||
+    railway === 'halt' ||
+    highway === 'bus_stop' ||
+    (publicTransport === 'stop_position' && railway)
+  ) return 'transit';
+
+  if (amenity === 'restaurant' || amenity === 'cafe') return 'restaurant';
+  if (amenity === 'supermarket' || shop === 'supermarket') return 'grocery';
+  if (amenity === 'laundry' || shop === 'laundry') return 'laundry';
+  if (leisure === 'park') return 'park';
+  return null;
+}
+```
+
+And update `getTypeName` to label the new types correctly:
+```ts
+function getTypeName(tags: Record<string, string>): string {
+  if (tags.amenity === 'subway_entrance' || tags.railway === 'subway_entrance') return 'Subway';
+  if (tags.railway === 'station' || tags.railway === 'halt') return 'Train Station';
+  if (tags.amenity === 'bus_stop' || tags.highway === 'bus_stop') return 'Bus Stop';
+  if (tags.amenity === 'restaurant') return 'Restaurant';
+  if (tags.amenity === 'cafe') return 'Cafe';
+  if (tags.amenity === 'supermarket' || tags.shop === 'supermarket') return 'Supermarket';
+  if (tags.amenity === 'laundry' || tags.shop === 'laundry') return 'Laundromat';
+  if (tags.leisure === 'park') return 'Park';
+  return 'Other';
+}
+```
+
+---
+
+## Fix 2 — `screens/renter/ExploreScreen.tsx`: Remove mock transit section, make Transit card tappable with expanded detail
+
+### Step 1 — Add state for transit modal
+
+Add this state near the other `areaInfo` state variables (around line 146):
+```ts
+const [showTransitModal, setShowTransitModal] = useState(false);
+```
+
+### Step 2 — Remove the mock "Nearby Transit" section
+
+Find and delete the entire block that starts with:
+```tsx
+{selectedProperty.transitInfo?.stops?.length > 0 ? (
+  <View style={styles.pdTransitSection}>
+    <Text style={styles.pdTransitTitle}>Nearby Transit</Text>
+    {selectedProperty.transitInfo.stops.slice(0, 3).map((stop: any, index: number) => (
+      ...
+    ))}
+  </View>
+) : null}
+```
+
+Remove this entire block. The transit data will now come exclusively from `areaInfo.transit` via the Overpass API.
+
+### Step 3 — Make the Transit area info card show nearest stop name + be tappable
+
+Find the Transit card inside the `areaInfo` grid (inside the `else` branch after `areaInfoLoading` and `areaInfoError`). Replace the static `<View>` with a `<Pressable>` that opens a transit detail modal:
+
+```tsx
+<Pressable
+  style={styles.pdAreaInfoCard}
+  onPress={() => {
+    if (areaInfo && areaInfo.transit.length > 0) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setShowTransitModal(true);
+    }
+  }}
+>
+  <View style={styles.pdAreaInfoIconWrap}>
+    <Feather name="navigation" size={16} color={ACCENT} />
+  </View>
+  <Text style={styles.pdAreaInfoLabel}>Transit</Text>
+  <Text style={styles.pdAreaInfoValue}>
+    {areaInfo.transit.length > 0
+      ? formatNearestAmenity(areaInfo.transit)   // e.g. "Fulton St Station (0.1 mi)"
+      : 'None found nearby'}
+  </Text>
+  {areaInfo.transit.length > 0 && (
+    <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 3 }}>
+      {areaInfo.transit.length} stop{areaInfo.transit.length !== 1 ? 's' : ''} · tap to see all
+    </Text>
+  )}
+</Pressable>
+```
+
+### Step 4 — Add the transit detail modal
+
+Add this modal just before the closing `</View>` of the listing detail sheet (after the existing modals, around line 2490). It renders the full sorted list of nearby transit stops:
+
+```tsx
+<Modal
+  visible={showTransitModal}
+  transparent
+  animationType="slide"
+  onRequestClose={() => setShowTransitModal(false)}
+>
+  <Pressable
+    style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' }}
+    onPress={() => setShowTransitModal(false)}
+  />
+  <View style={{
+    backgroundColor: '#1e1e1e',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    maxHeight: '70%',
+  }}>
+    {/* Handle */}
+    <View style={{
+      width: 40, height: 4, borderRadius: 2,
+      backgroundColor: 'rgba(255,255,255,0.2)',
+      alignSelf: 'center', marginTop: 12, marginBottom: 16,
+    }} />
+
+    <Text style={{ fontSize: 18, fontWeight: '700', color: '#FFFFFF', marginBottom: 4 }}>
+      Nearby Transit
+    </Text>
+    <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginBottom: 20 }}>
+      {selectedProperty?.neighborhood || selectedProperty?.city}
+    </Text>
+
+    <ScrollView showsVerticalScrollIndicator={false}>
+      {(areaInfo?.transit || []).map((stop, index) => (
+        <View key={index} style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingVertical: 14,
+          borderBottomWidth: 1,
+          borderBottomColor: 'rgba(255,255,255,0.07)',
+          gap: 14,
+        }}>
+          <View style={{
+            width: 36, height: 36, borderRadius: 18,
+            backgroundColor: 'rgba(255,77,77,0.12)',
+            alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Feather
+              name={stop.type === 'Bus Stop' ? 'truck' : 'navigation'}
+              size={15}
+              color={ACCENT}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 14, fontWeight: '600', color: '#FFFFFF' }} numberOfLines={1}>
+              {stop.name}
+            </Text>
+            <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
+              {stop.type}
+            </Text>
+          </View>
+          <Text style={{ fontSize: 13, fontWeight: '600', color: ACCENT }}>
+            {stop.distanceMi} mi
+          </Text>
+        </View>
+      ))}
+    </ScrollView>
+  </View>
+</Modal>
+```
+
+Make sure `ScrollView` is imported from `react-native` (it likely already is).
+
+### Step 5 — Reset transit modal on listing change
+
+In the `useEffect` that resets `areaInfo` when `selectedProperty` changes (around line 179), also reset the transit modal:
+```ts
+setShowTransitModal(false);
+```
+
+---
+
+## Result After Fix
+
+| Before | After |
+|--------|-------|
+| Two contradictory transit sections | One Transit card in Area Info |
+| Mock station names from `mockData.ts` | Real OSM station data via Overpass API |
+| Transit card says "None found nearby" even in NYC | Shows nearest station name + distance (e.g., "Fulton St Station (0.1 mi)") |
+| Transit card is not tappable | Tap opens modal with full sorted list of all nearby stops + distances |
+| Overpass query misses `railway=subway_entrance` tags | All common US transit OSM tags now included |
