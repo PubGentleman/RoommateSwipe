@@ -304,17 +304,42 @@ export const ExploreScreen = () => {
 
   const loadHostProfiles = async () => {
     try {
+      const { data: supaUsers } = await supabase
+        .from('users')
+        .select('id, full_name, avatar_url, host_type, company_name, agency_name, license_verified, units_managed')
+        .eq('role', 'host');
+
+      if (supaUsers && supaUsers.length > 0) {
+        const profileMap = new Map<string, User>();
+        supaUsers.forEach((u: any) => {
+          const mapped: Partial<User> = {
+            id: u.id,
+            name: u.full_name || 'Host',
+            profilePicture: u.avatar_url,
+            hostType: u.host_type,
+            companyName: u.company_name,
+            agencyName: u.agency_name,
+            licenseVerified: u.license_verified,
+            unitsManaged: u.units_managed,
+            role: 'host',
+          };
+          profileMap.set(u.id, mapped as User);
+        });
+        setHostProfiles(profileMap);
+        return;
+      }
+    } catch (err) {
+      console.warn('[ExploreScreen] Supabase host profiles failed, falling back to StorageService:', err);
+    }
+
+    try {
       const users = await StorageService.getUsers();
-      console.log('[ExploreScreen] Total users loaded:', users.length);
       const profileMap = new Map<string, User>();
       users.forEach(u => {
-        console.log('[ExploreScreen] User:', u.id, 'role:', u.role, 'has profileData:', !!u.profileData, 'has profilePicture:', !!u.profilePicture);
-        if ((u.role === 'renter' || u.role === 'host') && u.profileData) {
+        if (u.role === 'host') {
           profileMap.set(u.id, u);
         }
       });
-      console.log('[ExploreScreen] Loaded host profiles:', profileMap.size, 'profiles');
-      console.log('[ExploreScreen] Profile IDs:', Array.from(profileMap.keys()));
       setHostProfiles(profileMap);
     } catch (err) {
       console.error('Error loading host profiles:', err);
