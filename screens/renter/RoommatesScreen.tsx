@@ -1634,7 +1634,7 @@ export const RoommatesScreen = () => {
         </Animated.View>
       ) : !canSeeAIMatch ? (
         <Pressable
-          onPress={() => (navigation as any).navigate('Plans')}
+          onPress={() => setShowPaywall(true)}
           style={styles.lockedBestMatchBanner}
         >
           <Feather name="zap" size={14} color="#ff6b5b" />
@@ -1785,7 +1785,7 @@ export const RoommatesScreen = () => {
                 ) : (
                   <Pressable
                     style={[styles.whyMatchButton, { borderColor: 'rgba(168,85,247,0.3)' }]}
-                    onPress={() => (navigation as any).navigate('Plans')}
+                    onPress={() => setShowPaywall(true)}
                   >
                     <Feather name="lock" size={10} color="#a855f7" />
                     <ThemedText style={[styles.whyMatchText, { color: '#a855f7', marginLeft: 3 }]}>Why?</ThemedText>
