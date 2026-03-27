@@ -510,6 +510,7 @@ export const RoommatesScreen = () => {
   const advanceCard = () => {
     InteractionManager.runAfterInteractions(() => {
       swipingOutId.current = null;
+      setCurrentPhotoIndex(0);
       setCurrentIndex(prev => {
         const next = prev + 1;
         prefetchNextImages(profiles, next + 1);
@@ -1695,7 +1696,19 @@ export const RoommatesScreen = () => {
             user?.receivedSuperLikes?.some((sl: { superLikerId: string }) => sl.superLikerId === currentProfile.id) ? styles.cardSuperInterestGlow : null,
             highlightedProfileId && currentProfile.id === highlightedProfileId ? styles.cardHighlightedGlow : null,
           ]}>
-            <Image source={{ uri: photosArray[0] }} resizeMode="cover" style={styles.cardImage} />
+            <Image source={{ uri: photosArray[currentPhotoIndex] || photosArray[0] }} resizeMode="cover" style={styles.cardImage} />
+            {photosArray.length > 1 ? (
+              <View style={styles.photoTapZones}>
+                <Pressable
+                  style={styles.photoTapLeft}
+                  onPress={() => setCurrentPhotoIndex(Math.max(0, currentPhotoIndex - 1))}
+                />
+                <Pressable
+                  style={styles.photoTapRight}
+                  onPress={() => setCurrentPhotoIndex(Math.min(photosArray.length - 1, currentPhotoIndex + 1))}
+                />
+              </View>
+            ) : null}
 
             <LinearGradient
               colors={['transparent', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.95)']}
@@ -2923,6 +2936,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 5,
     zIndex: 10,
+  },
+  photoTapZones: {
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: '40%' as any,
+    flexDirection: 'row' as const,
+    zIndex: 5,
+  },
+  photoTapLeft: {
+    flex: 1,
+  },
+  photoTapRight: {
+    flex: 1,
   },
   photoDotBar: {
     flex: 1,
