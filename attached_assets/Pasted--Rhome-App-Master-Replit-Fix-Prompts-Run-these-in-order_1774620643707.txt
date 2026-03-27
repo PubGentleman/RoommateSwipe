@@ -1,0 +1,1243 @@
+# Rhome App — Master Replit Fix Prompts
+Run these in order in Replit. Each prompt is self-contained and can be copy-pasted directly.
+
+---
+
+## SECTION A — CRITICAL APP POLISH (Run first)
+
+---
+
+### A1 — Fix iOS Spinner Picker (Price Picker showing as ugly dropdown)
+
+**File:** `components/PricePicker.tsx`
+
+In `PricePicker.tsx`, find the `Picker` component and fix two issues:
+
+1. Find `itemStyle={[s.item, { height }]}` (where `height` is some large value like 150) and change it to `itemStyle={[s.item, { height: 44 }]}` — using exactly 44, not the variable.
+
+2. Find the wrapper/container `StyleSheet` style that has `overflow: 'hidden'` and remove that property entirely. The `overflow: 'hidden'` clips the spinner wheel so it looks like a dropdown box.
+
+Do not change anything else. Just those two targeted changes. After the fix, the Picker should display as a spinning wheel with multiple items visible at once on iOS.
+
+---
+
+### A2 — Fix PaywallSheet — Always Show Dismiss Button
+
+**Files:** `components/PaywallSheet.tsx`, and any screen that calls `navigation.navigate('Plans')` for a feature gate
+
+Find every place in the entire codebase (screens and components) where a locked/premium feature triggers `navigation.navigate('Plans')` or `navigation.push('Plans')`. Replace each one with a PaywallSheet bottom sheet instead.
+
+The PaywallSheet component already exists at `components/PaywallSheet.tsx` with these props:
+```tsx
+<PaywallSheet
+  visible={showPaywall}
+  featureName="Feature Name"
+  requiredPlan="plus" // or "elite", "starter", etc.
+  onUpgrade={() => setShowPaywall(false)}
+  onDismiss={() => setShowPaywall(false)}
+  role="renter" // or "host"
+/>
+```
+
+For each screen where you replace `navigation.navigate('Plans')`:
+- Add `const [showPaywall, setShowPaywall] = useState(false);` if not already present
+- Replace the navigate call with `setShowPaywall(true)`
+- Add the `<PaywallSheet>` component to the JSX, after all other content
+
+Make sure the PaywallSheet `onDismiss` prop always calls a function that sets visible to false — this ensures the user can always dismiss it with an X button. Do NOT remove the X/close button from the PaywallSheet component itself.
+
+---
+
+## SECTION B — GROUP FLOW FIXES
+
+---
+
+### B1 — Fix Group Member Profiles Not Showing
+
+**Files:** `screens/renter/GroupsScreen.tsx`, `services/groupService.ts`
+
+**Fix 1 — groupService.ts `getGroups` query:**
+Find the Supabase query in `getGroups` that fetches groups. It currently selects `members:group_members(count)` which only returns a COUNT, not the actual user IDs. Change it to:
+```ts
+members:group_members(user_id)
+```
+
+**Fix 2 — GroupsScreen.tsx `mapGroup` function:**
+Find the `mapGroup` function (or wherever Supabase group rows are mapped to local Group objects). Find the line that sets `members: []` (always an empty array) and replace it with:
+```ts
+members: (g.members || []).map((m: any) => m.user_id || m.id).filter(Boolean),
+```
+
+Do not break any other group loading logic. After this fix, groups should show actual member avatars/names instead of always showing 0 members.
+
+---
+
+### B2 — Fix CreateGroup Navigation After Creation
+
+**File:** `screens/shared/CreateGroupScreen.tsx`
+
+After a group is successfully created, the current code navigates to `Messages > Chat` which is wrong — it drops the user into a chat they didn't ask for.
+
+Find the `handleCreateGroup` (or similar) success handler. After the Supabase insert succeeds, find the `navigation.navigate(...)` call and replace it with:
+```ts
+navigation.goBack();
+```
+
+Also check: if there's an upgrade/paywall prompt in this file that uses `navigation.navigate('Payment')`, change it to `navigation.navigate('Plans')`.
+
+---
+
+### B3 — Fix Discover Tab Blocked by Preferences Check
+
+**File:** `screens/renter/GroupsScreen.tsx`
+
+Find the code that renders the 'discover' tab. There should be a condition checking something like `hasPreferences`, `budgetMin`, or a profile completeness check that gates access to the discover tab. Remove that gate entirely — the discover tab should always be accessible regardless of whether the user has set preferences/budget.
+
+The discover tab should show available groups to join. Only block it if there's a genuine plan limit (e.g., `groupLimit` reached), not a profile completeness check.
+
+---
+
+### B4 — Fix Group Plan Limit Navigation Consistency
+
+**File:** `screens/renter/GroupsScreen.tsx`
+
+Search for every place in GroupsScreen.tsx where the code navigates to `'Payment'` (e.g., `navigation.navigate('Payment')`). Replace each one with `navigation.navigate('Plans')`. The Plans screen is the correct upgrade screen throughout the app.
+
+---
+
+### B5 — Fix CreateGroupScreen Dark Theme Styling
+
+**File:** `screens/shared/CreateGroupScreen.tsx`
+
+The Create group screen looks visually out of place compared to the other two group tabs (My Groups and Discover). Apply the dark theme consistently:
+
+- Use `theme.backgroundRoot` as the screen background color (not white or undefined)
+- Use `theme.textPrimary` for all primary text (title, labels)
+- Use `theme.textSecondary` for placeholder and hint text
+- Use `theme.surface` or `theme.card` for input field backgrounds
+- Use `theme.border` for input field borders
+- Use `theme.primary` for the submit/create button background
+
+Reference the styling used in GroupsScreen.tsx or ExploreScreen.tsx for consistent dark mode appearance. Use `useTheme()` hook to access theme values — it's already used in the app.
+
+---
+
+## SECTION C — ROOMMATE SWIPE FLOW FIXES
+
+---
+
+### C1 — Fix Fake Online Status in RoommatesScreen
+
+**File:** `screens/renter/RoommatesScreen.tsx`
+
+Find line ~501 where the code has:
+```ts
+const isProfileOnline = currentProfile ? Math.random() > 0.5 : false;
+```
+
+Replace this with real online status logic:
+```ts
+const isProfileOnline = currentProfile?.lastActiveAt
+  ? (Date.now() - new Date(currentProfile.lastActiveAt).getTime()) < 30 * 60 * 1000
+  : false;
+```
+
+This shows the green online dot only if the user was active within the last 30 minutes, using the real `last_active_at` field from Supabase.
+
+Also ensure that when `getSwipeDeck` or the profile loading logic runs, the `lastActiveAt` (or `last_active_at`) field is included in the Supabase query. Add it to the select if it's missing.
+
+---
+
+### C2 — Fix Filters Being Skipped for Supabase Deck
+
+**File:** `screens/renter/RoommatesScreen.tsx`
+
+Find line ~424 where there is code like:
+```ts
+const filteredProfiles = usedSupabase ? profilesWithCompatibility : applyFiltersToProfiles(profilesWithCompatibility, filters);
+```
+
+Change it to always apply filters regardless of data source:
+```ts
+const filteredProfiles = applyFiltersToProfiles(profilesWithCompatibility, filters);
+```
+
+The `applyFiltersToProfiles` function should always run. When data comes from Supabase the server-side filtering may already be partially applied, but the client-side filter should still run for any fields not filtered server-side (like preference matching, budget overlap etc.).
+
+---
+
+### C3 — Fix Photo Minimum Threshold Too Strict
+
+**File:** `services/discoverService.ts`
+
+Find the code in `getSwipeDeck` (or wherever profiles are filtered before being returned as the swipe deck) that requires a minimum number of photos. It currently requires 3 or more photos. Change the minimum to 1:
+
+```ts
+// Change from:
+profile.photos?.length >= 3
+
+// To:
+profile.photos?.length >= 1
+```
+
+This prevents too many profiles from being excluded from the swipe deck just because they haven't uploaded 3 photos yet.
+
+---
+
+### C4 — Fix Match Screen Navigation Consistency
+
+**File:** `screens/renter/RoommatesScreen.tsx`
+
+Search for every `navigation.navigate('Payment')` call in RoommatesScreen.tsx and replace with `navigation.navigate('Plans')`. The Plans screen is the correct destination for upgrade prompts.
+
+---
+
+### C5 — Fix Why Button Using PaywallSheet Instead of Navigation
+
+**File:** `screens/renter/RoommatesScreen.tsx`
+
+The "Why?" button for free/basic users should show a bottom sheet paywall, not navigate away from the screen. Currently it calls `navigation.navigate('Plans')` which pushes the Plans screen onto the stack — when the profile detail screen is then opened and closed, the Plans screen shows up underneath it.
+
+Fix:
+1. Add `const [showWhyPaywall, setShowWhyPaywall] = useState(false);` to the component
+2. Find the code where the locked "Why?" button (for non-Elite users) calls `navigation.navigate('Plans')` and replace it with `setShowWhyPaywall(true)`
+3. Add `<PaywallSheet visible={showWhyPaywall} featureName="Match Breakdown" requiredPlan="elite" onUpgrade={() => setShowWhyPaywall(false)} onDismiss={() => setShowWhyPaywall(false)} role="renter" />` to the JSX
+
+Import `PaywallSheet` from `../../components/PaywallSheet` if not already imported.
+
+---
+
+## SECTION D — EXPLORE SCREEN FLOW FIXES
+
+---
+
+### D1 — Fix Listings Not Reloading on City Change
+
+**File:** `screens/renter/ExploreScreen.tsx`
+
+Find the `useEffect` that calls `loadProperties()`. It currently has an empty dependency array `[]` which means it only runs on mount. Add `activeCity` to the dependency array:
+
+```ts
+// Change from:
+useEffect(() => { loadProperties(); }, []);
+
+// To:
+useEffect(() => { loadProperties(); }, [activeCity]);
+```
+
+Also make sure `loadProperties` is defined with `useCallback` if it uses `activeCity` internally, or move `activeCity` into the function's scope correctly to avoid stale closure issues.
+
+---
+
+### D2 — Fix Send Interest Not Writing to Supabase
+
+**File:** `screens/renter/ExploreScreen.tsx`
+
+Find `handleSendUnifiedInterest` (or similar function for sending interest/inquiring on a listing). It currently only writes to `StorageService` and never to Supabase.
+
+Add a Supabase insert BEFORE the StorageService call:
+```ts
+try {
+  const { error } = await supabase
+    .from('interest_cards')
+    .insert({
+      renter_id: currentUser.id,
+      host_id: property.hostId,
+      listing_id: property.id,
+      status: 'pending',
+      created_at: new Date().toISOString(),
+    });
+  if (error) console.warn('Supabase interest insert failed:', error.message);
+} catch (e) {
+  console.warn('Supabase interest insert error:', e);
+}
+// Then continue with existing StorageService call as fallback/mirror
+```
+
+Wrap it in try/catch so the StorageService path still runs if Supabase fails.
+
+---
+
+### D3 — Fix Group Inquiry Creating New Group Instead of Using Existing
+
+**File:** `screens/renter/ExploreScreen.tsx`
+
+Find `handleInquireAsGroup` (or the function that runs when a user taps "Inquire as Group"). Currently it navigates to `Messages > CreateGroup` which creates a brand new group. Instead it should use the user's already-selected group.
+
+Fix: Instead of navigating to CreateGroup, call the `createListingInquiryGroup` service (or equivalent) with the existing group's ID and the listing ID. If the user hasn't selected a group yet, show a group picker modal. Do not navigate away from ExploreScreen.
+
+If a `createListingInquiryGroup` function doesn't exist in `groupService.ts`, create it:
+```ts
+export async function linkGroupToListing(groupId: string, listingId: string, hostId: string) {
+  const { error } = await supabase
+    .from('group_listing_inquiries')
+    .insert({ group_id: groupId, listing_id: listingId, host_id: hostId, status: 'pending' });
+  return !error;
+}
+```
+
+---
+
+### D4 — Fix Group Loading Using Supabase Instead of StorageService Only
+
+**File:** `screens/renter/ExploreScreen.tsx`
+
+Find `loadUserGroups` (or wherever the user's groups are loaded for the "Inquire as Group" feature). It currently only reads from `StorageService`. Replace with a Supabase call:
+
+```ts
+async function loadUserGroups() {
+  try {
+    const groups = await getMyGroups(currentUser.id); // from groupService.ts
+    setUserGroups(groups);
+  } catch {
+    // fallback
+    const local = await StorageService.getMyGroups();
+    setUserGroups(local);
+  }
+}
+```
+
+Import `getMyGroups` from `../../services/groupService` if not already imported.
+
+---
+
+## SECTION E — CHAT SCREEN FLOW FIXES
+
+---
+
+### E1 — Fix Fake Online Status in Chat and Messages Screens
+
+**Files:** `screens/shared/ChatScreen.tsx`, `screens/shared/MessagesScreen.tsx`
+
+**ChatScreen.tsx — line ~65:**
+Find:
+```ts
+const [isOnline, setIsOnline] = useState(Math.random() > 0.5);
+```
+Replace with:
+```ts
+const [isOnline, setIsOnline] = useState(false);
+```
+
+Then, inside the `loadMessages` function (or wherever the conversation partner's profile is fetched from Supabase), add code to fetch `last_active_at` for the other user and update `isOnline`:
+```ts
+const { data: partnerData } = await supabase
+  .from('users')
+  .select('last_active_at')
+  .eq('id', recipientId)
+  .single();
+
+if (partnerData?.last_active_at) {
+  const minutesAgo = (Date.now() - new Date(partnerData.last_active_at).getTime()) / 60000;
+  setIsOnline(minutesAgo < 30);
+}
+```
+
+**MessagesScreen.tsx — lines ~177 and ~338:**
+Find every instance of `online: Math.random() > 0.5` in MessagesScreen.tsx (there are 2 of them — one when creating a conversation from a match, one in `navigateToMatchChat`). Replace each with `online: false`.
+
+The real online status will be loaded when the individual chat is opened (as fixed above in ChatScreen.tsx).
+
+---
+
+### E2 — Replace Plans Navigation with PaywallSheet in Chat Screens
+
+**Files:** `screens/shared/ChatScreen.tsx`, `screens/shared/MessagesScreen.tsx`
+
+**ChatScreen.tsx — two locations:**
+
+1. Find line ~605 where cold message limit is hit and the code calls `(navigation as any).navigate('Plans')`. Replace with:
+   - Add `const [showChatPaywall, setShowChatPaywall] = useState(false);`
+   - Replace navigate call with `setShowChatPaywall(true)`
+   - Add PaywallSheet to JSX: `<PaywallSheet visible={showChatPaywall} featureName="Unlimited Messages" requiredPlan="plus" onUpgrade={() => setShowChatPaywall(false)} onDismiss={() => setShowChatPaywall(false)} role="renter" />`
+
+2. Find line ~1032 where the locked read receipt Pressable calls `(navigation as any).navigate('Plans')`. Replace with `setShowChatPaywall(true)` (reusing the same PaywallSheet state).
+
+**MessagesScreen.tsx — one location:**
+
+Find line ~697 where `handleAIAssistantPress` calls `navigation.navigate('Plans')` for locked AI assistant access. Replace with:
+   - Add `const [showAIPaywall, setShowAIPaywall] = useState(false);`
+   - Replace navigate with `setShowAIPaywall(true)`
+   - Add PaywallSheet: `<PaywallSheet visible={showAIPaywall} featureName="AI Assistant" requiredPlan="plus" onUpgrade={() => setShowAIPaywall(false)} onDismiss={() => setShowAIPaywall(false)} role="renter" />`
+
+---
+
+## SECTION F — LAUNDRY AMENITY FEATURE
+
+---
+
+### F1 — Add Laundry Types to Listing Creation, Filter Panel, and Card Chip
+
+**Files:** `screens/host/CreateEditListingScreen.tsx`, `screens/renter/ExploreScreen.tsx`
+
+**Fix 1 — CreateEditListingScreen.tsx:**
+Find the `AMENITIES_LIST` array near the top of the file:
+```ts
+const AMENITIES_LIST = [
+  'WiFi', 'Parking', 'Laundry', 'AC', ...
+];
+```
+Replace the single `'Laundry'` entry with two entries:
+```ts
+const AMENITIES_LIST = [
+  'WiFi', 'Parking', 'In-unit Laundry', 'In-building Laundry', 'AC', ...
+];
+```
+
+**Fix 2 — ExploreScreen.tsx, COMMON_AMENITIES array:**
+Find the `COMMON_AMENITIES` array (around line 46-49):
+```ts
+const COMMON_AMENITIES = [
+  'Parking', 'Gym', 'Pool', 'Laundry', 'Pet Friendly', ...
+];
+```
+Replace `'Laundry'` with two entries:
+```ts
+const COMMON_AMENITIES = [
+  'Parking', 'Gym', 'Pool', 'In-unit Laundry', 'In-building Laundry', 'Pet Friendly', ...
+];
+```
+
+**Fix 3 — ExploreScreen.tsx, filter matching logic:**
+Find the `applyFiltersToProfiles` function. Find the amenities filter block — it uses exact string matching like `profile.amenities?.includes(amenity)`. Add special handling so that when the filter is `'In-unit Laundry'` or `'In-building Laundry'`, it does a case-insensitive partial match:
+
+```ts
+// Inside the amenity filter loop, replace:
+const hasAmenity = profile.amenities?.includes(amenity);
+
+// With:
+const isLaundryFilter = amenity === 'In-unit Laundry' || amenity === 'In-building Laundry';
+let hasAmenity: boolean;
+if (isLaundryFilter) {
+  const searchTerm = amenity === 'In-unit Laundry' ? 'in-unit' : 'in-building';
+  hasAmenity = (profile.amenities || []).some(a =>
+    a.toLowerCase().includes(searchTerm) ||
+    a.toLowerCase().includes(amenity.toLowerCase())
+  );
+} else {
+  hasAmenity = (profile.amenities || []).some(a =>
+    a.toLowerCase() === amenity.toLowerCase()
+  );
+}
+```
+
+**Fix 4 — ExploreScreen.tsx, apartment listing card chip:**
+Find the `renderProperty` function. Find where the `isPetFriendly` chip variable is declared and its JSX badge is rendered. Add laundry chip detection and display right after it:
+
+```ts
+// Add near where isPetFriendly is declared:
+const hasInUnitLaundry = (item.amenities || []).some(a =>
+  a.toLowerCase().includes('in-unit') || a.toLowerCase() === 'in-unit laundry'
+);
+const hasInBuildingLaundry = !hasInUnitLaundry && (item.amenities || []).some(a =>
+  a.toLowerCase().includes('in-building') || a.toLowerCase() === 'in-building laundry' ||
+  a.toLowerCase().includes('laundry room') || a.toLowerCase().includes('shared laundry')
+);
+```
+
+Then in the JSX, after the pet-friendly badge, add:
+```tsx
+{hasInUnitLaundry && (
+  <View style={styles.amenityChip}>
+    <Feather name="wind" size={10} color="#60A5FA" />
+    <Text style={styles.amenityChipText}>In-unit Laundry</Text>
+  </View>
+)}
+{hasInBuildingLaundry && (
+  <View style={styles.amenityChip}>
+    <Feather name="wind" size={10} color="#94A3B8" />
+    <Text style={styles.amenityChipText}>In-building Laundry</Text>
+  </View>
+)}
+```
+
+Use the same styling as the existing `isPetFriendly` badge for `amenityChip` and `amenityChipText`.
+
+---
+
+## SECTION G — RENTER → HOST FLOW FIXES (Host Type Chain)
+
+---
+
+### G1 — Fix Host Type Not Passing from Supabase to Cards
+
+**Files:** `services/listingService.ts`
+
+**Fix 1 — getListings query:**
+Find the `getListings` function with a Supabase query that includes something like:
+```ts
+.select('*, host:users!host_id(id, full_name, avatar_url)')
+```
+Add `host_type` to the join fields:
+```ts
+.select('*, host:users!host_id(id, full_name, avatar_url, host_type)')
+```
+
+**Fix 2 — mapListingToProperty function:**
+Find the `mapListingToProperty` function (around lines 39-86). It maps the Supabase listing row `l` to a `Property` object. Add a `hostType` mapping:
+```ts
+hostType: l.host?.host_type ?? undefined,
+```
+
+Add this line alongside the other host-related fields being mapped (like `hostId`, `hostName`, `hostAvatar`). After this fix, `item.hostType` in ExploreScreen will correctly be `'individual'`, `'agent'`, or `'company'` instead of always `undefined`.
+
+---
+
+### G2 — Fix Host Profiles Loading from Supabase
+
+**File:** `screens/renter/ExploreScreen.tsx`
+
+Find the `loadHostProfiles` function (around lines 305-322). It currently only reads from `StorageService`. Replace it with a Supabase query:
+
+```ts
+async function loadHostProfiles(hostIds: string[]) {
+  if (!hostIds.length) return;
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, full_name, avatar_url, host_type, last_active_at')
+      .in('id', hostIds);
+
+    if (!error && data) {
+      const map = new Map<string, User>();
+      data.forEach(u => map.set(u.id, {
+        id: u.id,
+        name: u.full_name,
+        avatarUrl: u.avatar_url,
+        hostType: u.host_type,
+        lastActiveAt: u.last_active_at,
+      } as User));
+      setHostProfilesMap(map);
+    }
+  } catch (e) {
+    console.warn('loadHostProfiles Supabase error:', e);
+    // existing StorageService fallback here
+  }
+}
+```
+
+Call this after `loadProperties()` completes, passing the array of unique `hostId` values from the loaded listings.
+
+---
+
+### G3 — Fix Interest Card Insert Not Reaching Supabase
+
+**File:** `screens/renter/ExploreScreen.tsx`
+
+(This is the same as Prompt D2 above — `handleSendUnifiedInterest`. If you already ran D2, skip this one. If not, apply the same fix here.)
+
+In `handleSendUnifiedInterest`, add a Supabase insert to the `interest_cards` table before the StorageService call:
+```ts
+try {
+  await supabase.from('interest_cards').insert({
+    renter_id: currentUser.id,
+    host_id: property.hostId,
+    listing_id: property.id,
+    status: 'pending',
+    created_at: new Date().toISOString(),
+  });
+} catch (e) {
+  console.warn('Supabase interest card insert failed:', e);
+}
+```
+
+---
+
+## SECTION H — HOST FLOW FIXES
+
+---
+
+### H1 — Fix Dashboard Accept/Pass Interest Not Calling Supabase
+
+**File:** `screens/host/HostDashboardScreen.tsx`
+
+The `handleAcceptInterest` function currently only calls `StorageService.updateInterestCard()` and never calls the real Supabase service. This means accepted matches don't persist.
+
+Find `handleAcceptInterest` (around lines 230-290). Currently it looks something like:
+```ts
+await StorageService.updateInterestCard(card.id, { status: 'accepted' });
+```
+
+Add the Supabase service call BEFORE the StorageService call, mirroring what `HostInquiriesScreen.tsx` does:
+```ts
+import { acceptInterestCard } from '../../services/discoverService';
+
+// Inside handleAcceptInterest:
+try {
+  await acceptInterestCard(card.id, card.renterId);
+} catch (e) {
+  console.warn('Supabase accept interest error:', e);
+}
+// Then continue with existing StorageService call
+await StorageService.updateInterestCard(card.id, { status: 'accepted' });
+```
+
+Do the same for `handlePassInterest` (around lines 292-317):
+```ts
+import { rejectInterestCard } from '../../services/discoverService';
+
+// Inside handlePassInterest:
+try {
+  await rejectInterestCard(card.id);
+} catch (e) {
+  console.warn('Supabase reject interest error:', e);
+}
+// Then continue with existing StorageService call
+await StorageService.updateInterestCard(card.id, { status: 'rejected' });
+```
+
+The `acceptInterestCard` and `rejectInterestCard` functions are already in `services/discoverService.ts`.
+
+---
+
+### H2 — Fix BrowseRenters Listing Filter and Dashboard Stale State
+
+**Files:** `screens/host/BrowseRentersScreen.tsx`, `screens/host/HostDashboardScreen.tsx`
+
+**Fix 1 — BrowseRentersScreen.tsx:**
+Find the Supabase query for listings (around lines 156-160). It uses `.eq('available', true)` which references a column that doesn't exist. Replace with the correct availability check:
+```ts
+// Replace:
+.eq('available', true)
+
+// With:
+.eq('is_active', true)
+.eq('is_rented', false)
+.eq('is_paused', false)
+```
+
+If `is_active`, `is_rented`, and `is_paused` columns don't exist on the listings table, use a single `.not('status', 'in', '("rented","paused","inactive")')` filter instead. Check what columns actually exist on the listings table first and use the correct filter.
+
+**Fix 2 — HostDashboardScreen.tsx stale state:**
+Find the code around lines 201-203 that calculates unassigned listings:
+```ts
+const noAgent = listings.length > 0 ? listings.filter(...) : [];
+```
+This reads from the `listings` React state variable which may be stale. Replace with the freshly loaded array from the same function scope. If you're inside a function that loads listings into a local variable `mapped` (or similar), use that instead:
+```ts
+const noAgent = mapped.filter(l => !l.assigned_agent_id);
+```
+
+---
+
+### H3 — Fix Dashboard Message Count Using Supabase
+
+**File:** `screens/host/HostDashboardScreen.tsx`
+
+Find the code around lines 162-164 that loads the unread message count. It currently reads only from `StorageService`:
+```ts
+const count = await StorageService.getUnreadMessageCount(user.id);
+```
+
+Replace with a Supabase query:
+```ts
+try {
+  const { count, error } = await supabase
+    .from('messages')
+    .select('*', { count: 'exact', head: true })
+    .eq('recipient_id', user.id)
+    .eq('is_read', false);
+
+  if (!error && count !== null) {
+    setUnreadMessageCount(count);
+  } else {
+    // fallback to StorageService
+    const localCount = await StorageService.getUnreadMessageCount(user.id);
+    setUnreadMessageCount(localCount);
+  }
+} catch {
+  const localCount = await StorageService.getUnreadMessageCount(user.id);
+  setUnreadMessageCount(localCount);
+}
+```
+
+The `messages` table should have `recipient_id` and `is_read` columns based on the schema. If the column names differ (e.g., `read_at` instead of `is_read`), adjust accordingly.
+
+---
+
+## SECTION I — HOST-RENTER INTERACTION FLOW FIXES
+
+---
+
+### I1 — Fix matchIdFromConversation Wrong Prefix Check in ChatScreen
+
+**File:** `screens/shared/ChatScreen.tsx`
+
+**Bug:** Around line 198, `matchIdFromConversation` is derived like this:
+```ts
+const matchIdFromConversation = conversationId.startsWith('conv_')
+  ? conversationId.slice(5)
+  : conversationId;
+```
+This checks for `'conv_'` (underscore) but the actual format used everywhere is `'conv-interest-{cardId}'` (hyphens). So the condition is always false and `matchIdFromConversation` ends up as the full string `'conv-interest-abc123'` — which is NOT a valid Supabase UUID. Every Supabase message query (`getMessages`, `sendMessage`, `subscribeToMessages`) uses this wrong ID, so messages never sync in any chat opened from HostInquiriesScreen.
+
+**Fix — Two-part:**
+
+**Part 1 — Accept `matchId` as a route param:**
+
+Find the route params destructure near the top of ChatScreen (around line 50-70). It currently looks like:
+```ts
+const { conversationId, otherUser, inquiryGroup } = route.params;
+```
+Add `matchId` as an optional param:
+```ts
+const { conversationId, otherUser, inquiryGroup, matchId: routeMatchId } = route.params;
+```
+
+**Part 2 — Use routeMatchId when available, fall back to derivation:**
+
+Replace the existing `matchIdFromConversation` line with:
+```ts
+const matchIdFromConversation = routeMatchId
+  ?? (conversationId.startsWith('conv-interest-')
+    ? null  // no real UUID available — will use Supabase lookup or local only
+    : conversationId.startsWith('conv_')
+      ? conversationId.slice(5)
+      : conversationId);
+```
+
+Then wherever `matchIdFromConversation` is used in `loadMessages`, `sendSupabaseMessage`, and `subscribeToMessages`, wrap the call in a null check so it only hits Supabase when a valid match ID is present:
+```ts
+if (matchIdFromConversation) {
+  // existing Supabase call here
+}
+```
+
+This ensures chats navigated with a real `matchId` (after fixes in I2) sync properly, while chats without one gracefully fall back to local storage only.
+
+---
+
+### I2 — Fix HostInquiriesScreen Chat Navigation — Pass matchId and inquiryGroup
+
+**File:** `screens/host/HostInquiriesScreen.tsx`
+
+**Bug:** In `handleAcceptInterest`, after accepting the card and getting back `supabaseMatchId`, the navigation to Chat only passes `conversationId`:
+```ts
+navigation.navigate('Chat', { conversationId: `conv-interest-${card.id}` });
+```
+This means `routeMatchId` and `inquiryGroup` are both `undefined` in ChatScreen, which causes:
+1. All Supabase message queries use a wrong derived ID (no sync)
+2. `isHost` flag is false (requires `inquiryGroup?.hostId === user.id`) — host cannot see the Booking Offer button
+3. Booking metadata has no `listing_id` or `hostId` to reference
+
+**Fix:** Replace the navigation call with:
+```ts
+navigation.navigate('Chat', {
+  conversationId: `conv-interest-${card.id}`,
+  matchId: supabaseMatchId,
+  inquiryGroup: {
+    id: card.id,
+    listingId: card.propertyId ?? card.listingId ?? '',
+    listingAddress: card.propertyTitle ?? card.propertyAddress ?? '',
+    hostId: user.id,
+    inquiryStatus: 'accepted',
+    addressRevealed: true,
+  },
+});
+```
+
+Use whichever property name holds the listing ID on the `card` object — check the `InterestCard` type for the exact field name (it might be `propertyId`, `listingId`, or `property_id`).
+
+Also update the TypeScript type for ChatScreen's route params (in `navigation/types.ts` or wherever the `RootStackParamList` is defined) to add the optional `matchId` param:
+```ts
+Chat: {
+  conversationId: string;
+  otherUser?: User;
+  inquiryGroup?: InquiryGroup;
+  matchId?: string;
+};
+```
+
+---
+
+### I3 — Fix handleAcceptBooking and Booking Offer listing_id for Direct Chats
+
+**File:** `screens/shared/ChatScreen.tsx`
+
+**Bug 1 — handleAcceptBooking:** Around line 895, the booking creation is gated on `inquiryGroup?.hostId`:
+```ts
+if (metadata.listing_id && inquiryGroup?.hostId) {
+  await createBooking({
+    listingId: metadata.listing_id,
+    hostId: inquiryGroup.hostId,
+    ...
+  });
+  return;
+}
+// Falls through — no booking record created for direct match chats
+```
+For chats opened from MessagesScreen (direct match chats with no `inquiryGroup`), `inquiryGroup` is `undefined` so `createBooking` is never called.
+
+**Fix:** Derive the host ID from available sources before the guard check. Find the section in ChatScreen where `otherUser` and `conversationId` are used to determine participants. Add:
+```ts
+// Derive hostId for booking — prefer inquiryGroup, fall back to conversation metadata
+const bookingHostId = inquiryGroup?.hostId
+  ?? (conversation?.hostId)        // if conversation object has hostId stored
+  ?? otherUser?.id                  // or fall back to the other user in the chat;
+                                    // the actual host/renter role should be checked from match data
+```
+
+Then update the booking guard:
+```ts
+if (metadata.listing_id && bookingHostId) {
+  await createBooking({
+    listingId: metadata.listing_id,
+    hostId: bookingHostId,
+    renterId: user.id,
+    moveInDate: metadata.move_in_date,
+    leaseLength: metadata.lease_length,
+    monthlyRent: metadata.monthly_rent,
+    securityDeposit: metadata.security_deposit ?? null,
+  });
+  // Update message metadata to 'accepted'
+  return;
+}
+```
+
+**Bug 2 — Booking offer metadata missing listing_id:** Around line 830, the booking offer is constructed with:
+```ts
+const metadata = {
+  listing_id: inquiryGroup?.listingId,  // undefined for direct chats
+  ...
+};
+```
+
+**Fix:** Load the listing ID from the matched listing when `inquiryGroup` is not available. In ChatScreen, when it's a host-initiated booking offer and `inquiryGroup` is null, look up the listing from the current conversation/match:
+```ts
+// Add a state variable to store the listing ID for the current conversation
+const [conversationListingId, setConversationListingId] = useState<string | null>(null);
+```
+
+In `loadMessages` or wherever conversation data is loaded, if the match data includes a `listing_id`, set it:
+```ts
+if (matchData?.listing_id) {
+  setConversationListingId(matchData.listing_id);
+}
+```
+
+Then update the booking offer metadata:
+```ts
+const metadata = {
+  listing_id: inquiryGroup?.listingId ?? conversationListingId ?? null,
+  ...
+};
+```
+
+If listing_id is still null, show a toast/alert: `"Please select a listing for this booking offer"` and abort the send, rather than sending a booking offer with no listing reference.
+
+---
+
+### I4 — Fix Match Notifications — Write to Supabase notifications Table
+
+**File:** `screens/host/HostInquiriesScreen.tsx`
+
+**Bug:** In `handleAcceptInterest`, the match notification is only added to `StorageService` (local device only):
+```ts
+await StorageService.addNotification({
+  type: 'match',
+  title: "It's a Match!",
+  message: `You matched with ${card.renterName}`,
+  ...
+});
+```
+The renter on a different device will never see this notification because it's never written to Supabase.
+
+**Fix:** After the StorageService notification, also insert to the Supabase `notifications` table. Import `supabase` at the top of the file if not already imported, then:
+```ts
+// After the StorageService.addNotification call:
+try {
+  await supabase.from('notifications').insert({
+    user_id: card.renterId,           // send to the renter
+    type: 'match',
+    title: "It's a Match!",
+    message: `${card.hostName ?? 'A host'} accepted your interest`,
+    metadata: {
+      match_id: supabaseMatchId,
+      listing_id: card.propertyId ?? card.listingId,
+      host_id: user.id,
+    },
+    is_read: false,
+    created_at: new Date().toISOString(),
+  });
+} catch (e) {
+  console.warn('Failed to insert Supabase match notification:', e);
+}
+```
+
+Also add the same pattern to `HostDashboardScreen.tsx` `handleAcceptInterest` (after the fix from H1 is applied) — the dashboard also needs to write match notifications to Supabase when a host accepts from the dashboard card widget.
+
+The `notificationService.ts` already has `getNotifications()` and `subscribeToNotifications()` hooked up to the `notifications` table, so once records are inserted, renters will see them automatically.
+
+---
+
+## SECTION J — AGENT FLOW FIXES (Agent ↔ Renter)
+
+---
+
+### J1 — Fix AgentGroupBuilderScreen Loading Renters from StorageService Instead of Supabase
+
+**File:** `screens/host/AgentGroupBuilderScreen.tsx`
+
+**Bug:** In `loadData` (around line 72-106), the shortlisted renter profiles are loaded from `StorageService.getRoommateProfiles()` and filtered by the IDs from Supabase. If local storage is empty (any device other than the one that seeded mock data), no renters appear in the group builder — the agent's shortlist is always empty.
+
+```ts
+// WRONG — local storage only:
+const profiles: RoommateProfile[] = await StorageService.getRoommateProfiles();
+const shortlistedIds = await getShortlistedRenterIds(user.id);
+const mapped = profiles.filter(p => shortlistedIds.includes(p.id)).map(p => ({ ... }));
+```
+
+**Fix:** After getting `shortlistedIds` from Supabase, fetch the renter profiles directly from Supabase by ID:
+```ts
+const shortlistedIds = await getShortlistedRenterIds(user.id);
+
+if (shortlistedIds.length > 0) {
+  const { data: supaRenters } = await supabase
+    .from('users')
+    .select(`
+      id, full_name, avatar_url, age, occupation, gender, bio,
+      profile:profiles(
+        budget_max, budget_min, budget_per_person_min, budget_per_person_max,
+        move_in_date, room_type, cleanliness, sleep_schedule, smoking, pets, interests, photos, bio
+      )
+    `)
+    .in('id', shortlistedIds);
+
+  const mapped: AgentRenter[] = (supaRenters || []).map((u: any) => {
+    const p = Array.isArray(u.profile) ? u.profile[0] : u.profile;
+    return {
+      id: u.id,
+      name: u.full_name || 'Unknown',
+      age: u.age || 0,
+      occupation: u.occupation || '',
+      photos: p?.photos || (u.avatar_url ? [u.avatar_url] : []),
+      budgetMin: p?.budget_per_person_min ?? (p?.budget_max ? p.budget_max * 0.8 : undefined),
+      budgetMax: p?.budget_per_person_max ?? p?.budget_max,
+      moveInDate: p?.move_in_date,
+      cleanliness: p?.cleanliness,
+      sleepSchedule: p?.sleep_schedule,
+      smoking: p?.smoking,
+      pets: p?.pets === 'yes' || p?.pets === true,
+      interests: p?.interests || [],
+      roomType: p?.room_type,
+      gender: u.gender,
+      bio: p?.bio || u.bio,
+    };
+  });
+  setAllRenters(mapped);
+}
+```
+
+Import `supabase` at the top of the file if not already imported.
+
+---
+
+### J2 — Fix AgentGroupBuilderScreen Loading Listings from StorageService Instead of Supabase
+
+**File:** `screens/host/AgentGroupBuilderScreen.tsx`
+
+**Bug:** In `loadData` (around lines 98-105), the agent's listings are loaded from `StorageService.getProperties()`:
+```ts
+const props = await StorageService.getProperties();
+const myListings = props.filter(p => p.hostId === user.id && p.available);
+setListings(myListings);
+```
+This means no real Supabase listings appear in the "Select Target Listing" section.
+
+**Fix:** Replace with a Supabase query:
+```ts
+const { data: supaListings } = await supabase
+  .from('listings')
+  .select('id, title, price, bedrooms, bathrooms, city, neighborhood, address, photos, amenities, host_id, available_date, latitude, longitude')
+  .eq('host_id', user.id)
+  .eq('is_active', true)
+  .eq('is_rented', false);
+
+const myListings: Property[] = (supaListings || []).map((l: any) => ({
+  id: l.id,
+  title: l.title,
+  price: l.price,
+  bedrooms: l.bedrooms,
+  bathrooms: l.bathrooms,
+  city: l.city,
+  neighborhood: l.neighborhood,
+  address: l.address,
+  photos: l.photos || [],
+  amenities: l.amenities || [],
+  hostId: l.host_id,
+  available: true,
+  availableDate: l.available_date ? new Date(l.available_date) : undefined,
+  latitude: l.latitude,
+  longitude: l.longitude,
+}));
+setListings(myListings);
+```
+
+If `is_active` / `is_rented` columns don't exist, adjust the filter to match the actual schema (see H2 prompt for reference).
+
+---
+
+### J3 — Fix createAgentGroup Return Value Not Captured — Wrong Group ID Sent to Renters
+
+**File:** `screens/host/AgentGroupBuilderScreen.tsx`
+
+**Bug:** In `handleSendInvites` (around lines 141-178), the result of `createAgentGroup` is discarded:
+```ts
+await createAgentGroup(group);          // returns { ...group, id: realSupabaseUUID }
+await sendAgentInvites(
+  user.id,
+  user.name,
+  group.id,                             // BUG: still 'ag_1234567...' — the local temp ID
+  ...
+);
+```
+The `createAgentGroup` service creates the group in Supabase and returns a new object with the real UUID. But because the return value isn't captured, `sendAgentInvites` inserts invite rows with `group_id = 'ag_1234567...'` which matches nothing in the database. All renter invites are orphaned.
+
+**Fix:** Capture the return value and use the real ID:
+```ts
+const createdGroup = await createAgentGroup(group);   // capture the real Supabase group
+await sendAgentInvites(
+  user.id,
+  user.name,
+  createdGroup.id,                                    // real Supabase UUID
+  selectedRenters.map(r => r.id),
+  selectedListing,
+  agentMessage,
+  selectedRenters.map(r => ({ id: r.id, name: r.name, photo: r.photos?.[0] }))
+);
+```
+
+---
+
+### J4 — Fix sendAgentInvites Not Notifying Renters (No notifications Row Created)
+
+**File:** `services/agentMatchmakerService.ts`
+
+**Bug:** `sendAgentInvites` inserts rows into `agent_group_invites` but never inserts a corresponding row into the `notifications` table. This means renters on other devices receive no notification and cannot see the agent invite card in their NotificationsScreen.
+
+**Fix — Part 1:** Add `.select()` to the insert so you get back the inserted invite IDs:
+```ts
+const { data: insertedInvites, error } = await supabase
+  .from('agent_group_invites')
+  .insert(rows)
+  .select('id, renter_id');   // get back the rows with their real IDs
+
+if (error) {
+  console.warn('[AgentService] sendAgentInvites error:', error.message);
+}
+```
+
+**Fix — Part 2:** After inserting invites, insert a notification for each renter:
+```ts
+if (insertedInvites && insertedInvites.length > 0) {
+  const notificationRows = insertedInvites.map(inv => ({
+    user_id: inv.renter_id,
+    type: 'agent_invite',
+    title: `${agentName} wants you in their group!`,
+    body: `"${listing.title}" - ${listing.bedrooms}BR at $${listing.price?.toLocaleString()}/mo`,
+    data: {
+      agentInviteId: inv.id,
+      groupId,
+      listingTitle: listing.title,
+      listingRent: listing.price,
+      listingBedrooms: listing.bedrooms,
+      groupMembers: memberNames,
+    },
+    is_read: false,
+  }));
+
+  await supabase.from('notifications').insert(notificationRows);
+}
+```
+
+Also update the group status AFTER the notification inserts (so it only changes to `'invited'` on full success):
+```ts
+await supabase.from('groups').update({ group_status: 'invited' }).eq('id', groupId);
+```
+
+---
+
+### J5 + J6 — Fix getAgentGroups — Empty Members and Missing Listing Data
+
+**File:** `services/agentMatchmakerService.ts`
+
+**Bug:** The `getAgentGroups` Supabase query (around lines 126-160) returns `members: []` and `targetListing: undefined` because:
+1. It queries `group_members(user_id, role)` but never joins user profile data — so member names/photos are never loaded
+2. It gets `target_listing_id` but never joins listing data — so listing title/price are never available
+
+Both are visible in the `AgentGroupsScreen` render where member chips and listing info are always blank.
+
+**Fix:** Extend the Supabase query to join user and listing data:
+```ts
+const { data: groups, error } = await supabase
+  .from('groups')
+  .select(`
+    id,
+    name,
+    created_by_agent,
+    target_listing_id,
+    group_status,
+    created_at,
+    group_members(
+      user_id,
+      role,
+      user:users!user_id(id, full_name, avatar_url)
+    ),
+    listing:listings!target_listing_id(id, title, price, bedrooms, neighborhood)
+  `)
+  .eq('created_by_agent', agentId)
+  .eq('agent_assembled', true)
+  .order('created_at', { ascending: false });
+```
+
+Then update the mapping to populate `members` and `targetListing`:
+```ts
+return groups.map(g => {
+  const rawMembers = g.group_members || [];
+  const memberProfiles = rawMembers.map((m: any) => ({
+    id: m.user?.id ?? m.user_id,
+    name: m.user?.full_name ?? 'Unknown',
+    photos: m.user?.avatar_url ? [m.user.avatar_url] : [],
+  }));
+
+  const listing = Array.isArray(g.listing) ? g.listing[0] : g.listing;
+
+  return {
+    id: g.id,
+    name: g.name || 'Untitled Group',
+    agentId: g.created_by_agent,
+    targetListingId: g.target_listing_id,
+    targetListing: listing ? {
+      id: listing.id,
+      title: listing.title,
+      price: listing.price,
+      bedrooms: listing.bedrooms,
+      neighborhood: listing.neighborhood,
+    } as any : undefined,
+    members: memberProfiles,
+    memberIds: rawMembers.map((m: any) => m.user_id),
+    groupStatus: g.group_status || 'assembling',
+    avgCompatibility: 0,
+    combinedBudgetMin: 0,
+    combinedBudgetMax: 0,
+    coversRent: false,
+    invites: [],
+    createdAt: g.created_at,
+  };
+});
+```
+
+---
+
+### J7 — Fix NotificationsScreen Not Loading Agent Invites Directly from agent_group_invites
+
+**File:** `screens/shared/NotificationsScreen.tsx`
+
+**Bug:** `getAgentInvitesForRenter` is imported but never called. The screen only loads from the `notifications` table. If bug J4 is fixed and notifications are now inserted correctly, this becomes less critical — but as a fallback, the screen should also directly query `agent_group_invites` so renters can always see pending invites regardless of whether a notification was created.
+
+**Fix:** In `loadNotifications`, after loading Supabase notifications, also call `getAgentInvitesForRenter` and convert pending invites into notification-like objects if they're not already represented:
+```ts
+// After loading supabase notifications...
+try {
+  const agentInvites = await getAgentInvitesForRenter(user.id);
+  const pendingInvites = agentInvites.filter(inv => inv.status === 'pending');
+
+  // Convert to Notification shape for rendering
+  const inviteNotifs: Notification[] = pendingInvites.map(inv => ({
+    id: `agent_invite_${inv.id}`,
+    userId: user.id,
+    type: 'agent_invite' as any,
+    title: `${inv.agentName} wants you in their group!`,
+    body: `"${inv.listingTitle}" - ${inv.listingBedrooms}BR at $${inv.listingRent?.toLocaleString()}/mo`,
+    isRead: false,
+    createdAt: new Date(inv.sentAt),
+    data: {
+      agentInviteId: inv.id,
+      listingTitle: inv.listingTitle,
+      listingRent: inv.listingRent,
+      groupMembers: inv.groupMembers,
+    },
+  }));
+
+  // Merge, deduplicating by agentInviteId so we don't show a real notification AND a synthetic one
+  const existingInviteIds = new Set(
+    supabaseNotifications
+      .filter(n => n.type === 'agent_invite')
+      .map(n => n.data?.agentInviteId)
+  );
+  const newInviteNotifs = inviteNotifs.filter(n => !existingInviteIds.has(n.data?.agentInviteId));
+  setNotifications([...newInviteNotifs, ...mapped]);
+} catch (e) {
+  console.warn('[Notifications] Could not load agent invites:', e);
+}
+```
+
+---
+
+### J8 — Fix AgentGroupsScreen Message Button — Navigate to Specific Group Conversation
+
+**File:** `screens/host/AgentGroupsScreen.tsx`
+
+**Bug:** When an agent clicks "Message" on an active group (around line 201), the navigation is:
+```ts
+navigation.navigate('Messages')
+```
+This just opens the Messages tab with no context — the agent sees their full message list and has to manually find the right conversation.
+
+**Fix:** The agent should be taken to a conversation that includes the group's renters. Since group renters don't automatically have a single match/chat thread with the agent, the most practical fix is to navigate to the Messages tab AND pass a hint, or open a new group-specific chat. At minimum, pass the group name as a context hint:
+
+Find the Message button press handler and replace with:
+```ts
+onPress={() => {
+  // Navigate to messages screen with the group context
+  // so the agent sees conversations relevant to this group
+  navigation.navigate('Messages', {
+    highlightGroupId: item.id,
+  });
+}}
+```
+
+In `MessagesScreen` (or the host messages screen), check for `highlightGroupId` in route params and scroll to or filter conversations that include members from that group. If this is too complex, at minimum show a toast: `"Open Messages and search for members of '${item.name}'"`.
+
+---
+
+## REFERENCE — What Each Section Fixes
+
+| Section | Files | Bug |
+|---------|-------|-----|
+| A1 | PricePicker.tsx | iOS picker shows as dropdown instead of spinner |
+| A2 | Multiple screens | Plans screen can't be dismissed (no X button) |
+| B1 | GroupsScreen, groupService | Group members always show as empty |
+| B2 | CreateGroupScreen | After creating a group, drops into wrong screen |
+| B3 | GroupsScreen | Discover tab blocked for users without preferences |
+| B4 | GroupsScreen | 'Payment' navigation should be 'Plans' |
+| B5 | CreateGroupScreen | Screen looks out of place (light theme vs dark) |
+| C1 | RoommatesScreen | Online status is random/fake |
+| C2 | RoommatesScreen | Filters bypassed for Supabase data |
+| C3 | discoverService | Too few profiles in swipe deck (3 photo minimum) |
+| C4 | RoommatesScreen | 'Payment' navigation should be 'Plans' |
+| C5 | RoommatesScreen | "Why?" button causes Plans screen to appear under profile |
+| D1 | ExploreScreen | Listings don't reload when city changes |
+| D2 | ExploreScreen | Interest sent only to local storage, not Supabase |
+| D3 | ExploreScreen | Group inquiry creates new group instead of using existing |
+| D4 | ExploreScreen | User's groups loaded from local storage only |
+| E1 | ChatScreen, MessagesScreen | Online status is random/fake (3 locations) |
+| E2 | ChatScreen, MessagesScreen | Plans screen can't be dismissed from chat |
+| F1 | CreateEditListingScreen, ExploreScreen | No laundry type distinction (in-unit vs in-building) |
+| G1 | listingService | Host type never passed from Supabase to listing cards |
+| G2 | ExploreScreen | Host profiles loaded from local storage only |
+| G3 | ExploreScreen | Interest card never inserted to Supabase |
+| H1 | HostDashboardScreen | Accepting/passing interest only saved locally, not to Supabase |
+| H2 | BrowseRentersScreen, HostDashboardScreen | Wrong availability filter; stale state for unassigned count |
+| H3 | HostDashboardScreen | Unread message count only from local storage |
+| I1 | ChatScreen | matchIdFromConversation uses wrong prefix `'conv_'` vs `'conv-interest-'` — all Supabase message queries use a bad ID |
+| I2 | HostInquiriesScreen | Chat navigation missing `matchId` and `inquiryGroup` — messages don't sync and host can't send booking offers |
+| I3 | ChatScreen | `handleAcceptBooking` skips booking creation for direct chats; booking offer has no `listing_id` |
+| I4 | HostInquiriesScreen, HostDashboardScreen | Match notifications only written to local storage — renter on another device never sees the match |
+| J1 | AgentGroupBuilderScreen | Shortlisted renter profiles loaded from StorageService — always empty on real devices |
+| J2 | AgentGroupBuilderScreen | Agent listings loaded from StorageService — Supabase listings never appear in group builder |
+| J3 | AgentGroupBuilderScreen | createAgentGroup return value discarded — sendAgentInvites uses fake local group ID so all invites are orphaned |
+| J4 | agentMatchmakerService | sendAgentInvites never inserts to notifications table — renters on other devices never see the invite |
+| J5+J6 | agentMatchmakerService | getAgentGroups returns empty members[] and undefined targetListing — group cards always show blank member chips and no listing info |
+| J7 | NotificationsScreen | getAgentInvitesForRenter imported but never called — pending agent invites invisible if no notification row was created |
+| J8 | AgentGroupsScreen | Message button navigates to Messages root with no context — agent can't reach the right group conversation |

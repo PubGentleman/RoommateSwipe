@@ -382,6 +382,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       rcIdentifyUser(mappedUser.id).catch(() => {});
 
+      StorageService.seedUserSpecificMockData(mappedUser.id, mappedUser.name, mappedUser.role, mappedUser.hostType).catch(() => {});
+
       setUser(mappedUser);
     } catch (error) {
       console.error('Error loading user from Supabase:', error);
@@ -389,6 +391,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await StorageService.initializeWithMockData();
         const fallbackUser = await StorageService.getCurrentUser();
         if (fallbackUser) {
+          StorageService.seedUserSpecificMockData(fallbackUser.id, fallbackUser.name, fallbackUser.role, fallbackUser.hostType).catch(() => {});
           setUser(fallbackUser);
         }
       } catch {
@@ -429,6 +432,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
       }
       const resetUser = await resetDailyMessagesIfNeeded(currentUser);
+      StorageService.seedUserSpecificMockData(resetUser.id, resetUser.name, resetUser.role, resetUser.hostType).catch(() => {});
       setUser(resetUser);
     }
     setIsLoading(false);

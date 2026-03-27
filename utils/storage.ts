@@ -1109,6 +1109,12 @@ export const StorageService = {
         for (const profileUser of mockProfileUsers) {
           await this.addOrUpdateUser(profileUser);
         }
+
+        const allKeys = await AsyncStorage.getAllKeys();
+        const seedKeys = allKeys.filter(k => k.startsWith('@rhome/user_mock_seeded_'));
+        if (seedKeys.length > 0) {
+          await AsyncStorage.multiRemove(seedKeys);
+        }
         
         await AsyncStorage.setItem(STORAGE_KEYS.MOCK_DATA_VERSION, MOCK_DATA_VERSION);
         console.log('[StorageService] ✓ Mock data reloaded due to version change');
@@ -1197,6 +1203,251 @@ export const StorageService = {
       console.log('[StorageService] Mock data reload complete!');
     } catch (error) {
       console.error('Error force reloading mock data:', error);
+    }
+  },
+
+  async seedUserSpecificMockData(userId: string, userName?: string, userRole?: string, hostType?: string): Promise<void> {
+    if (!shouldLoadMockData()) return;
+    const seedKey = `@rhome/user_mock_seeded_${userId}`;
+    const alreadySeeded = await AsyncStorage.getItem(seedKey);
+    if (alreadySeeded) return;
+
+    try {
+      console.log('[StorageService] Seeding user-specific mock data...');
+      const now = Date.now();
+
+      const groups = await this.getGroups();
+      const groupsToJoin = ['1', '2', '14'];
+      for (const gid of groupsToJoin) {
+        const g = groups.find(gr => gr.id === gid);
+        if (g && Array.isArray(g.members) && !g.members.includes(userId)) {
+          (g.members as string[]).push(userId);
+        }
+      }
+      if (!groups.some(g => g.id === `user-group-${userId.slice(0, 8)}`)) {
+        groups.push({
+          id: `user-group-${userId.slice(0, 8)}`,
+          name: 'My Apartment Search',
+          description: 'Looking for a 2BR in Brooklyn with a chill roommate',
+          members: [userId, '1'],
+          pendingMembers: ['3'],
+          maxMembers: 3,
+          budget: 2200,
+          preferredLocation: 'Williamsburg',
+          createdAt: new Date(now - 1000 * 60 * 60 * 24 * 5),
+          type: 'roommate' as const,
+          isArchived: false,
+          createdBy: userId,
+        });
+      }
+      await this.setGroups(groups);
+      console.log('[StorageService] Added user to groups + created personal group');
+
+      const existingMatches = await this.getMatches();
+      const matchesToAdd: Match[] = [
+        { id: `match-${userId.slice(0, 6)}-1`, userId1: userId, userId2: '1', matchedAt: new Date(now - 1000 * 60 * 60 * 24 * 2), matchType: 'mutual' },
+        { id: `match-${userId.slice(0, 6)}-2`, userId1: userId, userId2: '2', matchedAt: new Date(now - 1000 * 60 * 60 * 24 * 3), matchType: 'mutual' },
+        { id: `match-${userId.slice(0, 6)}-3`, userId1: '3', userId2: userId, matchedAt: new Date(now - 1000 * 60 * 60 * 12), matchType: 'super_interest', isSuperLike: true, superLiker: '3' },
+        { id: `match-${userId.slice(0, 6)}-5`, userId1: userId, userId2: '5', matchedAt: new Date(now - 1000 * 60 * 60 * 24), matchType: 'mutual' },
+        { id: `match-${userId.slice(0, 6)}-4`, userId1: '4', userId2: userId, matchedAt: new Date(now - 1000 * 60 * 60 * 6), matchType: 'mutual' },
+        { id: `match-${userId.slice(0, 6)}-6`, userId1: userId, userId2: '6', matchedAt: new Date(now - 1000 * 60 * 60 * 48), matchType: 'cold' },
+      ];
+      for (const m of matchesToAdd) {
+        if (!existingMatches.some(em => em.id === m.id)) {
+          existingMatches.push(m);
+        }
+      }
+      await this.setMatches(existingMatches);
+      console.log('[StorageService] Seeded matches for conversations');
+
+      const conversations = await this.getConversations();
+      const conversationSeeds: Conversation[] = [
+        {
+          id: '1', participant: { id: '1', name: 'Sarah Johnson', photo: 'https://picsum.photos/100/100?random=1', online: true },
+          lastMessage: 'That sounds great! When can we schedule a viewing?', timestamp: new Date(now - 1000 * 60 * 5), unread: 2,
+          messages: [
+            { id: 'm1a', senderId: '1', text: 'Hey! I saw we matched. Are you still looking in Williamsburg?', content: 'Hey! I saw we matched. Are you still looking in Williamsburg?', timestamp: new Date(now - 1000 * 60 * 60 * 4) },
+            { id: 'm1b', senderId: userId, text: 'Yes! I love the area. Have you lived there before?', content: 'Yes! I love the area. Have you lived there before?', timestamp: new Date(now - 1000 * 60 * 60 * 3.5) },
+            { id: 'm1c', senderId: '1', text: 'I have been there for 2 years. The food scene is amazing. What is your budget range?', content: 'I have been there for 2 years. The food scene is amazing. What is your budget range?', timestamp: new Date(now - 1000 * 60 * 60 * 3) },
+            { id: 'm1d', senderId: userId, text: 'Around $1,200 for my share. I work from home 3 days a week so a quiet space matters.', content: 'Around $1,200 for my share. I work from home 3 days a week so a quiet space matters.', timestamp: new Date(now - 1000 * 60 * 60 * 2.5) },
+            { id: 'm1e', senderId: '1', text: 'That sounds great! When can we schedule a viewing?', content: 'That sounds great! When can we schedule a viewing?', timestamp: new Date(now - 1000 * 60 * 5) },
+          ],
+        },
+        {
+          id: '2', participant: { id: '2', name: 'Michael Chen', photo: 'https://picsum.photos/100/100?random=2', online: false },
+          lastMessage: 'Thanks for reaching out!', timestamp: new Date(now - 1000 * 60 * 60 * 2), unread: 0,
+          messages: [
+            { id: 'm2a', senderId: '2', text: 'Hi there! I noticed we have similar interests. I am also a tech professional.', content: 'Hi there! I noticed we have similar interests. I am also a tech professional.', timestamp: new Date(now - 1000 * 60 * 60 * 24) },
+            { id: 'm2b', senderId: userId, text: 'Nice to meet you! What area are you looking at?', content: 'Nice to meet you! What area are you looking at?', timestamp: new Date(now - 1000 * 60 * 60 * 20) },
+            { id: 'm2c', senderId: '2', text: 'Financial District or Tribeca. Close to the subway is a must for me.', content: 'Financial District or Tribeca. Close to the subway is a must for me.', timestamp: new Date(now - 1000 * 60 * 60 * 18) },
+            { id: 'm2d', senderId: userId, text: 'Thanks for reaching out!', content: 'Thanks for reaching out!', timestamp: new Date(now - 1000 * 60 * 60 * 2) },
+          ],
+        },
+        {
+          id: '3', participant: { id: '3', name: 'Emily Rodriguez', photo: 'https://picsum.photos/100/100?random=3', online: true },
+          lastMessage: 'Same! Let me know when you want to check out some places.', timestamp: new Date(now - 1000 * 60 * 15), unread: 1,
+          messages: [
+            { id: 'm3a', senderId: userId, text: 'Hey Emily! I see you are also interested in Williamsburg.', content: 'Hey Emily! I see you are also interested in Williamsburg.', timestamp: new Date(now - 1000 * 60 * 60) },
+            { id: 'm3b', senderId: '3', text: 'Yes! It is my favorite neighborhood. Do you have a move-in date in mind?', content: 'Yes! It is my favorite neighborhood. Do you have a move-in date in mind?', timestamp: new Date(now - 1000 * 60 * 30) },
+            { id: 'm3c', senderId: userId, text: 'I am flexible but ideally by next month. How about you?', content: 'I am flexible but ideally by next month. How about you?', timestamp: new Date(now - 1000 * 60 * 20) },
+            { id: 'm3d', senderId: '3', text: 'Same! Let me know when you want to check out some places.', content: 'Same! Let me know when you want to check out some places.', timestamp: new Date(now - 1000 * 60 * 15) },
+          ],
+        },
+        {
+          id: '5', participant: { id: '5', name: 'Jessica Park', photo: 'https://picsum.photos/100/100?random=5', online: true },
+          lastMessage: 'The room is still available! Want to set up a video call?', timestamp: new Date(now - 1000 * 60 * 60), unread: 3,
+          messages: [
+            { id: 'm5a', senderId: '5', text: 'Hi! I have a room available in my apartment. Want to hear about it?', content: 'Hi! I have a room available in my apartment. Want to hear about it?', timestamp: new Date(now - 1000 * 60 * 60 * 5) },
+            { id: 'm5b', senderId: userId, text: 'Absolutely! Where is it located and what is the rent?', content: 'Absolutely! Where is it located and what is the rent?', timestamp: new Date(now - 1000 * 60 * 60 * 4) },
+            { id: 'm5c', senderId: '5', text: 'The room is still available! Want to set up a video call?', content: 'The room is still available! Want to set up a video call?', timestamp: new Date(now - 1000 * 60 * 60) },
+          ],
+        },
+      ];
+
+      for (const seed of conversationSeeds) {
+        const idx = conversations.findIndex(c => c.id === seed.id);
+        if (idx >= 0) {
+          if (conversations[idx].messages.length === 0) {
+            conversations[idx].messages = seed.messages;
+          }
+        } else {
+          conversations.push(seed);
+        }
+      }
+      await AsyncStorage.setItem(STORAGE_KEYS.CONVERSATIONS, JSON.stringify(conversations));
+      console.log('[StorageService] Populated conversations with messages');
+
+      if (hostType === 'agent' || userRole === 'host') {
+        const agentGroupsKey = '@rhome/agent_groups';
+        const existingAgentData = await AsyncStorage.getItem(agentGroupsKey);
+        const existingAgentGroups = existingAgentData ? JSON.parse(existingAgentData) : [];
+        const newAgentGroups = [
+          {
+            id: `ag-${userId.slice(0, 6)}-1`,
+            name: 'Brooklyn Heights Trio',
+            agentId: userId,
+            targetListingId: '1',
+            memberIds: ['1', '3', '5'],
+            members: [
+              { id: '1', name: 'Sarah Johnson', age: 28, occupation: 'Software Engineer', photos: ['https://picsum.photos/400/500?random=1'], budgetMin: 1000, budgetMax: 1400 },
+              { id: '3', name: 'Emily Rodriguez', age: 26, occupation: 'UX Designer', photos: ['https://picsum.photos/400/500?random=3'], budgetMin: 900, budgetMax: 1300 },
+              { id: '5', name: 'Jessica Park', age: 29, occupation: 'Marketing Manager', photos: ['https://picsum.photos/400/500?random=5'], budgetMin: 1100, budgetMax: 1500 },
+            ],
+            groupStatus: 'active',
+            avgCompatibility: 87,
+            combinedBudgetMin: 3000,
+            combinedBudgetMax: 4200,
+            coversRent: true,
+            invites: [],
+            createdAt: new Date(now - 1000 * 60 * 60 * 24 * 3).toISOString(),
+          },
+          {
+            id: `ag-${userId.slice(0, 6)}-2`,
+            name: 'FiDi Professionals',
+            agentId: userId,
+            targetListingId: '2',
+            memberIds: ['2', '4'],
+            members: [
+              { id: '2', name: 'Michael Chen', age: 30, occupation: 'Data Scientist', photos: ['https://picsum.photos/400/500?random=2'], budgetMin: 1200, budgetMax: 1600 },
+              { id: '4', name: 'Bob Anderson', age: 32, occupation: 'Financial Analyst', photos: ['https://picsum.photos/400/500?random=4'], budgetMin: 1300, budgetMax: 1700 },
+            ],
+            groupStatus: 'assembling',
+            avgCompatibility: 79,
+            combinedBudgetMin: 2500,
+            combinedBudgetMax: 3300,
+            coversRent: false,
+            invites: [],
+            createdAt: new Date(now - 1000 * 60 * 60 * 24).toISOString(),
+          },
+          {
+            id: `ag-${userId.slice(0, 6)}-3`,
+            name: 'West Village Duo',
+            agentId: userId,
+            targetListingId: '5',
+            memberIds: ['7', '9'],
+            members: [
+              { id: '7', name: 'Alex Kim', age: 27, occupation: 'Graphic Designer', photos: ['https://picsum.photos/400/500?random=7'], budgetMin: 1000, budgetMax: 1400 },
+              { id: '9', name: 'Sophia Nguyen', age: 25, occupation: 'Content Writer', photos: ['https://picsum.photos/400/500?random=9'], budgetMin: 900, budgetMax: 1200 },
+            ],
+            groupStatus: 'placed',
+            avgCompatibility: 92,
+            combinedBudgetMin: 1900,
+            combinedBudgetMax: 2600,
+            coversRent: true,
+            invites: [],
+            createdAt: new Date(now - 1000 * 60 * 60 * 24 * 10).toISOString(),
+          },
+          {
+            id: `ag-${userId.slice(0, 6)}-4`,
+            name: 'SoHo Creatives',
+            agentId: userId,
+            targetListingId: '3',
+            memberIds: ['6', '8', '10'],
+            members: [
+              { id: '6', name: 'David Martinez', age: 31, occupation: 'Photographer', photos: ['https://picsum.photos/400/500?random=6'], budgetMin: 1100, budgetMax: 1500 },
+              { id: '8', name: 'Chris Wilson', age: 28, occupation: 'Film Editor', photos: ['https://picsum.photos/400/500?random=8'], budgetMin: 1000, budgetMax: 1300 },
+              { id: '10', name: 'Taylor Reed', age: 26, occupation: 'Animator', photos: ['https://picsum.photos/400/500?random=10'], budgetMin: 900, budgetMax: 1200 },
+            ],
+            groupStatus: 'invited',
+            avgCompatibility: 84,
+            combinedBudgetMin: 3000,
+            combinedBudgetMax: 4000,
+            coversRent: true,
+            invites: [
+              { id: `inv-1`, groupId: `ag-${userId.slice(0, 6)}-4`, renterId: '6', renterName: 'David Martinez', status: 'pending', sentAt: new Date(now - 1000 * 60 * 60 * 12).toISOString(), agentMessage: 'Great fit for this SoHo space!' },
+              { id: `inv-2`, groupId: `ag-${userId.slice(0, 6)}-4`, renterId: '8', renterName: 'Chris Wilson', status: 'accepted', sentAt: new Date(now - 1000 * 60 * 60 * 24).toISOString(), respondedAt: new Date(now - 1000 * 60 * 60 * 18).toISOString() },
+              { id: `inv-3`, groupId: `ag-${userId.slice(0, 6)}-4`, renterId: '10', renterName: 'Taylor Reed', status: 'accepted', sentAt: new Date(now - 1000 * 60 * 60 * 24).toISOString(), respondedAt: new Date(now - 1000 * 60 * 60 * 20).toISOString() },
+            ],
+            createdAt: new Date(now - 1000 * 60 * 60 * 24 * 7).toISOString(),
+          },
+        ];
+        for (const ag of newAgentGroups) {
+          if (!existingAgentGroups.some((e: any) => e.id === ag.id)) {
+            existingAgentGroups.push(ag);
+          }
+        }
+        await AsyncStorage.setItem(agentGroupsKey, JSON.stringify(existingAgentGroups));
+        console.log('[StorageService] Seeded agent groups (merged)');
+
+        const shortlistKey = '@rhome/agent_shortlists';
+        const existingShortlistData = await AsyncStorage.getItem(shortlistKey);
+        const existingShortlists = existingShortlistData ? JSON.parse(existingShortlistData) : [];
+        const newShortlists = [
+          { id: `sl_${userId.slice(0,6)}_1`, agentId: userId, renterId: '1', createdAt: new Date(now - 1000 * 60 * 60 * 48).toISOString() },
+          { id: `sl_${userId.slice(0,6)}_2`, agentId: userId, renterId: '2', createdAt: new Date(now - 1000 * 60 * 60 * 36).toISOString() },
+          { id: `sl_${userId.slice(0,6)}_3`, agentId: userId, renterId: '3', createdAt: new Date(now - 1000 * 60 * 60 * 24).toISOString() },
+          { id: `sl_${userId.slice(0,6)}_4`, agentId: userId, renterId: '5', createdAt: new Date(now - 1000 * 60 * 60 * 12).toISOString() },
+          { id: `sl_${userId.slice(0,6)}_5`, agentId: userId, renterId: '7', createdAt: new Date(now - 1000 * 60 * 60 * 6).toISOString() },
+        ];
+        for (const sl of newShortlists) {
+          if (!existingShortlists.some((e: any) => e.id === sl.id)) {
+            existingShortlists.push(sl);
+          }
+        }
+        await AsyncStorage.setItem(shortlistKey, JSON.stringify(existingShortlists));
+        console.log('[StorageService] Seeded agent shortlists (merged)');
+      }
+
+      if (hostType === 'company') {
+        const properties = await this.getProperties();
+        const companyListingIds: string[] = [];
+        for (let i = 0; i < Math.min(4, properties.length); i++) {
+          if (!properties[i].hostId || properties[i].hostId === '1') {
+            properties[i].hostId = userId;
+            properties[i].hostType = 'company';
+            companyListingIds.push(properties[i].id);
+          }
+        }
+        if (companyListingIds.length > 0) {
+          await this.setProperties(properties);
+          console.log(`[StorageService] Assigned ${companyListingIds.length} listings to company host`);
+        }
+      }
+
+      await AsyncStorage.setItem(seedKey, 'true');
+      console.log('[StorageService] User-specific mock data seeding complete');
+    } catch (error) {
+      console.error('[StorageService] Error seeding user-specific mock data:', error);
     }
   },
 
