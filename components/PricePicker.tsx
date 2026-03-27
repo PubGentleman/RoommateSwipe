@@ -1,9 +1,11 @@
-import React from 'react';
-import { View, StyleSheet, Platform } from 'react-native';
+import React, { useRef, useCallback, useEffect } from 'react';
+import { View, StyleSheet, Platform, ScrollView, Pressable, Text } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { ThemedText } from './ThemedText';
 
 const ACCENT = '#FF6B6B';
+const ITEM_HEIGHT = 44;
+const VISIBLE_ITEMS = 3;
 
 export const STANDARD_MIN_OPTIONS = [
   { label: '$500', value: 500 },
@@ -62,6 +64,181 @@ const isIOS = Platform.OS === 'ios';
 const isAndroid = Platform.OS === 'android';
 const isWeb = Platform.OS === 'web';
 
+interface WebSpinnerProps {
+  options: { label: string; value: number }[];
+  selectedValue: number;
+  onValueChange: (val: number) => void;
+  height?: number;
+}
+
+const WebSpinnerPicker: React.FC<WebSpinnerProps> = ({ options, selectedValue, onValueChange, height = 150 }) => {
+  const scrollRef = useRef<ScrollView>(null);
+  const isScrollingRef = useRef(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const selectedIdx = options.findIndex(o => o.value === selectedValue);
+  const activeIdx = selectedIdx >= 0 ? selectedIdx : 0;
+  const paddingItems = Math.floor(VISIBLE_ITEMS / 2);
+
+  useEffect(() => {
+    if (!isScrollingRef.current) {
+      const timer = setTimeout(() => {
+        scrollRef.current?.scrollTo({ y: activeIdx * ITEM_HEIGHT, animated: false });
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [activeIdx, options.length]);
+
+  const handleScrollEnd = useCallback((yOffset: number) => {
+    const idx = Math.round(yOffset / ITEM_HEIGHT);
+    const clampedIdx = Math.max(0, Math.min(idx, options.length - 1));
+    if (options[clampedIdx] && options[clampedIdx].value !== selectedValue) {
+      onValueChange(options[clampedIdx].value);
+    }
+    scrollRef.current?.scrollTo({ y: clampedIdx * ITEM_HEIGHT, animated: true });
+    isScrollingRef.current = false;
+  }, [options, selectedValue, onValueChange]);
+
+  const handleScroll = useCallback((e: any) => {
+    isScrollingRef.current = true;
+    const yOffset = e.nativeEvent.contentOffset.y;
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => handleScrollEnd(yOffset), 80);
+  }, [handleScrollEnd]);
+
+  const containerHeight = VISIBLE_ITEMS * ITEM_HEIGHT;
+
+  return (
+    <View style={[webStyles.container, { height: containerHeight }]}>
+      <View style={webStyles.selectionBand} pointerEvents="none" />
+      <View style={webStyles.topFade} pointerEvents="none" />
+      <View style={webStyles.bottomFade} pointerEvents="none" />
+      <ScrollView
+        ref={scrollRef}
+        showsVerticalScrollIndicator={false}
+        snapToInterval={ITEM_HEIGHT}
+        decelerationRate="fast"
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        contentContainerStyle={{
+          paddingTop: paddingItems * ITEM_HEIGHT,
+          paddingBottom: paddingItems * ITEM_HEIGHT,
+        }}
+      >
+        {options.map((opt, i) => {
+          const isSelected = opt.value === selectedValue;
+          return (
+            <Pressable
+              key={opt.value}
+              style={webStyles.item}
+              onPress={() => {
+                onValueChange(opt.value);
+                scrollRef.current?.scrollTo({ y: i * ITEM_HEIGHT, animated: true });
+              }}
+            >
+              <Text style={[
+                webStyles.itemText,
+                isSelected ? webStyles.itemTextSelected : webStyles.itemTextDimmed,
+              ]}>
+                {opt.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+};
+
+const webStyles = StyleSheet.create({
+  container: {
+    overflow: 'hidden',
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    position: 'relative',
+  },
+  selectionBand: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: ITEM_HEIGHT,
+    height: ITEM_HEIGHT,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 8,
+    zIndex: 1,
+  },
+  topFade: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: ITEM_HEIGHT,
+    zIndex: 2,
+  },
+  bottomFade: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: ITEM_HEIGHT,
+    zIndex: 2,
+  },
+  item: {
+    height: ITEM_HEIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  itemText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  itemTextSelected: {
+    color: '#ffffff',
+  },
+  itemTextDimmed: {
+    color: 'rgba(255,255,255,0.3)',
+  },
+});
+
+interface SpinnerPickerProps {
+  options: { label: string; value: number }[];
+  selectedValue: number;
+  onValueChange: (val: number) => void;
+  height?: number;
+}
+
+const SpinnerPicker: React.FC<SpinnerPickerProps> = ({ options, selectedValue, onValueChange, height = 150 }) => {
+  if (isWeb) {
+    return <WebSpinnerPicker options={options} selectedValue={selectedValue} onValueChange={onValueChange} height={height} />;
+  }
+
+  return (
+    <View style={[s.wrap, { height }]}>
+      <Picker
+        selectedValue={selectedValue}
+        onValueChange={onValueChange}
+        style={[
+          s.picker,
+          { height },
+          isAndroid && s.androidPicker,
+        ]}
+        itemStyle={[s.item, { height: 44 }]}
+        {...(isAndroid ? { mode: 'dialog' as const } : {})}
+        display={'spinner' as any}
+      >
+        {options.map(opt => (
+          <Picker.Item
+            key={opt.value}
+            label={opt.label}
+            value={opt.value}
+            color={isAndroid ? '#ffffff' : undefined}
+          />
+        ))}
+      </Picker>
+      {isIOS ? <View style={s.band} pointerEvents="none" /> : null}
+    </View>
+  );
+};
+
 interface PricePickerPairProps {
   minValue: number;
   maxValue: number;
@@ -109,60 +286,24 @@ export const PricePickerPair: React.FC<PricePickerPairProps> = ({
       <View style={s.row}>
         <View style={s.column}>
           <ThemedText style={s.label}>Min</ThemedText>
-          <View style={[s.wrap, { height }]}>
-            <Picker
-              selectedValue={minValue}
-              onValueChange={handleMinChange}
-              style={[
-                s.picker,
-                { height },
-                isAndroid && s.androidPicker,
-              ]}
-              itemStyle={[s.item, { height: 44 }]}
-              {...(isAndroid ? { mode: 'dialog' as const } : {})}
-              {...(isWeb ? {} : { display: 'spinner' as any })}
-            >
-              {STANDARD_MIN_OPTIONS.map(opt => (
-                <Picker.Item
-                  key={opt.value}
-                  label={opt.label}
-                  value={opt.value}
-                  color={isWeb ? '#ffffff' : isAndroid ? '#ffffff' : undefined}
-                />
-              ))}
-            </Picker>
-            {isIOS ? <View style={s.band} pointerEvents="none" /> : null}
-          </View>
+          <SpinnerPicker
+            options={STANDARD_MIN_OPTIONS}
+            selectedValue={minValue}
+            onValueChange={handleMinChange}
+            height={height}
+          />
         </View>
         <View style={s.dash}>
           <ThemedText style={s.dashText}>{'\u2014'}</ThemedText>
         </View>
         <View style={s.column}>
           <ThemedText style={s.label}>Max</ThemedText>
-          <View style={[s.wrap, { height }]}>
-            <Picker
-              selectedValue={maxValue}
-              onValueChange={handleMaxChange}
-              style={[
-                s.picker,
-                { height },
-                isAndroid && s.androidPicker,
-              ]}
-              itemStyle={[s.item, { height: 44 }]}
-              {...(isAndroid ? { mode: 'dialog' as const } : {})}
-              {...(isWeb ? {} : { display: 'spinner' as any })}
-            >
-              {availableMaxOptions.map(opt => (
-                <Picker.Item
-                  key={opt.value}
-                  label={opt.label}
-                  value={opt.value}
-                  color={isWeb ? '#ffffff' : isAndroid ? '#ffffff' : undefined}
-                />
-              ))}
-            </Picker>
-            {isIOS ? <View style={s.band} pointerEvents="none" /> : null}
-          </View>
+          <SpinnerPicker
+            options={availableMaxOptions}
+            selectedValue={maxValue}
+            onValueChange={handleMaxChange}
+            height={height}
+          />
         </View>
       </View>
     </View>
@@ -186,30 +327,12 @@ export const SinglePricePicker: React.FC<SinglePricePickerProps> = ({
 }) => (
   <View style={s.singleCol}>
     {label ? <ThemedText style={s.label}>{label}</ThemedText> : null}
-    <View style={[s.wrap, { height }]}>
-      <Picker
-        selectedValue={value}
-        onValueChange={onChange}
-        style={[
-          s.picker,
-          { height },
-          isAndroid && s.androidPicker,
-        ]}
-        itemStyle={[s.item, { height: 44 }]}
-        {...(isAndroid ? { mode: 'dialog' as const } : {})}
-        {...(isWeb ? {} : { display: 'spinner' as any })}
-      >
-        {options.map(opt => (
-          <Picker.Item
-            key={opt.value}
-            label={opt.label}
-            value={opt.value}
-            color={isWeb ? '#ffffff' : isAndroid ? '#ffffff' : undefined}
-          />
-        ))}
-      </Picker>
-      {isIOS ? <View style={s.band} pointerEvents="none" /> : null}
-    </View>
+    <SpinnerPicker
+      options={options}
+      selectedValue={value}
+      onValueChange={onChange}
+      height={height}
+    />
   </View>
 );
 
