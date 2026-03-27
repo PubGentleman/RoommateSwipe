@@ -157,7 +157,9 @@ export const BrowseRentersScreen = () => {
           .from('listings')
           .select('*')
           .eq('host_id', user?.id || '')
-          .eq('available', true);
+          .eq('is_active', true)
+          .eq('is_rented', false)
+          .eq('is_paused', false);
 
         myListings = (supaListings || []).map((l: any) => ({
           id: l.id,

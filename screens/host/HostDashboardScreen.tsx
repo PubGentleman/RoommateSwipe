@@ -140,23 +140,22 @@ export const HostDashboardScreen = () => {
   const loadData = useCallback(async () => {
     if (!user) return;
 
+    let freshListings: Property[] = [];
     try {
       const supaListings = await getMyListings();
       if (supaListings && supaListings.length > 0) {
-        const mapped: Property[] = supaListings.map((l: any) => mapListingToProperty(l, user.name));
-        setListings(mapped);
+        freshListings = supaListings.map((l: any) => mapListingToProperty(l, user.name));
+        setListings(freshListings);
       } else {
         const allProperties = await StorageService.getProperties();
         const myListings = allProperties.filter(p => p.hostId === user.id);
-        if (myListings.length > 0) {
-          setListings(myListings);
-        } else {
-          setListings([]);
-        }
+        freshListings = myListings;
+        setListings(myListings);
       }
     } catch {
       const allProperties = await StorageService.getProperties();
       const myListings = allProperties.filter(p => p.hostId === user.id);
+      freshListings = myListings;
       setListings(myListings);
     }
 
@@ -199,9 +198,8 @@ export const HostDashboardScreen = () => {
         setAgentStats(stats);
         const agents = await getCompanyAgents(user.id);
         setCompanyAgents(agents);
-        const noAgent = listings.length > 0
-          ? listings.filter(l => !l.assigned_agent_id && l.available)
-          : [];
+        const listingsToCheck = freshListings.length > 0 ? freshListings : listings;
+        const noAgent = listingsToCheck.filter(l => !l.assigned_agent_id && l.available);
         setUnassignedListings(noAgent);
         const alerts = await getAgentResponseAlerts(user.id);
         setResponseAlerts(alerts);
