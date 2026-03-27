@@ -27,7 +27,7 @@ import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import { formatMoveInDate, calculateCompatibility, getMatchQualityColor, getGenderSymbol, formatLocation } from '../../utils/matchingAlgorithm';
 import { getNeighborhoodsByCity, getAllCities, NEIGHBORHOODS } from '../../utils/locationData';
-import { fetchAreaInfo, formatNearestAmenity, AreaInfo } from '../../services/neighborhoodService';
+import { fetchAreaInfo, formatNearestAmenity, AreaInfo, NearbyAmenity } from '../../services/neighborhoodService';
 import { getZodiacSymbol } from '../../utils/zodiacUtils';
 import { getBoostRotationIndex } from '../../utils/boostRotation';
 import { getAgentsWithCriticalStatus } from '../../services/responseTrackingService';
@@ -147,7 +147,10 @@ export const ExploreScreen = () => {
   const [areaInfoLoading, setAreaInfoLoading] = useState(false);
   const [areaInfoError, setAreaInfoError] = useState(false);
   const [areaInfoListingId, setAreaInfoListingId] = useState<string | null>(null);
-  const [showTransitModal, setShowTransitModal] = useState(false);
+  const [areaDetailModal, setAreaDetailModal] = useState<{
+    visible: boolean;
+    category: 'transit' | 'restaurants' | 'grocery' | 'laundry' | 'parks' | null;
+  }>({ visible: false, category: null });
 
   const COLLAPSIBLE_HEIGHT = 120;
   const exploreScrollY = useSharedValue(0);
@@ -187,7 +190,7 @@ export const ExploreScreen = () => {
       setAreaInfoLoading(false);
       setAreaInfoError(false);
       setAreaInfoListingId(selectedProperty.id);
-      setShowTransitModal(false);
+      setAreaDetailModal({ visible: false, category: null });
       return;
     }
 
@@ -1252,6 +1255,44 @@ export const ExploreScreen = () => {
     );
   }
 
+  const AREA_MODAL_CONFIG: Record<string, {
+    title: string;
+    icon: string;
+    emptyText: string;
+    items: NearbyAmenity[];
+  }> = areaInfo ? {
+    transit: {
+      title: 'Nearby Transit',
+      icon: 'navigation',
+      emptyText: 'No transit stops found nearby.',
+      items: areaInfo.transit,
+    },
+    restaurants: {
+      title: 'Restaurants & Cafes',
+      icon: 'coffee',
+      emptyText: 'No restaurants found nearby.',
+      items: areaInfo.restaurants,
+    },
+    grocery: {
+      title: 'Grocery Stores',
+      icon: 'shopping-bag',
+      emptyText: 'No grocery stores found nearby.',
+      items: areaInfo.grocery,
+    },
+    laundry: {
+      title: 'Laundromats',
+      icon: 'briefcase',
+      emptyText: 'No laundromats found nearby.',
+      items: areaInfo.laundry,
+    },
+    parks: {
+      title: 'Parks',
+      icon: 'sun',
+      emptyText: 'No parks found nearby.',
+      items: areaInfo.parks,
+    },
+  } : {};
+
   return (
     <View style={[styles.container, { backgroundColor: BG }]}>
       <View style={[styles.exploreHeaderRow, { paddingTop: insets.top + 12 }]}>
@@ -2094,10 +2135,8 @@ export const ExploreScreen = () => {
                           <Pressable
                             style={styles.pdAreaInfoCard}
                             onPress={() => {
-                              if (areaInfo && areaInfo.transit.length > 0) {
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                setShowTransitModal(true);
-                              }
+                              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                              setAreaDetailModal({ visible: true, category: 'transit' });
                             }}
                           >
                             <View style={styles.pdAreaInfoIconWrap}>
@@ -2106,16 +2145,20 @@ export const ExploreScreen = () => {
                             <Text style={styles.pdAreaInfoLabel}>Transit</Text>
                             <Text style={styles.pdAreaInfoValue}>
                               {areaInfo.transit.length > 0
-                                ? formatNearestAmenity(areaInfo.transit)
+                                ? `${areaInfo.transit.length} stop${areaInfo.transit.length !== 1 ? 's' : ''} nearby`
                                 : 'None found nearby'}
                             </Text>
                             {areaInfo.transit.length > 0 ? (
-                              <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 3 }}>
-                                {areaInfo.transit.length} stop{areaInfo.transit.length !== 1 ? 's' : ''} · tap to see all
-                              </Text>
+                              <Text style={styles.pdAreaInfoTapHint}>Tap to explore</Text>
                             ) : null}
                           </Pressable>
-                          <View style={styles.pdAreaInfoCard}>
+                          <Pressable
+                            style={styles.pdAreaInfoCard}
+                            onPress={() => {
+                              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                              setAreaDetailModal({ visible: true, category: 'restaurants' });
+                            }}
+                          >
                             <View style={styles.pdAreaInfoIconWrap}>
                               <Feather name="coffee" size={16} color={ACCENT} />
                             </View>
@@ -2123,36 +2166,64 @@ export const ExploreScreen = () => {
                             <Text style={styles.pdAreaInfoValue}>
                               {areaInfo.restaurants.length > 0 ? `${areaInfo.restaurants.length} nearby` : 'None found nearby'}
                             </Text>
-                          </View>
-                          <View style={styles.pdAreaInfoCard}>
+                            {areaInfo.restaurants.length > 0 ? (
+                              <Text style={styles.pdAreaInfoTapHint}>Tap to explore</Text>
+                            ) : null}
+                          </Pressable>
+                          <Pressable
+                            style={styles.pdAreaInfoCard}
+                            onPress={() => {
+                              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                              setAreaDetailModal({ visible: true, category: 'grocery' });
+                            }}
+                          >
                             <View style={styles.pdAreaInfoIconWrap}>
                               <Feather name="shopping-bag" size={16} color={ACCENT} />
                             </View>
                             <Text style={styles.pdAreaInfoLabel}>Grocery</Text>
-                            <Text style={styles.pdAreaInfoValue}>
-                              {formatNearestAmenity(areaInfo.grocery)}
-                            </Text>
-                          </View>
-                          <View style={styles.pdAreaInfoCard}>
+                            <Text style={styles.pdAreaInfoValue}>{formatNearestAmenity(areaInfo.grocery)}</Text>
+                            {areaInfo.grocery.length > 0 ? (
+                              <Text style={styles.pdAreaInfoTapHint}>Tap to explore</Text>
+                            ) : null}
+                          </Pressable>
+                          <Pressable
+                            style={styles.pdAreaInfoCard}
+                            onPress={() => {
+                              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                              setAreaDetailModal({ visible: true, category: 'laundry' });
+                            }}
+                          >
                             <View style={styles.pdAreaInfoIconWrap}>
                               <Feather name="briefcase" size={16} color={ACCENT} />
                             </View>
                             <Text style={styles.pdAreaInfoLabel}>Laundromat</Text>
                             <Text style={styles.pdAreaInfoValue}>
-                              {selectedProperty.amenities?.some(a => a.toLowerCase().includes('laundry') && a.toLowerCase().includes('unit'))
+                              {selectedProperty.amenities?.some(a =>
+                                a.toLowerCase().includes('laundry') && a.toLowerCase().includes('unit')
+                              )
                                 ? 'In building'
                                 : formatNearestAmenity(areaInfo.laundry)}
                             </Text>
-                          </View>
-                          <View style={styles.pdAreaInfoCard}>
+                            {areaInfo.laundry.length > 0 ? (
+                              <Text style={styles.pdAreaInfoTapHint}>Tap to explore</Text>
+                            ) : null}
+                          </Pressable>
+                          <Pressable
+                            style={styles.pdAreaInfoCard}
+                            onPress={() => {
+                              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                              setAreaDetailModal({ visible: true, category: 'parks' });
+                            }}
+                          >
                             <View style={styles.pdAreaInfoIconWrap}>
                               <Feather name="sun" size={16} color={ACCENT} />
                             </View>
                             <Text style={styles.pdAreaInfoLabel}>Parks</Text>
-                            <Text style={styles.pdAreaInfoValue}>
-                              {formatNearestAmenity(areaInfo.parks)}
-                            </Text>
-                          </View>
+                            <Text style={styles.pdAreaInfoValue}>{formatNearestAmenity(areaInfo.parks)}</Text>
+                            {areaInfo.parks.length > 0 ? (
+                              <Text style={styles.pdAreaInfoTapHint}>Tap to explore</Text>
+                            ) : null}
+                          </Pressable>
                         </View>
                       )}
                     </View>
@@ -2571,72 +2642,119 @@ export const ExploreScreen = () => {
         }}
       />
 
-      <Modal
-        visible={showTransitModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowTransitModal(false)}
-      >
-        <Pressable
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' }}
-          onPress={() => setShowTransitModal(false)}
-        />
-        <View style={{
-          backgroundColor: '#1e1e1e',
-          borderTopLeftRadius: 24,
-          borderTopRightRadius: 24,
-          paddingHorizontal: 20,
-          paddingBottom: 40,
-          maxHeight: '70%',
-        }}>
-          <View style={{
-            width: 40, height: 4, borderRadius: 2,
-            backgroundColor: 'rgba(255,255,255,0.2)',
-            alignSelf: 'center', marginTop: 12, marginBottom: 16,
-          }} />
-          <Text style={{ fontSize: 18, fontWeight: '700', color: '#FFFFFF', marginBottom: 4 }}>
-            Nearby Transit
-          </Text>
-          <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginBottom: 20 }}>
-            {selectedProperty?.neighborhood || selectedProperty?.city}
-          </Text>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {(areaInfo?.transit || []).map((stop, index) => (
-              <View key={index} style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingVertical: 14,
-                borderBottomWidth: 1,
-                borderBottomColor: 'rgba(255,255,255,0.07)',
-                gap: 14,
-              }}>
-                <View style={{
-                  width: 36, height: 36, borderRadius: 18,
-                  backgroundColor: 'rgba(255,77,77,0.12)',
-                  alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <Feather
-                    name={stop.type === 'Bus Stop' ? 'truck' : 'navigation'}
-                    size={15}
-                    color={ACCENT}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#FFFFFF' }} numberOfLines={1}>
-                    {stop.name}
+      {(() => {
+        const config = areaDetailModal.category
+          ? AREA_MODAL_CONFIG[areaDetailModal.category]
+          : null;
+
+        return (
+          <Modal
+            visible={areaDetailModal.visible}
+            transparent
+            animationType="slide"
+            onRequestClose={() => setAreaDetailModal({ visible: false, category: null })}
+          >
+            <Pressable
+              style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' }}
+              onPress={() => setAreaDetailModal({ visible: false, category: null })}
+            />
+            <View style={{
+              backgroundColor: '#1e1e1e',
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              paddingHorizontal: 20,
+              paddingBottom: 40,
+              maxHeight: '75%',
+            }}>
+              <View style={{
+                width: 40, height: 4, borderRadius: 2,
+                backgroundColor: 'rgba(255,255,255,0.2)',
+                alignSelf: 'center', marginTop: 12, marginBottom: 20,
+              }} />
+              {config ? (
+                <>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                    <View style={{
+                      width: 32, height: 32, borderRadius: 16,
+                      backgroundColor: 'rgba(255,77,77,0.15)',
+                      alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <Feather name={config.icon as any} size={15} color={ACCENT} />
+                    </View>
+                    <Text style={{ fontSize: 18, fontWeight: '700', color: '#FFFFFF' }}>
+                      {config.title}
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 20 }}>
+                    {selectedProperty?.neighborhood
+                      ? `${selectedProperty.neighborhood}, ${selectedProperty.city}`
+                      : selectedProperty?.city}
                   </Text>
-                  <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
-                    {stop.type}
-                  </Text>
-                </View>
-                <Text style={{ fontSize: 13, fontWeight: '600', color: ACCENT }}>
-                  {stop.distanceMi} mi
-                </Text>
-              </View>
-            ))}
-          </ScrollView>
-        </View>
-      </Modal>
+                  {config.items.length === 0 ? (
+                    <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14, textAlign: 'center', paddingVertical: 40 }}>
+                      {config.emptyText}
+                    </Text>
+                  ) : (
+                    <ScrollView showsVerticalScrollIndicator={false}>
+                      {config.items.map((place, index) => (
+                        <View
+                          key={index}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            paddingVertical: 12,
+                            borderBottomWidth: 1,
+                            borderBottomColor: 'rgba(255,255,255,0.07)',
+                            gap: 14,
+                          }}
+                        >
+                          {place.photoUrl ? (
+                            <Image
+                              source={{ uri: place.photoUrl }}
+                              style={{
+                                width: 48, height: 48, borderRadius: 12,
+                                backgroundColor: 'rgba(255,255,255,0.06)',
+                              }}
+                              resizeMode="cover"
+                            />
+                          ) : (
+                            <View style={{
+                              width: 48, height: 48, borderRadius: 12,
+                              backgroundColor: 'rgba(255,77,77,0.12)',
+                              alignItems: 'center', justifyContent: 'center',
+                            }}>
+                              <Text style={{
+                                fontSize: 18, fontWeight: '700',
+                                color: ACCENT, textTransform: 'uppercase',
+                              }}>
+                                {place.name?.charAt(0) || '?'}
+                              </Text>
+                            </View>
+                          )}
+                          <View style={{ flex: 1 }}>
+                            <Text
+                              style={{ fontSize: 14, fontWeight: '600', color: '#FFFFFF' }}
+                              numberOfLines={1}
+                            >
+                              {place.name}
+                            </Text>
+                            <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
+                              {place.type}
+                            </Text>
+                          </View>
+                          <Text style={{ fontSize: 13, fontWeight: '600', color: ACCENT }}>
+                            {place.distanceMi} mi
+                          </Text>
+                        </View>
+                      ))}
+                    </ScrollView>
+                  )}
+                </>
+              ) : null}
+            </View>
+          </Modal>
+        );
+      })()}
 
       {selectedProperty ? (
         <NeighborhoodAISheet
@@ -2985,6 +3103,11 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.4)',
     fontSize: 12,
     fontWeight: '500',
+  },
+  pdAreaInfoTapHint: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.3)',
+    marginTop: 4,
   },
   pdAreaInfoFallback: {
     flexDirection: 'row',

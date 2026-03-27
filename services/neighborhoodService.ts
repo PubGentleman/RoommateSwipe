@@ -8,6 +8,7 @@ export interface NearbyAmenity {
   lng: number;
   distanceKm: number;
   distanceMi: number;
+  photoUrl?: string;
 }
 
 export interface AreaInfo {
@@ -168,6 +169,30 @@ export async function fetchAreaInfo(lat: number, lng: number): Promise<AreaInfo 
     result.grocery.sort((a, b) => a.distanceKm - b.distanceKm);
     result.laundry.sort((a, b) => a.distanceKm - b.distanceKm);
     result.parks.sort((a, b) => a.distanceKm - b.distanceKm);
+
+    const GOOGLE_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+    if (GOOGLE_KEY && result.restaurants.length > 0) {
+      try {
+        const enriched = await Promise.all(
+          result.restaurants.slice(0, 10).map(async (place) => {
+            try {
+              const searchUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${place.lat},${place.lng}&radius=50&keyword=${encodeURIComponent(place.name)}&key=${GOOGLE_KEY}`;
+              const res = await fetch(searchUrl);
+              const data = await res.json();
+              const photoRef = data?.results?.[0]?.photos?.[0]?.photo_reference;
+              if (photoRef) {
+                return {
+                  ...place,
+                  photoUrl: `https://maps.googleapis.com/maps/api/place/photo?maxwidth=100&photoreference=${photoRef}&key=${GOOGLE_KEY}`,
+                };
+              }
+            } catch {}
+            return place;
+          })
+        );
+        result.restaurants = enriched;
+      } catch {}
+    }
 
     areaInfoCache.set(cacheKey, result);
     return result;
