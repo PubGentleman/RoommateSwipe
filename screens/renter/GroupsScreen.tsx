@@ -9,7 +9,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { Group, RoommateProfile, GroupType } from '../../types/models';
 import { StorageService } from '../../utils/storage';
-import { getGroups as getGroupsFromSupabase, getMyGroups as getMyGroupsFromSupabase, getMyInquiryGroups as getMyInquiryGroupsFromSupabase, joinGroup as joinGroupSupabase, leaveGroup as leaveGroupSupabase, createGroup as createGroupSupabase, archiveGroup as archiveGroupSupabase, getGroupLimit, getMemberLimit, getMyPendingInvites, respondToInvite, joinGroupByCode, updateGroup as updateGroupSupabase } from '../../services/groupService';
+import { getGroups as getGroupsFromSupabase, getMyGroups as getMyGroupsFromSupabase, getMyInquiryGroups as getMyInquiryGroupsFromSupabase, joinGroup as joinGroupSupabase, leaveGroup as leaveGroupSupabase, archiveGroup as archiveGroupSupabase, getMemberLimit, getMyPendingInvites, respondToInvite, joinGroupByCode, updateGroup as updateGroupSupabase } from '../../services/groupService';
 import { getMyListings } from '../../services/listingService';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -29,7 +29,6 @@ import { PlanBadgeInline } from '../../components/LockedFeatureOverlay';
 import { useCityContext } from '../../contexts/CityContext';
 import { CityPickerModal, CityPillButton } from '../../components/CityPickerModal';
 import { RhomeAISheet } from '../../components/RhomeAISheet';
-import { GroupPropertySearchModal } from '../../components/GroupPropertySearchModal';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { AIGroupSuggestionCard } from '../../components/AIGroupSuggestionCard';
 
@@ -94,14 +93,7 @@ export const GroupsScreen = () => {
   const [groupQuickStats, setGroupQuickStats] = useState<Record<string, GroupQuickStats>>({});
   const [savingEdit, setSavingEdit] = useState(false);
 
-  const [groupName, setGroupName] = useState('');
-  const [groupDescription, setGroupDescription] = useState('');
-  const [selectedListingId, setSelectedListingId] = useState<string | null>(null);
-  const [selectedListingBedrooms, setSelectedListingBedrooms] = useState<number | null>(null);
-  const [showCreatePropertySearch, setShowCreatePropertySearch] = useState(false);
-  const [hostListings, setHostListings] = useState<any[]>([]);
   const userPlan = user?.subscription?.plan || 'basic';
-  const planMemberLimit = getMemberLimit(userPlan);
 
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -121,7 +113,7 @@ export const GroupsScreen = () => {
           });
       }
       if (user?.role === 'host') {
-        getMyListings().then(setHostListings).catch(() => {});
+        getMyListings().catch(() => {});
       }
     }, [user, activeCity, activeSubArea])
   );
@@ -497,7 +489,7 @@ export const GroupsScreen = () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } else {
       if (result.message.includes('payment method')) {
-        (navigation as any).navigate('Payment');
+        (navigation as any).navigate('Plans');
         setShowUndoUpgradeModal(false);
       }
     }
@@ -608,7 +600,7 @@ export const GroupsScreen = () => {
 
   const handleUpgradeForMessaging = () => {
     setShowMessageModal(false);
-    (navigation as any).navigate('Payment');
+    (navigation as any).navigate('Plans');
   };
 
   const openGroupDetail = () => {
@@ -691,83 +683,6 @@ export const GroupsScreen = () => {
     } finally {
       setJoiningByCode(false);
     }
-  };
-
-  const handleCreateGroup = async () => {
-    if (!user) return;
-
-    if (!groupName.trim()) {
-      await showAlert({ title: 'Name Required', message: 'Please enter a name for your group.', variant: 'warning' });
-      return;
-    }
-
-    const groupLimit = getGroupLimit(userPlan);
-
-    try {
-      let createdCount = 0;
-      try {
-        const { count, error: countError } = await supabase
-          .from('groups')
-          .select('id', { count: 'exact', head: true })
-          .eq('created_by', user.id);
-        if (countError || count === null) {
-          throw new Error(countError?.message || 'Count query returned null');
-        }
-        createdCount = count;
-      } catch {
-        const allExistingGroups = await StorageService.getGroups();
-        createdCount = allExistingGroups.filter(g => g.createdBy === user.id).length;
-      }
-
-      if (createdCount >= groupLimit) {
-        const planLabel = userPlan.charAt(0).toUpperCase() + userPlan.slice(1);
-        const wantsUpgrade = await confirm({
-          title: 'Group Limit Reached',
-          message: `Your ${planLabel} plan allows up to ${groupLimit} group${groupLimit === 1 ? '' : 's'}. Upgrade to create more.`,
-          confirmText: 'Upgrade',
-          variant: 'warning',
-        });
-        if (wantsUpgrade) (navigation as any).navigate('Payment');
-        return;
-      }
-    } catch (error) {
-      console.error('[GroupsScreen] Error checking group limits:', error);
-    }
-
-    try {
-      await createGroupSupabase({
-        name: groupName.trim(),
-        description: groupDescription.trim() || undefined,
-        listing_id: selectedListingId || undefined,
-      });
-    } catch (supabaseError) {
-      console.warn('[GroupsScreen] Supabase createGroup failed, falling back to StorageService:', supabaseError);
-      const newGroup: Group = {
-        id: Math.random().toString(36).substr(2, 9),
-        type: 'roommate',
-        name: groupName.trim(),
-        description: groupDescription.trim() || undefined,
-        members: [user.id],
-        pendingMembers: [],
-        budget: 0,
-        preferredLocation: '',
-        maxMembers: getMemberLimit(userPlan, selectedListingBedrooms),
-        createdAt: new Date(),
-        createdBy: user.id,
-        listingId: selectedListingId || undefined,
-      };
-      await StorageService.addOrUpdateGroup(newGroup);
-    }
-
-    setGroupName('');
-    setGroupDescription('');
-    setSelectedListingId(null);
-    setSelectedListingBedrooms(null);
-
-    await loadGroups();
-    setActiveTab('my-groups');
-
-    await showAlert({ title: 'Success', message: 'Your group has been created!', variant: 'success' });
   };
 
   const handleLeaveGroup = async (group: Group) => {
@@ -1350,6 +1265,24 @@ export const GroupsScreen = () => {
     }
 
     if (activeTab === 'discover') {
+      const hasPreferences = user?.profileData?.budgetMin || user?.profileData?.budget;
+      if (!hasPreferences) {
+        return (
+          <View style={styles.emptyState}>
+            <Feather name="sliders" size={48} color={theme.textSecondary} />
+            <ThemedText style={[Typography.body, { color: theme.textSecondary, textAlign: 'center', marginTop: 16 }]}>
+              Set your apartment preferences first so we can find the right groups for you.
+            </ThemedText>
+            <Pressable
+              style={{ marginTop: 20, backgroundColor: theme.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 24 }}
+              onPress={() => navigation.navigate('ApartmentPreferences')}
+            >
+              <ThemedText style={{ color: '#fff', fontWeight: '700' }}>Set Preferences</ThemedText>
+            </Pressable>
+          </View>
+        );
+      }
+
       if (!currentGroup) {
         return (
           <View style={styles.emptyState}>
@@ -1548,235 +1481,11 @@ export const GroupsScreen = () => {
       );
     }
 
-    return (
-      <Animated.ScrollView 
-        style={styles.scrollContent}
-        contentContainerStyle={styles.createForm}
-        showsVerticalScrollIndicator={false}
-        onScroll={grpScrollHandler}
-        scrollEventThrottle={16}
-      >
-        <ThemedText style={[Typography.h3, { marginBottom: Spacing.xs }]}>
-          Create a New Group
-        </ThemedText>
-        <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.lg, lineHeight: 18 }]}>
-          Start solo and invite roommates later, or create a group with people you already know.
-        </ThemedText>
-
-        <View style={styles.inputGroup}>
-          <ThemedText style={[Typography.body, { marginBottom: Spacing.xs }]}>Group Name *</ThemedText>
-          <TextInput
-            style={[styles.input, { 
-              backgroundColor: theme.backgroundDefault, 
-              color: theme.text,
-              borderColor: theme.border
-            }]}
-            placeholder="e.g., Looking for 2BR Downtown"
-            placeholderTextColor={theme.textSecondary}
-            value={groupName}
-            onChangeText={setGroupName}
-            maxLength={60}
-          />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <ThemedText style={[Typography.body, { marginBottom: Spacing.xs }]}>Description (Optional)</ThemedText>
-          <TextInput
-            style={[styles.input, styles.textArea, { 
-              backgroundColor: theme.backgroundDefault, 
-              color: theme.text,
-              borderColor: theme.border
-            }]}
-            placeholder="What is this group for?"
-            placeholderTextColor={theme.textSecondary}
-            value={groupDescription}
-            onChangeText={setGroupDescription}
-            multiline
-            numberOfLines={3}
-            textAlignVertical="top"
-            maxLength={200}
-          />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <ThemedText style={[Typography.body, { marginBottom: Spacing.xs }]}>
-            Link to a Property (Optional)
-          </ThemedText>
-          <ThemedText style={[Typography.caption, { color: theme.textSecondary, marginBottom: Spacing.sm, lineHeight: 18 }]}>
-            Attaching a listing pins the property details to the top of your group chat.
-          </ThemedText>
-
-          <Pressable
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              padding: 12,
-              borderRadius: 12,
-              borderWidth: 1.5,
-              borderColor: !selectedListingId ? theme.primary : theme.border,
-              backgroundColor: !selectedListingId ? `${theme.primary}15` : theme.backgroundDefault,
-              marginBottom: 8,
-            }}
-            onPress={() => { setSelectedListingId(null); setSelectedListingBedrooms(null); }}
-          >
-            <Feather name="slash" size={18} color={!selectedListingId ? theme.primary : theme.textSecondary} />
-            <ThemedText style={[Typography.body, {
-              marginLeft: Spacing.sm,
-              color: !selectedListingId ? theme.primary : theme.text,
-              flex: 1,
-            }]}>
-              No property — standalone group
-            </ThemedText>
-            {!selectedListingId ? (
-              <Feather name="check" size={18} color={theme.primary} />
-            ) : null}
-          </Pressable>
-
-          {user?.role === 'host' && hostListings.length > 0 ? (
-            <View>
-              {hostListings.map((listing: any) => (
-                <Pressable
-                  key={listing.id}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    padding: 12,
-                    borderRadius: 12,
-                    borderWidth: 1.5,
-                    borderColor: selectedListingId === listing.id ? theme.primary : theme.border,
-                    backgroundColor: selectedListingId === listing.id ? `${theme.primary}15` : theme.backgroundDefault,
-                    marginBottom: 8,
-                  }}
-                  onPress={() => { setSelectedListingId(listing.id); setSelectedListingBedrooms(listing.bedrooms || null); }}
-                >
-                  {listing.photos?.[0] ? (
-                    <Image source={{ uri: listing.photos[0] }} style={{ width: 44, height: 44, borderRadius: 8 }} />
-                  ) : (
-                    <View style={{ width: 44, height: 44, borderRadius: 8, backgroundColor: theme.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }}>
-                      <Feather name="home" size={18} color={theme.textSecondary} />
-                    </View>
-                  )}
-                  <View style={{ flex: 1, marginLeft: Spacing.sm }}>
-                    <ThemedText style={[Typography.body, { fontWeight: '600' }]} numberOfLines={1}>
-                      {listing.title || listing.address || 'Untitled Listing'}
-                    </ThemedText>
-                    <ThemedText style={[Typography.caption, { color: theme.textSecondary }]} numberOfLines={1}>
-                      {listing.address}{listing.city ? `, ${listing.city}` : ''}
-                    </ThemedText>
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 2 }}>
-                      {listing.rent || listing.price ? (
-                        <ThemedText style={[Typography.caption, { color: theme.primary, fontWeight: '600' }]}>
-                          ${listing.rent || listing.price}/mo
-                        </ThemedText>
-                      ) : null}
-                      {listing.bedrooms ? (
-                        <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
-                          {listing.bedrooms} BR
-                        </ThemedText>
-                      ) : null}
-                      {listing.bedrooms ? (
-                        <ThemedText style={[Typography.caption, { color: theme.primary }]}>
-                          {listing.bedrooms + 1} max members
-                        </ThemedText>
-                      ) : null}
-                    </View>
-                  </View>
-                  {selectedListingId === listing.id ? (
-                    <Feather name="check" size={18} color={theme.primary} />
-                  ) : null}
-                </Pressable>
-              ))}
-            </View>
-          ) : user?.role === 'host' ? (
-            <ThemedText style={[Typography.caption, { color: theme.textSecondary, fontStyle: 'italic', marginTop: 4 }]}>
-              No listings found. Create a listing first to link it here.
-            </ThemedText>
-          ) : selectedListingId ? (
-            <View style={{ marginBottom: 8 }}>
-              <Pressable
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  padding: 12,
-                  borderRadius: 12,
-                  borderWidth: 1.5,
-                  borderColor: theme.primary,
-                  backgroundColor: `${theme.primary}15`,
-                }}
-                onPress={() => setShowCreatePropertySearch(true)}
-              >
-                <Feather name="home" size={18} color={theme.primary} />
-                <View style={{ flex: 1, marginLeft: Spacing.sm }}>
-                  <ThemedText style={[Typography.body, { color: theme.text }]} numberOfLines={1}>
-                    Listing linked
-                  </ThemedText>
-                  {selectedListingBedrooms ? (
-                    <ThemedText style={[Typography.caption, { color: theme.primary }]}>
-                      {selectedListingBedrooms} BR — {selectedListingBedrooms + 1} max members
-                    </ThemedText>
-                  ) : null}
-                </View>
-                <Pressable
-                  onPress={() => { setSelectedListingId(null); setSelectedListingBedrooms(null); }}
-                  hitSlop={8}
-                  style={{ marginLeft: 8 }}
-                >
-                  <Feather name="x" size={18} color={theme.textSecondary} />
-                </Pressable>
-              </Pressable>
-            </View>
-          ) : (
-            <Pressable
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                padding: 12,
-                borderRadius: 12,
-                borderWidth: 1.5,
-                borderColor: theme.border,
-                backgroundColor: theme.backgroundDefault,
-                marginBottom: 8,
-              }}
-              onPress={() => setShowCreatePropertySearch(true)}
-            >
-              <Feather name="search" size={18} color={theme.textSecondary} />
-              <ThemedText style={[Typography.body, { marginLeft: Spacing.sm, color: theme.textSecondary }]}>
-                Search for a listing to link...
-              </ThemedText>
-            </Pressable>
-          )}
-        </View>
-
-        <View style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 8,
-          backgroundColor: selectedListingBedrooms ? 'rgba(255,107,91,0.08)' : 'rgba(255,255,255,0.04)',
-          borderRadius: 10,
-          paddingHorizontal: 12,
-          paddingVertical: 10,
-          marginTop: 4,
-        }}>
-          <Feather name="users" size={13} color={selectedListingBedrooms ? theme.primary : 'rgba(255,255,255,0.3)'} />
-          <ThemedText style={{ fontSize: 12, color: selectedListingBedrooms ? theme.primary : 'rgba(255,255,255,0.35)', flex: 1, lineHeight: 17 }}>
-            {selectedListingBedrooms
-              ? `Up to ${selectedListingBedrooms + 1} members (${selectedListingBedrooms} bedrooms + 1)`
-              : `Member limit: ${planMemberLimit} (${userPlan.charAt(0).toUpperCase() + userPlan.slice(1)} plan)`
-            }
-          </ThemedText>
-        </View>
-
-        <Pressable
-          style={[styles.createButton, { backgroundColor: theme.primary }]}
-          onPress={handleCreateGroup}
-        >
-          <ThemedText style={[Typography.body, { color: '#FFFFFF', fontWeight: '600' }]}>
-            Create Group
-          </ThemedText>
-        </Pressable>
-      </Animated.ScrollView>
-    );
+    navigation.navigate('CreateGroup');
+    setActiveTab('discover');
+    return null;
   };
+
 
   return (
     <View style={[styles.container, { backgroundColor: '#111111', paddingTop: insets.top, paddingBottom: insets.bottom + 80 }]}>
@@ -2388,21 +2097,6 @@ export const GroupsScreen = () => {
         </View>
       </Modal>
 
-      <GroupPropertySearchModal
-        visible={showCreatePropertySearch}
-        currentListingId={selectedListingId}
-        onSelect={(listing) => {
-          if (listing) {
-            setSelectedListingId(listing.id);
-            setSelectedListingBedrooms(listing.bedrooms || null);
-          } else {
-            setSelectedListingId(null);
-            setSelectedListingBedrooms(null);
-          }
-          setShowCreatePropertySearch(false);
-        }}
-        onClose={() => setShowCreatePropertySearch(false)}
-      />
 
       <RhomeAISheet
         visible={showAISheet}

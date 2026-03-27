@@ -28,6 +28,9 @@ import {
   linkListingToGroup,
   getInviteCode,
   regenerateInviteCode,
+  getGroupLikers,
+  adminLikeBack,
+  dismissGroupLiker,
 } from '../../services/groupService';
 import * as Clipboard from 'expo-clipboard';
 import { GroupPropertySearchModal } from '../../components/GroupPropertySearchModal';
@@ -113,6 +116,8 @@ export function GroupInfoScreen({ route, navigation }: Props) {
   const [suggestions, setSuggestions] = useState<Array<{ profile: any; groupScore: number; reason: string }>>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [health, setHealth] = useState<GroupHealthResult | null>(null);
+  const [groupLikers, setGroupLikers] = useState<any[]>([]);
+  const [loadingLikers, setLoadingLikers] = useState(false);
 
   const isAdmin = group?.adminId === user?.id;
   const memberCount = group?.members?.length || 0;
@@ -147,6 +152,18 @@ export function GroupInfoScreen({ route, navigation }: Props) {
       getGroupHealth(groupId, user.id).then(setHealth).catch(() => {});
     }
   }, [groupId, group?.id]);
+
+  useEffect(() => {
+    if (group && isAdmin) {
+      setLoadingLikers(true);
+      getGroupLikers(groupId)
+        .then(setGroupLikers)
+        .catch(() => {
+          StorageService.getGroupLikersForGroup(groupId).then(setGroupLikers).catch(() => {});
+        })
+        .finally(() => setLoadingLikers(false));
+    }
+  }, [group?.id, isAdmin]);
 
   async function loadGroup() {
     setLoading(true);
@@ -331,6 +348,26 @@ export function GroupInfoScreen({ route, navigation }: Props) {
       const mid = typeof m === 'string' ? m : (m.id || m.user_id);
       return mid !== targetId;
     });
+  }
+
+  async function handleInviteLiker(userId: string) {
+    try {
+      const { addMemberToGroup } = await import('../../services/groupService');
+      await addMemberToGroup(groupId, userId);
+      setGroupLikers(prev => prev.filter(l => l.userId !== userId));
+      loadGroup();
+    } catch {
+      await alert({ title: 'Error', message: 'Could not invite this user.', variant: 'warning' });
+    }
+  }
+
+  async function handleDismissLiker(userId: string) {
+    try {
+      await dismissGroupLiker(groupId, userId);
+    } catch {
+      await StorageService.dismissGroupLikerLocal(groupId, userId);
+    }
+    setGroupLikers(prev => prev.filter(l => l.userId !== userId));
   }
 
   async function handleRemoveMember(memberId: string, memberName: string) {
@@ -1028,6 +1065,59 @@ export function GroupInfoScreen({ route, navigation }: Props) {
             <Feather name="chevron-right" size={18} color={theme.textSecondary} />
           </Pressable>
         </Section>
+
+        {isAdmin ? (
+          <Section label="LIKES" theme={theme}>
+            {loadingLikers ? (
+              <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                <ActivityIndicator size="small" color={theme.primary} />
+              </View>
+            ) : groupLikers.length === 0 ? (
+              <ThemedText style={[Typography.body, { color: theme.textSecondary, textAlign: 'center', paddingVertical: 20 }]}>
+                No one has liked your group yet
+              </ThemedText>
+            ) : (
+              groupLikers.map((liker: any) => (
+                <View
+                  key={liker.userId}
+                  style={[styles.memberRow, { backgroundColor: theme.card, borderColor: theme.border }]}
+                >
+                  {liker.photo ? (
+                    <Image source={{ uri: liker.photo }} style={styles.memberAvatar} />
+                  ) : (
+                    <View style={[styles.memberAvatar, { backgroundColor: theme.primary + '25', alignItems: 'center', justifyContent: 'center' }]}>
+                      <ThemedText style={[Typography.body, { fontWeight: '800', color: theme.primary }]}>
+                        {(liker.name || '?').charAt(0).toUpperCase()}
+                      </ThemedText>
+                    </View>
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <ThemedText style={[Typography.body, { fontWeight: '700' }]}>{liker.name}</ThemedText>
+                    {liker.age ? (
+                      <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+                        {liker.age} years old
+                      </ThemedText>
+                    ) : null}
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <Pressable
+                      style={[styles.iconBtn, { borderColor: theme.primary }]}
+                      onPress={() => handleInviteLiker(liker.userId)}
+                    >
+                      <Feather name="user-plus" size={13} color={theme.primary} />
+                    </Pressable>
+                    <Pressable
+                      style={[styles.iconBtn, { borderColor: theme.textSecondary }]}
+                      onPress={() => handleDismissLiker(liker.userId)}
+                    >
+                      <Feather name="x" size={13} color={theme.textSecondary} />
+                    </Pressable>
+                  </View>
+                </View>
+              ))
+            )}
+          </Section>
+        ) : null}
 
         <Section label="SETTINGS" theme={theme}>
           {isAdmin ? (

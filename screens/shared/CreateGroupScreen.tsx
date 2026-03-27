@@ -80,15 +80,6 @@ export const CreateGroupScreen = ({ navigation, route }: any) => {
         }
 
         navigation.goBack();
-        setTimeout(() => {
-          navigation.navigate('Messages', {
-            screen: 'Chat',
-            params: {
-              conversationId: `group-${group.id}`,
-              isGroupChat: true,
-            },
-          });
-        }, 100);
       } catch (supaError) {
         console.warn('[CreateGroupScreen] Supabase failed, using local fallback:', supaError);
         const userPlanForLimit = (user as any)?.subscription?.plan || 'basic';
