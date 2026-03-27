@@ -1,0 +1,249 @@
+# Rhome — Group City Search Fix Prompt
+
+**File:** `components/CityPickerModal.tsx`
+
+---
+
+## Bug Summary
+
+The `CityPickerModal` used on the Groups → Discover tab has two search paths and **neither supports zip code lookup**:
+
+**Path 1 — Google Places (when API key is present):**
+- Uses `types: '(cities)'` filter in the query config, which restricts results to city names only
+- The placeholder text says "Search city, neighborhood, or ZIP..." but zip codes are silently rejected by the API filter — users type a zip and get no results
+- `handlePlaceSelect` only extracts the `locality` address component — no zip-to-city resolution
+
+**Path 2 — FallbackSearchInput (when Google Places is unavailable):**
+- `handleChange` only calls `.filter()` on the hardcoded 8-city `POPULAR_CITIES` array
+- Typing a zip code like `10001` returns nothing
+- Placeholder just says "Search city..." with no mention of zip support
+
+**By contrast, `ExploreScreen.tsx` correctly handles zip codes** using `Location.geocodeAsync(zip)` → `Location.reverseGeocodeAsync({latitude, longitude})` to resolve the zip to a city name.
+
+---
+
+## Fix
+
+**File:** `components/CityPickerModal.tsx`
+
+### Fix 1 — `FallbackSearchInput`: Add zip code geocoding
+
+Replace the entire `FallbackSearchInput` component with this version that handles zip codes:
+
+```tsx
+import * as Location from 'expo-location';
+
+const FallbackSearchInput: React.FC<{ onCitySelect: (city: string) => void }> = ({ onCitySelect }) => {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<{ label: string; city: string }[]>([]);
+  const [isGeocodingZip, setIsGeocodingZip] = useState(false);
+
+  const handleChange = async (text: string) => {
+    try {
+      setQuery(text);
+      const trimmed = text.trim();
+
+      if (!trimmed) {
+        setResults([]);
+        return;
+      }
+
+      // City name search against popular cities
+      const lower = trimmed.toLowerCase();
+      const matched = POPULAR_CITIES
+        .filter(c => c.toLowerCase().includes(lower))
+        .map(c => ({ label: c, city: c }));
+
+      // ZIP code lookup
+      if (/^\d{5}$/.test(trimmed)) {
+        setIsGeocodingZip(true);
+        try {
+          const geocoded = await Location.geocodeAsync(trimmed);
+          if (geocoded.length > 0) {
+            const { latitude, longitude } = geocoded[0];
+            const reverseResult = await Location.reverseGeocodeAsync({ latitude, longitude });
+            if (reverseResult.length > 0) {
+              const place = reverseResult[0];
+              const cityName = place.city || place.subregion || '';
+              if (cityName) {
+                matched.unshift({ label: `${trimmed} — ${cityName}`, city: cityName });
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('[CityPickerModal] zip geocoding failed:', e);
+        }
+        setIsGeocodingZip(false);
+      }
+
+      setResults(matched);
+    } catch {}
+  };
+
+  return (
+    <View>
+      <TextInput
+        style={fallbackStyles.input}
+        placeholder="Search city or ZIP..."
+        placeholderTextColor="rgba(255,255,255,0.3)"
+        value={query}
+        onChangeText={handleChange}
+        returnKeyType="search"
+        keyboardType="default"
+      />
+      {isGeocodingZip && (
+        <Text style={fallbackStyles.loadingText}>Looking up ZIP code...</Text>
+      )}
+      {results.map((r, i) => (
+        <Pressable key={`${r.city}-${i}`} style={fallbackStyles.resultRow} onPress={() => onCitySelect(r.city)}>
+          <Text style={fallbackStyles.resultText}>{r.label}</Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+};
+```
+
+Add this to `fallbackStyles`:
+```ts
+loadingText: {
+  color: 'rgba(255,255,255,0.4)',
+  fontSize: 13,
+  paddingHorizontal: 14,
+  paddingTop: 8,
+},
+```
+
+---
+
+### Fix 2 — Google Places path: Remove `(cities)` type restriction + add zip code interception
+
+In `renderSearchSection()`, make two changes to the `GooglePlacesAutocomplete` config:
+
+**Change 1:** Remove `types: '(cities)'` from the query so zip codes and neighborhoods are accepted:
+```ts
+query={{
+  key: GOOGLE_PLACES_KEY,
+  language: 'en',
+  // Remove: types: '(cities)',   ← this was blocking all zip code searches
+  components: 'country:us',
+}}
+```
+
+**Change 2:** Add zip code interception in `textInputProps.onChangeText`. If the user types a 5-digit zip, resolve it via Expo Location and call `handleFallbackSelect` directly — before Google Places even responds:
+
+Add this state at the top of the `CityPickerModal` component:
+```ts
+const [zipOverrideResult, setZipOverrideResult] = useState<{ label: string; city: string } | null>(null);
+const [isGeocodingZip, setIsGeocodingZip] = useState(false);
+```
+
+Add this handler inside `CityPickerModal`:
+```ts
+const handleGoogleInputChange = async (text: string) => {
+  const trimmed = text.trim();
+  if (/^\d{5}$/.test(trimmed)) {
+    setIsGeocodingZip(true);
+    setZipOverrideResult(null);
+    try {
+      const geocoded = await Location.geocodeAsync(trimmed);
+      if (geocoded.length > 0) {
+        const { latitude, longitude } = geocoded[0];
+        const reverseResult = await Location.reverseGeocodeAsync({ latitude, longitude });
+        if (reverseResult.length > 0) {
+          const place = reverseResult[0];
+          const cityName = place.city || place.subregion || '';
+          if (cityName) {
+            setZipOverrideResult({ label: `${trimmed} — ${cityName}`, city: cityName });
+          }
+        }
+      }
+    } catch {}
+    setIsGeocodingZip(false);
+  } else {
+    setZipOverrideResult(null);
+    setIsGeocodingZip(false);
+  }
+};
+```
+
+Update the `textInputProps` in `GooglePlacesAutocomplete`:
+```ts
+textInputProps={{
+  placeholderTextColor: 'rgba(255,255,255,0.3)',
+  returnKeyType: 'search',
+  onChangeText: handleGoogleInputChange,
+  onFocus: () => {},
+}}
+```
+
+Below the `GooglePlacesAutocomplete`, render the zip override result when present:
+```tsx
+{isGeocodingZip && (
+  <Text style={fallbackStyles.loadingText}>Looking up ZIP code...</Text>
+)}
+{zipOverrideResult && (
+  <Pressable
+    style={fallbackStyles.resultRow}
+    onPress={() => {
+      handleFallbackSelect(zipOverrideResult.city);
+      setZipOverrideResult(null);
+    }}
+  >
+    <Text style={fallbackStyles.resultText}>{zipOverrideResult.label}</Text>
+  </Pressable>
+)}
+```
+
+---
+
+### Fix 3 — `handlePlaceSelect`: Handle zip-type address components as fallback
+
+In `handlePlaceSelect`, if the `locality` component isn't found, also check for `postal_town` and `administrative_area_level_2` before falling back to the raw description split:
+
+```ts
+const handlePlaceSelect = (data: any, details: any) => {
+  try {
+    if (!details) return;
+    const components = details?.address_components || [];
+    let city = '';
+    for (const comp of components) {
+      const types: string[] = comp?.types || [];
+      if (types.includes('locality') || types.includes('postal_town') || types.includes('administrative_area_level_2')) {
+        city = comp.long_name || '';
+        break;
+      }
+    }
+    if (!city) {
+      city = data?.description?.split(',')[0]?.trim() || '';
+    }
+    if (city) {
+      handleSelect(city);
+      handleClose();
+    }
+  } catch {}
+};
+```
+
+---
+
+### Required import
+
+Add at the top of `CityPickerModal.tsx` if not already present:
+```ts
+import * as Location from 'expo-location';
+```
+
+`expo-location` is already installed in the project (used by `ExploreScreen.tsx`). No new package install needed.
+
+---
+
+## Result After Fix
+
+| Input | Before | After |
+|-------|--------|-------|
+| "New York" | ✅ Works | ✅ Works |
+| "10001" (NYC zip) | ❌ No results | ✅ Shows "10001 — New York" → selects New York |
+| "90210" (Beverly Hills zip) | ❌ No results | ✅ Shows "90210 — Beverly Hills" → selects Beverly Hills |
+| "Greenwich" (neighborhood) | ❌ Blocked by types filter | ✅ Now returned by Google Places |
+| Zip typed in fallback mode | ❌ No results | ✅ Geocoded and shown |

@@ -10,6 +10,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { StorageService } from '../../utils/storage';
 import { Property, RoommateProfile } from '../../types/models';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import {
   AgentRenter,
   AgentGroup,
@@ -71,32 +72,103 @@ export const AgentGroupBuilderScreen = () => {
 
   const loadData = async () => {
     if (!user) return;
-    const profiles: RoommateProfile[] = await StorageService.getRoommateProfiles();
     const shortlistedIds = await getShortlistedRenterIds(user.id);
-    const mapped: AgentRenter[] = profiles
-      .filter(p => shortlistedIds.includes(p.id))
-      .map(p => ({
-        id: p.id,
-        name: p.name,
-        age: p.age,
-        occupation: p.occupation,
-        photos: p.photos || [],
-        budgetMin: p.budget ? p.budget * 0.8 : undefined,
-        budgetMax: p.budget,
-        moveInDate: p.preferences?.moveInDate,
-        cleanliness: p.lifestyle?.cleanliness,
-        sleepSchedule: p.lifestyle?.workSchedule,
-        smoking: p.lifestyle?.smoking,
-        pets: p.lifestyle?.pets,
-        interests: p.profileData?.interests || [],
-        roomType: p.lookingFor,
-        bio: p.bio,
-        gender: p.gender,
-      }));
-    setAllRenters(mapped);
 
-    const props = await StorageService.getProperties();
-    const myListings = props.filter(p => p.hostId === user.id && p.available);
+    if (shortlistedIds.length > 0 && isSupabaseConfigured) {
+      try {
+        const { data: supaRenters } = await supabase
+          .from('users')
+          .select(`
+            id, full_name, avatar_url, age, occupation, gender, bio,
+            profile:profiles(
+              budget_max, budget_min, budget_per_person_min, budget_per_person_max,
+              move_in_date, room_type, cleanliness, sleep_schedule, smoking, pets, interests, photos, bio
+            )
+          `)
+          .in('id', shortlistedIds);
+
+        const mapped: AgentRenter[] = (supaRenters || []).map((u: any) => {
+          const p = Array.isArray(u.profile) ? u.profile[0] : u.profile;
+          return {
+            id: u.id,
+            name: u.full_name || 'Unknown',
+            age: u.age || 0,
+            occupation: u.occupation || '',
+            photos: p?.photos || (u.avatar_url ? [u.avatar_url] : []),
+            budgetMin: p?.budget_per_person_min ?? (p?.budget_max ? p.budget_max * 0.8 : undefined),
+            budgetMax: p?.budget_per_person_max ?? p?.budget_max,
+            moveInDate: p?.move_in_date,
+            cleanliness: p?.cleanliness,
+            sleepSchedule: p?.sleep_schedule,
+            smoking: p?.smoking,
+            pets: p?.pets === 'yes' || p?.pets === true,
+            interests: p?.interests || [],
+            roomType: p?.room_type,
+            gender: u.gender,
+            bio: p?.bio || u.bio,
+          };
+        });
+        setAllRenters(mapped);
+      } catch (e) {
+        console.warn('[AgentGroupBuilder] Supabase renter load failed, falling back:', e);
+        const profiles: RoommateProfile[] = await StorageService.getRoommateProfiles();
+        const mapped: AgentRenter[] = profiles
+          .filter(p => shortlistedIds.includes(p.id))
+          .map(p => ({
+            id: p.id, name: p.name, age: p.age, occupation: p.occupation,
+            photos: p.photos || [], budgetMin: p.budget ? p.budget * 0.8 : undefined,
+            budgetMax: p.budget, moveInDate: p.preferences?.moveInDate,
+            cleanliness: p.lifestyle?.cleanliness, sleepSchedule: p.lifestyle?.workSchedule,
+            smoking: p.lifestyle?.smoking, pets: p.lifestyle?.pets,
+            interests: p.profileData?.interests || [], roomType: p.lookingFor,
+            bio: p.bio, gender: p.gender,
+          }));
+        setAllRenters(mapped);
+      }
+    } else if (shortlistedIds.length > 0) {
+      const profiles: RoommateProfile[] = await StorageService.getRoommateProfiles();
+      const mapped: AgentRenter[] = profiles
+        .filter(p => shortlistedIds.includes(p.id))
+        .map(p => ({
+          id: p.id, name: p.name, age: p.age, occupation: p.occupation,
+          photos: p.photos || [], budgetMin: p.budget ? p.budget * 0.8 : undefined,
+          budgetMax: p.budget, moveInDate: p.preferences?.moveInDate,
+          cleanliness: p.lifestyle?.cleanliness, sleepSchedule: p.lifestyle?.workSchedule,
+          smoking: p.lifestyle?.smoking, pets: p.lifestyle?.pets,
+          interests: p.profileData?.interests || [], roomType: p.lookingFor,
+          bio: p.bio, gender: p.gender,
+        }));
+      setAllRenters(mapped);
+    }
+
+    let myListings: Property[] = [];
+    if (isSupabaseConfigured) {
+      try {
+        const { data: supaListings } = await supabase
+          .from('listings')
+          .select('id, title, rent, bedrooms, bathrooms, city, neighborhood, address, photos, amenities, host_id, available_date, coordinates, is_active, is_paused, is_rented')
+          .eq('host_id', user.id)
+          .eq('is_active', true)
+          .eq('is_rented', false);
+
+        myListings = (supaListings || []).map((l: any) => ({
+          id: l.id, title: l.title, price: l.rent || 0, bedrooms: l.bedrooms,
+          bathrooms: l.bathrooms, city: l.city, neighborhood: l.neighborhood,
+          address: l.address, photos: l.photos || [], amenities: l.amenities || [],
+          hostId: l.host_id, available: true,
+          availableDate: l.available_date ? new Date(l.available_date) : undefined,
+          latitude: l.coordinates?.lat ?? l.coordinates?.latitude,
+          longitude: l.coordinates?.lng ?? l.coordinates?.longitude,
+        }));
+      } catch (e) {
+        console.warn('[AgentGroupBuilder] Supabase listings failed, falling back:', e);
+        const props = await StorageService.getProperties();
+        myListings = props.filter(p => p.hostId === user.id && p.available);
+      }
+    } else {
+      const props = await StorageService.getProperties();
+      myListings = props.filter(p => p.hostId === user.id && p.available);
+    }
     setListings(myListings);
 
     if (preselectedListingId) {
@@ -158,11 +230,11 @@ export const AgentGroupBuilderScreen = () => {
         agentMessage,
       };
 
-      await createAgentGroup(group);
+      const createdGroup = await createAgentGroup(group);
       await sendAgentInvites(
         user.id,
         user.name,
-        group.id,
+        createdGroup.id,
         selectedRenters.map(r => r.id),
         selectedListing,
         agentMessage,

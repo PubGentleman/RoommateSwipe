@@ -132,7 +132,12 @@ export async function getAgentGroups(agentId: string): Promise<AgentGroup[]> {
       target_listing_id,
       group_status,
       created_at,
-      group_members(user_id, role)
+      group_members(
+        user_id,
+        role,
+        user:users!user_id(id, full_name, avatar_url)
+      ),
+      listing:listings!target_listing_id(id, title, rent, bedrooms, neighborhood)
     `)
     .eq('created_by_agent', agentId)
     .eq('agent_assembled', true)
@@ -143,21 +148,41 @@ export async function getAgentGroups(agentId: string): Promise<AgentGroup[]> {
     return [];
   }
 
-  return groups.map(g => ({
-    id: g.id,
-    name: g.name || 'Untitled Group',
-    agentId: g.created_by_agent,
-    targetListingId: g.target_listing_id,
-    members: [],
-    memberIds: (g.group_members || []).map((m: any) => m.user_id),
-    groupStatus: g.group_status || 'assembling',
-    avgCompatibility: 0,
-    combinedBudgetMin: 0,
-    combinedBudgetMax: 0,
-    coversRent: false,
-    invites: [],
-    createdAt: g.created_at,
-  }));
+  return groups.map(g => {
+    const rawMembers = g.group_members || [];
+    const memberProfiles = rawMembers.map((m: any) => ({
+      id: m.user?.id ?? m.user_id,
+      name: m.user?.full_name ?? 'Unknown',
+      age: 0,
+      occupation: '',
+      photos: m.user?.avatar_url ? [m.user.avatar_url] : [],
+    }));
+
+    const listing = Array.isArray(g.listing) ? g.listing[0] : g.listing;
+
+    return {
+      id: g.id,
+      name: g.name || 'Untitled Group',
+      agentId: g.created_by_agent,
+      targetListingId: g.target_listing_id,
+      targetListing: listing ? {
+        id: listing.id,
+        title: listing.title,
+        price: listing.rent || 0,
+        bedrooms: listing.bedrooms,
+        neighborhood: listing.neighborhood,
+      } as any : undefined,
+      members: memberProfiles,
+      memberIds: rawMembers.map((m: any) => m.user_id),
+      groupStatus: g.group_status || 'assembling',
+      avgCompatibility: 0,
+      combinedBudgetMin: 0,
+      combinedBudgetMax: 0,
+      coversRent: false,
+      invites: [],
+      createdAt: g.created_at,
+    };
+  });
 }
 
 export async function createAgentGroup(group: AgentGroup): Promise<AgentGroup> {
@@ -310,12 +335,36 @@ export async function sendAgentInvites(
     group_members: memberNames.map(m => ({ ...m, compatibility: 0 })),
   }));
 
-  const { error } = await supabase
+  const { data: insertedInvites, error } = await supabase
     .from('agent_group_invites')
-    .insert(rows);
+    .insert(rows)
+    .select('id, renter_id');
 
   if (error) {
     console.warn('[AgentService] sendAgentInvites error:', error.message);
+  }
+
+  if (insertedInvites && insertedInvites.length > 0) {
+    const notificationRows = insertedInvites.map(inv => ({
+      user_id: inv.renter_id,
+      type: 'agent_invite',
+      title: `${agentName} wants you in their group!`,
+      body: `"${listing.title}" - ${listing.bedrooms}BR at $${listing.price?.toLocaleString()}/mo`,
+      data: {
+        agentInviteId: inv.id,
+        groupId,
+        listingTitle: listing.title,
+        listingRent: listing.price,
+        listingBedrooms: listing.bedrooms,
+        groupMembers: memberNames,
+      },
+      read: false,
+    }));
+
+    const { error: notifError } = await supabase.from('notifications').insert(notificationRows);
+    if (notifError) {
+      console.warn('[AgentService] notification insert error:', notifError.message);
+    }
   }
 
   await supabase

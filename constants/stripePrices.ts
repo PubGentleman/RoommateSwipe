@@ -14,6 +14,15 @@ export const STRIPE_PRICES: Record<string, string> = {
   'host_starter_annual':   'price_host_starter_annual',
   'host_pro_annual':       'price_host_pro_annual',
   'host_business_annual':  'price_host_business_annual',
+  'agent_starter_monthly':  'price_agent_starter_monthly',
+  'agent_starter_3month':   'price_agent_starter_3month',
+  'agent_starter_annual':   'price_agent_starter_annual',
+  'agent_pro_monthly':      'price_agent_pro_monthly',
+  'agent_pro_3month':       'price_agent_pro_3month',
+  'agent_pro_annual':       'price_agent_pro_annual',
+  'agent_business_monthly': 'price_agent_business_monthly',
+  'agent_business_3month':  'price_agent_business_3month',
+  'agent_business_annual':  'price_agent_business_annual',
 };
 
 export const BOOST_PRICE_IDS = {

@@ -159,9 +159,9 @@ export interface AgentPlanLimits {
   teamSeats: number;
 }
 
-export const AGENT_PLAN_LIMITS: Record<AgentPlan, AgentPlanLimits> = {
+const _agentBase = {
   pay_per_use: {
-    plan: 'pay_per_use',
+    plan: 'pay_per_use' as AgentPlan,
     label: 'Pay Per Use',
     monthlyPrice: '$0',
     placementFeeCents: 14900,
@@ -179,7 +179,7 @@ export const AGENT_PLAN_LIMITS: Record<AgentPlan, AgentPlanLimits> = {
     teamSeats: 1,
   },
   starter: {
-    plan: 'starter',
+    plan: 'starter' as AgentPlan,
     label: 'Agent Starter',
     monthlyPrice: '$49',
     placementFeeCents: 9900,
@@ -197,7 +197,7 @@ export const AGENT_PLAN_LIMITS: Record<AgentPlan, AgentPlanLimits> = {
     teamSeats: 1,
   },
   pro: {
-    plan: 'pro',
+    plan: 'pro' as AgentPlan,
     label: 'Agent Pro',
     monthlyPrice: '$99',
     placementFeeCents: 4900,
@@ -215,7 +215,7 @@ export const AGENT_PLAN_LIMITS: Record<AgentPlan, AgentPlanLimits> = {
     teamSeats: 1,
   },
   business: {
-    plan: 'business',
+    plan: 'business' as AgentPlan,
     label: 'Agent Business',
     monthlyPrice: '$149',
     placementFeeCents: 2500,
@@ -234,36 +234,43 @@ export const AGENT_PLAN_LIMITS: Record<AgentPlan, AgentPlanLimits> = {
   },
 };
 
-export function getAgentPlanLimits(plan: AgentPlan): AgentPlanLimits {
+export const AGENT_PLAN_LIMITS: Record<string, AgentPlanLimits> = {
+  ..._agentBase,
+  agent_starter: _agentBase.starter,
+  agent_pro: _agentBase.pro,
+  agent_business: _agentBase.business,
+};
+
+export function getAgentPlanLimits(plan: string): AgentPlanLimits {
   return AGENT_PLAN_LIMITS[plan] ?? AGENT_PLAN_LIMITS.pay_per_use;
 }
 
-export function canAgentAddListing(plan: AgentPlan, currentCount: number): boolean {
+export function canAgentAddListing(plan: string, currentCount: number): boolean {
   const { listingLimit } = getAgentPlanLimits(plan);
   if (listingLimit === -1) return true;
   return currentCount < listingLimit;
 }
 
-export function getAgentListingLimitMessage(plan: AgentPlan): string {
+export function getAgentListingLimitMessage(plan: string): string {
   const limits = getAgentPlanLimits(plan);
   if (limits.listingLimit === -1) return '';
   const nextPlan = plan === 'pay_per_use' ? 'Agent Starter' : plan === 'starter' ? 'Agent Pro' : 'Agent Business';
   return `Your ${limits.label} plan allows up to ${limits.listingLimit} active listing${limits.listingLimit > 1 ? 's' : ''}. Upgrade to ${nextPlan} to add more.`;
 }
 
-export function canAgentShortlist(plan: AgentPlan, currentCount: number): boolean {
+export function canAgentShortlist(plan: string, currentCount: number): boolean {
   const { shortlistLimit } = getAgentPlanLimits(plan);
   if (shortlistLimit === -1) return true;
   return currentCount < shortlistLimit;
 }
 
-export function canAgentCreateGroup(plan: AgentPlan, activeGroupCount: number): boolean {
+export function canAgentCreateGroup(plan: string, activeGroupCount: number): boolean {
   const { activeGroupsLimit } = getAgentPlanLimits(plan);
   if (activeGroupsLimit === -1) return true;
   return activeGroupCount < activeGroupsLimit;
 }
 
-export function canAgentPlace(plan: AgentPlan, monthlyPlacementCount: number): boolean {
+export function canAgentPlace(plan: string, monthlyPlacementCount: number): boolean {
   const { monthlyPlacementLimit } = getAgentPlanLimits(plan);
   if (monthlyPlacementLimit === -1) return true;
   return monthlyPlacementCount < monthlyPlacementLimit;

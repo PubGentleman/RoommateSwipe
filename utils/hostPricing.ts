@@ -126,7 +126,55 @@ export const HOST_PLANS: Record<HostPlanType, {
       locked: [],
     },
   },
-};
+  agent_starter: {
+    label: 'Agent Starter',
+    price: 49,
+    listingsIncluded: 10,
+    overagePerListing: 0,
+    freeBoosts: 0,
+    freeBoostDuration: null,
+    simultaneousBoosts: 0,
+    features: {
+      included: ['Up to 10 active listings', 'Client management', 'AI renter matching', 'Agent badge'],
+      locked: ['Priority placement', 'Advanced analytics'],
+    },
+  },
+  agent_pro: {
+    label: 'Agent Pro',
+    price: 99,
+    listingsIncluded: Infinity,
+    overagePerListing: 0,
+    freeBoosts: 0,
+    freeBoostDuration: null,
+    simultaneousBoosts: 0,
+    features: {
+      included: ['Unlimited listings', 'Priority placement', 'Advanced analytics', 'Priority support'],
+      locked: [],
+    },
+  },
+  agent_business: {
+    label: 'Agent Business',
+    price: 149,
+    listingsIncluded: Infinity,
+    overagePerListing: 0,
+    freeBoosts: 0,
+    freeBoostDuration: null,
+    simultaneousBoosts: 0,
+    features: {
+      included: ['Unlimited listings', 'Full CRM', 'Max visibility', 'Dedicated account manager'],
+      locked: [],
+    },
+  },
+} as Record<string, {
+  label: string;
+  price: number;
+  listingsIncluded: number;
+  overagePerListing: number;
+  freeBoosts: number;
+  freeBoostDuration: '6h' | '12h' | '24h' | '72h' | '7d' | null;
+  simultaneousBoosts: number;
+  features: { included: string[]; locked: string[] };
+}>;
 
 export const BOOST_OPTIONS = [
   {
@@ -166,7 +214,7 @@ export const BOOST_OPTIONS = [
 
 export const AGENT_VERIFICATION_FEE = 9.99;
 
-export function isFreePlan(plan: HostPlanType): boolean {
+export function isFreePlan(plan: HostPlanType | string): boolean {
   return plan === 'free' || plan === 'none';
 }
 
@@ -180,7 +228,8 @@ export function calculateHostMonthlyCost(plan: HostPlanType, activeListings: num
 
 export function canAddListingCheck(subscription: HostSubscriptionData): { allowed: boolean; message: string; upgradeRequired?: boolean } {
   const plan = HOST_PLANS[subscription.plan];
-  if (subscription.plan === 'pro' || subscription.plan === 'business') {
+  if (subscription.plan === 'pro' || subscription.plan === 'business'
+      || subscription.plan === 'agent_pro' || subscription.plan === 'agent_business') {
     return { allowed: true, message: '' };
   }
   if (subscription.activeListingCount >= plan.listingsIncluded) {

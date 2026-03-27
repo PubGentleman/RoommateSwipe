@@ -40,30 +40,58 @@ export const NotificationsScreen = () => {
 
   const loadNotifications = async () => {
     if (!user?.id) return;
+    let mapped: Notification[] = [];
     try {
       const supabaseNotifications = await getNotifications();
-      const mapped = supabaseNotifications.map(mapSupabaseNotification);
-      const blockedIds = user.blockedUsers || [];
-      const filtered = mapped.filter(
-        n => !n.data?.fromUserId || !blockedIds.includes(n.data.fromUserId)
-      );
-      setNotifications(filtered);
+      mapped = supabaseNotifications.map(mapSupabaseNotification);
     } catch (error) {
       console.error('Error loading notifications from Supabase, falling back to StorageService:', error);
       try {
         const userNotifications = await StorageService.getNotifications(user.id);
-        const blockedIds = user.blockedUsers || [];
-        const filtered = userNotifications.filter(
-          n => !n.data?.fromUserId || !blockedIds.includes(n.data.fromUserId)
-        );
-        setNotifications(filtered);
+        mapped = userNotifications;
       } catch (fallbackError) {
         console.error('Error loading notifications from StorageService:', fallbackError);
       }
-    } finally {
-      setIsLoading(false);
-      setRefreshing(false);
     }
+
+    try {
+      const agentInvites = await getAgentInvitesForRenter(user.id);
+      const pendingInvites = agentInvites.filter(inv => inv.status === 'pending');
+
+      const inviteNotifs: Notification[] = pendingInvites.map(inv => ({
+        id: `agent_invite_${inv.id}`,
+        userId: user.id,
+        type: 'agent_invite' as any,
+        title: `${inv.agentName} wants you in their group!`,
+        body: `"${inv.listingTitle}" - ${inv.listingBedrooms}BR at $${inv.listingRent?.toLocaleString()}/mo`,
+        isRead: false,
+        createdAt: new Date(inv.sentAt),
+        data: {
+          agentInviteId: inv.id,
+          listingTitle: inv.listingTitle,
+          listingRent: inv.listingRent,
+          groupMembers: inv.groupMembers,
+        },
+      }));
+
+      const existingInviteIds = new Set(
+        mapped
+          .filter(n => n.type === 'agent_invite')
+          .map(n => n.data?.agentInviteId)
+      );
+      const newInviteNotifs = inviteNotifs.filter(n => !existingInviteIds.has(n.data?.agentInviteId));
+      mapped = [...newInviteNotifs, ...mapped];
+    } catch (e) {
+      console.warn('[Notifications] Could not load agent invites:', e);
+    }
+
+    const blockedIds = user.blockedUsers || [];
+    const filtered = mapped.filter(
+      n => !n.data?.fromUserId || !blockedIds.includes(n.data.fromUserId)
+    );
+    setNotifications(filtered);
+    setIsLoading(false);
+    setRefreshing(false);
   };
 
   useEffect(() => {

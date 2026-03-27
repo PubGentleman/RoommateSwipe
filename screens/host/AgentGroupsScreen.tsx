@@ -198,7 +198,7 @@ export const AgentGroupsScreen = () => {
               </Pressable>
               <Pressable
                 style={[styles.actionBtn, { backgroundColor: BLUE }]}
-                onPress={() => navigation.navigate('Messages')}
+                onPress={() => navigation.navigate('Messages', { highlightGroupId: item.id })}
               >
                 <Feather name="message-circle" size={14} color="#fff" />
                 <Text style={styles.actionText}>Message</Text>
