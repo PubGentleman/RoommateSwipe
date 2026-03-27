@@ -723,7 +723,11 @@ export const ProfileScreen = () => {
                   }
                   const url = `mailto:${emailAddress}?subject=${subject}`;
                   try {
-                    await Linking.openURL(url);
+                    if (Platform.OS === 'web') {
+                      window.open(url);
+                    } else {
+                      await Linking.openURL(url);
+                    }
                   } catch {
                     await alert({
                       title: 'Email not available',
