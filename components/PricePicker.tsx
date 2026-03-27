@@ -155,16 +155,16 @@ const SpinnerPicker: React.FC<SpinnerPickerProps> = ({ options, selectedValue, o
   }
 
   return (
-    <View style={[s.wrap, { height: NATIVE_HEIGHT, overflow: 'hidden' }]}>
+    <View style={[s.wrap, { height: 150 }]}>
       <Picker
         selectedValue={selectedValue}
         onValueChange={onValueChange}
         style={[
           s.picker,
-          { height: NATIVE_HEIGHT },
+          { height: 150 },
           isAndroid && s.androidPicker,
         ]}
-        itemStyle={[s.item, { height: NATIVE_HEIGHT }]}
+        itemStyle={[s.item, { height: 44 }]}
         {...(isAndroid ? { mode: 'dialog' as const } : {})}
       >
         {options.map(opt => (

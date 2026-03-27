@@ -125,6 +125,14 @@ export function PaywallSheet({ visible, featureName, requiredPlan, onUpgrade, on
         >
           <View style={styles.handle} />
 
+          <Pressable
+            onPress={onDismiss}
+            style={styles.closeButton}
+            hitSlop={8}
+          >
+            <Feather name="x" size={20} color="rgba(255,255,255,0.5)" />
+          </Pressable>
+
           <ScrollView
             showsVerticalScrollIndicator={false}
             bounces={false}
@@ -236,6 +244,18 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginTop: Spacing.md,
     marginBottom: Spacing.sm,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: Spacing.md + 4,
+    right: Spacing.lg,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
   },
   headerSection: {
     alignItems: 'center',

@@ -10,10 +10,19 @@ interface LockedFeatureOverlayProps {
   children: React.ReactNode;
   style?: any;
   compact?: boolean;
+  onPress?: () => void;
 }
 
-export function LockedFeatureOverlay({ requiredPlan, children, style, compact }: LockedFeatureOverlayProps) {
+export function LockedFeatureOverlay({ requiredPlan, children, style, compact, onPress }: LockedFeatureOverlayProps) {
   const navigation = useNavigation();
+
+  const handlePress = () => {
+    if (onPress) {
+      onPress();
+    } else {
+      (navigation as any).navigate('Plans');
+    }
+  };
 
   return (
     <View style={[styles.container, style]}>
@@ -22,7 +31,7 @@ export function LockedFeatureOverlay({ requiredPlan, children, style, compact }:
         <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
         <Pressable
           style={styles.overlay}
-          onPress={() => (navigation as any).navigate('Plans')}
+          onPress={handlePress}
         >
           <View style={[styles.badge, compact ? styles.badgeCompact : null]}>
             <Feather name="lock" size={compact ? 10 : 14} color="#a855f7" />

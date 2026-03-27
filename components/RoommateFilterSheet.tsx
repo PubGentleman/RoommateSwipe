@@ -200,9 +200,10 @@ interface Props {
   currentFilters: MatchFilters;
   allProfiles: any[];
   userPlan?: string;
+  onUpgradePress?: () => void;
 }
 
-export const RoommateFilterSheet: React.FC<Props> = ({ visible, onClose, onApply, currentFilters, allProfiles, userPlan = 'basic' }) => {
+export const RoommateFilterSheet: React.FC<Props> = ({ visible, onClose, onApply, currentFilters, allProfiles, userPlan = 'basic', onUpgradePress }) => {
   const isLifestyleLocked = userPlan === 'basic';
   const [filters, setFilters] = useState<MatchFilters>({ ...currentFilters });
 
@@ -314,7 +315,7 @@ export const RoommateFilterSheet: React.FC<Props> = ({ visible, onClose, onApply
               ) : null}
             </View>
             {isLifestyleLocked ? (
-              <View style={s.lockedOverlay}>
+              <Pressable style={s.lockedOverlay} onPress={onUpgradePress}>
                 <View style={s.lockedChipRow}>
                   {LIFESTYLE_OPTIONS.map(ls => (
                     <View key={ls} style={[s.filterChip, { opacity: 0.35 }]}>
@@ -326,7 +327,7 @@ export const RoommateFilterSheet: React.FC<Props> = ({ visible, onClose, onApply
                   <Feather name="lock" size={16} color={ACCENT} />
                   <ThemedText style={s.lockedMessageText}>Upgrade to Plus to unlock lifestyle filters</ThemedText>
                 </View>
-              </View>
+              </Pressable>
             ) : (
               <View style={s.chipRow}>
                 {LIFESTYLE_OPTIONS.map(ls => {

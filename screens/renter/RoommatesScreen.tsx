@@ -1339,6 +1339,15 @@ export const RoommatesScreen = () => {
           currentFilters={matchFilters}
           allProfiles={unfilteredProfiles}
           userPlan={user?.subscription?.plan || 'basic'}
+          onUpgradePress={() => { setShowFilterSheet(false); setTimeout(() => setShowPaywall(true), 300); }}
+        />
+        <PaywallSheet
+          visible={showPaywall}
+          featureName="AI Match Assistant"
+          requiredPlan="plus"
+          role="renter"
+          onUpgrade={() => { setShowPaywall(false); (navigation as any).navigate('Plans'); }}
+          onDismiss={() => setShowPaywall(false)}
         />
         {renderBoostModal()}
       </View>
@@ -2689,6 +2698,7 @@ export const RoommatesScreen = () => {
         currentFilters={matchFilters}
         allProfiles={unfilteredProfiles}
         userPlan={user?.subscription?.plan || 'basic'}
+        onUpgradePress={() => { setShowFilterSheet(false); setTimeout(() => setShowPaywall(true), 300); }}
       />
 
       {currentProfile ? (
