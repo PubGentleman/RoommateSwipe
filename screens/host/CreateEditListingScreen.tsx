@@ -25,7 +25,7 @@ type RouteParams = {
 };
 
 const AMENITIES_LIST = [
-  'WiFi', 'Parking', 'Laundry', 'AC', 'Heating', 'Dishwasher',
+  'WiFi', 'Parking', 'In-unit Laundry', 'In-building Laundry', 'AC', 'Heating', 'Dishwasher',
   'Gym', 'Pool', 'Pet Friendly', 'Furnished', 'Balcony', 'Storage',
 ];
 

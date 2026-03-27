@@ -935,6 +935,17 @@ export const ExploreScreen = () => {
     const hostInitials = getInitials(hostName);
     const avatarGradient = getAvatarGradient(item.hostProfileId || item.id);
     const isPetFriendly = item.amenities?.some(a => a.toLowerCase().includes('pet'));
+    const laundryType = item.amenities?.find(a =>
+      a.toLowerCase().includes('in-unit') || a.toLowerCase().includes('in unit') ||
+      a.toLowerCase().includes('washer') || a.toLowerCase().includes('dryer')
+    )
+      ? 'In-unit'
+      : item.amenities?.find(a =>
+          a.toLowerCase().includes('in-building') || a.toLowerCase().includes('laundry room') ||
+          a.toLowerCase().includes('shared laundry') || a.toLowerCase() === 'laundry'
+        )
+        ? 'Laundry'
+        : null;
     const itemHostType: HostType = (item.hostType || hostUser?.hostType || 'individual') as HostType;
     const showMatch = shouldShowMatchScore(itemHostType);
 
@@ -1070,6 +1081,11 @@ export const ExploreScreen = () => {
             {isPetFriendly ? (
               <View style={styles.availBadge}>
                 <Text style={styles.availBadgeText}>Pet OK</Text>
+              </View>
+            ) : null}
+            {laundryType ? (
+              <View style={styles.availBadge}>
+                <Text style={styles.availBadgeText}>{laundryType === 'In-unit' ? 'W/D In-unit' : 'Laundry'}</Text>
               </View>
             ) : null}
           </View>
