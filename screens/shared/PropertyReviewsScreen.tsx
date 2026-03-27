@@ -17,6 +17,7 @@ import {
   submitReview,
   submitHostReply,
   incrementHelpful,
+  checkReviewEligibility,
   PropertyReview,
   ReviewSummary,
 } from '../../services/reviewService';
@@ -132,7 +133,27 @@ export const PropertyReviewsScreen: React.FC<PropertyReviewsScreenProps> = ({
     : 1;
 
   const hasReviewed = reviews.some(r => r.reviewer_id === user?.id);
-  const canWrite = !!user && !isHost && !hasReviewed;
+  const [eligibleToReview, setEligibleToReview] = useState(false);
+  const [eligibilityChecked, setEligibilityChecked] = useState(false);
+
+  useEffect(() => {
+    if (user?.id && listingId && !isHost) {
+      checkReviewEligibility(user.id, listingId)
+        .then(({ eligible }) => {
+          setEligibleToReview(eligible);
+          setEligibilityChecked(true);
+        })
+        .catch(() => {
+          setEligibleToReview(false);
+          setEligibilityChecked(true);
+        });
+    } else {
+      setEligibleToReview(false);
+      setEligibilityChecked(true);
+    }
+  }, [user?.id, listingId, isHost]);
+
+  const canWrite = !!user && !isHost && !hasReviewed && eligibilityChecked && eligibleToReview;
 
   if (loading) {
     return (

@@ -76,6 +76,14 @@ export async function submitReview(params: {
   tags?: string[];
 }): Promise<{ success: boolean; error?: string }> {
   try {
+    const eligibility = await checkReviewEligibility(params.reviewerId, params.listingId);
+    if (!eligibility.eligible) {
+      return {
+        success: false,
+        error: 'You can only review a listing after a confirmed stay or showing.',
+      };
+    }
+
     const { error } = await supabase.from('property_reviews').insert({
       listing_id: params.listingId,
       reviewer_id: params.reviewerId,
@@ -95,6 +103,55 @@ export async function submitReview(params: {
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message || 'Failed to submit review' };
+  }
+}
+
+export async function checkReviewEligibility(
+  userId: string,
+  listingId: string
+): Promise<{ eligible: boolean; reason: 'booking' | 'showing' | 'none' }> {
+  try {
+    const { data: booking } = await supabase
+      .from('bookings')
+      .select('id')
+      .eq('renter_id', userId)
+      .eq('listing_id', listingId)
+      .eq('status', 'confirmed')
+      .limit(1)
+      .maybeSingle();
+
+    if (booking) {
+      return { eligible: true, reason: 'booking' };
+    }
+
+    const { data: matchIds } = await supabase
+      .from('matches')
+      .select('id')
+      .or(`user_id_1.eq.${userId},user_id_2.eq.${userId}`);
+
+    if (matchIds && matchIds.length > 0) {
+      const ids = matchIds.map((m: any) => m.id);
+      const { data: visitMessages } = await supabase
+        .from('messages')
+        .select('id, metadata')
+        .in('match_id', ids)
+        .eq('message_type', 'visit_request');
+
+      const hasConfirmedVisit = (visitMessages || []).some(
+        (msg: any) =>
+          msg.metadata?.status === 'confirmed' &&
+          msg.metadata?.listing_id === listingId
+      );
+
+      if (hasConfirmedVisit) {
+        return { eligible: true, reason: 'showing' };
+      }
+    }
+
+    return { eligible: false, reason: 'none' };
+  } catch (e) {
+    console.warn('[ReviewService] checkReviewEligibility error:', e);
+    return { eligible: false, reason: 'none' };
   }
 }
 

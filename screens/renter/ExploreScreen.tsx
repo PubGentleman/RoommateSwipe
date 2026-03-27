@@ -38,7 +38,7 @@ import { RhomeAISheet } from '../../components/RhomeAISheet';
 import { NeighborhoodAISheet } from '../../components/NeighborhoodAISheet';
 import { PropertyReviewsScreen } from '../shared/PropertyReviewsScreen';
 import { WriteReviewSheet } from '../../components/WriteReviewSheet';
-import { getReviewSummary, submitReview, ReviewSummary } from '../../services/reviewService';
+import { getReviewSummary, submitReview, checkReviewEligibility, ReviewSummary } from '../../services/reviewService';
 
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
@@ -138,6 +138,8 @@ export const ExploreScreen = () => {
   const [showGroupPickerModal, setShowGroupPickerModal] = useState(false);
   const [showReviewsModal, setShowReviewsModal] = useState(false);
   const [showWriteReview, setShowWriteReview] = useState(false);
+  const [canReviewListing, setCanReviewListing] = useState(false);
+  const [reviewEligibilityLoaded, setReviewEligibilityLoaded] = useState(false);
   const [reviewSummaryCache, setReviewSummaryCache] = useState<Map<string, ReviewSummary>>(new Map());
   const [detailReviewSummary, setDetailReviewSummary] = useState<ReviewSummary | null>(null);
   const [locationSearchQuery, setLocationSearchQuery] = useState('');
@@ -258,8 +260,30 @@ export const ExploreScreen = () => {
   useEffect(() => {
     if (selectedProperty && showPropertyDetail) {
       getReviewSummary(selectedProperty.id).then(setDetailReviewSummary).catch(() => {});
+
+      if (user?.id) {
+        setReviewEligibilityLoaded(false);
+        setCanReviewListing(false);
+        const propertyIdAtRequest = selectedProperty.id;
+        checkReviewEligibility(user.id, selectedProperty.id)
+          .then(({ eligible }) => {
+            if (propertyIdAtRequest !== selectedProperty?.id) return;
+            setCanReviewListing(eligible);
+            setReviewEligibilityLoaded(true);
+          })
+          .catch(() => {
+            if (propertyIdAtRequest !== selectedProperty?.id) return;
+            setCanReviewListing(false);
+            setReviewEligibilityLoaded(true);
+          });
+      } else {
+        setCanReviewListing(false);
+        setReviewEligibilityLoaded(true);
+      }
     } else {
       setDetailReviewSummary(null);
+      setCanReviewListing(false);
+      setReviewEligibilityLoaded(false);
     }
   }, [selectedProperty?.id, showPropertyDetail]);
 
@@ -2290,6 +2314,7 @@ export const ExploreScreen = () => {
                           </View>
                         ) : null}
                       </View>
+
                       {detailReviewSummary && detailReviewSummary.reviewCount > 0 ? (
                         <Pressable
                           style={styles.pdReviewsBtn}
@@ -2301,16 +2326,33 @@ export const ExploreScreen = () => {
                           </Text>
                           <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.4)" />
                         </Pressable>
-                      ) : (
-                        <Pressable
-                          style={styles.pdReviewsBtn}
-                          onPress={() => setShowWriteReview(true)}
-                        >
-                          <Feather name="edit-3" size={16} color="#ff6b5b" />
-                          <Text style={styles.pdReviewsBtnText}>Be the first to review</Text>
-                          <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.4)" />
-                        </Pressable>
-                      )}
+                      ) : null}
+
+                      {reviewEligibilityLoaded ? (
+                        canReviewListing ? (
+                          <Pressable
+                            style={[styles.pdReviewsBtn, { marginTop: detailReviewSummary?.reviewCount ? 8 : 0 }]}
+                            onPress={() => setShowWriteReview(true)}
+                          >
+                            <Feather name="edit-3" size={16} color="#ff6b5b" />
+                            <Text style={styles.pdReviewsBtnText}>
+                              {detailReviewSummary && detailReviewSummary.reviewCount > 0
+                                ? 'Write a review'
+                                : 'Be the first to review'}
+                            </Text>
+                            <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.4)" />
+                          </Pressable>
+                        ) : (
+                          detailReviewSummary?.reviewCount === 0 ? (
+                            <View style={styles.pdReviewsLocked}>
+                              <Feather name="lock" size={14} color="rgba(255,255,255,0.25)" />
+                              <Text style={styles.pdReviewsLockedText}>
+                                Reviews can only be left after a confirmed stay or showing
+                              </Text>
+                            </View>
+                          ) : null
+                        )
+                      ) : null}
                     </View>
 
                     <View style={{ height: 100 }} />
@@ -4633,5 +4675,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: 'rgba(255,255,255,0.8)',
+  },
+  pdReviewsLocked: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+  },
+  pdReviewsLockedText: {
+    flex: 1,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.35)',
+    lineHeight: 18,
   },
 });
