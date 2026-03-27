@@ -1,0 +1,125 @@
+# Four Role System Fix
+
+## The Correct Four Roles
+
+Rhome has four distinct user roles:
+
+- `'renter'` — looking for a place to live
+- `'host'` — individual landlord, owns 1–2 properties, renting directly (not a professional)
+- `'agent'` — licensed real estate professional managing listings for clients
+- `'company'` — property management company with multiple properties
+
+## What Needs to Be Fixed
+
+### 1. `screens/shared/ChatScreen.tsx`
+
+Find the role-based contact info check added by the safety mode prompt. It currently reads:
+
+```ts
+const isPaidUser = userRole === 'renter'
+  ? renterLimits.canSeeContactInfo
+  : (hostPlan === 'business' || userRole === 'company');
+```
+
+And the profile load comment:
+```ts
+// 'renter' | 'agent' | 'company'
+```
+
+Update to include `'host'`:
+
+```ts
+const isPaidUser = userRole === 'renter'
+  ? renterLimits.canSeeContactInfo
+  : (hostPlan === 'business' || userRole === 'company' || userRole === 'agent');
+
+// Profile role: 'renter' | 'host' | 'agent' | 'company'
+```
+
+Note: `'host'` (individual landlord) follows the same plan check as `'agent'` — Standard hosts can't see contact info until a showing is confirmed, Business hosts can.
+
+---
+
+### 2. `screens/shared/ProfileScreen.tsx` (host support button)
+
+Find the host support handler added by the support prompt. It currently checks:
+
+```ts
+userRole === 'company' ? 'COMPANY' : 'AGENT'
+```
+
+Update to handle all four roles correctly:
+
+```ts
+const roleLabel = userRole === 'company'
+  ? 'COMPANY'
+  : userRole === 'agent'
+  ? 'AGENT'
+  : 'HOST';
+
+const subject = encodeURIComponent(`[${roleLabel}][${plan.toUpperCase()}] Support Request`);
+```
+
+---
+
+### 3. `services/planLimitsService.ts` (or `normalizeRenterPlan`)
+
+Wherever host plan limits are computed, confirm the role check covers all four values:
+
+```ts
+// Host roles — all three non-renter roles
+const isHost = userRole === 'host' || userRole === 'agent' || userRole === 'company';
+const canSeeContactInfo = hostPlan === 'business' || userRole === 'company';
+```
+
+---
+
+### 4. Database — `profiles.role` column
+
+Run a quick check in Supabase to confirm the `role` column allows all four values. If there's a check constraint limiting it to three values, update it:
+
+```sql
+-- Drop old constraint if it exists
+ALTER TABLE profiles DROP CONSTRAINT IF EXISTS profiles_role_check;
+
+-- Add updated constraint with all four roles
+ALTER TABLE profiles
+  ADD CONSTRAINT profiles_role_check
+  CHECK (role IN ('renter', 'host', 'agent', 'company'));
+```
+
+---
+
+### 5. Global search
+
+Search the entire codebase for:
+- `'renter' | 'agent' | 'company'` — add `'host'` to all occurrences
+- `role === 'agent'` — add `|| role === 'host'` where the intent is "any individual host-side user"
+- Any TypeScript type or interface that defines the role enum — update to include `'host'`
+
+The most likely file to have a role type definition is something like:
+- `types/index.ts`
+- `types/user.ts`
+- `types/profile.ts`
+
+Find it and update:
+
+```ts
+// Before
+export type UserRole = 'renter' | 'agent' | 'company';
+
+// After
+export type UserRole = 'renter' | 'host' | 'agent' | 'company';
+```
+
+---
+
+## Summary
+
+| Location | Fix |
+|---|---|
+| `screens/shared/ChatScreen.tsx` | Add `'host'` to role comment and contact info check |
+| `screens/shared/ProfileScreen.tsx` | Add `'host'` case to support email subject line |
+| `services/planLimitsService.ts` | Include `'host'` in host role checks |
+| `types/*.ts` | Add `'host'` to `UserRole` type definition |
+| Supabase `profiles.role` constraint | Allow all four role values |

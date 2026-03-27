@@ -715,7 +715,7 @@ export const ProfileScreen = () => {
                 title="Contact Support"
                 subtitle={
                   isHost
-                    ? (getHostPlan() === 'business' || user?.role === 'company'
+                    ? (getHostPlan() === 'business' || user?.hostType === 'company'
                       ? 'Priority support — we respond faster'
                       : "We'll get back to you as soon as possible")
                     : (renterLimits.plan === 'elite' || renterLimits.plan === 'plus'
@@ -727,8 +727,9 @@ export const ProfileScreen = () => {
                   let subject: string;
                   if (isHost) {
                     const plan = getHostPlan() || 'standard';
-                    const role = user?.role === 'company' ? 'COMPANY' : 'AGENT';
-                    subject = encodeURIComponent(`[${role}][${plan.toUpperCase()}] Support Request`);
+                    const hostType = user?.hostType || 'individual';
+                    const roleLabel = hostType === 'company' ? 'COMPANY' : hostType === 'agent' ? 'AGENT' : 'HOST';
+                    subject = encodeURIComponent(`[${roleLabel}][${plan.toUpperCase()}] Support Request`);
                   } else {
                     const plan = renterLimits.plan ?? 'free';
                     subject = encodeURIComponent(`[${plan.toUpperCase()}] Support Request`);

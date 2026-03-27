@@ -122,10 +122,11 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const isEliteUser = () => userPlan === 'elite';
   const showLockedReadReceipt = !isEliteUser();
   const userRole = user?.role || 'renter';
+  const effectiveRole = userRole === 'host' ? (user?.hostType || 'host') : userRole;
   const hostPlan = getHostPlan();
   const isPaidUser = userRole === 'renter'
     ? renterLimits.canSeeContactInfo
-    : (hostPlan === 'business' || userRole === 'company');
+    : (hostPlan === 'business' || effectiveRole === 'company' || effectiveRole === 'agent');
   const contactInfoVisible = isPaidUser || hasBookingInThread;
 
   const handleAcceptInquiry = async () => {
