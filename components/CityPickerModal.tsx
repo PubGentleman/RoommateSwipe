@@ -4,6 +4,7 @@ import { Feather } from './VectorIcons';
 import { ThemedText } from './ThemedText';
 import { BorderRadius, Spacing } from '../constants/theme';
 import * as Haptics from 'expo-haptics';
+import * as Location from 'expo-location';
 
 const GOOGLE_PLACES_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
@@ -14,7 +15,6 @@ try {
   const mod = require('react-native-google-places-autocomplete');
   GooglePlacesAutocomplete = mod.GooglePlacesAutocomplete;
 } catch (e) {
-  // silently fail
 }
 
 type SearchErrorBoundaryState = { hasError: boolean };
@@ -33,17 +33,45 @@ class SearchErrorBoundary extends Component<{ children: React.ReactNode; fallbac
 
 const FallbackSearchInput: React.FC<{ onCitySelect: (city: string) => void }> = ({ onCitySelect }) => {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<string[]>([]);
+  const [results, setResults] = useState<{ label: string; city: string }[]>([]);
+  const [isGeocodingZip, setIsGeocodingZip] = useState(false);
 
-  const handleChange = (text: string) => {
+  const handleChange = async (text: string) => {
     try {
       setQuery(text);
-      if (!text.trim()) {
+      const trimmed = text.trim();
+
+      if (!trimmed) {
         setResults([]);
         return;
       }
-      const lower = text.toLowerCase();
-      const matched = POPULAR_CITIES.filter(c => c.toLowerCase().includes(lower));
+
+      const lower = trimmed.toLowerCase();
+      const matched = POPULAR_CITIES
+        .filter(c => c.toLowerCase().includes(lower))
+        .map(c => ({ label: c, city: c }));
+
+      if (/^\d{5}$/.test(trimmed)) {
+        setIsGeocodingZip(true);
+        try {
+          const geocoded = await Location.geocodeAsync(trimmed);
+          if (geocoded.length > 0) {
+            const { latitude, longitude } = geocoded[0];
+            const reverseResult = await Location.reverseGeocodeAsync({ latitude, longitude });
+            if (reverseResult.length > 0) {
+              const place = reverseResult[0];
+              const cityName = place.city || place.subregion || '';
+              if (cityName) {
+                matched.unshift({ label: `${trimmed} — ${cityName}`, city: cityName });
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('[CityPickerModal] zip geocoding failed:', e);
+        }
+        setIsGeocodingZip(false);
+      }
+
       setResults(matched);
     } catch {}
   };
@@ -52,15 +80,19 @@ const FallbackSearchInput: React.FC<{ onCitySelect: (city: string) => void }> = 
     <View>
       <TextInput
         style={fallbackStyles.input}
-        placeholder="Search city..."
+        placeholder="Search city or ZIP..."
         placeholderTextColor="rgba(255,255,255,0.3)"
         value={query}
         onChangeText={handleChange}
         returnKeyType="search"
+        keyboardType="default"
       />
-      {results.map(city => (
-        <Pressable key={city} style={fallbackStyles.resultRow} onPress={() => onCitySelect(city)}>
-          <Text style={fallbackStyles.resultText}>{city}</Text>
+      {isGeocodingZip ? (
+        <Text style={fallbackStyles.loadingText}>Looking up ZIP code...</Text>
+      ) : null}
+      {results.map((r, i) => (
+        <Pressable key={`${r.city}-${i}`} style={fallbackStyles.resultRow} onPress={() => onCitySelect(r.city)}>
+          <Text style={fallbackStyles.resultText}>{r.label}</Text>
         </Pressable>
       ))}
     </View>
@@ -86,6 +118,12 @@ const fallbackStyles = StyleSheet.create({
     color: 'rgba(255,255,255,0.85)',
     fontSize: 14,
   },
+  loadingText: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 13,
+    paddingHorizontal: 14,
+    paddingTop: 8,
+  },
 });
 
 interface CityPickerModalProps {
@@ -107,6 +145,9 @@ export const CityPickerModal: React.FC<CityPickerModalProps> = ({
   onSubAreaSelect,
   onClose,
 }) => {
+  const [zipOverrideResult, setZipOverrideResult] = useState<{ label: string; city: string } | null>(null);
+  const [isGeocodingZip, setIsGeocodingZip] = useState(false);
+
   const handleSelect = (city: string | null) => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -134,26 +175,50 @@ export const CityPickerModal: React.FC<CityPickerModalProps> = ({
       let city = '';
       for (const comp of components) {
         const types: string[] = comp?.types || [];
-        if (types.includes('locality')) {
+        if (types.includes('locality') || types.includes('postal_town') || types.includes('administrative_area_level_2')) {
           city = comp.long_name || '';
           break;
         }
       }
       if (!city) {
-        city = data?.description?.split(',')[0] || '';
+        city = data?.description?.split(',')[0]?.trim() || '';
       }
       if (city) {
         handleSelect(city);
         handleClose();
       }
-    } catch {
-      // silently fail
-    }
+    } catch {}
   };
 
   const handleFallbackSelect = (city: string) => {
     handleSelect(city);
     handleClose();
+  };
+
+  const handleGoogleInputChange = async (text: string) => {
+    const trimmed = text.trim();
+    if (/^\d{5}$/.test(trimmed)) {
+      setIsGeocodingZip(true);
+      setZipOverrideResult(null);
+      try {
+        const geocoded = await Location.geocodeAsync(trimmed);
+        if (geocoded.length > 0) {
+          const { latitude, longitude } = geocoded[0];
+          const reverseResult = await Location.reverseGeocodeAsync({ latitude, longitude });
+          if (reverseResult.length > 0) {
+            const place = reverseResult[0];
+            const cityName = place.city || place.subregion || '';
+            if (cityName) {
+              setZipOverrideResult({ label: `${trimmed} — ${cityName}`, city: cityName });
+            }
+          }
+        }
+      } catch {}
+      setIsGeocodingZip(false);
+    } else {
+      setZipOverrideResult(null);
+      setIsGeocodingZip(false);
+    }
   };
 
   const renderSearchSection = () => {
@@ -173,12 +238,12 @@ export const CityPickerModal: React.FC<CityPickerModalProps> = ({
             query={{
               key: GOOGLE_PLACES_KEY,
               language: 'en',
-              types: '(cities)',
               components: 'country:us',
             }}
             textInputProps={{
               placeholderTextColor: 'rgba(255,255,255,0.3)',
               returnKeyType: 'search',
+              onChangeText: handleGoogleInputChange,
               onFocus: () => {},
             }}
             onFail={() => {}}
@@ -216,6 +281,20 @@ export const CityPickerModal: React.FC<CityPickerModalProps> = ({
             enablePoweredByContainer={false}
             debounce={300}
           />
+          {isGeocodingZip ? (
+            <Text style={fallbackStyles.loadingText}>Looking up ZIP code...</Text>
+          ) : null}
+          {zipOverrideResult ? (
+            <Pressable
+              style={fallbackStyles.resultRow}
+              onPress={() => {
+                handleFallbackSelect(zipOverrideResult.city);
+                setZipOverrideResult(null);
+              }}
+            >
+              <Text style={fallbackStyles.resultText}>{zipOverrideResult.label}</Text>
+            </Pressable>
+          ) : null}
         </View>
       </SearchErrorBoundary>
     );
