@@ -21,6 +21,7 @@ import { recordMessageActivity } from '../../utils/aiMemory';
 import { acceptInquiry, declineInquiry, linkListingToGroup, leaveGroup, removeMember, getGroupMessages, sendGroupMessage, subscribeToGroupMessages } from '../../services/groupService';
 import { supabase } from '../../lib/supabase';
 import { SafeMessageText } from '../../components/SafeMessageText';
+import { normalizeRenterPlan, getRenterPlanLimits } from '../../constants/renterPlanLimits';
 import { GroupPropertySearchModal } from '../../components/GroupPropertySearchModal';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence } from 'react-native-reanimated';
 import { AdBanner } from '../../components/AdBanner';
@@ -66,7 +67,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [isOnline, setIsOnline] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
   const [paywallFeature, setPaywallFeature] = useState<string>('');
-  const [safetyModeEnabled, setSafetyModeEnabled] = useState(false);
+  const [hasBookingInThread, setHasBookingInThread] = useState(false);
   const [otherUser, setOtherUser] = useState<RoommateProfile | null>(routeOtherUser || null);
   const flatListRef = useRef<FlatList>(null);
   const [showReportBlockModal, setShowReportBlockModal] = useState(false);
@@ -114,10 +115,14 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   }));
   const isHost = isInquiryChat && user?.id === inquiryGroup?.hostId;
   const userPlan = (user?.subscription?.plan || 'basic') as 'basic' | 'plus' | 'elite';
+  const renterPlan = normalizeRenterPlan(user?.subscription?.plan);
+  const renterLimits = getRenterPlanLimits(renterPlan);
   const dailyCount = user ? getDailyMessageCount(user) : 0;
   const dailyLimit = MESSAGING_LIMITS[userPlan].dailyMessages;
   const isEliteUser = () => userPlan === 'elite';
   const showLockedReadReceipt = !isEliteUser();
+  const isPaidUser = renterLimits.canSeeContactInfo;
+  const contactInfoVisible = isPaidUser || hasBookingInThread;
 
   const handleAcceptInquiry = async () => {
     if (!inquiryGroup?.id) return;
@@ -209,16 +214,18 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   useEffect(() => {
     loadMessages();
     StorageService.updateConversation(conversationId, { unread: 0 });
-    (async () => {
-      try {
-        const { data: { user: authUser } } = await supabase.auth.getUser();
-        if (authUser) {
-          const { data } = await supabase.from('profiles').select('safety_mode_enabled').eq('user_id', authUser.id).single();
-          if (data?.safety_mode_enabled) setSafetyModeEnabled(true);
-        }
-      } catch (_e) {}
-    })();
   }, [conversationId]);
+
+  useEffect(() => {
+    if (!isPaidUser && messages.length > 0) {
+      const hasConfirmed = messages.some(
+        (m: any) => ['accepted', 'confirmed'].includes(m.metadata?.status) && (m.message_type === 'visit_request' || m.message_type === 'booking_offer')
+      );
+      if (hasConfirmed !== hasBookingInThread) {
+        setHasBookingInThread(hasConfirmed);
+      }
+    }
+  }, [messages, isPaidUser]);
 
   useEffect(() => {
     setLinkedListing(null);
@@ -1041,11 +1048,15 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         >
           <SafeMessageText
             text={item.text}
-            safetyMode={safetyModeEnabled}
+            safetyMode={!contactInfoVisible && !isOwnMessage}
             style={[
               Typography.body,
               { color: isOwnMessage ? '#FFFFFF' : theme.text },
             ]}
+            onUpgradePress={() => navigation.navigate('Plans' as any)}
+            onBookShowingPress={isInquiryChat ? () => {
+              flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+            } : undefined}
           />
         </View>
         {showReadReceipt ? (

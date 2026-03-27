@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { View, Pressable, StyleSheet, TextStyle, StyleProp } from 'react-native'
 import { Feather } from './VectorIcons'
 import { ThemedText } from './ThemedText'
@@ -7,6 +7,8 @@ interface Props {
   text: string
   safetyMode: boolean
   style?: StyleProp<TextStyle>
+  onUpgradePress?: () => void
+  onBookShowingPress?: () => void
 }
 
 const SENSITIVE_PATTERNS = [
@@ -25,10 +27,8 @@ const containsSensitiveInfo = (text: string): boolean => {
   })
 }
 
-export const SafeMessageText: React.FC<Props> = ({ text, safetyMode, style }) => {
-  const [revealed, setRevealed] = useState(false)
-
-  const shouldBlur = safetyMode && containsSensitiveInfo(text) && !revealed
+export const SafeMessageText: React.FC<Props> = ({ text, safetyMode, style, onUpgradePress, onBookShowingPress }) => {
+  const shouldBlur = safetyMode && containsSensitiveInfo(text)
 
   if (shouldBlur) {
     return (
@@ -36,13 +36,23 @@ export const SafeMessageText: React.FC<Props> = ({ text, safetyMode, style }) =>
         <ThemedText style={[style, styles.blurredText]}>
           {text.replace(/./g, '\u2022')}
         </ThemedText>
-        <Pressable
-          style={styles.revealButton}
-          onPress={() => setRevealed(true)}
-        >
-          <Feather name="eye" size={14} color="#FF6B6B" />
-          <ThemedText style={styles.revealText}>Tap to reveal contact info</ThemedText>
-        </Pressable>
+        <View style={styles.lockBanner}>
+          <Feather name="lock" size={13} color="#FF6B6B" />
+          <ThemedText style={styles.lockText}>Contact info hidden</ThemedText>
+        </View>
+        <View style={styles.ctaRow}>
+          {onBookShowingPress ? (
+            <Pressable style={styles.ctaButton} onPress={onBookShowingPress}>
+              <ThemedText style={styles.ctaText}>Book a Showing</ThemedText>
+            </Pressable>
+          ) : null}
+          {onUpgradePress ? (
+            <Pressable style={[styles.ctaButton, styles.ctaUpgrade]} onPress={onUpgradePress}>
+              <Feather name="zap" size={12} color="#667eea" />
+              <ThemedText style={[styles.ctaText, { color: '#667eea' }]}>Upgrade</ThemedText>
+            </Pressable>
+          ) : null}
+        </View>
       </View>
     )
   }
@@ -58,13 +68,35 @@ const styles = StyleSheet.create({
     textShadowRadius: 6,
     letterSpacing: 2,
   },
-  revealButton: {
+  lockBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 6,
+    marginBottom: 6,
+  },
+  lockText: {
+    color: '#FF6B6B',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  ctaRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  ctaButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginTop: 4,
+    backgroundColor: 'rgba(255, 107, 107, 0.12)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
   },
-  revealText: {
+  ctaUpgrade: {
+    backgroundColor: 'rgba(102, 126, 234, 0.12)',
+  },
+  ctaText: {
     color: '#FF6B6B',
     fontSize: 12,
     fontWeight: '600',

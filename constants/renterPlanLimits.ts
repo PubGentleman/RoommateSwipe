@@ -23,6 +23,7 @@ export interface RenterPlanLimits {
   apartmentSuggestionCount: number;
   hasConflictDetection: boolean;
   hasCompatibilityBreakdown: boolean;
+  canSeeContactInfo: boolean;
 }
 
 export const RENTER_PLAN_LIMITS: Record<RenterPlan, RenterPlanLimits> = {
@@ -49,6 +50,7 @@ export const RENTER_PLAN_LIMITS: Record<RenterPlan, RenterPlanLimits> = {
     apartmentSuggestionCount: 0,
     hasConflictDetection: false,
     hasCompatibilityBreakdown: false,
+    canSeeContactInfo: false,
   },
   plus: {
     plan: 'plus',
@@ -73,6 +75,7 @@ export const RENTER_PLAN_LIMITS: Record<RenterPlan, RenterPlanLimits> = {
     apartmentSuggestionCount: 3,
     hasConflictDetection: false,
     hasCompatibilityBreakdown: false,
+    canSeeContactInfo: true,
   },
   elite: {
     plan: 'elite',
@@ -97,6 +100,7 @@ export const RENTER_PLAN_LIMITS: Record<RenterPlan, RenterPlanLimits> = {
     apartmentSuggestionCount: -1,
     hasConflictDetection: true,
     hasCompatibilityBreakdown: true,
+    canSeeContactInfo: true,
   },
 };
 

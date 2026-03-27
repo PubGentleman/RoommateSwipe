@@ -557,7 +557,6 @@ export interface User {
   identity_verified?: boolean;
   identity_verified_at?: string;
   background_check_status?: 'none' | 'pending' | 'clear' | 'flagged';
-  safetyModeEnabled?: boolean;
   background_check_completed_at?: string;
   notificationPreferences?: {
     matches: boolean;

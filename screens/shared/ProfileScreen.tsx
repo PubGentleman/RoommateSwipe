@@ -41,7 +41,6 @@ export const ProfileScreen = () => {
   const [aiSheetContext, setAiSheetContext] = useState<'profile' | 'profile_reminder'>('profile');
   const [devTapCount, setDevTapCount] = useState(0);
   const [devTapTimer, setDevTapTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
-  const [safetyMode, setSafetyMode] = useState(false);
   const [hasAffiliate, setHasAffiliate] = useState(false);
   const [searchPaused, setSearchPaused] = useState(false);
   const [searchPausedAt, setSearchPausedAt] = useState<string | null>(null);
@@ -129,8 +128,7 @@ export const ProfileScreen = () => {
           setPendingInterestCount(cards.filter(c => c.status === 'pending').length);
         });
         import('../../lib/supabase').then(({ supabase }) => {
-          supabase.from('profiles').select('safety_mode_enabled, search_paused, search_paused_at').eq('user_id', user.id).single().then(({ data }) => {
-            if (data?.safety_mode_enabled !== undefined) setSafetyMode(!!data.safety_mode_enabled);
+          supabase.from('profiles').select('search_paused, search_paused_at').eq('user_id', user.id).single().then(({ data }) => {
             if (data?.search_paused !== undefined) setSearchPaused(!!data.search_paused);
             if (data?.search_paused_at) setSearchPausedAt(data.search_paused_at);
           });
@@ -670,35 +668,6 @@ export const ProfileScreen = () => {
               onPress={() => navigation.navigate('PrivacySecurity')}
             />
 
-            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#1a1a2e', borderRadius: 12, marginBottom: 8 }}>
-              <View style={{ flex: 1 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Feather name="shield" size={18} color="#FF6B6B" />
-                  <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Safety Mode</Text>
-                </View>
-                <Text style={{ color: '#999', fontSize: 12, marginTop: 4, marginLeft: 26 }}>
-                  Blur phone numbers and social handles in messages
-                </Text>
-              </View>
-              <Switch
-                value={safetyMode}
-                onValueChange={async (value) => {
-                  setSafetyMode(value)
-                  if (user) {
-                    updateUser({ ...user, safetyModeEnabled: value })
-                  }
-                  try {
-                    const { supabase } = await import('../../lib/supabase')
-                    const { data: { user: authUser } } = await supabase.auth.getUser()
-                    if (authUser) {
-                      await supabase.from('profiles').update({ safety_mode_enabled: value }).eq('user_id', authUser.id)
-                    }
-                  } catch (_e) {}
-                }}
-                trackColor={{ false: '#333', true: '#FF6B6B' }}
-                thumbColor="#fff"
-              />
-            </View>
             <SettingsItem
               iconName="credit-card"
               iconColor="#667eea"
