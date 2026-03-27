@@ -1340,13 +1340,17 @@ export const ExploreScreen = () => {
         </Pressable>
 
         <Pressable
-          style={styles.headerIconBtn}
+          style={[styles.headerIconBtn, displayMode === 'map' && styles.headerIconBtnActive]}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             setDisplayMode(displayMode === 'list' ? 'map' : 'list');
           }}
         >
-          <Feather name={displayMode === 'list' ? 'map' : 'list'} size={18} color="rgba(255,255,255,0.6)" />
+          <Feather
+            name={displayMode === 'list' ? 'map' : 'align-justify'}
+            size={18}
+            color={displayMode === 'map' ? '#ff6b5b' : 'rgba(255,255,255,0.6)'}
+          />
         </Pressable>
         <Pressable style={[styles.headerIconBtn, hasActiveFilters() ? styles.headerIconBtnActive : null]} onPress={handleFilterPress}>
           <Feather name="sliders" size={18} color={hasActiveFilters() ? ACCENT : 'rgba(255,255,255,0.6)'} />

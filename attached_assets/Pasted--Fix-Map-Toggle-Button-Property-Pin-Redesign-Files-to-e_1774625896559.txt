@@ -1,0 +1,290 @@
+# Fix: Map Toggle Button + Property Pin Redesign
+
+## Files to edit
+- `screens/renter/ExploreScreen.tsx` — toggle button fix
+- `components/PropertyMapView.tsx` — pin redesign (both Leaflet web + native MapView)
+
+---
+
+## PART 1 — Fix the blank map/list toggle button
+
+**File:** `screens/renter/ExploreScreen.tsx`
+
+### Problem
+The button between the city picker and filter button renders blank in map mode. The `'list'` Feather icon name is not rendering reliably. Replace it with clearer icons and add an active visual state so users know which mode they're in.
+
+### Step 1 — Replace the toggle button block
+
+Find (around line 1183):
+```tsx
+<Pressable
+  style={styles.headerIconBtn}
+  onPress={() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setDisplayMode(displayMode === 'list' ? 'map' : 'list');
+  }}
+>
+  <Feather name={displayMode === 'list' ? 'map' : 'list'} size={18} color="rgba(255,255,255,0.6)" />
+</Pressable>
+```
+
+Replace with:
+```tsx
+<Pressable
+  style={[styles.headerIconBtn, displayMode === 'map' && styles.headerIconBtnActive]}
+  onPress={() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setDisplayMode(displayMode === 'list' ? 'map' : 'list');
+  }}
+>
+  <Feather
+    name={displayMode === 'list' ? 'map' : 'align-justify'}
+    size={18}
+    color={displayMode === 'map' ? '#ff6b5b' : 'rgba(255,255,255,0.6)'}
+  />
+</Pressable>
+```
+
+> `'map'` shows when in list mode (tap to go to map).
+> `'align-justify'` shows when in map mode (tap to go back to list) — 3 horizontal lines, clearly a "list" icon.
+> The button uses the existing `headerIconBtnActive` style (red tint border) when in map mode so users can see it's the active view.
+
+---
+
+## PART 2 — Property Pin Redesign
+
+**File:** `components/PropertyMapView.tsx`
+
+### Design: Photo circle + price pill (Airbnb-style)
+
+```
+  ┌──────┐
+  │ 📷  │  ← 44×44 circular crop of property's first photo
+  └──┬───┘      (fallback: red background + house icon)
+     │
+  [$1,600]  ← compact red pill, anchored directly below the circle
+     ▲
+  (pointer tip)
+```
+
+- Tapping opens the existing popup/callout card (no change to that)
+- Selected/active pin gets a white ring + slight scale up
+- If `property.photos[0]` is empty, shows a red circle with a `🏠` house character
+
+---
+
+### Step 2 — Rewrite the Leaflet HTML marker (web path)
+
+In `buildLeafletHtml()`, find the `icon = L.divIcon(...)` block:
+```js
+var icon=L.divIcon({
+  className:'',
+  html:'<div style="background:linear-gradient(135deg,#ff6b5b,#e83a2a);color:#fff;font-weight:700;font-size:11px;font-family:-apple-system,system-ui,sans-serif;padding:4px 10px;border-radius:20px;white-space:nowrap;box-shadow:0 2px 8px rgba(255,80,60,0.5);border:2px solid rgba(255,255,255,0.3)">$'+m.price+'</div>',
+  iconSize:[0,0],
+  iconAnchor:[30,15]
+});
+```
+
+Replace with:
+```js
+var photoHtml = m.photo
+  ? '<img src="'+m.photo+'" style="width:44px;height:44px;object-fit:cover;border-radius:50%;display:block" onerror="this.style.display=\'none\';this.parentNode.innerHTML=\'<div style=\\\"width:44px;height:44px;border-radius:50%;background:#ff6b5b;display:flex;align-items:center;justify-content:center;font-size:18px\\\">🏠</div>\'">'
+  : '<div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#ff6b5b,#e83a2a);display:flex;align-items:center;justify-content:center;font-size:18px">🏠</div>';
+
+var icon=L.divIcon({
+  className:'',
+  html:'<div style="display:flex;flex-direction:column;align-items:center;cursor:pointer">'
+    +'<div style="width:44px;height:44px;border-radius:50%;overflow:hidden;border:2.5px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,0.35)">'
+      +photoHtml
+    +'</div>'
+    +'<div style="background:linear-gradient(135deg,#ff6b5b,#e83a2a);color:#fff;font-weight:700;font-size:11px;font-family:-apple-system,system-ui,sans-serif;padding:3px 9px;border-radius:20px;margin-top:4px;white-space:nowrap;box-shadow:0 2px 6px rgba(255,80,60,0.45);border:1.5px solid rgba(255,255,255,0.25)">$'+m.price.toLocaleString()+'</div>'
+    +'<div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid #e83a2a;margin-top:-1px"></div>'
+  +'</div>',
+  iconSize:[44,70],
+  iconAnchor:[22,70]
+});
+```
+
+> `iconSize:[44,70]` — width of the circle, total height including pill + tip.
+> `iconAnchor:[22,70]` — anchors the very bottom of the tip to the exact map coordinate. Price no longer hangs outside the pin.
+
+---
+
+### Step 3 — Rewrite the native MapView markers (iOS / Android path)
+
+In the `react-native-maps` render block, find the `<Marker>` component (around line 233):
+
+```tsx
+<Marker
+  key={property.id}
+  coordinate={{
+    latitude: property.coordinates!.lat,
+    longitude: property.coordinates!.lng,
+  }}
+  pinColor={saved.has(property.id) ? '#EF4444' : theme.primary}
+>
+```
+
+Replace the entire `<Marker>...</Marker>` block (including its `<Callout>`) with:
+
+```tsx
+<Marker
+  key={property.id}
+  coordinate={{
+    latitude: property.coordinates!.lat,
+    longitude: property.coordinates!.lng,
+  }}
+  tracksViewChanges={false}
+  onPress={() => onPropertyPress(property)}
+>
+  {/* Custom photo pin */}
+  <View style={styles.pinWrap}>
+    <View style={[
+      styles.pinPhotoRing,
+      saved.has(property.id) && styles.pinPhotoRingSaved,
+    ]}>
+      {property.photos[0] ? (
+        <Image
+          source={{ uri: property.photos[0] }}
+          style={styles.pinPhoto}
+          resizeMode="cover"
+        />
+      ) : (
+        <View style={styles.pinPhotoFallback}>
+          <Text style={styles.pinPhotoFallbackIcon}>🏠</Text>
+        </View>
+      )}
+    </View>
+    <View style={[styles.pinPricePill, saved.has(property.id) && styles.pinPricePillSaved]}>
+      <Text style={styles.pinPriceText}>${property.price.toLocaleString()}</Text>
+    </View>
+    <View style={[styles.pinTip, saved.has(property.id) && styles.pinTipSaved]} />
+  </View>
+
+  <Callout tooltip onPress={() => onPropertyPress(property)}>
+    <View style={[styles.callout, { backgroundColor: theme.backgroundDefault }]}>
+      <Image source={{ uri: property.photos[0] }} style={styles.calloutImage} />
+      <View style={styles.calloutInfo}>
+        <ThemedText style={[Typography.body, { fontWeight: '700' }]}>
+          ${property.price}/mo
+        </ThemedText>
+        <ThemedText style={[Typography.caption, { color: theme.textSecondary }]} numberOfLines={1}>
+          {property.title}
+        </ThemedText>
+        <View style={styles.calloutMeta}>
+          <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
+            {property.bedrooms}bd {property.bathrooms}ba
+          </ThemedText>
+          {compatibility !== null ? (
+            <View style={[styles.miniMatchBadge, { backgroundColor: getMatchQualityColor(compatibility) + '20' }]}>
+              <ThemedText style={[Typography.caption, { color: getMatchQualityColor(compatibility), fontWeight: '700', fontSize: 11 }]}>
+                {compatibility}%
+              </ThemedText>
+            </View>
+          ) : null}
+        </View>
+      </View>
+      <Pressable
+        style={styles.calloutSave}
+        onPress={() => onToggleSave(property.id)}
+      >
+        <Feather name="heart" size={16} color={saved.has(property.id) ? '#EF4444' : theme.textSecondary} />
+      </Pressable>
+    </View>
+  </Callout>
+</Marker>
+```
+
+> Note: `compatibility` is already computed in the existing `propertiesWithCoords.map()` loop just above this — keep that variable in scope.
+> `tracksViewChanges={false}` is required for performance — prevents the marker from re-rendering on every map frame.
+
+---
+
+### Step 4 — Add new styles to `StyleSheet.create({})`
+
+Append these to the existing styles object in `PropertyMapView.tsx`:
+
+```ts
+pinWrap: {
+  alignItems: 'center',
+},
+pinPhotoRing: {
+  width: 46,
+  height: 46,
+  borderRadius: 23,
+  borderWidth: 2.5,
+  borderColor: '#fff',
+  overflow: 'hidden',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.3,
+  shadowRadius: 4,
+  elevation: 5,
+},
+pinPhotoRingSaved: {
+  borderColor: '#EF4444',
+},
+pinPhoto: {
+  width: 41,
+  height: 41,
+  borderRadius: 20,
+},
+pinPhotoFallback: {
+  width: 41,
+  height: 41,
+  borderRadius: 20,
+  backgroundColor: '#ff6b5b',
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+pinPhotoFallbackIcon: {
+  fontSize: 18,
+},
+pinPricePill: {
+  backgroundColor: '#ff6b5b',
+  borderRadius: 20,
+  paddingHorizontal: 8,
+  paddingVertical: 3,
+  marginTop: 4,
+  shadowColor: 'rgba(255,80,60,0.5)',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 1,
+  shadowRadius: 4,
+  elevation: 3,
+},
+pinPricePillSaved: {
+  backgroundColor: '#EF4444',
+},
+pinPriceText: {
+  color: '#fff',
+  fontSize: 11,
+  fontWeight: '700',
+  fontFamily: '-apple-system',
+},
+pinTip: {
+  width: 0,
+  height: 0,
+  borderLeftWidth: 5,
+  borderRightWidth: 5,
+  borderTopWidth: 6,
+  borderLeftColor: 'transparent',
+  borderRightColor: 'transparent',
+  borderTopColor: '#ff6b5b',
+  marginTop: -1,
+},
+pinTipSaved: {
+  borderTopColor: '#EF4444',
+},
+```
+
+---
+
+## Summary of changes
+
+| Issue | Fix |
+|---|---|
+| Blank toggle button | Changed icon to `'align-justify'` (reliable) + active red tint when in map mode |
+| Price hanging off pin | `iconAnchor` now anchors the tip bottom to the coordinate; pin is self-contained |
+| Ugly plain red pill | Photo circle + price pill + pointer tip — modern Airbnb-style |
+| Saved listings | Saved pins show red ring + red pill instead of coral, so they stand out |
+| No photo fallback | Falls back to red circle + 🏠 emoji if photo URL is empty or fails to load |

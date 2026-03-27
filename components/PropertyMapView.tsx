@@ -1,5 +1,5 @@
 import React, { useMemo, useRef } from 'react';
-import { View, StyleSheet, Pressable, Image, Platform } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Image, Platform } from 'react-native';
 import { ThemedText } from './ThemedText';
 import { useTheme } from '../hooks/useTheme';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
@@ -86,11 +86,21 @@ L.tileLayer('${tileUrl}',{attribution:'',maxZoom:19}).addTo(map);
 L.control.zoom({position:'bottomright'}).addTo(map);
 var markers=${markersJson};
 markers.forEach(function(m){
+  var photoHtml = m.photo
+    ? '<img src="'+m.photo+'" style="width:44px;height:44px;object-fit:cover;border-radius:50%;display:block" onerror="this.style.display=\'none\';this.parentNode.innerHTML=\'<div style=\\\"width:44px;height:44px;border-radius:50%;background:#ff6b5b;display:flex;align-items:center;justify-content:center;font-size:18px\\\">&#127968;</div>\'">'
+    : '<div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#ff6b5b,#e83a2a);display:flex;align-items:center;justify-content:center;font-size:18px">&#127968;</div>';
+
   var icon=L.divIcon({
     className:'',
-    html:'<div style="background:linear-gradient(135deg,#ff6b5b,#e83a2a);color:#fff;font-weight:700;font-size:11px;font-family:-apple-system,system-ui,sans-serif;padding:4px 10px;border-radius:20px;white-space:nowrap;box-shadow:0 2px 8px rgba(255,80,60,0.5);border:2px solid rgba(255,255,255,0.3)">$'+m.price+'</div>',
-    iconSize:[0,0],
-    iconAnchor:[30,15]
+    html:'<div style="display:flex;flex-direction:column;align-items:center;cursor:pointer">'
+      +'<div style="width:44px;height:44px;border-radius:50%;overflow:hidden;border:2.5px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,0.35)">'
+        +photoHtml
+      +'</div>'
+      +'<div style="background:linear-gradient(135deg,#ff6b5b,#e83a2a);color:#fff;font-weight:700;font-size:11px;font-family:-apple-system,system-ui,sans-serif;padding:3px 9px;border-radius:20px;margin-top:4px;white-space:nowrap;box-shadow:0 2px 6px rgba(255,80,60,0.45);border:1.5px solid rgba(255,255,255,0.25)">$'+m.price.toLocaleString()+'</div>'
+      +'<div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid #e83a2a;margin-top:-1px"></div>'
+    +'</div>',
+    iconSize:[44,70],
+    iconAnchor:[22,70]
   });
   var popup='<div class="popup-card" onclick="window.parent.postMessage(JSON.stringify({type:\\'propertyTap\\',id:\\''+m.id+'\\',token:\\'__MSG_TOKEN__\\'}),\\'*\\')">'
     +'<img src="'+m.photo+'"/>'
@@ -236,8 +246,32 @@ export const PropertyMapView = ({
                 latitude: property.coordinates!.lat,
                 longitude: property.coordinates!.lng,
               }}
-              pinColor={saved.has(property.id) ? '#EF4444' : theme.primary}
+              tracksViewChanges={false}
+              onPress={() => onPropertyPress(property)}
             >
+              <View style={styles.pinWrap}>
+                <View style={[
+                  styles.pinPhotoRing,
+                  saved.has(property.id) && styles.pinPhotoRingSaved,
+                ]}>
+                  {property.photos[0] ? (
+                    <Image
+                      source={{ uri: property.photos[0] }}
+                      style={styles.pinPhoto}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View style={styles.pinPhotoFallback}>
+                      <Text style={styles.pinPhotoFallbackIcon}>&#127968;</Text>
+                    </View>
+                  )}
+                </View>
+                <View style={[styles.pinPricePill, saved.has(property.id) && styles.pinPricePillSaved]}>
+                  <Text style={styles.pinPriceText}>${property.price.toLocaleString()}</Text>
+                </View>
+                <View style={[styles.pinTip, saved.has(property.id) && styles.pinTipSaved]} />
+              </View>
+
               <Callout tooltip onPress={() => onPropertyPress(property)}>
                 <View style={[styles.callout, { backgroundColor: theme.backgroundDefault }]}>
                   <Image source={{ uri: property.photos[0] }} style={styles.calloutImage} />
@@ -345,5 +379,74 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm,
     paddingVertical: 2,
     borderRadius: BorderRadius.full,
+  },
+  pinWrap: {
+    alignItems: 'center',
+  },
+  pinPhotoRing: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 2.5,
+    borderColor: '#fff',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  pinPhotoRingSaved: {
+    borderColor: '#EF4444',
+  },
+  pinPhoto: {
+    width: 41,
+    height: 41,
+    borderRadius: 20,
+  },
+  pinPhotoFallback: {
+    width: 41,
+    height: 41,
+    borderRadius: 20,
+    backgroundColor: '#ff6b5b',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pinPhotoFallbackIcon: {
+    fontSize: 18,
+  },
+  pinPricePill: {
+    backgroundColor: '#ff6b5b',
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginTop: 4,
+    shadowColor: 'rgba(255,80,60,0.5)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  pinPricePillSaved: {
+    backgroundColor: '#EF4444',
+  },
+  pinPriceText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  pinTip: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 5,
+    borderRightWidth: 5,
+    borderTopWidth: 6,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: '#ff6b5b',
+    marginTop: -1,
+  },
+  pinTipSaved: {
+    borderTopColor: '#EF4444',
   },
 });
