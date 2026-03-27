@@ -64,7 +64,6 @@ export const GroupsScreen = () => {
   const [avatarsExpanded, setAvatarsExpanded] = useState(false);
   const { activeCity, activeSubArea, recentCities, setActiveCity, setActiveSubArea } = useCityContext();
   const [showCityPicker, setShowCityPicker] = useState(false);
-  const [hasApartmentPrefs, setHasApartmentPrefs] = useState(false);
   const [showAISheet, setShowAISheet] = useState(false);
   const GRP_COLLAPSE_H = 52;
   const grpScrollY = useSharedValue(0);
@@ -106,11 +105,6 @@ export const GroupsScreen = () => {
     React.useCallback(() => {
       loadGroups();
       loadLikedGroupState();
-      if (user) {
-        StorageService.getApartmentPreferences(user.id).then(prefs => {
-          setHasApartmentPrefs(!!(prefs?.apartmentPrefsComplete || prefs?.budgetPerPersonMin));
-        }).catch(() => {});
-      }
       if (user) {
         getMyPendingInvites()
           .then(setPendingInvites)
@@ -185,7 +179,7 @@ export const GroupsScreen = () => {
           type: g.type || 'roommate',
           name: g.name,
           description: g.description,
-          members: [],
+          members: (g.members || []).map((m: any) => m.user_id || m.id).filter(Boolean),
           pendingMembers: [],
           budget: g.budget_min || 0,
           budgetMin: g.budget_min,
@@ -1271,24 +1265,6 @@ export const GroupsScreen = () => {
     }
 
     if (activeTab === 'discover') {
-      const hasPreferences = hasApartmentPrefs || user?.profileData?.budgetMin || user?.profileData?.budget;
-      if (!hasPreferences) {
-        return (
-          <View style={styles.emptyState}>
-            <Feather name="sliders" size={48} color={theme.textSecondary} />
-            <ThemedText style={[Typography.body, { color: theme.textSecondary, textAlign: 'center', marginTop: 16 }]}>
-              Set your apartment preferences first so we can find the right groups for you.
-            </ThemedText>
-            <Pressable
-              style={{ marginTop: 20, backgroundColor: theme.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 24 }}
-              onPress={() => navigation.navigate('ApartmentPreferences')}
-            >
-              <ThemedText style={{ color: '#fff', fontWeight: '700' }}>Set Preferences</ThemedText>
-            </Pressable>
-          </View>
-        );
-      }
-
       if (!currentGroup) {
         return (
           <View style={styles.emptyState}>
