@@ -507,18 +507,23 @@ export const ExploreScreen = () => {
         createdAt: new Date().toISOString(),
       };
       try {
-        const { supabase } = await import('../../lib/supabase');
         await supabase.from('interest_cards').insert({
-          sender_id: user.id,
-          recipient_id: effectiveHostId,
-          listing_id: selectedProperty.id,
-          action: 'interest',
-          is_super_interest: isSuperInterest,
+          id: interestId,
+          renter_id: user.id,
+          host_id: effectiveHostId,
+          property_id: selectedProperty.id,
+          property_title: selectedProperty.title,
+          compatibility_score: compatibility,
+          budget_range: budgetRange,
+          move_in_date: moveIn,
+          lifestyle_tags: tags.length > 0 ? tags : ['Flexible'],
           personal_note: note,
           status: 'pending',
+          is_super_interest: isSuperInterest,
+          created_at: new Date().toISOString(),
         });
-      } catch (supabaseErr) {
-        console.warn('[ExploreScreen] Supabase interest insert failed, using local fallback:', supabaseErr);
+      } catch (supaErr) {
+        console.warn('Supabase interest insert failed, using StorageService fallback:', supaErr);
       }
       await StorageService.addInterestCard(interestRecord);
 
