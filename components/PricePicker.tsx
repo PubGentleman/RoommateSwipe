@@ -119,7 +119,8 @@ export const PricePickerPair: React.FC<PricePickerPairProps> = ({
                 isAndroid && s.androidPicker,
               ]}
               itemStyle={[s.item, { height }]}
-              {...(isAndroid ? { mode: 'dropdown' as const } : {})}
+              {...(isAndroid ? { mode: 'dialog' as const } : {})}
+              {...(isWeb ? {} : { display: 'spinner' as any })}
             >
               {STANDARD_MIN_OPTIONS.map(opt => (
                 <Picker.Item
@@ -148,7 +149,8 @@ export const PricePickerPair: React.FC<PricePickerPairProps> = ({
                 isAndroid && s.androidPicker,
               ]}
               itemStyle={[s.item, { height }]}
-              {...(isAndroid ? { mode: 'dropdown' as const } : {})}
+              {...(isAndroid ? { mode: 'dialog' as const } : {})}
+              {...(isWeb ? {} : { display: 'spinner' as any })}
             >
               {availableMaxOptions.map(opt => (
                 <Picker.Item
@@ -194,7 +196,8 @@ export const SinglePricePicker: React.FC<SinglePricePickerProps> = ({
           isAndroid && s.androidPicker,
         ]}
         itemStyle={[s.item, { height }]}
-        {...(isAndroid ? { mode: 'dropdown' as const } : {})}
+        {...(isAndroid ? { mode: 'dialog' as const } : {})}
+        {...(isWeb ? {} : { display: 'spinner' as any })}
       >
         {options.map(opt => (
           <Picker.Item

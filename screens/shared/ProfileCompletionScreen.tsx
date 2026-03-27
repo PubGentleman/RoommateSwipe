@@ -11,6 +11,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { getCompletionPercentage } from '../../utils/profileReminderUtils';
 import { OccupationBarSelector } from '../../components/OccupationBarSelector';
 import { INTEREST_TAGS } from '../../constants/interestTags';
+import { PricePickerPair, STANDARD_MIN_OPTIONS, STANDARD_MAX_OPTIONS, STANDARD_MAX_VALUE, formatPriceDisplay, normalizeToOption } from '../../components/PricePicker';
 
 const ACCENT = '#ff6b5b';
 const BG = '#111111';
@@ -33,14 +34,6 @@ const LIFESTYLE_OPTIONS = [
   { id: 'student', label: 'Student', icon: 'book' },
 ];
 
-const BUDGET_PRESETS = [
-  { label: '$500–$800', min: 500, max: 800 },
-  { label: '$800–$1,200', min: 800, max: 1200 },
-  { label: '$1,200–$1,800', min: 1200, max: 1800 },
-  { label: '$1,800–$2,500', min: 1800, max: 2500 },
-  { label: '$2,500–$3,500', min: 2500, max: 3500 },
-  { label: '$3,500+', min: 3500, max: 5000 },
-];
 
 const FLAT_INTEREST_TAGS = Object.values(INTEREST_TAGS).flatMap(cat =>
   cat.tags.map(t => ({ ...t, category: cat.label }))
@@ -84,14 +77,30 @@ export const ProfileCompletionScreen = () => {
     if (prefs?.cleanliness === 'very_clean') tags.push('clean_freak');
     return tags;
   });
-  const [budgetIdx, setBudgetIdx] = useState<number | null>(() => {
+  const [budgetMin, setBudgetMin] = useState<number>(() => {
     const b = user?.profileData?.budget;
-    if (!b) return null;
-    const num = parseInt(String(b).replace(/[^0-9]/g, ''), 10);
-    if (isNaN(num)) return null;
-    const idx = BUDGET_PRESETS.findIndex(p => num >= p.min && num <= p.max);
-    return idx >= 0 ? idx : null;
+    if (!b) return 1000;
+    const str = String(b);
+    const nums = str.match(/[\d,]+/g);
+    if (nums && nums.length > 0) {
+      const val = parseInt(nums[0].replace(/,/g, ''), 10);
+      if (!isNaN(val)) return normalizeToOption(val, STANDARD_MIN_OPTIONS);
+    }
+    return 1000;
   });
+  const [budgetMax, setBudgetMax] = useState<number>(() => {
+    const b = user?.profileData?.budget;
+    if (!b) return 2000;
+    const str = String(b);
+    const nums = str.match(/[\d,]+/g);
+    if (nums && nums.length >= 2) {
+      const val = parseInt(nums[1].replace(/,/g, ''), 10);
+      if (!isNaN(val)) return normalizeToOption(val, STANDARD_MAX_OPTIONS);
+    }
+    if (str.includes('+')) return STANDARD_MAX_VALUE;
+    return 2000;
+  });
+  const [budgetTouched, setBudgetTouched] = useState<boolean>(() => !!user?.profileData?.budget);
   const [interestTags, setInterestTags] = useState<string[]>(user?.profileData?.interests || []);
   const [saving, setSaving] = useState(false);
 
@@ -99,7 +108,7 @@ export const ProfileCompletionScreen = () => {
   const bioComplete = bio.trim().length >= 20;
   const occupationComplete = isAgent || !!occupation;
   const lifestyleComplete = lifestyleTags.length >= 2;
-  const budgetComplete = budgetIdx !== null;
+  const budgetComplete = budgetTouched;
   const interestsComplete = interestTags.length >= 3;
 
   const sectionsDone = [photoComplete, bioComplete, occupationComplete, lifestyleComplete, budgetComplete, interestsComplete];
@@ -140,8 +149,8 @@ export const ProfileCompletionScreen = () => {
       const pets = lifestyleTags.includes('pet_friendly') ? 'ok' : lifestyleTags.includes('no_pets') ? 'no' : undefined;
       const smoking = lifestyleTags.includes('non_smoker') ? 'no' : undefined;
 
-      const budgetStr = budgetIdx !== null && budgetIdx >= 0 && budgetIdx < BUDGET_PRESETS.length
-        ? BUDGET_PRESETS[budgetIdx].label
+      const budgetStr = budgetTouched
+        ? `${formatPriceDisplay(budgetMin)}–${formatPriceDisplay(budgetMax)}/mo`
         : (user?.profileData?.budget || undefined);
 
       const updates: any = {
@@ -261,23 +270,13 @@ export const ProfileCompletionScreen = () => {
         </View>
 
         <SectionHeader icon="dollar-sign" title="Budget range" complete={budgetComplete} />
-        <View style={styles.budgetGrid}>
-          {BUDGET_PRESETS.map((preset, i) => {
-            const selected = budgetIdx === i;
-            return (
-              <Pressable
-                key={i}
-                style={[styles.budgetChip, selected ? styles.budgetChipSelected : null]}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setBudgetIdx(i);
-                }}
-              >
-                <Text style={[styles.budgetText, selected ? styles.budgetTextSelected : null]}>{preset.label}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        <PricePickerPair
+          minValue={budgetMin}
+          maxValue={budgetMax}
+          onMinChange={(val) => { setBudgetMin(val); setBudgetTouched(true); }}
+          onMaxChange={(val) => { setBudgetMax(val); setBudgetTouched(true); }}
+          height={140}
+        />
 
         <SectionHeader icon="tag" title="Interest tags" complete={interestsComplete} />
         <Text style={styles.tagHint}>Select at least 3</Text>
@@ -507,31 +506,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: 8,
     textTransform: 'uppercase',
-  },
-  budgetGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  budgetChip: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-  budgetChipSelected: {
-    backgroundColor: 'rgba(255,107,91,0.12)',
-    borderColor: 'rgba(255,107,91,0.3)',
-  },
-  budgetText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.55)',
-  },
-  budgetTextSelected: {
-    color: ACCENT,
   },
   saveWrap: {
     position: 'absolute',

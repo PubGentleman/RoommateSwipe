@@ -25,6 +25,7 @@ import {
   SUBWAY_LINE_COLORS,
   BOROUGH_NEIGHBORHOODS,
 } from '../../constants/transitData';
+import { PricePickerPair, STANDARD_MAX_VALUE } from '../../components/PricePicker';
 
 const TOTAL_STEPS = 6;
 const CORAL = '#ff6b5b';
@@ -38,14 +39,6 @@ const BEDROOM_OPTIONS = [
   { label: '4BR+', value: 4, hint: '3 roommates' },
 ];
 
-const BUDGET_OPTIONS = [
-  { label: 'Under $1,000', min: 0, max: 1000 },
-  { label: '$1,000 - $1,500', min: 1000, max: 1500 },
-  { label: '$1,500 - $2,000', min: 1500, max: 2000 },
-  { label: '$2,000 - $2,500', min: 2000, max: 2500 },
-  { label: '$2,500 - $3,000', min: 2500, max: 3000 },
-  { label: '$3,000+', min: 3000, max: 5000 },
-];
 
 const AMENITY_OPTIONS = [
   'In-unit laundry', 'Laundry in building', 'Dishwasher', 'Elevator',
@@ -61,7 +54,8 @@ export default function ApartmentPreferencesScreen() {
 
   const [step, setStep] = useState(0);
   const [bedrooms, setBedrooms] = useState<number | null>(null);
-  const [budgetIdx, setBudgetIdx] = useState<number | null>(null);
+  const [budgetMin, setBudgetMin] = useState<number>(1000);
+  const [budgetMax, setBudgetMax] = useState<number>(2000);
   const [selectedTrains, setSelectedTrains] = useState<string[]>([]);
   const [hasCar, setHasCar] = useState(false);
   const [isWfh, setIsWfh] = useState(false);
@@ -74,14 +68,14 @@ export default function ApartmentPreferencesScreen() {
   const canProceed = useCallback(() => {
     switch (step) {
       case 0: return bedrooms !== null;
-      case 1: return budgetIdx !== null;
+      case 1: return true;
       case 2: return selectedTrains.length > 0 || hasCar || isWfh;
       case 3: return moveInFlexible || moveInDate.length > 0;
       case 4: return true;
       case 5: return true;
       default: return false;
     }
-  }, [step, bedrooms, budgetIdx, selectedTrains, hasCar, isWfh, moveInFlexible, moveInDate, amenities]);
+  }, [step, bedrooms, budgetMin, budgetMax, selectedTrains, hasCar, isWfh, moveInFlexible, moveInDate, amenities]);
 
   const handleNext = useCallback(async () => {
     if (!canProceed()) return;
@@ -103,13 +97,12 @@ export default function ApartmentPreferencesScreen() {
   }, [step, navigation]);
 
   const handleSave = async () => {
-    if (!user || budgetIdx === null || bedrooms === null) return;
+    if (!user || bedrooms === null) return;
     setSaving(true);
-    const budget = BUDGET_OPTIONS[budgetIdx];
     const prefs: ApartmentPreferences = {
       desiredBedrooms: bedrooms,
-      budgetPerPersonMin: budget.min,
-      budgetPerPersonMax: budget.max,
+      budgetPerPersonMin: budgetMin,
+      budgetPerPersonMax: budgetMax,
       preferredTrains: selectedTrains,
       preferredNeighborhoods: neighborhoods,
       amenityMustHaves: amenities,
@@ -212,26 +205,13 @@ export default function ApartmentPreferencesScreen() {
       <ThemedText style={styles.stepHint}>
         This is your share, not the total rent
       </ThemedText>
-      {BUDGET_OPTIONS.map((opt, i) => (
-        <Pressable
-          key={i}
-          style={[
-            styles.budgetRow,
-            budgetIdx === i && styles.chipSelected,
-          ]}
-          onPress={() => setBudgetIdx(i)}
-        >
-          <ThemedText style={[
-            styles.budgetLabel,
-            budgetIdx === i && styles.chipLabelSelected,
-          ]}>
-            {opt.label}
-          </ThemedText>
-          {budgetIdx === i ? (
-            <Feather name="check-circle" size={18} color={CORAL} />
-          ) : null}
-        </Pressable>
-      ))}
+      <PricePickerPair
+        minValue={budgetMin}
+        maxValue={budgetMax}
+        onMinChange={setBudgetMin}
+        onMaxChange={setBudgetMax}
+        height={160}
+      />
     </Animated.View>
   );
 
@@ -538,13 +518,6 @@ const styles = StyleSheet.create({
   chipLabel: { fontSize: 16, fontWeight: '600', color: '#fff' },
   chipLabelSelected: { color: CORAL },
   chipHint: { fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 2 },
-  budgetRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#1c1c1c', borderRadius: 14, paddingVertical: 16,
-    paddingHorizontal: 18, borderWidth: 1.5, borderColor: '#2a2a2a',
-    marginBottom: 8,
-  },
-  budgetLabel: { fontSize: 16, fontWeight: '600', color: '#fff' },
   trainGrid: {
     flexDirection: 'row', flexWrap: 'wrap', gap: 8,
   },

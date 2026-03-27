@@ -259,25 +259,6 @@ export const RoommateFilterSheet: React.FC<Props> = ({ visible, onClose, onApply
               onMinChange={handleMinChange}
               onMaxChange={handleMaxChange}
             />
-            <View style={s.budgetPresets}>
-              {[
-                { label: '$500-$1,000', min: 500, max: 1000 },
-                { label: '$1,000-$2,000', min: 1000, max: 2000 },
-                { label: '$2,000-$3,500', min: 2000, max: 3500 },
-                { label: '$3,500+', min: 3500, max: STANDARD_MAX_VALUE },
-              ].map(preset => {
-                const isActive = filters.budgetMin === preset.min && filters.budgetMax === preset.max;
-                return (
-                  <Pressable
-                    key={preset.label}
-                    style={[s.filterChip, isActive ? s.filterChipActive : null]}
-                    onPress={() => setFilters(f => ({ ...f, budgetMin: preset.min, budgetMax: preset.max }))}
-                  >
-                    <ThemedText style={[s.filterChipText, isActive ? s.filterChipTextActive : null]}>{preset.label}</ThemedText>
-                  </Pressable>
-                );
-              })}
-            </View>
           </View>
 
           <View style={s.section}>
@@ -496,11 +477,6 @@ const s = StyleSheet.create({
     fontSize: 18,
     color: 'rgba(255,255,255,0.4)',
     fontWeight: '600',
-  },
-  budgetPresets: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
   },
   chipRow: {
     flexDirection: 'row',
