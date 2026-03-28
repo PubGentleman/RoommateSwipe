@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, Pressable } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Pressable, Platform } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenKeyboardAwareScrollView } from '../../components/ScreenKeyboardAwareScrollView';
 import { useAuth } from '../../contexts/AuthContext';
@@ -150,10 +151,14 @@ export const LoginScreen = () => {
           <Pressable style={styles.socialBtn} onPress={async () => await showAlert({ title: 'Google Sign In', message: 'Google authentication will be available in a future update.', variant: 'info' })}>
             <Text style={styles.socialBtnText}>Google</Text>
           </Pressable>
-          <Pressable style={styles.socialBtn} onPress={async () => await showAlert({ title: 'Apple Sign In', message: 'Apple authentication will be available in a future update.', variant: 'info' })}>
-            <Feather name="smartphone" size={16} color="rgba(255,255,255,0.75)" />
-            <Text style={styles.socialBtnText}>Apple</Text>
-          </Pressable>
+          {Platform.OS !== 'android' ? (
+            <Pressable style={styles.socialBtn} onPress={async () => await showAlert({ title: 'Apple Sign In', message: 'Apple authentication will be available in a future update.', variant: 'info' })}>
+              <Svg width={18} height={18} viewBox="0 0 24 24" fill="rgba(255,255,255,0.75)">
+                <Path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.32 2.32-2.11 4.45-3.74 4.25z" />
+              </Svg>
+              <Text style={styles.socialBtnText}>Apple</Text>
+            </Pressable>
+          ) : null}
         </View>
 
         <View style={styles.switchRow}>
