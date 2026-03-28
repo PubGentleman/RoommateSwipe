@@ -19,6 +19,8 @@ export const LoginScreen = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [emailFocused, setEmailFocused] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
 
   if (isSignUp) {
     return <SignUpFlow onBackToLogin={() => setIsSignUp(false)} />;
@@ -58,38 +60,42 @@ export const LoginScreen = () => {
 
       <View style={styles.content}>
         <View style={styles.field}>
-          <Text style={styles.fieldLabel}>EMAIL</Text>
-          <View style={styles.inputWrap}>
-            <Feather name="mail" size={16} color="rgba(255,255,255,0.35)" style={styles.inputIcon} />
+          <Text style={styles.fieldLabel}>Email</Text>
+          <View style={[styles.inputWrap, emailFocused && styles.inputWrapFocused]}>
+            <Feather name="mail" size={16} color={emailFocused ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.35)'} />
             <TextInput
               style={styles.input}
               placeholder="you@example.com"
-              placeholderTextColor="rgba(255,255,255,0.35)"
+              placeholderTextColor="rgba(255,255,255,0.3)"
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
+              onFocus={() => setEmailFocused(true)}
+              onBlur={() => setEmailFocused(false)}
             />
           </View>
         </View>
 
         <View style={styles.field}>
-          <Text style={styles.fieldLabel}>PASSWORD</Text>
-          <View style={styles.inputWrap}>
-            <Feather name="lock" size={16} color="rgba(255,255,255,0.35)" style={styles.inputIcon} />
+          <Text style={styles.fieldLabel}>Password</Text>
+          <View style={[styles.inputWrap, passwordFocused && styles.inputWrapFocused]}>
+            <Feather name="lock" size={16} color={passwordFocused ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.35)'} />
             <TextInput
               style={styles.input}
-              placeholder={String.fromCharCode(8226).repeat(8)}
-              placeholderTextColor="rgba(255,255,255,0.35)"
+              placeholder="Enter your password"
+              placeholderTextColor="rgba(255,255,255,0.3)"
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
               textContentType="password"
               autoComplete="password"
               passwordRules="minlength: 6;"
+              onFocus={() => setPasswordFocused(true)}
+              onBlur={() => setPasswordFocused(false)}
             />
             <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn} hitSlop={8}>
-              <Feather name={showPassword ? 'eye-off' : 'eye'} size={16} color="rgba(255,255,255,0.35)" />
+              <Feather name={showPassword ? 'eye-off' : 'eye'} size={18} color="rgba(255,255,255,0.4)" />
             </Pressable>
           </View>
         </View>
@@ -142,7 +148,6 @@ export const LoginScreen = () => {
 
         <View style={styles.socialRow}>
           <Pressable style={styles.socialBtn} onPress={async () => await showAlert({ title: 'Google Sign In', message: 'Google authentication will be available in a future update.', variant: 'info' })}>
-            <Feather name="globe" size={16} color="rgba(255,255,255,0.75)" />
             <Text style={styles.socialBtnText}>Google</Text>
           </Pressable>
           <Pressable style={styles.socialBtn} onPress={async () => await showAlert({ title: 'Apple Sign In', message: 'Apple authentication will be available in a future update.', variant: 'info' })}>
@@ -199,42 +204,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   field: {
-    marginBottom: 13,
+    marginBottom: 14,
   },
   fieldLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.6)',
-    letterSpacing: 0.6,
-    marginBottom: 7,
+    fontSize: 12,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.45)',
+    marginBottom: 6,
+    marginLeft: 2,
   },
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.07)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: 'rgba(255,255,255,0.1)',
     borderRadius: 14,
+    paddingHorizontal: 14,
   },
-  inputIcon: {
-    position: 'absolute',
-    left: 18,
-    zIndex: 1,
-    color: 'rgba(255,255,255,0.35)',
+  inputWrapFocused: {
+    borderColor: '#F06464',
   },
   input: {
     flex: 1,
     paddingVertical: 14,
-    paddingLeft: 48,
-    paddingRight: 42,
-    fontSize: 14,
+    paddingHorizontal: 12,
+    fontSize: 15,
     fontWeight: '400',
-    color: 'rgba(255,255,255,0.85)',
+    color: '#FFFFFF',
+    backgroundColor: 'transparent',
   },
   eyeBtn: {
-    position: 'absolute',
-    right: 14,
-    zIndex: 1,
+    padding: 4,
   },
   forgotRow: {
     alignItems: 'flex-end',
