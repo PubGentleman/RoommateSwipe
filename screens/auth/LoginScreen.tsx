@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, Pressable, Platform } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Pressable, Platform, Image } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenKeyboardAwareScrollView } from '../../components/ScreenKeyboardAwareScrollView';
@@ -143,20 +143,19 @@ export const LoginScreen = () => {
 
         <View style={styles.orRow}>
           <View style={styles.orLine} />
-          <Text style={styles.orText}>OR CONTINUE WITH</Text>
+          <Text style={styles.orText}>or</Text>
           <View style={styles.orLine} />
         </View>
 
         <View style={styles.socialRow}>
-          <Pressable style={styles.socialBtn} onPress={async () => await showAlert({ title: 'Google Sign In', message: 'Google authentication will be available in a future update.', variant: 'info' })}>
-            <Text style={styles.socialBtnText}>Google</Text>
+          <Pressable style={styles.socialIconBtn} onPress={async () => await showAlert({ title: 'Google Sign In', message: 'Google authentication will be available in a future update.', variant: 'info' })}>
+            <Image source={require('../../assets/icons/google.png')} style={styles.googleIcon} resizeMode="contain" />
           </Pressable>
           {Platform.OS !== 'android' ? (
-            <Pressable style={styles.socialBtn} onPress={async () => await showAlert({ title: 'Apple Sign In', message: 'Apple authentication will be available in a future update.', variant: 'info' })}>
-              <Svg width={18} height={18} viewBox="0 0 24 24" fill="rgba(255,255,255,0.75)">
+            <Pressable style={styles.socialIconBtn} onPress={async () => await showAlert({ title: 'Apple Sign In', message: 'Apple authentication will be available in a future update.', variant: 'info' })}>
+              <Svg width={24} height={24} viewBox="0 0 24 24" fill="#FFFFFF">
                 <Path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.32 2.32-2.11 4.45-3.74 4.25z" />
               </Svg>
-              <Text style={styles.socialBtnText}>Apple</Text>
             </Pressable>
           ) : null}
         </View>
@@ -287,40 +286,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginBottom: 16,
+    marginVertical: 20,
   },
   orLine: {
     flex: 1,
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.07)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
   orText: {
-    fontSize: 10.5,
-    fontWeight: '600',
+    fontSize: 12,
     color: 'rgba(255,255,255,0.35)',
-    letterSpacing: 0.6,
   },
   socialRow: {
     flexDirection: 'row',
-    gap: 10,
+    justifyContent: 'center',
+    gap: 16,
     marginBottom: 26,
   },
-  socialBtn: {
-    flex: 1,
-    height: 48,
+  socialIconBtn: {
+    width: 56,
+    height: 56,
     borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.07)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    flexDirection: 'row',
+    borderColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
   },
-  socialBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.75)',
+  googleIcon: {
+    width: 24,
+    height: 24,
   },
   switchRow: {
     flexDirection: 'row',
