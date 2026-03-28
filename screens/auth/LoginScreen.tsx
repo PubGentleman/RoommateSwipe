@@ -218,14 +218,14 @@ const styles = StyleSheet.create({
   },
   inputIcon: {
     position: 'absolute',
-    left: 14,
+    left: 18,
     zIndex: 1,
     color: 'rgba(255,255,255,0.35)',
   },
   input: {
     flex: 1,
     paddingVertical: 14,
-    paddingLeft: 42,
+    paddingLeft: 48,
     paddingRight: 42,
     fontSize: 14,
     fontWeight: '400',
