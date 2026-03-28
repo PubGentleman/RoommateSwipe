@@ -63,7 +63,9 @@ export const LoginScreen = () => {
         <View style={styles.field}>
           <Text style={styles.fieldLabel}>Email</Text>
           <View style={[styles.inputWrap, emailFocused && styles.inputWrapFocused]}>
-            <Feather name="mail" size={16} color={emailFocused ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.35)'} />
+            <View style={{ paddingLeft: 12 }}>
+              <Feather name="mail" size={16} color={emailFocused ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.35)'} />
+            </View>
             <TextInput
               style={styles.input}
               placeholder="you@example.com"
@@ -72,6 +74,9 @@ export const LoginScreen = () => {
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="off"
+              textContentType="none"
               onFocus={() => setEmailFocused(true)}
               onBlur={() => setEmailFocused(false)}
             />
@@ -81,7 +86,9 @@ export const LoginScreen = () => {
         <View style={styles.field}>
           <Text style={styles.fieldLabel}>Password</Text>
           <View style={[styles.inputWrap, passwordFocused && styles.inputWrapFocused]}>
-            <Feather name="lock" size={16} color={passwordFocused ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.35)'} />
+            <View style={{ paddingLeft: 12 }}>
+              <Feather name="lock" size={16} color={passwordFocused ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.35)'} />
+            </View>
             <TextInput
               style={styles.input}
               placeholder="Enter your password"
@@ -220,11 +227,11 @@ const styles = StyleSheet.create({
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.07)',
+    backgroundColor: '#242538',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
     borderRadius: 14,
-    paddingHorizontal: 14,
+    overflow: 'hidden',
   },
   inputWrapFocused: {
     borderColor: '#F06464',
