@@ -118,24 +118,25 @@ export const ProfileScreen = () => {
 
   const scrollRef = useRef<any>(null);
 
+  const userId = user?.id;
   useFocusEffect(
     React.useCallback(() => {
       scrollRef.current?.scrollTo?.({ y: 0, animated: false });
       checkAndUpdateBoostStatus();
       loadProfileStats();
-      if (user) {
-        StorageService.getInterestCardsForRenter(user.id).then(cards => {
+      if (userId) {
+        StorageService.getInterestCardsForRenter(userId).then(cards => {
           setPendingInterestCount(cards.filter(c => c.status === 'pending').length);
         });
         import('../../lib/supabase').then(({ supabase }) => {
-          supabase.from('profiles').select('search_paused, search_paused_at').eq('user_id', user.id).single().then(({ data }) => {
+          supabase.from('profiles').select('search_paused, search_paused_at').eq('user_id', userId).single().then(({ data }) => {
             if (data?.search_paused !== undefined) setSearchPaused(!!data.search_paused);
             if (data?.search_paused_at) setSearchPausedAt(data.search_paused_at);
           });
         }).catch(() => {});
-        getAffiliateForUser(user.id).then(aff => setHasAffiliate(!!aff)).catch(() => {});
+        getAffiliateForUser(userId).then(aff => setHasAffiliate(!!aff)).catch(() => {});
       }
-    }, [user, loadProfileStats])
+    }, [userId, loadProfileStats])
   );
 
   const [boostTimeLabel, setBoostTimeLabel] = useState('');
