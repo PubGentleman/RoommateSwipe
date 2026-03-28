@@ -86,57 +86,68 @@ export const ProfileScreen = () => {
   const [hostInquiryCount, setHostInquiryCount] = useState(0);
   const [hostViewCount, setHostViewCount] = useState(0);
 
-  const loadProfileStats = React.useCallback(async () => {
-    if (!user) return;
-    try {
-      if (user.role === 'host') {
-        const allProperties = await StorageService.getProperties();
-        const myListings = allProperties.filter(p => p.hostId === user.id);
-        setHostListingCount(myListings.length);
-        const activeCount = myListings.filter(p => p.available && !p.rentedDate).length;
-        setHostViewCount(activeCount);
-        const interestCards = await StorageService.getInterestCardsForHost(user.id);
-        setHostInquiryCount(interestCards.length);
-      } else {
-        const matches = await StorageService.getMatches();
-        const userMatches = matches.filter(m =>
-          m.userId1 === user.id || m.userId2 === user.id
-        );
-        setMatchCount(userMatches.length);
-        const allUsers = await StorageService.getUsers();
-        const currentUser = allUsers.find(u => u.id === user.id);
-        const receivedLikes = currentUser?.receivedLikes || [];
-        const regularLikes = receivedLikes.filter((l: any) => !l.isSuperLike);
-        const superLikes = receivedLikes.filter((l: any) => l.isSuperLike);
-        setProfileViewCount(regularLikes.length);
-        setLikesCount(superLikes.length);
-      }
-    } catch (e) {
-      console.warn('Failed to load profile stats:', e);
-    }
-  }, [user?.id, user?.role]);
-
   const scrollRef = useRef<any>(null);
 
   const userId = user?.id;
+  const userRole = user?.role;
   useFocusEffect(
     React.useCallback(() => {
+      let isMounted = true;
       scrollRef.current?.scrollTo?.({ y: 0, animated: false });
       checkAndUpdateBoostStatus();
-      loadProfileStats();
-      if (userId) {
-        StorageService.getInterestCardsForRenter(userId).then(cards => {
+
+      if (!userId) return () => { isMounted = false; };
+
+      const loadData = async () => {
+        try {
+          if (userRole === 'host') {
+            const allProperties = await StorageService.getProperties();
+            if (!isMounted) return;
+            const myListings = allProperties.filter(p => p.hostId === userId);
+            setHostListingCount(myListings.length);
+            setHostViewCount(myListings.filter(p => p.available && !p.rentedDate).length);
+            const interestCards = await StorageService.getInterestCardsForHost(userId);
+            if (!isMounted) return;
+            setHostInquiryCount(interestCards.length);
+          } else {
+            const matches = await StorageService.getMatches();
+            if (!isMounted) return;
+            const userMatches = matches.filter(m => m.userId1 === userId || m.userId2 === userId);
+            setMatchCount(userMatches.length);
+            const allUsers = await StorageService.getUsers();
+            if (!isMounted) return;
+            const currentUser = allUsers.find(u => u.id === userId);
+            const receivedLikes = currentUser?.receivedLikes || [];
+            setProfileViewCount(receivedLikes.filter((l: any) => !l.isSuperLike).length);
+            setLikesCount(receivedLikes.filter((l: any) => l.isSuperLike).length);
+          }
+
+          const cards = await StorageService.getInterestCardsForRenter(userId);
+          if (!isMounted) return;
           setPendingInterestCount(cards.filter(c => c.status === 'pending').length);
-        });
-        import('../../lib/supabase').then(({ supabase }) => {
-          supabase.from('profiles').select('search_paused, search_paused_at').eq('user_id', userId).single().then(({ data }) => {
-            if (data?.search_paused !== undefined) setSearchPaused(!!data.search_paused);
-            if (data?.search_paused_at) setSearchPausedAt(data.search_paused_at);
-          });
-        }).catch(() => {});
-        getAffiliateForUser(userId).then(aff => setHasAffiliate(!!aff)).catch(() => {});
-      }
-    }, [userId, loadProfileStats])
+
+          const { supabase } = await import('../../lib/supabase');
+          const { data } = await supabase
+            .from('profiles')
+            .select('search_paused, search_paused_at')
+            .eq('user_id', userId)
+            .single();
+          if (!isMounted) return;
+          if (data?.search_paused !== undefined) setSearchPaused(!!data.search_paused);
+          if (data?.search_paused_at) setSearchPausedAt(data.search_paused_at);
+
+          const aff = await getAffiliateForUser(userId);
+          if (!isMounted) return;
+          setHasAffiliate(!!aff);
+        } catch (e) {
+          console.warn('Failed to load profile data:', e);
+        }
+      };
+
+      loadData();
+
+      return () => { isMounted = false; };
+    }, [userId, userRole])
   );
 
   const [boostTimeLabel, setBoostTimeLabel] = useState('');

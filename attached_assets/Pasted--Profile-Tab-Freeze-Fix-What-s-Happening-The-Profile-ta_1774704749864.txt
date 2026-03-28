@@ -1,0 +1,158 @@
+# Profile Tab Freeze Fix
+
+## What's Happening
+
+The Profile tab freezes when switching between bottom navigation tabs. This is caused by one or more `useEffect` or `useFocusEffect` hooks in `ProfileScreen.tsx` running in an infinite loop or blocking the main thread. Recent changes added several new Supabase reads and state updates to this screen — any one of them could be causing the freeze.
+
+---
+
+## Step 1 — Audit All Effects in ProfileScreen
+
+**File:** `screens/shared/ProfileScreen.tsx`
+
+Go through every `useEffect` and `useFocusEffect` in the file. For each one, check:
+
+1. Does it have a proper dependency array?
+2. Does it update state that is also in its dependency array? (This causes infinite loops)
+3. Does it have a cleanup function if it sets up a subscription or listener?
+
+The most likely culprit is the Supabase data fetch inside `useFocusEffect`. It should look like this — if it doesn't have the `return` cleanup, add it:
+
+```ts
+useFocusEffect(
+  useCallback(() => {
+    let isMounted = true; // ← add this flag
+
+    const fetchProfile = async () => {
+      try {
+        const { supabase } = await import('../../lib/supabase');
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || !isMounted) return;
+
+        const { data } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+
+        if (!isMounted) return; // ← check before every setState
+        if (data?.search_paused !== undefined) setSearchPaused(!!data.search_paused);
+        if (data?.search_paused_at) setSearchPausedAt(data.search_paused_at);
+        // ... other state updates
+      } catch (e) {
+        console.error('ProfileScreen fetch error:', e);
+      }
+    };
+
+    fetchProfile();
+
+    return () => {
+      isMounted = false; // ← cleanup — prevents state updates after unmount
+    };
+  }, []) // ← empty dependency array — only runs on focus, not on every render
+);
+```
+
+The `isMounted` flag prevents setState calls from firing after the component unmounts (when the user switches tabs), which is a common cause of freezes and memory leaks.
+
+---
+
+## Step 2 — Check for State-Triggered Re-renders
+
+Look for any `useEffect` that watches a state variable and also sets that same state variable. For example:
+
+```ts
+// BAD — infinite loop
+useEffect(() => {
+  setSomeState(computeValue(someState)); // sets the state it's watching
+}, [someState]);
+```
+
+Fix by either removing the dependency or computing the value without setting state:
+
+```ts
+// GOOD — computed value, no loop
+const computedValue = useMemo(() => computeValue(someState), [someState]);
+```
+
+---
+
+## Step 3 — Defer Heavy Operations Off the Main Thread
+
+If the profile screen is doing multiple Supabase queries sequentially on focus, combine them into a single query using `.select()` with multiple fields instead of separate round trips:
+
+```ts
+// Before — multiple queries (slow, blocks thread)
+const { data: profile } = await supabase.from('profiles').select('search_paused').eq('user_id', userId).single();
+const { data: plan } = await supabase.from('profiles').select('host_plan').eq('user_id', userId).single();
+
+// After — single query (fast)
+const { data: profile } = await supabase
+  .from('profiles')
+  .select('search_paused, search_paused_at, host_plan, host_subscription_status, last_active_at')
+  .eq('user_id', userId)
+  .single();
+```
+
+---
+
+## Step 4 — Add Error Boundaries Around New Features
+
+Wrap the new pause card and support button sections in try/catch or null checks so a rendering error in one section doesn't crash the whole screen:
+
+```tsx
+// Pause card — guard against null state
+{userRole === 'renter' && searchPaused !== undefined && (
+  <View style={styles.pauseCard}>
+    {/* pause card content */}
+  </View>
+)}
+```
+
+---
+
+## Step 5 — Check for Missing Navigation Dependencies
+
+If `navigation` is used inside a `useEffect` without being in the dependency array, React may throw a warning that causes erratic behavior. Make sure any effect that calls `navigation.navigate()` includes `navigation` in its deps:
+
+```ts
+useEffect(() => {
+  if (someCondition) navigation.navigate('SomeScreen');
+}, [someCondition, navigation]); // ← navigation must be here
+```
+
+---
+
+## Step 6 — Verify Supabase Realtime Subscriptions Are Cleaned Up
+
+If any realtime subscription was added to ProfileScreen (for live updates to pause state, plan, etc.), confirm it has a proper unsubscribe in the cleanup:
+
+```ts
+useFocusEffect(
+  useCallback(() => {
+    const subscription = supabase
+      .channel('profile-changes')
+      .on('postgres_changes', { ... }, handler)
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe(); // ← MUST have this or it leaks
+    };
+  }, [])
+);
+```
+
+A leaked realtime subscription keeps firing state updates even after the user navigates away, which freezes the tab switcher.
+
+---
+
+## Summary
+
+| Check | What to look for |
+|---|---|
+| `useFocusEffect` | Add `isMounted` flag + empty dependency array |
+| `useEffect` loops | Any effect that sets a state variable it also watches |
+| Multiple Supabase queries | Combine into one `.select()` call |
+| New UI sections | Wrap in null guards so rendering errors don't crash the screen |
+| Realtime subscriptions | Confirm `.unsubscribe()` is called in cleanup |
+| `navigation` in effects | Add `navigation` to dependency array |
