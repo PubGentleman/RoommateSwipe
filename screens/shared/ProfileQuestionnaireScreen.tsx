@@ -46,7 +46,7 @@ import { getCoordinatesFromNeighborhood } from '../../utils/locationData';
 import { BOROUGH_NEIGHBORHOODS } from '../../constants/transitData';
 import { updateProfile } from '../../services/profileService';
 
-const TOTAL_STEPS = 10;
+const TOTAL_STEPS = 11;
 
 function EmojiTileGrid({
   options,
@@ -270,7 +270,8 @@ type StepId =
   | 'housing'
   | 'interests'
   | 'personality'
-  | 'profileNote';
+  | 'profileNote'
+  | 'idealRoommate';
 
 const STEP_ORDER: StepId[] = [
   'photos',
@@ -284,6 +285,7 @@ const STEP_ORDER: StepId[] = [
   'interests',
   'personality',
   'profileNote',
+  'idealRoommate',
 ];
 
 const ONBOARDING_STEPS: StepId[] = [
@@ -305,6 +307,7 @@ const STEP_TITLES: Record<StepId, string> = {
   interests: 'Interests',
   personality: 'Your Living Style',
   profileNote: 'In Your Own Words',
+  idealRoommate: 'Your Ideal Roommate',
 };
 
 const STEP_SUBTITLES: Record<StepId, string> = {
@@ -319,6 +322,7 @@ const STEP_SUBTITLES: Record<StepId, string> = {
   interests: 'Pick at least 1 tag from each category.',
   personality: 'How you live with others.',
   profileNote: 'Write anything you want potential roommates to know about you.',
+  idealRoommate: 'Describe your ideal roommate in your own words. Pi uses this to find better matches.',
 };
 
 const STEP_ICONS: Record<StepId, keyof typeof Feather.glyphMap> = {
@@ -333,6 +337,7 @@ const STEP_ICONS: Record<StepId, keyof typeof Feather.glyphMap> = {
   interests: 'star',
   personality: 'cpu',
   profileNote: 'edit-3',
+  idealRoommate: 'cpu',
 };
 
 export const ProfileQuestionnaireScreen = () => {
@@ -414,6 +419,8 @@ export const ProfileQuestionnaireScreen = () => {
   const [budgetMin, setBudgetMin] = useState(user?.profileData?.budgetMin?.toString() || '');
   const [profileNote, setProfileNote] = useState(user?.profileData?.profileNote || '');
   const profileNoteCharLimit = 500;
+  const [idealRoommateText, setIdealRoommateText] = useState(user?.profileData?.ideal_roommate_text || user?.ideal_roommate_text || '');
+  const idealRoommateCharLimit = 500;
 
   useEffect(() => {
     if (user?.photos && user.photos.length > 0) {
@@ -569,6 +576,7 @@ export const ProfileQuestionnaireScreen = () => {
         dealbreakers,
         personalityAnswers: Object.keys(personalityAnswers).length > 0 ? personalityAnswers : undefined,
         profileNote: profileNote.trim() || undefined,
+        ideal_roommate_text: idealRoommateText.trim() || undefined,
         preferences: {
           sleepSchedule,
           cleanliness,
@@ -634,6 +642,7 @@ export const ProfileQuestionnaireScreen = () => {
       await updateProfile({
         preferred_neighborhoods: preferredNeighborhoods.length > 0 ? preferredNeighborhoods : undefined,
         zip_code: zipCode.trim() || undefined,
+        ideal_roommate_text: idealRoommateText.trim() || undefined,
       });
     } catch (e) {
       console.warn('[ProfileQuestionnaire] Profile sync failed:', e);
@@ -1207,16 +1216,80 @@ export const ProfileQuestionnaireScreen = () => {
             </View>
 
             <TouchableOpacity
+              onPress={() => handleNext()}
+              style={{ alignItems: 'center', marginTop: 16 }}
+            >
+              <Text style={{ color: theme.textSecondary, fontSize: 14 }}>
+                Skip for now
+              </Text>
+            </TouchableOpacity>
+          </View>
+        );
+      }
+
+      case 'idealRoommate': {
+        return (
+          <View style={styles.stepContainer}>
+            <View style={styles.stepHeader}>
+              <Feather name="cpu" size={28} color="#a855f7" />
+              <Text style={[styles.stepTitle, { color: theme.text }]}>
+                Your ideal roommate
+              </Text>
+              <Text style={[styles.stepSubtitle, { color: theme.textSecondary }]}>
+                Describe your perfect roommate in your own words. Pi, our AI matchmaker, reads this to find people who actually fit what you're looking for — beyond just checkboxes.
+              </Text>
+            </View>
+
+            <View style={{
+              backgroundColor: theme.backgroundSecondary,
+              borderRadius: 16,
+              borderWidth: 2,
+              borderColor: idealRoommateText.length > 0 ? '#a855f7' : theme.border,
+              padding: 16,
+            }}>
+              <TextInput
+                style={{
+                  color: theme.text,
+                  fontSize: 16,
+                  lineHeight: 24,
+                  minHeight: 140,
+                  textAlignVertical: 'top',
+                }}
+                value={idealRoommateText}
+                onChangeText={(text) => setIdealRoommateText(text.slice(0, idealRoommateCharLimit))}
+                placeholder="e.g. Someone who's clean but not uptight about it. Ideally works a 9-5 so we're on similar schedules. I'd love a roommate who's down to grab dinner sometimes but also totally fine doing their own thing. No heavy partiers please — I'm an early riser."
+                placeholderTextColor={theme.textSecondary}
+                multiline
+                maxLength={idealRoommateCharLimit}
+              />
+              <Text style={{
+                color: idealRoommateText.length > idealRoommateCharLimit * 0.9 ? '#ef4444' : theme.textSecondary,
+                fontSize: 12,
+                textAlign: 'right',
+                marginTop: 8,
+              }}>
+                {idealRoommateText.length}/{idealRoommateCharLimit}
+              </Text>
+            </View>
+
+            <View style={{
+              flexDirection: 'row',
+              gap: 10,
+              padding: 14,
+              backgroundColor: 'rgba(168,85,247,0.08)',
+              borderRadius: 14,
+              marginTop: 12,
+            }}>
+              <Feather name="cpu" size={16} color="#a855f7" />
+              <Text style={{ color: theme.textSecondary, fontSize: 13, flex: 1, lineHeight: 18 }}>
+                Pi reads this to understand what matters to you beyond the standard filters. The more specific you are, the better your matches.
+              </Text>
+            </View>
+
+            <TouchableOpacity
               onPress={async () => {
-                setProfileNote('');
-                const data = buildProfileData();
-                if (data.profileData) data.profileData.profileNote = '';
-                await updateUser(data);
-                if (user?.onboardingStep === 'profile') {
-                  await completeOnboardingStep(user?.role === 'host' ? 'hostType' : 'plan');
-                } else {
-                  navigation.goBack();
-                }
+                setIdealRoommateText('');
+                await handleSave();
               }}
               style={{ alignItems: 'center', marginTop: 16 }}
             >

@@ -73,6 +73,7 @@ export const EditProfileScreen = () => {
   const [bedrooms, setBedrooms] = useState(user?.profileData?.preferences?.bedrooms?.toString() || '');
   
   const [profileNote, setProfileNote] = useState(user?.profileData?.profileNote || '');
+  const [idealRoommateText, setIdealRoommateText] = useState(user?.profileData?.ideal_roommate_text || user?.ideal_roommate_text || '');
   const [isSaving, setIsSaving] = useState(false);
 
   const pickImage = async () => {
@@ -234,6 +235,7 @@ export const EditProfileScreen = () => {
         bathrooms: bedrooms.trim() ? parseInt(bedrooms) : undefined,
         profile_note: profileNote.trim() || null,
         profile_note_updated_at: profileNote.trim() ? new Date().toISOString() : null,
+        ideal_roommate_text: idealRoommateText.trim() || null,
       });
 
       console.log('[EditProfileScreen] Supabase profile updated successfully');
@@ -257,6 +259,7 @@ export const EditProfileScreen = () => {
         interests: interests.length > 0 ? interests : undefined,
         gender,
         profileNote: profileNote.trim() || undefined,
+        ideal_roommate_text: idealRoommateText.trim() || undefined,
         preferences: {
           sleepSchedule,
           cleanliness,
@@ -605,6 +608,37 @@ export const EditProfileScreen = () => {
               <Feather name="eye" size={11} color={theme.textSecondary} />
               <ThemedText style={{ color: theme.textSecondary, fontSize: 11 }}>
                 Visible to your matches · You control this
+              </ThemedText>
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.xs }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Feather name="cpu" size={14} color="#a855f7" />
+                <ThemedText style={[Typography.small, { color: '#a855f7' }]}>
+                  Your ideal roommate
+                </ThemedText>
+              </View>
+              <ThemedText style={[Typography.small, { color: idealRoommateText.length > 450 ? '#ef4444' : theme.textSecondary }]}>
+                {idealRoommateText.length}/500
+              </ThemedText>
+            </View>
+            <TextInput
+              style={[styles.input, styles.textArea, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: idealRoommateText.length > 0 ? '#a855f7' + '60' : theme.border }]}
+              placeholder="Describe your ideal roommate in your own words. Pi uses this to find better matches for you..."
+              placeholderTextColor={theme.textSecondary}
+              value={idealRoommateText}
+              onChangeText={(text) => setIdealRoommateText(text.slice(0, 500))}
+              multiline
+              maxLength={500}
+              numberOfLines={4}
+              textAlignVertical="top"
+            />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+              <Feather name="cpu" size={11} color="#a855f7" />
+              <ThemedText style={{ color: theme.textSecondary, fontSize: 11 }}>
+                Pi reads this to improve your match quality
               </ThemedText>
             </View>
           </View>

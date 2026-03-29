@@ -4,7 +4,11 @@ import { ThemedText } from './ThemedText';
 import { Feather } from './VectorIcons';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../hooks/useTheme';
+import { useAuth } from '../contexts/AuthContext';
 import { Spacing, BorderRadius } from '../constants/theme';
+import { getCachedOrGenerateInsight } from '../services/piMatchingService';
+import { normalizeRenterPlan, getRenterPlanLimits } from '../constants/renterPlanLimits';
+import type { PiMatchInsight } from '../types/models';
 
 interface Props {
   visible: boolean;
@@ -15,17 +19,25 @@ interface Props {
   onSendMessage?: (text: string) => void;
 }
 
+const PI_PURPLE = '#a855f7';
+
 export const WhyThisMatchModal: React.FC<Props> = ({
   visible, profileId, profileName, compatibilityScore, onClose, onSendMessage,
 }) => {
   const { theme } = useTheme();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
+  const [piInsight, setPiInsight] = useState<PiMatchInsight | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const plan = normalizeRenterPlan(user?.subscription?.plan);
+  const limits = getRenterPlanLimits(plan);
 
   useEffect(() => {
     if (visible && profileId) {
       setResult(null);
+      setPiInsight(null);
       setError(null);
       fetchExplanation();
     }
@@ -35,11 +47,16 @@ export const WhyThisMatchModal: React.FC<Props> = ({
     setLoading(true);
     setError(null);
     try {
-      const response = await supabase.functions.invoke('explain-match', {
-        body: { matchedProfileId: profileId, targetProfileId: profileId },
-      });
-      if (response.error) throw new Error(response.error.message);
-      setResult(response.data);
+      const [explainResponse, insight] = await Promise.all([
+        supabase.functions.invoke('explain-match', {
+          body: { matchedProfileId: profileId, targetProfileId: profileId },
+        }),
+        getCachedOrGenerateInsight(profileId, compatibilityScore),
+      ]);
+
+      if (explainResponse.error) throw new Error(explainResponse.error.message);
+      setResult(explainResponse.data);
+      setPiInsight(insight);
     } catch (e: any) {
       setResult({
         headline: `${profileName} looks like an interesting potential match worth exploring.`,
@@ -56,6 +73,27 @@ export const WhyThisMatchModal: React.FC<Props> = ({
     }
   };
 
+  const getVisibleHighlights = (): string[] => {
+    if (!piInsight?.highlights?.length) return [];
+    if (limits.piInsightLevel === 'full') return piInsight.highlights;
+    if (limits.piInsightLevel === 'highlights') return piInsight.highlights.slice(0, 3);
+    return piInsight.highlights.slice(0, 1);
+  };
+
+  const getVisibleWarnings = (): string[] => {
+    if (!piInsight?.warnings?.length) return [];
+    if (limits.piInsightLevel === 'full') return piInsight.warnings;
+    if (limits.piInsightLevel === 'highlights') return piInsight.warnings.slice(0, 1);
+    return [];
+  };
+
+  const confidenceColor = (c: string) => {
+    if (c === 'strong') return '#4CAF50';
+    if (c === 'good') return '#8BC34A';
+    if (c === 'moderate') return '#FF9800';
+    return '#F44336';
+  };
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
@@ -69,7 +107,7 @@ export const WhyThisMatchModal: React.FC<Props> = ({
 
           <ScrollView showsVerticalScrollIndicator={false}>
             <View style={styles.scoreRow}>
-              <View style={[styles.scoreBadge, { backgroundColor: theme.primary }]}>
+              <View style={[styles.scoreBadge, { backgroundColor: PI_PURPLE }]}>
                 <ThemedText style={styles.scoreNumber}>{compatibilityScore}%</ThemedText>
                 <ThemedText style={styles.scoreLabel}>Match</ThemedText>
               </View>
@@ -77,17 +115,25 @@ export const WhyThisMatchModal: React.FC<Props> = ({
                 <ThemedText style={[styles.scoreTitle, { color: theme.text }]}>
                   Why {profileName}?
                 </ThemedText>
-                <ThemedText style={[styles.scoreSubtitle, { color: theme.textSecondary }]}>
-                  AI analyzed your profiles
-                </ThemedText>
+                <View style={styles.piTagRow}>
+                  <View style={[styles.piBadge, { backgroundColor: PI_PURPLE + '20' }]}>
+                    <Feather name="cpu" size={11} color={PI_PURPLE} />
+                    <ThemedText style={[styles.piBadgeText, { color: PI_PURPLE }]}>Pi Analysis</ThemedText>
+                  </View>
+                  {piInsight?.confidence ? (
+                    <ThemedText style={[styles.confidenceText, { color: confidenceColor(piInsight.confidence) }]}>
+                      {piInsight.confidence} confidence
+                    </ThemedText>
+                  ) : null}
+                </View>
               </View>
             </View>
 
             {loading ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator color={theme.primary} size="large" />
+                <ActivityIndicator color={PI_PURPLE} size="large" />
                 <ThemedText style={[styles.loadingText, { color: theme.textSecondary }]}>
-                  Analyzing compatibility...
+                  Pi is analyzing your compatibility...
                 </ThemedText>
               </View>
             ) : null}
@@ -95,7 +141,7 @@ export const WhyThisMatchModal: React.FC<Props> = ({
             {error ? (
               <View style={styles.errorContainer}>
                 <ThemedText style={[styles.errorText, { color: theme.error }]}>{error}</ThemedText>
-                <Pressable style={[styles.retryButton, { backgroundColor: theme.primary }]} onPress={fetchExplanation}>
+                <Pressable style={[styles.retryButton, { backgroundColor: PI_PURPLE }]} onPress={fetchExplanation}>
                   <ThemedText style={styles.retryText}>Try Again</ThemedText>
                 </Pressable>
               </View>
@@ -103,23 +149,71 @@ export const WhyThisMatchModal: React.FC<Props> = ({
 
             {result && !loading ? (
               <>
-                <View style={[styles.headlineCard, { backgroundColor: theme.background, borderLeftColor: theme.primary }]}>
-                  <ThemedText style={[styles.headline, { color: theme.text }]}>
-                    "{result.headline}"
-                  </ThemedText>
-                </View>
-
-                <ThemedText style={[styles.sectionLabel, { color: theme.textSecondary }]}>
-                  Why you'd work well together
-                </ThemedText>
-                {result.topReasons?.map((reason: string, i: number) => (
-                  <View key={i} style={styles.reasonRow}>
-                    <View style={styles.reasonDot} />
-                    <ThemedText style={[styles.reasonText, { color: theme.text }]}>{reason}</ThemedText>
+                {piInsight?.summary ? (
+                  <View style={[styles.piSummaryCard, { backgroundColor: PI_PURPLE + '10', borderLeftColor: PI_PURPLE }]}>
+                    <View style={styles.piSummaryHeader}>
+                      <Feather name="cpu" size={14} color={PI_PURPLE} />
+                      <ThemedText style={[styles.piSummaryTitle, { color: PI_PURPLE }]}>Pi's Take</ThemedText>
+                    </View>
+                    <ThemedText style={[styles.headline, { color: theme.text }]}>
+                      "{piInsight.summary}"
+                    </ThemedText>
                   </View>
-                ))}
+                ) : (
+                  <View style={[styles.headlineCard, { backgroundColor: theme.background, borderLeftColor: PI_PURPLE }]}>
+                    <ThemedText style={[styles.headline, { color: theme.text }]}>
+                      "{result.headline}"
+                    </ThemedText>
+                  </View>
+                )}
 
-                {result.concerns?.length > 0 && result.concerns[0] ? (
+                {getVisibleHighlights().length > 0 ? (
+                  <>
+                    <ThemedText style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+                      Pi's highlights
+                    </ThemedText>
+                    {getVisibleHighlights().map((h: string, i: number) => (
+                      <View key={i} style={styles.reasonRow}>
+                        <View style={[styles.reasonDot, { backgroundColor: PI_PURPLE }]} />
+                        <ThemedText style={[styles.reasonText, { color: theme.text }]}>{h}</ThemedText>
+                      </View>
+                    ))}
+                    {limits.piInsightLevel === 'summary' && (piInsight?.highlights?.length ?? 0) > 1 ? (
+                      <View style={[styles.upgradeBanner, { backgroundColor: PI_PURPLE + '10', borderColor: PI_PURPLE + '30' }]}>
+                        <Feather name="lock" size={12} color={PI_PURPLE} />
+                        <ThemedText style={[styles.upgradeText, { color: PI_PURPLE }]}>
+                          Upgrade to Plus for full Pi insights
+                        </ThemedText>
+                      </View>
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    <ThemedText style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+                      Why you'd work well together
+                    </ThemedText>
+                    {result.topReasons?.map((reason: string, i: number) => (
+                      <View key={i} style={styles.reasonRow}>
+                        <View style={[styles.reasonDot, { backgroundColor: '#4CAF50' }]} />
+                        <ThemedText style={[styles.reasonText, { color: theme.text }]}>{reason}</ThemedText>
+                      </View>
+                    ))}
+                  </>
+                )}
+
+                {getVisibleWarnings().length > 0 ? (
+                  <>
+                    <ThemedText style={[styles.sectionLabel, { color: theme.textSecondary, marginTop: 20 }]}>
+                      Worth keeping in mind
+                    </ThemedText>
+                    {getVisibleWarnings().map((w: string, i: number) => (
+                      <View key={i} style={styles.concernRow}>
+                        <Feather name="alert-circle" size={16} color="#FF9800" />
+                        <ThemedText style={[styles.concernText, { color: theme.text }]}>{w}</ThemedText>
+                      </View>
+                    ))}
+                  </>
+                ) : result.concerns?.length > 0 && result.concerns[0] ? (
                   <>
                     <ThemedText style={[styles.sectionLabel, { color: theme.textSecondary, marginTop: 20 }]}>
                       Worth keeping in mind
@@ -142,7 +236,7 @@ export const WhyThisMatchModal: React.FC<Props> = ({
                       "{result.conversationStarter}"
                     </ThemedText>
                     <TouchableOpacity
-                      style={[styles.useStarterButton, { backgroundColor: theme.primary }]}
+                      style={[styles.useStarterButton, { backgroundColor: PI_PURPLE }]}
                       onPress={() => {
                         onSendMessage(result.conversationStarter);
                         onClose();
@@ -217,8 +311,45 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
   },
-  scoreSubtitle: {
-    fontSize: 13,
+  piTagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
+  piBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  piBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  confidenceText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  piSummaryCard: {
+    borderRadius: BorderRadius.medium,
+    padding: Spacing.md,
+    marginBottom: Spacing.lg,
+    borderLeftWidth: 3,
+  },
+  piSummaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  piSummaryTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   loadingContainer: {
     alignItems: 'center',
@@ -274,13 +405,26 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#4CAF50',
     marginTop: 6,
   },
   reasonText: {
     fontSize: 14,
     flex: 1,
     lineHeight: 20,
+  },
+  upgradeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 4,
+    marginBottom: Spacing.md,
+  },
+  upgradeText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   concernRow: {
     flexDirection: 'row',

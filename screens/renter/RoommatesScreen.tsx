@@ -367,6 +367,7 @@ export const RoommatesScreen = () => {
             profileData: {
               interests: Array.isArray(p.profile?.interests) ? p.profile.interests : [],
               profileNote: p.profile?.profile_note || undefined,
+              ideal_roommate_text: p.profile?.ideal_roommate_text || undefined,
             },
           })) as RoommateProfile[];
           usedSupabase = true;
@@ -1804,13 +1805,19 @@ export const RoommatesScreen = () => {
                   <Feather name="heart" size={12} color="#ff8070" />
                   <ThemedText style={styles.tagMatchText}>{currentProfile.compatibility || 50}% Match</ThemedText>
                 </View>
+                {(currentProfile.compatibility || 0) >= 80 ? (
+                  <View style={styles.piPickBadge}>
+                    <Feather name="cpu" size={10} color="#a855f7" />
+                    <ThemedText style={styles.piPickText}>Pi Pick</ThemedText>
+                  </View>
+                ) : null}
                 {renterLimits.hasMatchBreakdown ? (
                   <Pressable
                     style={styles.whyMatchButton}
                     onPress={() => setShowWhyModal(true)}
                   >
                     <ThemedText style={styles.whyMatchText}>Why?</ThemedText>
-                    <Feather name="zap" size={12} color="#FF6B6B" />
+                    <Feather name="cpu" size={12} color="#a855f7" />
                   </Pressable>
                 ) : (
                   <Pressable
@@ -2581,6 +2588,38 @@ export const RoommatesScreen = () => {
                             Written by {currentProfile.name?.split(' ')[0]}
                           </Text>
                         </View>
+                      </View>
+                    </View>
+                  ) : null}
+
+                  {currentProfile.profileData?.ideal_roommate_text ? (
+                    <View style={styles.pdSection}>
+                      <View style={{
+                        padding: 14,
+                        backgroundColor: 'rgba(168,85,247,0.06)',
+                        borderRadius: 14,
+                        borderLeftWidth: 3,
+                        borderLeftColor: '#a855f7',
+                      }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                          <Feather name="cpu" size={11} color="#a855f7" />
+                          <Text style={{
+                            color: '#a855f7',
+                            fontSize: 11,
+                            fontWeight: '700',
+                            letterSpacing: 0.5,
+                          }}>
+                            IDEAL ROOMMATE
+                          </Text>
+                        </View>
+                        <Text style={{
+                          color: 'rgba(255,255,255,0.85)',
+                          fontSize: 14,
+                          lineHeight: 21,
+                          fontStyle: 'italic',
+                        }}>
+                          "{currentProfile.profileData.ideal_roommate_text}"
+                        </Text>
                       </View>
                     </View>
                   ) : null}
@@ -3381,16 +3420,32 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#ff8070',
   },
+  piPickBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(168,85,247,0.15)',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(168,85,247,0.3)',
+  },
+  piPickText: {
+    color: '#a855f7',
+    fontSize: 10,
+    fontWeight: '700',
+  },
   whyMatchButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(255,107,107,0.15)',
+    backgroundColor: 'rgba(168,85,247,0.15)',
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderWidth: 1,
-    borderColor: 'rgba(255,107,107,0.3)',
+    borderColor: 'rgba(168,85,247,0.3)',
   },
   whyMatchText: {
     color: '#FF6B6B',
