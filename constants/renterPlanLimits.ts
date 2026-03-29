@@ -23,6 +23,9 @@ export interface RenterPlanLimits {
   hasConflictDetection: boolean;
   hasCompatibilityBreakdown: boolean;
   canSeeContactInfo: boolean;
+  piMessagesPerDay: number;
+  piInsightLevel: 'summary' | 'highlights' | 'full';
+  hasPiDeckReranking: boolean;
 }
 
 export const RENTER_PLAN_LIMITS: Record<RenterPlan, RenterPlanLimits> = {
@@ -49,6 +52,9 @@ export const RENTER_PLAN_LIMITS: Record<RenterPlan, RenterPlanLimits> = {
     hasConflictDetection: false,
     hasCompatibilityBreakdown: false,
     canSeeContactInfo: false,
+    piMessagesPerDay: 5,
+    piInsightLevel: 'summary',
+    hasPiDeckReranking: false,
   },
   plus: {
     plan: 'plus',
@@ -73,6 +79,9 @@ export const RENTER_PLAN_LIMITS: Record<RenterPlan, RenterPlanLimits> = {
     hasConflictDetection: false,
     hasCompatibilityBreakdown: false,
     canSeeContactInfo: true,
+    piMessagesPerDay: 50,
+    piInsightLevel: 'highlights',
+    hasPiDeckReranking: true,
   },
   elite: {
     plan: 'elite',
@@ -97,6 +106,9 @@ export const RENTER_PLAN_LIMITS: Record<RenterPlan, RenterPlanLimits> = {
     hasConflictDetection: true,
     hasCompatibilityBreakdown: true,
     canSeeContactInfo: true,
+    piMessagesPerDay: 200,
+    piInsightLevel: 'full',
+    hasPiDeckReranking: true,
   },
 };
 

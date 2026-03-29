@@ -26,6 +26,8 @@ export interface ProfileData {
   profile_note_updated_at?: string | null;
   preferred_neighborhoods?: string[];
   zip_code?: string;
+  ideal_roommate_text?: string;
+  pi_parsed_preferences?: Record<string, any>;
 }
 
 export interface UserData {
@@ -116,6 +118,7 @@ export async function updateProfile(updates: ProfileData) {
     .eq('user_id', user.id)
     .single();
 
+  let result;
   if (existing) {
     const { data, error } = await supabase
       .from('profiles')
@@ -124,7 +127,7 @@ export async function updateProfile(updates: ProfileData) {
       .select()
       .single();
     if (error) throw error;
-    return data;
+    result = data;
   } else {
     const { data, error } = await supabase
       .from('profiles')
@@ -132,7 +135,24 @@ export async function updateProfile(updates: ProfileData) {
       .select()
       .single();
     if (error) throw error;
-    return data;
+    result = data;
+  }
+
+  if (
+    updates.ideal_roommate_text &&
+    updates.ideal_roommate_text.trim().length > 20
+  ) {
+    triggerPiParsing(updates.ideal_roommate_text).catch(() => {});
+  }
+
+  return result;
+}
+
+async function triggerPiParsing(text: string): Promise<void> {
+  try {
+    const { parseIdealRoommateText } = await import('./piMatchingService');
+    await parseIdealRoommateText(text);
+  } catch {
   }
 }
 

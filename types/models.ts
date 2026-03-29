@@ -18,6 +18,8 @@ export interface RoommateProfile {
   };
   preferredNeighborhoods?: string[];
   zip_code?: string;
+  ideal_roommate_text?: string;
+  pi_parsed_preferences?: PiParsedPreferences;
   preferences: {
     location: string;
     moveInDate: string;
@@ -38,6 +40,8 @@ export interface RoommateProfile {
     profileNote?: string;
     preferred_neighborhoods?: string[];
     zip_code?: string;
+    ideal_roommate_text?: string;
+    pi_parsed_preferences?: PiParsedPreferences;
     [key: string]: any;
   };
   references?: Reference[];
@@ -520,6 +524,8 @@ export interface User {
     lastAdWatched?: Date;
   };
   zip_code?: string;
+  ideal_roommate_text?: string;
+  pi_parsed_preferences?: PiParsedPreferences;
   profileData?: {
     bio?: string;
     budget?: number;
@@ -538,6 +544,8 @@ export interface User {
     interests?: string[];
     gender?: 'male' | 'female' | 'other';
     personalityAnswers?: Record<string, string>;
+    ideal_roommate_text?: string;
+    pi_parsed_preferences?: PiParsedPreferences;
     preferences?: {
       sleepSchedule?: 'early_sleeper' | 'late_sleeper' | 'flexible' | 'irregular';
       cleanliness?: 'very_tidy' | 'moderately_tidy' | 'relaxed';
@@ -691,4 +699,77 @@ export interface DailyQuestion {
   selected_value: string | null;
   generated_at: string;
   expires_at: string;
+}
+
+export interface PiParsedPreferences {
+  vibe?: string;
+  schedule_hints?: string[];
+  social_style?: string;
+  hard_nos?: string[];
+  soft_preferences?: string[];
+  personality_signals?: string[];
+  cleanliness_hints?: string;
+  noise_hints?: string;
+  guest_hints?: string;
+  budget_hints?: string;
+  location_hints?: string[];
+}
+
+export interface PiMatchInsight {
+  id: string;
+  user_id: string;
+  target_user_id: string;
+  match_score?: number;
+  summary: string;
+  highlights: string[];
+  warnings: string[];
+  confidence: 'strong' | 'good' | 'moderate' | 'low';
+  model_used?: string;
+  generated_at: string;
+  expires_at: string;
+}
+
+export interface PiDeckRanking {
+  id: string;
+  user_id: string;
+  ranked_user_ids: string[];
+  adjustments: Array<{
+    user_id: string;
+    reason: string;
+    direction: 'up' | 'down';
+  }>;
+  model_used?: string;
+  generated_at: string;
+  expires_at: string;
+  swiped_count: number;
+}
+
+export interface PiHostRecommendation {
+  id: string;
+  host_id: string;
+  listing_id: string;
+  recommendations: Array<{
+    type: 'renter' | 'group';
+    target_id: string;
+    name: string;
+    photo?: string;
+    match_strength: 'strong' | 'good' | 'moderate';
+    reason: string;
+    suggested_action: string;
+  }>;
+  market_insight?: string;
+  model_used?: string;
+  generated_at: string;
+  expires_at: string;
+}
+
+export type PiFeature = 'match_insight' | 'deck_rerank' | 'parse_preferences' | 'host_matchmaker';
+
+export interface PiUsageLog {
+  id: string;
+  user_id: string;
+  feature: PiFeature;
+  tokens_used: number;
+  model_used?: string;
+  created_at: string;
 }

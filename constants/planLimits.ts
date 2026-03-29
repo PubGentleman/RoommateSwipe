@@ -19,6 +19,7 @@ export interface PlanLimits {
   hasBoosts: boolean;
   freeBoostsPerMonth: number;
   simultaneousBoosts: number;
+  piCallsPerMonth: number;
 }
 
 export const PLAN_LIMITS: Record<HostPlan, PlanLimits> = {
@@ -41,6 +42,7 @@ export const PLAN_LIMITS: Record<HostPlan, PlanLimits> = {
     hasBoosts: false,
     freeBoostsPerMonth: 0,
     simultaneousBoosts: 0,
+    piCallsPerMonth: 5,
   },
   none: {
     plan: 'none',
@@ -61,6 +63,7 @@ export const PLAN_LIMITS: Record<HostPlan, PlanLimits> = {
     hasBoosts: false,
     freeBoostsPerMonth: 0,
     simultaneousBoosts: 0,
+    piCallsPerMonth: 5,
   },
   starter: {
     plan: 'starter',
@@ -81,6 +84,7 @@ export const PLAN_LIMITS: Record<HostPlan, PlanLimits> = {
     hasBoosts: true,
     freeBoostsPerMonth: 1,
     simultaneousBoosts: 1,
+    piCallsPerMonth: 30,
   },
   pro: {
     plan: 'pro',
@@ -101,6 +105,7 @@ export const PLAN_LIMITS: Record<HostPlan, PlanLimits> = {
     hasBoosts: true,
     freeBoostsPerMonth: 1,
     simultaneousBoosts: 3,
+    piCallsPerMonth: 100,
   },
   business: {
     plan: 'business',
@@ -121,6 +126,7 @@ export const PLAN_LIMITS: Record<HostPlan, PlanLimits> = {
     hasBoosts: true,
     freeBoostsPerMonth: 2,
     simultaneousBoosts: 10,
+    piCallsPerMonth: 200,
   },
 };
 
@@ -157,6 +163,7 @@ export interface AgentPlanLimits {
   hasAdvancedAnalytics: boolean;
   hasClientManagement: boolean;
   teamSeats: number;
+  piCallsPerMonth: number;
 }
 
 const _agentBase = {
@@ -177,6 +184,7 @@ const _agentBase = {
     hasAdvancedAnalytics: false,
     hasClientManagement: false,
     teamSeats: 1,
+    piCallsPerMonth: 20,
   },
   starter: {
     plan: 'starter' as AgentPlan,
@@ -195,6 +203,7 @@ const _agentBase = {
     hasAdvancedAnalytics: false,
     hasClientManagement: true,
     teamSeats: 1,
+    piCallsPerMonth: 100,
   },
   pro: {
     plan: 'pro' as AgentPlan,
@@ -213,6 +222,7 @@ const _agentBase = {
     hasAdvancedAnalytics: false,
     hasClientManagement: true,
     teamSeats: 1,
+    piCallsPerMonth: 200,
   },
   business: {
     plan: 'business' as AgentPlan,
@@ -231,6 +241,7 @@ const _agentBase = {
     hasAdvancedAnalytics: true,
     hasClientManagement: true,
     teamSeats: 5,
+    piCallsPerMonth: 500,
   },
 };
 

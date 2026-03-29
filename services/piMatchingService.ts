@@ -1,0 +1,389 @@
+import { supabase } from '../lib/supabase';
+import type {
+  PiMatchInsight,
+  PiDeckRanking,
+  PiHostRecommendation,
+  PiFeature,
+  PiParsedPreferences,
+} from '../types/models';
+
+const INSIGHT_CACHE_HOURS = 168;
+const DECK_CACHE_HOURS = 24;
+const HOST_REC_CACHE_HOURS = 168;
+const DECK_SWIPED_INVALIDATION_RATIO = 0.5;
+
+async function getCurrentUserId(): Promise<string | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  return user?.id ?? null;
+}
+
+function isExpired(expiresAt: string): boolean {
+  return new Date(expiresAt) <= new Date();
+}
+
+export async function getCachedOrGenerateInsight(
+  targetUserId: string,
+  matchScore?: number
+): Promise<PiMatchInsight | null> {
+  try {
+    const userId = await getCurrentUserId();
+    if (!userId) return null;
+
+    const { data: cached } = await supabase
+      .from('pi_match_insights')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('target_user_id', targetUserId)
+      .single();
+
+    if (cached && !isExpired(cached.expires_at)) {
+      return cached as PiMatchInsight;
+    }
+
+    const quotaOk = await checkAIQuota(userId, 'match_insight');
+    if (!quotaOk) return cached as PiMatchInsight | null;
+
+    const { data, error } = await supabase.functions.invoke('pi-match-insight', {
+      body: { user_id: userId, target_user_id: targetUserId, match_score: matchScore },
+    });
+
+    if (error || !data) return cached as PiMatchInsight | null;
+    return data as PiMatchInsight;
+  } catch {
+    return null;
+  }
+}
+
+export async function getCachedInsight(
+  targetUserId: string
+): Promise<PiMatchInsight | null> {
+  try {
+    const userId = await getCurrentUserId();
+    if (!userId) return null;
+
+    const { data } = await supabase
+      .from('pi_match_insights')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('target_user_id', targetUserId)
+      .single();
+
+    if (data && !isExpired(data.expires_at)) {
+      return data as PiMatchInsight;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export async function generateDeckReranking(
+  candidateIds: string[]
+): Promise<PiDeckRanking | null> {
+  try {
+    const userId = await getCurrentUserId();
+    if (!userId) return null;
+
+    const quotaOk = await checkAIQuota(userId, 'deck_rerank');
+    if (!quotaOk) return null;
+
+    const { data, error } = await supabase.functions.invoke('pi-rerank-deck', {
+      body: { user_id: userId, candidate_ids: candidateIds.slice(0, 30) },
+    });
+
+    if (error || !data) return null;
+    return data as PiDeckRanking;
+  } catch {
+    return null;
+  }
+}
+
+export async function getCachedDeckRanking(): Promise<PiDeckRanking | null> {
+  try {
+    const userId = await getCurrentUserId();
+    if (!userId) return null;
+
+    const { data } = await supabase
+      .from('pi_deck_rankings')
+      .select('*')
+      .eq('user_id', userId)
+      .order('generated_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (!data) return null;
+    if (isExpired(data.expires_at)) return null;
+
+    const rankedIds = data.ranked_user_ids as string[];
+    const swipedRatio = data.swiped_count / Math.max(rankedIds.length, 1);
+    if (swipedRatio >= DECK_SWIPED_INVALIDATION_RATIO) return null;
+
+    return data as PiDeckRanking;
+  } catch {
+    return null;
+  }
+}
+
+export async function incrementDeckSwipedCount(rankingId: string): Promise<void> {
+  try {
+    const { data } = await supabase
+      .from('pi_deck_rankings')
+      .select('swiped_count')
+      .eq('id', rankingId)
+      .single();
+
+    if (data) {
+      await supabase
+        .from('pi_deck_rankings')
+        .update({ swiped_count: (data.swiped_count || 0) + 1 })
+        .eq('id', rankingId);
+    }
+  } catch {
+  }
+}
+
+export async function parseIdealRoommateText(
+  text: string
+): Promise<PiParsedPreferences | null> {
+  try {
+    const userId = await getCurrentUserId();
+    if (!userId) return null;
+    if (!text || text.trim().length < 20) return null;
+
+    const quotaOk = await checkAIQuota(userId, 'parse_preferences');
+    if (!quotaOk) return null;
+
+    const { data, error } = await supabase.functions.invoke('pi-parse-preferences', {
+      body: { user_id: userId, text: text.trim().slice(0, 500) },
+    });
+
+    if (error || !data) return null;
+    return data as PiParsedPreferences;
+  } catch {
+    return null;
+  }
+}
+
+export async function getHostRecommendations(
+  listingId: string
+): Promise<PiHostRecommendation | null> {
+  try {
+    const userId = await getCurrentUserId();
+    if (!userId) return null;
+
+    const { data: cached } = await supabase
+      .from('pi_host_recommendations')
+      .select('*')
+      .eq('host_id', userId)
+      .eq('listing_id', listingId)
+      .single();
+
+    if (cached && !isExpired(cached.expires_at)) {
+      return cached as PiHostRecommendation;
+    }
+
+    const quotaOk = await checkAIQuota(userId, 'host_matchmaker');
+    if (!quotaOk) return cached as PiHostRecommendation | null;
+
+    const { data, error } = await supabase.functions.invoke('pi-host-matchmaker', {
+      body: { host_id: userId, listing_id: listingId },
+    });
+
+    if (error || !data) return cached as PiHostRecommendation | null;
+    return data as PiHostRecommendation;
+  } catch {
+    return null;
+  }
+}
+
+export async function logAIUsage(
+  userId: string,
+  feature: PiFeature,
+  tokensUsed: number = 0,
+  modelUsed?: string
+): Promise<void> {
+  try {
+    await supabase.from('pi_usage_log').insert({
+      user_id: userId,
+      feature,
+      tokens_used: tokensUsed,
+      model_used: modelUsed,
+    });
+  } catch {
+  }
+}
+
+export async function getDailyUsageCount(
+  userId: string
+): Promise<number> {
+  try {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const { count } = await supabase
+      .from('pi_usage_log')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .gte('created_at', todayStart.toISOString());
+
+    return count ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+export async function getMonthlyUsageCount(
+  userId: string,
+  feature?: PiFeature
+): Promise<number> {
+  try {
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+
+    let query = supabase
+      .from('pi_usage_log')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .gte('created_at', monthStart.toISOString());
+
+    if (feature) {
+      query = query.eq('feature', feature);
+    }
+
+    const { count } = await query;
+    return count ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+export async function checkAIQuota(
+  userId: string,
+  feature: PiFeature
+): Promise<boolean> {
+  try {
+    const { data: userData } = await supabase
+      .from('users')
+      .select('role, host_type')
+      .eq('id', userId)
+      .single();
+
+    if (!userData) return false;
+
+    const isHost = userData.role === 'host';
+
+    if (isHost) {
+      const { data: sub } = await supabase
+        .from('subscriptions')
+        .select('plan')
+        .eq('user_id', userId)
+        .single();
+
+      const plan = sub?.plan || 'free';
+      const monthlyLimit = getHostPiMonthlyLimit(plan, userData.host_type);
+      if (monthlyLimit === -1) return true;
+
+      const used = await getMonthlyUsageCount(userId);
+      return used < monthlyLimit;
+    } else {
+      const { data: sub } = await supabase
+        .from('subscriptions')
+        .select('plan')
+        .eq('user_id', userId)
+        .single();
+
+      const plan = sub?.plan || 'free';
+      const dailyLimit = getRenterPiDailyLimit(plan);
+      if (dailyLimit === -1) return true;
+
+      const used = await getDailyUsageCount(userId);
+      return used < dailyLimit;
+    }
+  } catch {
+    return false;
+  }
+}
+
+export function getRenterPiDailyLimit(plan: string): number {
+  const limits: Record<string, number> = {
+    free: 5,
+    basic: 5,
+    plus: 50,
+    elite: 200,
+  };
+  return limits[plan] ?? 5;
+}
+
+export function getHostPiMonthlyLimit(plan: string, hostType?: string): number {
+  if (hostType === 'agent') {
+    const agentLimits: Record<string, number> = {
+      pay_per_use: 20,
+      starter: 100,
+      pro: 200,
+      business: 500,
+    };
+    return agentLimits[plan] ?? 20;
+  }
+
+  if (hostType === 'company') {
+    const companyLimits: Record<string, number> = {
+      starter: 200,
+      pro: 500,
+      enterprise: -1,
+      business: -1,
+    };
+    return companyLimits[plan] ?? 200;
+  }
+
+  const hostLimits: Record<string, number> = {
+    free: 5,
+    none: 5,
+    starter: 30,
+    pro: 100,
+    business: 200,
+  };
+  return hostLimits[plan] ?? 5;
+}
+
+export async function invalidateInsightsForUser(userId: string): Promise<void> {
+  try {
+    await supabase
+      .from('pi_match_insights')
+      .delete()
+      .eq('user_id', userId);
+
+    await supabase
+      .from('pi_match_insights')
+      .delete()
+      .eq('target_user_id', userId);
+  } catch {
+  }
+}
+
+export async function invalidateDeckRankingForUser(userId: string): Promise<void> {
+  try {
+    await supabase
+      .from('pi_deck_rankings')
+      .delete()
+      .eq('user_id', userId);
+  } catch {
+  }
+}
+
+export async function invalidateHostRecsForListing(listingId: string): Promise<void> {
+  try {
+    await supabase
+      .from('pi_host_recommendations')
+      .delete()
+      .eq('listing_id', listingId);
+  } catch {
+  }
+}
+
+export async function invalidateAllCachesForUser(userId: string): Promise<void> {
+  await Promise.all([
+    invalidateInsightsForUser(userId),
+    invalidateDeckRankingForUser(userId),
+  ]);
+}
