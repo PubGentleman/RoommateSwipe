@@ -2656,7 +2656,7 @@ export const RoommatesScreen = () => {
                             fontWeight: '700',
                             letterSpacing: 0.5,
                           }}>
-                            Looking for...
+                            {'\u03C0'} Looking for...
                           </Text>
                         </View>
                         <Text style={{

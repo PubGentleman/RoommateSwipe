@@ -130,7 +130,7 @@ export default function ApartmentPreferencesScreen() {
         wfh: isWfh,
         apartment_prefs_complete: true,
         zip_code: zipCode || undefined,
-        ideal_roommate_text: piIdealText.trim() || null,
+        ...(piIdealText.trim().length > 0 ? { ideal_roommate_text: piIdealText.trim() } : {}),
       } as Record<string, unknown>);
     } catch (e) {
       console.warn('[ApartmentPrefs] Supabase sync failed:', e);
