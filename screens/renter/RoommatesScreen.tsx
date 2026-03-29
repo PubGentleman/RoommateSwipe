@@ -1805,7 +1805,7 @@ export const RoommatesScreen = () => {
                   <Feather name="heart" size={12} color="#ff8070" />
                   <ThemedText style={styles.tagMatchText}>{currentProfile.compatibility || 50}% Match</ThemedText>
                 </View>
-                {(currentProfile.compatibility || 0) >= 80 ? (
+                {renterLimits.hasPiDeckReranking && (currentProfile.compatibility || 0) >= 80 ? (
                   <View style={styles.piPickBadge}>
                     <Feather name="cpu" size={10} color="#a855f7" />
                     <ThemedText style={styles.piPickText}>Pi Pick</ThemedText>

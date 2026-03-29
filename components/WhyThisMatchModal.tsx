@@ -77,14 +77,20 @@ export const WhyThisMatchModal: React.FC<Props> = ({
     if (!piInsight?.highlights?.length) return [];
     if (limits.piInsightLevel === 'full') return piInsight.highlights;
     if (limits.piInsightLevel === 'highlights') return piInsight.highlights.slice(0, 3);
-    return piInsight.highlights.slice(0, 1);
+    return [];
   };
 
   const getVisibleWarnings = (): string[] => {
     if (!piInsight?.warnings?.length) return [];
     if (limits.piInsightLevel === 'full') return piInsight.warnings;
-    if (limits.piInsightLevel === 'highlights') return piInsight.warnings.slice(0, 1);
     return [];
+  };
+
+  const confidenceLabel = (c: string) => {
+    if (c === 'strong') return 'Strong Match';
+    if (c === 'good') return 'Good Match';
+    if (c === 'moderate') return 'Worth Exploring';
+    return 'Early Signal';
   };
 
   const confidenceColor = (c: string) => {
@@ -120,10 +126,13 @@ export const WhyThisMatchModal: React.FC<Props> = ({
                     <Feather name="cpu" size={11} color={PI_PURPLE} />
                     <ThemedText style={[styles.piBadgeText, { color: PI_PURPLE }]}>Pi Analysis</ThemedText>
                   </View>
-                  {piInsight?.confidence ? (
-                    <ThemedText style={[styles.confidenceText, { color: confidenceColor(piInsight.confidence) }]}>
-                      {piInsight.confidence} confidence
-                    </ThemedText>
+                  {piInsight?.confidence && limits.piInsightLevel === 'full' ? (
+                    <View style={[styles.confidencePill, { backgroundColor: confidenceColor(piInsight.confidence) + '20' }]}>
+                      <Feather name="cpu" size={10} color={confidenceColor(piInsight.confidence)} />
+                      <ThemedText style={[styles.confidenceText, { color: confidenceColor(piInsight.confidence) }]}>
+                        {confidenceLabel(piInsight.confidence)}
+                      </ThemedText>
+                    </View>
                   ) : null}
                 </View>
               </View>
@@ -158,6 +167,14 @@ export const WhyThisMatchModal: React.FC<Props> = ({
                     <ThemedText style={[styles.headline, { color: theme.text }]}>
                       "{piInsight.summary}"
                     </ThemedText>
+                    {limits.piInsightLevel === 'summary' ? (
+                      <View style={[styles.upgradeBanner, { backgroundColor: PI_PURPLE + '10', borderColor: PI_PURPLE + '30', marginTop: Spacing.sm }]}>
+                        <Feather name="lock" size={12} color={PI_PURPLE} />
+                        <ThemedText style={[styles.upgradeText, { color: PI_PURPLE }]}>
+                          Upgrade to Plus for detailed Pi insights
+                        </ThemedText>
+                      </View>
+                    ) : null}
                   </View>
                 ) : (
                   <View style={[styles.headlineCard, { backgroundColor: theme.background, borderLeftColor: PI_PURPLE }]}>
@@ -174,15 +191,15 @@ export const WhyThisMatchModal: React.FC<Props> = ({
                     </ThemedText>
                     {getVisibleHighlights().map((h: string, i: number) => (
                       <View key={i} style={styles.reasonRow}>
-                        <View style={[styles.reasonDot, { backgroundColor: PI_PURPLE }]} />
+                        <Feather name="check-circle" size={14} color="#4CAF50" />
                         <ThemedText style={[styles.reasonText, { color: theme.text }]}>{h}</ThemedText>
                       </View>
                     ))}
-                    {limits.piInsightLevel === 'summary' && (piInsight?.highlights?.length ?? 0) > 1 ? (
+                    {limits.piInsightLevel === 'highlights' && (piInsight?.highlights?.length ?? 0) > 3 ? (
                       <View style={[styles.upgradeBanner, { backgroundColor: PI_PURPLE + '10', borderColor: PI_PURPLE + '30' }]}>
                         <Feather name="lock" size={12} color={PI_PURPLE} />
                         <ThemedText style={[styles.upgradeText, { color: PI_PURPLE }]}>
-                          Upgrade to Plus for full Pi insights
+                          Upgrade to Elite for full Pi analysis
                         </ThemedText>
                       </View>
                     ) : null}
@@ -328,6 +345,14 @@ const styles = StyleSheet.create({
   piBadgeText: {
     fontSize: 11,
     fontWeight: '600',
+  },
+  confidencePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
   },
   confidenceText: {
     fontSize: 11,

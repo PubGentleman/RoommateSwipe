@@ -420,6 +420,8 @@ export const ProfileQuestionnaireScreen = () => {
   const [profileNote, setProfileNote] = useState(user?.profileData?.profileNote || '');
   const profileNoteCharLimit = 500;
   const [idealRoommateText, setIdealRoommateText] = useState(user?.profileData?.ideal_roommate_text || user?.ideal_roommate_text || '');
+  const idealRoommateTextRef = React.useRef(idealRoommateText);
+  React.useEffect(() => { idealRoommateTextRef.current = idealRoommateText; }, [idealRoommateText]);
   const idealRoommateCharLimit = 500;
 
   useEffect(() => {
@@ -576,7 +578,7 @@ export const ProfileQuestionnaireScreen = () => {
         dealbreakers,
         personalityAnswers: Object.keys(personalityAnswers).length > 0 ? personalityAnswers : undefined,
         profileNote: profileNote.trim() || undefined,
-        ideal_roommate_text: idealRoommateText.trim() || undefined,
+        ideal_roommate_text: idealRoommateTextRef.current.trim() || undefined,
         preferences: {
           sleepSchedule,
           cleanliness,
@@ -642,7 +644,7 @@ export const ProfileQuestionnaireScreen = () => {
       await updateProfile({
         preferred_neighborhoods: preferredNeighborhoods.length > 0 ? preferredNeighborhoods : undefined,
         zip_code: zipCode.trim() || undefined,
-        ideal_roommate_text: idealRoommateText.trim() || undefined,
+        ideal_roommate_text: idealRoommateTextRef.current.trim() || undefined,
       });
     } catch (e) {
       console.warn('[ProfileQuestionnaire] Profile sync failed:', e);
@@ -1288,6 +1290,7 @@ export const ProfileQuestionnaireScreen = () => {
 
             <TouchableOpacity
               onPress={async () => {
+                idealRoommateTextRef.current = '';
                 setIdealRoommateText('');
                 await handleSave();
               }}
