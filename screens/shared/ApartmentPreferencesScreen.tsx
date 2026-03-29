@@ -119,10 +119,10 @@ export default function ApartmentPreferencesScreen() {
     await StorageService.setApartmentPreferences(user.id, prefs);
 
     try {
-      const profileUpdate: any = {
+      await updateProfile({
         desired_bedrooms: bedrooms,
-        budget_per_person_min: budget.min,
-        budget_per_person_max: budget.max,
+        budget_per_person_min: budgetMin,
+        budget_per_person_max: budgetMax,
         preferred_trains: selectedTrains,
         preferred_neighborhoods: neighborhoods,
         amenity_must_haves: amenities,
@@ -130,11 +130,8 @@ export default function ApartmentPreferencesScreen() {
         wfh: isWfh,
         apartment_prefs_complete: true,
         zip_code: zipCode || undefined,
-      };
-      if (piIdealText.trim()) {
-        profileUpdate.ideal_roommate_text = piIdealText.trim();
-      }
-      await updateProfile(profileUpdate);
+        ...(piIdealText.trim() ? { ideal_roommate_text: piIdealText.trim() } : {}),
+      } as Record<string, unknown>);
     } catch (e) {
       console.warn('[ApartmentPrefs] Supabase sync failed:', e);
     }
