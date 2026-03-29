@@ -65,7 +65,7 @@ export default function ApartmentPreferencesScreen() {
   const [amenities, setAmenities] = useState<string[]>([]);
   const [neighborhoods, setNeighborhoods] = useState<string[]>([]);
   const [zipCode, setZipCode] = useState('');
-  const [piIdealText, setPiIdealText] = useState('');
+  const [piIdealText, setPiIdealText] = useState(user?.profileData?.ideal_roommate_text || '');
   const [saving, setSaving] = useState(false);
 
   const canProceed = useCallback(() => {

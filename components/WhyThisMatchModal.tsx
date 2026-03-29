@@ -102,10 +102,10 @@ export const WhyThisMatchModal: React.FC<Props> = ({
   };
 
   const confidenceLabel = (c: string) => {
-    if (c === 'strong') return 'Strong Match';
-    if (c === 'good') return 'Good Match';
-    if (c === 'moderate') return 'Worth Exploring';
-    return 'Early Signal';
+    if (c === 'strong') return '\u03C0 Strong Match';
+    if (c === 'good') return '\u03C0 Good Match';
+    if (c === 'moderate') return '\u03C0 Worth Exploring';
+    return '\u03C0 Early Signal';
   };
 
   const confidenceColor = (c: string) => {
