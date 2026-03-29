@@ -122,9 +122,9 @@ serve(async (req) => {
     }
 
     const [userDataResult, userProfileResult, candidateUsersResult, candidateProfilesResult] = await Promise.all([
-      supabase.from('users').select('full_name, age, occupation, bio, city, neighborhood, zodiac_sign, lifestyle_tags').eq('id', user.id).single(),
+      supabase.from('users').select('*').eq('id', user.id).single(),
       supabase.from('profiles').select('*').eq('user_id', user.id).single(),
-      supabase.from('users').select('id, full_name, age, occupation, bio, city, neighborhood, zodiac_sign, lifestyle_tags').in('id', resolvedCandidateIds),
+      supabase.from('users').select('*').in('id', resolvedCandidateIds),
       supabase.from('profiles').select('*').in('user_id', resolvedCandidateIds),
     ]);
 

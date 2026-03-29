@@ -36,7 +36,7 @@ serve(async (req) => {
       return errorResponse('Text must be at least 10 characters', 400);
     }
 
-    const trimmedText = text.length > 1000 ? text.substring(0, 1000) : text;
+    const trimmedText = text.length > 500 ? text.substring(0, 500) : text;
 
     const { data: sub } = await supabase
       .from('subscriptions')
@@ -81,9 +81,7 @@ Respond with ONLY this JSON:
   "noise_hints": "noise preference signals (e.g., 'needs quiet for work', 'doesn't mind noise', null)",
   "guest_hints": "guest policy signals (e.g., 'loves hosting', 'prefers no overnight guests', null)",
   "budget_hints": "any budget signals (e.g., 'looking to save money', 'willing to pay more for quality', null)",
-  "location_hints": ["any location preferences mentioned, e.g., 'near the L train', 'wants to be in Brooklyn'"],
-  "diet_hints": "any food/diet signals (e.g., 'vegan', 'loves cooking together', null)",
-  "work_style_hints": "WFH/office/hybrid signals (e.g., 'works from home', 'gone all day', null)"
+  "location_hints": ["any location preferences mentioned, e.g., 'near the L train', 'wants to be in Brooklyn'"]
 }`;
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -127,8 +125,6 @@ Respond with ONLY this JSON:
       guest_hints: parsed.guest_hints || null,
       budget_hints: parsed.budget_hints || null,
       location_hints: Array.isArray(parsed.location_hints) ? parsed.location_hints : [],
-      diet_hints: parsed.diet_hints || null,
-      work_style_hints: parsed.work_style_hints || null,
     };
 
     await Promise.all([
@@ -147,10 +143,7 @@ Respond with ONLY this JSON:
       }),
     ]);
 
-    return jsonResponse({
-      parsed: cleanParsed,
-      text_saved: true,
-    });
+    return jsonResponse(cleanParsed);
   } catch (err: any) {
     console.error('pi-parse-preferences error:', err);
     return errorResponse('Preference parsing failed', 500);

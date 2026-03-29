@@ -150,7 +150,7 @@ serve(async (req) => {
 
     const { data: candidateUsers } = await supabase
       .from('users')
-      .select('id, full_name, age, occupation, bio, city, neighborhood, zodiac_sign, lifestyle_tags, role, onboarding_step')
+      .select('*')
       .in('id', candidateUserIds)
       .eq('role', 'renter')
       .eq('onboarding_step', 'complete');
