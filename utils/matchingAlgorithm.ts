@@ -829,14 +829,18 @@ export const calculateDetailedCompatibility = (
     }
   }
 
-  const BASE_MAX = 100;
-  const PI_MIN = -10;
-  const PI_MAX = 5;
   const rawTotal = Object.values(breakdown).reduce((sum, score) => sum + score, 0);
-  const effectiveMin = 0 + PI_MIN;
-  const effectiveMax = BASE_MAX + PI_MAX;
-  const normalized = ((rawTotal - effectiveMin) / (effectiveMax - effectiveMin)) * 100;
-  const totalScore = Math.round(Math.max(0, Math.min(100, normalized)));
+  let totalScore: number;
+  if (breakdown.piPreference !== 0) {
+    const PI_MIN = -10;
+    const PI_MAX = 5;
+    const effectiveMin = 0 + PI_MIN;
+    const effectiveMax = 100 + PI_MAX;
+    const normalized = ((rawTotal - effectiveMin) / (effectiveMax - effectiveMin)) * 100;
+    totalScore = Math.round(Math.max(0, Math.min(100, normalized)));
+  } else {
+    totalScore = Math.max(0, Math.min(100, rawTotal));
+  }
 
   return {
     totalScore,

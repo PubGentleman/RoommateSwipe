@@ -393,6 +393,7 @@ function applyAIRanking(deck: any[], rankedIds: string[]): any[] {
   const usedIds = new Set<string>();
 
   for (const id of rankedIds) {
+    if (usedIds.has(id)) continue;
     const profile = top30Map.get(id);
     if (profile) {
       reorderedTop.push(profile);
