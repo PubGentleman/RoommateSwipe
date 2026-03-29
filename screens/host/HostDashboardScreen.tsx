@@ -110,6 +110,7 @@ export const HostDashboardScreen = () => {
   const [piMatchCount, setPiMatchCount] = useState(0);
   const [piUsedThisMonth, setPiUsedThisMonth] = useState(0);
   const [piMonthlyLimit, setPiMonthlyLimit] = useState(0);
+  const [piTopPicks, setPiTopPicks] = useState<{ name: string; reason: string; strength: string }[]>([]);
 
   const DASH_COLLAPSE_H = 50;
   const dashScrollY = useSharedValue(0);
@@ -220,11 +221,25 @@ export const HostDashboardScreen = () => {
         .from('pi_host_recommendations')
         .select('recommendations')
         .eq('host_id', user.id);
-      const total = (piRecs || []).reduce((sum: number, r: any) => {
+      let total = 0;
+      const topPicks: { name: string; reason: string; strength: string }[] = [];
+      (piRecs || []).forEach((r: any) => {
         const recs = r.recommendations;
-        return sum + (Array.isArray(recs) ? recs.length : 0);
-      }, 0);
+        if (Array.isArray(recs)) {
+          total += recs.length;
+          recs.forEach((rec: any) => {
+            if (topPicks.length < 3 && rec.target_name) {
+              topPicks.push({
+                name: rec.target_name || 'Renter',
+                reason: rec.reason || 'Strong match for your listing',
+                strength: rec.match_strength || 'good',
+              });
+            }
+          });
+        }
+      });
       setPiMatchCount(total);
+      setPiTopPicks(topPicks);
     } catch {}
 
     if (user.hostType === 'company') {
@@ -668,7 +683,10 @@ export const HostDashboardScreen = () => {
         {activeCount > 0 ? (
           <Pressable
             style={styles.groupMatchCard}
-            onPress={() => navigation.navigate('BrowseRenters')}
+            onPress={() => {
+              const activeListing = listings.find(l => l.available && !l.rentedDate);
+              navigation.navigate('BrowseRenters', activeListing ? { listingId: activeListing.id } : undefined);
+            }}
           >
             <View style={styles.groupMatchLeft}>
               <View style={[styles.groupMatchIconWrap, { backgroundColor: PURPLE + '20' }]}>
@@ -721,7 +739,7 @@ export const HostDashboardScreen = () => {
                 <Text style={styles.groupMatchSub}>AI-powered renter matching across all company listings</Text>
               </View>
             </View>
-            <View style={{ flexDirection: 'row', gap: 10 }}>
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: piTopPicks.length > 0 ? 12 : 0 }}>
               <View style={{ flex: 1, backgroundColor: PURPLE + '10', borderRadius: 10, padding: 12, alignItems: 'center' }}>
                 <Text style={{ color: PURPLE, fontSize: 20, fontWeight: '700' }}>{piMatchCount}</Text>
                 <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, marginTop: 2 }}>Total Matches</Text>
@@ -737,6 +755,24 @@ export const HostDashboardScreen = () => {
                 <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, marginTop: 2 }}>Remaining</Text>
               </View>
             </View>
+            {piTopPicks.length > 0 ? (
+              <View>
+                <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '600', marginBottom: 8 }}>TOP PICKS</Text>
+                {piTopPicks.map((pick, idx) => {
+                  const strengthColor = pick.strength === 'strong' ? GREEN : pick.strength === 'good' ? GOLD : '#3b82f6';
+                  return (
+                    <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: strengthColor }} />
+                      <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600', flex: 0 }} numberOfLines={1}>{pick.name}</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, flex: 1 }} numberOfLines={1}>{pick.reason}</Text>
+                      <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: strengthColor + '20' }}>
+                        <Text style={{ color: strengthColor, fontSize: 9, fontWeight: '700', textTransform: 'capitalize' }}>{pick.strength}</Text>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            ) : null}
           </View>
         ) : null}
 
