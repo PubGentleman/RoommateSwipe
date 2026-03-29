@@ -163,13 +163,11 @@ serve(async (req: Request) => {
     supabase.functions.invoke('generate-group-suggestions', { body: { userId } }).catch(() => {});
 
     const highScores = scores.filter(s => s.score > 60);
-    if (highScores.length > 0) {
-      for (const hs of highScores.slice(0, 5)) {
-        const targetId = hs.user_id === userId ? hs.target_id : hs.user_id;
-        supabase.functions.invoke('pi-match-insight', {
-          body: { user_id: userId, target_user_id: targetId, match_score: hs.score },
-        }).catch(() => {});
-      }
+    for (const hs of highScores) {
+      const targetId = hs.user_id === userId ? hs.target_id : hs.user_id;
+      supabase.functions.invoke('pi-match-insight', {
+        body: { user_id: userId, target_user_id: targetId, match_score: hs.score },
+      }).catch(() => {});
     }
 
     return new Response(JSON.stringify({ calculated: scores.length, piTriggered: highScores.length }), {

@@ -800,7 +800,7 @@ export const calculateDetailedCompatibility = (
     if (userPiPrefs && checkHardNoConflicts(userPiPrefs, roommateProfile)) {
       breakdown.piPreference = -10;
       reasons.concerns.push('Conflicts with a stated deal-breaker preference');
-    } else if (roommatePiPrefs && checkHardNoConflicts(roommatePiPrefs, currentUser as any)) {
+    } else if (roommatePiPrefs && checkHardNoConflicts(roommatePiPrefs, roommateProfileToCheckable(currentUser))) {
       breakdown.piPreference = -10;
       reasons.concerns.push('Conflicts with their stated deal-breaker preference');
     } else {
@@ -829,9 +829,14 @@ export const calculateDetailedCompatibility = (
     }
   }
 
-  // Calculate total score — normalize to 0-100 scale
+  const BASE_MAX = 100;
+  const PI_MIN = -10;
+  const PI_MAX = 5;
   const rawTotal = Object.values(breakdown).reduce((sum, score) => sum + score, 0);
-  const totalScore = Math.max(0, Math.min(100, rawTotal));
+  const effectiveMin = 0 + PI_MIN;
+  const effectiveMax = BASE_MAX + PI_MAX;
+  const normalized = ((rawTotal - effectiveMin) / (effectiveMax - effectiveMin)) * 100;
+  const totalScore = Math.round(Math.max(0, Math.min(100, normalized)));
 
   return {
     totalScore,
@@ -1170,7 +1175,27 @@ function getCluster(value: string, clusters: Record<string, string[]>): string |
   return null;
 }
 
-export function checkHardNoConflicts(prefs: PiParsedPreferences, profile: any): boolean {
+interface HardNoCheckable {
+  profileData?: {
+    preferences?: Record<string, string | undefined>;
+    interests?: string[];
+  };
+  lifestyle?: Record<string, string | number | boolean | undefined>;
+  occupation?: string;
+}
+
+function roommateProfileToCheckable(user: User): HardNoCheckable {
+  return {
+    profileData: {
+      preferences: user.profileData?.preferences as Record<string, string | undefined> | undefined,
+      interests: user.profileData?.interests,
+    },
+    lifestyle: undefined,
+    occupation: (user as User & { occupation?: string }).occupation,
+  };
+}
+
+export function checkHardNoConflicts(prefs: PiParsedPreferences, profile: HardNoCheckable): boolean {
   if (!prefs.hard_nos || prefs.hard_nos.length === 0) return false;
 
   const profileText = [
@@ -1232,20 +1257,20 @@ export function countSoftPreferenceOverlap(prefs1: PiParsedPreferences, prefs2: 
   return overlap >= 2 ? 1 : 0;
 }
 
-function matchesProfileVibe(vibe: string, profile: any): boolean {
+function matchesProfileVibe(vibe: string, profile: User | RoommateProfile): boolean {
   const vibeCluster = getCluster(vibe, VIBE_CLUSTERS);
   if (!vibeCluster) return false;
-  const socialLevel = profile.lifestyle?.socialLevel ?? 5;
+  const socialLevel = (profile as RoommateProfile).lifestyle?.socialLevel ?? 5;
   if (vibeCluster === 'social' && socialLevel >= 7) return true;
   if (vibeCluster === 'quiet' && socialLevel <= 4) return true;
   if (vibeCluster === 'chill' && socialLevel >= 3 && socialLevel <= 7) return true;
   return false;
 }
 
-function matchesProfileSocialStyle(style: string, profile: any): boolean {
+function matchesProfileSocialStyle(style: string, profile: User | RoommateProfile): boolean {
   const styleCluster = getCluster(style, SOCIAL_CLUSTERS);
   if (!styleCluster) return false;
-  const socialLevel = profile.lifestyle?.socialLevel ?? 5;
+  const socialLevel = (profile as RoommateProfile).lifestyle?.socialLevel ?? 5;
   if (styleCluster === 'social' && socialLevel >= 7) return true;
   if (styleCluster === 'independent' && socialLevel <= 4) return true;
   if (styleCluster === 'balanced' && socialLevel >= 4 && socialLevel <= 7) return true;

@@ -375,29 +375,38 @@ export async function saveRefinementAnswer(questionId: string, value: string): P
 }
 
 function applyAIRanking(deck: any[], rankedIds: string[]): any[] {
-  const idToProfile = new Map<string, any>();
-  for (const p of deck) {
-    idToProfile.set(p.id, p);
+  const top30 = deck.slice(0, 30);
+  const remainder = deck.slice(30);
+
+  const top30Ids = new Set(top30.map((p: any) => p.id));
+  const overlap = rankedIds.filter(id => top30Ids.has(id));
+  if (overlap.length < top30.length * 0.5) {
+    return deck;
   }
 
-  const reordered: any[] = [];
+  const top30Map = new Map<string, any>();
+  for (const p of top30) {
+    top30Map.set(p.id, p);
+  }
+
+  const reorderedTop: any[] = [];
   const usedIds = new Set<string>();
 
   for (const id of rankedIds) {
-    const profile = idToProfile.get(id);
+    const profile = top30Map.get(id);
     if (profile) {
-      reordered.push(profile);
+      reorderedTop.push(profile);
       usedIds.add(id);
     }
   }
 
-  for (const p of deck) {
+  for (const p of top30) {
     if (!usedIds.has(p.id)) {
-      reordered.push(p);
+      reorderedTop.push(p);
     }
   }
 
-  return reordered;
+  return [...reorderedTop, ...remainder];
 }
 
 async function checkPiDeckReranking(userId: string): Promise<boolean> {
