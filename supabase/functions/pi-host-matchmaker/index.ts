@@ -1,14 +1,14 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import {
+  serializeCompactContext, stripName, trimAndSanitize, sanitizeValue,
+  CORS_HEADERS, errorResponse, jsonResponse,
+  PI_HOST_PERSONA,
+} from '../_shared/pi-utils.ts';
 
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')!;
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
 
 const HOST_MONTHLY_LIMITS: Record<string, number> = {
   free: 5, basic: 5, starter: 10, plus: 30, pro: 100, business: 200, elite: 200,
@@ -21,21 +21,6 @@ const AGENT_MONTHLY_LIMITS: Record<string, number> = {
 const COMPANY_MONTHLY_LIMITS: Record<string, number> = {
   starter: 200, pro: 500, enterprise: -1,
 };
-
-const PI_PERSONA = `You are Pi, Rhome's AI matchmaker — now helping from the host's perspective. You're analyzing renters and groups who might be great fits for a specific listing. You understand what makes a tenancy work: financial reliability, lifestyle compatibility with the building/neighborhood, timing alignment, and group dynamics. You're practical but warm — you want both the host and the renters to have a great experience. When recommending, you consider the whole picture: can they afford it, will they be happy there, and will the host feel confident about them?`;
-
-function stripPii(name: string | null | undefined): string {
-  if (!name) return 'User';
-  return name.split(' ')[0] || 'User';
-}
-
-function trimText(text: string | null | undefined, max = 500): string {
-  if (!text) return '';
-  let cleaned = text.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '[email]');
-  cleaned = cleaned.replace(/\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g, '[phone]');
-  cleaned = cleaned.replace(/\b\d{1,5}\s+[A-Z][a-z]+\s+(St|Ave|Blvd|Dr|Rd|Ln|Ct|Way|Pl)\b/gi, '[address]');
-  return cleaned.length > max ? cleaned.substring(0, max) + '...' : cleaned;
-}
 
 async function getHostPlanAndLimit(supabase: any, userId: string): Promise<{ plan: string; limit: number }> {
   const { data: userData } = await supabase
@@ -72,7 +57,7 @@ async function getHostPlanAndLimit(supabase: any, userId: string): Promise<{ pla
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
 
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
@@ -168,10 +153,10 @@ serve(async (req) => {
     const userMap = new Map((candidateUsers || []).map((u: any) => [u.id, u]));
 
     const listingContext = `LISTING:
-- Title: ${listing.title || 'Untitled'}
+- Title: ${sanitizeValue(listing.title || 'Untitled')}
 - Rent: $${listingRent}/month (${listing.rooms_available || listingBedrooms} rooms available, ~$${sharePerPerson.toFixed(0)}/person)
 - Bedrooms: ${listingBedrooms} | Bathrooms: ${listing.bathrooms || '?'}
-- Neighborhood: ${listing.neighborhood || '?'} | City: ${listing.city || '?'}
+- Neighborhood: ${sanitizeValue(listing.neighborhood || '?')} | City: ${sanitizeValue(listing.city || '?')}
 - Available: ${listing.available_date || 'now'}
 - Amenities: ${(listing.amenities || []).join(', ') || 'standard'}
 - Type: ${listing.type || 'apartment'}
@@ -179,34 +164,15 @@ serve(async (req) => {
 - Existing roommates: ${listing.existing_roommates_count || 0}
 - Transit nearby: ${(listing.nearby_transit || []).join(', ') || 'not specified'}
 - Pet policy: ${listing.pet_policy || 'not specified'}
-- Description: ${trimText(listing.description, 400)}`;
+- Description: ${trimAndSanitize(listing.description, 400)}`;
 
     const renterSummaries = filteredCandidates.slice(0, 20).map((p: any) => {
       const u = userMap.get(p.user_id) || {};
-      return `[RENTER:${p.user_id}] ${stripPii(u.full_name)}, ${u.age || '?'}yo, ${u.occupation || '?'}
-  Bio: ${trimText(u.bio || p.bio, 300)}
-  Zodiac: ${u.zodiac_sign || '-'}
-  Budget: $${p.budget_min || '?'}-$${p.budget_max || '?'} | Per-person: $${p.budget_per_person_min || '?'}-$${p.budget_per_person_max || '?'}
-  Move-in: ${p.move_in_date || '?'} | Lease: ${p.lease_duration || '?'}
-  Room type: ${p.room_type || '?'} | Desired BR: ${p.desired_bedrooms || '?'}
-  Sleep: ${p.sleep_schedule || '?'} | Clean: ${p.cleanliness ?? '?'}/10 | Noise: ${p.noise_tolerance || '?'}
-  Smoke: ${p.smoking != null ? (p.smoking ? 'Y' : 'N') : '?'} | Drink: ${p.drinking || '?'} | Pets: ${p.pets || '?'}
-  WFH: ${p.wfh != null ? (p.wfh ? 'Y' : 'N') : '?'} | Guests: ${p.guests || '?'}
-  Trains: ${(p.preferred_trains || []).join(',') || '-'}
-  Amenities: ${(p.amenity_must_haves || []).join(',') || '-'}
-  Diet: ${p.diet || '-'} | Roommate vibe: ${p.roommate_relationship || '-'}
-  Shared expenses: ${p.shared_expenses || '-'} | Location flexible: ${p.location_flexible != null ? (p.location_flexible ? 'Y' : 'N') : '?'}
-  Interests: ${(p.interests || []).join(',') || '-'}
-  Tags: ${(u.lifestyle_tags || p.lifestyle_tags || []).join(',') || '-'}
-  Dealbreakers: ${(p.dealbreakers || []).join(',') || '-'}
-  Neighborhoods: ${(p.preferred_neighborhoods || []).join(',') || '-'}
-  Ideal roommate: ${trimText(p.ideal_roommate_text, 200)}
-  Profile note: ${trimText(p.profile_note, 150)}
-  Personality: ${p.personality_quiz_answers ? JSON.stringify(p.personality_quiz_answers) : '-'}`;
+      return serializeCompactContext(p.user_id, u, p, 0);
     }).join('\n\n');
 
     const groupSummaries = (groupCandidates || []).map((g: any) => {
-      return `[GROUP:${g.id}] "${g.name}" — ${g.member_count} members
+      return `[GROUP:${g.id}] "${sanitizeValue(g.name)}" — ${g.member_count} members
   Budget: $${g.budget_min || '?'}-$${g.budget_max || '?'}
   Move-in: ${g.move_in_date || '?'}
   Neighborhoods: ${(g.preferred_neighborhoods || []).join(',') || '-'}`;
@@ -243,11 +209,11 @@ Respond with ONLY this JSON:
   "recommendations": [
     {
       "type": "renter",
-      "id": "user_id_here",
+      "target_id": "user_id_here",
       "name": "First name only",
-      "match_strength": 0.0-1.0,
+      "match_strength": "strong" | "good" | "moderate",
       "reason": "2-3 sentences explaining why this person is a great fit for THIS specific listing",
-      "action": "suggested next step for the host (e.g., 'Send a message about their move-in timeline', 'Invite to a showing')"
+      "suggested_action": "suggested next step for the host (e.g., 'Send a message about their move-in timeline', 'Invite to a showing')"
     }
   ],
   "market_insight": "1-2 sentences about the listing's market position and any suggestions"
@@ -265,7 +231,7 @@ For groups, use "type": "group" and "id" is the group ID. Keep recommendations t
       body: JSON.stringify({
         model: 'claude-sonnet-4-5',
         max_tokens: 1536,
-        system: PI_PERSONA,
+        system: PI_HOST_PERSONA,
         messages: [{ role: 'user', content: prompt }],
       }),
     });
@@ -292,20 +258,22 @@ For groups, use "type": "group" and "id" is the group ID. Keep recommendations t
     const validRenterIds = new Set(filteredCandidates.map((r: any) => r.user_id));
     const validGroupIds = new Set((groupCandidates || []).map((g: any) => g.id));
 
+    const validStrengths = ['strong', 'good', 'moderate'];
     result.recommendations = (result.recommendations || [])
       .filter((r: any) => {
-        if (r.type === 'renter') return validRenterIds.has(r.id);
-        if (r.type === 'group') return validGroupIds.has(r.id);
+        const rid = r.target_id || r.id;
+        if (r.type === 'renter') return validRenterIds.has(rid);
+        if (r.type === 'group') return validGroupIds.has(rid);
         return false;
       })
       .slice(0, 5)
       .map((r: any) => ({
         type: r.type || 'renter',
-        id: r.id,
-        name: r.name || 'Unknown',
-        match_strength: typeof r.match_strength === 'number' ? Math.min(1, Math.max(0, r.match_strength)) : 0.5,
+        target_id: r.target_id || r.id,
+        name: stripName(r.name),
+        match_strength: validStrengths.includes(r.match_strength) ? r.match_strength : 'moderate',
         reason: r.reason || 'Potential fit based on budget and preferences',
-        action: r.action || 'Review their profile',
+        suggested_action: r.suggested_action || r.action || 'Review their profile',
       }));
 
     await Promise.all([
@@ -334,16 +302,3 @@ For groups, use "type": "group" and "id" is the group ID. Keep recommendations t
     return errorResponse('Matchmaker analysis failed', 500);
   }
 });
-
-function errorResponse(message: string, status: number) {
-  return new Response(JSON.stringify({ error: message }), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}
-
-function jsonResponse(data: any) {
-  return new Response(JSON.stringify(data), {
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}

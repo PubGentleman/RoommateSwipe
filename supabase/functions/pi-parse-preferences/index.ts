@@ -1,26 +1,16 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import {
+  sanitizeValue, CORS_HEADERS, errorResponse, jsonResponse,
+  PI_PARSE_PERSONA,
+} from '../_shared/pi-utils.ts';
 
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')!;
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-const PI_PERSONA = `You are Pi, Rhome's AI matchmaker. You're reading someone's free-text description of their ideal roommate situation and extracting structured preferences. Be generous in interpretation — people express preferences in many ways. "I need my beauty sleep" means early sleeper. "I throw dinner parties" means frequent guests. "No drama" might signal preference for a respectful/parallel roommate relationship. Extract everything you can, but never fabricate preferences that aren't implied.`;
-
-function sanitizeText(text: string): string {
-  let cleaned = text.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '[email]');
-  cleaned = cleaned.replace(/\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g, '[phone]');
-  cleaned = cleaned.replace(/\b\d{1,5}\s+[A-Z][a-z]+\s+(St|Ave|Blvd|Dr|Rd|Ln|Ct|Way|Pl)\b/gi, '[address]');
-  return cleaned;
-}
-
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
 
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
@@ -37,6 +27,7 @@ serve(async (req) => {
     }
 
     const trimmedText = text.length > 500 ? text.substring(0, 500) : text;
+    const sanitizedText = sanitizeValue(trimmedText);
 
     const { data: sub } = await supabase
       .from('subscriptions')
@@ -60,8 +51,6 @@ serve(async (req) => {
     if ((count ?? 0) >= dailyLimit) {
       return errorResponse('Daily Pi limit reached.', 429);
     }
-
-    const sanitizedText = sanitizeText(trimmedText);
 
     const prompt = `The user wrote this about their ideal roommate/living situation:
 
@@ -94,7 +83,7 @@ Respond with ONLY this JSON:
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 768,
-        system: PI_PERSONA,
+        system: PI_PARSE_PERSONA,
         messages: [{ role: 'user', content: prompt }],
       }),
     });
@@ -149,16 +138,3 @@ Respond with ONLY this JSON:
     return errorResponse('Preference parsing failed', 500);
   }
 });
-
-function errorResponse(message: string, status: number) {
-  return new Response(JSON.stringify({ error: message }), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}
-
-function jsonResponse(data: any) {
-  return new Response(JSON.stringify(data), {
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}

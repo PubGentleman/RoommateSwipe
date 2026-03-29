@@ -1,61 +1,21 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import {
+  serializeFullContext, serializeCompactContext,
+  CORS_HEADERS, errorResponse, jsonResponse,
+  PI_RERANK_PERSONA,
+} from '../_shared/pi-utils.ts';
 
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')!;
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
 const RENTER_DAILY_LIMITS: Record<string, number> = {
   free: 5, basic: 5, plus: 50, elite: 200,
 };
 
-const PI_PERSONA = `You are Pi, Rhome's AI matchmaker. You're re-ranking a discovery deck of potential roommates. The deterministic algorithm already scored them on budget, location, sleep, cleanliness, smoking, pets, and timeline. Your job is to look at what the algorithm CAN'T score: bio nuance, occupation compatibility, personality quiz alignment, amenity priorities, transit needs, diet preferences, social style, and the intangible "would these people actually vibe?" factor. You're not replacing the algorithm — you're adding human-like intuition on top.`;
-
-function stripPii(name: string | null | undefined): string {
-  if (!name) return 'User';
-  return name.split(' ')[0] || 'User';
-}
-
-function trimText(text: string | null | undefined, max = 500): string {
-  if (!text) return '';
-  let cleaned = text.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '[email]');
-  cleaned = cleaned.replace(/\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g, '[phone]');
-  cleaned = cleaned.replace(/\b\d{1,5}\s+[A-Z][a-z]+\s+(St|Ave|Blvd|Dr|Rd|Ln|Ct|Way|Pl)\b/gi, '[address]');
-  return cleaned.length > max ? cleaned.substring(0, max) + '...' : cleaned;
-}
-
-function buildCompactProfile(userId: string, user: any, profile: any, score: number): string {
-  const p = profile || {};
-  const u = user || {};
-  return `[${userId}] ${stripPii(u.full_name)}, ${u.age || '?'}yo, ${u.occupation || '?'} | Score: ${score}
-  Bio: ${trimText(u.bio, 400)}
-  Zodiac: ${u.zodiac_sign || '-'}
-  Budget: $${p.budget_min || '?'}-$${p.budget_max || '?'} | Per-person: $${p.budget_per_person_min || '?'}-$${p.budget_per_person_max || '?'}
-  Move-in: ${p.move_in_date || '?'} | Lease: ${p.lease_duration || '?'}
-  Room type: ${p.room_type || '?'} | Desired BR: ${p.desired_bedrooms || '?'}
-  Sleep: ${p.sleep_schedule || '?'} | Clean: ${p.cleanliness ?? '?'}/10 | Noise: ${p.noise_tolerance || '?'}
-  Smoke: ${p.smoking != null ? (p.smoking ? 'Y' : 'N') : '?'} | Drink: ${p.drinking || '?'} | Pets: ${p.pets || '?'}
-  WFH: ${p.wfh != null ? (p.wfh ? 'Y' : 'N') : '?'} | Guests: ${p.guests || '?'}
-  Trains: ${(p.preferred_trains || []).join(',') || '-'}
-  Amenities: ${(p.amenity_must_haves || []).join(',') || '-'}
-  Diet: ${p.diet || '-'} | Roommate vibe: ${p.roommate_relationship || '-'}
-  Shared expenses: ${p.shared_expenses || '-'} | Location flexible: ${p.location_flexible != null ? (p.location_flexible ? 'Y' : 'N') : '?'}
-  Interests: ${(p.interests || []).join(',') || '-'}
-  Tags: ${(u.lifestyle_tags || p.lifestyle_tags || []).join(',') || '-'}
-  Dealbreakers: ${(p.dealbreakers || []).join(',') || '-'}
-  Profile note: ${trimText(p.profile_note, 200)}
-  Ideal roommate: ${trimText(p.ideal_roommate_text, 300)}
-  Personality: ${p.personality_quiz_answers ? JSON.stringify(p.personality_quiz_answers) : '-'}
-  Neighborhoods: ${(p.preferred_neighborhoods || []).join(',') || '-'}`;
-}
-
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
 
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
@@ -88,9 +48,8 @@ serve(async (req) => {
 
     if (cached) {
       const cachedSet = new Set(cached.ranked_user_ids || []);
-      const requestSet = new Set(resolvedCandidateIds);
       const overlap = resolvedCandidateIds.filter((id: string) => cachedSet.has(id)).length;
-      if (overlap / requestSet.size >= 0.8) {
+      if (overlap / resolvedCandidateIds.length >= 0.8) {
         return jsonResponse({
           ranked_ids: cached.ranked_user_ids,
           adjustments: cached.adjustments,
@@ -135,24 +94,12 @@ serve(async (req) => {
     const candidateUsers = new Map((candidateUsersResult.data || []).map((u: any) => [u.id, u]));
     const candidateProfiles = new Map((candidateProfilesResult.data || []).map((p: any) => [p.user_id, p]));
 
-    const userContext = `YOUR PROFILE (the person swiping):
-- Name: ${stripPii(userData.full_name)}, Age: ${userData.age || '?'}
-- Occupation: ${userData.occupation || '?'}
-- Bio: ${trimText(userData.bio, 300)}
-- Interests: ${(userProfile?.interests || []).join(', ') || '-'}
-- Tags: ${(userData.lifestyle_tags || []).join(', ') || '-'}
-- Ideal roommate: ${trimText(userProfile?.ideal_roommate_text, 300)}
-- Personality: ${userProfile?.personality_quiz_answers ? JSON.stringify(userProfile.personality_quiz_answers) : '-'}
-- Diet: ${userProfile?.diet || '-'}
-- Amenities: ${(userProfile?.amenity_must_haves || []).join(', ') || '-'}
-- Trains: ${(userProfile?.preferred_trains || []).join(', ') || '-'}
-- Desired bedrooms: ${userProfile?.desired_bedrooms || '-'}
-- Neighborhoods: ${(userProfile?.preferred_neighborhoods || []).join(', ') || '-'}`;
+    const userContext = serializeFullContext(userData, userProfile, 'YOUR PROFILE (the person swiping)');
 
     const candidateContexts = top30.map((c: any) => {
       const id = c.userId || c.user_id || c.id;
       const score = c.score || c.totalScore || 0;
-      return buildCompactProfile(id, candidateUsers.get(id), candidateProfiles.get(id), score);
+      return serializeCompactContext(id, candidateUsers.get(id), candidateProfiles.get(id), score);
     }).join('\n\n');
 
     const prompt = `${userContext}
@@ -191,7 +138,7 @@ Return ALL candidate IDs in ranked_ids. Only include the top 5 most significant 
       body: JSON.stringify({
         model: 'claude-sonnet-4-5',
         max_tokens: 1536,
-        system: PI_PERSONA,
+        system: PI_RERANK_PERSONA,
         messages: [{ role: 'user', content: prompt }],
       }),
     });
@@ -246,16 +193,3 @@ Return ALL candidate IDs in ranked_ids. Only include the top 5 most significant 
     return errorResponse('Reranking failed — try again shortly', 500);
   }
 });
-
-function errorResponse(message: string, status: number) {
-  return new Response(JSON.stringify({ error: message }), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}
-
-function jsonResponse(data: any) {
-  return new Response(JSON.stringify(data), {
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}
