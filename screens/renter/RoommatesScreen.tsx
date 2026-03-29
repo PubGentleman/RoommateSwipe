@@ -529,7 +529,7 @@ export const RoommatesScreen = () => {
   }, [renterLimits.hasPiDeckReranking, profiles.length]);
 
   useEffect(() => {
-    if (!currentProfile?.id || !renterLimits.hasPiDeckReranking) {
+    if (!currentProfile?.id) {
       setPiCardSummary(null);
       setPiCardLoading(false);
       return;
@@ -551,7 +551,7 @@ export const RoommatesScreen = () => {
       }
     }).catch(() => {}).finally(() => { if (!stale) setPiCardLoading(false); });
     return () => { stale = true; };
-  }, [currentProfile?.id, renterLimits.hasPiDeckReranking]);
+  }, [currentProfile?.id]);
 
   const advanceCard = () => {
     InteractionManager.runAfterInteractions(() => {
@@ -1853,23 +1853,13 @@ export const RoommatesScreen = () => {
                     <ThemedText style={styles.piPickText}>Pi Pick</ThemedText>
                   </View>
                 ) : null}
-                {renterLimits.hasMatchBreakdown ? (
-                  <Pressable
-                    style={styles.whyMatchButton}
-                    onPress={() => setShowWhyModal(true)}
-                  >
-                    <ThemedText style={styles.whyMatchText}>Why?</ThemedText>
-                    <Feather name="cpu" size={12} color="#a855f7" />
-                  </Pressable>
-                ) : (
-                  <Pressable
-                    style={[styles.whyMatchButton, { borderColor: 'rgba(168,85,247,0.3)' }]}
-                    onPress={() => setShowPaywall(true)}
-                  >
-                    <Feather name="lock" size={10} color="#a855f7" />
-                    <ThemedText style={[styles.whyMatchText, { color: '#a855f7', marginLeft: 3 }]}>Why?</ThemedText>
-                  </Pressable>
-                )}
+                <Pressable
+                  style={styles.whyMatchButton}
+                  onPress={() => setShowWhyModal(true)}
+                >
+                  <ThemedText style={styles.whyMatchText}>Why?</ThemedText>
+                  <Feather name="cpu" size={12} color="#a855f7" />
+                </Pressable>
                 <Pressable
                   style={styles.askAIPill}
                   onPress={() => {
@@ -1907,22 +1897,20 @@ export const RoommatesScreen = () => {
                   </View>
                 );
               })()}
-              {renterLimits.hasPiDeckReranking ? (
-                piCardLoading ? (
-                  <View style={styles.piSummaryRow}>
-                    <Feather name="cpu" size={11} color="#a855f7" />
-                    <View style={styles.piSummarySkeleton}>
-                      <View style={[styles.piSkeletonBar, { width: '70%' }]} />
-                    </View>
+              {piCardLoading ? (
+                <View style={styles.piSummaryRow}>
+                  <Feather name="cpu" size={11} color="#a855f7" />
+                  <View style={styles.piSummarySkeleton}>
+                    <View style={[styles.piSkeletonBar, { width: '70%' }]} />
                   </View>
-                ) : piCardSummary ? (
-                  <View style={styles.piSummaryRow}>
-                    <Feather name="cpu" size={11} color="#a855f7" />
-                    <ThemedText style={styles.piSummaryText} numberOfLines={2}>
-                      {piCardSummary}
-                    </ThemedText>
-                  </View>
-                ) : null
+                </View>
+              ) : piCardSummary ? (
+                <View style={styles.piSummaryRow}>
+                  <Feather name="cpu" size={11} color="#a855f7" />
+                  <ThemedText style={styles.piSummaryText} numberOfLines={2}>
+                    {piCardSummary}
+                  </ThemedText>
+                </View>
               ) : null}
             </View>
           </Animated.View>
