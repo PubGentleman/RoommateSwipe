@@ -641,6 +641,33 @@ export const EditProfileScreen = () => {
                 Pi reads this to improve your match quality
               </ThemedText>
             </View>
+            {user?.profileData?.pi_parsed_preferences ? (() => {
+              const pp = user.profileData.pi_parsed_preferences;
+              const tags: string[] = [];
+              if (pp.vibe) tags.push(pp.vibe);
+              if (pp.social_style) tags.push(pp.social_style);
+              if (pp.personality_signals) tags.push(...pp.personality_signals.slice(0, 3));
+              if (pp.cleanliness_hints) tags.push(Array.isArray(pp.cleanliness_hints) ? pp.cleanliness_hints[0] : pp.cleanliness_hints);
+              if (pp.schedule_hints) tags.push(...(Array.isArray(pp.schedule_hints) ? pp.schedule_hints.slice(0, 2) : [pp.schedule_hints]));
+              if (pp.hard_nos) tags.push(...pp.hard_nos.slice(0, 2).map((n: string) => `no ${n}`));
+              return tags.length > 0 ? (
+                <View style={{ marginTop: 8 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 }}>
+                    <Feather name="cpu" size={11} color="#a855f7" />
+                    <ThemedText style={{ color: '#a855f7', fontSize: 11, fontWeight: '600' }}>
+                      Pi extracted:
+                    </ThemedText>
+                  </View>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                    {tags.map((tag, i) => (
+                      <View key={i} style={{ backgroundColor: '#a855f7' + '15', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 }}>
+                        <ThemedText style={{ color: '#a855f7', fontSize: 11 }}>{tag}</ThemedText>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              ) : null;
+            })() : null}
           </View>
 
           <View style={styles.inputGroup}>

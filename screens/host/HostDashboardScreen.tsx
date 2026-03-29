@@ -642,6 +642,24 @@ export const HostDashboardScreen = () => {
           </Pressable>
         ) : null}
 
+        {activeCount > 0 ? (
+          <Pressable
+            style={styles.groupMatchCard}
+            onPress={() => navigation.navigate('BrowseRenters')}
+          >
+            <View style={styles.groupMatchLeft}>
+              <View style={[styles.groupMatchIconWrap, { backgroundColor: PURPLE + '20' }]}>
+                <Feather name="cpu" size={18} color={PURPLE} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.groupMatchTitle}>{'\u03C0'} Pi Matchmaker</Text>
+                <Text style={styles.groupMatchSub}>Pi finds renters that fit your listings</Text>
+              </View>
+            </View>
+            <Feather name="chevron-right" size={18} color="#888" />
+          </Pressable>
+        ) : null}
+
         {user?.hostType === 'company' ? (
           <Pressable
             style={styles.groupMatchCard}

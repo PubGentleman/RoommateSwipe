@@ -265,6 +265,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         leaseDuration: profile.lease_duration,
         profileNote: profile.profile_note || undefined,
         ideal_roommate_text: profile.ideal_roommate_text || undefined,
+        pi_parsed_preferences: profile.pi_parsed_preferences || undefined,
         instagram_verified: profile.instagram_verified || false,
         instagram_handle: profile.instagram_handle || undefined,
       } : {

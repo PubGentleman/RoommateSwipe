@@ -484,6 +484,13 @@ export const MyListingsScreen = () => {
             ) : null}
             {status === 'active' ? (
               <>
+                <Pressable
+                  style={styles.actBoost}
+                  onPress={() => navigation.navigate('BrowseRenters', { listingId: listing.id })}
+                >
+                  <Feather name="cpu" size={13} color="#a855f7" />
+                  <Text style={styles.actBoostText}>{'\u03C0'} Pi's Picks</Text>
+                </Pressable>
                 {canUseBoosts(getHostPlan() as HostPlan) ? (
                   <Pressable
                     style={styles.actBoost}

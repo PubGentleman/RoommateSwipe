@@ -4,7 +4,7 @@ import {
   ActivityIndicator, Modal, TextInput, ScrollView,
 } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -22,6 +22,8 @@ import {
   generateBestGroupSuggestion,
 } from '../../services/agentMatchmakerService';
 import { calculateListingLocationScore } from '../../utils/listingMatchUtils';
+import { getHostRecommendations } from '../../services/piMatchingService';
+import { PiHostRecommendation } from '../../types/models';
 import {
   getAgentPlanLimits,
   canAgentShortlist,
@@ -46,9 +48,11 @@ const YELLOW = '#f39c12';
 
 export const BrowseRentersScreen = () => {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { alert: showAlert, confirm } = useConfirm();
+  const routeListingId = route.params?.listingId as string | undefined;
 
   const [renters, setRenters] = useState<AgentRenter[]>([]);
   const [filteredRenters, setFilteredRenters] = useState<AgentRenter[]>([]);
@@ -66,6 +70,9 @@ export const BrowseRentersScreen = () => {
     renter: AgentRenter; listingFitScore: number; reason: string;
   }>>([]);
   const [bestGroupSuggestion, setBestGroupSuggestion] = useState<any>(null);
+  const [piRecommendedIds, setPiRecommendedIds] = useState<Map<string, string>>(new Map());
+  const [piSortActive, setPiSortActive] = useState(false);
+  const [piLoading, setPiLoading] = useState(false);
 
   const agentPlan: AgentPlan = (user?.agentPlan as AgentPlan) || 'pay_per_use';
   const planLimits = getAgentPlanLimits(agentPlan);
@@ -223,6 +230,14 @@ export const BrowseRentersScreen = () => {
       setFilteredRenters(mapped);
       setListings(myListings);
 
+      if (routeListingId && myListings.length > 0) {
+        const match = myListings.find(l => l.id === routeListingId);
+        if (match) {
+          setSelectedListing(match);
+          setPiSortActive(true);
+        }
+      }
+
       if (user) {
         const ids = await getShortlistedRenterIds(user.id);
         setShortlistedIds(new Set(ids));
@@ -235,7 +250,29 @@ export const BrowseRentersScreen = () => {
 
   useEffect(() => {
     applyFilters();
-  }, [selectedListing, roomTypeFilter, neighborhoodFilter, renters, allProfiles]);
+  }, [selectedListing, roomTypeFilter, neighborhoodFilter, renters, allProfiles, piSortActive, piRecommendedIds]);
+
+  useEffect(() => {
+    if (selectedListing) {
+      setPiLoading(true);
+      getHostRecommendations(selectedListing.id).then(rec => {
+        if (rec?.recommendations) {
+          const map = new Map<string, string>();
+          rec.recommendations.forEach((r: any) => {
+            if (r.type === 'renter' && r.target_id) {
+              map.set(r.target_id, r.reason || '');
+            }
+          });
+          setPiRecommendedIds(map);
+        } else {
+          setPiRecommendedIds(new Map());
+        }
+      }).catch(() => setPiRecommendedIds(new Map())).finally(() => setPiLoading(false));
+    } else {
+      setPiRecommendedIds(new Map());
+      setPiSortActive(false);
+    }
+  }, [selectedListing]);
 
   useEffect(() => {
     if (planLimits.hasAISuggestions && selectedListing && renters.length > 0) {
@@ -277,6 +314,14 @@ export const BrowseRentersScreen = () => {
         r.neighborhood?.toLowerCase().includes(nfLower) ||
         r.preferredNeighborhoods?.some(n => n.toLowerCase().includes(nfLower))
       );
+    }
+
+    if (piSortActive && piRecommendedIds.size > 0) {
+      filtered.sort((a, b) => {
+        const aPi = piRecommendedIds.has(a.id) ? 1 : 0;
+        const bPi = piRecommendedIds.has(b.id) ? 1 : 0;
+        return bPi - aPi;
+      });
     }
 
     setFilteredRenters(filtered);
@@ -339,7 +384,15 @@ export const BrowseRentersScreen = () => {
             </View>
           )}
           <View style={styles.cardInfo}>
-            <Text style={styles.cardName}>{item.name}, {item.age}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={styles.cardName}>{item.name}, {item.age}</Text>
+              {piRecommendedIds.has(item.id) ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#a855f7' + '20', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 }}>
+                  <Feather name="cpu" size={10} color="#a855f7" />
+                  <Text style={{ color: '#a855f7', fontSize: 10, fontWeight: '600' }}>{'\u03C0'} Pi Pick</Text>
+                </View>
+              ) : null}
+            </View>
             <Text style={styles.cardOccupation}>{item.occupation}</Text>
             {item.preferredNeighborhoods && item.preferredNeighborhoods.length > 0 ? (
               <Text style={styles.cardMeta} numberOfLines={1}>
@@ -393,6 +446,15 @@ export const BrowseRentersScreen = () => {
             </View>
           ) : null}
         </View>
+
+        {piRecommendedIds.has(item.id) && piRecommendedIds.get(item.id) ? (
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 8, paddingHorizontal: 4 }}>
+            <Feather name="cpu" size={11} color="#a855f7" />
+            <Text style={{ color: '#a855f7', fontSize: 11, flex: 1, lineHeight: 15 }} numberOfLines={2}>
+              {piRecommendedIds.get(item.id)}
+            </Text>
+          </View>
+        ) : null}
 
         <Pressable
           style={styles.viewProfileBtn}
@@ -508,6 +570,17 @@ export const BrowseRentersScreen = () => {
       </Pressable>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
+        {selectedListing && piRecommendedIds.size > 0 ? (
+          <Pressable
+            style={[styles.filterChip, piSortActive ? { backgroundColor: '#a855f7', borderColor: '#a855f7' } : null]}
+            onPress={() => setPiSortActive(!piSortActive)}
+          >
+            <Feather name="cpu" size={12} color={piSortActive ? '#fff' : '#a855f7'} />
+            <Text style={[styles.filterChipText, piSortActive ? { color: '#fff' } : { color: '#a855f7' }]}>
+              {'\u03C0'} Pi Recommended
+            </Text>
+          </Pressable>
+        ) : null}
         {['any', 'room', 'entire_apartment'].map(type => (
           <Pressable
             key={type}
@@ -697,7 +770,7 @@ const styles = StyleSheet.create({
   listingSelector: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: CARD_BG, borderRadius: 12, padding: 14, marginBottom: 12 },
   listingSelectorText: { flex: 1, color: '#ccc', fontSize: 14 },
   filterRow: { marginBottom: 12 },
-  filterChip: { backgroundColor: CARD_BG, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, marginRight: 8 },
+  filterChip: { backgroundColor: CARD_BG, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, marginRight: 8, flexDirection: 'row' as const, alignItems: 'center' as const, gap: 4 },
   filterChipActive: { backgroundColor: ACCENT },
   filterChipText: { color: '#999', fontSize: 13, fontWeight: '600' },
   filterChipTextActive: { color: '#fff' },
