@@ -562,6 +562,10 @@ const styles = StyleSheet.create({
     fontSize: 22, fontWeight: '700', color: '#fff',
     marginBottom: Spacing.xs, marginTop: Spacing.md,
   },
+  stepSubtitle: {
+    fontSize: 14, color: 'rgba(255,255,255,0.6)',
+    marginBottom: Spacing.md, lineHeight: 20,
+  },
   stepHint: {
     fontSize: 14, color: 'rgba(255,255,255,0.5)',
     marginBottom: Spacing.lg,
