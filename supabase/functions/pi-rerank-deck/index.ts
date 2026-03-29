@@ -143,6 +143,11 @@ Return ALL candidate IDs in ranked_ids. Only include the top 5 most significant 
       }),
     });
 
+    if (!response.ok) {
+      console.error('Claude API error:', response.status, await response.text());
+      return jsonResponse({ ranked_ids: resolvedCandidateIds, adjustments: [], fallback: true });
+    }
+
     const claudeData = await response.json();
     const rawText = claudeData.content?.[0]?.text ?? '';
     const tokensUsed = (claudeData.usage?.input_tokens ?? 0) + (claudeData.usage?.output_tokens ?? 0);

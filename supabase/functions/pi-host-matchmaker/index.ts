@@ -236,6 +236,15 @@ For groups, use "type": "group" and "id" is the group ID. Keep recommendations t
       }),
     });
 
+    if (!response.ok) {
+      console.error('Claude API error:', response.status, await response.text());
+      return jsonResponse({
+        recommendations: [],
+        market_insight: 'AI analysis temporarily unavailable. Try again shortly.',
+        cached: false, error: true,
+      });
+    }
+
     const claudeData = await response.json();
     const rawText = claudeData.content?.[0]?.text ?? '';
     const tokensUsed = (claudeData.usage?.input_tokens ?? 0) + (claudeData.usage?.output_tokens ?? 0);

@@ -30,7 +30,8 @@ export function stripName(name: string | null | undefined): string {
 export function trimAndSanitize(text: string | null | undefined, max = 500): string {
   if (!text) return '';
   const sanitized = sanitizeValue(text);
-  return sanitized.length > max ? sanitized.substring(0, max) + '...' : sanitized;
+  const capped = Math.min(max, 500);
+  return sanitized.length > capped ? sanitized.substring(0, capped) + '...' : sanitized;
 }
 
 export function serializeFullContext(

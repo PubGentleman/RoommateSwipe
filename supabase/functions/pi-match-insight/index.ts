@@ -121,6 +121,14 @@ Respond with ONLY this JSON:
       }),
     });
 
+    if (!response.ok) {
+      console.error('Claude API error:', response.status, await response.text());
+      return jsonResponse({
+        summary: 'I\'m having a moment — couldn\'t analyze this match right now. Try again shortly.',
+        highlights: [], warnings: [], confidence: 0, error: true,
+      });
+    }
+
     const claudeData = await response.json();
     const rawText = claudeData.content?.[0]?.text ?? '';
     const tokensUsed = (claudeData.usage?.input_tokens ?? 0) + (claudeData.usage?.output_tokens ?? 0);

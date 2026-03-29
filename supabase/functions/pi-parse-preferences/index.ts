@@ -88,6 +88,11 @@ Respond with ONLY this JSON:
       }),
     });
 
+    if (!response.ok) {
+      console.error('Claude API error:', response.status, await response.text());
+      return errorResponse('AI analysis temporarily unavailable', 503);
+    }
+
     const claudeData = await response.json();
     const rawText = claudeData.content?.[0]?.text ?? '';
     const tokensUsed = (claudeData.usage?.input_tokens ?? 0) + (claudeData.usage?.output_tokens ?? 0);
