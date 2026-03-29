@@ -287,7 +287,7 @@ export function canAgentPlace(plan: string, monthlyPlacementCount: number): bool
   return monthlyPlacementCount < monthlyPlacementLimit;
 }
 
-export type CompanyPlan = 'starter' | 'pro' | 'business' | 'enterprise';
+export type CompanyPlan = 'starter' | 'pro' | 'enterprise';
 
 export interface CompanyPlanLimits {
   plan: CompanyPlan;
@@ -298,7 +298,6 @@ export interface CompanyPlanLimits {
 export const COMPANY_PI_LIMITS: Record<CompanyPlan, CompanyPlanLimits> = {
   starter: { plan: 'starter', label: 'Company Starter', piCallsPerMonth: 200 },
   pro: { plan: 'pro', label: 'Company Pro', piCallsPerMonth: 500 },
-  business: { plan: 'business', label: 'Company Business', piCallsPerMonth: -1 },
   enterprise: { plan: 'enterprise', label: 'Company Enterprise', piCallsPerMonth: -1 },
 };
 

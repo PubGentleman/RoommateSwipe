@@ -1,5 +1,8 @@
 import { supabase } from '../lib/supabase';
-import { getCompanyPiMonthlyLimit } from '../constants/planLimits';
+import { getCompanyPiMonthlyLimit, AGENT_PLAN_LIMITS, PLAN_LIMITS } from '../constants/planLimits';
+import { RENTER_PLAN_LIMITS } from '../constants/renterPlanLimits';
+import type { HostPlan } from '../constants/planLimits';
+import type { RenterPlan } from '../constants/renterPlanLimits';
 import type {
   PiMatchInsight,
   PiDeckRanking,
@@ -334,38 +337,21 @@ function normalizeHostPlan(rawPlan: string, hostType?: string): string {
 }
 
 export function getRenterPiDailyLimit(plan: string): number {
-  const limits: Record<string, number> = {
-    free: 5,
-    basic: 5,
-    plus: 50,
-    elite: 200,
-  };
-  return limits[plan] ?? 5;
+  const normalized = (plan === 'basic' ? 'free' : plan) as RenterPlan;
+  return RENTER_PLAN_LIMITS[normalized]?.piMessagesPerDay ?? RENTER_PLAN_LIMITS.free.piMessagesPerDay;
 }
 
 export function getHostPiMonthlyLimit(plan: string, hostType?: string): number {
   if (hostType === 'agent') {
-    const agentLimits: Record<string, number> = {
-      pay_per_use: 20,
-      starter: 100,
-      pro: 200,
-      business: 500,
-    };
-    return agentLimits[plan] ?? 20;
+    return AGENT_PLAN_LIMITS[plan]?.piCallsPerMonth ?? AGENT_PLAN_LIMITS.pay_per_use.piCallsPerMonth;
   }
 
   if (hostType === 'company') {
     return getCompanyPiMonthlyLimit(plan);
   }
 
-  const hostLimits: Record<string, number> = {
-    free: 5,
-    none: 5,
-    starter: 30,
-    pro: 100,
-    business: 200,
-  };
-  return hostLimits[plan] ?? 5;
+  const hostPlan = plan as HostPlan;
+  return PLAN_LIMITS[hostPlan]?.piCallsPerMonth ?? PLAN_LIMITS.free.piCallsPerMonth;
 }
 
 export async function invalidateInsightsForUser(userId: string): Promise<void> {
