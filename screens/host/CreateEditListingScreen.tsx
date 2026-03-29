@@ -69,6 +69,7 @@ export const CreateEditListingScreen = () => {
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
   const [neighborhood, setNeighborhood] = useState('');
+  const [zipCode, setZipCode] = useState('');
   const [address, setAddress] = useState('');
   const [availableDate, setAvailableDate] = useState('');
   const [showAvailableDatePicker, setShowAvailableDatePicker] = useState(false);
@@ -140,6 +141,7 @@ export const CreateEditListingScreen = () => {
     setCity(prop.city);
     setState(prop.state);
     setNeighborhood(prop.neighborhood || '');
+    setZipCode((prop as any).zip_code || '');
     setAddress(prop.address);
     setAvailableDate(prop.availableDate ? new Date(prop.availableDate).toISOString().split('T')[0] : '');
     setSelectedAmenities(prop.amenities);
@@ -311,6 +313,7 @@ export const CreateEditListingScreen = () => {
         city: city.trim(),
         state: state.trim(),
         neighborhood: neighborhood.trim() || undefined,
+        zip_code: zipCode.trim() || undefined,
         room_type: roomType,
         amenities: selectedAmenities,
         photos: photos,
@@ -347,6 +350,7 @@ export const CreateEditListingScreen = () => {
           city: city.trim(),
           state: state.trim(),
           neighborhood: neighborhood.trim() || undefined,
+          zip_code: zipCode.trim() || undefined,
           address: address.trim(),
           availableDate: availableDate ? new Date(availableDate) : undefined,
           amenities: selectedAmenities,
@@ -829,6 +833,19 @@ export const CreateEditListingScreen = () => {
             onChangeText={setNeighborhood}
             placeholder="e.g. Williamsburg"
             placeholderTextColor="#666"
+          />
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <ThemedText style={styles.label}>Zip Code</ThemedText>
+          <TextInput
+            style={styles.input}
+            value={zipCode}
+            onChangeText={(t) => setZipCode(t.replace(/[^0-9]/g, '').slice(0, 5))}
+            placeholder="10001"
+            placeholderTextColor="#666"
+            keyboardType="numeric"
+            maxLength={5}
           />
         </View>
 

@@ -1,0 +1,658 @@
+# Replit Prompt: Multi-Neighborhood & Zip Code Location Matching (v2)
+
+## GOAL
+
+Upgrade the entire location matching system across both **renter-to-renter** (roommate matching) and **renter-to-listing** (apartment matching) flows. Three key changes:
+
+1. **Renters pick up to 3 preferred neighborhoods** (capped at 3 to force real commitment and keep the matching signal strong)
+2. **Zip code** added as an optional field for renters, hosts, and listings
+3. **Distance-based proximity scoring** using actual coordinates instead of the manually maintained `nearbyNeighborhoods` arrays — this makes the system work for any city without hardcoded neighbor lists
+
+---
+
+## WHAT EXISTS TODAY
+
+### Database
+- `profiles` table already has `preferred_neighborhoods TEXT[]` (migration 018) — currently used by ApartmentPreferencesScreen but NOT by the matching algorithm
+- `profiles` table has `coordinates JSONB` ({lat, lng})
+- `users` table has `neighborhood TEXT` (single value), `city TEXT`, `state TEXT`, `location TEXT`
+- `listings` table has `neighborhood TEXT`, `city TEXT`, `state TEXT`, `coordinates JSONB`
+- No zip code column exists on any table
+
+### ApartmentPreferencesScreen (`screens/shared/ApartmentPreferencesScreen.tsx`)
+- Step 5 of 6 already lets renters select multiple neighborhoods via `toggleNeighborhood()` — **no cap on how many they can pick**
+- Saves to `profiles.preferred_neighborhoods` via `updateProfile()`
+- Neighborhoods sourced from `BOROUGH_NEIGHBORHOODS` in `constants/transitData.ts` (Brooklyn, Manhattan, Queens, Bronx, Staten Island, New Jersey boroughs)
+- No zip code input field
+
+### ProfileQuestionnaireScreen (`screens/shared/ProfileQuestionnaireScreen.tsx`)
+- Onboarding flow collects a **single** `neighborhood` text field
+- Does NOT offer multi-neighborhood selection
+- Does NOT save to `profiles.preferred_neighborhoods`
+- Many users only go through onboarding and never visit ApartmentPreferencesScreen, so they never get to pick multiple neighborhoods
+
+### Matching Algorithm (`utils/matchingAlgorithm.ts`)
+- Location is the **highest weighted category at 16 out of 100 points**
+- Only compares `userProfile.neighborhood` (single string) vs `roommateProfile.preferences.location` (single string)
+- Uses `isNearbyNeighborhood()` from `utils/locationData.ts` — checks a **hardcoded** `nearbyNeighborhoods` string array per neighborhood entry. Incomplete and only works for pre-defined NYC neighborhoods.
+- Uses `isSameCity()` — string comparison of city names
+- **DOES NOT use the `preferred_neighborhoods` array at all**
+- Current scoring: Same neighborhood = 16pts, Nearby (hardcoded list) = 12pts, Same city = 8pts, Different city = 0pts
+
+### Location Data (`utils/locationData.ts`)
+- `NEIGHBORHOODS` dictionary with ~50+ entries, each with: name, city, borough, state, **coordinates** (`{lat, lng}`), and a manually defined `nearbyNeighborhoods` string array
+- `isNearbyNeighborhood()` only checks the hardcoded list, ignores actual distance
+- `isSameCity()` compares city strings from the dictionary
+
+### Discover Service (`services/discoverService.ts`)
+- `getSwipeDeck(city?)` filters by `users.city` only
+- Does NOT filter or sort by neighborhood overlap or proximity
+
+### Host Screens
+- `CreateEditListingScreen` collects a single neighborhood and address for listings, no zip code
+- `BrowseRentersScreen` shows all renters in the city, does NOT prioritize renters whose preferred neighborhoods match the host's listings
+- `BrowseRenterGroupsScreen` shows all visible groups, does NOT sort by location relevance to the host's listings
+- Host outreach and pipeline features do NOT factor in neighborhood overlap
+
+---
+
+## CHANGES TO MAKE
+
+### 1. Database Migration
+
+Create `supabase/migrations/XXX_zip_code_and_location_upgrade.sql`:
+
+```sql
+-- Add zip_code to users, listings, and profiles
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS zip_code TEXT;
+
+ALTER TABLE public.listings
+  ADD COLUMN IF NOT EXISTS zip_code TEXT;
+
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS zip_code TEXT;
+
+-- Zip code reference table for coordinate lookups
+-- Avoids needing an external API — seed with US zip code data
+CREATE TABLE IF NOT EXISTS public.zip_code_data (
+  zip_code TEXT PRIMARY KEY,
+  city TEXT,
+  state TEXT,
+  latitude NUMERIC,
+  longitude NUMERIC
+);
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_zip_code_data_coords
+  ON public.zip_code_data(latitude, longitude);
+
+CREATE INDEX IF NOT EXISTS idx_profiles_preferred_neighborhoods
+  ON public.profiles USING GIN (preferred_neighborhoods);
+```
+
+After the migration, seed `zip_code_data` with US zip codes. Start with the NYC metro area (zip codes 10001-11697, 07001-07999 for NJ) since that's where the app's neighborhood data covers. A free dataset is available at simplemaps.com/data/us-zips. Each row needs: zip_code, city, state, latitude, longitude.
+
+### 2. Update Type Definitions (`types/models.ts`)
+
+```typescript
+// Add to User interface:
+zip_code?: string;
+
+// Add to RoommateProfile interface:
+preferredNeighborhoods?: string[];  // if not already present
+zip_code?: string;
+
+// Add to ApartmentPreferences interface:
+zip_code?: string;
+
+// Add to Property interface:
+zip_code?: string;
+```
+
+### 3. Replace Distance Logic — Coordinate-Based Proximity (`utils/locationData.ts`)
+
+**This is the core upgrade.** Instead of relying on the hardcoded `nearbyNeighborhoods` arrays, calculate the actual distance between any two neighborhoods using their coordinates. Every entry in the `NEIGHBORHOODS` dictionary already has `{lat, lng}`.
+
+Add these functions:
+
+```typescript
+/**
+ * Haversine formula — distance between two lat/lng points in miles
+ */
+export function haversineDistanceMiles(
+  lat1: number, lng1: number,
+  lat2: number, lng2: number
+): number {
+  const R = 3959; // Earth's radius in miles
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+/**
+ * Get distance between two neighborhoods using their coordinates.
+ * Returns distance in miles, or null if either neighborhood isn't in the dictionary.
+ */
+export function getNeighborhoodDistance(name1: string, name2: string): number | null {
+  const n1 = NEIGHBORHOODS[name1];
+  const n2 = NEIGHBORHOODS[name2];
+  if (!n1?.coordinates || !n2?.coordinates) return null;
+  return haversineDistanceMiles(
+    n1.coordinates.lat, n1.coordinates.lng,
+    n2.coordinates.lat, n2.coordinates.lng
+  );
+}
+
+/**
+ * Find the closest distance between any neighborhood in list A and any in list B.
+ * Returns the minimum distance in miles, or null if no coordinates found.
+ */
+export function getClosestNeighborhoodDistance(
+  neighborhoodsA: string[],
+  neighborhoodsB: string[]
+): { distance: number; pairA: string; pairB: string } | null {
+  let closest: { distance: number; pairA: string; pairB: string } | null = null;
+
+  for (const a of neighborhoodsA) {
+    for (const b of neighborhoodsB) {
+      const dist = getNeighborhoodDistance(a, b);
+      if (dist !== null && (closest === null || dist < closest.distance)) {
+        closest = { distance: dist, pairA: a, pairB: b };
+      }
+    }
+  }
+  return closest;
+}
+
+/**
+ * Get distance between two zip codes.
+ * Uses a local cache loaded from zip_code_data table.
+ */
+let zipCache: Record<string, { lat: number; lng: number }> = {};
+
+export function setZipCodeCache(data: Record<string, { lat: number; lng: number }>) {
+  zipCache = data;
+}
+
+export function getZipCodeDistance(zip1: string, zip2: string): number | null {
+  const c1 = zipCache[zip1];
+  const c2 = zipCache[zip2];
+  if (!c1 || !c2) return null;
+  return haversineDistanceMiles(c1.lat, c1.lng, c2.lat, c2.lng);
+}
+```
+
+**Load the zip code cache on app startup.** Create a service function that queries `zip_code_data` from Supabase and calls `setZipCodeCache()`. This only needs to run once per session. For the initial version, you can also bundle a static JSON file with the ~500 most common NYC/NJ zip codes as a fallback.
+
+The `isNearbyNeighborhood()` function can remain for backward compatibility but the matching algorithm should prefer the coordinate-based distance.
+
+### 4. Rewrite the Matching Algorithm Location Scoring (`utils/matchingAlgorithm.ts`)
+
+**Replace the entire location scoring block** (section 1, "LOCATION (16 points)") with this logic:
+
+```typescript
+// ========================================
+// 1. LOCATION (16 points) - MAJOR FACTOR
+// Uses multi-neighborhood overlap + coordinate distance + zip code proximity
+// ========================================
+
+// Gather all preferred neighborhoods for both users (deduplicated)
+const userNeighborhoods: string[] = [...new Set([
+  ...(currentUser.profileData?.preferred_neighborhoods || []),
+  ...(currentUser.profileData?.neighborhood ? [currentUser.profileData.neighborhood] : []),
+])].filter(Boolean);
+
+const roommateNeighborhoods: string[] = [...new Set([
+  ...(roommateProfile.preferredNeighborhoods || []),
+  ...(roommateProfile.preferences?.location ? [roommateProfile.preferences.location] : []),
+])].filter(Boolean);
+
+if (userNeighborhoods.length > 0 && roommateNeighborhoods.length > 0) {
+  // TIER 1: Direct neighborhood name overlap
+  const directOverlap = userNeighborhoods.filter(n =>
+    roommateNeighborhoods.includes(n)
+  );
+
+  if (directOverlap.length >= 2) {
+    breakdown.location = 16;
+    reasons.strengths.push(
+      `Both want ${directOverlap.slice(0, 2).join(' & ')} — perfect location match`
+    );
+  } else if (directOverlap.length === 1) {
+    breakdown.location = 14;
+    reasons.strengths.push(`Both interested in ${directOverlap[0]}`);
+  } else {
+    // TIER 2: Coordinate-based distance between closest neighborhood pair
+    const closest = getClosestNeighborhoodDistance(userNeighborhoods, roommateNeighborhoods);
+
+    if (closest) {
+      if (closest.distance <= 1) {
+        breakdown.location = 12;
+        reasons.strengths.push(
+          `${closest.pairA} and ${closest.pairB} are under a mile apart`
+        );
+      } else if (closest.distance <= 3) {
+        breakdown.location = 10;
+        reasons.strengths.push(
+          `${closest.pairA} and ${closest.pairB} are ${closest.distance.toFixed(1)} miles apart`
+        );
+      } else if (closest.distance <= 5) {
+        breakdown.location = 8;
+        reasons.notes.push(
+          `Closest neighborhoods are ${closest.distance.toFixed(1)} miles apart`
+        );
+      } else if (closest.distance <= 10) {
+        breakdown.location = 4;
+        reasons.notes.push(
+          `Neighborhoods are ${closest.distance.toFixed(0)} miles apart`
+        );
+      } else {
+        breakdown.location = 2;
+        reasons.concerns.push(
+          `Preferred areas are ${closest.distance.toFixed(0)} miles apart`
+        );
+      }
+    } else {
+      // TIER 3: Zip code fallback (when neighborhoods aren't in coordinate dictionary)
+      const userZip = currentUser.profileData?.zip_code || currentUser.zip_code;
+      const roommateZip = roommateProfile.zip_code;
+
+      if (userZip && roommateZip) {
+        const zipDist = getZipCodeDistance(userZip, roommateZip);
+        if (zipDist !== null) {
+          if (zipDist <= 2) {
+            breakdown.location = 12;
+            reasons.strengths.push(`Zip codes within 2 miles`);
+          } else if (zipDist <= 5) {
+            breakdown.location = 10;
+            reasons.notes.push(`Zip codes within 5 miles`);
+          } else if (zipDist <= 10) {
+            breakdown.location = 6;
+            reasons.notes.push(`Zip codes about ${Math.round(zipDist)} miles apart`);
+          } else {
+            breakdown.location = 2;
+            reasons.concerns.push(`Zip codes are ${Math.round(zipDist)} miles apart`);
+          }
+        } else {
+          fallbackSameCity();
+        }
+      } else {
+        fallbackSameCity();
+      }
+    }
+  }
+} else {
+  // No neighborhood data — try zip code, then city
+  const userZip = currentUser.profileData?.zip_code || currentUser.zip_code;
+  const roommateZip = roommateProfile.zip_code;
+
+  if (userZip && roommateZip) {
+    const zipDist = getZipCodeDistance(userZip, roommateZip);
+    if (zipDist !== null) {
+      if (zipDist <= 2) {
+        breakdown.location = 12;
+        reasons.strengths.push(`Very close zip codes`);
+      } else if (zipDist <= 5) {
+        breakdown.location = 10;
+        reasons.notes.push(`Zip codes within 5 miles`);
+      } else if (zipDist <= 10) {
+        breakdown.location = 6;
+        reasons.notes.push(`Zip codes about ${Math.round(zipDist)} miles apart`);
+      } else {
+        breakdown.location = 2;
+        reasons.concerns.push(`Zip codes are ${Math.round(zipDist)} miles apart`);
+      }
+    } else {
+      fallbackSameCity();
+    }
+  } else {
+    fallbackSameCity();
+  }
+}
+
+function fallbackSameCity() {
+  const userCity = currentUser.profileData?.city || currentUser.city;
+  const roommateCity = roommateProfile.city || roommateProfile.preferences?.location;
+  if (userCity && roommateCity && isSameCity(userCity, roommateCity)) {
+    breakdown.location = 6;
+    reasons.notes.push(`Same city, but no specific neighborhood overlap`);
+  } else if (userCity && roommateCity) {
+    breakdown.location = 0;
+    reasons.concerns.push(`Different cities`);
+  } else {
+    breakdown.location = 8; // Neutral when data is missing
+  }
+}
+```
+
+### 5. Update Renter Screens
+
+#### ApartmentPreferencesScreen (`screens/shared/ApartmentPreferencesScreen.tsx`)
+
+**Cap neighborhoods at 3.** Change `toggleNeighborhood()`:
+
+```typescript
+const toggleNeighborhood = (n: string) => {
+  setNeighborhoods(prev => {
+    if (prev.includes(n)) return prev.filter(x => x !== n);
+    if (prev.length >= 3) return prev; // CAP AT 3
+    return [...prev, n];
+  });
+};
+```
+
+Add a helper label above the grid: **"Pick up to 3 neighborhoods you'd live in"**
+
+If the user already has 3 selected and taps a 4th, show a brief toast: "Max 3 neighborhoods — remove one to add another"
+
+**Add zip code input** in the same step, above the neighborhood grid:
+- Label: "Your zip code (optional)"
+- Placeholder: "10001"
+- Keyboard type: `numeric`, max length: 5
+- Validation: exactly 5 digits if provided
+- State: `const [zipCode, setZipCode] = useState('')`
+- Load existing value from profile on mount
+- Save in `handleSave()`: add `zip_code: zipCode || undefined` to the `updateProfile()` call
+
+#### ProfileQuestionnaireScreen (`screens/shared/ProfileQuestionnaireScreen.tsx`)
+
+This is the **onboarding flow** — the place most users will first enter their location. Currently only collects a single neighborhood. Upgrade to:
+
+1. **Replace the single neighborhood text input** with the same multi-neighborhood selector UI used in ApartmentPreferencesScreen. Reuse the `BOROUGH_NEIGHBORHOODS` data from `constants/transitData.ts`. Show neighborhoods grouped by borough with tap-to-select chips.
+2. **Cap at 3 neighborhoods.** Label: "Where do you want to live? Pick up to 3"
+3. **Add a zip code input** below the neighborhood selector. Label: "Zip code (optional)". Same styling and validation as above.
+4. **On save:**
+   - Write the first selected neighborhood to `users.neighborhood` (for backward compatibility and display)
+   - Write ALL selected neighborhoods to `profiles.preferred_neighborhoods`
+   - Write zip code to both `users.zip_code` and `profiles.zip_code`
+
+### 6. Update Host Screens
+
+#### CreateEditListingScreen (`screens/host/CreateEditListingScreen.tsx`)
+
+**Add zip code field** in the Location section, after address/city/state:
+- Label: "Zip Code"
+- Placeholder: "10001"
+- Keyboard type: `numeric`, max length: 5
+- Save to `listings.zip_code`
+
+#### BrowseRentersScreen (`screens/host/BrowseRentersScreen.tsx`)
+
+When an agent/company browses renters, **sort results by location relevance to the host's listings:**
+
+1. Get the host's active listings and their neighborhoods + zip codes
+2. For each renter, calculate a location relevance score:
+   - Renter's `preferred_neighborhoods` includes one of the listing neighborhoods → high relevance
+   - Renter's closest preferred neighborhood is < 3 miles from a listing → medium relevance
+   - Renter's zip code is within 5 miles of a listing zip code → medium relevance
+   - No location overlap → low relevance
+3. Sort renters by relevance (high → low), then by compatibility score within each tier
+4. Show a location tag on the renter card: "Wants [Neighborhood]" if they match a listing neighborhood
+
+#### BrowseRenterGroupsScreen (`screens/host/BrowseRenterGroupsScreen.tsx`)
+
+Same logic for groups:
+1. For each group, check if the group's city/neighborhoods overlap with the host's listings
+2. Sort groups with location overlap higher
+3. Show which listing a group is relevant to
+
+#### HostGroupOutreachScreen (`screens/host/HostGroupOutreachScreen.tsx`)
+
+When showing groups that match a specific listing, use neighborhood overlap as a primary filter:
+- Show groups where ANY member's `preferred_neighborhoods` includes the listing's neighborhood
+- Also show groups where members' zip codes are within 5 miles of the listing
+- Clearly indicate the match: "2/3 members want [Listing Neighborhood]"
+
+#### Company Fill Pipeline (`screens/host/CompanyFillPipelineScreen.tsx`)
+
+When showing matched groups for each vacant unit:
+- Factor in neighborhood overlap between listing and group members
+- Show a location match indicator: "Strong location match" / "Moderate" / "Weak"
+- Sort matched groups by location relevance
+
+### 7. Update Discover Service (`services/discoverService.ts`)
+
+Update `getSwipeDeck()` to accept and use preferred neighborhoods:
+
+```typescript
+export async function getSwipeDeck(city?: string, filters?: {
+  budgetMin?: number;
+  budgetMax?: number;
+  roomType?: string;
+  minCompatibility?: number;
+  neighborhoods?: string[];  // NEW
+  zipCode?: string;          // NEW
+}) {
+  // ... existing query code ...
+
+  // After fetching and filtering profiles, sort by neighborhood relevance
+  if (filters?.neighborhoods && filters.neighborhoods.length > 0) {
+    profiles.sort((a, b) => {
+      const aN = a.profile?.preferred_neighborhoods || [];
+      const bN = b.profile?.preferred_neighborhoods || [];
+
+      // Count direct neighborhood overlaps
+      const aOverlap = aN.filter((n: string) => filters.neighborhoods!.includes(n)).length;
+      const bOverlap = bN.filter((n: string) => filters.neighborhoods!.includes(n)).length;
+
+      if (aOverlap !== bOverlap) return bOverlap - aOverlap;
+
+      // If same overlap count, sort by closest neighborhood distance
+      const aDist = getClosestNeighborhoodDistance(filters.neighborhoods!, aN);
+      const bDist = getClosestNeighborhoodDistance(filters.neighborhoods!, bN);
+      const aMin = aDist?.distance ?? 999;
+      const bMin = bDist?.distance ?? 999;
+      return aMin - bMin;
+    });
+  }
+}
+```
+
+Pass the current user's `preferred_neighborhoods` when calling `getSwipeDeck()` from the swipe/explore screens.
+
+### 8. Update Listing Service (`services/listingService.ts`)
+
+When saving or reading listings, include `zip_code`:
+
+```typescript
+// In createListing / updateListing:
+zip_code: listing.zip_code || undefined,
+
+// In getListings / getListing query select:
+// zip_code is already included if using SELECT *
+```
+
+### 9. Update Profile Service (`services/profileService.ts`)
+
+Include `zip_code` in profile read/write operations:
+
+```typescript
+// In updateProfile:
+zip_code: updates.zip_code,
+
+// In getMyProfile / getUserProfile, ensure zip_code is in the select
+```
+
+### 10. Update Profile Display (Various Components)
+
+Wherever a renter's location is shown (profile cards, renter cards in host browse, group member info, match details):
+
+- If `preferred_neighborhoods` has items: show "Williamsburg, Bushwick, Greenpoint" (all 3)
+- If only a single `neighborhood`: show that
+- If neither: show city/state
+- Do NOT display zip code publicly — it's for matching calculation only
+
+### 11. Update Listing-to-Renter Matching Logic
+
+Create a new utility function for scoring how well a renter matches a listing's location:
+
+```typescript
+// In utils/matchingAlgorithm.ts or a new utils/listingMatchUtils.ts
+
+export function calculateListingLocationScore(
+  renterNeighborhoods: string[],
+  renterZipCode: string | undefined,
+  listingNeighborhood: string,
+  listingZipCode: string | undefined,
+): { score: number; reason: string } {
+  // Direct match: renter wants this exact neighborhood
+  if (renterNeighborhoods.includes(listingNeighborhood)) {
+    return { score: 100, reason: `Wants ${listingNeighborhood}` };
+  }
+
+  // Distance-based: check how far listing is from renter's preferred neighborhoods
+  const distances = renterNeighborhoods
+    .map(n => ({
+      neighborhood: n,
+      distance: getNeighborhoodDistance(n, listingNeighborhood),
+    }))
+    .filter(d => d.distance !== null)
+    .sort((a, b) => a.distance! - b.distance!);
+
+  if (distances.length > 0) {
+    const closest = distances[0];
+    if (closest.distance! <= 1) return { score: 90, reason: `Near ${closest.neighborhood}` };
+    if (closest.distance! <= 3) return { score: 75, reason: `${closest.distance!.toFixed(1)}mi from ${closest.neighborhood}` };
+    if (closest.distance! <= 5) return { score: 50, reason: `${closest.distance!.toFixed(0)}mi from preferred area` };
+    if (closest.distance! <= 10) return { score: 25, reason: `${closest.distance!.toFixed(0)}mi from preferred area` };
+  }
+
+  // Zip code fallback
+  if (renterZipCode && listingZipCode) {
+    const zipDist = getZipCodeDistance(renterZipCode, listingZipCode);
+    if (zipDist !== null) {
+      if (zipDist <= 3) return { score: 70, reason: `Close by zip code` };
+      if (zipDist <= 5) return { score: 50, reason: `Within 5 miles` };
+      if (zipDist <= 10) return { score: 25, reason: `Within 10 miles` };
+    }
+  }
+
+  return { score: 0, reason: `Outside preferred area` };
+}
+```
+
+Use this function in:
+- `BrowseRentersScreen` — sorting renters for a listing
+- `BrowseRenterGroupsScreen` — sorting groups
+- `HostGroupOutreachScreen` — filtering groups for a listing
+- `CompanyFillPipelineScreen` — ranking matched groups
+- `match-groups-to-listings` edge function — AI matching
+
+### 12. Update AI / Edge Functions
+
+Update these Supabase edge functions to include `preferred_neighborhoods` and `zip_code` in the context passed to AI:
+
+**Files:**
+- `supabase/functions/agent-pair-group/index.ts`
+- `supabase/functions/company-pair-group/index.ts`
+- `supabase/functions/match-groups-to-listings/index.ts`
+- `supabase/functions/ai-assistant/index.ts` (already partially uses preferred_neighborhoods from ai_memory)
+
+In the AI prompts, add lines like:
+```
+- Renter preferred neighborhoods: ${user.preferred_neighborhoods?.join(', ') || 'not set'}
+- Renter zip code: ${user.zip_code || 'not set'}
+- Listing neighborhood: ${listing.neighborhood}
+- Listing zip code: ${listing.zip_code || 'not set'}
+```
+
+This lets the AI factor location fit into its grouping and recommendation decisions.
+
+---
+
+## COMPLETE SCORING TABLE
+
+### Renter ↔ Renter (Roommate Matching) — 16 points max
+
+| Tier | Scenario | Points | How It's Determined |
+|------|----------|--------|---------------------|
+| 1 | 2+ neighborhoods overlap | 16 | Both picked at least 2 of the same neighborhoods |
+| 1 | 1 neighborhood overlaps | 14 | One shared neighborhood name |
+| 2 | Closest neighborhoods < 1 mile | 12 | Haversine distance between nearest pair of preferred neighborhoods |
+| 2 | Closest neighborhoods 1-3 miles | 10 | Coordinate distance |
+| 2 | Closest neighborhoods 3-5 miles | 8 | Coordinate distance |
+| 3 | Zip codes within 2 miles | 12 | Fallback when neighborhoods not in coordinate dictionary |
+| 3 | Zip codes within 5 miles | 10 | Zip code distance |
+| 3 | Zip codes within 10 miles | 6 | Zip code distance |
+| 4 | Same city, no proximity data | 6 | City string match |
+| 4 | Neighborhoods 5-10 miles apart | 4 | Coordinate distance |
+| 5 | Zip codes > 10 miles / neighborhoods > 10 mi | 2 | Far apart |
+| 5 | Different cities | 0 | No geographic connection |
+| — | Missing location data | 8 | Neutral (no penalty for incomplete profiles) |
+
+### Renter ↔ Listing (Apartment Matching) — 100 point scale
+
+| Scenario | Score | Display |
+|----------|-------|---------|
+| Renter picked this exact neighborhood | 100 | "Wants [Neighborhood]" |
+| Listing < 1 mile from preferred neighborhood | 90 | "Near [Neighborhood]" |
+| Listing 1-3 miles from preferred | 75 | "X.Xmi from [Neighborhood]" |
+| Listing 3-5 miles | 50 | "Xmi from preferred area" |
+| Zip codes within 3 miles | 70 | "Close by zip code" |
+| Zip codes within 5 miles | 50 | "Within 5 miles" |
+| Listing 5-10 miles | 25 | "Xmi from preferred area" |
+| No proximity | 0 | "Outside preferred area" |
+
+---
+
+## FILES TO MODIFY (Complete List)
+
+| File | Change |
+|------|--------|
+| `supabase/migrations/XXX_zip_code.sql` | **NEW** — add zip_code columns, zip_code_data table |
+| `types/models.ts` | Add zip_code to User, Property, ApartmentPreferences, RoommateProfile |
+| `utils/locationData.ts` | Add `haversineDistanceMiles()`, `getNeighborhoodDistance()`, `getClosestNeighborhoodDistance()`, `getZipCodeDistance()`, zip cache |
+| `utils/matchingAlgorithm.ts` | **Rewrite** location scoring to use multi-neighborhood overlap + coordinate distance + zip fallback |
+| `utils/listingMatchUtils.ts` | **NEW** — `calculateListingLocationScore()` for renter-to-listing matching |
+| `screens/shared/ApartmentPreferencesScreen.tsx` | Cap neighborhoods at 3, add zip code input |
+| `screens/shared/ProfileQuestionnaireScreen.tsx` | Replace single neighborhood with multi-select (cap 3) + zip code |
+| `screens/host/CreateEditListingScreen.tsx` | Add zip code field to listing form |
+| `screens/host/BrowseRentersScreen.tsx` | Sort renters by location relevance to host's listings |
+| `screens/host/BrowseRenterGroupsScreen.tsx` | Sort groups by location relevance |
+| `screens/host/HostGroupOutreachScreen.tsx` | Filter/sort groups by listing neighborhood match |
+| `screens/host/CompanyFillPipelineScreen.tsx` | Show location match strength for groups per listing |
+| `services/discoverService.ts` | Sort swipe deck by neighborhood overlap + distance |
+| `services/profileService.ts` | Include zip_code in read/write |
+| `services/listingService.ts` | Include zip_code in read/write |
+| `supabase/functions/agent-pair-group/index.ts` | Add neighborhoods + zip to AI context |
+| `supabase/functions/company-pair-group/index.ts` | Add neighborhoods + zip to AI context |
+| `supabase/functions/match-groups-to-listings/index.ts` | Use neighborhood overlap + distance in matching |
+| `supabase/functions/ai-assistant/index.ts` | Already partial — ensure full neighborhoods + zip |
+
+---
+
+## BUILD ORDER
+
+1. **Migration** — Run SQL to add zip_code columns and zip_code_data table
+2. **Seed zip data** — Load NYC/NJ metro area zip codes into zip_code_data
+3. **Types** — Update TypeScript interfaces
+4. **Location utilities** — Add haversine, neighborhood distance, zip distance functions, zip cache
+5. **Matching algorithm** — Rewrite the location scoring block (renter ↔ renter)
+6. **Listing match utility** — Create `calculateListingLocationScore()` (renter ↔ listing)
+7. **Renter screens** — Update ApartmentPreferencesScreen (cap at 3, add zip) and ProfileQuestionnaireScreen (multi-select + zip in onboarding)
+8. **Host screens** — Add zip to CreateEditListingScreen, update BrowseRenters/BrowseGroups/Outreach/Pipeline with location sorting
+9. **Discover service** — Sort swipe deck by neighborhood overlap and distance
+10. **Profile + listing services** — Read/write zip_code
+11. **AI edge functions** — Pass neighborhoods + zip to AI context
+12. **Test** — Verify scoring with these scenarios:
+    - Two renters both pick Williamsburg → 16 pts
+    - One picks Williamsburg, other picks Greenpoint (< 1 mile) → 12 pts
+    - One picks Park Slope, other picks Bushwick (~3 miles) → 10 pts
+    - No neighborhood data, zip codes 3 miles apart → 10 pts
+    - Renter picks Bushwick, listing is in Bushwick → listing score 100
+    - Renter picks Williamsburg, listing is in Greenpoint → listing score 90
+
+## IMPORTANT NOTES
+
+- **Cap at 3 neighborhoods.** This is intentional — 5 was too many and diluted the signal. Three forces real commitment.
+- **Do NOT remove `users.neighborhood`** — it's used for display throughout the app. It remains the "primary" neighborhood. `profiles.preferred_neighborhoods` is the source of truth for matching and should ALWAYS include the primary.
+- **Do NOT remove the `nearbyNeighborhoods` arrays** from the NEIGHBORHOODS dictionary — they can stay for backward compatibility. But the matching algorithm should use coordinate distance instead.
+- **Zip code is always optional** — never block users from proceeding if they skip it.
+- **Handle existing users gracefully** — many users won't have preferred_neighborhoods or zip_code set. Fall back through the tiers: neighborhoods → zip → city → neutral score (8).
+- **Coordinate distance replaces the hardcoded neighbor lists** as the proximity measure. This means the system works for ANY neighborhood, not just ones with manually maintained nearbyNeighborhoods arrays.

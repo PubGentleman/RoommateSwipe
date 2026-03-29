@@ -5,6 +5,7 @@ import {
   Pressable,
   ScrollView,
   Platform,
+  TextInput,
 } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useNavigation } from '@react-navigation/native';
@@ -63,6 +64,7 @@ export default function ApartmentPreferencesScreen() {
   const [moveInDate, setMoveInDate] = useState('');
   const [amenities, setAmenities] = useState<string[]>([]);
   const [neighborhoods, setNeighborhoods] = useState<string[]>([]);
+  const [zipCode, setZipCode] = useState('');
   const [saving, setSaving] = useState(false);
 
   const canProceed = useCallback(() => {
@@ -125,6 +127,7 @@ export default function ApartmentPreferencesScreen() {
         location_flexible: hasCar,
         wfh: isWfh,
         apartment_prefs_complete: true,
+        zip_code: zipCode || undefined,
       } as any);
     } catch (e) {
       console.warn('[ApartmentPrefs] Supabase sync failed:', e);
@@ -150,9 +153,11 @@ export default function ApartmentPreferencesScreen() {
   };
 
   const toggleNeighborhood = (n: string) => {
-    setNeighborhoods(prev =>
-      prev.includes(n) ? prev.filter(x => x !== n) : [...prev, n]
-    );
+    setNeighborhoods(prev => {
+      if (prev.includes(n)) return prev.filter(x => x !== n);
+      if (prev.length >= 3) return prev;
+      return [...prev, n];
+    });
   };
 
   const getMinDate = () => {
@@ -390,12 +395,26 @@ export default function ApartmentPreferencesScreen() {
   const renderNeighborhoodStep = () => (
     <Animated.View entering={FadeInDown.duration(300)} key="neighborhoods">
       <ThemedText style={styles.stepTitle}>
-        Any specific neighborhoods you love?
+        Pick up to 3 neighborhoods you'd live in
       </ThemedText>
       <ThemedText style={styles.stepHint}>
-        Optional. We'll factor in your train line automatically.
+        {neighborhoods.length}/3 selected. We'll factor in your train line automatically.
       </ThemedText>
-      <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
+
+      <View style={{ marginBottom: 16 }}>
+        <ThemedText style={styles.zipLabel}>Zip code (optional)</ThemedText>
+        <TextInput
+          style={styles.zipInput}
+          value={zipCode}
+          onChangeText={(t) => setZipCode(t.replace(/[^0-9]/g, '').slice(0, 5))}
+          placeholder="10001"
+          placeholderTextColor="rgba(255,255,255,0.3)"
+          keyboardType="numeric"
+          maxLength={5}
+        />
+      </View>
+
+      <ScrollView style={{ maxHeight: 340 }} showsVerticalScrollIndicator={false}>
         {Object.entries(BOROUGH_NEIGHBORHOODS).map(([borough, hoods]) => (
           <View key={borough} style={styles.boroughSection}>
             <ThemedText style={styles.boroughTitle}>{borough}</ThemedText>
@@ -561,6 +580,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12, borderWidth: 1.5, borderColor: '#2a2a2a',
   },
   hoodLabel: { fontSize: 13, color: '#ccc' },
+  zipLabel: {
+    fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.5)',
+    marginBottom: 6,
+  },
+  zipInput: {
+    backgroundColor: '#1c1c1c', borderRadius: 12, borderWidth: 1.5,
+    borderColor: '#2a2a2a', paddingVertical: 12, paddingHorizontal: 14,
+    fontSize: 15, color: '#fff',
+  },
   footer: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     paddingHorizontal: Spacing.xl, paddingTop: Spacing.md,

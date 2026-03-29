@@ -973,3 +973,50 @@ export function calculateDistance(
 
   return distance;
 }
+
+export function haversineDistanceMiles(
+  lat1: number, lng1: number,
+  lat2: number, lng2: number
+): number {
+  return calculateDistance(lat1, lng1, lat2, lng2);
+}
+
+export function getNeighborhoodDistance(name1: string, name2: string): number | null {
+  const n1 = NEIGHBORHOODS[name1];
+  const n2 = NEIGHBORHOODS[name2];
+  if (!n1?.coordinates || !n2?.coordinates) return null;
+  return haversineDistanceMiles(
+    n1.coordinates.lat, n1.coordinates.lng,
+    n2.coordinates.lat, n2.coordinates.lng
+  );
+}
+
+export function getClosestNeighborhoodDistance(
+  neighborhoodsA: string[],
+  neighborhoodsB: string[]
+): { distance: number; pairA: string; pairB: string } | null {
+  let closest: { distance: number; pairA: string; pairB: string } | null = null;
+
+  for (const a of neighborhoodsA) {
+    for (const b of neighborhoodsB) {
+      const dist = getNeighborhoodDistance(a, b);
+      if (dist !== null && (closest === null || dist < closest.distance)) {
+        closest = { distance: dist, pairA: a, pairB: b };
+      }
+    }
+  }
+  return closest;
+}
+
+let zipCache: Record<string, { lat: number; lng: number }> = {};
+
+export function setZipCodeCache(data: Record<string, { lat: number; lng: number }>) {
+  zipCache = data;
+}
+
+export function getZipCodeDistance(zip1: string, zip2: string): number | null {
+  const c1 = zipCache[zip1];
+  const c2 = zipCache[zip2];
+  if (!c1 || !c2) return null;
+  return haversineDistanceMiles(c1.lat, c1.lng, c2.lat, c2.lng);
+}

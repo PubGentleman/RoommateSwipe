@@ -17,6 +17,7 @@ export interface AgentRenter {
   photos: string[];
   city?: string;
   neighborhood?: string;
+  preferredNeighborhoods?: string[];
   budgetMin?: number;
   budgetMax?: number;
   moveInDate?: string;

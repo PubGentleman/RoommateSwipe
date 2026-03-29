@@ -14,6 +14,7 @@ export interface ListingData {
   city?: string;
   state?: string;
   neighborhood?: string;
+  zip_code?: string;
   room_type?: string;
   amenities?: string[];
   photos?: string[];
@@ -58,6 +59,7 @@ export function mapListingToProperty(l: any, fallbackHostName?: string): Propert
     city: l.city || '',
     state: l.state || '',
     neighborhood: l.neighborhood || '',
+    zip_code: l.zip_code || '',
     address: l.address || '',
     availableDate: l.available_date ? new Date(l.available_date) : undefined,
     rentedDate: l.rented_date ? new Date(l.rented_date) : undefined,

@@ -363,6 +363,7 @@ export const RoommatesScreen = () => {
             verified: p.profile?.verified || false,
             instagram_verified: p.profile?.instagram_verified || false,
             instagram_handle: p.profile?.instagram_handle || undefined,
+            preferredNeighborhoods: p.profile?.preferred_neighborhoods || [],
             profileData: {
               interests: Array.isArray(p.profile?.interests) ? p.profile.interests : [],
               profileNote: p.profile?.profile_note || undefined,
@@ -1788,7 +1789,12 @@ export const RoommatesScreen = () => {
                     <ThemedText style={styles.tagDarkText}>{getWorkStyleTag(currentProfile.profileData?.preferences?.workLocation)}</ThemedText>
                   </View>
                 ) : null}
-                {currentProfile.preferences?.location ? (
+                {(currentProfile as any).preferredNeighborhoods?.length > 0 ? (
+                  <View style={styles.tagDark}>
+                    <Feather name="map-pin" size={12} color="rgba(255,255,255,0.85)" />
+                    <ThemedText style={styles.tagDarkText} numberOfLines={1}>{(currentProfile as any).preferredNeighborhoods.slice(0, 2).join(', ')}</ThemedText>
+                  </View>
+                ) : currentProfile.preferences?.location ? (
                   <View style={styles.tagDark}>
                     <Feather name="map-pin" size={12} color="rgba(255,255,255,0.85)" />
                     <ThemedText style={styles.tagDarkText} numberOfLines={1}>{currentProfile.preferences.location}</ThemedText>
@@ -2522,7 +2528,7 @@ export const RoommatesScreen = () => {
                   <View style={styles.pdStatStrip}>
                     {[
                       { icon: 'dollar-sign' as const, label: 'Budget', value: `$${currentProfile.budget}/mo` },
-                      { icon: 'map-pin' as const, label: 'Location', value: currentProfile.preferences?.location ?? 'Flexible' },
+                      { icon: 'map-pin' as const, label: 'Location', value: (currentProfile as any).preferredNeighborhoods?.length > 0 ? (currentProfile as any).preferredNeighborhoods.join(', ') : (currentProfile.preferences?.location ?? 'Flexible') },
                       { icon: 'calendar' as const, label: 'Move-in', value: currentProfile.preferences?.moveInDate ? formatMoveInDate(currentProfile.preferences.moveInDate) : 'ASAP' },
                       { icon: 'home' as const, label: 'Rooms', value: `${currentProfile.preferences?.bedrooms ?? 1} bd` },
                     ].map((stat, i) => (

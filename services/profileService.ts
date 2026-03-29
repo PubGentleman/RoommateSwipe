@@ -24,6 +24,8 @@ export interface ProfileData {
   coordinates?: { lat: number; lng: number };
   profile_note?: string | null;
   profile_note_updated_at?: string | null;
+  preferred_neighborhoods?: string[];
+  zip_code?: string;
 }
 
 export interface UserData {
@@ -37,6 +39,7 @@ export interface UserData {
   occupation?: string;
   location?: string;
   neighborhood?: string;
+  zip_code?: string;
   city?: string;
   state?: string;
   onboarding_step?: string;

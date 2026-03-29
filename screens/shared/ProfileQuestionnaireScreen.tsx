@@ -43,6 +43,8 @@ import { calculateZodiacFromBirthday } from '../../utils/zodiacUtils';
 import { ProgressBar } from '../../components/questionnaire/ProgressBar';
 import { LocationPicker } from '../../components/LocationPicker';
 import { getCoordinatesFromNeighborhood } from '../../utils/locationData';
+import { BOROUGH_NEIGHBORHOODS } from '../../constants/transitData';
+import { updateProfile } from '../../services/profileService';
 
 const TOTAL_STEPS = 10;
 
@@ -378,6 +380,8 @@ export const ProfileQuestionnaireScreen = () => {
   const [selectedState, setSelectedState] = useState(user?.profileData?.state || '');
   const [selectedCity, setSelectedCity] = useState(user?.profileData?.city || '');
   const [selectedNeighborhood, setSelectedNeighborhood] = useState(user?.profileData?.neighborhood || '');
+  const [preferredNeighborhoods, setPreferredNeighborhoods] = useState<string[]>(user?.profileData?.preferred_neighborhoods || []);
+  const [zipCode, setZipCode] = useState(user?.profileData?.zip_code || user?.zip_code || '');
   const [occupation, setOccupation] = useState(user?.profileData?.occupation || '');
   const [gender, setGender] = useState<'male' | 'female' | 'other' | undefined>(user?.profileData?.gender);
   const [sleepSchedule, setSleepSchedule] = useState<'early_sleeper' | 'late_sleeper' | 'flexible' | 'irregular' | undefined>(user?.profileData?.preferences?.sleepSchedule);
@@ -552,11 +556,13 @@ export const ProfileQuestionnaireScreen = () => {
         budget: budget.trim() ? parseInt(budget) : undefined,
         budgetMin: budgetMin.trim() ? parseInt(budgetMin) : undefined,
         lookingFor,
-        location: selectedNeighborhood || selectedCity || location.trim() || undefined,
-        neighborhood: selectedNeighborhood || undefined,
+        location: selectedNeighborhood || preferredNeighborhoods[0] || selectedCity || location.trim() || undefined,
+        neighborhood: selectedNeighborhood || preferredNeighborhoods[0] || undefined,
         city: selectedCity || undefined,
         state: selectedState || undefined,
-        coordinates: selectedNeighborhood ? getCoordinatesFromNeighborhood(selectedNeighborhood) || undefined : undefined,
+        coordinates: (selectedNeighborhood || preferredNeighborhoods[0]) ? getCoordinatesFromNeighborhood(selectedNeighborhood || preferredNeighborhoods[0]) || undefined : undefined,
+        preferred_neighborhoods: preferredNeighborhoods.length > 0 ? preferredNeighborhoods : undefined,
+        zip_code: zipCode.trim() || undefined,
         occupation: occupation.trim() || undefined,
         interests: interests.length > 0 ? interests : undefined,
         gender,
@@ -623,6 +629,15 @@ export const ProfileQuestionnaireScreen = () => {
     setIsSaving(true);
 
     await updateUser(buildProfileData());
+
+    try {
+      await updateProfile({
+        preferred_neighborhoods: preferredNeighborhoods.length > 0 ? preferredNeighborhoods : undefined,
+        zip_code: zipCode.trim() || undefined,
+      });
+    } catch (e) {
+      console.warn('[ProfileQuestionnaire] Profile sync failed:', e);
+    }
 
     try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
     setIsSaving(false);
@@ -787,8 +802,70 @@ export const ProfileQuestionnaireScreen = () => {
               selectedNeighborhood={selectedNeighborhood}
               onStateChange={setSelectedState}
               onCityChange={setSelectedCity}
-              onNeighborhoodChange={setSelectedNeighborhood}
+              onNeighborhoodChange={(n) => {
+                setSelectedNeighborhood(n);
+                if (n && !preferredNeighborhoods.includes(n) && preferredNeighborhoods.length < 3) {
+                  setPreferredNeighborhoods(prev => [...prev, n]);
+                }
+              }}
             />
+
+            <ThemedText style={[styles.questionText, { marginTop: 20, fontSize: 16 }]}>
+              Preferred neighborhoods (pick up to 3)
+            </ThemedText>
+            <ThemedText style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginBottom: 12 }}>
+              {preferredNeighborhoods.length}/3 selected
+            </ThemedText>
+            <ScrollView style={{ maxHeight: 200 }} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+              {Object.entries(BOROUGH_NEIGHBORHOODS).map(([borough, hoods]) => (
+                <View key={borough} style={{ marginBottom: 12 }}>
+                  <ThemedText style={{ fontSize: 13, fontWeight: '700', color: '#ff6b5b', marginBottom: 6 }}>{borough}</ThemedText>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                    {hoods.map(hood => {
+                      const isSelected = preferredNeighborhoods.includes(hood);
+                      return (
+                        <Pressable
+                          key={hood}
+                          style={{
+                            backgroundColor: isSelected ? 'rgba(255,107,91,0.15)' : '#1c1c1c',
+                            borderRadius: 10, paddingVertical: 7, paddingHorizontal: 11,
+                            borderWidth: 1.5, borderColor: isSelected ? '#ff6b5b' : '#2a2a2a',
+                          }}
+                          onPress={() => {
+                            setPreferredNeighborhoods(prev => {
+                              if (prev.includes(hood)) return prev.filter(x => x !== hood);
+                              if (prev.length >= 3) return prev;
+                              return [...prev, hood];
+                            });
+                          }}
+                        >
+                          <ThemedText style={{ fontSize: 12, color: isSelected ? '#ff6b5b' : '#ccc' }}>
+                            {hood}
+                          </ThemedText>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+
+            <View style={{ marginTop: 16 }}>
+              <ThemedText style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>Zip code (optional)</ThemedText>
+              <TextInput
+                style={{
+                  backgroundColor: '#1c1c1c', borderRadius: 12, borderWidth: 1.5,
+                  borderColor: '#2a2a2a', paddingVertical: 12, paddingHorizontal: 14,
+                  fontSize: 15, color: '#fff',
+                }}
+                value={zipCode}
+                onChangeText={(t) => setZipCode(t.replace(/[^0-9]/g, '').slice(0, 5))}
+                placeholder="10001"
+                placeholderTextColor="rgba(255,255,255,0.3)"
+                keyboardType="numeric"
+                maxLength={5}
+              />
+            </View>
 
             <ThemedText style={[styles.questionText, { marginTop: 24 }]}>What do you do for work?</ThemedText>
             <OccupationBarSelector

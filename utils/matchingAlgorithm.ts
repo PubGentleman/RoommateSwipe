@@ -1,5 +1,5 @@
 import { User, RoommateProfile } from '../types/models';
-import { isNearbyNeighborhood, isSameCity } from './locationData';
+import { isNearbyNeighborhood, isSameCity, getClosestNeighborhoodDistance, getZipCodeDistance } from './locationData';
 import { getZodiacCompatibilityScore } from './zodiacUtils';
 
 /**
@@ -291,38 +291,131 @@ export const calculateDetailedCompatibility = (
 
   // ========================================
   // 1. LOCATION (16 points) - MAJOR FACTOR
-  // Priority: Same neighborhood > Nearby > Same city > Different city
+  // Uses multi-neighborhood overlap + coordinate distance + zip code proximity
   // ========================================
-  if (userProfile.neighborhood && roommateProfile.preferences?.location) {
-    const userNeighborhood = userProfile.neighborhood;
-    const roommateNeighborhood = roommateProfile.preferences.location;
-    
-    if (userNeighborhood === roommateNeighborhood) {
-      breakdown.location = 16;
-      reasons.strengths.push(`Both in ${userNeighborhood} - perfect location match`);
-    } else if (isNearbyNeighborhood(userNeighborhood, roommateNeighborhood)) {
-      breakdown.location = 12;
-      reasons.strengths.push(`${userNeighborhood} and ${roommateNeighborhood} are nearby neighborhoods`);
-    } else if (isSameCity(userNeighborhood, roommateNeighborhood)) {
-      breakdown.location = 8;
-      reasons.notes.push(`Same city (${userProfile.city}), different neighborhoods`);
-    } else {
+  const userNeighborhoods: string[] = [...new Set([
+    ...(currentUser.profileData?.preferred_neighborhoods || []),
+    ...(currentUser.profileData?.neighborhood ? [currentUser.profileData.neighborhood] : []),
+    ...(userProfile.neighborhood ? [userProfile.neighborhood] : []),
+  ])].filter(Boolean);
+
+  const roommateNeighborhoods: string[] = [...new Set([
+    ...(roommateProfile.preferredNeighborhoods || []),
+    ...(roommateProfile.profileData?.preferred_neighborhoods || []),
+    ...(roommateProfile.preferences?.location ? [roommateProfile.preferences.location] : []),
+  ])].filter(Boolean);
+
+  const fallbackSameCity = () => {
+    const userCity = currentUser.profileData?.city || (currentUser as any).city;
+    const roommateCity = (roommateProfile as any).city || roommateProfile.preferences?.location;
+    if (userCity && roommateCity && isSameCity(userCity, roommateCity)) {
+      breakdown.location = 6;
+      reasons.notes.push(`Same city, but no specific neighborhood overlap`);
+    } else if (userCity && roommateCity) {
       breakdown.location = 0;
-      reasons.concerns.push(`Different cities - not compatible for local roommate matching`);
-    }
-  } else if (userProfile.location && roommateProfile.preferences?.location) {
-    const userLocation = userProfile.location;
-    const roommateLocation = roommateProfile.preferences.location;
-    
-    if (userLocation === roommateLocation) {
-      breakdown.location = 16;
-      reasons.strengths.push(`Both prefer ${userLocation} - perfect location match`);
+      reasons.concerns.push(`Different cities`);
     } else {
       breakdown.location = 8;
-      reasons.notes.push(`Different preferred locations`);
+    }
+  };
+
+  if (userNeighborhoods.length > 0 && roommateNeighborhoods.length > 0) {
+    const directOverlap = userNeighborhoods.filter(n =>
+      roommateNeighborhoods.includes(n)
+    );
+
+    if (directOverlap.length >= 2) {
+      breakdown.location = 16;
+      reasons.strengths.push(
+        `Both want ${directOverlap.slice(0, 2).join(' & ')} — perfect location match`
+      );
+    } else if (directOverlap.length === 1) {
+      breakdown.location = 14;
+      reasons.strengths.push(`Both interested in ${directOverlap[0]}`);
+    } else {
+      const closest = getClosestNeighborhoodDistance(userNeighborhoods, roommateNeighborhoods);
+
+      if (closest) {
+        if (closest.distance <= 1) {
+          breakdown.location = 12;
+          reasons.strengths.push(
+            `${closest.pairA} and ${closest.pairB} are under a mile apart`
+          );
+        } else if (closest.distance <= 3) {
+          breakdown.location = 10;
+          reasons.strengths.push(
+            `${closest.pairA} and ${closest.pairB} are ${closest.distance.toFixed(1)} miles apart`
+          );
+        } else if (closest.distance <= 5) {
+          breakdown.location = 8;
+          reasons.notes.push(
+            `Closest neighborhoods are ${closest.distance.toFixed(1)} miles apart`
+          );
+        } else if (closest.distance <= 10) {
+          breakdown.location = 4;
+          reasons.notes.push(
+            `Neighborhoods are ${closest.distance.toFixed(0)} miles apart`
+          );
+        } else {
+          breakdown.location = 2;
+          reasons.concerns.push(
+            `Preferred areas are ${closest.distance.toFixed(0)} miles apart`
+          );
+        }
+      } else {
+        const userZip = currentUser.profileData?.zip_code || currentUser.zip_code;
+        const roommateZip = roommateProfile.zip_code || roommateProfile.profileData?.zip_code;
+
+        if (userZip && roommateZip) {
+          const zipDist = getZipCodeDistance(userZip, roommateZip);
+          if (zipDist !== null) {
+            if (zipDist <= 2) {
+              breakdown.location = 12;
+              reasons.strengths.push(`Zip codes within 2 miles`);
+            } else if (zipDist <= 5) {
+              breakdown.location = 10;
+              reasons.notes.push(`Zip codes within 5 miles`);
+            } else if (zipDist <= 10) {
+              breakdown.location = 6;
+              reasons.notes.push(`Zip codes about ${Math.round(zipDist)} miles apart`);
+            } else {
+              breakdown.location = 2;
+              reasons.concerns.push(`Zip codes are ${Math.round(zipDist)} miles apart`);
+            }
+          } else {
+            fallbackSameCity();
+          }
+        } else {
+          fallbackSameCity();
+        }
+      }
     }
   } else {
-    breakdown.location = 8;
+    const userZip = currentUser.profileData?.zip_code || currentUser.zip_code;
+    const roommateZip = roommateProfile.zip_code || roommateProfile.profileData?.zip_code;
+
+    if (userZip && roommateZip) {
+      const zipDist = getZipCodeDistance(userZip, roommateZip);
+      if (zipDist !== null) {
+        if (zipDist <= 2) {
+          breakdown.location = 12;
+          reasons.strengths.push(`Very close zip codes`);
+        } else if (zipDist <= 5) {
+          breakdown.location = 10;
+          reasons.notes.push(`Zip codes within 5 miles`);
+        } else if (zipDist <= 10) {
+          breakdown.location = 6;
+          reasons.notes.push(`Zip codes about ${Math.round(zipDist)} miles apart`);
+        } else {
+          breakdown.location = 2;
+          reasons.concerns.push(`Zip codes are ${Math.round(zipDist)} miles apart`);
+        }
+      } else {
+        fallbackSameCity();
+      }
+    } else {
+      fallbackSameCity();
+    }
   }
 
   // ========================================

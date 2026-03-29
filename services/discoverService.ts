@@ -1,12 +1,15 @@
 import { supabase } from '../lib/supabase';
 import { applyBoostRotation } from '../utils/boostRotation';
 import { getRecencyMultiplier, isWithinActivityCutoff } from '../utils/activityDecay';
+import { getClosestNeighborhoodDistance } from '../utils/locationData';
 
 export async function getSwipeDeck(city?: string, filters?: {
   budgetMin?: number;
   budgetMax?: number;
   roomType?: string;
   minCompatibility?: number;
+  neighborhoods?: string[];
+  zipCode?: string;
 }) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return [];
@@ -61,13 +64,33 @@ export async function getSwipeDeck(city?: string, filters?: {
     );
   }
 
-  const decayScored = profiles
+  let decayScored = profiles
     .filter((p: any) => isWithinActivityCutoff(p.last_active_at))
     .map((p: any) => ({
       ...p,
       _decayScore: (p.profile?.compatibility ?? 1) * getRecencyMultiplier(p.last_active_at),
     }))
     .sort((a: any, b: any) => b._decayScore - a._decayScore);
+
+  if (filters?.neighborhoods && filters.neighborhoods.length > 0) {
+    decayScored.sort((a: any, b: any) => {
+      const aN = a.profile?.preferred_neighborhoods || [];
+      const bN = b.profile?.preferred_neighborhoods || [];
+
+      const aOverlap = aN.filter((n: string) => filters.neighborhoods!.includes(n)).length;
+      const bOverlap = bN.filter((n: string) => filters.neighborhoods!.includes(n)).length;
+
+      if (aOverlap !== bOverlap) return bOverlap - aOverlap;
+
+      const aDist = getClosestNeighborhoodDistance(filters.neighborhoods!, aN);
+      const bDist = getClosestNeighborhoodDistance(filters.neighborhoods!, bN);
+      const aMin = aDist?.distance ?? 999;
+      const bMin = bDist?.distance ?? 999;
+      if (aMin !== bMin) return aMin - bMin;
+
+      return b._decayScore - a._decayScore;
+    });
+  }
 
   const sortedProfiles = decayScored;
 

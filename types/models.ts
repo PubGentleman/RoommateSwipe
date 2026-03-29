@@ -16,6 +16,8 @@ export interface RoommateProfile {
     pets: boolean;
     smoking: boolean;
   };
+  preferredNeighborhoods?: string[];
+  zip_code?: string;
   preferences: {
     location: string;
     moveInDate: string;
@@ -34,6 +36,8 @@ export interface RoommateProfile {
     interests?: string[];
     preferences?: Record<string, any>;
     profileNote?: string;
+    preferred_neighborhoods?: string[];
+    zip_code?: string;
     [key: string]: any;
   };
   references?: Reference[];
@@ -53,6 +57,7 @@ export interface ApartmentPreferences {
   locationFlexible: boolean;
   wfh: boolean;
   apartmentPrefsComplete: boolean;
+  zip_code?: string;
 }
 
 export interface GroupApartmentVote {
@@ -145,6 +150,7 @@ export interface Property {
     manualOverride?: string;
     fetchedAt: string;
   };
+  zip_code?: string;
   average_rating?: number | null;
   review_count?: number;
   assigned_agent_id?: string;
@@ -513,6 +519,7 @@ export interface User {
     totalAdsWatched: number;
     lastAdWatched?: Date;
   };
+  zip_code?: string;
   profileData?: {
     bio?: string;
     budget?: number;
@@ -525,6 +532,8 @@ export interface User {
       lat: number;
       lng: number;
     };
+    preferred_neighborhoods?: string[];
+    zip_code?: string;
     occupation?: string;
     interests?: string[];
     gender?: 'male' | 'female' | 'other';

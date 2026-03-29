@@ -21,6 +21,7 @@ import {
   generateAISuggestions,
   generateBestGroupSuggestion,
 } from '../../services/agentMatchmakerService';
+import { calculateListingLocationScore } from '../../utils/listingMatchUtils';
 import {
   getAgentPlanLimits,
   canAgentShortlist,
@@ -91,7 +92,8 @@ export const BrowseRentersScreen = () => {
               budget_max, budget_min, move_in_date, room_type, cleanliness,
               sleep_schedule, smoking, pets, interests, photos, bio,
               preferred_trains, budget_per_person_min, budget_per_person_max,
-              desired_bedrooms, location_flexible, wfh, apartment_prefs_complete
+              desired_bedrooms, location_flexible, wfh, apartment_prefs_complete,
+              preferred_neighborhoods, zip_code
             )
           `)
           .eq('role', 'renter')
@@ -114,6 +116,7 @@ export const BrowseRentersScreen = () => {
             occupation: u.occupation || '',
             photos: p?.photos || (u.avatar_url ? [u.avatar_url] : []),
             city: u.city,
+            preferredNeighborhoods: p?.preferred_neighborhoods || [],
             budgetMin: p?.budget_per_person_min || (p?.budget_max ? p.budget_max * 0.8 : undefined),
             budgetMax: p?.budget_per_person_max || p?.budget_max,
             moveInDate: p?.move_in_date,
@@ -141,6 +144,7 @@ export const BrowseRentersScreen = () => {
             lookingFor: p?.room_type || '',
             budget: p?.budget_max || 0,
             preferences: { location: u.city || '' },
+            preferredNeighborhoods: p?.preferred_neighborhoods || [],
             lifestyle: {
               cleanliness: p?.cleanliness,
               workSchedule: p?.sleep_schedule,
@@ -196,6 +200,7 @@ export const BrowseRentersScreen = () => {
           photos: p.photos || [],
           city: p.preferences?.location,
           neighborhood: p.preferences?.location,
+          preferredNeighborhoods: p.preferredNeighborhoods || p.profileData?.preferred_neighborhoods || [],
           budgetMin: p.budget ? p.budget * 0.8 : undefined,
           budgetMax: p.budget,
           moveInDate: p.preferences?.moveInDate,
@@ -267,8 +272,10 @@ export const BrowseRentersScreen = () => {
     }
 
     if (neighborhoodFilter) {
+      const nfLower = neighborhoodFilter.toLowerCase();
       filtered = filtered.filter(r =>
-        r.neighborhood?.toLowerCase().includes(neighborhoodFilter.toLowerCase())
+        r.neighborhood?.toLowerCase().includes(nfLower) ||
+        r.preferredNeighborhoods?.some(n => n.toLowerCase().includes(nfLower))
       );
     }
 
@@ -334,6 +341,13 @@ export const BrowseRentersScreen = () => {
           <View style={styles.cardInfo}>
             <Text style={styles.cardName}>{item.name}, {item.age}</Text>
             <Text style={styles.cardOccupation}>{item.occupation}</Text>
+            {item.preferredNeighborhoods && item.preferredNeighborhoods.length > 0 ? (
+              <Text style={styles.cardMeta} numberOfLines={1}>
+                {item.preferredNeighborhoods.slice(0, 2).join(', ')}
+              </Text>
+            ) : item.city ? (
+              <Text style={styles.cardMeta} numberOfLines={1}>{item.city}</Text>
+            ) : null}
             {item.budgetMin != null && item.budgetMax != null ? (
               <Text style={styles.cardBudget}>
                 ${item.budgetMin.toLocaleString()} - ${item.budgetMax.toLocaleString()}/mo
