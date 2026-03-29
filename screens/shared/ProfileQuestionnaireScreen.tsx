@@ -1290,11 +1290,7 @@ export const ProfileQuestionnaireScreen = () => {
             </View>
 
             <TouchableOpacity
-              onPress={async () => {
-                idealRoommateTextRef.current = '';
-                setIdealRoommateText('');
-                await handleSave();
-              }}
+              onPress={() => goNext()}
               style={{ alignItems: 'center', marginTop: 16 }}
             >
               <Text style={{ color: theme.textSecondary, fontSize: 14 }}>
