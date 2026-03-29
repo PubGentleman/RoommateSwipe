@@ -122,13 +122,17 @@ CREATE POLICY "Users can view their own usage log"
   ON public.pi_usage_log FOR SELECT
   USING (auth.uid() = user_id);
 
+CREATE POLICY "Users can insert their own usage log"
+  ON public.pi_usage_log FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
 CREATE POLICY "Service role can manage usage log"
   ON public.pi_usage_log FOR ALL
   USING (auth.role() = 'service_role');
 
 CREATE POLICY "Users can delete their own match insights"
   ON public.pi_match_insights FOR DELETE
-  USING (auth.uid() = user_id);
+  USING (auth.uid() = user_id OR auth.uid() = target_user_id);
 
 CREATE POLICY "Users can delete their own deck rankings"
   ON public.pi_deck_rankings FOR DELETE

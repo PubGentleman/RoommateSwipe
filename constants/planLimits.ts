@@ -287,6 +287,26 @@ export function canAgentPlace(plan: string, monthlyPlacementCount: number): bool
   return monthlyPlacementCount < monthlyPlacementLimit;
 }
 
+export type CompanyPlan = 'starter' | 'pro' | 'business' | 'enterprise';
+
+export interface CompanyPlanLimits {
+  plan: CompanyPlan;
+  label: string;
+  piCallsPerMonth: number;
+}
+
+export const COMPANY_PI_LIMITS: Record<CompanyPlan, CompanyPlanLimits> = {
+  starter: { plan: 'starter', label: 'Company Starter', piCallsPerMonth: 200 },
+  pro: { plan: 'pro', label: 'Company Pro', piCallsPerMonth: 500 },
+  business: { plan: 'business', label: 'Company Business', piCallsPerMonth: -1 },
+  enterprise: { plan: 'enterprise', label: 'Company Enterprise', piCallsPerMonth: -1 },
+};
+
+export function getCompanyPiMonthlyLimit(plan: string): number {
+  const normalized = plan.replace('company_', '') as CompanyPlan;
+  return COMPANY_PI_LIMITS[normalized]?.piCallsPerMonth ?? 200;
+}
+
 export const UNLOCK_PACKAGES = [
   { id: 'small', label: '+3 messages today',  credits: 3,  priceCents: 499  },
   { id: 'large', label: '+10 messages today', credits: 10, priceCents: 1299 },

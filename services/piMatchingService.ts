@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { getCompanyPiMonthlyLimit } from '../constants/planLimits';
 import type {
   PiMatchInsight,
   PiDeckRanking,
@@ -48,6 +49,7 @@ export async function getCachedOrGenerateInsight(
     });
 
     if (error || !data) return cached as PiMatchInsight | null;
+    logAIUsage(userId, 'match_insight', 0, data.model_used).catch(() => {});
     return data as PiMatchInsight;
   } catch {
     return null;
@@ -92,6 +94,7 @@ export async function generateDeckReranking(
     });
 
     if (error || !data) return null;
+    logAIUsage(userId, 'deck_rerank', 0, data.model_used).catch(() => {});
     return data as PiDeckRanking;
   } catch {
     return null;
@@ -158,6 +161,7 @@ export async function parseIdealRoommateText(
     });
 
     if (error || !data) return null;
+    logAIUsage(userId, 'parse_preferences').catch(() => {});
     return data as PiParsedPreferences;
   } catch {
     return null;
@@ -190,6 +194,7 @@ export async function getHostRecommendations(
     });
 
     if (error || !data) return cached as PiHostRecommendation | null;
+    logAIUsage(userId, 'host_matchmaker', 0, data.model_used).catch(() => {});
     return data as PiHostRecommendation;
   } catch {
     return null;
@@ -350,13 +355,7 @@ export function getHostPiMonthlyLimit(plan: string, hostType?: string): number {
   }
 
   if (hostType === 'company') {
-    const companyLimits: Record<string, number> = {
-      starter: 200,
-      pro: 500,
-      enterprise: -1,
-      business: -1,
-    };
-    return companyLimits[plan] ?? 200;
+    return getCompanyPiMonthlyLimit(plan);
   }
 
   const hostLimits: Record<string, number> = {
