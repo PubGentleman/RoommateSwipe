@@ -18,7 +18,7 @@ import { Image } from 'expo-image';
 import { getSuggestedGroupMembers } from '../../utils/groupSuggestions';
 import { getGroupHealth, GroupHealthResult } from '../../utils/groupHealthScore';
 import { normalizeRenterPlan, getRenterPlanLimits } from '../../constants/renterPlanLimits';
-import { getCachedInsight } from '../../services/piMatchingService';
+import { getCachedOrGenerateInsight } from '../../services/piMatchingService';
 import { PlanBadgeInline } from '../../components/LockedFeatureOverlay';
 import {
   getGroupDetails,
@@ -176,7 +176,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
       await Promise.all(
         otherMembers.map(async (m: any) => {
           try {
-            const insight = await getCachedInsight(m.id);
+            const insight = await getCachedOrGenerateInsight(m.id);
             if (insight?.summary) summaries[m.id] = insight.summary;
           } catch {}
         })
