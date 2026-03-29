@@ -1254,7 +1254,7 @@ export function countSoftPreferenceOverlap(prefs1: PiParsedPreferences, prefs2: 
       }
     }
   }
-  return overlap >= 2 ? 1 : 0;
+  return overlap >= 1 ? 1 : 0;
 }
 
 function matchesProfileVibe(vibe: string, profile: User | RoommateProfile): boolean {
