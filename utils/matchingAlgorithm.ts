@@ -1,4 +1,4 @@
-import { User, RoommateProfile } from '../types/models';
+import { User, RoommateProfile, PiParsedPreferences } from '../types/models';
 import { isNearbyNeighborhood, isSameCity, getClosestNeighborhoodDistance, getZipCodeDistance } from './locationData';
 import { getZodiacCompatibilityScore } from './zodiacUtils';
 
@@ -124,6 +124,7 @@ export interface MatchScore {
     lifestyle: number;
     zodiac: number;
     personality: number;
+    piPreference: number;
   };
   reasons: {
     strengths: string[];
@@ -152,7 +153,7 @@ const ZERO_SCORE: MatchScore = {
     age: 0, location: 0, budget: 0, sleepSchedule: 0, cleanliness: 0,
     smoking: 0, moveInTimeline: 0, workLocation: 0, guestPolicy: 0,
     noiseTolerance: 0, pets: 0, roommateRelationship: 0, sharedExpenses: 0,
-    lifestyle: 0, zodiac: 0, personality: 0,
+    lifestyle: 0, zodiac: 0, personality: 0, piPreference: 0,
   },
   reasons: {
     strengths: [],
@@ -243,6 +244,7 @@ export const calculateDetailedCompatibility = (
       lifestyle: 1,
       zodiac: 0,
       personality: 7,
+      piPreference: 0,
     };
     const neutralScore = Object.values(neutralBreakdown).reduce((sum, score) => sum + score, 0);
     return { totalScore: neutralScore, breakdown: neutralBreakdown, reasons };
@@ -784,8 +786,52 @@ export const calculateDetailedCompatibility = (
     reasons.concerns.push('Different personality preferences and living style');
   }
 
-  // Calculate total score
-  const totalScore = Object.values(breakdown).reduce((sum, score) => sum + score, 0);
+  // ========================================
+  // 16. PI PARSED PREFERENCE BONUS (up to +5 / -10)
+  // Applies if either user has pi_parsed_preferences from free-text input
+  // Uses keyword matching — no AI calls at scoring time
+  // ========================================
+  const userPiPrefs: PiParsedPreferences | undefined =
+    currentUser.pi_parsed_preferences || currentUser.profileData?.pi_parsed_preferences;
+  const roommatePiPrefs: PiParsedPreferences | undefined =
+    roommateProfile.pi_parsed_preferences || roommateProfile.profileData?.pi_parsed_preferences;
+
+  if (userPiPrefs || roommatePiPrefs) {
+    if (userPiPrefs && checkHardNoConflicts(userPiPrefs, roommateProfile)) {
+      breakdown.piPreference = -10;
+      reasons.concerns.push('Conflicts with a stated deal-breaker preference');
+    } else if (roommatePiPrefs && checkHardNoConflicts(roommatePiPrefs, currentUser as any)) {
+      breakdown.piPreference = -10;
+      reasons.concerns.push('Conflicts with their stated deal-breaker preference');
+    } else {
+      let piBonus = 0;
+      if (userPiPrefs && roommatePiPrefs) {
+        if (vibeAligns(userPiPrefs, roommatePiPrefs)) {
+          piBonus += 2;
+          reasons.strengths.push('Similar vibe and energy');
+        }
+        if (socialStyleAligns(userPiPrefs, roommatePiPrefs)) {
+          piBonus += 2;
+          reasons.strengths.push('Compatible social styles');
+        }
+        piBonus += countSoftPreferenceOverlap(userPiPrefs, roommatePiPrefs);
+      } else {
+        const prefs = userPiPrefs || roommatePiPrefs!;
+        const other = userPiPrefs ? roommateProfile : currentUser;
+        if (prefs.vibe && matchesProfileVibe(prefs.vibe, other)) {
+          piBonus += 1;
+        }
+        if (prefs.social_style && matchesProfileSocialStyle(prefs.social_style, other)) {
+          piBonus += 1;
+        }
+      }
+      breakdown.piPreference = Math.min(piBonus, 5);
+    }
+  }
+
+  // Calculate total score — normalize to 0-100 scale
+  const rawTotal = Object.values(breakdown).reduce((sum, score) => sum + score, 0);
+  const totalScore = Math.max(0, Math.min(100, rawTotal));
 
   return {
     totalScore,
@@ -1101,3 +1147,107 @@ export const getGenderSymbol = (gender: 'male' | 'female' | 'other' | undefined)
   };
   return symbols[gender] || '';
 };
+
+const VIBE_CLUSTERS: Record<string, string[]> = {
+  chill: ['chill', 'relaxed', 'easygoing', 'laid-back', 'calm', 'mellow', 'low-key', 'casual'],
+  social: ['social', 'outgoing', 'extroverted', 'lively', 'fun', 'energetic', 'party', 'adventurous'],
+  quiet: ['quiet', 'introverted', 'reserved', 'private', 'solitary', 'homebody', 'peaceful'],
+  focused: ['focused', 'studious', 'professional', 'driven', 'organized', 'motivated', 'ambitious'],
+  creative: ['creative', 'artistic', 'musical', 'bohemian', 'expressive', 'free-spirited'],
+};
+
+const SOCIAL_CLUSTERS: Record<string, string[]> = {
+  independent: ['independent', 'solo', 'alone', 'space', 'privacy', 'introvert', 'minimal'],
+  balanced: ['balanced', 'friendly', 'occasional', 'sometimes', 'moderate', 'flexible'],
+  social: ['social', 'together', 'hangout', 'friends', 'group', 'communal', 'extrovert'],
+};
+
+function getCluster(value: string, clusters: Record<string, string[]>): string | null {
+  const lower = value.toLowerCase();
+  for (const [cluster, keywords] of Object.entries(clusters)) {
+    if (keywords.some(k => lower.includes(k))) return cluster;
+  }
+  return null;
+}
+
+export function checkHardNoConflicts(prefs: PiParsedPreferences, profile: any): boolean {
+  if (!prefs.hard_nos || prefs.hard_nos.length === 0) return false;
+
+  const profileText = [
+    profile.profileData?.preferences?.smoking,
+    profile.profileData?.preferences?.pets,
+    profile.profileData?.preferences?.guestPolicy,
+    profile.profileData?.preferences?.noiseTolerance,
+    profile.profileData?.preferences?.sleepSchedule,
+    profile.profileData?.preferences?.workLocation,
+    profile.lifestyle?.smoking,
+    profile.lifestyle?.pets,
+    profile.occupation,
+    ...(profile.profileData?.interests || []),
+  ].filter(Boolean).join(' ').toLowerCase();
+
+  for (const hardNo of prefs.hard_nos) {
+    const noLower = hardNo.toLowerCase();
+    if (noLower.includes('smok') && (profileText.includes('yes') && profileText.includes('smok') || profileText.includes('smoker'))) return true;
+    if (noLower.includes('pet') && profileText.includes('have_pets')) return true;
+    if (noLower.includes('party') && (profileText.includes('frequently') || profileText.includes('nightlife'))) return true;
+    if (noLower.includes('loud') && profileText.includes('loud_environments')) return true;
+    if (noLower.includes('messy') && profileText.includes('relaxed')) return true;
+    if (noLower.includes('early') && profileText.includes('early_sleeper')) return true;
+    if (noLower.includes('late') && profileText.includes('late_sleeper')) return true;
+    if (noLower.includes('drug') && profileText.includes('drug')) return true;
+  }
+  return false;
+}
+
+export function vibeAligns(prefs1: PiParsedPreferences, prefs2: PiParsedPreferences): boolean {
+  if (!prefs1.vibe || !prefs2.vibe) return false;
+  const cluster1 = getCluster(prefs1.vibe, VIBE_CLUSTERS);
+  const cluster2 = getCluster(prefs2.vibe, VIBE_CLUSTERS);
+  if (!cluster1 || !cluster2) return false;
+  return cluster1 === cluster2;
+}
+
+export function socialStyleAligns(prefs1: PiParsedPreferences, prefs2: PiParsedPreferences): boolean {
+  if (!prefs1.social_style || !prefs2.social_style) return false;
+  const cluster1 = getCluster(prefs1.social_style, SOCIAL_CLUSTERS);
+  const cluster2 = getCluster(prefs2.social_style, SOCIAL_CLUSTERS);
+  if (!cluster1 || !cluster2) return false;
+  return cluster1 === cluster2;
+}
+
+export function countSoftPreferenceOverlap(prefs1: PiParsedPreferences, prefs2: PiParsedPreferences): number {
+  if (!prefs1.soft_preferences?.length || !prefs2.soft_preferences?.length) return 0;
+  const set1 = new Set(prefs1.soft_preferences.map(s => s.toLowerCase()));
+  const set2 = new Set(prefs2.soft_preferences.map(s => s.toLowerCase()));
+  let overlap = 0;
+  for (const item of set1) {
+    for (const item2 of set2) {
+      if (item === item2 || item.includes(item2) || item2.includes(item)) {
+        overlap++;
+        break;
+      }
+    }
+  }
+  return overlap >= 2 ? 1 : 0;
+}
+
+function matchesProfileVibe(vibe: string, profile: any): boolean {
+  const vibeCluster = getCluster(vibe, VIBE_CLUSTERS);
+  if (!vibeCluster) return false;
+  const socialLevel = profile.lifestyle?.socialLevel ?? 5;
+  if (vibeCluster === 'social' && socialLevel >= 7) return true;
+  if (vibeCluster === 'quiet' && socialLevel <= 4) return true;
+  if (vibeCluster === 'chill' && socialLevel >= 3 && socialLevel <= 7) return true;
+  return false;
+}
+
+function matchesProfileSocialStyle(style: string, profile: any): boolean {
+  const styleCluster = getCluster(style, SOCIAL_CLUSTERS);
+  if (!styleCluster) return false;
+  const socialLevel = profile.lifestyle?.socialLevel ?? 5;
+  if (styleCluster === 'social' && socialLevel >= 7) return true;
+  if (styleCluster === 'independent' && socialLevel <= 4) return true;
+  if (styleCluster === 'balanced' && socialLevel >= 4 && socialLevel <= 7) return true;
+  return false;
+}

@@ -2,6 +2,8 @@ import { supabase } from '../lib/supabase';
 import { applyBoostRotation } from '../utils/boostRotation';
 import { getRecencyMultiplier, isWithinActivityCutoff } from '../utils/activityDecay';
 import { getClosestNeighborhoodDistance } from '../utils/locationData';
+import { getCachedDeckRanking, generateDeckReranking } from './piMatchingService';
+import { RENTER_PLAN_LIMITS, normalizeRenterPlan } from '../constants/renterPlanLimits';
 
 export async function getSwipeDeck(city?: string, filters?: {
   budgetMin?: number;
@@ -101,7 +103,22 @@ export async function getSwipeDeck(city?: string, filters?: {
     !p.boost?.some((b: any) => b.is_active && new Date(b.expires_at) > new Date())
   );
 
-  return applyBoostRotation(boosted, normal, user.id);
+  let finalDeck = applyBoostRotation(boosted, normal, user.id);
+
+  const hasPiReranking = await checkPiDeckReranking(user.id);
+  if (hasPiReranking && finalDeck.length >= 5) {
+    try {
+      const cached = await getCachedDeckRanking();
+      if (cached) {
+        finalDeck = applyAIRanking(finalDeck, cached.ranked_user_ids);
+      } else {
+        const top30Ids = finalDeck.slice(0, 30).map((p: any) => p.id);
+        generateDeckReranking(top30Ids).catch(() => {});
+      }
+    } catch {}
+  }
+
+  return finalDeck;
 }
 
 export async function sendLike(recipientId: string) {
@@ -355,4 +372,45 @@ export async function saveRefinementAnswer(questionId: string, value: string): P
   }
 
   return { success: true };
+}
+
+function applyAIRanking(deck: any[], rankedIds: string[]): any[] {
+  const idToProfile = new Map<string, any>();
+  for (const p of deck) {
+    idToProfile.set(p.id, p);
+  }
+
+  const reordered: any[] = [];
+  const usedIds = new Set<string>();
+
+  for (const id of rankedIds) {
+    const profile = idToProfile.get(id);
+    if (profile) {
+      reordered.push(profile);
+      usedIds.add(id);
+    }
+  }
+
+  for (const p of deck) {
+    if (!usedIds.has(p.id)) {
+      reordered.push(p);
+    }
+  }
+
+  return reordered;
+}
+
+async function checkPiDeckReranking(userId: string): Promise<boolean> {
+  try {
+    const { data: sub } = await supabase
+      .from('subscriptions')
+      .select('plan')
+      .eq('user_id', userId)
+      .single();
+
+    const plan = normalizeRenterPlan(sub?.plan);
+    return RENTER_PLAN_LIMITS[plan]?.hasPiDeckReranking === true;
+  } catch {
+    return false;
+  }
 }
