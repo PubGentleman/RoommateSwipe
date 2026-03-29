@@ -293,6 +293,7 @@ const ONBOARDING_STEPS: StepId[] = [
   'basicInfo',
   'budgetLocation',
   'dealbreakers',
+  'idealRoommate',
 ];
 
 const STEP_TITLES: Record<StepId, string> = {
