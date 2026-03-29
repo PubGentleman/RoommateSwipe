@@ -1218,7 +1218,7 @@ export const ProfileQuestionnaireScreen = () => {
             </View>
 
             <TouchableOpacity
-              onPress={() => handleNext()}
+              onPress={() => goNext()}
               style={{ alignItems: 'center', marginTop: 16 }}
             >
               <Text style={{ color: theme.textSecondary, fontSize: 14 }}>

@@ -53,7 +53,7 @@ import { getBestMatchToday } from '../../utils/bestMatchToday';
 import { AIGroupSuggestionCard } from '../../components/AIGroupSuggestionCard';
 import { InstagramBadge } from '../../components/InstagramBadge';
 import { WhyThisMatchModal } from '../../components/WhyThisMatchModal';
-import { getCachedInsight } from '../../services/piMatchingService';
+import { getCachedOrGenerateInsight, getCachedDeckRanking } from '../../services/piMatchingService';
 import { DailyQuestionCard } from '../../components/DailyQuestionCard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getCompletionPercentage } from '../../utils/profileReminderUtils';
@@ -112,6 +112,7 @@ export const RoommatesScreen = () => {
   const [piCardSummary, setPiCardSummary] = useState<string | null>(null);
   const [piCardLoading, setPiCardLoading] = useState(false);
   const piSummaryCache = useRef<Record<string, string>>({});
+  const [piBoostedIds, setPiBoostedIds] = useState<Set<string>>(new Set());
   const [askAboutVisible, setAskAboutVisible] = useState(false);
   const [askAboutTarget, setAskAboutTarget] = useState<{ id: string; name: string; age?: number; compatibility?: number; entryPoint: 'swipe_card' | 'match_screen' | 'chat_screen' } | null>(null);
   const [pendingQuestion, setPendingQuestion] = useState<RefinementQuestion | null>(null);
@@ -516,6 +517,18 @@ export const RoommatesScreen = () => {
     : false;
 
   useEffect(() => {
+    if (!renterLimits.hasPiDeckReranking || profiles.length === 0) return;
+    getCachedDeckRanking().then((ranking) => {
+      if (!ranking?.adjustments) return;
+      const boosted = new Set<string>();
+      for (const adj of ranking.adjustments) {
+        if (adj.direction === 'up') boosted.add(adj.user_id);
+      }
+      setPiBoostedIds(boosted);
+    }).catch(() => {});
+  }, [renterLimits.hasPiDeckReranking, profiles.length]);
+
+  useEffect(() => {
     if (!currentProfile?.id || !renterLimits.hasPiDeckReranking) {
       setPiCardSummary(null);
       setPiCardLoading(false);
@@ -530,7 +543,7 @@ export const RoommatesScreen = () => {
     let stale = false;
     setPiCardSummary(null);
     setPiCardLoading(true);
-    getCachedInsight(profileId).then((insight) => {
+    getCachedOrGenerateInsight(profileId, currentProfile?.compatibility).then((insight) => {
       if (stale) return;
       if (insight?.summary) {
         piSummaryCache.current[profileId] = insight.summary;
@@ -1834,7 +1847,7 @@ export const RoommatesScreen = () => {
                   <Feather name="heart" size={12} color="#ff8070" />
                   <ThemedText style={styles.tagMatchText}>{currentProfile.compatibility || 50}% Match</ThemedText>
                 </View>
-                {renterLimits.hasPiDeckReranking && (currentProfile.compatibility || 0) >= 80 ? (
+                {renterLimits.hasPiDeckReranking && piBoostedIds.has(currentProfile.id) ? (
                   <View style={styles.piPickBadge}>
                     <Feather name="cpu" size={10} color="#a855f7" />
                     <ThemedText style={styles.piPickText}>Pi Pick</ThemedText>
