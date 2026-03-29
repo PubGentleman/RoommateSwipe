@@ -53,6 +53,7 @@ import { getBestMatchToday } from '../../utils/bestMatchToday';
 import { AIGroupSuggestionCard } from '../../components/AIGroupSuggestionCard';
 import { InstagramBadge } from '../../components/InstagramBadge';
 import { WhyThisMatchModal } from '../../components/WhyThisMatchModal';
+import { getCachedInsight } from '../../services/piMatchingService';
 import { DailyQuestionCard } from '../../components/DailyQuestionCard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getCompletionPercentage } from '../../utils/profileReminderUtils';
@@ -108,6 +109,9 @@ export const RoommatesScreen = () => {
   const [showAISheet, setShowAISheet] = useState(false);
   const [aiSheetContext, setAiSheetContext] = useState<ScreenContext>('match');
   const [showWhyModal, setShowWhyModal] = useState(false);
+  const [piCardSummary, setPiCardSummary] = useState<string | null>(null);
+  const [piCardLoading, setPiCardLoading] = useState(false);
+  const piSummaryCache = useRef<Record<string, string>>({});
   const [askAboutVisible, setAskAboutVisible] = useState(false);
   const [askAboutTarget, setAskAboutTarget] = useState<{ id: string; name: string; age?: number; compatibility?: number; entryPoint: 'swipe_card' | 'match_screen' | 'chat_screen' } | null>(null);
   const [pendingQuestion, setPendingQuestion] = useState<RefinementQuestion | null>(null);
@@ -510,6 +514,31 @@ export const RoommatesScreen = () => {
         return minutesAgo < 30;
       })()
     : false;
+
+  useEffect(() => {
+    if (!currentProfile?.id || !renterLimits.hasPiDeckReranking) {
+      setPiCardSummary(null);
+      setPiCardLoading(false);
+      return;
+    }
+    const profileId = currentProfile.id;
+    if (piSummaryCache.current[profileId]) {
+      setPiCardSummary(piSummaryCache.current[profileId]);
+      setPiCardLoading(false);
+      return;
+    }
+    let stale = false;
+    setPiCardSummary(null);
+    setPiCardLoading(true);
+    getCachedInsight(profileId).then((insight) => {
+      if (stale) return;
+      if (insight?.summary) {
+        piSummaryCache.current[profileId] = insight.summary;
+        setPiCardSummary(insight.summary);
+      }
+    }).catch(() => {}).finally(() => { if (!stale) setPiCardLoading(false); });
+    return () => { stale = true; };
+  }, [currentProfile?.id, renterLimits.hasPiDeckReranking]);
 
   const advanceCard = () => {
     InteractionManager.runAfterInteractions(() => {
@@ -1865,6 +1894,23 @@ export const RoommatesScreen = () => {
                   </View>
                 );
               })()}
+              {renterLimits.hasPiDeckReranking ? (
+                piCardLoading ? (
+                  <View style={styles.piSummaryRow}>
+                    <Feather name="cpu" size={11} color="#a855f7" />
+                    <View style={styles.piSummarySkeleton}>
+                      <View style={[styles.piSkeletonBar, { width: '70%' }]} />
+                    </View>
+                  </View>
+                ) : piCardSummary ? (
+                  <View style={styles.piSummaryRow}>
+                    <Feather name="cpu" size={11} color="#a855f7" />
+                    <ThemedText style={styles.piSummaryText} numberOfLines={2}>
+                      {piCardSummary}
+                    </ThemedText>
+                  </View>
+                ) : null
+              ) : null}
             </View>
           </Animated.View>
         </GestureDetector>
@@ -3419,6 +3465,30 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '600',
     color: '#ff8070',
+  },
+  piSummaryRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    marginTop: 8,
+    paddingHorizontal: 2,
+  },
+  piSummaryText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.7)',
+    flex: 1,
+    lineHeight: 17,
+    fontStyle: 'italic',
+  },
+  piSummarySkeleton: {
+    flex: 1,
+    height: 14,
+    justifyContent: 'center',
+  },
+  piSkeletonBar: {
+    height: 10,
+    backgroundColor: 'rgba(168,85,247,0.15)',
+    borderRadius: 5,
   },
   piPickBadge: {
     flexDirection: 'row',

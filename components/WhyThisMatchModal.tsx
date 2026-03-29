@@ -204,7 +204,7 @@ export const WhyThisMatchModal: React.FC<Props> = ({
                       </View>
                     ) : null}
                   </>
-                ) : (
+                ) : !piInsight ? (
                   <>
                     <ThemedText style={[styles.sectionLabel, { color: theme.textSecondary }]}>
                       Why you'd work well together
@@ -216,7 +216,7 @@ export const WhyThisMatchModal: React.FC<Props> = ({
                       </View>
                     ))}
                   </>
-                )}
+                ) : null}
 
                 {getVisibleWarnings().length > 0 ? (
                   <>
@@ -230,7 +230,7 @@ export const WhyThisMatchModal: React.FC<Props> = ({
                       </View>
                     ))}
                   </>
-                ) : result.concerns?.length > 0 && result.concerns[0] ? (
+                ) : !piInsight && result.concerns?.length > 0 && result.concerns[0] ? (
                   <>
                     <ThemedText style={[styles.sectionLabel, { color: theme.textSecondary, marginTop: 20 }]}>
                       Worth keeping in mind
