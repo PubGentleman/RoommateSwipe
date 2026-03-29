@@ -1855,7 +1855,7 @@ export const RoommatesScreen = () => {
                 {renterLimits.hasPiDeckReranking && piBoostedIds.has(currentProfile.id) ? (
                   <View style={styles.piPickBadge}>
                     <Feather name="cpu" size={10} color="#a855f7" />
-                    <ThemedText style={styles.piPickText}>Pi Pick</ThemedText>
+                    <ThemedText style={styles.piPickText}>{'\u03C0'} Pi Pick</ThemedText>
                   </View>
                 ) : null}
                 <Pressable
@@ -1913,7 +1913,7 @@ export const RoommatesScreen = () => {
                 <View style={styles.piSummaryRow}>
                   <Feather name="cpu" size={11} color="#a855f7" />
                   <ThemedText style={styles.piSummaryText} numberOfLines={2}>
-                    {piCardSummary}
+                    {'\u03C0'} Pi's Take: {piCardSummary}
                   </ThemedText>
                 </View>
               ) : null}
