@@ -47,16 +47,31 @@ export const WhyThisMatchModal: React.FC<Props> = ({
     setLoading(true);
     setError(null);
     try {
-      const [explainResponse, insight] = await Promise.all([
+      const [explainResult, piResult] = await Promise.allSettled([
         supabase.functions.invoke('explain-match', {
           body: { matchedProfileId: profileId, targetProfileId: profileId },
         }),
         getCachedOrGenerateInsight(profileId, compatibilityScore),
       ]);
 
-      if (explainResponse.error) throw new Error(explainResponse.error.message);
-      setResult(explainResponse.data);
-      setPiInsight(insight);
+      if (piResult.status === 'fulfilled' && piResult.value) {
+        setPiInsight(piResult.value);
+      }
+
+      if (explainResult.status === 'fulfilled' && !explainResult.value.error) {
+        setResult(explainResult.value.data);
+      } else {
+        setResult({
+          headline: `${profileName} looks like an interesting potential match worth exploring.`,
+          compatibilityScore: compatibilityScore || 50,
+          topReasons: [
+            'Both actively looking for a roommate on Rhome',
+            'Profiles suggest potential compatibility based on shared criteria',
+          ],
+          concerns: [],
+          conversationStarter: `Hey ${profileName}! I saw your profile — would love to chat about what you're looking for.`,
+        });
+      }
     } catch (e: any) {
       setResult({
         headline: `${profileName} looks like an interesting potential match worth exploring.`,
