@@ -141,14 +141,7 @@ serve(async (req) => {
 
     const { data: renterCandidates } = await supabase
       .from('profiles')
-      .select(`
-        user_id, budget_min, budget_max, budget_per_person_max,
-        move_in_date, sleep_schedule, cleanliness, smoking, pets,
-        drinking, guests, noise_tolerance, interests, preferred_trains,
-        desired_bedrooms, wfh, location_flexible, diet, roommate_relationship,
-        amenity_must_haves, preferred_neighborhoods, ideal_roommate_text,
-        personality_quiz_answers, lifestyle_tags, bio, profile_note
-      `)
+      .select('*')
       .gte('budget_max', budgetFloor)
       .lte('budget_min', budgetCeiling)
       .limit(40);
@@ -191,14 +184,25 @@ serve(async (req) => {
     const renterSummaries = filteredCandidates.slice(0, 20).map((p: any) => {
       const u = userMap.get(p.user_id) || {};
       return `[RENTER:${p.user_id}] ${stripPii(u.full_name)}, ${u.age || '?'}yo, ${u.occupation || '?'}
-  Budget: $${p.budget_min || '?'}-$${p.budget_max || '?'} | Move-in: ${p.move_in_date || '?'}
-  Sleep: ${p.sleep_schedule || '?'} | Clean: ${p.cleanliness ?? '?'}/10
-  Smoke: ${p.smoking != null ? (p.smoking ? 'Y' : 'N') : '?'} | Pets: ${p.pets || '?'}
+  Bio: ${trimText(u.bio || p.bio, 300)}
+  Zodiac: ${u.zodiac_sign || '-'}
+  Budget: $${p.budget_min || '?'}-$${p.budget_max || '?'} | Per-person: $${p.budget_per_person_min || '?'}-$${p.budget_per_person_max || '?'}
+  Move-in: ${p.move_in_date || '?'} | Lease: ${p.lease_duration || '?'}
+  Room type: ${p.room_type || '?'} | Desired BR: ${p.desired_bedrooms || '?'}
+  Sleep: ${p.sleep_schedule || '?'} | Clean: ${p.cleanliness ?? '?'}/10 | Noise: ${p.noise_tolerance || '?'}
+  Smoke: ${p.smoking != null ? (p.smoking ? 'Y' : 'N') : '?'} | Drink: ${p.drinking || '?'} | Pets: ${p.pets || '?'}
   WFH: ${p.wfh != null ? (p.wfh ? 'Y' : 'N') : '?'} | Guests: ${p.guests || '?'}
   Trains: ${(p.preferred_trains || []).join(',') || '-'}
-  Neighborhoods: ${(p.preferred_neighborhoods || []).join(',') || '-'}
+  Amenities: ${(p.amenity_must_haves || []).join(',') || '-'}
+  Diet: ${p.diet || '-'} | Roommate vibe: ${p.roommate_relationship || '-'}
+  Shared expenses: ${p.shared_expenses || '-'} | Location flexible: ${p.location_flexible != null ? (p.location_flexible ? 'Y' : 'N') : '?'}
   Interests: ${(p.interests || []).join(',') || '-'}
-  Bio: ${trimText(u.bio || p.bio, 200)}`;
+  Tags: ${(u.lifestyle_tags || p.lifestyle_tags || []).join(',') || '-'}
+  Dealbreakers: ${(p.dealbreakers || []).join(',') || '-'}
+  Neighborhoods: ${(p.preferred_neighborhoods || []).join(',') || '-'}
+  Ideal roommate: ${trimText(p.ideal_roommate_text, 200)}
+  Profile note: ${trimText(p.profile_note, 150)}
+  Personality: ${p.personality_quiz_answers ? JSON.stringify(p.personality_quiz_answers) : '-'}`;
     }).join('\n\n');
 
     const groupSummaries = (groupCandidates || []).map((g: any) => {

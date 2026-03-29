@@ -33,15 +33,23 @@ function buildCompactProfile(userId: string, user: any, profile: any, score: num
   const p = profile || {};
   const u = user || {};
   return `[${userId}] ${stripPii(u.full_name)}, ${u.age || '?'}yo, ${u.occupation || '?'} | Score: ${score}
-  Bio: ${trimText(u.bio, 300)}
-  Budget: $${p.budget_min || '?'}-$${p.budget_max || '?'} | Move-in: ${p.move_in_date || '?'}
+  Bio: ${trimText(u.bio, 400)}
+  Zodiac: ${u.zodiac_sign || '-'}
+  Budget: $${p.budget_min || '?'}-$${p.budget_max || '?'} | Per-person: $${p.budget_per_person_min || '?'}-$${p.budget_per_person_max || '?'}
+  Move-in: ${p.move_in_date || '?'} | Lease: ${p.lease_duration || '?'}
+  Room type: ${p.room_type || '?'} | Desired BR: ${p.desired_bedrooms || '?'}
   Sleep: ${p.sleep_schedule || '?'} | Clean: ${p.cleanliness ?? '?'}/10 | Noise: ${p.noise_tolerance || '?'}
-  Smoke: ${p.smoking != null ? (p.smoking ? 'Y' : 'N') : '?'} | Pets: ${p.pets || '?'} | WFH: ${p.wfh != null ? (p.wfh ? 'Y' : 'N') : '?'}
-  Trains: ${(p.preferred_trains || []).join(',') || '-'} | Amenities: ${(p.amenity_must_haves || []).join(',') || '-'}
-  Diet: ${p.diet || '-'} | Guests: ${p.guests || '-'} | Roommate vibe: ${p.roommate_relationship || '-'}
+  Smoke: ${p.smoking != null ? (p.smoking ? 'Y' : 'N') : '?'} | Drink: ${p.drinking || '?'} | Pets: ${p.pets || '?'}
+  WFH: ${p.wfh != null ? (p.wfh ? 'Y' : 'N') : '?'} | Guests: ${p.guests || '?'}
+  Trains: ${(p.preferred_trains || []).join(',') || '-'}
+  Amenities: ${(p.amenity_must_haves || []).join(',') || '-'}
+  Diet: ${p.diet || '-'} | Roommate vibe: ${p.roommate_relationship || '-'}
+  Shared expenses: ${p.shared_expenses || '-'} | Location flexible: ${p.location_flexible != null ? (p.location_flexible ? 'Y' : 'N') : '?'}
   Interests: ${(p.interests || []).join(',') || '-'}
   Tags: ${(u.lifestyle_tags || p.lifestyle_tags || []).join(',') || '-'}
-  Ideal roommate: ${trimText(p.ideal_roommate_text, 200)}
+  Dealbreakers: ${(p.dealbreakers || []).join(',') || '-'}
+  Profile note: ${trimText(p.profile_note, 200)}
+  Ideal roommate: ${trimText(p.ideal_roommate_text, 300)}
   Personality: ${p.personality_quiz_answers ? JSON.stringify(p.personality_quiz_answers) : '-'}
   Neighborhoods: ${(p.preferred_neighborhoods || []).join(',') || '-'}`;
 }
@@ -58,8 +66,8 @@ serve(async (req) => {
     if (!user) return errorResponse('Unauthorized', 401);
 
     const body = await req.json();
-    const resolvedCandidateIds: string[] = body.candidate_ids || [];
-    const candidates: any[] = body.candidates || resolvedCandidateIds.map((id: string) => ({ user_id: id, score: 0 }));
+    const rawCandidateIds: string[] = body.candidate_ids || [];
+    const candidates: any[] = body.candidates || rawCandidateIds.map((id: string) => ({ user_id: id, score: 0 }));
     if (!candidates || candidates.length === 0) {
       return errorResponse('candidate_ids or candidates array is required', 400);
     }

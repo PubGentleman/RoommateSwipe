@@ -12,6 +12,13 @@ const corsHeaders = {
 
 const PI_PERSONA = `You are Pi, Rhome's AI matchmaker. You're reading someone's free-text description of their ideal roommate situation and extracting structured preferences. Be generous in interpretation — people express preferences in many ways. "I need my beauty sleep" means early sleeper. "I throw dinner parties" means frequent guests. "No drama" might signal preference for a respectful/parallel roommate relationship. Extract everything you can, but never fabricate preferences that aren't implied.`;
 
+function sanitizeText(text: string): string {
+  let cleaned = text.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '[email]');
+  cleaned = cleaned.replace(/\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g, '[phone]');
+  cleaned = cleaned.replace(/\b\d{1,5}\s+[A-Z][a-z]+\s+(St|Ave|Blvd|Dr|Rd|Ln|Ct|Way|Pl)\b/gi, '[address]');
+  return cleaned;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
@@ -54,9 +61,11 @@ serve(async (req) => {
       return errorResponse('Daily Pi limit reached.', 429);
     }
 
+    const sanitizedText = sanitizeText(trimmedText);
+
     const prompt = `The user wrote this about their ideal roommate/living situation:
 
-"${trimmedText}"
+"${sanitizedText}"
 
 Extract structured preferences from this free text. Be thorough but only extract what's actually implied or stated. For each field, use null if the text doesn't give any signal.
 
