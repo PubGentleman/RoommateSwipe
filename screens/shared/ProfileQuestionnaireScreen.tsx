@@ -1290,7 +1290,14 @@ export const ProfileQuestionnaireScreen = () => {
             </View>
 
             <TouchableOpacity
-              onPress={() => goNext()}
+              onPress={() => {
+                const isLastStep = currentFilteredIndex >= stepsToShow.length - 1;
+                if (isLastStep) {
+                  handleSave();
+                } else {
+                  goNext();
+                }
+              }}
               style={{ alignItems: 'center', marginTop: 16 }}
             >
               <Text style={{ color: theme.textSecondary, fontSize: 14 }}>

@@ -1819,6 +1819,11 @@ export const RoommatesScreen = () => {
               <ThemedText style={styles.cardBio} numberOfLines={2}>
                 {currentProfile.bio}
               </ThemedText>
+              {currentProfile.profileData?.ideal_roommate_text ? (
+                <ThemedText style={styles.piLookingFor} numberOfLines={1}>
+                  {'\u03C0'} Looking for: {currentProfile.profileData.ideal_roommate_text}
+                </ThemedText>
+              ) : null}
               <View style={styles.cardTags}>
                 {currentProfile.budget ? (
                   <View style={styles.tagDark}>
@@ -3466,6 +3471,13 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '600',
     color: '#ff8070',
+  },
+  piLookingFor: {
+    fontSize: 12,
+    color: 'rgba(168,85,247,0.8)',
+    fontStyle: 'italic',
+    marginTop: 4,
+    marginBottom: 2,
   },
   piSummaryRow: {
     flexDirection: 'row',
