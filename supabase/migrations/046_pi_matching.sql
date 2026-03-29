@@ -82,3 +82,58 @@ CREATE INDEX IF NOT EXISTS idx_pi_usage_log_user_date
   ON public.pi_usage_log(user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_pi_usage_log_feature
   ON public.pi_usage_log(feature);
+
+-- Row Level Security
+ALTER TABLE public.pi_match_insights ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pi_deck_rankings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pi_host_recommendations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pi_usage_log ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own match insights"
+  ON public.pi_match_insights FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Service role can manage match insights"
+  ON public.pi_match_insights FOR ALL
+  USING (auth.role() = 'service_role');
+
+CREATE POLICY "Users can view their own deck rankings"
+  ON public.pi_deck_rankings FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Service role can manage deck rankings"
+  ON public.pi_deck_rankings FOR ALL
+  USING (auth.role() = 'service_role');
+
+CREATE POLICY "Users can update their own deck ranking swiped count"
+  ON public.pi_deck_rankings FOR UPDATE
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Hosts can view their own recommendations"
+  ON public.pi_host_recommendations FOR SELECT
+  USING (auth.uid() = host_id);
+
+CREATE POLICY "Service role can manage host recommendations"
+  ON public.pi_host_recommendations FOR ALL
+  USING (auth.role() = 'service_role');
+
+CREATE POLICY "Users can view their own usage log"
+  ON public.pi_usage_log FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Service role can manage usage log"
+  ON public.pi_usage_log FOR ALL
+  USING (auth.role() = 'service_role');
+
+CREATE POLICY "Users can delete their own match insights"
+  ON public.pi_match_insights FOR DELETE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own deck rankings"
+  ON public.pi_deck_rankings FOR DELETE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Hosts can delete their own recommendations"
+  ON public.pi_host_recommendations FOR DELETE
+  USING (auth.uid() = host_id);

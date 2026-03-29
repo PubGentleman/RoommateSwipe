@@ -280,8 +280,9 @@ export async function checkAIQuota(
         .eq('user_id', userId)
         .single();
 
-      const plan = sub?.plan || 'free';
-      const monthlyLimit = getHostPiMonthlyLimit(plan, userData.host_type);
+      const rawPlan = sub?.plan || 'free';
+      const normalizedPlan = normalizeHostPlan(rawPlan, userData.host_type);
+      const monthlyLimit = getHostPiMonthlyLimit(normalizedPlan, userData.host_type);
       if (monthlyLimit === -1) return true;
 
       const used = await getMonthlyUsageCount(userId);
@@ -303,6 +304,28 @@ export async function checkAIQuota(
   } catch {
     return false;
   }
+}
+
+function normalizeHostPlan(rawPlan: string, hostType?: string): string {
+  if (hostType === 'agent') {
+    const prefixed: Record<string, string> = {
+      agent_starter: 'starter',
+      agent_pro: 'pro',
+      agent_business: 'business',
+      pay_per_use: 'pay_per_use',
+    };
+    return prefixed[rawPlan] ?? rawPlan;
+  }
+  if (hostType === 'company') {
+    const prefixed: Record<string, string> = {
+      company_starter: 'starter',
+      company_pro: 'pro',
+      company_business: 'business',
+      company_enterprise: 'enterprise',
+    };
+    return prefixed[rawPlan] ?? rawPlan;
+  }
+  return rawPlan;
 }
 
 export function getRenterPiDailyLimit(plan: string): number {
@@ -387,3 +410,5 @@ export async function invalidateAllCachesForUser(userId: string): Promise<void> 
     invalidateDeckRankingForUser(userId),
   ]);
 }
+
+export const getMonthlyAIUsage = getMonthlyUsageCount;

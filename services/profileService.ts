@@ -145,13 +145,37 @@ export async function updateProfile(updates: ProfileData) {
     triggerPiParsing(updates.ideal_roommate_text).catch(() => {});
   }
 
+  const matchingFieldsChanged = hasMatchingFieldChanges(updates);
+  if (matchingFieldsChanged) {
+    triggerPiCacheInvalidation(user.id).catch(() => {});
+  }
+
   return result;
+}
+
+const MATCHING_FIELDS: (keyof ProfileData)[] = [
+  'budget_min', 'budget_max', 'cleanliness', 'noise_tolerance',
+  'sleep_schedule', 'pets', 'smoking', 'drinking', 'guests',
+  'interests', 'preferred_neighborhoods', 'zip_code',
+  'coordinates', 'ideal_roommate_text',
+];
+
+function hasMatchingFieldChanges(updates: ProfileData): boolean {
+  return MATCHING_FIELDS.some((field) => updates[field] !== undefined);
 }
 
 async function triggerPiParsing(text: string): Promise<void> {
   try {
     const { parseIdealRoommateText } = await import('./piMatchingService');
     await parseIdealRoommateText(text);
+  } catch {
+  }
+}
+
+async function triggerPiCacheInvalidation(userId: string): Promise<void> {
+  try {
+    const { invalidateAllCachesForUser } = await import('./piMatchingService');
+    await invalidateAllCachesForUser(userId);
   } catch {
   }
 }
