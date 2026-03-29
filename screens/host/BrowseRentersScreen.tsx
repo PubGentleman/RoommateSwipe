@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, StyleSheet, Pressable, Image,
   ActivityIndicator, Modal, TextInput, ScrollView,
@@ -22,7 +22,7 @@ import {
   generateBestGroupSuggestion,
 } from '../../services/agentMatchmakerService';
 import { calculateListingLocationScore } from '../../utils/listingMatchUtils';
-import { getHostRecommendations } from '../../services/piMatchingService';
+import { getHostRecommendations, getMonthlyUsageCount, getHostPiMonthlyLimit } from '../../services/piMatchingService';
 import { PiHostRecommendation } from '../../types/models';
 import {
   getAgentPlanLimits,
@@ -73,6 +73,9 @@ export const BrowseRentersScreen = () => {
   const [piRecommendedIds, setPiRecommendedIds] = useState<Map<string, string>>(new Map());
   const [piSortActive, setPiSortActive] = useState(false);
   const [piLoading, setPiLoading] = useState(false);
+  const [piQuotaUsed, setPiQuotaUsed] = useState(0);
+  const [piQuotaLimit, setPiQuotaLimit] = useState(0);
+  const piRequestId = useRef(0);
 
   const agentPlan: AgentPlan = (user?.agentPlan as AgentPlan) || 'pay_per_use';
   const planLimits = getAgentPlanLimits(agentPlan);
@@ -239,6 +242,18 @@ export const BrowseRentersScreen = () => {
       }
 
       if (user) {
+        try {
+          const sub = await StorageService.getHostSubscription(user.id);
+          const rawPlan = sub?.plan || 'free';
+          const hostType = user.hostType;
+          const limit = getHostPiMonthlyLimit(rawPlan, hostType);
+          setPiQuotaLimit(limit);
+          const used = await getMonthlyUsageCount(user.id);
+          setPiQuotaUsed(used);
+        } catch {}
+      }
+
+      if (user) {
         const ids = await getShortlistedRenterIds(user.id);
         setShortlistedIds(new Set(ids));
       }
@@ -254,8 +269,10 @@ export const BrowseRentersScreen = () => {
 
   useEffect(() => {
     if (selectedListing) {
+      const thisRequestId = ++piRequestId.current;
       setPiLoading(true);
       getHostRecommendations(selectedListing.id).then(rec => {
+        if (piRequestId.current !== thisRequestId) return;
         if (rec?.recommendations) {
           const map = new Map<string, string>();
           rec.recommendations.forEach((r: any) => {
@@ -267,8 +284,13 @@ export const BrowseRentersScreen = () => {
         } else {
           setPiRecommendedIds(new Map());
         }
-      }).catch(() => setPiRecommendedIds(new Map())).finally(() => setPiLoading(false));
+      }).catch(() => {
+        if (piRequestId.current === thisRequestId) setPiRecommendedIds(new Map());
+      }).finally(() => {
+        if (piRequestId.current === thisRequestId) setPiLoading(false);
+      });
     } else {
+      piRequestId.current++;
       setPiRecommendedIds(new Map());
       setPiSortActive(false);
     }
@@ -593,6 +615,22 @@ export const BrowseRentersScreen = () => {
           </Pressable>
         ))}
       </ScrollView>
+
+      {piQuotaLimit !== 0 && selectedListing ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#a855f7' + '10', borderRadius: 10, padding: 10, marginBottom: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Feather name="cpu" size={12} color="#a855f7" />
+            <Text style={{ color: '#a855f7', fontSize: 11, fontWeight: '600' }}>
+              {piQuotaLimit === -1 ? 'Unlimited Pi calls' : `${Math.max(0, piQuotaLimit - piQuotaUsed)}/${piQuotaLimit} Pi calls left`}
+            </Text>
+          </View>
+          {piQuotaLimit !== -1 && piQuotaUsed >= piQuotaLimit ? (
+            <Pressable onPress={() => navigation.navigate('HostSubscription')}>
+              <Text style={{ color: '#a855f7', fontSize: 11, fontWeight: '700' }}>Upgrade</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
 
       <View style={styles.statsRow}>
         <Text style={styles.statsText}>{filteredRenters.length} renters</Text>

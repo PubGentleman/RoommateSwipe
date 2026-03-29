@@ -23,6 +23,7 @@ import { getAgentPlanLimits, type AgentPlan } from '../../constants/planLimits';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getAgentResponseAlerts } from '../../services/responseTrackingService';
 import { getHostCompletionPercentage } from '../../utils/profileReminderUtils';
+import { getMonthlyUsageCount, getHostPiMonthlyLimit } from '../../services/piMatchingService';
 
 const BG = '#111';
 const CARD_BG = '#1a1a1a';
@@ -106,6 +107,9 @@ export const HostDashboardScreen = () => {
   const [agentDetailMap, setAgentDetailMap] = useState<Map<string, { conversations: AgentConversationSummary[]; bookings: AgentBookingSummary[]; loading: boolean }>>(new Map());
   const [reassignConvId, setReassignConvId] = useState<string | null>(null);
   const [reassignConvListingId, setReassignConvListingId] = useState<string | null>(null);
+  const [piMatchCount, setPiMatchCount] = useState(0);
+  const [piUsedThisMonth, setPiUsedThisMonth] = useState(0);
+  const [piMonthlyLimit, setPiMonthlyLimit] = useState(0);
 
   const DASH_COLLAPSE_H = 50;
   const dashScrollY = useSharedValue(0);
@@ -203,6 +207,25 @@ export const HostDashboardScreen = () => {
 
     const sub = await StorageService.getHostSubscription(user.id);
     setHostSub(sub);
+
+    try {
+      const rawPlan = sub?.plan || 'free';
+      const hostType = user.hostType;
+      const limit = getHostPiMonthlyLimit(rawPlan, hostType);
+      setPiMonthlyLimit(limit);
+      const used = await getMonthlyUsageCount(user.id);
+      setPiUsedThisMonth(used);
+
+      const { data: piRecs } = await supabase
+        .from('pi_host_recommendations')
+        .select('recommendations')
+        .eq('host_id', user.id);
+      const total = (piRecs || []).reduce((sum: number, r: any) => {
+        const recs = r.recommendations;
+        return sum + (Array.isArray(recs) ? recs.length : 0);
+      }, 0);
+      setPiMatchCount(total);
+    } catch {}
 
     if (user.hostType === 'company') {
       try {
@@ -653,7 +676,16 @@ export const HostDashboardScreen = () => {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.groupMatchTitle}>{'\u03C0'} Pi Matchmaker</Text>
-                <Text style={styles.groupMatchSub}>Pi finds renters that fit your listings</Text>
+                <Text style={styles.groupMatchSub}>
+                  {piMatchCount > 0
+                    ? `Pi found ${piMatchCount} match${piMatchCount !== 1 ? 'es' : ''} for your listings`
+                    : 'Pi finds renters that fit your listings'}
+                </Text>
+                {piMonthlyLimit !== 0 ? (
+                  <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11, marginTop: 2 }}>
+                    {piMonthlyLimit === -1 ? 'Unlimited' : `${Math.max(0, piMonthlyLimit - piUsedThisMonth)}/${piMonthlyLimit}`} Pi calls remaining this month
+                  </Text>
+                ) : null}
               </View>
             </View>
             <Feather name="chevron-right" size={18} color="#888" />
@@ -676,6 +708,36 @@ export const HostDashboardScreen = () => {
             </View>
             <Feather name="chevron-right" size={18} color="#888" />
           </Pressable>
+        ) : null}
+
+        {user?.hostType === 'company' && activeCount > 0 ? (
+          <View style={[styles.groupMatchCard, { flexDirection: 'column' as const }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+              <View style={[styles.groupMatchIconWrap, { backgroundColor: PURPLE + '20' }]}>
+                <Feather name="cpu" size={18} color={PURPLE} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.groupMatchTitle}>{'\u03C0'} Pi Matchmaker Summary</Text>
+                <Text style={styles.groupMatchSub}>AI-powered renter matching across all company listings</Text>
+              </View>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <View style={{ flex: 1, backgroundColor: PURPLE + '10', borderRadius: 10, padding: 12, alignItems: 'center' }}>
+                <Text style={{ color: PURPLE, fontSize: 20, fontWeight: '700' }}>{piMatchCount}</Text>
+                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, marginTop: 2 }}>Total Matches</Text>
+              </View>
+              <View style={{ flex: 1, backgroundColor: PURPLE + '10', borderRadius: 10, padding: 12, alignItems: 'center' }}>
+                <Text style={{ color: PURPLE, fontSize: 20, fontWeight: '700' }}>{piUsedThisMonth}</Text>
+                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, marginTop: 2 }}>Calls Used</Text>
+              </View>
+              <View style={{ flex: 1, backgroundColor: PURPLE + '10', borderRadius: 10, padding: 12, alignItems: 'center' }}>
+                <Text style={{ color: PURPLE, fontSize: 20, fontWeight: '700' }}>
+                  {piMonthlyLimit === -1 ? '\u221E' : Math.max(0, piMonthlyLimit - piUsedThisMonth)}
+                </Text>
+                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, marginTop: 2 }}>Remaining</Text>
+              </View>
+            </View>
+          </View>
         ) : null}
 
         {user?.hostType === 'company' && unassignedListings.length > 0 ? (
