@@ -2656,7 +2656,7 @@ export const RoommatesScreen = () => {
                             fontWeight: '700',
                             letterSpacing: 0.5,
                           }}>
-                            IDEAL ROOMMATE
+                            Looking for...
                           </Text>
                         </View>
                         <Text style={{

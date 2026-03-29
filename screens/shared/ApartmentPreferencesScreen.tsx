@@ -28,7 +28,7 @@ import {
 } from '../../constants/transitData';
 import { PricePickerPair, STANDARD_MAX_VALUE } from '../../components/PricePicker';
 
-const TOTAL_STEPS = 6;
+const TOTAL_STEPS = 7;
 const CORAL = '#ff6b5b';
 const BG = '#111';
 
@@ -65,6 +65,7 @@ export default function ApartmentPreferencesScreen() {
   const [amenities, setAmenities] = useState<string[]>([]);
   const [neighborhoods, setNeighborhoods] = useState<string[]>([]);
   const [zipCode, setZipCode] = useState('');
+  const [piIdealText, setPiIdealText] = useState('');
   const [saving, setSaving] = useState(false);
 
   const canProceed = useCallback(() => {
@@ -75,6 +76,7 @@ export default function ApartmentPreferencesScreen() {
       case 3: return moveInFlexible || moveInDate.length > 0;
       case 4: return true;
       case 5: return true;
+      case 6: return true;
       default: return false;
     }
   }, [step, bedrooms, budgetMin, budgetMax, selectedTrains, hasCar, isWfh, moveInFlexible, moveInDate, amenities]);
@@ -117,7 +119,7 @@ export default function ApartmentPreferencesScreen() {
     await StorageService.setApartmentPreferences(user.id, prefs);
 
     try {
-      await updateProfile({
+      const profileUpdate: any = {
         desired_bedrooms: bedrooms,
         budget_per_person_min: budget.min,
         budget_per_person_max: budget.max,
@@ -128,7 +130,11 @@ export default function ApartmentPreferencesScreen() {
         wfh: isWfh,
         apartment_prefs_complete: true,
         zip_code: zipCode || undefined,
-      } as any);
+      };
+      if (piIdealText.trim()) {
+        profileUpdate.ideal_roommate_text = piIdealText.trim();
+      }
+      await updateProfile(profileUpdate);
     } catch (e) {
       console.warn('[ApartmentPrefs] Supabase sync failed:', e);
     }
@@ -443,6 +449,46 @@ export default function ApartmentPreferencesScreen() {
     </Animated.View>
   );
 
+  const renderPiIdealStep = () => (
+    <Animated.View entering={SlideInRight.duration(300)} exiting={SlideOutLeft.duration(200)}>
+      <ThemedText style={styles.stepTitle}>Tell Pi anything else</ThemedText>
+      <ThemedText style={styles.stepSubtitle}>
+        Describe your ideal living situation in your own words. Pi uses this to find better matches.
+      </ThemedText>
+      <View style={{
+        backgroundColor: 'rgba(168,85,247,0.06)',
+        borderRadius: 14,
+        borderLeftWidth: 3,
+        borderLeftColor: '#a855f7',
+        padding: 14,
+        marginTop: 16,
+      }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+          <Feather name="cpu" size={12} color="#a855f7" />
+          <ThemedText style={{ color: '#a855f7', fontSize: 12, fontWeight: '700' }}>Pi reads this</ThemedText>
+        </View>
+        <TextInput
+          style={{
+            color: '#fff',
+            fontSize: 15,
+            lineHeight: 22,
+            minHeight: 100,
+            textAlignVertical: 'top',
+          }}
+          placeholder="e.g. I'm looking for a quiet, clean place near the L train. I work from home 3 days a week and love cooking..."
+          placeholderTextColor="rgba(255,255,255,0.3)"
+          value={piIdealText}
+          onChangeText={(t) => setPiIdealText(t.slice(0, 500))}
+          multiline
+          maxLength={500}
+        />
+        <ThemedText style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11, textAlign: 'right', marginTop: 4 }}>
+          {piIdealText.length}/500
+        </ThemedText>
+      </View>
+    </Animated.View>
+  );
+
   const renderStep = () => {
     switch (step) {
       case 0: return renderBedroomStep();
@@ -451,6 +497,7 @@ export default function ApartmentPreferencesScreen() {
       case 3: return renderMoveInStep();
       case 4: return renderAmenitiesStep();
       case 5: return renderNeighborhoodStep();
+      case 6: return renderPiIdealStep();
       default: return null;
     }
   };
@@ -491,7 +538,7 @@ export default function ApartmentPreferencesScreen() {
             <Feather name="arrow-right" size={18} color="#fff" />
           ) : null}
         </Pressable>
-        {step === 4 || step === 5 ? (
+        {step === 4 || step === 5 || step === 6 ? (
           <Pressable onPress={handleNext} style={styles.skipBtn}>
             <ThemedText style={styles.skipText}>Skip</ThemedText>
           </Pressable>

@@ -18,6 +18,7 @@ import { Image } from 'expo-image';
 import { getSuggestedGroupMembers } from '../../utils/groupSuggestions';
 import { getGroupHealth, GroupHealthResult } from '../../utils/groupHealthScore';
 import { normalizeRenterPlan, getRenterPlanLimits } from '../../constants/renterPlanLimits';
+import { getCachedInsight } from '../../services/piMatchingService';
 import { PlanBadgeInline } from '../../components/LockedFeatureOverlay';
 import {
   getGroupDetails,
@@ -118,6 +119,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
   const [health, setHealth] = useState<GroupHealthResult | null>(null);
   const [groupLikers, setGroupLikers] = useState<any[]>([]);
   const [loadingLikers, setLoadingLikers] = useState(false);
+  const [memberPiSummaries, setMemberPiSummaries] = useState<Record<string, string>>({});
 
   const isAdmin = group?.adminId === user?.id;
   const memberCount = group?.members?.length || 0;
@@ -164,6 +166,25 @@ export function GroupInfoScreen({ route, navigation }: Props) {
         .finally(() => setLoadingLikers(false));
     }
   }, [group?.id, isAdmin]);
+
+  useEffect(() => {
+    if (!group?.members || !user) return;
+    const otherMembers = group.members.filter((m: any) => m.id !== user.id);
+    if (otherMembers.length === 0) return;
+    const fetchSummaries = async () => {
+      const summaries: Record<string, string> = {};
+      await Promise.all(
+        otherMembers.map(async (m: any) => {
+          try {
+            const insight = await getCachedInsight(m.id);
+            if (insight?.summary) summaries[m.id] = insight.summary;
+          } catch {}
+        })
+      );
+      if (Object.keys(summaries).length > 0) setMemberPiSummaries(summaries);
+    };
+    fetchSummaries();
+  }, [group?.id, user?.id]);
 
   async function loadGroup() {
     setLoading(true);
@@ -947,6 +968,14 @@ export function GroupInfoScreen({ route, navigation }: Props) {
                     {member.role === 'host' ? 'Host' : 'Renter'}
                     {member.verified ? ' · Verified' : ''}
                   </ThemedText>
+                  {!isCurrentUser && memberPiSummaries[member.id] ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 4, marginTop: 4 }}>
+                      <Feather name="cpu" size={10} color="#a855f7" />
+                      <ThemedText style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', flex: 1, fontStyle: 'italic' }} numberOfLines={1}>
+                        {memberPiSummaries[member.id]}
+                      </ThemedText>
+                    </View>
+                  ) : null}
                 </View>
 
                 {isAdmin && !isCurrentUser && !isMemberAdmin ? (
