@@ -11,9 +11,6 @@ import type {
   PiParsedPreferences,
 } from '../types/models';
 
-const INSIGHT_CACHE_HOURS = 168;
-const DECK_CACHE_HOURS = 24;
-const HOST_REC_CACHE_HOURS = 168;
 const DECK_SWIPED_INVALIDATION_RATIO = 0.5;
 
 async function getCurrentUserId(): Promise<string | null> {
