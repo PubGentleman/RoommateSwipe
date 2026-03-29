@@ -264,6 +264,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         roomType: profile.room_type,
         leaseDuration: profile.lease_duration,
         profileNote: profile.profile_note || undefined,
+        ideal_roommate_text: profile.ideal_roommate_text || undefined,
         instagram_verified: profile.instagram_verified || false,
         instagram_handle: profile.instagram_handle || undefined,
       } : {
@@ -1004,6 +1005,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('[Auth] Synced profile_note to Supabase');
       } catch (err) {
         console.log('[Auth] profile_note sync error:', err);
+      }
+    }
+
+    if (updates.profileData?.ideal_roommate_text !== undefined) {
+      try {
+        const textValue = updates.profileData.ideal_roommate_text?.trim() || null;
+        await supabase
+          .from('profiles')
+          .update({ ideal_roommate_text: textValue })
+          .eq('user_id', user.id);
+        console.log('[Auth] Synced ideal_roommate_text to Supabase');
+      } catch (err) {
+        console.log('[Auth] ideal_roommate_text sync error:', err);
       }
     }
   };

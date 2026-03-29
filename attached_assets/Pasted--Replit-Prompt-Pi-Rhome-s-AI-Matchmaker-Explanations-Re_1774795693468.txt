@@ -1,0 +1,1212 @@
+# Replit Prompt: Pi — Rhome's AI Matchmaker (Explanations, Re-Ranking, Free-Text Preferences & Host Matchmaker)
+
+## GOAL
+
+Transform the matching system from a rigid point calculator into **Pi** — Rhome's AI-powered matchmaker persona. Pi is the intelligence behind every match, recommendation, and insight in the app. The name comes from π (pi) — the mathematical constant that defines relationships between things, just like Pi defines compatibility between roommates.
+
+Four new features layered on top of the existing 100-point deterministic algorithm:
+
+1. **Pi Match Insights** — Pi generates natural language compatibility narratives for every match ("You both love cooking and keep early hours. Heads up — they prefer overnight guests while you don't.")
+2. **Pi Deck Re-Ranking** — After the deterministic algorithm scores candidates, Pi re-ranks the top batch by analyzing full profiles holistically, catching nuances the point system misses
+3. **Free-Text "Tell Pi What You Want" Field** — Users describe what they want in plain English; Pi parses it into structured signals AND uses it for deeper matching
+4. **Pi Host Matchmaker** — For agents/companies on paid tiers, Pi proactively recommends renters and groups for their listings with explanations
+
+---
+
+## WHAT EXISTS TODAY
+
+### Matching Algorithm (`utils/matchingAlgorithm.ts` — 1010 lines)
+
+100-point weighted scoring across 16 categories:
+
+**High Priority (62 pts):**
+- Location (16 pts) — neighborhood/distance matching
+- Budget (12 pts) — budget variance scoring
+- Sleep Schedule (12 pts) — schedule compatibility
+- Cleanliness (12 pts) — cleanliness level diff
+- Smoking/Substances (10 pts) — compatibility tiers
+- Age (8 pts) — life stage proximity (replaced by move-in timeline below in priority)
+- Move-in Timeline (4 pts) — date alignment
+
+**Medium Priority (24 pts):**
+- Work Location (6 pts) — remote/office/hybrid
+- Guest Policy (6 pts) — overnight guests tolerance
+- Noise Tolerance (4 pts) — noise level matching
+- Pets (4 pts) — pet ownership/tolerance
+
+**Lower Priority (14 pts):**
+- Personality Compatibility (~15% weight) — 5-question quiz results
+- Roommate Relationship (2 pts) — social expectations
+- Shared Expenses (2 pts) — split preferences
+- Lifestyle/Interest Tags (2 pts) — shared interests with conflict penalties
+- Zodiac (2 pts) — optional element-based compatibility
+
+**Dealbreaker System:** Hard blocks for `no_smokers`, `no_pets`, `no_overnight_guests`, etc. — these skip scoring entirely and return 0.
+
+### Existing AI Edge Functions (Supabase Deno Functions)
+
+All use Anthropic API — `claude-haiku-4-5-20251001` for fast tasks, `claude-sonnet-4-5` for complex reasoning.
+
+1. **`ai-assistant/index.ts`** (27KB) — Streaming chat with full profile context, AI memory extraction, profile field collection. Daily message limits by plan.
+2. **`agent-pair-group/index.ts`** (9.7KB) — AI group recommendations for agents. Takes 2+ renters, recommends best group for a listing. Returns JSON with confidence, reasoning, alternatives.
+3. **`calculate-match-scores/index.ts`** (6.3KB) — Pre-calculates simplified scores (budget, sleep, cleanliness, smoking, move-in, pets = 100pts). Runs after swipes. Only re-scores every 24h.
+4. **`ai-ask-about-profile/index.ts`** (14.7KB) — AI asks contextual questions to fill profile gaps.
+5. **`ai-neighborhood-info/index.ts`** (14KB) — Neighborhood intelligence (transit, vibes, safety, cost).
+
+### AI Memory System
+
+`user_ai_memory` table stores extracted context from conversations:
+- Budget stated, move-in timeline, dealbreakers, must-haves
+- Preferred neighborhoods, transit preferences
+- Work schedule, social preferences
+- Free-form memory notes from past conversations
+
+### Discover Service (`services/discoverService.ts` — 335 lines)
+
+Builds swipe deck with filters (budget, room type, compatibility). Applies activity decay scoring and boost rotation. Does NOT use AI for ordering.
+
+### Pre-Calculated Scores (`calculate-match-scores`)
+
+Simpler 100-point score (budget 25, sleep 20, cleanliness 20, smoking 15, move-in 10, pets 10) stored in a scores table. Candidates not scored in 24h get re-scored. Triggers `generate-group-suggestions`.
+
+### Plan Tiers (Relevant for Pi Feature Gating)
+
+**Renter Plans:**
+- Free: 5 Pi messages/day
+- Basic: 5 Pi messages/day
+- Plus: 50 Pi messages/day
+- Elite: 200 Pi messages/day
+
+**Agent Plans:**
+- PayPerUse ($0): 20 Pi calls/month
+- Starter ($49): 100 Pi calls/month
+- Pro ($99): 200 Pi calls/month
+- Business ($149): 500 Pi calls/month
+
+**Company Plans:**
+- Starter ($199): 200 Pi calls/month
+- Pro ($399): 500 Pi calls/month
+- Enterprise (custom): unlimited
+
+---
+
+## COMPLETE PROFILE FIELD REFERENCE — WHAT PI HAS ACCESS TO
+
+Pi should have access to EVERY field collected from users. Currently the deterministic algorithm only uses 16 out of 45+ collected fields. Pi closes this gap by reading the full profile holistically.
+
+### Fields Currently Used in 100-Point Algorithm (16 fields)
+
+| Field | Points | Source |
+|-------|--------|--------|
+| Location/Neighborhood | 16 pts | `users.neighborhood`, `profiles.preferred_neighborhoods` |
+| Budget | 12 pts | `profileData.budget` (min/max) |
+| Sleep Schedule | 12 pts | `preferences.sleepSchedule`: early_sleeper, late_sleeper, flexible, irregular |
+| Cleanliness | 12 pts | `preferences.cleanliness`: very_tidy, moderately_tidy, relaxed |
+| Smoking | 10 pts | `preferences.smoking`: yes, no, only_outside |
+| Age | 8 pts | Calculated from `birthday` |
+| Work Location | 6 pts | `preferences.workLocation`: wfh_fulltime, hybrid, office_fulltime, irregular |
+| Guest Policy | 6 pts | `preferences.guestPolicy`: rarely, occasionally, frequently, prefer_no_guests |
+| Noise Tolerance | 4 pts | `preferences.noiseTolerance`: prefer_quiet, normal_noise, loud_environments |
+| Pets | 4 pts | `preferences.pets`: have_pets, open_to_pets, no_pets |
+| Move-in Timeline | 4 pts | `preferences.moveInDate` (ISO date) |
+| Roommate Relationship | 2 pts | `preferences.roommateRelationship`: respectful_coliving, occasional_hangouts, prefer_friends, minimal_interaction |
+| Shared Expenses | 2 pts | `preferences.sharedExpenses` (utilities, groceries, internet, cleaning — each: split_equally, usage_based, buy_own, etc.) |
+| Interest Tags | 2 pts | `profileData.interests[]` — 46 tags across 5 categories (lifestyle, habits, hobbies, social, diet) |
+| Zodiac Sign | 2 pts | Auto-calculated from birthday, element-based compatibility |
+| Personality Quiz | ~15% | 5 questions with compatibility matrix |
+
+### Dealbreakers (Hard Filters — Return 0% Score)
+
+- `no_smokers` — filters if target smokes
+- `no_cats` — filters if target has cats
+- `no_dogs` — filters if target has dogs
+- `no_pets` — filters if target has any pet
+- `no_overnight_guests` — filters if target frequently hosts guests
+- `private_bathroom` — filters if no private bathroom
+
+### Personality Quiz (5 Questions — Pi Should Reference These)
+
+**Q1: "When you get home after a long day:"**
+- alone: Decompress alone quietly
+- music: Put on music and unwind
+- social: Call friends or catch up
+- kitchen: Cook and relax in the kitchen
+
+**Q2: "How do you want to handle issues with a roommate?"**
+- text: Text — keeps things low pressure
+- direct: Face to face, direct and clear
+- meeting: Sit down together and talk it out
+- flow: Go with the flow, no drama
+
+**Q3: "The kitchen after cooking:"**
+- immediate: Cleaned up immediately every time
+- sameday: Cleaned before the end of the day
+- nextday: Sometimes the next morning is fine
+- flexible: Doesn't bother me either way
+
+**Q4: "What kind of roommate relationship do you want?"**
+- friends: Actual friends — hang out together
+- friendly: Friendly but independent lives
+- respectful: Respectful co-living, minimal interaction
+- parallel: Ships passing — barely see each other
+
+**Q5: "How far can you realistically commute from home?"**
+- under_20: Under 20 minutes
+- under_40: Up to 40 minutes
+- under_60: Up to an hour
+- flexible: Flexible — I work remotely or don't mind
+
+### Fields COLLECTED But NOT Used in Matching — Pi Should Use These
+
+These are collected from users during onboarding, profile editing, or apartment preferences but the deterministic algorithm ignores them. **Pi must read ALL of these** when generating insights, re-ranking, and making recommendations:
+
+| Field | Where Collected | Why Pi Should Use It |
+|-------|----------------|---------------------|
+| **Bio** | Onboarding + Edit Profile | Rich free-text about personality, lifestyle, values — Pi's most powerful signal for holistic matching |
+| **Profile Note** | Onboarding + Edit Profile | 500-char text about living habits — similar to bio, high value for Pi |
+| **Occupation** | Onboarding + Edit Profile | Life stage, schedule compatibility, income bracket signals. Two nurses on opposite shifts = potential conflict. Two remote freelancers = potential great fit. |
+| **Gender** | Onboarding + Edit Profile | Some users prefer same-gender roommates — Pi should ask if not stated |
+| **Looking For** | Onboarding | room vs entire_apartment — compatibility signal (someone wanting a room won't match someone wanting their own apartment) |
+| **Bedrooms** | Onboarding + Apt Prefs | Group size compatibility — 3BR seekers should match with other 3BR seekers |
+| **Bathrooms** | Onboarding | Shared vs private bathroom tolerance |
+| **Private Bathroom** | Onboarding | Dealbreaker for some, flexible for others |
+| **Preferred Neighborhoods** | Apartment Prefs | Multi-neighborhood array — CRITICAL for location matching (being added in the neighborhood upgrade prompt) |
+| **Preferred Trains** | Apartment Prefs | Commute compatibility — two people who both take the L train are more likely to want the same neighborhoods |
+| **Has Car** | Apartment Prefs | Location flexibility signal |
+| **Works From Home** | Apartment Prefs | Overlaps with workLocation but more definitive — affects noise tolerance, space needs |
+| **Amenity Must-Haves** | Apartment Prefs | Up to 3: laundry, dishwasher, elevator, doorman, outdoor space, pet friendly, parking, AC, gym, no fee, furnished — group members should agree on must-haves |
+| **Desired Bedrooms** | Apartment Prefs | Studio vs 1BR vs 2BR vs 3BR vs 4+ — must align within a group |
+| **Move-in Flexibility** | Apartment Prefs | Boolean — more nuanced than just the date |
+| **Instagram Verified** | Edit Profile | Trust signal — verified users may prefer other verified users |
+| **Photos count** | Onboarding | Profile completeness signal |
+
+### Interest Tag Categories (Full List — Pi Should Reference for Personality Matching)
+
+**Lifestyle (12):** early_bird, night_owl, homebody, social_butterfly, introvert, extrovert, remote_worker, student, fitness_lover, foodie, minimalist, plant_parent
+
+**Habits (8):** super_clean, pretty_clean, relaxed_clean, no_shoes_inside, early_sleeper, late_sleeper, quiet_hours, open_door
+
+**Hobbies (12):** gaming, cooking, music, reading, art, photography, travel, yoga, hiking, movies, sports, podcasts
+
+**Social (8):** host_gatherings, rarely_guests, occasional_guests, pet_friendly, no_pets_tag, smoker, non_smoker, cannabis_friendly
+
+**Diet (6):** vegan, vegetarian, halal, kosher, gluten_free, no_diet_preference
+
+### AI Memory (From ai-assistant Conversations)
+
+Pi also has access to `user_ai_memory` which stores context extracted from past conversations:
+- Budget stated in conversation
+- Move-in timeline mentioned
+- Dealbreakers and must-haves expressed
+- Preferred neighborhoods and transit
+- Work schedule and social preferences
+- Free-form memory notes from past conversations
+
+**IMPORTANT:** When building Pi's prompts for match insights, re-ranking, and host matchmaker, include ALL fields listed above — not just the 16 used in the deterministic algorithm. The whole point of Pi is to see the complete picture that the point system misses.
+
+---
+
+## FEATURE 1: PI MATCH INSIGHTS
+
+### What It Does
+
+When a user views a match (swipe card, match detail screen, group member list), they see a short Pi-generated narrative explaining WHY they're compatible — not just a number. Branded as "π Pi's Take" throughout the UI.
+
+### New Edge Function: `pi-match-insight/index.ts`
+
+Create `supabase/functions/pi-match-insight/index.ts`:
+
+```typescript
+// Input: two user IDs + their pre-calculated score breakdown
+// Output: { summary: string, highlights: string[], warnings: string[], confidence: string }
+
+// Example output:
+{
+  summary: "Strong match — you're both clean, budget-aligned, and want the same Brooklyn neighborhoods.",
+  highlights: [
+    "Both early risers with similar sleep schedules",
+    "Budget within 5% of each other ($1,400 vs $1,350)",
+    "You both picked Williamsburg and Bushwick"
+  ],
+  warnings: [
+    "They allow overnight guests frequently — you prefer rarely"
+  ],
+  confidence: "high" // high, medium, low
+}
+```
+
+**Claude Prompt Structure (Pi's voice):**
+```
+You are Pi, the AI matchmaker for Rhome — a roommate-finding app. You speak in a warm, confident, slightly witty tone. Given two user profiles and their compatibility score breakdown, generate a brief, friendly explanation of their match.
+
+USER A PROFILE:
+- Name: ${userA.first_name}, Age: ${userA.age}, Gender: ${userA.gender}
+- Occupation: ${userA.occupation || 'not set'}
+- Bio: ${userA.bio || 'not set'}
+- Profile Note: ${userA.profile_note || 'not set'}
+- Ideal Roommate: ${userA.ideal_roommate_text || 'not set'}
+- Budget: $${userA.budget_min}-$${userA.budget_max}/month
+- Neighborhoods: ${userA.preferred_neighborhoods?.join(', ')}
+- Sleep: ${userA.sleep_schedule}, Cleanliness: ${userA.cleanliness}
+- Smoking: ${userA.smoking}, Pets: ${userA.pets}
+- Work: ${userA.work_location}, Noise: ${userA.noise_tolerance}
+- Guest Policy: ${userA.guest_policy}
+- Roommate Relationship: ${userA.roommate_relationship}
+- Move-in: ${userA.move_in_date}
+- Looking for: ${userA.looking_for} (${userA.desired_bedrooms}BR)
+- Interests: ${userA.interest_tags?.join(', ')}
+- Diet: ${userA.diet_tags?.join(', ') || 'none'}
+- Dealbreakers: ${userA.dealbreakers?.join(', ')}
+- Personality Q1 (after long day): ${userA.personality_answers?.q1}
+- Personality Q2 (handle issues): ${userA.personality_answers?.q2}
+- Personality Q3 (kitchen after cooking): ${userA.personality_answers?.q3}
+- Personality Q4 (roommate relationship): ${userA.personality_answers?.q4}
+- Personality Q5 (commute): ${userA.personality_answers?.q5}
+- Preferred trains: ${userA.preferred_trains?.join(', ') || 'not set'}
+- Amenity must-haves: ${userA.amenity_must_haves?.join(', ') || 'not set'}
+- Shared expenses: utilities=${userA.shared_expenses?.utilities}, groceries=${userA.shared_expenses?.groceries}, internet=${userA.shared_expenses?.internet}, cleaning=${userA.shared_expenses?.cleaning}
+- AI Memory: ${userA.ai_memory_notes || 'none'}
+
+USER B PROFILE:
+[same fields as User A]
+
+SCORE BREAKDOWN:
+- Overall: ${score.total}/100
+- Location: ${score.location}/16
+- Budget: ${score.budget}/12
+- Sleep: ${score.sleep}/12
+- Cleanliness: ${score.cleanliness}/12
+- Smoking: ${score.smoking}/10
+- Age: ${score.age}/8
+- Work: ${score.work}/6
+- Guest: ${score.guest}/6
+- Noise: ${score.noise}/4
+- Pets: ${score.pets}/4
+- Timeline: ${score.timeline}/4
+- Personality: ${score.personality}/15%
+
+RULES:
+1. Summary must be 1 sentence, max 20 words. Start with the match strength ("Strong match", "Good match", "Decent match", "Mixed match").
+2. List 2-4 highlights — specific things they have in common. Reference actual values, not vague statements.
+3. List 0-2 warnings — potential friction points. Be honest but kind. Only include if there's a real conflict (score < 50% in a category).
+4. Confidence is "high" if total > 75, "medium" if 50-75, "low" if < 50.
+5. Never mention the numerical score — speak in human terms.
+6. If ideal_roommate_text exists for either user, look for alignment or conflicts between their free-text descriptions.
+
+Return valid JSON only.
+```
+
+**Use `claude-haiku-4-5-20251001`** for this — it's fast and cheap enough to run at scale.
+
+### Caching & Storage
+
+Create a new table to cache Pi's insights:
+
+```sql
+CREATE TABLE IF NOT EXISTS public.pi_match_insights (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_a_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+  user_b_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+  summary TEXT NOT NULL,
+  highlights JSONB NOT NULL DEFAULT '[]',
+  warnings JSONB NOT NULL DEFAULT '[]',
+  confidence TEXT NOT NULL DEFAULT 'medium',
+  score_snapshot JSONB, -- the score breakdown at time of generation
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  expires_at TIMESTAMPTZ DEFAULT NOW() + INTERVAL '7 days',
+  UNIQUE(user_a_id, user_b_id)
+);
+
+CREATE INDEX idx_pi_match_insights_users ON public.pi_match_insights(user_a_id, user_b_id);
+CREATE INDEX idx_pi_match_insights_expiry ON public.pi_match_insights(expires_at);
+```
+
+**Expiry logic:** Regenerate if:
+- Explanation is > 7 days old
+- Either user updated their profile since the explanation was generated
+- The score changed by more than 10 points
+
+### When to Generate
+
+- **Eager generation (background):** When `calculate-match-scores` runs, trigger explanation generation for any match scoring > 60. Store in cache.
+- **Lazy generation (on-demand):** If a user views a match card and no cached explanation exists, call the edge function in real-time and cache the result.
+- **Never generate** for matches below 40 — not worth the cost.
+
+### UI Integration
+
+**Swipe Card (`screens/renter/SwipeScreen.tsx` or equivalent):**
+- Show "π Pi's Take" below the compatibility percentage
+- Example: "87% Compatible — π Pi's Take: You're both clean early risers who want Williamsburg."
+
+**Match Detail Screen:**
+- Show full `highlights` as a list with green checkmark icons
+- Show `warnings` with yellow caution icons
+- Show `confidence` as a badge: "π Strong Match" / "π Good Match" / "π Worth Exploring"
+
+**Group Member Cards:**
+- When viewing group members, show a condensed version (summary only) for each member
+
+### Plan Gating
+
+- **Free/Basic renters:** See summary line only (1 sentence)
+- **Plus renters:** See summary + highlights
+- **Elite renters:** See summary + highlights + warnings + confidence
+- **All hosts:** See full explanation for renter matches (they're paying for this insight)
+
+---
+
+## FEATURE 2: PI DECK RE-RANKING
+
+### What It Does
+
+After the deterministic algorithm scores all candidates, the top 30 are passed to Pi for holistic re-ranking. Pi reads full profiles side by side and reorders based on nuances the point system can't capture.
+
+### New Edge Function: `pi-rerank-deck/index.ts`
+
+Create `supabase/functions/pi-rerank-deck/index.ts`:
+
+```typescript
+// Input: user profile + array of 30 candidate profiles with scores
+// Output: reordered array of candidate IDs with Pi's reasoning
+
+// The function:
+// 1. Takes the user's full profile (including ideal_roommate_text, ai_memory, interest_tags)
+// 2. Takes top 30 candidates from deterministic scoring
+// 3. Sends to Claude for holistic re-ranking
+// 4. Returns new order + brief reason for top 5 promotions/demotions
+```
+
+**Claude Prompt Structure (Pi's voice):**
+```
+You are Pi, the AI matchmaker for Rhome — a roommate-finding app. A user is looking for a roommate. You've been given their full profile and 30 potential matches pre-scored by an algorithm.
+
+Your job: re-rank these 30 candidates by TRUE compatibility, catching things the algorithm misses.
+
+THE USER:
+- Name: ${user.first_name}, Age: ${user.age}, Gender: ${user.gender}
+- Occupation: ${user.occupation || 'not set'}
+- Bio: ${user.bio || 'not set'}
+- Profile Note: ${user.profile_note || 'not set'}
+- Ideal Roommate: ${user.ideal_roommate_text || 'not provided'}
+- AI Memory Notes: ${user.ai_memory_notes || 'none'}
+- Budget: $${user.budget_min}-$${user.budget_max}/month
+- Neighborhoods: ${user.preferred_neighborhoods?.join(', ')}
+- Looking for: ${user.looking_for} (${user.desired_bedrooms}BR)
+- Lifestyle: sleep ${user.sleep_schedule}, cleanliness ${user.cleanliness}, noise ${user.noise_tolerance}
+- Smoking: ${user.smoking}, Pets: ${user.pets}
+- Work: ${user.work_location}, Guest policy: ${user.guest_policy}
+- Roommate relationship: ${user.roommate_relationship}
+- Move-in: ${user.move_in_date}
+- Interests: ${user.interest_tags?.join(', ')}
+- Diet: ${user.diet_tags?.join(', ') || 'none'}
+- Dealbreakers: ${user.dealbreakers?.join(', ')}
+- Preferred trains: ${user.preferred_trains?.join(', ') || 'not set'}
+- Amenity must-haves: ${user.amenity_must_haves?.join(', ') || 'not set'}
+- Shared expenses: utilities=${user.shared_expenses?.utilities}, groceries=${user.shared_expenses?.groceries}
+- Personality: after_long_day=${user.personality_answers?.q1}, handle_issues=${user.personality_answers?.q2}, kitchen=${user.personality_answers?.q3}, relationship=${user.personality_answers?.q4}, commute=${user.personality_answers?.q5}
+
+CANDIDATES (ranked by algorithm score):
+${candidates.map((c, i) => `
+#${i+1} [ID: ${c.id}] Score: ${c.score}/100
+  Name: ${c.first_name}, Age: ${c.age}, Gender: ${c.gender}
+  Occupation: ${c.occupation || 'not set'}
+  Bio: ${c.bio || 'not set'}
+  Profile Note: ${c.profile_note || 'not set'}
+  Ideal Roommate: ${c.ideal_roommate_text || 'not provided'}
+  Budget: $${c.budget_min}-$${c.budget_max}, Move-in: ${c.move_in_date}
+  Neighborhoods: ${c.preferred_neighborhoods?.join(', ')}
+  Looking for: ${c.looking_for} (${c.desired_bedrooms}BR)
+  Sleep: ${c.sleep_schedule}, Clean: ${c.cleanliness}, Noise: ${c.noise_tolerance}
+  Smoking: ${c.smoking}, Pets: ${c.pets}
+  Work: ${c.work_location}, Guests: ${c.guest_policy}
+  Roommate relationship: ${c.roommate_relationship}
+  Interests: ${c.interest_tags?.join(', ')}
+  Diet: ${c.diet_tags?.join(', ') || 'none'}
+  Personality: q1=${c.personality_answers?.q1}, q2=${c.personality_answers?.q2}, q3=${c.personality_answers?.q3}, q4=${c.personality_answers?.q4}, q5=${c.personality_answers?.q5}
+  Trains: ${c.preferred_trains?.join(', ') || 'not set'}
+  Amenities: ${c.amenity_must_haves?.join(', ') || 'not set'}
+`).join('\n')}
+
+INSTRUCTIONS:
+1. Re-rank all 30 candidates from best to worst fit for this specific user.
+2. Consider — especially the fields the algorithm DOESN'T score:
+   - **Bio + Profile Note + Ideal Roommate text** — do their descriptions align? These are the richest signals the algorithm ignores.
+   - **Occupation compatibility** — two nurses on opposite shifts = conflict. Two remote freelancers = great fit. A student + a professional might have different lifestyles.
+   - **Personality quiz answers together** — someone who decompresses alone (q1=alone) + wants minimal interaction (q4=parallel) is very different from someone who picks alone but wants actual friends (q4=friends). Read the answers holistically.
+   - **Amenity must-haves alignment** — two people both needing in-unit laundry and a gym should be prioritized together for group formation.
+   - **Transit/commute compatibility** — two people who both take the L train probably want the same neighborhoods even if they picked different ones.
+   - **Desired bedrooms** — a 2BR seeker and a 4BR seeker have fundamentally different group size needs.
+   - **Diet alignment** — two vegans sharing a kitchen is much smoother than a vegan + someone with no diet preference (not a dealbreaker, but a quality of life signal).
+   - **Interest overlap depth** — sharing 1 niche hobby (art, yoga) is more meaningful than sharing 3 generic ones (movies, music, travel).
+   - **Potential personality clashes** hidden in the data (e.g., "loves hosting parties" + "needs quiet for work").
+   - **Red flags or contradictions** (someone claims very_tidy but their bio says "I'm pretty chill about mess").
+   - **Age + life stage alignment** — a 22-year-old fresh grad vs. a 35-year-old professional might score well on paper but be a bad fit.
+3. Do NOT re-rank based on things the algorithm already handles well (exact budget math, sleep schedule overlap). Only adjust when you see something the algorithm missed — especially from bio, occupation, personality answers, and apartment preference fields.
+4. For the top 5 changes (candidates moved up or down significantly), provide a 1-sentence reason.
+
+Return JSON:
+{
+  "ranked_ids": ["id1", "id2", ...],
+  "adjustments": [
+    { "id": "xxx", "moved": "+8", "reason": "Both freelance designers who want a creative live/work space" },
+    { "id": "yyy", "moved": "-6", "reason": "Claims to be tidy but bio mentions being relaxed about mess — potential cleanliness conflict" }
+  ]
+}
+```
+
+**Use `claude-sonnet-4-5`** for this — it needs deeper reasoning than Haiku can handle.
+
+### Integration with Discover Service
+
+Update `services/discoverService.ts` — `getSwipeDeck()`:
+
+```typescript
+// Current flow:
+// 1. Query candidates by city/filters
+// 2. Score with matchingAlgorithm
+// 3. Apply activity decay + boosts
+// 4. Return sorted deck
+
+// NEW flow:
+// 1. Query candidates by city/filters
+// 2. Score with matchingAlgorithm
+// 3. Apply activity decay + boosts
+// 4. Take top 30 scored candidates
+// 5. IF user is on Plus or Elite plan:
+//    a. Call pi-rerank-deck edge function
+//    b. Replace ordering of top 30 with Pi's ranking
+//    c. Cache Pi's ranking for 24 hours
+// 6. Return sorted deck
+
+// For Free/Basic users: skip step 5, use deterministic order only
+```
+
+### Caching
+
+Store Pi's rankings in a cache table:
+
+```sql
+CREATE TABLE IF NOT EXISTS public.pi_deck_rankings (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+  ranked_candidate_ids JSONB NOT NULL, -- ordered array of user IDs
+  adjustments JSONB, -- AI's reasoning for major changes
+  generated_at TIMESTAMPTZ DEFAULT NOW(),
+  expires_at TIMESTAMPTZ DEFAULT NOW() + INTERVAL '24 hours',
+  UNIQUE(user_id)
+);
+```
+
+**Invalidate when:**
+- 24 hours have passed
+- User updates their profile
+- User has swiped through more than 50% of the ranked candidates
+- New users join that would be in the top 30
+
+### Plan Gating
+
+- **Free/Basic:** Deterministic order only. No Pi re-ranking.
+- **Plus:** Pi re-ranking enabled. See "π Pi Pick" badge on top 3 Pi-promoted candidates.
+- **Elite:** Pi re-ranking + see Pi's reasoning for why each top match was promoted ("Both freelance designers who want a creative live/work space").
+
+---
+
+## FEATURE 3: FREE-TEXT "TELL PI WHAT YOU WANT" FIELD
+
+### What It Does
+
+Users write a short paragraph describing their ideal roommate or living situation in their own words. Pi parses this into structured signals for matching AND uses the raw text for deeper comparisons.
+
+### Database Changes
+
+```sql
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS ideal_roommate_text TEXT;
+
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS pi_parsed_preferences JSONB;
+  -- Stores Claude's structured extraction from the free text
+  -- Example: {
+  --   "vibe": "chill creative",
+  --   "schedule_hints": ["works from home", "late riser"],
+  --   "social_style": "occasional hangouts, not every night",
+  --   "hard_nos": ["loud music after 11pm", "smoking indoors"],
+  --   "soft_preferences": ["likes cooking together", "open to sharing groceries"],
+  --   "personality_signals": ["introverted", "creative", "neat but not obsessive"]
+  -- }
+```
+
+### New Edge Function: `pi-parse-preferences/index.ts`
+
+Called whenever a user saves their `ideal_roommate_text`:
+
+```typescript
+// Input: user's free-text description
+// Output: structured preference extraction
+
+// Claude Prompt:
+`
+You are parsing a roommate seeker's description of their ideal living situation. Extract structured preferences from their natural language.
+
+USER'S DESCRIPTION:
+"${text}"
+
+Extract the following (leave null if not mentioned):
+- vibe: Overall energy/vibe they're looking for (1-3 words)
+- schedule_hints: Any mentions of work schedule, sleep, or routines
+- social_style: How social they want the household to be
+- hard_nos: Things they explicitly don't want (dealbreakers mentioned in text)
+- soft_preferences: Nice-to-haves they mention
+- personality_signals: Personality traits they describe wanting or having
+- cleanliness_hints: Any mentions of tidiness expectations
+- noise_hints: Any mentions of noise, quiet, music
+- guest_hints: Any mentions of visitors, partners staying over
+- budget_hints: Any mentions of price range or financial expectations
+- location_hints: Any neighborhoods, areas, or commute needs mentioned
+
+Return valid JSON only. Use short phrases, not full sentences. If the text is too vague to extract anything meaningful, return { "vibe": "flexible", "notes": "Description too vague for structured extraction" }.
+`
+```
+
+**Use `claude-haiku-4-5-20251001`** — fast extraction task.
+
+### Where Users Enter It
+
+### Current Onboarding Structure (DO NOT CHANGE)
+
+The app already has a streamlined signup — only 4 steps are required to get into the app. This is defined in `ONBOARDING_STEPS` in `ProfileQuestionnaireScreen.tsx`:
+
+1. **Photos** (1+ required)
+2. **Basic Info** — name, email, birthday, gender (all required)
+3. **Budget & Location** — budget max + city required, neighborhood + occupation optional
+4. **Dealbreakers** — multi-select from 8 options (completely optional, can skip)
+
+After step 4 → plan selection → into the app. Steps 5-11 (sleep, cleanliness, smoking, pets, lifestyle, housing, interests, personality quiz, profile note) are all **optional** and available later in EditProfileScreen.
+
+### Add "Tell Pi" as Step 5 (Optional)
+
+Add a new step to `ONBOARDING_STEPS` after dealbreakers:
+
+```typescript
+const ONBOARDING_STEPS: StepId[] = [
+  'photos',
+  'basicInfo',
+  'budgetLocation',
+  'dealbreakers',
+  'tellPi',  // NEW — optional, with prominent "Skip" button
+];
+```
+
+**Step 5: "Tell Pi what you're looking for"**
+- Header: "Tell Pi what you're looking for"
+- Subtext: "In your own words, what matters most? Pi uses this to find your best matches — even before you fill out the rest of your profile."
+- TextInput: multiline, 500 character max
+- Placeholder: "e.g., I'm a grad student who works from home. Looking for someone chill and clean who's okay with my dog. I cook a lot and love sharing meals..."
+- Prominent "Skip for now" button — this is 100% optional
+- On submit: save to `profiles.ideal_roommate_text`, trigger `pi-parse-preferences` edge function in background
+
+**WHY THIS IS POWERFUL:** Most users will only have photos, basic info, budget, city, and maybe dealbreakers when they start swiping. That's not enough data for great matching. But if they write even 1-2 sentences to Pi, the `pi-parse-preferences` function extracts sleep, cleanliness, smoking, pets, noise, social style, and more from natural language — giving Pi enough signal to produce meaningful match insights and re-rankings immediately, without the user manually filling out 7 more screens.
+
+**Pi should proactively fill profile fields from the free text.** When `pi-parse-preferences` runs, if the user hasn't manually set fields like sleep_schedule, cleanliness, smoking, etc., AND Pi can confidently extract them from the text, auto-populate those profile fields (with a "Pi filled this in based on what you told us — tap to change" indicator in EditProfileScreen).
+
+### EditProfileScreen — Add "Tell Pi" Section
+
+- Add a section at the top of EditProfileScreen: "Tell Pi About Your Ideal Roommate"
+- Same TextInput with current value pre-filled
+- When saved, re-trigger `pi-parse-preferences` edge function to update `pi_parsed_preferences`
+- Show a "Pi extracted:" summary below the text field showing what Pi parsed (e.g., "clean, non-smoker, works from home, early riser") with edit links for each
+
+### ApartmentPreferencesScreen — Add "Tell Pi" Condensed
+
+- Show a condensed version: "Tell Pi anything else about your ideal living situation" — shorter prompt, same field
+
+### Post-Signup Profile Completion (Steps 5-11)
+
+The remaining profile fields stay in EditProfileScreen where they already are — users fill them out at their own pace:
+
+- Sleep Schedule + Cleanliness (step 5 in full questionnaire)
+- Smoking + Pets (step 6)
+- Lifestyle: work style, guest policy, noise (step 7)
+- Housing: looking for, move-in date, bedrooms, bathrooms (step 8)
+- Interest Tags (step 9)
+- Personality Quiz — 5 questions (step 10)
+- Profile Note — 500 char free text (step 11)
+- Shared Expenses (EditProfileScreen only — not in questionnaire)
+- Instagram Verification (EditProfileScreen only)
+
+**Pi should nudge users to complete their profile** via the AI assistant chat. After they start swiping, Pi can say: "Hey, I noticed you haven't set your sleep schedule yet. Are you an early bird or night owl? This helps me find better matches for you." Each answer Pi collects fills in the profile gap and improves matching.
+
+### How It's Used in Matching
+
+1. **Pi Match Insights (Feature 1):** The `ideal_roommate_text` is included in both profiles sent to Pi. Pi spots alignment between what two people wrote.
+
+2. **Pi Deck Re-Ranking (Feature 2):** The full text is included in candidate profiles. Pi uses it for holistic comparison.
+
+3. **Deterministic Algorithm Boost:** The `pi_parsed_preferences` structured data can add up to **5 bonus points** to the existing 100-point score:
+   - If `pi_parsed_preferences.hard_nos` from user A conflicts with user B's profile → penalty of -10 points (override, this is effectively a soft dealbreaker)
+   - If `pi_parsed_preferences.vibe` keywords match between two users → +2 pts
+   - If `pi_parsed_preferences.social_style` aligns → +2 pts
+   - If `pi_parsed_preferences.soft_preferences` overlap → +1 pt
+   - Cap bonus at +5 total (so max score becomes 105, normalize back to 100 scale)
+
+4. **Pi Assistant Context:** When Pi chats with a user (ai-assistant), include their `ideal_roommate_text` in the context so Pi can reference what they said they want.
+
+### Display
+
+- Show the user's `ideal_roommate_text` on their profile card (below bio, above interests)
+- Label it: "π Looking for..." in a distinct visual style (italic or different background, with Pi icon)
+- On match cards, if both users have free text, show a small "π Pi's Take" tag that links to the full insight
+
+---
+
+## FEATURE 4: PI HOST MATCHMAKER
+
+### What It Does
+
+For agents and companies on paid tiers, Pi proactively analyzes their listings against the renter pool and generates recommendations: "Pi found 5 strong matches for your Bushwick 3BR — here's why."
+
+### New Edge Function: `pi-host-matchmaker/index.ts`
+
+```typescript
+// Input: host user ID, listing ID (optional — if omitted, analyze all active listings)
+// Output: per-listing recommendations with explanations
+
+// Example output:
+{
+  listing_id: "xxx",
+  listing_summary: "3BR in Bushwick, $4,200/mo",
+  recommendations: [
+    {
+      type: "group",
+      id: "group-123",
+      members: ["Alice (26)", "Bob (28)", "Carol (25)"],
+      match_strength: "strong",
+      reason: "All 3 want Bushwick, combined budget $4,500 (7% over listing), 2/3 work from home so they'll appreciate the large living room. Move-in dates align within 2 weeks.",
+      action: "Invite to apply"
+    },
+    {
+      type: "renter",
+      id: "user-456",
+      name: "David (30)",
+      match_strength: "good",
+      reason: "Wants Bushwick or Bed-Stuy, budget $1,600 (fits if paired with 2 others), no dealbreaker conflicts. Currently forming a group — could pair with your other applicants.",
+      action: "Add to shortlist"
+    }
+  ],
+  market_insight: "12 active renters want Bushwick with budgets matching this listing. 3 new renter groups formed this week in the area. Demand is high — consider responding within 48 hours."
+}
+```
+
+**Claude Prompt Structure:**
+```
+You are Pi, the AI matchmaker for Rhome — a roommate-finding platform. You speak in a warm, confident, slightly witty tone. A host (${host.type}: individual/agent/company) has listings and you need to find the best renter matches.
+
+HOST INFO:
+- Name: ${host.name}
+- Type: ${host.type}
+- Active listings: ${host.listings.length}
+
+LISTING TO MATCH:
+- Address: ${listing.neighborhood}, ${listing.city}
+- Zip: ${listing.zip_code}
+- Bedrooms: ${listing.bedrooms}
+- Price: $${listing.price}/month (per person: $${listing.price / listing.bedrooms})
+- Available: ${listing.available_date}
+- Amenities: ${listing.amenities?.join(', ')}
+- Description: ${listing.description}
+
+CANDIDATE RENTERS (pre-filtered by city + budget range):
+${renters.map(r => `
+  [${r.id}] ${r.first_name} (${r.age}, ${r.gender})
+  - Occupation: ${r.occupation || 'not set'}
+  - Bio: ${r.bio || 'not set'}
+  - Budget: $${r.budget_min}-$${r.budget_max}/mo
+  - Neighborhoods: ${r.preferred_neighborhoods?.join(', ')}
+  - Looking for: ${r.looking_for} (${r.desired_bedrooms}BR)
+  - Move-in: ${r.move_in_date}
+  - Ideal roommate: ${r.ideal_roommate_text || 'not set'}
+  - Sleep: ${r.sleep_schedule}, Clean: ${r.cleanliness}, Noise: ${r.noise_tolerance}
+  - Smoking: ${r.smoking}, Pets: ${r.pets}
+  - Work: ${r.work_location}, Guests: ${r.guest_policy}
+  - Interests: ${r.interest_tags?.join(', ')}
+  - Amenity must-haves: ${r.amenity_must_haves?.join(', ') || 'not set'}
+  - Preferred trains: ${r.preferred_trains?.join(', ') || 'not set'}
+  - In group: ${r.group_id || 'no'}
+`).join('\n')}
+
+CANDIDATE GROUPS:
+${groups.map(g => `
+  [${g.id}] "${g.name}" — ${g.members.length} members
+  - Members: ${g.members.map(m => `${m.first_name} (${m.age}, $${m.budget_max})`).join(', ')}
+  - Combined budget: $${g.members.reduce((sum, m) => sum + m.budget_max, 0)}
+  - Group neighborhoods: ${[...new Set(g.members.flatMap(m => m.preferred_neighborhoods || []))].join(', ')}
+  - Move-in range: ${g.earliest_move_in} to ${g.latest_move_in}
+`).join('\n')}
+
+INSTRUCTIONS:
+1. Recommend the top 5 best matches (groups first, then individual renters who could form groups).
+2. For each, explain WHY in 2-3 sentences referencing specific data points.
+3. Rate match strength: "strong" (>80% fit), "good" (60-80%), "moderate" (40-60%).
+4. Suggest an action for each: "Invite to apply", "Add to shortlist", "Pair with [other renter]", "Send message".
+5. End with a 1-2 sentence market_insight about demand in this listing's area.
+6. Prioritize:
+   a. Groups that fill the listing completely (members = bedrooms)
+   b. Budget alignment (combined budget within 15% of listing price)
+   c. Move-in date alignment
+   d. Neighborhood preference match
+   e. Lifestyle compatibility within the group
+7. Flag any risks: "One member's budget is 30% below per-person price" or "Move-in dates 2 months apart"
+
+Return valid JSON.
+```
+
+**Use `claude-sonnet-4-5`** — complex multi-candidate analysis.
+
+### When It Runs
+
+- **On-demand:** Host taps "Ask Pi" button on a listing detail screen
+- **Weekly digest (background):** For Pro+ hosts, generate recommendations every Monday and store them. Send a push notification: "Pi found 3 strong matches for your listings this week"
+- **On new listing:** When a host creates a new listing, auto-generate initial recommendations within 1 hour
+
+### UI Integration
+
+**Host Dashboard / Listing Detail Screen:**
+- New "π Pi's Picks" tab alongside existing tabs
+- Shows recommendation cards with match strength badge (green/yellow/blue)
+- Each card shows: group/renter name, match strength, Pi's reason summary, action button
+- "Market Insight" banner at top of the tab
+
+**Push Notifications (for weekly digest):**
+- "Pi found 3 new matches for your Bushwick 3BR — check them out"
+- Deep links to the Pi's Picks tab for that listing
+
+**BrowseRentersScreen:**
+- Add a "π Pi Recommended" filter/sort option
+- Renters flagged by Pi get a π sparkle badge
+
+### Plan Gating
+
+- **Individual hosts (all plans):** See Pi recommendations on-demand (costs 1 Pi call per listing)
+- **Agent PayPerUse:** 5 Pi matchmaker calls/month
+- **Agent Starter:** 20/month + weekly digest for top listing
+- **Agent Pro:** 50/month + weekly digest for all listings
+- **Agent Business:** Unlimited + weekly digest + priority processing
+- **Company Starter:** 30/month + weekly digest for top 3 listings
+- **Company Pro:** 100/month + weekly digest for all listings
+- **Company Enterprise:** Unlimited + real-time matching + custom Pi tuning
+
+---
+
+## DATABASE MIGRATION
+
+Create `supabase/migrations/XXX_pi_matching_upgrade.sql`:
+
+```sql
+-- Feature 1: Match Explanations Cache
+CREATE TABLE IF NOT EXISTS public.pi_match_insights (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_a_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+  user_b_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+  summary TEXT NOT NULL,
+  highlights JSONB NOT NULL DEFAULT '[]',
+  warnings JSONB NOT NULL DEFAULT '[]',
+  confidence TEXT NOT NULL DEFAULT 'medium',
+  score_snapshot JSONB,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  expires_at TIMESTAMPTZ DEFAULT NOW() + INTERVAL '7 days',
+  UNIQUE(user_a_id, user_b_id)
+);
+CREATE INDEX idx_pi_match_insights_users ON public.pi_match_insights(user_a_id, user_b_id);
+CREATE INDEX idx_pi_match_insights_expiry ON public.pi_match_insights(expires_at);
+
+-- Feature 2: Pi Deck Rankings Cache
+CREATE TABLE IF NOT EXISTS public.pi_deck_rankings (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+  ranked_candidate_ids JSONB NOT NULL,
+  adjustments JSONB,
+  generated_at TIMESTAMPTZ DEFAULT NOW(),
+  expires_at TIMESTAMPTZ DEFAULT NOW() + INTERVAL '24 hours',
+  UNIQUE(user_id)
+);
+CREATE INDEX idx_pi_deck_rankings_user ON public.pi_deck_rankings(user_id);
+
+-- Feature 3: Ideal Roommate Text + Pi Parsed Preferences
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS ideal_roommate_text TEXT;
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS pi_parsed_preferences JSONB;
+
+-- Feature 4: Pi Host Matchmaker Recommendations Cache
+CREATE TABLE IF NOT EXISTS public.pi_host_recommendations (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  host_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+  listing_id UUID REFERENCES public.listings(id) ON DELETE CASCADE,
+  recommendations JSONB NOT NULL,
+  market_insight TEXT,
+  generated_at TIMESTAMPTZ DEFAULT NOW(),
+  expires_at TIMESTAMPTZ DEFAULT NOW() + INTERVAL '7 days',
+  UNIQUE(host_id, listing_id)
+);
+CREATE INDEX idx_ai_host_recs_host ON public.pi_host_recommendations(host_id);
+CREATE INDEX idx_ai_host_recs_listing ON public.pi_host_recommendations(listing_id);
+
+-- Pi Usage Tracking (for plan limits)
+CREATE TABLE IF NOT EXISTS public.pi_usage_log (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+  feature TEXT NOT NULL, -- 'pi_match_insight', 'pi_deck_rerank', 'pi_host_matchmaker', 'pi_parse_preferences'
+  edge_function TEXT NOT NULL,
+  model TEXT NOT NULL, -- 'claude-haiku-4-5-20251001' or 'claude-sonnet-4-5'
+  input_tokens INTEGER,
+  output_tokens INTEGER,
+  cost_estimate NUMERIC(10,6), -- estimated USD cost
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX idx_ai_usage_user_date ON public.pi_usage_log(user_id, created_at);
+CREATE INDEX idx_ai_usage_feature ON public.pi_usage_log(feature, created_at);
+```
+
+---
+
+## TYPE DEFINITIONS UPDATE (`types/models.ts`)
+
+```typescript
+// Add to Profile or RoommateProfile interface:
+ideal_roommate_text?: string;
+pi_parsed_preferences?: {
+  vibe?: string;
+  schedule_hints?: string[];
+  social_style?: string;
+  hard_nos?: string[];
+  soft_preferences?: string[];
+  personality_signals?: string[];
+  cleanliness_hints?: string[];
+  noise_hints?: string[];
+  guest_hints?: string[];
+  budget_hints?: string[];
+  location_hints?: string[];
+  notes?: string;
+};
+
+// New interfaces:
+interface PiMatchInsight {
+  id: string;
+  user_a_id: string;
+  user_b_id: string;
+  summary: string;
+  highlights: string[];
+  warnings: string[];
+  confidence: 'high' | 'medium' | 'low';
+  score_snapshot?: Record<string, number>;
+  created_at: string;
+  expires_at: string;
+}
+
+interface PiDeckRanking {
+  id: string;
+  user_id: string;
+  ranked_candidate_ids: string[];
+  adjustments?: Array<{
+    id: string;
+    moved: string;
+    reason: string;
+  }>;
+  generated_at: string;
+  expires_at: string;
+}
+
+interface PiHostRecommendation {
+  listing_id: string;
+  listing_summary: string;
+  recommendations: Array<{
+    type: 'group' | 'renter';
+    id: string;
+    name?: string;
+    members?: string[];
+    match_strength: 'strong' | 'good' | 'moderate';
+    reason: string;
+    action: string;
+  }>;
+  market_insight?: string;
+  generated_at: string;
+}
+
+interface PiUsageLog {
+  id: string;
+  user_id: string;
+  feature: 'pi_match_insight' | 'pi_deck_rerank' | 'pi_host_matchmaker' | 'pi_parse_preferences';
+  edge_function: string;
+  model: string;
+  input_tokens?: number;
+  output_tokens?: number;
+  cost_estimate?: number;
+  created_at: string;
+}
+```
+
+---
+
+## NEW SERVICES
+
+### `services/piMatchingService.ts` (NEW)
+
+Central service for all Pi matching features:
+
+```typescript
+// Match Explanations
+getPiMatchInsight(userAId: string, userBId: string): Promise<PiMatchInsight | null>
+generatePiMatchInsight(userAId: string, userBId: string, scoreBreakdown: object): Promise<PiMatchInsight>
+getCachedOrGenerateExplanation(userAId: string, userBId: string): Promise<PiMatchInsight>
+
+// Deck Re-ranking
+getPiDeckRanking(userId: string): Promise<PiDeckRanking | null>
+generateDeckReranking(userId: string, candidates: ScoredCandidate[]): Promise<PiDeckRanking>
+
+// Ideal Roommate Parsing
+parseIdealRoommateText(userId: string, text: string): Promise<PiParsedPreferences>
+getPiParsedPreferences(userId: string): Promise<PiParsedPreferences | null>
+
+// Host Matchmaker
+getHostRecommendations(hostId: string, listingId?: string): Promise<PiHostRecommendation[]>
+generateHostRecommendations(hostId: string, listingId: string): Promise<PiHostRecommendation>
+
+// Usage Tracking
+logAIUsage(userId: string, feature: string, edgeFunction: string, model: string, tokens?: { input: number, output: number }): Promise<void>
+getMonthlyAIUsage(userId: string): Promise<{ feature: string, count: number, totalTokens: number }[]>
+checkAIQuota(userId: string, feature: string): Promise<{ allowed: boolean, remaining: number, limit: number }>
+```
+
+### Update `services/discoverService.ts`
+
+In `getSwipeDeck()`:
+
+```typescript
+// After deterministic scoring:
+const scoredCandidates = candidates.map(c => ({
+  ...c,
+  score: calculateCompatibility(currentUser, c)
+})).sort((a, b) => b.score.total - a.score.total);
+
+// Pi re-ranking for Plus/Elite users:
+if (userPlan === 'plus' || userPlan === 'elite') {
+  const aiRanking = await piMatchingService.getPiDeckRanking(currentUser.id);
+
+  if (aiRanking && !isExpired(aiRanking)) {
+    // Reorder top 30 based on Pi's ranking
+    return applyAIRanking(scoredCandidates, aiRanking);
+  } else {
+    // Generate new ranking in background, return deterministic for now
+    generateDeckReranking(currentUser.id, scoredCandidates.slice(0, 30));
+    return scoredCandidates;
+  }
+}
+
+return scoredCandidates;
+```
+
+### Update `services/profileService.ts`
+
+When saving profile, handle `ideal_roommate_text`:
+
+```typescript
+// In updateProfile():
+if (data.ideal_roommate_text !== undefined) {
+  // Save the text
+  await supabase.from('profiles').update({
+    ideal_roommate_text: data.ideal_roommate_text
+  }).eq('user_id', userId);
+
+  // Trigger Pi parsing in background
+  if (data.ideal_roommate_text && data.ideal_roommate_text.length > 20) {
+    piMatchingService.parseIdealRoommateText(userId, data.ideal_roommate_text);
+  }
+}
+```
+
+---
+
+## UPDATE MATCHING ALGORITHM (`utils/matchingAlgorithm.ts`)
+
+Add AI-parsed preference bonus to the scoring:
+
+```typescript
+// After all 16 category scores are calculated:
+
+// Pi Free-Text Preference Bonus (max +5, normalized back to 100)
+let aiBonus = 0;
+
+if (userA.pi_parsed_preferences && userB.pi_parsed_preferences) {
+  const prefsA = userA.pi_parsed_preferences;
+  const prefsB = userB.pi_parsed_preferences;
+
+  // Check for hard_no conflicts (penalty)
+  const hardNoConflict = checkHardNoConflicts(prefsA, prefsB, userA, userB);
+  if (hardNoConflict) {
+    aiBonus -= 10; // Significant penalty — this is a soft dealbreaker
+  }
+
+  // Vibe alignment
+  if (prefsA.vibe && prefsB.vibe && vibeAligns(prefsA.vibe, prefsB.vibe)) {
+    aiBonus += 2;
+  }
+
+  // Social style alignment
+  if (prefsA.social_style && prefsB.social_style && socialStyleAligns(prefsA.social_style, prefsB.social_style)) {
+    aiBonus += 2;
+  }
+
+  // Soft preference overlap
+  const softOverlap = countSoftPreferenceOverlap(prefsA.soft_preferences, prefsB.soft_preferences);
+  if (softOverlap >= 2) aiBonus += 1;
+
+  // Cap bonus at +5
+  aiBonus = Math.max(-10, Math.min(5, aiBonus));
+}
+
+// Apply bonus and normalize
+const rawTotal = Object.values(breakdown).reduce((sum, v) => sum + v, 0) + aiBonus;
+const normalizedTotal = Math.max(0, Math.min(100, Math.round(rawTotal * (100 / 105))));
+```
+
+Helper functions needed:
+```typescript
+function checkHardNoConflicts(prefsA, prefsB, profileA, profileB): boolean
+// e.g., prefsA.hard_nos includes "no smoking" but profileB.smoking === "yes"
+
+function vibeAligns(vibeA: string, vibeB: string): boolean
+// Keyword overlap or semantic similarity check
+// "chill creative" aligns with "relaxed artistic"
+
+function socialStyleAligns(styleA: string, styleB: string): boolean
+// "occasional hangouts" aligns with "friendly but independent"
+// "always social" conflicts with "very private"
+
+function countSoftPreferenceOverlap(prefsA: string[], prefsB: string[]): number
+// Count shared keywords between soft preference lists
+```
+
+---
+
+## SCREENS TO UPDATE
+
+### New/Modified Renter Screens
+
+1. **ProfileQuestionnaireScreen** — Add "Tell Pi" as step 5 (optional, after dealbreakers, before plan selection)
+2. **EditProfileScreen** — Add "Tell Pi" section at top + show Pi-extracted fields with edit links
+3. **SwipeScreen** — Show "π Pi's Take" summary line below compatibility %
+4. **MatchDetailScreen** — Show full Pi insight (highlights, warnings, confidence)
+5. **GroupMemberScreen** — Show condensed Pi insight per member
+
+### New/Modified Host Screens
+
+6. **ListingDetailScreen** — Add "π Pi's Picks" tab with recommendations
+7. **BrowseRentersScreen** — Add "π Pi Recommended" sort/filter + sparkle badge
+8. **HostDashboard** — Show "Pi" card: "Pi found 3 strong matches this week"
+9. **CompanyDashboard** — Pi matchmaker summary across all listings
+
+---
+
+## PI EDGE FUNCTIONS TO CREATE
+
+| Function | Model | Trigger | Plan Gate |
+|----------|-------|---------|-----------|
+| `pi-match-insight` | Haiku | On match view or background after scoring | Free: summary only. Plus: + highlights. Elite: full. |
+| `pi-rerank-deck` | Sonnet | When Plus/Elite user opens swipe deck (cached 24h) | Plus/Elite renters only |
+| `pi-parse-preferences` | Haiku | When user saves ideal_roommate_text | All users (free) |
+| `pi-host-matchmaker` | Sonnet | On-demand or weekly cron for Pro+ hosts | All hosts (limited by plan) |
+
+**All edge functions use Pi's persona:** System prompts should begin with "You are Pi, the AI matchmaker for Rhome." Pi's tone is warm, confident, and slightly witty — like a friend who happens to be great at reading people.
+
+---
+
+## PI COST MANAGEMENT
+
+### Token Estimation Per Call
+
+| Function | Avg Input | Avg Output | Est. Cost (Sonnet) | Est. Cost (Haiku) |
+|----------|-----------|------------|---------------------|-------------------|
+| Match explanation | ~2,000 tokens | ~200 tokens | — | ~$0.002 |
+| Deck re-ranking | ~15,000 tokens | ~1,000 tokens | ~$0.06 | — |
+| Parse preferences | ~500 tokens | ~300 tokens | — | ~$0.001 |
+| Host matchmaker | ~10,000 tokens | ~800 tokens | ~$0.04 | — |
+
+### Monthly Cost Estimates (per active user)
+
+- Free renter: ~$0.01/month (occasional match explanations only)
+- Plus renter: ~$2/month (daily re-ranking + explanations)
+- Elite renter: ~$4/month (frequent re-ranking + full explanations)
+- Agent Pro: ~$8/month (weekly matchmaker for 5 listings + renter explanations)
+- Company Pro: ~$25/month (weekly matchmaker for 20 listings)
+
+### Cost Controls
+
+1. **Aggressive caching** — Never regenerate if cache is valid
+2. **Batch processing** — Run match explanations in batches during off-peak (2-4 AM)
+3. **Token limits** — Cap input context: max 30 candidates for re-ranking, max 50 renters for host matchmaker
+4. **Quality threshold** — Don't generate explanations for matches < 40 score
+5. **Usage quotas** — Track in `pi_usage_log`, enforce limits per plan tier
+6. **Haiku first** — Use Haiku for everything except Pi re-ranking and Pi host matchmaker (which need Sonnet's reasoning)
+
+---
+
+## FILES TO CREATE/MODIFY (Complete List)
+
+| File | Change |
+|------|--------|
+| `supabase/migrations/XXX_pi_matching.sql` | **NEW** — All tables (pi_match_insights, pi_deck_rankings, pi_host_recommendations, pi_usage_log) + profile columns |
+| `types/models.ts` | Add PiMatchInsight, PiDeckRanking, PiHostRecommendation, PiUsageLog interfaces + profile fields |
+| `services/piMatchingService.ts` | **NEW** — Central Pi matching service |
+| `services/discoverService.ts` | Integrate Pi re-ranking into getSwipeDeck() |
+| `services/profileService.ts` | Handle ideal_roommate_text save + trigger Pi parsing |
+| `utils/matchingAlgorithm.ts` | Add Pi parsed preference bonus scoring (+5/-10 points) |
+| `screens/shared/ProfileQuestionnaireScreen.tsx` | Add "Tell Pi" as step 5 in ONBOARDING_STEPS (optional, skip button) |
+| `screens/shared/EditProfileScreen.tsx` | Add "Tell Pi" section at top + Pi-extracted field indicators |
+| `screens/renter/SwipeScreen.tsx` | Show "π Pi's Take" on cards |
+| `screens/shared/MatchDetailScreen.tsx` | Show full Pi insight (highlights, warnings, confidence) |
+| `screens/shared/GroupDetailScreen.tsx` | Show per-member Pi insight |
+| `screens/host/ListingDetailScreen.tsx` | Add "π Pi's Picks" tab |
+| `screens/host/BrowseRentersScreen.tsx` | Add "π Pi Recommended" sort + badge |
+| `screens/host/HostDashboardScreen.tsx` | Pi insights card |
+| `screens/host/CompanyDashboardScreen.tsx` | Pi matchmaker summary |
+| `supabase/functions/pi-match-insight/index.ts` | **NEW** — Pi match insight generator |
+| `supabase/functions/pi-rerank-deck/index.ts` | **NEW** — Pi deck re-ranking |
+| `supabase/functions/pi-parse-preferences/index.ts` | **NEW** — Pi free text parser |
+| `supabase/functions/pi-host-matchmaker/index.ts` | **NEW** — Pi host recommendation engine |
+| `supabase/functions/calculate-match-scores/index.ts` | Trigger explanation generation for high-scoring matches |
+| `constants/planFeatures.ts` | Add Pi feature gates per plan tier |
+
+---
+
+## BUILD ORDER
+
+1. **Migration** — Run SQL to create all new tables and columns
+2. **Types** — Add all new TypeScript interfaces
+3. **Pi Matching Service** — Create `piMatchingService.ts` with all methods + usage tracking
+4. **Parse Ideal Roommate** — Edge function + profile service integration (simplest, standalone)
+5. **Onboarding + Edit Profile** — Add "Tell Pi" as step 5 in onboarding (optional), add Tell Pi section to EditProfileScreen with Pi-extracted field indicators. Pi should auto-populate empty profile fields from parsed text.
+6. **Matching Algorithm** — Add Pi parsed preference bonus scoring
+7. **Match Explanations** — Edge function + caching + UI (swipe cards, match detail)
+8. **Deck Re-Ranking** — Edge function + discover service integration + caching
+9. **Host Matchmaker** — Edge function + listing detail UI + dashboard cards
+10. **Plan Gating** — Wire up feature access per plan tier
+11. **Cost Tracking** — Usage logging + quota enforcement
+12. **Test** — Verify with these scenarios:
+    - User writes "I want a quiet, clean roommate who doesn't smoke" → Pi parses to hard_nos: ["smoking"], cleanliness_hints: ["clean"], noise_hints: ["quiet"]
+    - Two users both write about being creative freelancers → Pi's insight highlights this connection
+    - Deterministic score ranks candidate #8, but both users mention loving cooking and dogs in their bios → Pi re-ranks to #3
+    - Agent with Bushwick listing gets recommendation: "Group of 3, all want Bushwick, combined budget matches"
+    - Free user sees summary only; Elite user sees full explanation with warnings
+    - User on Plus plan opens deck → sees "π Pi Pick" badge on 3 promoted candidates
+
+## IMPORTANT NOTES
+
+- **Pi is ADDITIVE** — Pi layers on top of the existing 100-point algorithm. The deterministic scoring is NEVER removed or replaced. Pi's re-ranking only reorders, it never adds or removes candidates.
+- **All Pi results are cached** — never call an edge function if a valid cached result exists.
+- **Graceful degradation** — if a Pi call fails (timeout, rate limit, error), fall back to deterministic results silently. Never show an error to the user.
+- **Privacy** — Pi never sees last names, emails, phone numbers, or exact addresses. Only first names, ages, and preference data.
+- **Free text is optional** — never block onboarding or profile completion if user skips the "Tell Pi" field.
+- **Token efficiency** — Trim long bios and ideal_roommate_text to 500 chars before sending to Pi. Remove null/empty fields from prompts.
+- **Pi's voice** — All user-facing text from Pi should feel like a person talking, not a system. Use "Pi thinks..." or "Pi noticed..." not "The algorithm determined..." Keep it warm, confident, and slightly witty.
+- **Pi branding** — Use the π symbol as Pi's icon throughout the app. Badge format: "π Pi Pick", "π Pi's Take", "π Pi Recommended". Color: use the app's accent/brand color for Pi elements.
+- **A/B testing** — Consider showing Pi-ranked vs deterministic-ranked decks to measure if Pi actually improves match acceptance rates. Track: swipe-right rate, message rate after match, and eventual lease signing rate for Pi-ranked vs deterministic-ranked matches.
