@@ -836,8 +836,7 @@ export interface PiAutoGroupMember {
   compatibility_score?: number;
   pi_reason?: string;
   invited_at: string;
-  accepted_at?: string;
-  declined_at?: string;
+  responded_at?: string;
   status: 'pending' | 'accepted' | 'declined' | 'expired' | 'left';
 }
 
