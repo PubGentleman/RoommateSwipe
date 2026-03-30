@@ -240,6 +240,23 @@ export const NotificationsScreen = () => {
       case 'activity_nudge':
         (navigation as any).navigate('Explore');
         break;
+      case 'pi_group_assembled':
+      case 'pi_member_accepted':
+      case 'pi_group_confirmed':
+      case 'pi_replacement_found':
+        if (notification.data?.groupId) {
+          (navigation as any).navigate('Groups', {
+            screen: 'PiGroupInvite',
+            params: { groupId: notification.data.groupId },
+          });
+        } else {
+          (navigation as any).navigate('Groups');
+        }
+        break;
+      case 'pi_member_declined':
+      case 'pi_group_expired':
+        (navigation as any).navigate('Groups');
+        break;
       default:
         break;
     }

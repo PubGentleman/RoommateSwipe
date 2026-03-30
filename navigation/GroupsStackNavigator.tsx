@@ -12,6 +12,7 @@ import ApartmentPreferencesScreen from '../screens/shared/ApartmentPreferencesSc
 import GroupApartmentSuggestionsScreen from '../screens/renter/GroupApartmentSuggestionsScreen';
 import { AIGroupInviteScreen } from '../screens/shared/AIGroupInviteScreen';
 import { CompanyGroupInviteScreen } from '../screens/shared/CompanyGroupInviteScreen';
+import { PiGroupInviteScreen } from '../screens/renter/PiGroupInviteScreen';
 import { RoommateProfile } from '../types/models';
 
 export type GroupsStackParamList = {
@@ -58,6 +59,9 @@ export type GroupsStackParamList = {
     listingId: string;
     groupId: string;
   };
+  PiGroupInvite: {
+    groupId?: string;
+  };
 };
 
 const Stack = createNativeStackNavigator<GroupsStackParamList>();
@@ -77,6 +81,7 @@ export const GroupsStackNavigator = () => {
       <Stack.Screen name="GroupApartmentSuggestions" component={GroupApartmentSuggestionsScreen} />
       <Stack.Screen name="AIGroupInvite" component={AIGroupInviteScreen} />
       <Stack.Screen name="CompanyGroupInvite" component={CompanyGroupInviteScreen} />
+      <Stack.Screen name="PiGroupInvite" component={PiGroupInviteScreen} />
     </Stack.Navigator>
   );
 };

@@ -31,6 +31,7 @@ import { CityPickerModal, CityPillButton } from '../../components/CityPickerModa
 import { RhomeAISheet } from '../../components/RhomeAISheet';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { AIGroupSuggestionCard } from '../../components/AIGroupSuggestionCard';
+import { getPendingAutoGroupCount } from '../../services/piAutoMatchService';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - Spacing.xxl;
@@ -93,6 +94,7 @@ export const GroupsScreen = () => {
   const [bestGroupId, setBestGroupId] = useState<string | null>(null);
   const [groupQuickStats, setGroupQuickStats] = useState<Record<string, GroupQuickStats>>({});
   const [savingEdit, setSavingEdit] = useState(false);
+  const [piPendingCount, setPiPendingCount] = useState(0);
 
   const userPlan = user?.subscription?.plan || 'basic';
 
@@ -240,6 +242,10 @@ export const GroupsScreen = () => {
       setAllGroups(otherGroups);
       setCurrentIndex(0);
       loadGroupLikeCounts(userGroups);
+
+      if (user?.id) {
+        getPendingAutoGroupCount(user.id).then(c => setPiPendingCount(c)).catch(() => {});
+      }
     } catch (error) {
       console.error('Error loading groups:', error);
     } finally {
@@ -1262,12 +1268,39 @@ export const GroupsScreen = () => {
           <AIGroupSuggestionCard
             onAccepted={() => loadGroups()}
           />
+          {piPendingCount > 0 ? (
+            <Pressable
+              style={[styles.piCtaCard, { backgroundColor: '#1a1a2e', borderColor: 'rgba(255,107,91,0.3)', borderWidth: 1 }]}
+              onPress={() => navigation.navigate('PiGroupInvite', {})}
+            >
+              <View style={styles.piCtaIconWrap}>
+                <Text style={styles.piCtaIcon}>π</Text>
+              </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <ThemedText style={styles.piCtaTitle}>Pi found you a match!</ThemedText>
+                <ThemedText style={[styles.piCtaDesc, { color: 'rgba(255,255,255,0.6)' }]}>
+                  {piPendingCount} pending {piPendingCount === 1 ? 'invite' : 'invites'} from Pi Auto-Match
+                </ThemedText>
+              </View>
+              <View style={[styles.piCtaBadge, { backgroundColor: '#ff6b5b' }]}>
+                <Text style={styles.piCtaBadgeText}>{piPendingCount}</Text>
+              </View>
+            </Pressable>
+          ) : null}
+
           {myGroups.length === 0 ? (
             <View style={[styles.emptyState, { paddingVertical: 30 }]}>
               <Feather name="users" size={40} color={theme.textSecondary} />
               <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.sm, textAlign: 'center' }]}>
                 No groups yet — let AI find your perfect roommates!
               </ThemedText>
+              <Pressable
+                style={[styles.piCtaBtn, { backgroundColor: '#ff6b5b', marginTop: 16 }]}
+                onPress={() => navigation.navigate('Profile', { screen: 'PiAutoMatchSettings' })}
+              >
+                <Text style={styles.piCtaIcon}>π</Text>
+                <Text style={styles.piCtaBtnText}>Enable Pi Auto-Match</Text>
+              </Pressable>
             </View>
           ) : (
             myGroups.map(group => renderMyGroup(group))
@@ -3425,6 +3458,60 @@ const styles = StyleSheet.create({
   quickStatText: {
     color: '#ff6b5b',
     fontSize: 11,
+    fontWeight: '600',
+  },
+  piCtaCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+  },
+  piCtaIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,107,91,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  piCtaIcon: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#ff6b5b',
+  },
+  piCtaTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  piCtaDesc: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  piCtaBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  piCtaBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  piCtaBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  piCtaBtnText: {
+    color: '#fff',
+    fontSize: 14,
     fontWeight: '600',
   },
 });

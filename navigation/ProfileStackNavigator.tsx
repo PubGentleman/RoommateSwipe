@@ -33,6 +33,7 @@ import { AffiliateApplyScreen } from '../screens/shared/AffiliateApplyScreen';
 import { AffiliateDashboardScreen } from '../screens/shared/AffiliateDashboardScreen';
 import MoveInCheckinScreen from '../screens/renter/MoveInCheckinScreen';
 import MoveInSuccessScreen from '../screens/renter/MoveInSuccessScreen';
+import { PiAutoMatchSettingsScreen } from '../screens/renter/PiAutoMatchSettingsScreen';
 
 export type ProfileStackParamList = {
   ProfileMain: undefined;
@@ -66,6 +67,7 @@ export type ProfileStackParamList = {
   AffiliateDashboard: undefined;
   MoveInCheckin: { bookingId: string };
   MoveInSuccess: undefined;
+  PiAutoMatchSettings: undefined;
 };
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
@@ -335,6 +337,11 @@ export const ProfileStackNavigator = () => {
       <Stack.Screen
         name="MoveInSuccess"
         component={MoveInSuccessScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="PiAutoMatchSettings"
+        component={PiAutoMatchSettingsScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>
