@@ -431,7 +431,7 @@ export const ProfileQuestionnaireScreen = () => {
   const idealRoommateCharLimit = 500;
 
   const [desiredRoommateCount, setDesiredRoommateCount] = useState<number>(user?.profileData?.desired_roommate_count ?? user?.desired_roommate_count ?? 0);
-  const [desiredBedroomCount, setDesiredBedroomCount] = useState<number>(user?.profileData?.desired_bedroom_count || user?.desired_bedroom_count || 2);
+  const [desiredBedroomCount, setDesiredBedroomCount] = useState<number>(user?.profileData?.desired_bedroom_count ?? user?.desired_bedroom_count ?? 0);
   const [householdGenderPref, setHouseholdGenderPref] = useState<'any' | 'male_only' | 'female_only' | 'same_gender'>(user?.profileData?.household_gender_preference || user?.household_gender_preference || 'any');
   const [piAutoMatchEnabled, setPiAutoMatchEnabled] = useState<boolean>(user?.profileData?.pi_auto_match_enabled ?? user?.pi_auto_match_enabled ?? true);
 
@@ -1117,6 +1117,7 @@ export const ProfileQuestionnaireScreen = () => {
             <ThemedText style={[styles.inputLabel, { marginBottom: 10 }]}>How many bedrooms?</ThemedText>
             <EmojiTileGrid
               options={[
+                { value: '0', emoji: '\uD83C\uDF1F', label: 'No Preference', subtitle: 'Open to any' },
                 { value: '1', emoji: '\uD83D\uDECF\uFE0F', label: '1 Bedroom' },
                 { value: '2', emoji: '\uD83D\uDECF\uFE0F', label: '2 Bedrooms' },
                 { value: '3', emoji: '\uD83D\uDECF\uFE0F', label: '3 Bedrooms' },
