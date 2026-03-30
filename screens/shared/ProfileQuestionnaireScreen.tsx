@@ -430,7 +430,7 @@ export const ProfileQuestionnaireScreen = () => {
   React.useEffect(() => { idealRoommateTextRef.current = idealRoommateText; }, [idealRoommateText]);
   const idealRoommateCharLimit = 500;
 
-  const [desiredRoommateCount, setDesiredRoommateCount] = useState<number>(user?.profileData?.desired_roommate_count || user?.desired_roommate_count || 1);
+  const [desiredRoommateCount, setDesiredRoommateCount] = useState<number>(user?.profileData?.desired_roommate_count ?? user?.desired_roommate_count ?? 0);
   const [desiredBedroomCount, setDesiredBedroomCount] = useState<number>(user?.profileData?.desired_bedroom_count || user?.desired_bedroom_count || 2);
   const [householdGenderPref, setHouseholdGenderPref] = useState<'any' | 'male_only' | 'female_only' | 'same_gender'>(user?.profileData?.household_gender_preference || user?.household_gender_preference || 'any');
   const [piAutoMatchEnabled, setPiAutoMatchEnabled] = useState<boolean>(user?.profileData?.pi_auto_match_enabled ?? user?.pi_auto_match_enabled ?? true);
@@ -1102,6 +1102,7 @@ export const ProfileQuestionnaireScreen = () => {
             <ThemedText style={[styles.inputLabel, { marginBottom: 10 }]}>How many roommates?</ThemedText>
             <EmojiTileGrid
               options={[
+                { value: '0', emoji: '\uD83C\uDF1F', label: 'No Preference', subtitle: 'Open to any size' },
                 { value: '1', emoji: '\uD83D\uDC64', label: '1 Roommate', subtitle: '2 people total' },
                 { value: '2', emoji: '\uD83D\uDC65', label: '2 Roommates', subtitle: '3 people total' },
                 { value: '3', emoji: '\uD83D\uDC6A', label: '3 Roommates', subtitle: '4 people total' },
