@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Image, Platform } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Image, Platform, ActivityIndicator } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { ThemedText } from './ThemedText';
 import { useTheme } from '../hooks/useTheme';
@@ -79,9 +79,17 @@ html,body,#map{width:100%;height:100%;background:${isDark ? '#1a1a2e' : '#f0f0f0
 </head><body>
 <div id="map"><div id="loading">Loading map...</div></div>
 <script>
+window.onerror = function(msg, url, line) {
+  var payload = JSON.stringify({type:'mapError', message: msg, url: url, line: line});
+  if (window.ReactNativeWebView) {
+    window.ReactNativeWebView.postMessage(payload);
+  }
+};
 function loadCSS(url,cb){var l=document.createElement('link');l.rel='stylesheet';l.href=url;l.onload=cb;l.onerror=cb;document.head.appendChild(l)}
 function loadJS(url,cb){var s=document.createElement('script');s.src=url;s.onload=cb;s.onerror=function(){
   var el=document.getElementById('loading');if(el)el.textContent='Map unavailable';
+  var payload = JSON.stringify({type:'mapError', message:'Failed to load Leaflet JS from CDN'});
+  if(window.ReactNativeWebView){window.ReactNativeWebView.postMessage(payload)}
 };document.head.appendChild(s)}
 loadCSS('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',function(){
   loadJS('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',function(){
@@ -134,6 +142,8 @@ export const PropertyMapView = ({
   bottomInset,
 }: PropertyMapViewProps) => {
   const { theme, isDark } = useTheme();
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [mapError, setMapError] = useState(false);
 
   const propertiesWithCoords = useMemo(
     () => properties.filter(p => p.coordinates?.lat && p.coordinates?.lng),
@@ -230,8 +240,27 @@ export const PropertyMapView = ({
     );
   }
 
+  if (mapError) {
+    return (
+      <View style={[styles.mapContainer, styles.mapErrorContainer, { paddingBottom: bottomInset }]}>
+        <Feather name="map" size={40} color="rgba(255,255,255,0.2)" />
+        <Text style={styles.mapErrorText}>Map couldn't load</Text>
+        <Text style={styles.mapErrorSubtext}>Check your internet connection</Text>
+        <Pressable style={styles.mapRetryBtn} onPress={() => { setMapError(false); setMapLoaded(false); }}>
+          <Text style={styles.mapRetryText}>Retry</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.mapContainer, { paddingBottom: bottomInset }]}>
+      {!mapLoaded ? (
+        <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#111' }]}>
+          <ActivityIndicator color="#ff6b5b" size="large" />
+          <Text style={{ color: 'rgba(255,255,255,0.5)', marginTop: 12, fontSize: 13 }}>Loading map...</Text>
+        </View>
+      ) : null}
       <WebView
         originWhitelist={['*']}
         source={{ html: htmlWithToken }}
@@ -246,16 +275,25 @@ export const PropertyMapView = ({
         bounces={false}
         overScrollMode="never"
         nestedScrollEnabled={false}
+        onLoad={() => setMapLoaded(true)}
+        onError={(syntheticEvent: { nativeEvent: { description?: string } }) => {
+          console.warn('[PropertyMapView] WebView error:', syntheticEvent.nativeEvent.description);
+          setMapError(true);
+        }}
+        onHttpError={(syntheticEvent: { nativeEvent: { statusCode?: number } }) => {
+          console.warn('[PropertyMapView] HTTP error:', syntheticEvent.nativeEvent.statusCode);
+        }}
         onMessage={(event: { nativeEvent: { data: string } }) => {
           try {
             const data = JSON.parse(event.nativeEvent.data);
             if (data.type === 'propertyTap' && data.token === messageToken) {
               handlePropertyTap(data.id);
             }
+            if (data.type === 'mapError') {
+              console.error('[PropertyMapView] JS error in map:', data.message);
+              setMapError(true);
+            }
           } catch {}
-        }}
-        onError={(syntheticEvent: { nativeEvent: { description?: string } }) => {
-          console.warn('[PropertyMapView] WebView error:', syntheticEvent.nativeEvent.description);
         }}
       />
       <View style={[styles.propertyCount, { backgroundColor: theme.backgroundDefault }]}>

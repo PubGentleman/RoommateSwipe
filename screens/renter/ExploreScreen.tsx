@@ -134,9 +134,11 @@ export const ExploreScreen = () => {
   const [paywallPlan, setPaywallPlan] = useState<'plus' | 'elite'>('plus');
   const [activeQuickFilters, setActiveQuickFilters] = useState<Set<string>>(new Set(['bestMatch']));
   const intentPref = user?.profileData?.listing_type_preference;
-  const [listingTypeFilter, setListingTypeFilter] = useState<'any' | 'room' | 'entire' | 'sublet'>(
-    intentPref === 'room' ? 'room' : intentPref === 'entire_apartment' ? 'entire' : 'any'
-  );
+  const [listingTypeFilter, setListingTypeFilter] = useState<string[]>(() => {
+    if (intentPref === 'room') return ['room'];
+    if (intentPref === 'entire_apartment') return ['entire'];
+    return [];
+  });
   const [showAISheet, setShowAISheet] = useState(false);
   const [interestNote, setInterestNote] = useState('');
   const [userGroups, setUserGroups] = useState<Group[]>([]);
@@ -185,8 +187,9 @@ export const ExploreScreen = () => {
 
   useEffect(() => {
     const newPref = user?.profileData?.listing_type_preference;
-    const mapped = newPref === 'room' ? 'room' as const : newPref === 'entire_apartment' ? 'entire' as const : 'any' as const;
-    setListingTypeFilter(mapped);
+    if (newPref === 'room') setListingTypeFilter(['room']);
+    else if (newPref === 'entire_apartment') setListingTypeFilter(['entire']);
+    else setListingTypeFilter([]);
   }, [user?.profileData?.listing_type_preference]);
 
   useEffect(() => {
@@ -793,14 +796,13 @@ export const ExploreScreen = () => {
       );
     }
 
-    if (listingTypeFilter !== 'any') {
+    if (listingTypeFilter.length > 0) {
       const TYPE_MAP: Record<string, string[]> = {
         room:   ['room', 'private_room'],
         entire: ['entire', 'entire_unit', 'entire_apartment'],
-        entire_apartment: ['entire', 'entire_unit', 'entire_apartment'],
         sublet: ['sublet'],
       };
-      const allowedValues = TYPE_MAP[listingTypeFilter] ?? [];
+      const allowedValues = listingTypeFilter.flatMap(type => TYPE_MAP[type] ?? []);
       filtered = filtered.filter(p => {
         const rt = (p.roomType || p.listing_type || p.type || '').toLowerCase();
         return allowedValues.some(v => rt === v.toLowerCase());
@@ -920,14 +922,14 @@ export const ExploreScreen = () => {
   const renterLimits = getRenterPlanLimits(renterPlan);
 
   const handleFilterPress = () => {
-    setTempFilters({ ...filters, listingType: listingTypeFilter });
+    setTempFilters({ ...filters, listingTypes: [...listingTypeFilter] });
     setShowFilterModal(true);
   };
 
   const handleApplyFilters = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    if (tempFilters.listingType) {
-      setListingTypeFilter(tempFilters.listingType);
+    if (tempFilters.listingTypes) {
+      setListingTypeFilter(tempFilters.listingTypes);
     }
     setFilters(tempFilters);
     setShowFilterModal(false);
@@ -937,7 +939,7 @@ export const ExploreScreen = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setTempFilters({});
     setFilters({});
-    setListingTypeFilter('any');
+    setListingTypeFilter([]);
     setShowFilterModal(false);
   };
 
@@ -953,7 +955,7 @@ export const ExploreScreen = () => {
     const hasModalFilters = Object.keys(filters).length > 0 && Object.values(filters).some(v => 
       v !== undefined && (Array.isArray(v) ? v.length > 0 : true)
     );
-    return hasModalFilters || listingTypeFilter !== 'any';
+    return hasModalFilters || listingTypeFilter.length > 0;
   };
 
 
@@ -1009,9 +1011,14 @@ export const ExploreScreen = () => {
     });
   };
 
-  const handleListingTypeChip = (type: 'room' | 'entire' | 'sublet') => {
+  const handleListingTypeChip = (type: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setListingTypeFilter(prev => prev === type ? 'any' : type);
+    setListingTypeFilter(prev => {
+      if (prev.includes(type)) {
+        return prev.filter(t => t !== type);
+      }
+      return [...prev, type];
+    });
   };
 
   const isBasic = renterPlan === 'free';
@@ -1446,7 +1453,7 @@ export const ExploreScreen = () => {
             );
           })}
           {LISTING_TYPE_CHIPS.map(t => {
-            const active = listingTypeFilter === t.key;
+            const active = listingTypeFilter.includes(t.key);
             return (
               <Pressable key={t.key} style={active ? styles.chipSelected : styles.chipUnselected} onPress={() => handleListingTypeChip(t.key)}>
                 <Feather name={t.icon} size={11} color={active ? '#fff' : 'rgba(255,255,255,0.45)'} />
@@ -1585,12 +1592,25 @@ export const ExploreScreen = () => {
             <Text style={styles.fmSectionTitle}>Listing Type</Text>
             <View style={styles.fmTypeGrid}>
               {LISTING_TYPE_OPTIONS.map((opt) => {
-                const isActive = (tempFilters.listingType || 'any') === opt.key;
+                const selectedTypes = tempFilters.listingTypes || [];
+                const isActive = opt.key === 'any'
+                  ? selectedTypes.length === 0
+                  : selectedTypes.includes(opt.key);
                 return (
                   <Pressable
                     key={opt.key}
                     style={[styles.fmTypeCard, isActive && styles.fmTypeCardActive]}
-                    onPress={() => setTempFilters({ ...tempFilters, listingType: opt.key })}
+                    onPress={() => {
+                      if (opt.key === 'any') {
+                        setTempFilters({ ...tempFilters, listingTypes: [] });
+                      } else {
+                        const current = tempFilters.listingTypes || [];
+                        const updated = current.includes(opt.key)
+                          ? current.filter((t: string) => t !== opt.key)
+                          : [...current, opt.key];
+                        setTempFilters({ ...tempFilters, listingTypes: updated });
+                      }
+                    }}
                   >
                     <View style={[styles.fmTypeIcon, isActive && styles.fmTypeIconActive]}>
                       <Feather
