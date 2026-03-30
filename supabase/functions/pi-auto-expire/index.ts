@@ -30,7 +30,7 @@ serve(async (req) => {
     const { data: expiredGroups, error: queryError } = await supabase
       .from('pi_auto_groups')
       .select('*')
-      .in('status', ['forming', 'pending_acceptance'])
+      .in('status', ['forming', 'pending_acceptance', 'partial'])
       .lt('acceptance_deadline', now);
 
     if (queryError) return errorResponse(`Query failed: ${queryError.message}`, 500);
@@ -60,12 +60,6 @@ serve(async (req) => {
       const accepted = members.filter((m: any) => m.status === 'accepted');
       const pending = members.filter((m: any) => m.status === 'pending');
 
-      await supabase
-        .from('pi_auto_group_members')
-        .update({ status: 'expired' })
-        .eq('group_id', group.id)
-        .eq('status', 'pending');
-
       const memberUserIds = members.map((m: any) => m.user_id);
       const { data: users } = await supabase
         .from('users')
@@ -78,6 +72,12 @@ serve(async (req) => {
       if (meetsPartialThreshold) {
         const spotsNeeded = group.max_members - accepted.length;
         const newDeadline = new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString();
+
+        await supabase
+          .from('pi_auto_group_members')
+          .update({ status: 'expired' })
+          .eq('group_id', group.id)
+          .eq('status', 'pending');
 
         await supabase
           .from('pi_auto_groups')
@@ -147,6 +147,12 @@ serve(async (req) => {
           replacement_search_triggered: true,
         });
       } else {
+        await supabase
+          .from('pi_auto_group_members')
+          .update({ status: 'expired' })
+          .eq('group_id', group.id)
+          .in('status', ['pending', 'accepted']);
+
         await supabase
           .from('pi_auto_groups')
           .update({ status: 'dissolved', dissolved_at: now })
