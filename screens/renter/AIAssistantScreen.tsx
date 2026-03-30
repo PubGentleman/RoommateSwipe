@@ -10,7 +10,7 @@ import { StorageService } from '../../utils/storage';
 import { analyzePrice, isPriceQuestion } from '../../utils/priceAnalysis';
 import { useRoute } from '@react-navigation/native';
 
-type PiMode = 'general' | 'listing_advisor' | 'price_analysis' | 'compatibility';
+type PiMode = 'general' | 'listing_advisor' | 'price_analysis' | 'photo_analysis' | 'compatibility';
 
 type AIMessage = {
   id: string;

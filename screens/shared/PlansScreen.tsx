@@ -82,10 +82,11 @@ const PLAN_FEATURES_PLACE: Record<RenterPlan, { icon: string; label: string }[]>
     { icon: 'message-square', label: '10 cold messages per month' },
     { icon: 'cpu', label: 'Pi apartment advisor (10/day)' },
     { icon: 'dollar-sign', label: 'Pi price analysis (10/day)' },
+    { icon: 'image', label: 'Pi photo Q&A (10/day shared)' },
   ],
   plus: [
     { icon: 'heart', label: 'Unlimited interests' },
-    { icon: 'cpu', label: 'Unlimited Pi advisor + price analysis' },
+    { icon: 'cpu', label: 'Unlimited Pi advisor, price & photo analysis' },
     { icon: 'trending-up', label: 'Priority in host inboxes' },
     { icon: 'message-circle', label: 'Unlimited active chats' },
     { icon: 'check-circle', label: 'Verified profile badge' },

@@ -71,8 +71,8 @@ interface AuthContextType {
   useSuperInterestCredit: () => Promise<void>;
   canSendColdMessage: () => Promise<{ canSend: boolean; remaining: number; reason?: string }>;
   useColdMessage: () => Promise<void>;
-  canAskPi: (mode: 'general' | 'listing_advisor' | 'price_analysis' | 'compatibility') => { canAsk: boolean; remaining: number; limit: number; message?: string };
-  incrementPiUsage: (mode: 'listing_advisor' | 'price_analysis' | 'compatibility') => Promise<void>;
+  canAskPi: (mode: 'general' | 'listing_advisor' | 'price_analysis' | 'photo_analysis' | 'compatibility') => { canAsk: boolean; remaining: number; limit: number; message?: string };
+  incrementPiUsage: (mode: 'listing_advisor' | 'price_analysis' | 'photo_analysis' | 'compatibility') => Promise<void>;
   getSuperInterestCount: () => number;
   upgradeHostPlan: (plan: string, billingCycle?: 'monthly' | '3month' | 'annual') => Promise<void>;
   downgradeHostPlan: (plan: string) => Promise<void>;
@@ -2040,7 +2040,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(updated);
   };
 
-  const canAskPi = (mode: 'general' | 'listing_advisor' | 'price_analysis' | 'compatibility'): { canAsk: boolean; remaining: number; limit: number; message?: string } => {
+  const canAskPi = (mode: 'general' | 'listing_advisor' | 'price_analysis' | 'photo_analysis' | 'compatibility'): { canAsk: boolean; remaining: number; limit: number; message?: string } => {
     if (!user) return { canAsk: false, remaining: 0, limit: 0, message: 'Not logged in' };
 
     const plan = user.subscription?.plan || 'basic';
@@ -2053,7 +2053,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { canAsk: true, remaining: Infinity, limit: Infinity };
     }
 
-    if (mode === 'listing_advisor' || mode === 'price_analysis') {
+    if (mode === 'listing_advisor' || mode === 'price_analysis' || mode === 'photo_analysis') {
       if (!isPlaceSeeker()) {
         return { canAsk: false, remaining: 0, limit: 0, message: 'This feature is for apartment seekers.' };
       }
@@ -2116,11 +2116,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { canAsk: false, remaining: 0, limit: 0 };
   };
 
-  const incrementPiUsage = async (mode: 'listing_advisor' | 'price_analysis' | 'compatibility') => {
+  const incrementPiUsage = async (mode: 'listing_advisor' | 'price_analysis' | 'photo_analysis' | 'compatibility') => {
     if (!user) return;
     const now = new Date();
 
-    if (mode === 'listing_advisor' || mode === 'price_analysis') {
+    if (mode === 'listing_advisor' || mode === 'price_analysis' || mode === 'photo_analysis') {
       const lastReset = user.piAdvisorData?.lastResetDate
         ? new Date(user.piAdvisorData.lastResetDate)
         : null;
