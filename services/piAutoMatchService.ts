@@ -131,89 +131,12 @@ export async function getMyAutoGroup(userId: string): Promise<PiAutoGroup | null
 
 export async function convertToRealGroup(autoGroupId: string): Promise<string | null> {
   try {
-    const { data: autoGroup } = await supabase
-      .from('pi_auto_groups')
-      .select('*')
-      .eq('id', autoGroupId)
-      .single();
+    const { data, error } = await supabase.functions.invoke('pi-convert-group', {
+      body: { auto_group_id: autoGroupId },
+    });
 
-    if (!autoGroup) return null;
-
-    if (autoGroup.status === 'placed') {
-      const { data: existing } = await supabase
-        .from('groups')
-        .select('id')
-        .eq('pi_auto_group_id', autoGroupId)
-        .limit(1)
-        .single();
-      return existing?.id ?? null;
-    }
-
-    const { data: members } = await supabase
-      .from('pi_auto_group_members')
-      .select('user_id')
-      .eq('group_id', autoGroupId)
-      .eq('status', 'accepted');
-
-    if (!members || members.length === 0) return null;
-
-    const creatorId = autoGroup.anchor_user_id || members[0].user_id;
-
-    const { data: existingGroup } = await supabase
-      .from('groups')
-      .select('id')
-      .eq('pi_auto_group_id', autoGroupId)
-      .limit(1)
-      .maybeSingle();
-
-    if (existingGroup) return existingGroup.id;
-
-    const { data: newGroup, error } = await supabase
-      .from('groups')
-      .insert({
-        name: 'Pi Match Group',
-        created_by: creatorId,
-        group_type: 'roommate',
-        pi_auto_group_id: autoGroupId,
-      })
-      .select('id')
-      .single();
-
-    if (error || !newGroup) {
-      if (error?.code === '23505') {
-        const { data: raceGroup } = await supabase
-          .from('groups')
-          .select('id')
-          .eq('pi_auto_group_id', autoGroupId)
-          .limit(1)
-          .single();
-        return raceGroup?.id ?? null;
-      }
-      return null;
-    }
-
-    const memberInserts = members.map((m: { user_id: string }) => ({
-      group_id: newGroup.id,
-      user_id: m.user_id,
-      role: m.user_id === creatorId ? 'admin' : 'member',
-      joined_at: new Date().toISOString(),
-    }));
-
-    const { error: memberError } = await supabase
-      .from('group_members')
-      .insert(memberInserts);
-
-    if (memberError) {
-      await supabase.from('groups').delete().eq('id', newGroup.id);
-      return null;
-    }
-
-    await supabase
-      .from('pi_auto_groups')
-      .update({ status: 'placed' })
-      .eq('id', autoGroupId);
-
-    return newGroup.id;
+    if (error || !data?.group_id) return null;
+    return data.group_id as string;
   } catch {
     return null;
   }
