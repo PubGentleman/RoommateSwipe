@@ -311,7 +311,9 @@ export const PiGroupInviteScreen = () => {
     return groupNeighborhoods;
   })();
 
-  const combinedBudget = group ? { min: group.budget_min, max: group.budget_max } : null;
+  const combinedBudget = group && group.budget_min > 0 && group.budget_max > 0
+    ? { min: group.budget_min, max: group.budget_max }
+    : null;
 
   const hasRisks = (() => {
     if (!group) return false;
