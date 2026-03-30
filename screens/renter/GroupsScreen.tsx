@@ -128,8 +128,7 @@ export const GroupsScreen = () => {
     AsyncStorage.getItem('pending_group_create').then(val => {
       if (val === 'true') {
         AsyncStorage.removeItem('pending_group_create');
-        setActiveTab('create');
-        navigation.navigate('CreateGroup' as never);
+        navigation.navigate('GroupSetup' as never);
       }
     });
   }, []);

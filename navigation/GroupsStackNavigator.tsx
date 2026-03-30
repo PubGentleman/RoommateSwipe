@@ -16,6 +16,8 @@ import { PiGroupInviteScreen } from '../screens/renter/PiGroupInviteScreen';
 import { PiReplacementVoteScreen } from '../screens/renter/PiReplacementVoteScreen';
 import MyGroupScreen from '../screens/renter/MyGroupScreen';
 import GroupInviteAcceptScreen from '../screens/renter/GroupInviteAcceptScreen';
+import GroupSetupScreen from '../screens/renter/GroupSetupScreen';
+import InviteFriendsScreen from '../screens/renter/InviteFriendsScreen';
 import { RoommateProfile } from '../types/models';
 
 export type GroupsStackParamList = {
@@ -72,6 +74,12 @@ export type GroupsStackParamList = {
   GroupInviteAccept: {
     inviteCode: string;
   };
+  GroupSetup: undefined;
+  InviteFriends: {
+    groupId: string;
+    inviteCode: string;
+    groupName?: string;
+  };
 };
 
 const Stack = createNativeStackNavigator<GroupsStackParamList>();
@@ -95,6 +103,26 @@ export const GroupsStackNavigator = () => {
       <Stack.Screen name="PiReplacementVote" component={PiReplacementVoteScreen} />
       <Stack.Screen name="MyGroup" component={MyGroupScreen} />
       <Stack.Screen name="GroupInviteAccept" component={GroupInviteAcceptScreen} />
+      <Stack.Screen name="GroupSetup">
+        {({ navigation: nav }) => (
+          <GroupSetupScreen
+            onComplete={(groupId, inviteCode) => {
+              nav.replace('InviteFriends', { groupId, inviteCode });
+            }}
+            onSkip={() => nav.goBack()}
+          />
+        )}
+      </Stack.Screen>
+      <Stack.Screen name="InviteFriends">
+        {({ route, navigation: nav }) => (
+          <InviteFriendsScreen
+            groupId={route.params.groupId}
+            inviteCode={route.params.inviteCode}
+            groupName={route.params.groupName}
+            onDone={() => nav.navigate('GroupsList')}
+          />
+        )}
+      </Stack.Screen>
     </Stack.Navigator>
   );
 };
