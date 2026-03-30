@@ -56,6 +56,7 @@ export function mapListingToProperty(l: any, fallbackHostName?: string): Propert
     sqft: l.sqft || 0,
     propertyType: l.property_type || 'lease',
     roomType: l.room_type || 'entire',
+    listing_type: l.listing_type || (l.room_type === 'room' ? 'room' : 'entire_apartment'),
     city: l.city || '',
     state: l.state || '',
     neighborhood: l.neighborhood || '',

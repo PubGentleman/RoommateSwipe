@@ -60,6 +60,7 @@ export interface RoommateProfile {
   household_gender_preference?: GenderPreference;
   pi_auto_match_enabled?: boolean;
   pi_last_match_attempt?: string;
+  is_group_lead?: boolean;
 }
 
 export interface ApartmentPreferences {
@@ -140,6 +141,7 @@ export interface Property {
   featured?: boolean;
   propertyType: 'lease' | 'sublet';
   roomType: 'room' | 'entire';
+  listing_type?: 'room' | 'entire_apartment';
   existingRoommates?: Array<{
     gender: 'male' | 'female' | 'other';
     onApp: boolean;
@@ -804,7 +806,7 @@ export interface PiUsageLog {
 
 export type GenderPreference = 'any' | 'male_only' | 'female_only' | 'same_gender';
 
-export type PiAutoMatchStatus = 'forming' | 'pending_acceptance' | 'partial' | 'ready' | 'invited' | 'claimed' | 'placed' | 'expired' | 'dissolved';
+export type PiAutoMatchStatus = 'forming' | 'pending_acceptance' | 'partial' | 'ready' | 'invited' | 'claimed' | 'placed' | 'expired' | 'dissolved' | 'active';
 
 export interface PiAutoGroup {
   id: string;
@@ -827,6 +829,7 @@ export interface PiAutoGroup {
   ready_at?: string;
   expires_at?: string;
   acceptance_deadline?: string;
+  is_preformed?: boolean;
   dissolved_at?: string;
   deadline_extended?: boolean;
   anchor_user_id?: string;
@@ -858,4 +861,43 @@ export interface PiGroupClaim {
   created_at: string;
   responded_at?: string;
   expires_at: string;
+}
+
+export interface PreformedGroup {
+  id: string;
+  name?: string;
+  group_lead_id: string;
+  group_size: number;
+  status: 'forming' | 'ready' | 'searching' | 'applied' | 'placed';
+  invite_code: string;
+  city?: string;
+  preferred_neighborhoods?: string[];
+  combined_budget_min?: number;
+  combined_budget_max?: number;
+  desired_bedroom_count?: number;
+  move_in_date?: string;
+  created_at: string;
+  converted_group_id?: string;
+}
+
+export interface PreformedGroupMember {
+  id: string;
+  preformed_group_id: string;
+  user_id?: string;
+  name: string;
+  status: 'invited' | 'joined' | 'declined';
+  invited_at: string;
+  joined_at?: string;
+  invite_link?: string;
+}
+
+export interface GroupShortlistItem {
+  id: string;
+  preformed_group_id: string;
+  listing_id: string;
+  added_by: string;
+  notes?: string;
+  vote_count: number;
+  created_at: string;
+  listing?: Property;
 }

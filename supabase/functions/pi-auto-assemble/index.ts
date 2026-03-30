@@ -287,9 +287,16 @@ serve(async (req) => {
     if (filterCity) profileQuery = profileQuery.eq('city', filterCity);
     if (filterUserId) profileQuery = profileQuery.eq('user_id', filterUserId);
 
-    const { data: profiles, error: profileError } = await profileQuery;
+    const { data: rawProfiles, error: profileError } = await profileQuery;
     if (profileError) return errorResponse(`Profile query failed: ${profileError.message}`, 500);
-    if (!profiles || profiles.length === 0) return jsonResponse({ groups_created: 0, message: 'No eligible renters found' });
+    if (!rawProfiles || rawProfiles.length === 0) return jsonResponse({ groups_created: 0, message: 'No eligible renters found' });
+
+    const profiles = rawProfiles.filter((p: any) => {
+      const searchType = p.apartment_search_type;
+      if (searchType === 'solo' || searchType === 'with_partner' || searchType === 'have_group') return false;
+      return true;
+    });
+    if (profiles.length === 0) return jsonResponse({ groups_created: 0, message: 'No eligible renters after intent filter' });
 
     const profileUserIds = profiles.map((p: any) => p.user_id);
 

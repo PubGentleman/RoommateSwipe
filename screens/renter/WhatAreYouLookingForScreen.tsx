@@ -8,6 +8,7 @@ import {
   Dimensions,
   Text,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -91,8 +92,8 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
 
   const [saving, setSaving] = useState(false);
 
-  const saveAndContinue = async (listingPref: 'room' | 'entire_apartment' | 'any', searchType: 'solo' | 'with_partner' | 'with_roommates' | 'have_group') => {
-    if (!user || saving) return;
+  const doSave = async (listingPref: 'room' | 'entire_apartment' | 'any', searchType: 'solo' | 'with_partner' | 'with_roommates' | 'have_group') => {
+    if (!user) return;
     setSaving(true);
     try {
       await updateProfile({
@@ -109,6 +110,46 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
       onComplete();
     } catch (_) {
       setSaving(false);
+    }
+  };
+
+  const saveAndContinue = async (listingPref: 'room' | 'entire_apartment' | 'any', searchType: 'solo' | 'with_partner' | 'with_roommates' | 'have_group') => {
+    if (!user || saving) return;
+    const currentSearch = user.profileData?.apartment_search_type;
+    if (!isSettings || !currentSearch) {
+      doSave(listingPref, searchType);
+      return;
+    }
+    const wasMatching = currentSearch === 'with_roommates';
+    const willMatch = searchType === 'with_roommates';
+    const wasGroup = currentSearch === 'have_group';
+
+    if (wasMatching && !willMatch) {
+      Alert.alert(
+        'Leave Roommate Matching?',
+        'This will remove you from roommate matching and Pi auto-groups. Continue?',
+        [
+          { text: 'Cancel', style: 'cancel', onPress: () => setSaving(false) },
+          { text: 'Continue', onPress: () => doSave(listingPref, searchType) },
+        ],
+      );
+    } else if (wasGroup) {
+      Alert.alert(
+        'Leave Your Group?',
+        'Changing your search intent will remove you from your current group. Continue?',
+        [
+          { text: 'Cancel', style: 'cancel', onPress: () => setSaving(false) },
+          { text: 'Continue', onPress: () => doSave(listingPref, searchType) },
+        ],
+      );
+    } else if (!wasMatching && willMatch) {
+      Alert.alert(
+        'Join Roommate Matching',
+        'You\'ll be added to the roommate matching pool. Pi will start looking for your ideal roommates!',
+        [{ text: 'Let\'s Go', onPress: () => doSave(listingPref, searchType) }],
+      );
+    } else {
+      doSave(listingPref, searchType);
     }
   };
 

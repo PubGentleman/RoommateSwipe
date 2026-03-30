@@ -315,6 +315,7 @@ export const CreateEditListingScreen = () => {
         neighborhood: neighborhood.trim() || undefined,
         zip_code: zipCode.trim() || undefined,
         room_type: roomType,
+        listing_type: roomType === 'entire' ? 'entire_apartment' : 'room',
         amenities: selectedAmenities,
         photos: photos,
         available_date: availableDate && availableDate !== 'flexible' ? new Date(availableDate).toISOString() : undefined,

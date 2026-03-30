@@ -44,11 +44,25 @@ export async function getSwipeDeck(city?: string, filters?: {
   const { data, error } = await query.limit(50);
   if (error) throw error;
 
+  const { data: currentProfile } = await supabase
+    .from('profiles')
+    .select('apartment_search_type')
+    .eq('user_id', user.id)
+    .single();
+  const currentSearchType = currentProfile?.apartment_search_type;
+
   let profiles = (data || []).filter(p => {
     if (p.profile?.search_paused === true) return false;
     const photos = p.profile?.photos || p.photos || [];
-    return Array.isArray(photos) && photos.length >= 1;
+    if (!Array.isArray(photos) || photos.length < 1) return false;
+    const pSearchType = p.profile?.apartment_search_type;
+    if (pSearchType === 'solo' || pSearchType === 'with_partner' || pSearchType === 'have_group') return false;
+    return true;
   });
+
+  if (currentSearchType === 'solo' || currentSearchType === 'with_partner' || currentSearchType === 'have_group') {
+    return [];
+  }
 
   if (filters?.budgetMin || filters?.budgetMax) {
     profiles = profiles.filter(p => {

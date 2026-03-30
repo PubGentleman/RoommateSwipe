@@ -6,6 +6,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
+import * as Linking from "expo-linking";
 
 import { RootNavigator } from "./navigation/RootNavigator";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -83,7 +84,24 @@ export default function App() {
                     <NotificationProvider>
                       <ConfirmProvider>
                         <RevenueCatProvider>
-                          <NavigationContainer>
+                          <NavigationContainer
+                            linking={{
+                              prefixes: [Linking.createURL('/'), 'rhome://'],
+                              config: {
+                                screens: {
+                                  Main: {
+                                    screens: {
+                                      Groups: {
+                                        screens: {
+                                          GroupInviteAccept: 'join/:inviteCode',
+                                        },
+                                      },
+                                    },
+                                  },
+                                },
+                              },
+                            }}
+                          >
                             <RootNavigator />
                             <ResponseTracker />
                           </NavigationContainer>

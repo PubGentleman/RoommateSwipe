@@ -21,6 +21,7 @@ import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme
 import { StorageService } from '../../utils/storage';
 import { getListings, mapListingToProperty, recordListingView } from '../../services/listingService';
 import { getDiscoverableGroupsForListing } from '../../services/groupService';
+import { getUserPreformedGroup, addToShortlist } from '../../services/preformedGroupService';
 import { Property, PropertyFilter, User, RoommateProfile, InterestCard, Conversation, Group } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -970,6 +971,17 @@ export const ExploreScreen = () => {
         await StorageService.unsaveProperty(user.id, id);
       } else {
         await StorageService.saveProperty(user.id, id);
+        const searchType = user.profileData?.apartment_search_type;
+        if (searchType === 'have_group') {
+          try {
+            const myGroup = await getUserPreformedGroup();
+            if (myGroup) {
+              await addToShortlist(myGroup.id, id);
+            }
+          } catch (shortlistErr) {
+            console.warn('Could not add to group shortlist:', shortlistErr);
+          }
+        }
       }
     } catch (err) {
       console.error('Error toggling save:', err);

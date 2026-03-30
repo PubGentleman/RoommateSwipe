@@ -10,12 +10,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
-import { PiAutoGroup } from '../../types/models';
+import { PiAutoGroup, PiAutoMatchStatus } from '../../types/models';
 import {
   getAvailableGroups,
   claimGroup,
   getClaimsUsedThisMonth,
 } from '../../services/piAutoMatchService';
+import { supabase } from '../../lib/supabase';
 import { getAutoClaimLimits, type AgentPlan } from '../../constants/planLimits';
 
 const BG = '#111';
@@ -65,10 +66,33 @@ export const PiMatchedGroupsScreen = () => {
   const loadData = useCallback(async () => {
     if (!user) return;
     try {
-      const [available, usage] = await Promise.all([
+      const [available, usage, preformedResult] = await Promise.all([
         getAvailableGroups(cityFilter ? { city: cityFilter } : undefined),
         getClaimsUsedThisMonth(user.id),
+        (() => {
+          let q = supabase
+            .from('preformed_groups')
+            .select('*')
+            .in('status', ['ready', 'searching']);
+          if (cityFilter) q = q.eq('city', cityFilter);
+          return q.then(r => r.data || []);
+        })(),
       ]);
+
+      const preformedAsAuto: PiAutoGroup[] = preformedResult.map((pg) => ({
+        id: pg.id as string,
+        status: 'ready' as PiAutoMatchStatus,
+        member_count: (pg.group_size as number) || 2,
+        max_members: (pg.group_size as number) || 2,
+        desired_bedrooms: (pg.desired_bedroom_count as number) || 0,
+        city: (pg.city as string) || '',
+        neighborhoods: (pg.preferred_neighborhoods as string[]) || [],
+        budget_min: (pg.combined_budget_min as number) || 0,
+        budget_max: (pg.combined_budget_max as number) || 0,
+        created_at: pg.created_at as string,
+        match_score: 0,
+        is_preformed: true,
+      }));
 
       const limits = getAutoClaimLimits(agentPlan || hostPlan, hostType);
       setFreeClaimsTotal(limits.freePerMonth);
@@ -77,8 +101,9 @@ export const PiMatchedGroupsScreen = () => {
         limits.freePerMonth === -1 ? -1 : Math.max(0, limits.freePerMonth - usage.free)
       );
 
-      setGroups(available);
-      applyFiltersAndSort(available, sizeFilter, sortBy, neighborhoodFilter, budgetMinFilter, budgetMaxFilter);
+      const allGroups = [...available, ...preformedAsAuto];
+      setGroups(allGroups);
+      applyFiltersAndSort(allGroups, sizeFilter, sortBy, neighborhoodFilter, budgetMinFilter, budgetMaxFilter);
     } catch {
       setGroups([]);
       setFilteredGroups([]);
@@ -133,6 +158,11 @@ export const PiMatchedGroupsScreen = () => {
         break;
     }
     setFilteredGroups(result);
+  };
+
+  const handleContactPreformedGroup = (group: PiAutoGroup) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    navigation.navigate('Chat' as never, { groupId: group.id } as never);
   };
 
   const handleClaimGroup = async (group: PiAutoGroup) => {
@@ -299,9 +329,16 @@ export const PiMatchedGroupsScreen = () => {
               </View>
             ) : null}
           </View>
-          <View style={[styles.scoreRing, { borderColor: scoreColor }]}>
-            <Text style={[styles.scoreText, { color: scoreColor }]}>{score}</Text>
-          </View>
+          {item.is_preformed ? (
+            <View style={[styles.sizeBadge, { backgroundColor: GREEN + '20' }]}>
+              <Feather name="check-circle" size={12} color={GREEN} />
+              <Text style={[styles.sizeBadgeText, { color: GREEN }]}>Pre-formed</Text>
+            </View>
+          ) : (
+            <View style={[styles.scoreRing, { borderColor: scoreColor }]}>
+              <Text style={[styles.scoreText, { color: scoreColor }]}>{score}</Text>
+            </View>
+          )}
         </View>
 
         {item.city || (item.neighborhoods && item.neighborhoods.length > 0) ? (
@@ -366,20 +403,30 @@ export const PiMatchedGroupsScreen = () => {
           </Text>
         ) : null}
 
-        <Pressable
-          style={[styles.claimBtn, isClaiming ? { opacity: 0.5 } : null]}
-          onPress={() => handleClaimGroup(item)}
-          disabled={isClaiming}
-        >
-          {isClaiming ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <>
-              <Feather name="check-circle" size={16} color="#fff" />
-              <Text style={styles.claimBtnText}>Claim Group</Text>
-            </>
-          )}
-        </Pressable>
+        {item.is_preformed ? (
+          <Pressable
+            style={[styles.claimBtn, { backgroundColor: GREEN }]}
+            onPress={() => handleContactPreformedGroup(item)}
+          >
+            <Feather name="message-circle" size={16} color="#fff" />
+            <Text style={styles.claimBtnText}>Contact Group</Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            style={[styles.claimBtn, isClaiming ? { opacity: 0.5 } : null]}
+            onPress={() => handleClaimGroup(item)}
+            disabled={isClaiming}
+          >
+            {isClaiming ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Feather name="check-circle" size={16} color="#fff" />
+                <Text style={styles.claimBtnText}>Claim Group</Text>
+              </>
+            )}
+          </Pressable>
+        )}
       </View>
     );
   };
