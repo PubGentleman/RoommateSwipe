@@ -537,6 +537,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     if (data.user) {
+      try {
+        await supabase.from('profiles').upsert(
+          { user_id: data.user.id },
+          { onConflict: 'user_id', ignoreDuplicates: true }
+        );
+      } catch (profileErr) {
+        console.warn('Failed to create initial profile row:', profileErr);
+      }
+
       if (data.session) {
         await loadUserFromSupabase(data.session);
       } else {
