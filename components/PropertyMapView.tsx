@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable, Image, Platform, ActivityIndicator } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { ThemedText } from './ThemedText';
@@ -59,6 +59,10 @@ function buildLeafletHtml(
     ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
     : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
 
+  const chipBg = isDark ? '#1a1a1a' : '#fff';
+  const chipColor = isDark ? '#fff' : '#111';
+  const chipBorder = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)';
+
   return `<!DOCTYPE html>
 <html><head>
 <meta charset="utf-8"/>
@@ -67,14 +71,6 @@ function buildLeafletHtml(
 *{margin:0;padding:0;box-sizing:border-box}
 html,body,#map{width:100%;height:100%;background:${isDark ? '#1a1a2e' : '#f0f0f0'}}
 #loading{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:${isDark ? 'rgba(255,255,255,0.4)' : '#999'};font-family:-apple-system,system-ui,sans-serif;font-size:13px}
-.popup-card{font-family:-apple-system,system-ui,sans-serif;width:220px;overflow:hidden;border-radius:12px;background:${isDark ? '#1a1a1a' : '#fff'};box-shadow:0 4px 20px rgba(0,0,0,0.3)}
-.popup-card img{width:100%;height:110px;object-fit:cover;display:block}
-.popup-info{padding:10px 12px}
-.popup-price{font-size:15px;font-weight:700;color:${isDark ? '#fff' : '#111'}}
-.popup-title{font-size:11px;color:${isDark ? 'rgba(255,255,255,0.5)' : '#888'};margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.popup-meta{display:flex;align-items:center;justify-content:space-between;margin-top:6px}
-.popup-beds{font-size:11px;color:${isDark ? 'rgba(255,255,255,0.5)' : '#888'}}
-.popup-match{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px}
 </style>
 </head><body>
 <div id="map"><div id="loading">Loading map...</div></div>
@@ -100,28 +96,70 @@ loadCSS('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',function(){
     L.control.zoom({position:'bottomright'}).addTo(map);
     var markers=${markersJson};
     markers.forEach(function(m){
-      var photoHtml=m.photo
-        ?'<img src="'+m.photo+'" style="width:44px;height:44px;object-fit:cover;border-radius:50%;display:block" onerror="this.style.display=\\'none\\';this.parentNode.innerHTML=\\'<div style=\\\\\"width:44px;height:44px;border-radius:50%;background:#ff6b5b;display:flex;align-items:center;justify-content:center;font-size:18px\\\\\">*</div>\\'">'
-        :'<div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#ff6b5b,#e83a2a);display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff">*</div>';
-      var icon=L.divIcon({
-        className:'',
-        html:'<div style="display:flex;flex-direction:column;align-items:center;cursor:pointer">'
-          +'<div style="width:44px;height:44px;border-radius:50%;overflow:hidden;border:2.5px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,0.35)">'
-          +photoHtml+'</div>'
-          +'<div style="background:linear-gradient(135deg,#ff6b5b,#e83a2a);color:#fff;font-weight:700;font-size:11px;font-family:-apple-system,system-ui,sans-serif;padding:3px 9px;border-radius:20px;margin-top:4px;white-space:nowrap;box-shadow:0 2px 6px rgba(255,80,60,0.45);border:1.5px solid rgba(255,255,255,0.25)">$'+m.price.toLocaleString()+'</div>'
-          +'<div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid #e83a2a;margin-top:-1px"></div>'
-          +'</div>',
-        iconSize:[44,70],iconAnchor:[22,70]
+      var isS = m.isSaved;
+      var icon = L.divIcon({
+        className: '',
+        html: '<div style="'
+          + 'background:${chipBg};'
+          + 'color:${chipColor};'
+          + 'font-weight:700;font-size:12px;font-family:-apple-system,system-ui,sans-serif;'
+          + 'padding:6px 12px;border-radius:20px;white-space:nowrap;'
+          + 'box-shadow:0 2px 8px rgba(0,0,0,0.3);'
+          + 'border:1.5px solid ${chipBorder};'
+          + 'cursor:pointer;transition:all 0.15s ease;'
+          + '"'
+          + ' data-id="' + m.id + '"'
+          + '>$' + m.price.toLocaleString()
+          + (isS ? ' <span style="color:#EF4444;margin-left:2px">&#9829;</span>' : '')
+          + '</div>',
+        iconSize: [0, 0],
+        iconAnchor: [0, 16]
       });
-      var popup='<div class="popup-card" onclick="var msg=JSON.stringify({type:\\'propertyTap\\',id:\\''+m.id+'\\',token:\\'__MSG_TOKEN__\\'});if(window.ReactNativeWebView){window.ReactNativeWebView.postMessage(msg)}else{window.parent.postMessage(msg,\\'*\\')}">'
-        +'<img src="'+m.photo+'"/><div class="popup-info">'
-        +'<div class="popup-price">$'+m.price+'/mo</div>'
-        +'<div class="popup-title">'+m.title+'</div>'
-        +'<div class="popup-meta"><span class="popup-beds">'+m.beds+'bd '+m.baths+'ba</span>'
-        +(m.matchPct!==null?'<span class="popup-match" style="background:'+m.matchColor+'20;color:'+m.matchColor+'">'+m.matchPct+'%</span>':'')
-        +'</div></div></div>';
-      L.marker([m.lat,m.lng],{icon:icon}).addTo(map).bindPopup(popup,{maxWidth:240,minWidth:220});
+      var marker = L.marker([m.lat, m.lng], {icon: icon}).addTo(map);
+      marker.on('click', function() {
+        if (window._activeChip) {
+          window._activeChip.style.background = '${chipBg}';
+          window._activeChip.style.color = '${chipColor}';
+          window._activeChip.style.borderColor = '${chipBorder}';
+          window._activeChip.style.transform = 'scale(1)';
+        }
+        var chip = marker.getElement().querySelector('[data-id]');
+        if (chip) {
+          chip.style.background = '#ff6b5b';
+          chip.style.color = '#fff';
+          chip.style.borderColor = '#ff6b5b';
+          chip.style.transform = 'scale(1.1)';
+          window._activeChip = chip;
+        }
+        var msg = JSON.stringify({
+          type: 'markerSelect',
+          id: m.id,
+          token: '__MSG_TOKEN__'
+        });
+        if (window.ReactNativeWebView) {
+          window.ReactNativeWebView.postMessage(msg);
+        } else {
+          window.parent.postMessage(msg, '*');
+        }
+      });
     });
+
+    map.on('click', function() {
+      if (window._activeChip) {
+        window._activeChip.style.background = '${chipBg}';
+        window._activeChip.style.color = '${chipColor}';
+        window._activeChip.style.borderColor = '${chipBorder}';
+        window._activeChip.style.transform = 'scale(1)';
+        window._activeChip = null;
+      }
+      var msg = JSON.stringify({ type: 'markerDeselect', token: '__MSG_TOKEN__' });
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(msg);
+      } else {
+        window.parent.postMessage(msg, '*');
+      }
+    });
+
     if(markers.length>1){
       var bounds=L.latLngBounds(markers.map(function(m){return[m.lat,m.lng]}));
       map.fitBounds(bounds,{padding:[40,40]});
@@ -144,6 +182,7 @@ export const PropertyMapView = ({
   const { theme, isDark } = useTheme();
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState(false);
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
 
   const propertiesWithCoords = useMemo(
     () => properties.filter(p => p.coordinates?.lat && p.coordinates?.lng),
@@ -203,26 +242,88 @@ export const PropertyMapView = ({
   );
 
   const messageToken = React.useRef(`rhome_map_${Date.now()}_${Math.random().toString(36).slice(2)}`).current;
-  const htmlWithToken = htmlContent.replace('__MSG_TOKEN__', messageToken);
+  const htmlWithToken = htmlContent.replace(/__MSG_TOKEN__/g, messageToken);
 
-  const handlePropertyTap = React.useCallback((id: string) => {
+  const handlePropertyTap = useCallback((id: string) => {
     const property = properties.find(p => p.id === id);
     if (property) onPropertyPress(property);
   }, [properties, onPropertyPress]);
 
+  const handleMessage = useCallback((rawData: string) => {
+    try {
+      const data = JSON.parse(rawData);
+      if (data.token !== messageToken) return;
+      if (data.type === 'markerSelect') {
+        setSelectedPropertyId(data.id);
+      } else if (data.type === 'markerDeselect') {
+        setSelectedPropertyId(null);
+      } else if (data.type === 'propertyTap') {
+        handlePropertyTap(data.id);
+      } else if (data.type === 'mapError') {
+        console.error('[PropertyMapView] JS error in map:', data.message);
+        setMapError(true);
+      }
+    } catch {}
+  }, [messageToken, handlePropertyTap]);
+
+  const selectedProperty = selectedPropertyId
+    ? propertiesWithCoords.find(p => p.id === selectedPropertyId) ?? null
+    : null;
+
+  const selectedMarkerData = selectedPropertyId
+    ? mapMarkers.find(m => m.id === selectedPropertyId) ?? null
+    : null;
+
+  const previewCard = selectedProperty && selectedMarkerData ? (
+    <Pressable
+      style={[styles.previewCard, { backgroundColor: isDark ? '#1a1a1a' : '#fff' }]}
+      onPress={() => onPropertyPress(selectedProperty)}
+    >
+      <Image
+        source={{ uri: selectedProperty.photos[0] }}
+        style={styles.previewImage}
+      />
+      <View style={styles.previewInfo}>
+        <View style={styles.previewHeader}>
+          <Text style={[styles.previewPrice, { color: isDark ? '#fff' : '#111' }]}>
+            ${selectedProperty.price.toLocaleString()}/mo
+          </Text>
+          <Pressable
+            onPress={() => onToggleSave(selectedProperty.id)}
+            hitSlop={8}
+          >
+            <Feather
+              name="heart"
+              size={20}
+              color={saved.has(selectedProperty.id) ? '#EF4444' : (isDark ? 'rgba(255,255,255,0.3)' : '#ccc')}
+            />
+          </Pressable>
+        </View>
+        <Text style={[styles.previewMeta, { color: isDark ? 'rgba(255,255,255,0.5)' : '#888' }]} numberOfLines={1}>
+          {selectedProperty.bedrooms}bd {selectedProperty.bathrooms}ba · {selectedProperty.title}
+        </Text>
+        {selectedMarkerData.matchPct !== null ? (
+          <View style={styles.previewMatchRow}>
+            <View style={[styles.previewMatchBar, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#f0f0f0' }]}>
+              <View style={[styles.previewMatchFill, { width: `${selectedMarkerData.matchPct}%`, backgroundColor: selectedMarkerData.matchColor }]} />
+            </View>
+            <Text style={[styles.previewMatchText, { color: selectedMarkerData.matchColor }]}>
+              {selectedMarkerData.matchPct}% Match
+            </Text>
+          </View>
+        ) : null}
+      </View>
+    </Pressable>
+  ) : null;
+
   if (Platform.OS === 'web') {
     React.useEffect(() => {
-      const handleMessage = (event: MessageEvent) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === 'propertyTap' && data.token === messageToken) {
-            handlePropertyTap(data.id);
-          }
-        } catch {}
+      const onMsg = (event: MessageEvent) => {
+        handleMessage(event.data);
       };
-      window.addEventListener('message', handleMessage);
-      return () => window.removeEventListener('message', handleMessage);
-    }, [messageToken, handlePropertyTap]);
+      window.addEventListener('message', onMsg);
+      return () => window.removeEventListener('message', onMsg);
+    }, [handleMessage]);
 
     return (
       <View style={[styles.mapContainer, { paddingBottom: bottomInset }]}>
@@ -236,6 +337,7 @@ export const PropertyMapView = ({
             {propertiesWithCoords.length} {propertiesWithCoords.length === 1 ? 'property' : 'properties'}
           </ThemedText>
         </View>
+        {previewCard}
       </View>
     );
   }
@@ -284,16 +386,7 @@ export const PropertyMapView = ({
           console.warn('[PropertyMapView] HTTP error:', syntheticEvent.nativeEvent.statusCode);
         }}
         onMessage={(event: { nativeEvent: { data: string } }) => {
-          try {
-            const data = JSON.parse(event.nativeEvent.data);
-            if (data.type === 'propertyTap' && data.token === messageToken) {
-              handlePropertyTap(data.id);
-            }
-            if (data.type === 'mapError') {
-              console.error('[PropertyMapView] JS error in map:', data.message);
-              setMapError(true);
-            }
-          } catch {}
+          handleMessage(event.nativeEvent.data);
         }}
       />
       <View style={[styles.propertyCount, { backgroundColor: theme.backgroundDefault }]}>
@@ -302,6 +395,7 @@ export const PropertyMapView = ({
           {propertiesWithCoords.length} {propertiesWithCoords.length === 1 ? 'property' : 'properties'}
         </ThemedText>
       </View>
+      {previewCard}
     </View>
   );
 };
@@ -329,114 +423,62 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  callout: {
-    width: 240,
-    borderRadius: BorderRadius.medium,
+  previewCard: {
+    position: 'absolute',
+    bottom: 24,
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  calloutImage: {
-    width: 240,
-    height: 120,
+  previewImage: {
+    width: 100,
+    height: 100,
     resizeMode: 'cover',
   },
-  calloutInfo: {
-    padding: Spacing.md,
+  previewInfo: {
+    flex: 1,
+    padding: 12,
+    justifyContent: 'center',
   },
-  calloutMeta: {
+  previewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  previewPrice: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  previewMeta: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  previewMatchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: Spacing.xs,
+    marginTop: 8,
+    gap: 8,
   },
-  calloutSave: {
-    position: 'absolute',
-    top: Spacing.sm,
-    right: Spacing.sm,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  miniMatchBadge: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.full,
-  },
-  pinWrap: {
-    alignItems: 'center',
-  },
-  pinPhotoRing: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    borderWidth: 2.5,
-    borderColor: '#fff',
+  previewMatchBar: {
+    flex: 1,
+    height: 4,
+    borderRadius: 2,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
   },
-  pinPhotoRingSaved: {
-    borderColor: '#EF4444',
+  previewMatchFill: {
+    height: '100%',
+    borderRadius: 2,
   },
-  pinPhoto: {
-    width: 41,
-    height: 41,
-    borderRadius: 20,
-  },
-  pinPhotoFallback: {
-    width: 41,
-    height: 41,
-    borderRadius: 20,
-    backgroundColor: '#ff6b5b',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pinPhotoFallbackIcon: {
-    fontSize: 18,
-  },
-  pinPricePill: {
-    backgroundColor: '#ff6b5b',
-    borderRadius: 20,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    marginTop: 4,
-    shadowColor: 'rgba(255,80,60,0.5)',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  pinPricePillSaved: {
-    backgroundColor: '#EF4444',
-  },
-  pinPriceText: {
-    color: '#fff',
+  previewMatchText: {
     fontSize: 11,
     fontWeight: '700',
-  },
-  pinTip: {
-    width: 0,
-    height: 0,
-    borderLeftWidth: 5,
-    borderRightWidth: 5,
-    borderTopWidth: 6,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderTopColor: '#ff6b5b',
-    marginTop: -1,
-  },
-  pinTipSaved: {
-    borderTopColor: '#EF4444',
   },
   mapErrorContainer: {
     alignItems: 'center',
