@@ -24,6 +24,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getAgentResponseAlerts } from '../../services/responseTrackingService';
 import { getHostCompletionPercentage } from '../../utils/profileReminderUtils';
 import { getMonthlyUsageCount, getHostPiMonthlyLimit } from '../../services/piMatchingService';
+import { getAvailableGroups } from '../../services/piAutoMatchService';
 
 const BG = '#111';
 const CARD_BG = '#1a1a1a';
@@ -111,6 +112,7 @@ export const HostDashboardScreen = () => {
   const [piUsedThisMonth, setPiUsedThisMonth] = useState(0);
   const [piMonthlyLimit, setPiMonthlyLimit] = useState(0);
   const [piTopPicks, setPiTopPicks] = useState<{ name: string; reason: string; strength: string }[]>([]);
+  const [piAvailableGroups, setPiAvailableGroups] = useState(0);
 
   const DASH_COLLAPSE_H = 50;
   const dashScrollY = useSharedValue(0);
@@ -240,6 +242,11 @@ export const HostDashboardScreen = () => {
       });
       setPiMatchCount(total);
       setPiTopPicks(topPicks);
+
+      try {
+        const available = await getAvailableGroups(user.city ? { city: user.city } : undefined);
+        setPiAvailableGroups(available.length);
+      } catch {}
     } catch {}
 
     if (user.hostType === 'company') {
@@ -707,6 +714,35 @@ export const HostDashboardScreen = () => {
               </View>
             </View>
             <Feather name="chevron-right" size={18} color="#888" />
+          </Pressable>
+        ) : null}
+
+        {(user?.hostType === 'agent' || user?.hostType === 'company') ? (
+          <Pressable
+            style={styles.groupMatchCard}
+            onPress={() => navigation.navigate('PiMatchedGroups')}
+          >
+            <View style={styles.groupMatchLeft}>
+              <View style={[styles.groupMatchIconWrap, { backgroundColor: PURPLE + '20' }]}>
+                <Feather name="users" size={18} color={PURPLE} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.groupMatchTitle}>{'\u03C0'} Pi Matched Groups</Text>
+                <Text style={styles.groupMatchSub}>
+                  {piAvailableGroups > 0
+                    ? `${piAvailableGroups} confirmed group${piAvailableGroups !== 1 ? 's' : ''} ready to claim`
+                    : 'Browse pre-vetted roommate groups matched by Pi'}
+                </Text>
+              </View>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              {piAvailableGroups > 0 ? (
+                <View style={{ backgroundColor: PURPLE, borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2 }}>
+                  <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>{piAvailableGroups}</Text>
+                </View>
+              ) : null}
+              <Feather name="chevron-right" size={18} color="#888" />
+            </View>
           </Pressable>
         ) : null}
 

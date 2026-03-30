@@ -25,6 +25,8 @@ import { AgentGroupsScreen } from '../screens/host/AgentGroupsScreen';
 import { HostGroupMatchesScreen } from '../screens/host/HostGroupMatchesScreen';
 import { CompanyFillPipelineScreen } from '../screens/host/CompanyFillPipelineScreen';
 import { CompanyListingAIScreen } from '../screens/host/CompanyListingAIScreen';
+import { PiMatchedGroupsScreen } from '../screens/host/PiMatchedGroupsScreen';
+import { PiClaimedGroupDetailScreen } from '../screens/host/PiClaimedGroupDetailScreen';
 import { InviteExistingRoommatesScreen } from '../screens/host/InviteExistingRoommatesScreen';
 import { HostMessagesStackNavigator } from './HostMessagesStackNavigator';
 import { NotificationsScreen } from '../screens/shared/NotificationsScreen';
@@ -57,6 +59,8 @@ export type HostDashboardStackParamList = {
   BrowseRenters: { targetListingId?: string };
   RenterProfileDetail: { renter: any };
   InviteExistingRoommates: { listingId: string; count: number; listingAddress?: string };
+  PiMatchedGroups: undefined;
+  PiClaimedGroupDetail: { groupId: string };
 };
 
 export type HostGroupsStackParamList = {
@@ -112,6 +116,8 @@ function DashboardStackNavigator() {
       <DashboardStack.Screen name="BrowseRenters" component={BrowseRentersScreen} />
       <DashboardStack.Screen name="RenterProfileDetail" component={RenterProfileDetailScreen} />
       <DashboardStack.Screen name="InviteExistingRoommates" component={InviteExistingRoommatesScreen} />
+      <DashboardStack.Screen name="PiMatchedGroups" component={PiMatchedGroupsScreen} />
+      <DashboardStack.Screen name="PiClaimedGroupDetail" component={PiClaimedGroupDetailScreen} />
     </DashboardStack.Navigator>
   );
 }
