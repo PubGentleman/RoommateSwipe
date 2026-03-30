@@ -188,7 +188,7 @@ export const PiGroupInviteScreen = () => {
           setResponded(true);
           setResponseAction('accepted');
           setTimeout(() => {
-            (navigation as any).replace('Chat', { conversationId: realGroupId });
+            navigation.replace('Chat', { conversationId: `group-${realGroupId}` });
           }, 1500);
           return;
         }
@@ -235,6 +235,7 @@ export const PiGroupInviteScreen = () => {
         .eq('deadline_extended', false);
 
       if (error) {
+        Alert.alert('Already Extended', 'The deadline has already been extended for this group.');
         setExtendedTime(true);
         return;
       }
