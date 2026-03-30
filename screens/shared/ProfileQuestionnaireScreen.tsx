@@ -298,6 +298,12 @@ const ONBOARDING_STEPS: StepId[] = [
   'idealRoommate',
 ];
 
+const ONBOARDING_STEPS_LITE: StepId[] = [
+  'photos',
+  'basicInfo',
+  'budgetLocation',
+];
+
 const STEP_TITLES: Record<StepId, string> = {
   photos: 'Add Your Photos',
   basicInfo: 'About You',
@@ -355,6 +361,9 @@ export const ProfileQuestionnaireScreen = () => {
   const insets = useSafeAreaInsets();
 
   const isOnboarding = user?.onboardingStep === 'profile';
+  const isLiteOnboarding = isOnboarding && user?.role === 'renter' && (
+    user?.profileData?.apartment_search_type === 'solo' || user?.profileData?.apartment_search_type === 'with_partner'
+  );
   const missingStepsParam = (route.params as any)?.missingSteps as string[] | undefined;
   const filteredSteps = React.useMemo(() => {
     if (missingStepsParam?.length) {
@@ -363,7 +372,7 @@ export const ProfileQuestionnaireScreen = () => {
     return null;
   }, []);
   const isMissingMode = !!filteredSteps;
-  const stepsToShow = filteredSteps || (isOnboarding ? ONBOARDING_STEPS : STEP_ORDER);
+  const stepsToShow = filteredSteps || (isLiteOnboarding ? ONBOARDING_STEPS_LITE : isOnboarding ? ONBOARDING_STEPS : STEP_ORDER);
   const [currentFilteredIndex, setCurrentFilteredIndex] = useState(0);
   const currentStep = (isMissingMode || isOnboarding)
     ? STEP_ORDER.indexOf(stepsToShow[currentFilteredIndex])

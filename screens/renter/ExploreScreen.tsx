@@ -42,6 +42,7 @@ import { getReviewSummary, submitReview, checkReviewEligibility, ReviewSummary }
 
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { shouldShowRoommateFeatures } from '../../utils/renterIntentUtils';
 
 const COMMON_AMENITIES = [
   'Parking', 'Gym', 'Pool', 'In-unit Laundry', 'In-building Laundry', 'Pet Friendly',
@@ -2455,7 +2456,7 @@ export const ExploreScreen = () => {
                     ) : null}
                   </Pressable>
 
-                  {eligibleGroups.length > 0 ? (
+                  {eligibleGroups.length > 0 && shouldShowRoommateFeatures(user) ? (
                     <Pressable
                       style={styles.pdActionSecondary}
                       onPress={() => {

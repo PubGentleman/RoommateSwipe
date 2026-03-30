@@ -86,6 +86,15 @@ export const RootNavigator = () => {
 
   const step = user.onboardingStep || 'complete';
 
+  const needsRenterIntent = user.role === 'renter' && intentCompletedForUserId !== user.id && !user.profileData?.apartment_search_type;
+  if (needsRenterIntent) {
+    return (
+      <WhatAreYouLookingForScreen
+        onComplete={() => setIntentCompletedForUserId(user.id)}
+      />
+    );
+  }
+
   if (step === 'profile') {
     return (
       <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -109,15 +118,6 @@ export const RootNavigator = () => {
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="OnboardingPlan" component={PlanSelectionScreen} />
       </Stack.Navigator>
-    );
-  }
-
-  const needsRenterIntent = user.role === 'renter' && intentCompletedForUserId !== user.id && !user.profileData?.apartment_search_type;
-  if (needsRenterIntent) {
-    return (
-      <WhatAreYouLookingForScreen
-        onComplete={() => setIntentCompletedForUserId(user.id)}
-      />
     );
   }
 
