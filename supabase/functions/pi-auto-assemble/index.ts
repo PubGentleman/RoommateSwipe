@@ -10,7 +10,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const CRON_SECRET = Deno.env.get('CRON_SECRET') || '';
 
-const MIN_PAIRWISE_SCORE = 50;
+const MIN_PAIRWISE_SCORE = 51;
 const ELIGIBLE_ACTIVE_DAYS = 30;
 
 function verifyCronAuth(req: Request): boolean {
@@ -118,6 +118,14 @@ function checkGenderCompatibility(members: CandidateProfile[]): boolean {
   return true;
 }
 
+function getGenderPoolKey(pref: string, gender: string): string {
+  if (!pref || pref === 'any') return 'any';
+  if (pref === 'male_only') return 'male_only';
+  if (pref === 'female_only') return 'female_only';
+  if (pref === 'same_gender') return `same_${gender}`;
+  return 'any';
+}
+
 function greedyAssemble(
   pool: CandidateProfile[],
   targetSize: number,
@@ -137,7 +145,7 @@ function greedyAssemble(
     for (let i = 0; i < Math.min(available.length, 50); i++) {
       for (let j = i + 1; j < Math.min(available.length, 50); j++) {
         const score = calculatePairwiseScore(available[i], available[j]);
-        if (score > bestPairScore && checkGenderCompatibility([available[i], available[j]])) {
+        if (score >= MIN_PAIRWISE_SCORE && score > bestPairScore && checkGenderCompatibility([available[i], available[j]])) {
           bestPairScore = score;
           bestPair = [available[i], available[j]];
         }
@@ -186,6 +194,32 @@ function greedyAssemble(
   return groups;
 }
 
+function findReplacements(
+  pool: CandidateProfile[],
+  existingMembers: CandidateProfile[],
+  spotsNeeded: number,
+  globalReserved: Set<string>
+): CandidateProfile[] {
+  const candidates = pool.filter(c => !globalReserved.has(c.user_id));
+  const replacements: CandidateProfile[] = [];
+
+  for (const candidate of candidates) {
+    if (replacements.length >= spotsNeeded) break;
+
+    const scores = existingMembers.map(m => calculatePairwiseScore(m, candidate));
+    const minScore = Math.min(...scores);
+    if (minScore < MIN_PAIRWISE_SCORE) continue;
+
+    const testGroup = [...existingMembers, ...replacements, candidate];
+    if (!checkGenderCompatibility(testGroup)) continue;
+
+    replacements.push(candidate);
+    globalReserved.add(candidate.user_id);
+  }
+
+  return replacements;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
 
@@ -199,6 +233,9 @@ serve(async (req) => {
     const filterCity: string | undefined = body.city;
     const filterUserId: string | undefined = body.user_id;
     const dryRun: boolean = body.dry_run ?? false;
+    const replacementForGroup: string | undefined = body.replacement_for_group;
+    const spotsNeeded: number = body.spots_needed ?? 0;
+    const excludeUsers: string[] = body.exclude_users ?? [];
 
     const cutoffDate = new Date(Date.now() - ELIGIBLE_ACTIVE_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
@@ -246,9 +283,12 @@ serve(async (req) => {
         .map((u: any) => u.id)
     );
 
+    const excludeSet = new Set(excludeUsers);
+
     const eligible: CandidateProfile[] = profiles
       .filter((p: any) =>
         !inGroupSet.has(p.user_id) &&
+        !excludeSet.has(p.user_id) &&
         userMap.has(p.user_id) &&
         hasPhotoSet.has(p.user_id)
       )
@@ -269,6 +309,14 @@ serve(async (req) => {
         };
       });
 
+    if (eligible.length < 1) {
+      return jsonResponse({ groups_created: 0, message: 'Not enough eligible renters' });
+    }
+
+    if (replacementForGroup && spotsNeeded > 0) {
+      return await handleReplacementFlow(supabase, eligible, replacementForGroup, spotsNeeded, dryRun);
+    }
+
     if (eligible.length < 2) {
       return jsonResponse({ groups_created: 0, message: 'Not enough eligible renters' });
     }
@@ -286,20 +334,56 @@ serve(async (req) => {
     for (const [, pool] of cityPools) {
       if (pool.length < 2) continue;
 
-      const sizePools = new Map<number, CandidateProfile[]>();
+      const genderPrefPools = new Map<string, CandidateProfile[]>();
       for (const c of pool) {
-        const target = c.desired_roommate_count > 0 ? c.desired_roommate_count + 1 : 2;
-        if (!sizePools.has(target)) sizePools.set(target, []);
-        sizePools.get(target)!.push(c);
+        const key = getGenderPoolKey(c.household_gender_preference, c.gender);
+        if (!genderPrefPools.has(key)) genderPrefPools.set(key, []);
+        genderPrefPools.get(key)!.push(c);
       }
 
-      const noPreference = pool.filter(c => c.desired_roommate_count === 0);
+      const anyPool = genderPrefPools.get('any') || [];
 
-      for (const [size, sizePool] of sizePools) {
-        const combined = [...sizePool, ...noPreference.filter(c => !sizePool.includes(c))];
-        if (combined.length < size) continue;
-        const assembled = greedyAssemble(combined, Math.min(size, 5), globalReserved);
-        allCandidateGroups.push(...assembled);
+      for (const [genderKey, genderPool] of genderPrefPools) {
+        if (genderKey === 'any') continue;
+
+        const combinedPool = [...genderPool, ...anyPool.filter(c => !genderPool.includes(c))];
+
+        const sizePools = new Map<number, CandidateProfile[]>();
+        for (const c of combinedPool) {
+          const target = c.desired_roommate_count > 0 ? c.desired_roommate_count + 1 : 2;
+          if (!sizePools.has(target)) sizePools.set(target, []);
+          sizePools.get(target)!.push(c);
+        }
+
+        const noPreference = combinedPool.filter(c => c.desired_roommate_count === 0);
+
+        for (const [size, sizePool] of sizePools) {
+          const combined = [...sizePool, ...noPreference.filter(c => !sizePool.includes(c))];
+          if (combined.length < size) continue;
+          const assembled = greedyAssemble(combined, Math.min(size, 5), globalReserved);
+          allCandidateGroups.push(...assembled);
+        }
+      }
+
+      if (anyPool.length >= 2) {
+        const remainingAny = anyPool.filter(c => !globalReserved.has(c.user_id));
+        if (remainingAny.length >= 2) {
+          const sizePools = new Map<number, CandidateProfile[]>();
+          for (const c of remainingAny) {
+            const target = c.desired_roommate_count > 0 ? c.desired_roommate_count + 1 : 2;
+            if (!sizePools.has(target)) sizePools.set(target, []);
+            sizePools.get(target)!.push(c);
+          }
+
+          const noPreference = remainingAny.filter(c => c.desired_roommate_count === 0);
+
+          for (const [size, sizePool] of sizePools) {
+            const combined = [...sizePool, ...noPreference.filter(c => !sizePool.includes(c))];
+            if (combined.length < size) continue;
+            const assembled = greedyAssemble(combined, Math.min(size, 5), globalReserved);
+            allCandidateGroups.push(...assembled);
+          }
+        }
       }
     }
 
@@ -392,7 +476,6 @@ Respond with ONLY this JSON:
         if (dryRun) { groupsCreated++; continue; }
 
         const anchorUser = group[0];
-        const deadline = new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString();
 
         const { data: newGroup, error: groupError } = await supabase
           .from('pi_auto_groups')
@@ -404,7 +487,6 @@ Respond with ONLY this JSON:
             pi_summary: result.summary,
             pi_confidence: result.confidence,
             pi_risks: result.risks || [],
-            acceptance_deadline: deadline,
             avg_compatibility_score: avgScore,
           })
           .select('id')
@@ -458,3 +540,98 @@ Respond with ONLY this JSON:
     return errorResponse('Auto-assemble pipeline failed', 500);
   }
 });
+
+async function handleReplacementFlow(
+  supabase: any,
+  eligible: CandidateProfile[],
+  groupId: string,
+  spotsNeeded: number,
+  dryRun: boolean
+): Promise<Response> {
+  const { data: group, error: groupError } = await supabase
+    .from('pi_auto_groups')
+    .select('*')
+    .eq('id', groupId)
+    .single();
+
+  if (groupError || !group) return errorResponse('Group not found for replacement', 404);
+
+  const { data: currentMembers } = await supabase
+    .from('pi_auto_group_members')
+    .select('*')
+    .eq('group_id', groupId)
+    .eq('status', 'accepted');
+
+  if (!currentMembers || currentMembers.length === 0) {
+    return errorResponse('No accepted members in group', 400);
+  }
+
+  const currentUserIds = currentMembers.map((m: any) => m.user_id);
+  const { data: currentUsers } = await supabase
+    .from('users')
+    .select('*')
+    .in('id', currentUserIds);
+
+  const currentUserMap = new Map((currentUsers || []).map((u: any) => [u.id, u]));
+
+  const existingProfiles: CandidateProfile[] = currentMembers.map((m: any) => {
+    const u = currentUserMap.get(m.user_id) || {};
+    return {
+      user_id: m.user_id,
+      full_name: u.full_name || u.name || 'User',
+      age: u.age || 0,
+      gender: u.gender || 'other',
+      city: group.city || '',
+      budget: u.budget || 0,
+      desired_roommate_count: 0,
+      household_gender_preference: u.household_gender_preference || 'any',
+      move_in_date: null,
+      userData: u,
+      profileData: {},
+    };
+  });
+
+  const globalReserved = new Set<string>(currentUserIds);
+  const replacements = findReplacements(eligible, existingProfiles, spotsNeeded, globalReserved);
+
+  if (replacements.length === 0) {
+    return jsonResponse({
+      replacements_found: 0,
+      message: 'No compatible replacements found',
+      group_id: groupId,
+    });
+  }
+
+  if (!dryRun) {
+    const memberInserts = replacements.map(r => ({
+      group_id: groupId,
+      user_id: r.user_id,
+      status: 'pending',
+      invited_at: new Date().toISOString(),
+    }));
+
+    const { error: insertError } = await supabase
+      .from('pi_auto_group_members')
+      .insert(memberInserts);
+
+    if (insertError) return errorResponse(`Replacement insert failed: ${insertError.message}`, 500);
+
+    const newDeadline = new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString();
+    await supabase
+      .from('pi_auto_groups')
+      .update({
+        status: 'pending_acceptance',
+        acceptance_deadline: newDeadline,
+      })
+      .eq('id', groupId);
+  }
+
+  return jsonResponse({
+    replacements_found: replacements.length,
+    group_id: groupId,
+    replacements: replacements.map(r => ({
+      user_id: r.user_id,
+      name: stripName(r.full_name),
+    })),
+  });
+}

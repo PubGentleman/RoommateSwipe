@@ -1,6 +1,9 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { CORS_HEADERS, errorResponse, jsonResponse, stripName } from '../_shared/pi-utils.ts';
+import {
+  CORS_HEADERS, errorResponse, jsonResponse, stripName,
+  getPiNotifContent, sendPushNotifications,
+} from '../_shared/pi-utils.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -27,7 +30,7 @@ serve(async (req) => {
     const { data: expiredGroups, error: queryError } = await supabase
       .from('pi_auto_groups')
       .select('*')
-      .in('status', ['forming', 'invited'])
+      .in('status', ['forming', 'pending_acceptance'])
       .lt('acceptance_deadline', now);
 
     if (queryError) return errorResponse(`Query failed: ${queryError.message}`, 500);
@@ -48,7 +51,7 @@ serve(async (req) => {
       if (!members || members.length === 0) {
         await supabase
           .from('pi_auto_groups')
-          .update({ status: 'expired', dissolved_at: now })
+          .update({ status: 'dissolved', dissolved_at: now })
           .eq('id', group.id);
         dissolved++;
         continue;
@@ -79,7 +82,7 @@ serve(async (req) => {
         await supabase
           .from('pi_auto_groups')
           .update({
-            status: 'forming',
+            status: 'partial',
             acceptance_deadline: newDeadline,
           })
           .eq('id', group.id);
@@ -89,48 +92,31 @@ serve(async (req) => {
           return stripName(u?.full_name || u?.name);
         });
 
+        const notifData = {
+          groupId: group.id,
+          memberNames: acceptedNames,
+          memberCount: accepted.length,
+          spotsNeeded,
+        };
+        const content = getPiNotifContent('pi_replacement_found', notifData);
+
         for (const member of accepted) {
-          const { data: pushTokens } = await supabase
-            .from('push_tokens')
-            .select('token')
-            .eq('user_id', member.user_id);
-
-          const title = 'Looking for a replacement';
-          const body = `Not everyone in your group responded in time, but ${acceptedNames.length} of you said yes. I'm looking for ${spotsNeeded === 1 ? 'a replacement' : `${spotsNeeded} replacements`} to complete the group.`;
-
           await supabase.from('notifications').insert({
             user_id: member.user_id,
             type: 'pi_replacement_found',
-            title,
-            body,
+            title: content.title,
+            body: content.body,
             read: false,
-            data: {
-              groupId: group.id,
-              memberNames: acceptedNames,
-              memberCount: accepted.length,
-              spotsNeeded,
-            },
+            data: notifData,
           });
 
-          if (pushTokens && pushTokens.length > 0) {
-            for (const tokenRow of pushTokens) {
-              try {
-                await fetch('https://exp.host/--/api/v2/push/send', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    to: tokenRow.token,
-                    title,
-                    body,
-                    data: { type: 'pi_replacement_found', groupId: group.id },
-                    sound: 'default',
-                  }),
-                });
-              } catch (pushErr) {
-                console.error('Push send error:', pushErr);
-              }
-            }
-          }
+          await sendPushNotifications(
+            supabase,
+            member.user_id,
+            content.title,
+            content.body,
+            { type: 'pi_replacement_found', groupId: group.id }
+          );
         }
 
         try {
@@ -144,6 +130,7 @@ serve(async (req) => {
               city: group.city,
               replacement_for_group: group.id,
               spots_needed: spotsNeeded,
+              exclude_users: memberUserIds,
             }),
           });
         } catch (replacementErr) {
@@ -162,47 +149,29 @@ serve(async (req) => {
       } else {
         await supabase
           .from('pi_auto_groups')
-          .update({ status: 'expired', dissolved_at: now })
+          .update({ status: 'dissolved', dissolved_at: now })
           .eq('id', group.id);
+
+        const expiredContent = getPiNotifContent('pi_group_expired', { groupId: group.id });
 
         const allNotifiable = members.filter((m: any) => m.status === 'accepted' || m.status === 'declined');
         for (const member of allNotifiable) {
-          const title = 'Group timed out';
-          const body = `This group's acceptance window has closed. Don't worry -- I'm still working behind the scenes to find your ideal roommates. I'll reach out when I have another strong match.`;
-
           await supabase.from('notifications').insert({
             user_id: member.user_id,
             type: 'pi_group_expired',
-            title,
-            body,
+            title: expiredContent.title,
+            body: expiredContent.body,
             read: false,
             data: { groupId: group.id },
           });
 
-          const { data: pushTokens } = await supabase
-            .from('push_tokens')
-            .select('token')
-            .eq('user_id', member.user_id);
-
-          if (pushTokens && pushTokens.length > 0) {
-            for (const tokenRow of pushTokens) {
-              try {
-                await fetch('https://exp.host/--/api/v2/push/send', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    to: tokenRow.token,
-                    title,
-                    body,
-                    data: { type: 'pi_group_expired', groupId: group.id },
-                    sound: 'default',
-                  }),
-                });
-              } catch (pushErr) {
-                console.error('Push send error:', pushErr);
-              }
-            }
-          }
+          await sendPushNotifications(
+            supabase,
+            member.user_id,
+            expiredContent.title,
+            expiredContent.body,
+            { type: 'pi_group_expired', groupId: group.id }
+          );
         }
 
         dissolved++;

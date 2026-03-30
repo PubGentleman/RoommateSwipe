@@ -800,7 +800,7 @@ export interface PiUsageLog {
 
 export type GenderPreference = 'any' | 'male_only' | 'female_only' | 'same_gender';
 
-export type PiAutoMatchStatus = 'forming' | 'ready' | 'invited' | 'claimed' | 'placed' | 'expired' | 'dissolved';
+export type PiAutoMatchStatus = 'forming' | 'pending_acceptance' | 'partial' | 'ready' | 'invited' | 'claimed' | 'placed' | 'expired' | 'dissolved';
 
 export interface PiAutoGroup {
   id: string;

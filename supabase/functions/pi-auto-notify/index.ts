@@ -1,6 +1,9 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { CORS_HEADERS, errorResponse, jsonResponse, stripName } from '../_shared/pi-utils.ts';
+import {
+  CORS_HEADERS, errorResponse, jsonResponse, stripName,
+  getPiNotifContent, sendPushNotifications,
+} from '../_shared/pi-utils.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -60,7 +63,7 @@ serve(async (req) => {
     await supabase
       .from('pi_auto_groups')
       .update({
-        status: 'invited',
+        status: 'pending_acceptance',
         acceptance_deadline: deadline,
       })
       .eq('id', groupId);
@@ -77,15 +80,20 @@ serve(async (req) => {
           return stripName(u?.full_name || u?.name);
         });
 
-      const scoreText = avgScore > 0 ? ` ${avgScore}% compatible.` : '';
-      const title = 'Pi found your roommates!';
-      const notifBody = `Meet ${otherNames.join(' & ')} --${scoreText} I put this group together because I think you'd genuinely enjoy living together. You have ${ACCEPTANCE_HOURS} hours to say yes.`;
+      const content = getPiNotifContent('pi_group_assembled', {
+        groupId,
+        memberNames: otherNames,
+        groupScore: avgScore,
+        deadline,
+        memberCount: members.length,
+        city: group.city,
+      });
 
       const { error: notifError } = await supabase.from('notifications').insert({
         user_id: member.user_id,
         type: 'pi_group_assembled',
-        title,
-        body: notifBody,
+        title: content.title,
+        body: content.body,
         read: false,
         data: {
           groupId,
@@ -99,32 +107,14 @@ serve(async (req) => {
 
       if (!notifError) notificationsSent++;
 
-      const { data: pushTokenData } = await supabase
-        .from('push_tokens')
-        .select('token')
-        .eq('user_id', member.user_id);
-
-      if (pushTokenData && pushTokenData.length > 0) {
-        for (const tokenRow of pushTokenData) {
-          try {
-            await fetch('https://exp.host/--/api/v2/push/send', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                to: tokenRow.token,
-                title,
-                body: notifBody,
-                data: { type: 'pi_group_assembled', groupId },
-                sound: 'default',
-                badge: 1,
-              }),
-            });
-            pushNotificationsSent++;
-          } catch (pushErr) {
-            console.error('Push send error:', pushErr);
-          }
-        }
-      }
+      const pushCount = await sendPushNotifications(
+        supabase,
+        member.user_id,
+        content.title,
+        content.body,
+        { type: 'pi_group_assembled', groupId }
+      );
+      pushNotificationsSent += pushCount;
     }
 
     return jsonResponse({

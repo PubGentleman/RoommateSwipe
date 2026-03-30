@@ -137,6 +137,127 @@ export const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+export interface PiNotificationData {
+  groupId: string;
+  memberNames?: string[];
+  groupScore?: number;
+  acceptedBy?: string;
+  declinedBy?: string;
+  deadline?: string;
+  city?: string;
+  memberCount?: number;
+  spotsNeeded?: number;
+}
+
+export type PiNotificationType =
+  | 'pi_group_assembled'
+  | 'pi_member_accepted'
+  | 'pi_group_confirmed'
+  | 'pi_member_declined'
+  | 'pi_group_expired'
+  | 'pi_replacement_found'
+  | 'pi_agent_new_group';
+
+const PI_TEMPLATES: Record<PiNotificationType, {
+  title: (d: PiNotificationData) => string;
+  body: (d: PiNotificationData) => string;
+}> = {
+  pi_group_assembled: {
+    title: () => 'Pi found your roommates!',
+    body: (d) => {
+      const names = d.memberNames?.join(' & ') || 'your matches';
+      const score = d.groupScore ? ` ${d.groupScore}% compatible.` : '';
+      return `Meet ${names} --${score} I put this group together because I think you'd genuinely enjoy living together. You have 72 hours to say yes.`;
+    },
+  },
+  pi_member_accepted: {
+    title: () => 'Someone said yes!',
+    body: (d) => {
+      const name = d.acceptedBy || 'A group member';
+      return `${name} is in! They liked what they saw and want to be part of this group. Waiting on the others now.`;
+    },
+  },
+  pi_group_confirmed: {
+    title: () => 'Your group is official!',
+    body: (d) => {
+      const names = d.memberNames?.join(', ') || 'Everyone';
+      return `${names} -- everyone said yes. Your Pi-matched group is now active and ready to start the apartment search together.`;
+    },
+  },
+  pi_member_declined: {
+    title: () => 'A member passed',
+    body: (d) => {
+      const name = d.declinedBy || 'A group member';
+      return `${name} decided this group wasn't the right fit. I'm already looking for someone who'd be a great replacement.`;
+    },
+  },
+  pi_group_expired: {
+    title: () => 'Group timed out',
+    body: () => `This group's acceptance window has closed. Don't worry -- I'm still working behind the scenes to find your ideal roommates. I'll reach out when I have another strong match.`,
+  },
+  pi_replacement_found: {
+    title: () => 'Looking for a replacement',
+    body: (d) => {
+      const count = d.memberCount || 2;
+      const spots = d.spotsNeeded || 1;
+      return `Not everyone in your group responded in time, but ${count} of you said yes. I'm looking for ${spots === 1 ? 'a replacement' : `${spots} replacements`} to complete the group.`;
+    },
+  },
+  pi_agent_new_group: {
+    title: () => 'New Pi-matched group available',
+    body: (d) => {
+      const city = d.city || 'your area';
+      const count = d.memberCount || 2;
+      return `A new ${count}-person group just matched in ${city}. They're pre-vetted and compatible -- claim them before another host does.`;
+    },
+  },
+};
+
+export function getPiNotifContent(
+  type: PiNotificationType,
+  data: PiNotificationData
+): { title: string; body: string } {
+  const template = PI_TEMPLATES[type];
+  return { title: template.title(data), body: template.body(data) };
+}
+
+export async function sendPushNotifications(
+  supabase: any,
+  userId: string,
+  title: string,
+  body: string,
+  pushData: Record<string, any>
+): Promise<number> {
+  const { data: pushTokens } = await supabase
+    .from('push_tokens')
+    .select('token')
+    .eq('user_id', userId);
+
+  if (!pushTokens || pushTokens.length === 0) return 0;
+
+  let sent = 0;
+  for (const tokenRow of pushTokens) {
+    try {
+      await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: tokenRow.token,
+          title,
+          body,
+          data: pushData,
+          sound: 'default',
+          badge: 1,
+        }),
+      });
+      sent++;
+    } catch (err) {
+      console.error('Push send error:', err);
+    }
+  }
+  return sent;
+}
+
 export function errorResponse(message: string, status: number) {
   return new Response(JSON.stringify({ error: message }), {
     status,
