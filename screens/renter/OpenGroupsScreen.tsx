@@ -16,12 +16,16 @@ import { getOpenGroups } from '../../services/groupJoinService';
 import { OpenGroupListing } from '../../types/models';
 import { Image } from 'expo-image';
 import { Spacing } from '../../constants/theme';
+import { needsRoommates } from '../../utils/renterIntentUtils';
 
 export default function OpenGroupsScreen() {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
   const { user } = useAuth();
   const navigation = useNavigation();
+
+  const isRoommateSeeker = needsRoommates(user?.profileData?.apartment_search_type);
+
   const [groups, setGroups] = useState<OpenGroupListing[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -139,6 +143,27 @@ export default function OpenGroupsScreen() {
       </Pressable>
     );
   };
+
+  if (!isRoommateSeeker) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+          <Pressable onPress={() => navigation.goBack()} hitSlop={12}>
+            <Feather name="arrow-left" size={22} color={theme.text} />
+          </Pressable>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>Find a Group</Text>
+          <View style={{ width: 22 }} />
+        </View>
+        <View style={styles.centered}>
+          <Feather name="info" size={40} color={theme.textSecondary} />
+          <Text style={[styles.emptyTitle, { color: theme.text }]}>Not available</Text>
+          <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
+            Group browsing is only for renters looking for roommates. Update your search intent in Settings.
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>

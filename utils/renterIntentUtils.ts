@@ -1,7 +1,19 @@
 export type SearchType = 'solo' | 'with_partner' | 'with_roommates' | 'have_group' | null | undefined;
 
 export function shouldShowRoommateFeatures(searchType: SearchType): boolean {
-  return !searchType || searchType === 'with_roommates' || searchType === 'have_group';
+  return !searchType || searchType === 'with_roommates';
+}
+
+export function isPreformedGroup(searchType: SearchType): boolean {
+  return searchType === 'have_group';
+}
+
+export function isFastLane(searchType: SearchType): boolean {
+  return searchType === 'solo' || searchType === 'with_partner';
+}
+
+export function needsRoommates(searchType: SearchType): boolean {
+  return !searchType || searchType === 'with_roommates';
 }
 
 export function getIntentLabel(searchType: SearchType): string {

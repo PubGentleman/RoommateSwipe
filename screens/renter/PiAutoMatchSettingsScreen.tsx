@@ -18,6 +18,7 @@ import {
 } from '../../services/piAutoMatchService';
 import { supabase } from '../../lib/supabase';
 import { normalizeRenterPlan, getRenterPlanLimits } from '../../constants/renterPlanLimits';
+import { needsRoommates } from '../../utils/renterIntentUtils';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { ProfileStackParamList } from '../../navigation/ProfileStackNavigator';
@@ -67,6 +68,8 @@ export const PiAutoMatchSettingsScreen = () => {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<ScreenNavProp>();
+
+  const isRoommateSeeker = needsRoommates(user?.profileData?.apartment_search_type);
 
   const renterPlan = normalizeRenterPlan(user?.subscription?.plan);
   const planLimits = getRenterPlanLimits(renterPlan);
@@ -220,6 +223,27 @@ export const PiAutoMatchSettingsScreen = () => {
   }
 
   const overallStatus = getOverallStatus();
+
+  if (!isRoommateSeeker) {
+    return (
+      <View style={{ flex: 1, backgroundColor: theme.background, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 }}>
+        <View style={{ paddingTop: insets.top }}>
+          <Text style={{ fontSize: 18, fontWeight: '700', color: theme.text, textAlign: 'center', marginBottom: 8 }}>
+            Not in roommate mode
+          </Text>
+          <Text style={{ fontSize: 14, color: theme.textSecondary, textAlign: 'center', lineHeight: 20, marginBottom: 24 }}>
+            Pi Auto-Match is only available when you're looking for roommates. Update your search intent in Settings.
+          </Text>
+          <Pressable
+            onPress={() => navigation.goBack()}
+            style={{ backgroundColor: theme.primary, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 24, alignSelf: 'center' }}
+          >
+            <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Go Back</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top }]}>

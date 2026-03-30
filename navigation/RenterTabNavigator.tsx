@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { View, Pressable, StyleSheet, Platform, Text } from 'react-native';
 import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Feather } from '../components/VectorIcons';
@@ -9,10 +9,12 @@ import { RoommatesStackNavigator } from './RoommatesStackNavigator';
 import { GroupsStackNavigator } from './GroupsStackNavigator';
 import { MessagesStackNavigator } from './MessagesStackNavigator';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
+import SavedListingsScreen from '../screens/renter/SavedListingsScreen';
+import MyGroupScreen from '../screens/renter/MyGroupScreen';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotificationContext } from '../contexts/NotificationContext';
-import { shouldShowRoommateFeatures } from '../utils/renterIntentUtils';
+import { needsRoommates, isPreformedGroup, isFastLane } from '../utils/renterIntentUtils';
 
 export type RenterTabParamList = {
   Explore: { viewListingId?: string } | undefined;
@@ -20,6 +22,8 @@ export type RenterTabParamList = {
   Groups: undefined;
   Messages: undefined;
   Profile: undefined;
+  Saved: undefined;
+  MyGroup: undefined;
 };
 
 const Tab = createBottomTabNavigator<RenterTabParamList>();
@@ -30,6 +34,8 @@ const TAB_CONFIG: Record<string, { icon: string; label: string }> = {
   Groups: { icon: 'grid', label: 'Groups' },
   Messages: { icon: 'message-circle', label: 'Chat' },
   Profile: { icon: 'user', label: 'Profile' },
+  Saved: { icon: 'bookmark', label: 'Saved' },
+  MyGroup: { icon: 'grid', label: 'My Group' },
 };
 
 function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
@@ -135,14 +141,18 @@ const tabStyles = StyleSheet.create({
 
 export const RenterTabNavigator = () => {
   const { user } = useAuth();
-  const showRoommateFeatures = shouldShowRoommateFeatures(user?.profileData?.apartment_search_type);
+  const searchType = user?.profileData?.apartment_search_type;
 
-  const tabKey = showRoommateFeatures ? 'full' : 'lite';
+  const showRoommates = needsRoommates(searchType);
+  const showMyGroup = isPreformedGroup(searchType);
+  const showSaved = isFastLane(searchType);
+
+  const tabKey = showRoommates ? 'full' : showMyGroup ? 'group' : 'lite';
 
   return (
     <Tab.Navigator
       key={tabKey}
-      initialRouteName={showRoommateFeatures ? 'Roommates' : 'Explore'}
+      initialRouteName={showRoommates ? 'Roommates' : 'Explore'}
       tabBar={(props) => <CustomTabBar {...props} />}
       backBehavior="history"
       screenOptions={{
@@ -152,11 +162,17 @@ export const RenterTabNavigator = () => {
       }}
     >
       <Tab.Screen name="Explore" component={ExploreScreen} />
-      {showRoommateFeatures ? (
+      {showRoommates ? (
         <Tab.Screen name="Roommates" component={RoommatesStackNavigator} />
       ) : null}
-      {showRoommateFeatures ? (
+      {showRoommates ? (
         <Tab.Screen name="Groups" component={GroupsStackNavigator} />
+      ) : null}
+      {showMyGroup ? (
+        <Tab.Screen name="MyGroup" component={MyGroupScreen} />
+      ) : null}
+      {showSaved ? (
+        <Tab.Screen name="Saved" component={SavedListingsScreen} />
       ) : null}
       <Tab.Screen name="Messages" component={MessagesStackNavigator} />
       <Tab.Screen name="Profile" component={ProfileStackNavigator} />

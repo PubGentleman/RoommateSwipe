@@ -8,6 +8,7 @@ import { ScreenKeyboardAwareScrollView } from '../../components/ScreenKeyboardAw
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
+import { needsRoommates } from '../../utils/renterIntentUtils';
 import { Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { calculateZodiacFromBirthday } from '../../utils/zodiacUtils';
 import { updateUser as supabaseUpdateUser, updateProfile as supabaseUpdateProfile, uploadProfilePhoto } from '../../services/profileService';
@@ -22,6 +23,7 @@ export const EditProfileScreen = () => {
   const { theme } = useTheme();
   const { user, updateUser } = useAuth();
   const navigation = useNavigation();
+  const needsRoommatesCheck = needsRoommates(user?.profileData?.apartment_search_type);
   const { alert } = useConfirm();
   
   const [photos, setPhotos] = useState<string[]>(user?.photos || [user?.profilePicture].filter(Boolean) as string[] || []);
@@ -909,6 +911,8 @@ export const EditProfileScreen = () => {
 
         </View>
 
+        {needsRoommatesCheck ? (
+        <>
         {/* Roommate Matching */}
         <View style={styles.section}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: Spacing.xs }}>
@@ -981,6 +985,8 @@ export const EditProfileScreen = () => {
             </Pressable>
           </View>
         </View>
+        </>
+        ) : null}
 
         {/* Shared Expenses */}
         <View style={styles.section}>
