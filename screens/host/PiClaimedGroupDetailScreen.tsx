@@ -78,15 +78,21 @@ export const PiClaimedGroupDetailScreen = () => {
 
       const memberUserIds = memberData.map(m => m.user_id);
       if (memberUserIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from('users')
-          .select('id, full_name, avatar_url, age, bio, occupation, city')
-          .in('id', memberUserIds);
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('user_id, full_name, avatar_url, age, bio, occupation, city')
+          .in('user_id', memberUserIds);
 
-        const enriched: MemberProfile[] = (profiles || []).map(p => {
-          const memberRow = memberData.find(m => m.user_id === p.id);
+        const enriched: MemberProfile[] = (profileData || []).map(p => {
+          const memberRow = memberData.find(m => m.user_id === p.user_id);
           return {
-            ...p,
+            id: p.user_id,
+            full_name: p.full_name,
+            avatar_url: p.avatar_url,
+            age: p.age,
+            bio: p.bio,
+            occupation: p.occupation,
+            city: p.city,
             compatibility_score: memberRow?.compatibility_score,
             pi_reason: memberRow?.pi_reason,
           };
@@ -153,8 +159,24 @@ export const PiClaimedGroupDetailScreen = () => {
     setReleasing(false);
   };
 
-  const handleSendIntro = () => {
+  const handleSendIntro = async () => {
+    if (!user || !groupId) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    const introMessage = `Hi! I'm ${user.name || 'your potential host'} and I'd love to connect with your group about a place I have available. Looking forward to chatting!`;
     const chatId = `pi-group-${groupId}`;
+
+    try {
+      await supabase.from('messages').insert({
+        conversation_id: chatId,
+        sender_id: user.id,
+        content: introMessage,
+        type: 'text',
+      });
+    } catch {}
+
+    if (claimStep === 'Claimed') setClaimStep('Contacted');
+
     navigation.navigate('Messages', {
       screen: 'Chat',
       params: { conversationId: chatId, groupId },

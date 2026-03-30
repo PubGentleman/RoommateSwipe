@@ -10,7 +10,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../contexts/AuthContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
-import { StorageService } from '../../utils/storage';
 import { PiAutoGroup } from '../../types/models';
 import {
   getAvailableGroups,
@@ -18,7 +17,7 @@ import {
   getClaimAllowance,
   getClaimsUsedThisMonth,
 } from '../../services/piAutoMatchService';
-import { getAgentPlanLimits, getAutoClaimLimits, type AgentPlan } from '../../constants/planLimits';
+import { getAutoClaimLimits, type AgentPlan } from '../../constants/planLimits';
 
 const BG = '#111';
 const CARD_BG = '#1a1a1a';
@@ -45,15 +44,24 @@ export const PiMatchedGroupsScreen = () => {
   const [claimingId, setClaimingId] = useState<string | null>(null);
 
   const [cityFilter, setCityFilter] = useState('');
+  const [neighborhoodFilter, setNeighborhoodFilter] = useState('');
   const [sizeFilter, setSizeFilter] = useState<number | null>(null);
+  const [budgetMinFilter, setBudgetMinFilter] = useState('');
+  const [budgetMaxFilter, setBudgetMaxFilter] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('score');
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [tempCity, setTempCity] = useState('');
+  const [tempNeighborhood, setTempNeighborhood] = useState('');
   const [tempSize, setTempSize] = useState<number | null>(null);
+  const [tempBudgetMin, setTempBudgetMin] = useState('');
+  const [tempBudgetMax, setTempBudgetMax] = useState('');
 
   const hostPlan = user?.hostSubscription?.plan || 'free';
   const hostType = user?.hostType || 'individual';
   const agentPlan = user?.agentPlan as AgentPlan | undefined;
+  const isFreePlan = hostType === 'agent'
+    ? (!agentPlan || agentPlan === 'pay_per_use')
+    : (hostPlan === 'free' || hostPlan === 'none');
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -63,10 +71,7 @@ export const PiMatchedGroupsScreen = () => {
         getClaimsUsedThisMonth(user.id),
       ]);
 
-      const limits = getAutoClaimLimits(
-        agentPlan || hostPlan,
-        hostType
-      );
+      const limits = getAutoClaimLimits(agentPlan || hostPlan, hostType);
       setFreeClaimsTotal(limits.freePerMonth);
       setClaimsUsed(usage.total);
       setFreeRemaining(
@@ -74,14 +79,14 @@ export const PiMatchedGroupsScreen = () => {
       );
 
       setGroups(available);
-      applyFiltersAndSort(available, sizeFilter, sortBy);
+      applyFiltersAndSort(available, sizeFilter, sortBy, neighborhoodFilter, budgetMinFilter, budgetMaxFilter);
     } catch {
       setGroups([]);
       setFilteredGroups([]);
     }
     setLoading(false);
     setRefreshing(false);
-  }, [user, cityFilter, sizeFilter, sortBy, agentPlan, hostPlan, hostType]);
+  }, [user, cityFilter, sizeFilter, sortBy, agentPlan, hostPlan, hostType, neighborhoodFilter, budgetMinFilter, budgetMaxFilter]);
 
   useFocusEffect(
     useCallback(() => {
@@ -93,11 +98,29 @@ export const PiMatchedGroupsScreen = () => {
   const applyFiltersAndSort = (
     data: PiAutoGroup[],
     size: number | null,
-    sort: SortOption
+    sort: SortOption,
+    neighborhood: string,
+    budMin: string,
+    budMax: string,
   ) => {
     let result = [...data];
     if (size) {
       result = result.filter(g => g.max_members === size);
+    }
+    if (neighborhood) {
+      const nfLower = neighborhood.toLowerCase();
+      result = result.filter(g =>
+        g.neighborhoods?.some(n => n.toLowerCase().includes(nfLower)) ||
+        g.city?.toLowerCase().includes(nfLower)
+      );
+    }
+    const parsedMin = budMin ? parseInt(budMin, 10) : 0;
+    const parsedMax = budMax ? parseInt(budMax, 10) : 0;
+    if (parsedMin > 0) {
+      result = result.filter(g => (g.budget_max || 0) >= parsedMin);
+    }
+    if (parsedMax > 0) {
+      result = result.filter(g => (g.budget_min || 0) <= parsedMax);
     }
     switch (sort) {
       case 'score':
@@ -116,11 +139,20 @@ export const PiMatchedGroupsScreen = () => {
   const handleClaimGroup = async (group: PiAutoGroup) => {
     if (!user) return;
 
-    const allowance = await getClaimAllowance(
-      user.id,
-      agentPlan || hostPlan,
-      hostType
-    );
+    if (isFreePlan) {
+      const confirmed = await confirm({
+        title: 'Upgrade Required',
+        message: 'Group claims require a Starter plan or higher. Upgrade to access Pi matched groups.',
+        confirmText: 'View Plans',
+        cancelText: 'Not Now',
+      });
+      if (confirmed) {
+        navigation.navigate('HostSubscription');
+      }
+      return;
+    }
+
+    const allowance = await getClaimAllowance(user.id, agentPlan || hostPlan, hostType);
 
     if (!allowance.allowed) {
       showAlert({
@@ -144,13 +176,8 @@ export const PiMatchedGroupsScreen = () => {
     setClaimingId(group.id);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    const listingId = '';
     const success = await claimGroup(
-      group.id,
-      user.id,
-      listingId,
-      allowance.isFree,
-      allowance.priceCents
+      group.id, user.id, '', allowance.isFree, allowance.priceCents
     );
 
     if (success) {
@@ -158,7 +185,6 @@ export const PiMatchedGroupsScreen = () => {
       setFilteredGroups(prev => prev.filter(g => g.id !== group.id));
       setClaimsUsed(prev => prev + 1);
       if (freeRemaining > 0) setFreeRemaining(prev => prev - 1);
-
       navigation.navigate('PiClaimedGroupDetail', { groupId: group.id });
     } else {
       showAlert({
@@ -171,14 +197,18 @@ export const PiMatchedGroupsScreen = () => {
 
   const applyFilterModal = () => {
     setCityFilter(tempCity);
+    setNeighborhoodFilter(tempNeighborhood);
     setSizeFilter(tempSize);
+    setBudgetMinFilter(tempBudgetMin);
+    setBudgetMaxFilter(tempBudgetMax);
     setShowFilterModal(false);
-    applyFiltersAndSort(
-      tempCity ? groups.filter(g => g.city?.toLowerCase().includes(tempCity.toLowerCase())) : groups,
-      tempSize,
-      sortBy
-    );
+    const cityFiltered = tempCity
+      ? groups.filter(g => g.city?.toLowerCase().includes(tempCity.toLowerCase()))
+      : groups;
+    applyFiltersAndSort(cityFiltered, tempSize, sortBy, tempNeighborhood, tempBudgetMin, tempBudgetMax);
   };
+
+  const hasActiveFilters = cityFilter || neighborhoodFilter || sizeFilter || budgetMinFilter || budgetMaxFilter;
 
   const getScoreColor = (score: number) => {
     if (score >= 80) return GREEN;
@@ -188,9 +218,16 @@ export const PiMatchedGroupsScreen = () => {
 
   const formatBudget = (min: number, max: number) => {
     if (!min && !max) return '';
-    const fmtMin = min >= 1000 ? `$${(min / 1000).toFixed(1)}k` : `$${min}`;
-    const fmtMax = max >= 1000 ? `$${(max / 1000).toFixed(1)}k` : `$${max}`;
-    return `${fmtMin} - ${fmtMax}`;
+    const fmt = (v: number) => v >= 1000 ? `$${(v / 1000).toFixed(1)}k` : `$${v}`;
+    return `${fmt(min)} - ${fmt(max)}`;
+  };
+
+  const AMENITY_ICONS: Record<string, string> = {
+    laundry: 'wind', dishwasher: 'disc', parking: 'truck',
+    gym: 'activity', pool: 'droplet', doorman: 'shield',
+    elevator: 'arrow-up', ac: 'thermometer', pets: 'heart',
+    wifi: 'wifi', storage: 'archive', balcony: 'sun',
+    rooftop: 'sunrise',
   };
 
   const renderGroupCard = ({ item }: { item: PiAutoGroup }) => {
@@ -211,7 +248,7 @@ export const PiMatchedGroupsScreen = () => {
                 {item.max_members} {item.max_members === 1 ? 'person' : 'people'}
               </Text>
             </View>
-            {item.desired_bedrooms > 0 ? (
+            {item.desired_bedrooms !== 0 ? (
               <View style={[styles.sizeBadge, { backgroundColor: '#3b82f6' + '20' }]}>
                 <Feather name="home" size={12} color="#3b82f6" />
                 <Text style={[styles.sizeBadgeText, { color: '#3b82f6' }]}>
@@ -251,6 +288,13 @@ export const PiMatchedGroupsScreen = () => {
           </View>
         ) : null}
 
+        {item.gender_composition ? (
+          <View style={styles.infoRow}>
+            <Feather name="user" size={12} color="rgba(255,255,255,0.5)" />
+            <Text style={styles.infoText}>{item.gender_composition}</Text>
+          </View>
+        ) : null}
+
         {item.pi_rationale ? (
           <Text style={styles.rationale} numberOfLines={2}>
             {item.pi_rationale}
@@ -277,7 +321,14 @@ export const PiMatchedGroupsScreen = () => {
 
   const renderHeader = () => (
     <View>
-      {freeClaimsTotal !== 0 ? (
+      {isFreePlan ? (
+        <View style={[styles.allowanceBanner, { backgroundColor: ACCENT + '15' }]}>
+          <Feather name="lock" size={14} color={ACCENT} />
+          <Text style={[styles.allowanceText, { color: ACCENT }]}>
+            Upgrade to a Starter plan or higher to claim groups.
+          </Text>
+        </View>
+      ) : freeClaimsTotal !== 0 ? (
         <View style={styles.allowanceBanner}>
           <Feather name="info" size={14} color={PURPLE} />
           <Text style={styles.allowanceText}>
@@ -297,7 +348,7 @@ export const PiMatchedGroupsScreen = () => {
             style={[styles.sortChip, sortBy === opt ? styles.sortChipActive : null]}
             onPress={() => {
               setSortBy(opt);
-              applyFiltersAndSort(groups, sizeFilter, opt);
+              applyFiltersAndSort(groups, sizeFilter, opt, neighborhoodFilter, budgetMinFilter, budgetMaxFilter);
             }}
           >
             <Text style={[styles.sortChipText, sortBy === opt ? styles.sortChipTextActive : null]}>
@@ -316,9 +367,9 @@ export const PiMatchedGroupsScreen = () => {
       </View>
       <Text style={styles.emptyTitle}>No matched groups available</Text>
       <Text style={styles.emptySubtitle}>
-        {cityFilter
-          ? `No matched groups in "${cityFilter}" yet. Try removing the city filter.`
-          : 'Pi is working on assembling compatible roommate groups in your area!'}
+        {hasActiveFilters
+          ? 'No groups match your filters. Try adjusting or clearing them.'
+          : 'No matched groups available in your area yet. Pi is working on it!'}
       </Text>
     </View>
   );
@@ -334,11 +385,14 @@ export const PiMatchedGroupsScreen = () => {
           style={styles.filterBtn}
           onPress={() => {
             setTempCity(cityFilter);
+            setTempNeighborhood(neighborhoodFilter);
             setTempSize(sizeFilter);
+            setTempBudgetMin(budgetMinFilter);
+            setTempBudgetMax(budgetMaxFilter);
             setShowFilterModal(true);
           }}
         >
-          <Feather name="sliders" size={18} color={(cityFilter || sizeFilter) ? PURPLE : '#888'} />
+          <Feather name="sliders" size={18} color={hasActiveFilters ? PURPLE : '#888'} />
         </Pressable>
       </View>
 
@@ -357,10 +411,7 @@ export const PiMatchedGroupsScreen = () => {
           ListEmptyComponent={renderEmpty}
           showsVerticalScrollIndicator={false}
           refreshing={refreshing}
-          onRefresh={() => {
-            setRefreshing(true);
-            loadData();
-          }}
+          onRefresh={() => { setRefreshing(true); loadData(); }}
         />
       )}
 
@@ -378,7 +429,37 @@ export const PiMatchedGroupsScreen = () => {
               placeholderTextColor="rgba(255,255,255,0.3)"
             />
 
-            <Text style={styles.modalLabel}>Group Size</Text>
+            <Text style={styles.modalLabel}>Neighborhood</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={tempNeighborhood}
+              onChangeText={setTempNeighborhood}
+              placeholder="e.g. Williamsburg"
+              placeholderTextColor="rgba(255,255,255,0.3)"
+            />
+
+            <Text style={styles.modalLabel}>Budget Range</Text>
+            <View style={styles.budgetRow}>
+              <TextInput
+                style={[styles.modalInput, { flex: 1, marginBottom: 0 }]}
+                value={tempBudgetMin}
+                onChangeText={setTempBudgetMin}
+                placeholder="Min"
+                placeholderTextColor="rgba(255,255,255,0.3)"
+                keyboardType="numeric"
+              />
+              <Text style={{ color: 'rgba(255,255,255,0.3)', paddingHorizontal: 8 }}>-</Text>
+              <TextInput
+                style={[styles.modalInput, { flex: 1, marginBottom: 0 }]}
+                value={tempBudgetMax}
+                onChangeText={setTempBudgetMax}
+                placeholder="Max"
+                placeholderTextColor="rgba(255,255,255,0.3)"
+                keyboardType="numeric"
+              />
+            </View>
+
+            <Text style={[styles.modalLabel, { marginTop: 16 }]}>Group Size</Text>
             <View style={styles.sizeFilterRow}>
               {[null, 2, 3, 4].map(size => (
                 <Pressable
@@ -398,10 +479,13 @@ export const PiMatchedGroupsScreen = () => {
                 style={styles.modalClearBtn}
                 onPress={() => {
                   setTempCity('');
+                  setTempNeighborhood('');
                   setTempSize(null);
+                  setTempBudgetMin('');
+                  setTempBudgetMax('');
                 }}
               >
-                <Text style={styles.modalClearText}>Clear</Text>
+                <Text style={styles.modalClearText}>Clear All</Text>
               </Pressable>
               <Pressable style={styles.modalApplyBtn} onPress={applyFilterModal}>
                 <Text style={styles.modalApplyText}>Apply</Text>
@@ -497,6 +581,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: 12,
     color: '#fff', fontSize: 14, marginBottom: 16, borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
+  },
+  budgetRow: {
+    flexDirection: 'row', alignItems: 'center', marginBottom: 0,
   },
   sizeFilterRow: { flexDirection: 'row', gap: 8, marginBottom: 20 },
   sizeChip: {

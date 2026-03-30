@@ -123,6 +123,12 @@ CREATE POLICY "Users can view members of their groups" ON public.pi_auto_group_m
       SELECT 1 FROM public.pi_auto_group_members m
       WHERE m.group_id = pi_auto_group_members.group_id AND m.user_id = auth.uid()
     )
+    OR EXISTS (
+      SELECT 1 FROM public.pi_group_claims c
+      WHERE c.group_id = pi_auto_group_members.group_id
+        AND c.host_id = auth.uid()
+        AND c.status IN ('pending', 'accepted')
+    )
   );
 
 CREATE POLICY "Users can update their own membership" ON public.pi_auto_group_members
