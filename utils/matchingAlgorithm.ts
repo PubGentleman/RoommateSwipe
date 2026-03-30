@@ -1271,6 +1271,7 @@ export interface GroupCompatibilityResult {
   moveInAligned: boolean;
   dealbreakerConflicts: string[];
   memberScores: Array<{ userId1: string; userId2: string; score: number }>;
+  passesMinPairwiseThreshold: boolean;
 }
 
 function getMemberName(m: User | RoommateProfile): string {
@@ -1354,6 +1355,7 @@ export function calculateGroupCompatibility(
     moveInAligned: checkMoveInAlignment(members),
     dealbreakerConflicts,
     memberScores: pairScores,
+    passesMinPairwiseThreshold: min > 50,
   };
 }
 
