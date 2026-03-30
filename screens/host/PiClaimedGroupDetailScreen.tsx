@@ -160,27 +160,68 @@ export const PiClaimedGroupDetailScreen = () => {
   };
 
   const handleSendIntro = async () => {
-    if (!user || !groupId) return;
+    if (!user || !groupId || members.length === 0) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     const introMessage = `Hi! I'm ${user.name || 'your potential host'} and I'd love to connect with your group about a place I have available. Looking forward to chatting!`;
-    const chatId = `pi-group-${groupId}`;
+    const anchorMember = members[0];
 
     try {
+      const userId1 = user.id < anchorMember.id ? user.id : anchorMember.id;
+      const userId2 = user.id < anchorMember.id ? anchorMember.id : user.id;
+
+      const { data: existingMatch } = await supabase
+        .from('matches')
+        .select('id')
+        .eq('user_id_1', userId1)
+        .eq('user_id_2', userId2)
+        .maybeSingle();
+
+      let matchId: string;
+
+      if (existingMatch) {
+        matchId = existingMatch.id;
+      } else {
+        const { data: newMatch, error: matchError } = await supabase
+          .from('matches')
+          .insert({
+            user_id_1: userId1,
+            user_id_2: userId2,
+            match_type: 'pi_group',
+            status: 'matched',
+          })
+          .select()
+          .single();
+
+        if (matchError || !newMatch) {
+          showAlert({
+            title: 'Error',
+            message: 'Could not start conversation. Please try again.',
+          });
+          return;
+        }
+        matchId = newMatch.id;
+      }
+
       await supabase.from('messages').insert({
-        conversation_id: chatId,
+        match_id: matchId,
         sender_id: user.id,
         content: introMessage,
-        type: 'text',
       });
-    } catch {}
 
-    if (claimStep === 'Claimed') setClaimStep('Contacted');
+      if (claimStep === 'Claimed') setClaimStep('Contacted');
 
-    navigation.navigate('Messages', {
-      screen: 'Chat',
-      params: { conversationId: chatId, groupId },
-    });
+      navigation.navigate('Messages', {
+        screen: 'Chat',
+        params: { matchId },
+      });
+    } catch (e) {
+      console.warn('[handleSendIntro] error:', e);
+      showAlert({
+        title: 'Error',
+        message: 'Could not send introduction. Please try again.',
+      });
+    }
   };
 
   const handleMatchListing = (listing: Property) => {

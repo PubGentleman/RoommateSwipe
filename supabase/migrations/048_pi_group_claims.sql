@@ -77,9 +77,10 @@ CREATE POLICY "Users can view members of their groups or claimed hosts" ON publi
   );
 
 -- Atomic claim function: only succeeds if group is still 'ready' and no active claim exists
+-- Uses auth.uid() for host identity — ignores client-supplied host ID
 CREATE OR REPLACE FUNCTION public.claim_pi_group(
   p_group_id UUID,
-  p_host_id UUID,
+  p_host_id UUID DEFAULT NULL,
   p_listing_id TEXT DEFAULT NULL,
   p_is_free BOOLEAN DEFAULT false,
   p_price_cents INTEGER DEFAULT 0
@@ -87,7 +88,13 @@ CREATE OR REPLACE FUNCTION public.claim_pi_group(
 DECLARE
   v_claim_id UUID;
   v_group_status TEXT;
+  v_host_id UUID;
 BEGIN
+  v_host_id := auth.uid();
+  IF v_host_id IS NULL THEN
+    RAISE EXCEPTION 'Authentication required';
+  END IF;
+
   SELECT status INTO v_group_status
   FROM public.pi_auto_groups
   WHERE id = p_group_id
@@ -102,7 +109,7 @@ BEGIN
   END IF;
 
   INSERT INTO public.pi_group_claims (group_id, host_id, listing_id, is_free_claim, claim_price_cents)
-  VALUES (p_group_id, p_host_id, p_listing_id, p_is_free, p_price_cents)
+  VALUES (p_group_id, v_host_id, p_listing_id, p_is_free, p_price_cents)
   RETURNING id INTO v_claim_id;
 
   UPDATE public.pi_auto_groups
@@ -111,4 +118,7 @@ BEGIN
 
   RETURN v_claim_id;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY INVOKER;
+
+REVOKE ALL ON FUNCTION public.claim_pi_group FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.claim_pi_group TO authenticated;
