@@ -14,6 +14,7 @@ import {
   setAutoMatchEnabled,
   getAutoMatchStats,
   getUserAutoGroups,
+  updateAutoMatchPreferences,
 } from '../../services/piAutoMatchService';
 import { supabase } from '../../lib/supabase';
 import { normalizeRenterPlan, getRenterPlanLimits } from '../../constants/renterPlanLimits';
@@ -144,14 +145,11 @@ export const PiAutoMatchSettingsScreen = () => {
     if (!user?.id) return;
     setSavingPrefs(true);
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ [field]: value })
-        .eq('user_id', user.id);
-      if (error) {
-        Alert.alert('Error', 'Could not save preference.');
-      } else {
+      const success = await updateAutoMatchPreferences(user.id, { [field]: value });
+      if (success) {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } else {
+        Alert.alert('Error', 'Could not save preference.');
       }
     } catch {
       Alert.alert('Error', 'Could not save preference.');

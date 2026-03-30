@@ -240,7 +240,7 @@ export const PiGroupInviteScreen = () => {
         .from('pi_auto_groups')
         .update({ acceptance_deadline: newDeadline, deadline_extended: true })
         .eq('id', invite.group_id)
-        .is('deadline_extended', null);
+        .not('deadline_extended', 'eq', true);
 
       if (error) {
         const { data: check } = await supabase

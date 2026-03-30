@@ -443,6 +443,25 @@ export async function getPendingAutoGroupCount(userId: string): Promise<number> 
   }
 }
 
+export async function updateAutoMatchPreferences(
+  userId: string,
+  preferences: {
+    desired_roommate_count?: number;
+    desired_bedroom_count?: number;
+    household_gender_preference?: string;
+  }
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('profiles')
+      .update(preferences)
+      .eq('user_id', userId);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
 export async function canJoinAutoGroup(
   userId: string,
   renterPlan: string
