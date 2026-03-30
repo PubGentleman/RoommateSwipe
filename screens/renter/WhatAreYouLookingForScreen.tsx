@@ -143,6 +143,12 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
       doSave(listingPref, searchType);
       return;
     }
+
+    if (currentSearch === searchType) {
+      doSave(listingPref, searchType);
+      return;
+    }
+
     const wasMatching = currentSearch === 'with_roommates';
     const willMatch = searchType === 'with_roommates';
     const wasGroup = currentSearch === 'have_group';

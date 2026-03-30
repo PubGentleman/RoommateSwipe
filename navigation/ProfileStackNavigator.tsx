@@ -86,13 +86,25 @@ const darkHeaderOptions = {
   headerShadowVisible: false,
 };
 
-export const ProfileStackNavigator = () => {
+function SearchIntentScreen({ navigation }: { navigation: { goBack: () => void } }) {
   const { user } = useAuth();
   const currentSearchType = user?.profileData?.apartment_search_type;
   const currentIntent = currentSearchType === 'with_roommates' ? 'find_roommates' as const
     : currentSearchType === 'solo' || currentSearchType === 'with_partner' || currentSearchType === 'have_group' ? 'find_place' as const
     : undefined;
 
+  return (
+    <WhatAreYouLookingForScreen
+      isSettings
+      onComplete={() => navigation.goBack()}
+      initialIntent={currentIntent}
+      initialSubIntent={currentSearchType}
+      initialListingPref={user?.profileData?.listing_type_preference}
+    />
+  );
+}
+
+export const ProfileStackNavigator = () => {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="ProfileMain" component={ProfileScreen} />
@@ -355,18 +367,9 @@ export const ProfileStackNavigator = () => {
       />
       <Stack.Screen
         name="SearchIntent"
+        component={SearchIntentScreen}
         options={{ headerShown: false }}
-      >
-        {({ navigation: nav }: { navigation: { goBack: () => void } }) => (
-          <WhatAreYouLookingForScreen
-            isSettings
-            onComplete={() => nav.goBack()}
-            initialIntent={currentIntent}
-            initialSubIntent={currentSearchType}
-            initialListingPref={user?.profileData?.listing_type_preference}
-          />
-        )}
-      </Stack.Screen>
+      />
     </Stack.Navigator>
   );
 };
