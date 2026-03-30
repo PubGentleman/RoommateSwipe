@@ -213,7 +213,7 @@ export const PiClaimedGroupDetailScreen = () => {
 
       navigation.navigate('Messages', {
         screen: 'Chat',
-        params: { matchId },
+        params: { conversationId: matchId },
       });
     } catch (e) {
       console.warn('[handleSendIntro] error:', e);

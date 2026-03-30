@@ -225,24 +225,18 @@ export async function claimGroup(
   }
 }
 
-export async function releaseGroup(groupId: string, hostId: string): Promise<boolean> {
+export async function releaseGroup(groupId: string, _hostId: string): Promise<boolean> {
   try {
-    const now = new Date().toISOString();
-    const { error } = await supabase
-      .from('pi_group_claims')
-      .update({ status: 'withdrawn', responded_at: now })
-      .eq('group_id', groupId)
-      .eq('host_id', hostId)
-      .eq('status', 'pending');
+    const { data, error } = await supabase.rpc('release_pi_group', {
+      p_group_id: groupId,
+    });
 
-    if (error) return false;
+    if (error) {
+      console.warn('[releaseGroup] RPC error:', error.message);
+      return false;
+    }
 
-    await supabase
-      .from('pi_auto_groups')
-      .update({ status: 'ready' })
-      .eq('id', groupId);
-
-    return true;
+    return !!data;
   } catch {
     return false;
   }

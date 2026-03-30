@@ -77,7 +77,8 @@ CREATE POLICY "Users can view members of their groups or claimed hosts" ON publi
   );
 
 -- Atomic claim function: only succeeds if group is still 'ready' and no active claim exists
--- Uses auth.uid() for host identity — ignores client-supplied host ID
+-- SECURITY DEFINER to bypass RLS for UPDATE on pi_auto_groups
+-- Always uses auth.uid() — ignores client-supplied host ID
 CREATE OR REPLACE FUNCTION public.claim_pi_group(
   p_group_id UUID,
   p_host_id UUID DEFAULT NULL,
@@ -118,7 +119,49 @@ BEGIN
 
   RETURN v_claim_id;
 END;
-$$ LANGUAGE plpgsql SECURITY INVOKER;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 REVOKE ALL ON FUNCTION public.claim_pi_group FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.claim_pi_group TO authenticated;
+
+-- Atomic release function: returns group to 'ready' and withdraws claim
+-- SECURITY DEFINER to bypass RLS for UPDATE on pi_auto_groups
+CREATE OR REPLACE FUNCTION public.release_pi_group(
+  p_group_id UUID
+) RETURNS BOOLEAN AS $$
+DECLARE
+  v_host_id UUID;
+  v_rows INTEGER;
+BEGIN
+  v_host_id := auth.uid();
+  IF v_host_id IS NULL THEN
+    RAISE EXCEPTION 'Authentication required';
+  END IF;
+
+  UPDATE public.pi_group_claims
+  SET status = 'withdrawn', responded_at = now()
+  WHERE group_id = p_group_id
+    AND host_id = v_host_id
+    AND status IN ('pending', 'accepted');
+
+  GET DIAGNOSTICS v_rows = ROW_COUNT;
+  IF v_rows = 0 THEN
+    RETURN false;
+  END IF;
+
+  UPDATE public.pi_auto_groups
+  SET status = 'ready'
+  WHERE id = p_group_id
+    AND status = 'claimed';
+
+  RETURN true;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+REVOKE ALL ON FUNCTION public.release_pi_group FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.release_pi_group TO authenticated;
+
+-- Backfill columns for environments that already applied 047
+ALTER TABLE public.pi_auto_groups
+  ADD COLUMN IF NOT EXISTS amenity_preferences TEXT[] DEFAULT '{}',
+  ADD COLUMN IF NOT EXISTS location_preferences TEXT[] DEFAULT '{}';
