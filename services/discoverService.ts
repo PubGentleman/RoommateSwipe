@@ -56,11 +56,11 @@ export async function getSwipeDeck(city?: string, filters?: {
     const photos = p.profile?.photos || p.photos || [];
     if (!Array.isArray(photos) || photos.length < 1) return false;
     const pSearchType = p.profile?.apartment_search_type;
-    if (pSearchType === 'solo' || pSearchType === 'with_partner' || pSearchType === 'have_group') return false;
+    if (pSearchType === 'solo' || pSearchType === 'with_partner') return false;
     return true;
   });
 
-  if (currentSearchType === 'solo' || currentSearchType === 'with_partner' || currentSearchType === 'have_group') {
+  if (currentSearchType === 'solo' || currentSearchType === 'with_partner') {
     return [];
   }
 

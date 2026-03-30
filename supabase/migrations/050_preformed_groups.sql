@@ -129,4 +129,4 @@ CREATE POLICY shortlist_delete ON public.group_shortlist
 UPDATE public.profiles
 SET listing_type_preference = 'room'
 WHERE listing_type_preference IS NULL
-  AND (SELECT role FROM auth.users WHERE id = profiles.user_id) = 'renter';
+  AND role = 'renter';
