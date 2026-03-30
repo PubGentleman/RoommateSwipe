@@ -226,6 +226,7 @@ export const PropertyMapView = ({
 
   const MapView = require('react-native-maps').default;
   const { Marker, Callout, PROVIDER_GOOGLE } = require('react-native-maps');
+  const mapProvider = Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined;
 
   if (mapError) {
     return (
@@ -246,7 +247,7 @@ export const PropertyMapView = ({
   return (
     <View style={styles.mapContainer}>
       <MapView
-        provider={PROVIDER_GOOGLE}
+        provider={mapProvider}
         style={styles.map}
         initialRegion={initialRegion}
         showsUserLocation={false}
