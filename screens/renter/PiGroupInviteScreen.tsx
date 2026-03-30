@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, ActivityIndicator, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, ScrollView, Alert, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -109,8 +109,12 @@ export const PiGroupInviteScreen = () => {
         .single();
 
       if (groupData) {
-        setGroup(groupData as PiAutoGroup);
+        const groupRecord = groupData as PiAutoGroup;
+        setGroup(groupRecord);
         setTimeRemaining(getTimeRemaining(groupData.expires_at));
+        if ((groupData as Record<string, unknown>).deadline_extended) {
+          setExtendedTime(true);
+        }
       }
 
       const memberList = await getAutoGroupMembers(pendingInvite.group_id);
@@ -220,19 +224,25 @@ export const PiGroupInviteScreen = () => {
   };
 
   const handleExtendTime = async () => {
-    if (!invite || extendedTime) return;
+    if (!invite || extendedTime || !group?.expires_at) return;
     try {
-      const newExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      const currentExpiry = new Date(group.expires_at).getTime();
+      const newExpiry = new Date(currentExpiry + 24 * 60 * 60 * 1000).toISOString();
       const { error } = await supabase
         .from('pi_auto_groups')
-        .update({ expires_at: newExpiry })
-        .eq('id', invite.group_id);
+        .update({ expires_at: newExpiry, deadline_extended: true })
+        .eq('id', invite.group_id)
+        .eq('deadline_extended', false);
 
-      if (!error) {
+      if (error) {
         setExtendedTime(true);
-        setTimeRemaining(getTimeRemaining(newExpiry));
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        return;
       }
+
+      setExtendedTime(true);
+      setGroup(prev => prev ? { ...prev, expires_at: newExpiry } : prev);
+      setTimeRemaining(getTimeRemaining(newExpiry));
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {
       Alert.alert('Error', 'Could not extend time.');
     }
@@ -263,14 +273,20 @@ export const PiGroupInviteScreen = () => {
     riskMessages.push('This invite has expired');
   }
 
+  const groupMatchScore = group?.match_score ?? 0;
+
   const renderMemberCard = (member: MemberProfile) => {
     const score = member.compatibilityScore ?? 0;
     return (
       <View key={member.userId} style={[styles.memberCard, { backgroundColor: theme.card }]}>
         <View style={styles.memberTop}>
-          <View style={[styles.memberAvatar, { backgroundColor: theme.primary + '30' }]}>
-            <Feather name="user" size={20} color={theme.primary} />
-          </View>
+          {member.photo ? (
+            <Image source={{ uri: member.photo }} style={styles.memberPhoto} />
+          ) : (
+            <View style={[styles.memberAvatar, { backgroundColor: theme.primary + '30' }]}>
+              <Feather name="user" size={20} color={theme.primary} />
+            </View>
+          )}
           <View style={styles.memberInfo}>
             <ThemedText style={styles.memberName}>{member.name}</ThemedText>
             <ThemedText style={[styles.memberMeta, { color: theme.textSecondary }]}>
@@ -402,6 +418,16 @@ export const PiGroupInviteScreen = () => {
           <ThemedText style={styles.heroSubtitle}>
             Based on your preferences and lifestyle, Pi thinks these roommates could be a great fit.
           </ThemedText>
+          {groupMatchScore > 0 ? (
+            <View style={styles.groupScoreGauge}>
+              <View style={[styles.groupScoreCircle, { borderColor: getCompatibilityColor(groupMatchScore) }]}>
+                <Text style={[styles.groupScoreNumber, { color: getCompatibilityColor(groupMatchScore) }]}>
+                  {groupMatchScore}
+                </Text>
+              </View>
+              <Text style={styles.groupScoreLabel}>Group Compatibility</Text>
+            </View>
+          ) : null}
           {group ? (
             <View style={styles.groupMeta}>
               <View style={styles.metaItem}>
@@ -619,6 +645,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
+  groupScoreGauge: {
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 4,
+  },
+  groupScoreCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  groupScoreNumber: { fontSize: 22, fontWeight: '800' },
+  groupScoreLabel: { fontSize: 12, color: 'rgba(255,255,255,0.6)', marginTop: 6 },
   groupMeta: { flexDirection: 'row', gap: 16, marginTop: 16, flexWrap: 'wrap' },
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   metaText: { fontSize: 13, color: 'rgba(255,255,255,0.7)' },
@@ -665,6 +707,11 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   memberTop: { flexDirection: 'row', alignItems: 'center' },
+  memberPhoto: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+  },
   memberAvatar: {
     width: 44,
     height: 44,

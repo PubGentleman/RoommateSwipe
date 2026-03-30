@@ -1304,13 +1304,23 @@ export const GroupsScreen = () => {
                   : 'No groups yet — let AI find your perfect roommates!'}
               </ThemedText>
               {piAutoMatchActive ? (
-                <Pressable
-                  style={[styles.piCtaBtn, { backgroundColor: '#ff6b5b', marginTop: 16 }]}
-                  onPress={() => navigation.navigate('PiGroupInvite', {})}
-                >
-                  <Text style={styles.piCtaIcon}>π</Text>
-                  <Text style={styles.piCtaBtnText}>Let Pi find my roommates</Text>
-                </Pressable>
+                piPendingCount > 0 ? (
+                  <Pressable
+                    style={[styles.piCtaBtn, { backgroundColor: '#ff6b5b', marginTop: 16 }]}
+                    onPress={() => navigation.navigate('PiGroupInvite', {})}
+                  >
+                    <Text style={styles.piCtaIcon}>π</Text>
+                    <Text style={styles.piCtaBtnText}>View Pi match ({piPendingCount})</Text>
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    style={[styles.piCtaBtn, { backgroundColor: '#ff6b5b', marginTop: 16 }]}
+                    onPress={() => navigation.navigate('Profile', { screen: 'PiAutoMatchSettings' })}
+                  >
+                    <Text style={styles.piCtaIcon}>π</Text>
+                    <Text style={styles.piCtaBtnText}>Let Pi find my roommates</Text>
+                  </Pressable>
+                )
               ) : (
                 <Pressable
                   style={[styles.piCtaBtn, { backgroundColor: '#ff6b5b', marginTop: 16 }]}
