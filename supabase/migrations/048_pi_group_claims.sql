@@ -50,11 +50,20 @@ CREATE POLICY "Users can view groups they belong to or hosts browse marketplace"
       WHERE m.group_id = id AND m.user_id = auth.uid()
     )
     OR (
-      status IN ('ready', 'claimed')
+      status = 'ready'
       AND EXISTS (
         SELECT 1 FROM public.profiles p
         WHERE p.user_id = auth.uid()
           AND p.role IN ('host', 'agent', 'company')
+      )
+    )
+    OR (
+      status = 'claimed'
+      AND EXISTS (
+        SELECT 1 FROM public.pi_group_claims c
+        WHERE c.group_id = id
+          AND c.host_id = auth.uid()
+          AND c.status IN ('pending', 'accepted')
       )
     )
   );
