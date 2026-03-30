@@ -111,7 +111,8 @@ export const PiGroupInviteScreen = () => {
       if (groupData) {
         const groupRecord = groupData as PiAutoGroup;
         setGroup(groupRecord);
-        setTimeRemaining(getTimeRemaining(groupData.expires_at));
+        const deadline = groupRecord.acceptance_deadline ?? groupRecord.expires_at;
+        setTimeRemaining(getTimeRemaining(deadline));
         if (groupRecord.deadline_extended) {
           setExtendedTime(true);
         }
@@ -156,16 +157,18 @@ export const PiGroupInviteScreen = () => {
     loadInvite();
   }, [loadInvite]);
 
+  const activeDeadline = group?.acceptance_deadline ?? group?.expires_at;
+
   useEffect(() => {
-    if (group?.expires_at) {
+    if (activeDeadline) {
       timerRef.current = setInterval(() => {
-        setTimeRemaining(getTimeRemaining(group.expires_at));
+        setTimeRemaining(getTimeRemaining(activeDeadline));
       }, 60000);
     }
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [group?.expires_at]);
+  }, [activeDeadline]);
 
   const handleAccept = async () => {
     if (!invite) return;
@@ -227,25 +230,36 @@ export const PiGroupInviteScreen = () => {
   };
 
   const handleExtendTime = async () => {
-    if (!invite || extendedTime || !group?.expires_at) return;
+    if (!invite || extendedTime) return;
+    const currentDeadline = group?.acceptance_deadline ?? group?.expires_at;
+    if (!currentDeadline) return;
     try {
-      const currentExpiry = new Date(group.expires_at).getTime();
-      const newExpiry = new Date(currentExpiry + 24 * 60 * 60 * 1000).toISOString();
+      const currentTime = new Date(currentDeadline).getTime();
+      const newDeadline = new Date(currentTime + 24 * 60 * 60 * 1000).toISOString();
       const { error } = await supabase
         .from('pi_auto_groups')
-        .update({ expires_at: newExpiry, deadline_extended: true })
+        .update({ acceptance_deadline: newDeadline, deadline_extended: true })
         .eq('id', invite.group_id)
-        .eq('deadline_extended', false);
+        .is('deadline_extended', null);
 
       if (error) {
-        Alert.alert('Already Extended', 'The deadline has already been extended for this group.');
-        setExtendedTime(true);
+        const { data: check } = await supabase
+          .from('pi_auto_groups')
+          .select('deadline_extended')
+          .eq('id', invite.group_id)
+          .single();
+        if (check?.deadline_extended) {
+          Alert.alert('Already Extended', 'The deadline has already been extended for this group.');
+          setExtendedTime(true);
+        } else {
+          Alert.alert('Error', 'Could not extend time. Please try again.');
+        }
         return;
       }
 
       const { data: updated } = await supabase
         .from('pi_auto_groups')
-        .select('deadline_extended, expires_at')
+        .select('deadline_extended, acceptance_deadline')
         .eq('id', invite.group_id)
         .single();
 
@@ -255,9 +269,9 @@ export const PiGroupInviteScreen = () => {
       }
 
       setExtendedTime(true);
-      const confirmedExpiry = updated.expires_at ?? newExpiry;
-      setGroup(prev => prev ? { ...prev, expires_at: confirmedExpiry, deadline_extended: true } : prev);
-      setTimeRemaining(getTimeRemaining(confirmedExpiry));
+      const confirmedDeadline = updated.acceptance_deadline ?? newDeadline;
+      setGroup(prev => prev ? { ...prev, acceptance_deadline: confirmedDeadline, deadline_extended: true } : prev);
+      setTimeRemaining(getTimeRemaining(confirmedDeadline));
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {
       Alert.alert('Error', 'Could not extend time.');

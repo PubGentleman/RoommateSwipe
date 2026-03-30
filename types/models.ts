@@ -822,6 +822,7 @@ export interface PiAutoGroup {
   created_at: string;
   ready_at?: string;
   expires_at?: string;
+  acceptance_deadline?: string;
   dissolved_at?: string;
   deadline_extended?: boolean;
   anchor_user_id?: string;
