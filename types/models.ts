@@ -806,7 +806,7 @@ export interface PiUsageLog {
 
 export type GenderPreference = 'any' | 'male_only' | 'female_only' | 'same_gender';
 
-export type PiAutoMatchStatus = 'forming' | 'pending_acceptance' | 'partial' | 'ready' | 'invited' | 'claimed' | 'placed' | 'expired' | 'dissolved' | 'active';
+export type PiAutoMatchStatus = 'forming' | 'pending_acceptance' | 'partial' | 'awaiting_replacement_vote' | 'ready' | 'invited' | 'claimed' | 'placed' | 'expired' | 'dissolved' | 'active';
 
 export interface PiAutoGroup {
   id: string;
@@ -846,7 +846,13 @@ export interface PiAutoGroupMember {
   pi_reason?: string;
   invited_at: string;
   responded_at?: string;
-  status: 'pending' | 'accepted' | 'declined' | 'expired' | 'left';
+  status: 'pending' | 'accepted' | 'declined' | 'expired' | 'left' | 'removed';
+  reminder_sent?: boolean;
+  is_replacement?: boolean;
+  replacement_approved_by?: string[];
+  replacement_passed_by?: string[];
+  compatibility_with_group?: number;
+  pi_member_insight?: string;
 }
 
 export interface PiGroupClaim {

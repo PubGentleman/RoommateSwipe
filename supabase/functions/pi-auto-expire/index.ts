@@ -25,17 +25,86 @@ serve(async (req) => {
 
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-    const now = new Date().toISOString();
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+
+    let remindersSent = 0;
+
+    const { data: groupsNearDeadline } = await supabase
+      .from('pi_auto_groups')
+      .select('*, pi_auto_group_members(*)')
+      .eq('status', 'pending_acceptance')
+      .lte('acceptance_deadline', in24h)
+      .gt('acceptance_deadline', nowIso);
+
+    if (groupsNearDeadline && groupsNearDeadline.length > 0) {
+      for (const group of groupsNearDeadline) {
+        const members = group.pi_auto_group_members || [];
+        const unresponded = members.filter(
+          (m: any) => m.status === 'pending' && !m.reminder_sent
+        );
+
+        if (unresponded.length === 0) continue;
+
+        const memberUserIds = members.map((m: any) => m.user_id);
+        const { data: users } = await supabase
+          .from('users')
+          .select('id, full_name, name')
+          .in('id', memberUserIds);
+        const userMap = new Map((users || []).map((u: any) => [u.id, u]));
+
+        const acceptedNames = members
+          .filter((m: any) => m.status === 'accepted')
+          .map((m: any) => {
+            const u = userMap.get(m.user_id);
+            return stripName(u?.full_name || u?.name);
+          })
+          .filter(Boolean);
+
+        const notifData = {
+          groupId: group.id,
+          memberNames: acceptedNames.length > 0 ? acceptedNames : undefined,
+        };
+        const content = getPiNotifContent('pi_deadline_reminder', notifData);
+
+        for (const member of unresponded) {
+          await supabase.from('notifications').insert({
+            user_id: member.user_id,
+            type: 'pi_deadline_reminder',
+            title: content.title,
+            body: content.body,
+            read: false,
+            data: { groupId: group.id },
+          });
+
+          await sendPushNotifications(
+            supabase,
+            member.user_id,
+            content.title,
+            content.body,
+            { type: 'pi_deadline_reminder', groupId: group.id }
+          );
+
+          await supabase
+            .from('pi_auto_group_members')
+            .update({ reminder_sent: true })
+            .eq('id', member.id);
+
+          remindersSent++;
+        }
+      }
+    }
 
     const { data: expiredGroups, error: queryError } = await supabase
       .from('pi_auto_groups')
       .select('*')
-      .in('status', ['forming', 'pending_acceptance', 'partial'])
-      .lt('acceptance_deadline', now);
+      .in('status', ['forming', 'pending_acceptance', 'partial', 'awaiting_replacement_vote'])
+      .lt('acceptance_deadline', nowIso);
 
     if (queryError) return errorResponse(`Query failed: ${queryError.message}`, 500);
     if (!expiredGroups || expiredGroups.length === 0) {
-      return jsonResponse({ processed: 0, message: 'No expired groups' });
+      return jsonResponse({ processed: 0, reminders_sent: remindersSent, message: 'No expired groups' });
     }
 
     let dissolved = 0;
@@ -51,7 +120,7 @@ serve(async (req) => {
       if (!members || members.length === 0) {
         await supabase
           .from('pi_auto_groups')
-          .update({ status: 'dissolved', dissolved_at: now })
+          .update({ status: 'dissolved', dissolved_at: nowIso })
           .eq('id', group.id);
         dissolved++;
         continue;
@@ -66,6 +135,41 @@ serve(async (req) => {
         .select('id, full_name, name')
         .in('id', memberUserIds);
       const userMap = new Map((users || []).map((u: any) => [u.id, u]));
+
+      if (group.status === 'awaiting_replacement_vote') {
+        await supabase
+          .from('pi_auto_group_members')
+          .update({ status: 'expired' })
+          .eq('group_id', group.id)
+          .eq('is_replacement', true)
+          .eq('status', 'pending');
+
+        await supabase
+          .from('pi_auto_groups')
+          .update({ status: 'dissolved', dissolved_at: nowIso })
+          .eq('id', group.id);
+
+        const noRepContent = getPiNotifContent('pi_no_replacement', { groupId: group.id });
+        for (const member of accepted) {
+          await supabase.from('notifications').insert({
+            user_id: member.user_id,
+            type: 'pi_no_replacement',
+            title: noRepContent.title,
+            body: noRepContent.body,
+            read: false,
+            data: { groupId: group.id },
+          });
+          await sendPushNotifications(
+            supabase, member.user_id,
+            noRepContent.title, noRepContent.body,
+            { type: 'pi_no_replacement', groupId: group.id }
+          );
+        }
+
+        dissolved++;
+        results.push({ group_id: group.id, action: 'replacement_vote_expired' });
+        continue;
+      }
 
       const meetsPartialThreshold = accepted.length >= 1 && accepted.length < group.max_members;
 
@@ -155,7 +259,7 @@ serve(async (req) => {
 
         await supabase
           .from('pi_auto_groups')
-          .update({ status: 'dissolved', dissolved_at: now })
+          .update({ status: 'dissolved', dissolved_at: nowIso })
           .eq('id', group.id);
 
         const expiredContent = getPiNotifContent('pi_group_expired', { groupId: group.id });
@@ -194,6 +298,7 @@ serve(async (req) => {
       processed: expiredGroups.length,
       dissolved,
       partial_acceptance: partial,
+      reminders_sent: remindersSent,
       results,
     });
   } catch (err: any) {

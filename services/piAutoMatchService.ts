@@ -113,7 +113,131 @@ export async function respondToAutoGroupInvite(groupId: string, accept: boolean)
       .eq('group_id', groupId)
       .eq('user_id', userId);
 
-    return !error;
+    if (error) return false;
+
+    if (!accept) {
+      await handleMemberDecline(groupId, userId);
+    }
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function handleMemberDecline(groupId: string, userId: string): Promise<void> {
+  const { data: group } = await supabase
+    .from('pi_auto_groups')
+    .select('*, pi_auto_group_members(*)')
+    .eq('id', groupId)
+    .single();
+
+  if (!group) return;
+
+  const members: PiAutoGroupMember[] = group.pi_auto_group_members || [];
+  const acceptedMembers = members.filter(m => m.status === 'accepted');
+  const pendingMembers = members.filter(m => m.status === 'pending');
+
+  if (acceptedMembers.length === 0 && pendingMembers.length === 0) {
+    await dissolveGroup(groupId);
+    return;
+  }
+
+  await supabase
+    .from('pi_auto_groups')
+    .update({ status: 'partial' })
+    .eq('id', groupId);
+
+  try {
+    await supabase.functions.invoke('pi-auto-assemble', {
+      body: {
+        city: group.city,
+        replacement_for_group: groupId,
+        spots_needed: 1,
+        exclude_users: members.map(m => m.user_id),
+        propose_as_replacement: true,
+      },
+    });
+  } catch {
+    // assembly may fail; group stays partial
+  }
+}
+
+export async function getReplacementCandidates(groupId: string): Promise<PiAutoGroupMember[]> {
+  try {
+    const { data } = await supabase
+      .from('pi_auto_group_members')
+      .select('*')
+      .eq('group_id', groupId)
+      .eq('is_replacement', true)
+      .in('status', ['pending']);
+
+    return (data as PiAutoGroupMember[]) ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export async function voteOnReplacement(
+  groupId: string,
+  replacementMemberId: string,
+  vote: 'approve' | 'pass'
+): Promise<{ result: 'voted' | 'approved' | 'rejected' | 'dissolved' | 'error' }> {
+  try {
+    const userId = await getCurrentUserId();
+    if (!userId) return { result: 'error' };
+
+    const { data, error } = await supabase.rpc('pi_vote_on_replacement', {
+      p_group_id: groupId,
+      p_replacement_member_id: replacementMemberId,
+      p_voter_id: userId,
+      p_vote: vote,
+    });
+
+    if (error) return { result: 'error' };
+
+    const rpcResult = data as { result: string; message?: string };
+    return { result: rpcResult.result as 'voted' | 'approved' | 'rejected' | 'dissolved' | 'error' };
+  } catch {
+    return { result: 'error' };
+  }
+}
+
+export async function requestGroupDissolve(groupId: string): Promise<boolean> {
+  try {
+    const userId = await getCurrentUserId();
+    if (!userId) return false;
+
+    const { data, error } = await supabase.rpc('pi_dissolve_group', {
+      p_group_id: groupId,
+      p_user_id: userId,
+    });
+
+    if (error) return false;
+
+    const rpcResult = data as { result: string };
+    if (rpcResult.result !== 'dissolved') return false;
+
+    const { data: otherMembers } = await supabase
+      .from('pi_auto_group_members')
+      .select('user_id')
+      .eq('group_id', groupId)
+      .neq('user_id', userId);
+
+    if (otherMembers) {
+      for (const member of otherMembers) {
+        await supabase.from('notifications').insert({
+          user_id: member.user_id,
+          type: 'pi_group_dissolved_member',
+          title: 'Group dissolved',
+          body: "A member chose to start fresh. Don't worry -- Pi is still looking for your perfect roommates.",
+          read: false,
+          data: { groupId },
+        });
+      }
+    }
+
+    return true;
   } catch {
     return false;
   }

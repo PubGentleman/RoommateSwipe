@@ -94,6 +94,8 @@ export default function App() {
                                       Groups: {
                                         screens: {
                                           GroupInviteAccept: 'join/:inviteCode',
+                                          PiGroupInvite: 'pi-group-invite/:groupId',
+                                          PiReplacementVote: 'pi-replacement-vote/:groupId',
                                         },
                                       },
                                     },

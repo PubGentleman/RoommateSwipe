@@ -13,6 +13,7 @@ import GroupApartmentSuggestionsScreen from '../screens/renter/GroupApartmentSug
 import { AIGroupInviteScreen } from '../screens/shared/AIGroupInviteScreen';
 import { CompanyGroupInviteScreen } from '../screens/shared/CompanyGroupInviteScreen';
 import { PiGroupInviteScreen } from '../screens/renter/PiGroupInviteScreen';
+import { PiReplacementVoteScreen } from '../screens/renter/PiReplacementVoteScreen';
 import MyGroupScreen from '../screens/renter/MyGroupScreen';
 import GroupInviteAcceptScreen from '../screens/renter/GroupInviteAcceptScreen';
 import { RoommateProfile } from '../types/models';
@@ -64,6 +65,9 @@ export type GroupsStackParamList = {
   PiGroupInvite: {
     groupId?: string;
   };
+  PiReplacementVote: {
+    groupId: string;
+  };
   MyGroup: undefined;
   GroupInviteAccept: {
     inviteCode: string;
@@ -88,6 +92,7 @@ export const GroupsStackNavigator = () => {
       <Stack.Screen name="AIGroupInvite" component={AIGroupInviteScreen} />
       <Stack.Screen name="CompanyGroupInvite" component={CompanyGroupInviteScreen} />
       <Stack.Screen name="PiGroupInvite" component={PiGroupInviteScreen} />
+      <Stack.Screen name="PiReplacementVote" component={PiReplacementVoteScreen} />
       <Stack.Screen name="MyGroup" component={MyGroupScreen} />
       <Stack.Screen name="GroupInviteAccept" component={GroupInviteAcceptScreen} />
     </Stack.Navigator>

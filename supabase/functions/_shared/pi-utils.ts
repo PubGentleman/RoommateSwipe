@@ -147,6 +147,8 @@ export interface PiNotificationData {
   city?: string;
   memberCount?: number;
   spotsNeeded?: number;
+  replacementName?: string;
+  compatibilityScore?: number;
 }
 
 export type PiNotificationType =
@@ -156,7 +158,13 @@ export type PiNotificationType =
   | 'pi_member_declined'
   | 'pi_group_expired'
   | 'pi_replacement_found'
-  | 'pi_agent_new_group';
+  | 'pi_agent_new_group'
+  | 'pi_deadline_reminder'
+  | 'pi_replacement_vote'
+  | 'pi_replacement_approved'
+  | 'pi_replacement_invited'
+  | 'pi_no_replacement'
+  | 'pi_group_dissolved_member';
 
 const PI_TEMPLATES: Record<PiNotificationType, {
   title: (d: PiNotificationData) => string;
@@ -210,6 +218,39 @@ const PI_TEMPLATES: Record<PiNotificationType, {
       const count = d.memberCount || 2;
       return `A new ${count}-person group just matched in ${city}. They're pre-vetted and compatible -- claim them before another host does.`;
     },
+  },
+  pi_deadline_reminder: {
+    title: () => 'Your Pi match is waiting!',
+    body: (d) => {
+      const names = d.memberNames?.join(' and ');
+      return names
+        ? `${names} already accepted -- 24 hours left to respond.`
+        : `Your potential roommates are waiting -- 24 hours left to respond.`;
+    },
+  },
+  pi_replacement_vote: {
+    title: (d) => `${d.declinedBy || 'A member'} passed on the group`,
+    body: () => `Pi found a potential replacement -- tap to review and vote.`,
+  },
+  pi_replacement_approved: {
+    title: () => 'Replacement approved!',
+    body: (d) => `${d.replacementName || 'Your new match'} has been invited to join your group.`,
+  },
+  pi_replacement_invited: {
+    title: () => 'Pi found your roommates!',
+    body: (d) => {
+      const names = d.memberNames?.join(' and ') || 'your matches';
+      const score = d.compatibilityScore ? ` ${d.compatibilityScore}% compatible.` : '';
+      return `Meet ${names} --${score} Tap to see why Pi thinks you'd be great together.`;
+    },
+  },
+  pi_no_replacement: {
+    title: () => "Pi couldn't find a replacement",
+    body: () => "No compatible matches available right now. Your group has been dissolved -- Pi will keep looking for new groups.",
+  },
+  pi_group_dissolved_member: {
+    title: () => 'Group dissolved',
+    body: () => "A member chose to start fresh. Don't worry -- Pi is still looking for your perfect roommates.",
   },
 };
 

@@ -652,6 +652,7 @@ async function handleReplacementFlow(
       user_id: r.user_id,
       status: 'pending',
       invited_at: new Date().toISOString(),
+      is_replacement: true,
     }));
 
     const { error: insertError } = await supabase
@@ -664,7 +665,7 @@ async function handleReplacementFlow(
     await supabase
       .from('pi_auto_groups')
       .update({
-        status: 'pending_acceptance',
+        status: 'awaiting_replacement_vote',
         acceptance_deadline: newDeadline,
       })
       .eq('id', groupId);

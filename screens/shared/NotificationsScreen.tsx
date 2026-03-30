@@ -267,8 +267,41 @@ export const NotificationsScreen = () => {
           (navigation as any).navigate('Groups');
         }
         break;
+      case 'pi_replacement_vote':
+      case 'pi_replacement_approved':
+        if (notification.data?.groupId) {
+          (navigation as any).navigate('Groups', {
+            screen: 'PiReplacementVote',
+            params: { groupId: notification.data.groupId },
+          });
+        } else {
+          (navigation as any).navigate('Groups');
+        }
+        break;
+      case 'pi_replacement_invited':
+        if (notification.data?.groupId) {
+          (navigation as any).navigate('Groups', {
+            screen: 'PiGroupInvite',
+            params: { groupId: notification.data.groupId },
+          });
+        } else {
+          (navigation as any).navigate('Groups');
+        }
+        break;
+      case 'pi_deadline_reminder':
+        if (notification.data?.groupId) {
+          (navigation as any).navigate('Groups', {
+            screen: 'PiGroupInvite',
+            params: { groupId: notification.data.groupId },
+          });
+        } else {
+          (navigation as any).navigate('Groups');
+        }
+        break;
       case 'pi_member_declined':
       case 'pi_group_expired':
+      case 'pi_no_replacement':
+      case 'pi_group_dissolved_member':
         (navigation as any).navigate('Groups');
         break;
       default:

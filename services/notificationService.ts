@@ -55,7 +55,13 @@ export type PiAutoMatchNotificationType =
   | 'pi_member_declined'
   | 'pi_group_expired'
   | 'pi_replacement_found'
-  | 'pi_agent_new_group';
+  | 'pi_agent_new_group'
+  | 'pi_deadline_reminder'
+  | 'pi_replacement_vote'
+  | 'pi_replacement_approved'
+  | 'pi_replacement_invited'
+  | 'pi_no_replacement'
+  | 'pi_group_dissolved_member';
 
 export interface PiNotificationData {
   groupId: string;
@@ -120,6 +126,33 @@ const PI_NOTIFICATION_TEMPLATES: Record<PiAutoMatchNotificationType, {
       const count = data.memberCount || 2;
       return `A new ${count}-person group just matched in ${city}. They're pre-vetted and compatible -- claim them before another host does.`;
     },
+  },
+  pi_deadline_reminder: {
+    title: () => 'Time is running out',
+    body: () => "You have less than 24 hours to respond to your Pi group invite. Don't miss out on these roommates!",
+  },
+  pi_replacement_vote: {
+    title: () => 'Vote on a new roommate',
+    body: (data) => {
+      const names = data.memberNames?.join(' & ') || 'a potential roommate';
+      return `I found ${names} to fill the open spot. Check them out and vote on whether they'd be a good fit.`;
+    },
+  },
+  pi_replacement_approved: {
+    title: () => 'Replacement approved!',
+    body: () => 'The group voted yes on the new roommate. They have 72 hours to accept the invite.',
+  },
+  pi_replacement_invited: {
+    title: () => 'Pi found your new roommates!',
+    body: () => "Great news -- a group voted you in as their new roommate. Check out the group and decide if it's the right fit.",
+  },
+  pi_no_replacement: {
+    title: () => 'No replacement found',
+    body: () => "I couldn't find a compatible replacement in time. The group has been dissolved, but I'm still looking for your perfect match.",
+  },
+  pi_group_dissolved_member: {
+    title: () => 'Group dissolved',
+    body: () => "A member chose to start fresh. Don't worry -- Pi is still looking for your perfect roommates.",
   },
 };
 

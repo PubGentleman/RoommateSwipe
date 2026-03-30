@@ -66,6 +66,7 @@ export const PiGroupInviteScreen = () => {
   const [responseAction, setResponseAction] = useState<'accepted' | 'declined' | null>(null);
   const [timeRemaining, setTimeRemaining] = useState({ hours: 48, minutes: 0, isUrgent: false, expired: false });
   const [extendedTime, setExtendedTime] = useState(false);
+  const [isReplacement, setIsReplacement] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadInvite = useCallback(async () => {
@@ -128,6 +129,7 @@ export const PiGroupInviteScreen = () => {
       }
 
       setInvite(memberRecord);
+      setIsReplacement(!!memberRecord.is_replacement);
 
       const { data: groupData } = await supabase
         .from('pi_auto_groups')
@@ -457,7 +459,17 @@ export const PiGroupInviteScreen = () => {
           <View style={styles.piIconWrapper}>
             <Text style={styles.piIcon}>π</Text>
           </View>
-          <ThemedText style={styles.heroTitle}>Pi found you a group!</ThemedText>
+          <ThemedText style={styles.heroTitle}>
+            {isReplacement ? 'Pi found your new roommates!' : 'Pi found you a group!'}
+          </ThemedText>
+          {isReplacement ? (
+            <View style={styles.replacementBanner}>
+              <Feather name="repeat" size={14} color="#a855f7" />
+              <ThemedText style={styles.replacementBannerText}>
+                You're joining as a replacement -- the group already has members who are excited to meet you.
+              </ThemedText>
+            </View>
+          ) : null}
           <ThemedText style={styles.heroSubtitle}>
             Based on your preferences and lifestyle, Pi thinks these roommates could be a great fit.
           </ThemedText>
@@ -687,6 +699,22 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.7)',
     textAlign: 'center',
     lineHeight: 20,
+  },
+  replacementBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(168,85,247,0.12)',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginVertical: 10,
+  },
+  replacementBannerText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#c084fc',
+    lineHeight: 18,
   },
   groupScoreGauge: {
     alignItems: 'center',
