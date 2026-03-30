@@ -257,11 +257,12 @@ export const calculateDetailedCompatibility = (
   const getUserAge = (): number | null => {
     if (currentUser.age) return currentUser.age;
     if (currentUser.birthday) {
-      const birth = new Date(currentUser.birthday);
+      const parts = currentUser.birthday.split('T')[0].split('-').map(Number);
+      const birth = new Date(parts[0], parts[1] - 1, parts[2]);
       const today = new Date();
       let a = today.getFullYear() - birth.getFullYear();
-      const m = today.getMonth() - birth.getMonth();
-      if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) a--;
+      const md = today.getMonth() - birth.getMonth();
+      if (md < 0 || (md === 0 && today.getDate() < birth.getDate())) a--;
       return a;
     }
     return null;

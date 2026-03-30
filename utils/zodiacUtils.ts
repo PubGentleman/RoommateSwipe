@@ -151,7 +151,12 @@ export const calculateZodiacFromBirthday = (birthday: string): ZodiacSign | unde
       return undefined;
     }
   } else {
-    date = new Date(birthday);
+    const [y, m, d] = birthday.split('T')[0].split('-').map(Number);
+    if (y && m && d) {
+      date = new Date(y, m - 1, d);
+    } else {
+      return undefined;
+    }
   }
   
   if (isNaN(date.getTime())) return undefined;
