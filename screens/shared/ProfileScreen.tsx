@@ -28,7 +28,7 @@ import { PlanBadgeInline } from '../../components/LockedFeatureOverlay';
 type ProfileScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'ProfileMain'>;
 
 export const ProfileScreen = () => {
-  const { user, logout, updateUser, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, getHostPlan, getSuperInterestCount, activeMode, canSwitchMode, isFirstTimeHost } = useAuth();
+  const { user, logout, updateUser, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, getHostPlan, getSuperInterestCount, activeMode, canSwitchMode, isFirstTimeHost, isPlaceSeeker } = useAuth();
   const { unreadCount } = useNotificationContext();
   const navigation = useNavigation<ProfileScreenNavigationProp>();
   const insets = useSafeAreaInsets();
@@ -345,14 +345,18 @@ export const ProfileScreen = () => {
                   <Text style={styles.statValue}>{profileViewCount}</Text>
                   <Text style={styles.statLabel}>Likes</Text>
                 </Pressable>
-                <View style={styles.statDivider} />
-                <Pressable
-                  style={styles.statBox}
-                  onPress={() => navigation.navigate('WhoLikedMe')}
-                >
-                  <Text style={[styles.statValue, styles.statCoral]}>{likesCount}</Text>
-                  <Text style={styles.statLabel}>Super Likes</Text>
-                </Pressable>
+                {!isPlaceSeeker() ? (
+                  <>
+                    <View style={styles.statDivider} />
+                    <Pressable
+                      style={styles.statBox}
+                      onPress={() => navigation.navigate('WhoLikedMe')}
+                    >
+                      <Text style={[styles.statValue, styles.statCoral]}>{likesCount}</Text>
+                      <Text style={styles.statLabel}>Super Likes</Text>
+                    </Pressable>
+                  </>
+                ) : null}
               </>
             )}
           </View>
@@ -368,7 +372,7 @@ export const ProfileScreen = () => {
                 <Text style={styles.boostBtnText}>Manage Plan</Text>
               </View>
             </TouchableOpacity>
-          ) : renterLimits.hasProfileBoost ? (
+          ) : isPlaceSeeker() ? null : renterLimits.hasProfileBoost ? (
             <TouchableOpacity activeOpacity={0.7} onPress={handleBoostPress} style={styles.boostBtnWrap}>
               {boostIsActive ? (
                 <View style={styles.boostActiveBtn}>

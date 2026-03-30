@@ -71,8 +71,8 @@ interface AuthContextType {
   useSuperInterestCredit: () => Promise<void>;
   canSendColdMessage: () => Promise<{ canSend: boolean; remaining: number; reason?: string }>;
   useColdMessage: () => Promise<void>;
-  canAskPiAdvisor: () => { canAsk: boolean; remaining: number; limit: number };
-  incrementPiAdvisorUsage: () => Promise<void>;
+  canAskPi: (mode: 'general' | 'listing_advisor' | 'price_analysis' | 'compatibility') => { canAsk: boolean; remaining: number; limit: number; message?: string };
+  incrementPiUsage: (mode: 'listing_advisor' | 'price_analysis' | 'compatibility') => Promise<void>;
   getSuperInterestCount: () => number;
   upgradeHostPlan: (plan: string, billingCycle?: 'monthly' | '3month' | 'annual') => Promise<void>;
   downgradeHostPlan: (plan: string) => Promise<void>;
@@ -2040,8 +2040,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(updated);
   };
 
-  const canAskPiAdvisor = (): { canAsk: boolean; remaining: number; limit: number } => {
-    if (!user) return { canAsk: false, remaining: 0, limit: 0 };
+  const canAskPi = (mode: 'general' | 'listing_advisor' | 'price_analysis' | 'compatibility'): { canAsk: boolean; remaining: number; limit: number; message?: string } => {
+    if (!user) return { canAsk: false, remaining: 0, limit: 0, message: 'Not logged in' };
 
     const plan = user.subscription?.plan || 'basic';
 
@@ -2049,47 +2049,118 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { canAsk: true, remaining: Infinity, limit: Infinity };
     }
 
-    if (!isPlaceSeeker()) {
-      return { canAsk: false, remaining: 0, limit: 0 };
+    if (mode === 'general') {
+      return { canAsk: true, remaining: Infinity, limit: Infinity };
     }
 
-    const now = new Date();
-    const lastReset = user.piAdvisorData?.lastResetDate
-      ? new Date(user.piAdvisorData.lastResetDate)
-      : null;
+    if (mode === 'listing_advisor' || mode === 'price_analysis') {
+      if (!isPlaceSeeker()) {
+        return { canAsk: false, remaining: 0, limit: 0, message: 'This feature is for apartment seekers.' };
+      }
 
-    let questionsUsed = user.piAdvisorData?.questionsToday || 0;
-    if (!lastReset || !isSameDay(lastReset, now)) {
-      questionsUsed = 0;
+      const now = new Date();
+      const lastReset = user.piAdvisorData?.lastResetDate
+        ? new Date(user.piAdvisorData.lastResetDate)
+        : null;
+
+      let questionsUsed = user.piAdvisorData?.questionsToday || 0;
+      if (!lastReset || !isSameDay(lastReset, now)) {
+        questionsUsed = 0;
+      }
+
+      const DAILY_LIMIT = 10;
+      const remaining = Math.max(0, DAILY_LIMIT - questionsUsed);
+
+      if (remaining > 0) {
+        return { canAsk: true, remaining, limit: DAILY_LIMIT };
+      }
+
+      return {
+        canAsk: false,
+        remaining: 0,
+        limit: DAILY_LIMIT,
+        message: "You've used your 10 daily Pi questions. Upgrade to Plus for unlimited access, or check back tomorrow!",
+      };
     }
 
-    const DAILY_LIMIT = 10;
-    const remaining = Math.max(0, DAILY_LIMIT - questionsUsed);
+    if (mode === 'compatibility') {
+      if (isPlaceSeeker()) {
+        return { canAsk: false, remaining: 0, limit: 0 };
+      }
 
-    return { canAsk: remaining > 0, remaining, limit: DAILY_LIMIT };
+      const now = new Date();
+      const lastReset = user.piMatchingData?.lastResetDate
+        ? new Date(user.piMatchingData.lastResetDate)
+        : null;
+
+      let matchesUsed = user.piMatchingData?.matchesToday || 0;
+      if (!lastReset || !isSameDay(lastReset, now)) {
+        matchesUsed = 0;
+      }
+
+      const DAILY_LIMIT = 3;
+      const remaining = Math.max(0, DAILY_LIMIT - matchesUsed);
+
+      if (remaining > 0) {
+        return { canAsk: true, remaining, limit: DAILY_LIMIT };
+      }
+
+      return {
+        canAsk: false,
+        remaining: 0,
+        limit: DAILY_LIMIT,
+        message: "You've used your 3 daily compatibility checks. Upgrade to Plus for unlimited Pi matching!",
+      };
+    }
+
+    return { canAsk: false, remaining: 0, limit: 0 };
   };
 
-  const incrementPiAdvisorUsage = async () => {
+  const incrementPiUsage = async (mode: 'listing_advisor' | 'price_analysis' | 'compatibility') => {
     if (!user) return;
     const now = new Date();
-    const lastReset = user.piAdvisorData?.lastResetDate
-      ? new Date(user.piAdvisorData.lastResetDate)
-      : null;
 
-    let questionsToday = user.piAdvisorData?.questionsToday || 0;
-    if (!lastReset || !isSameDay(lastReset, now)) {
-      questionsToday = 0;
+    if (mode === 'listing_advisor' || mode === 'price_analysis') {
+      const lastReset = user.piAdvisorData?.lastResetDate
+        ? new Date(user.piAdvisorData.lastResetDate)
+        : null;
+
+      let questionsToday = user.piAdvisorData?.questionsToday || 0;
+      if (!lastReset || !isSameDay(lastReset, now)) {
+        questionsToday = 0;
+      }
+
+      const updatedData = {
+        questionsToday: questionsToday + 1,
+        lastResetDate: now.toISOString(),
+      };
+
+      const updated = { ...user, piAdvisorData: updatedData };
+      await StorageService.setCurrentUser(updated);
+      await StorageService.addOrUpdateUser(updated);
+      setUser(updated);
     }
 
-    const updatedData = {
-      questionsToday: questionsToday + 1,
-      lastResetDate: now.toISOString(),
-    };
+    if (mode === 'compatibility') {
+      const lastReset = user.piMatchingData?.lastResetDate
+        ? new Date(user.piMatchingData.lastResetDate)
+        : null;
 
-    const updated = { ...user, piAdvisorData: updatedData };
-    await StorageService.setCurrentUser(updated);
-    await StorageService.addOrUpdateUser(updated);
-    setUser(updated);
+      let matchesToday = user.piMatchingData?.matchesToday || 0;
+      if (!lastReset || !isSameDay(lastReset, now)) {
+        matchesToday = 0;
+      }
+
+      const updatedData = {
+        matchesToday: matchesToday + 1,
+        lastResetDate: now.toISOString(),
+      };
+
+      const updated = { ...user, piMatchingData: updatedData };
+      await StorageService.setCurrentUser(updated);
+      await StorageService.addOrUpdateUser(updated);
+      setUser(updated);
+    }
   };
 
   const getHostPlan = (): string => {
@@ -2438,7 +2509,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const canRespondToInquiries = teamRole !== null;
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout, abandonSignup, resetPassword, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, cancelSubscriptionAtPeriodEnd, reactivateSubscription, getSubscriptionDetails, updateUser, blockUser: blockUserAction, unblockUser: unblockUserAction, reportUser: reportUserAction, isUserBlocked: isUserBlockedCheck, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike, watchAdForCredit, getAdCredits, useAdCredit, isBasicUser, isPlaceSeeker, canViewListing, useListingView, canSendInterest, canSendSuperInterest, useSuperInterestCredit, canSendColdMessage, useColdMessage, canAskPiAdvisor, incrementPiAdvisorUsage, getSuperInterestCount, upgradeHostPlan, downgradeHostPlan, getHostPlan, canAddListing, canRespondToInquiry, useInquiryResponse, purchaseListingBoost, purchaseHostVerification, purchaseSuperInterest, completeOnboardingStep, cancelHostSubscriptionAtPeriodEnd, reactivateHostSubscription, softDeleteAccount, recoverDeletedAccount, updateLastActive, activeMode: effectiveMode, canSwitchMode, isFirstTimeHost, switchMode, completeHostOnboarding, getTeamMembers, inviteTeamMember, resendTeamInvite, removeTeamMember, updateTeamMemberRole, getTeamSeatLimit, teamRole, canInviteMembers, canManageBilling, canDeleteListings, canRespondToInquiries }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout, abandonSignup, resetPassword, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, cancelSubscriptionAtPeriodEnd, reactivateSubscription, getSubscriptionDetails, updateUser, blockUser: blockUserAction, unblockUser: unblockUserAction, reportUser: reportUserAction, isUserBlocked: isUserBlockedCheck, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike, watchAdForCredit, getAdCredits, useAdCredit, isBasicUser, isPlaceSeeker, canViewListing, useListingView, canSendInterest, canSendSuperInterest, useSuperInterestCredit, canSendColdMessage, useColdMessage, canAskPi, incrementPiUsage, getSuperInterestCount, upgradeHostPlan, downgradeHostPlan, getHostPlan, canAddListing, canRespondToInquiry, useInquiryResponse, purchaseListingBoost, purchaseHostVerification, purchaseSuperInterest, completeOnboardingStep, cancelHostSubscriptionAtPeriodEnd, reactivateHostSubscription, softDeleteAccount, recoverDeletedAccount, updateLastActive, activeMode: effectiveMode, canSwitchMode, isFirstTimeHost, switchMode, completeHostOnboarding, getTeamMembers, inviteTeamMember, resendTeamInvite, removeTeamMember, updateTeamMemberRole, getTeamSeatLimit, teamRole, canInviteMembers, canManageBilling, canDeleteListings, canRespondToInquiries }}>
       {children}
     </AuthContext.Provider>
   );

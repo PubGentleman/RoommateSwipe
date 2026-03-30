@@ -38,7 +38,7 @@ export type MessagesStackParamList = {
     groupId: string;
     groupName?: string;
   };
-  AIMatchAssistant: undefined;
+  AIMatchAssistant: { listingContext?: any; profileContext?: any; mode?: string } | undefined;
 };
 
 const Stack = createNativeStackNavigator<MessagesStackParamList>();

@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, TextInput, FlatList, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { View, Text, StyleSheet, Pressable, TextInput, FlatList, KeyboardAvoidingView, Platform } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,6 +7,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { sendAIMessage, createSessionId } from '../../utils/aiService';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { StorageService } from '../../utils/storage';
+import { analyzePrice, isPriceQuestion } from '../../utils/priceAnalysis';
+import { useRoute } from '@react-navigation/native';
+
+type PiMode = 'general' | 'listing_advisor' | 'price_analysis' | 'compatibility';
 
 type AIMessage = {
   id: string;
@@ -15,15 +19,37 @@ type AIMessage = {
   timestamp: Date;
   suggestions?: string[];
   isWelcome?: boolean;
+  isLimitMessage?: boolean;
+};
+
+type ListingContext = {
+  listingId?: string;
+  title?: string;
+  price?: number;
+  location?: string;
+  zipCode?: string;
+  city?: string;
+  bedrooms?: number;
+  bathrooms?: number;
+  amenities?: string[];
+  description?: string;
+  hostName?: string;
 };
 
 type AIAssistantScreenProps = {
   navigation: any;
 };
 
-const QUICK_ACTIONS = [
+const QUICK_ACTIONS_ROOMMATE = [
   { icon: 'search' as const, label: 'Find my best\nmatches today', action: 'best_matches' },
   { icon: 'trending-up' as const, label: 'Improve my\nprofile', action: 'improve_profile' },
+  { icon: 'map-pin' as const, label: 'Best neighborhoods\nfor my budget', action: 'neighborhoods' },
+  { icon: 'calendar' as const, label: 'Plan my\nmove-in timeline', action: 'timeline' },
+];
+
+const QUICK_ACTIONS_PLACE = [
+  { icon: 'search' as const, label: 'What to look for\nin an apartment', action: 'apartment_tips' },
+  { icon: 'dollar-sign' as const, label: 'How to\nnegotiate rent', action: 'negotiate' },
   { icon: 'map-pin' as const, label: 'Best neighborhoods\nfor my budget', action: 'neighborhoods' },
   { icon: 'calendar' as const, label: 'Plan my\nmove-in timeline', action: 'timeline' },
 ];
@@ -31,9 +57,51 @@ const QUICK_ACTIONS = [
 const QUICK_ACTION_PROMPTS: Record<string, string> = {
   best_matches: 'Based on my profile, who should I be swiping right on today and why?',
   improve_profile: 'What changes to my profile would get me the most matches?',
-  neighborhoods: 'What neighborhoods in NYC fit my budget and lifestyle best?',
+  neighborhoods: 'What neighborhoods fit my budget and lifestyle best?',
   timeline: 'Help me plan a realistic move-in timeline based on when I need to be moved in.',
+  apartment_tips: 'What should I look for when touring an apartment? Any red flags?',
+  negotiate: 'How do I negotiate rent with a landlord? What leverage do I have?',
 };
+
+function getSuggestedQuestions(piMode: PiMode, placeSeekerFlag: boolean, listingContext: ListingContext | null): string[] {
+  if (piMode === 'listing_advisor' && listingContext) {
+    return [
+      "Is this a good price for this area?",
+      "Tell me about this neighborhood",
+      "What should I ask the host?",
+      "Is this pet-friendly?",
+    ];
+  }
+  if (piMode === 'listing_advisor') {
+    return [
+      "What should I look for in an apartment?",
+      "How do I negotiate rent?",
+      "What questions should I ask on a tour?",
+      "What red flags should I watch for?",
+    ];
+  }
+  if (piMode === 'compatibility') {
+    return [
+      "Are we a good match?",
+      "What do we have in common?",
+      "What might cause friction?",
+      "Tips for our living situation?",
+    ];
+  }
+  return placeSeekerFlag
+    ? [
+        "How do I write a strong rental application?",
+        "What's a fair security deposit?",
+        "Should I get renter's insurance?",
+        "Tips for apartment tours?",
+      ]
+    : [
+        "How do I write a good roommate profile?",
+        "What questions should I ask potential roommates?",
+        "How do we split expenses fairly?",
+        "Tips for co-living agreements?",
+      ];
+}
 
 const PROFILE_FIELDS = [
   'sleep_schedule', 'cleanliness', 'smoking', 'pets',
@@ -56,20 +124,53 @@ function calculateProfileCompletion(profileData: any): number {
   return Math.round((filled / fields.length) * 100);
 }
 
-function getOpeningMessage(completion: number, userName: string): string {
-  if (completion === 0) {
-    return `Hey ${userName}! I'm your Rhome AI assistant. I'll help you find the perfect roommates and apartment. To get started, what's your budget for rent each month?`;
-  } else if (completion < 50) {
-    return `Welcome back ${userName}! Your profile is ${completion}% complete. The more I know about you, the better your matches will be. What trains do you take for work?`;
-  } else if (completion < 100) {
-    return `Hey ${userName}! Almost there \u2014 your profile is ${completion}% done. Let me ask you one more thing so I can give you better matches.`;
+function getPiIntro(piMode: PiMode, placeSeekerFlag: boolean, listingContext: ListingContext | null, profileContext: any): string {
+  switch (piMode) {
+    case 'listing_advisor':
+      return listingContext?.title
+        ? `Hi! I'm Pi, your apartment search assistant. I can see you're looking at "${listingContext.title}" \u2014 ask me anything about this listing, the neighborhood, or whether the price is fair for this area.`
+        : "Hi! I'm Pi, your apartment search assistant. Ask me about any listing you're viewing \u2014 pricing, neighborhoods, commute times, or whether a place is right for you.";
+    case 'compatibility':
+      return profileContext?.name
+        ? `Hi! I'm Pi. Let me analyze your compatibility with ${profileContext.name} and help you decide if you'd be a good roommate match.`
+        : "Hi! I'm Pi, your roommate matching assistant. I can help you understand compatibility scores, improve your profile, and find your ideal roommate.";
+    case 'general':
+    default:
+      return placeSeekerFlag
+        ? "Hi! I'm Pi. Ask me anything about apartment hunting \u2014 what to look for, questions to ask landlords, lease tips, and more."
+        : "Hi! I'm Pi. Ask me anything about finding a roommate \u2014 what to look for, how to screen potential matches, co-living tips, and more.";
   }
-  return `Hey ${userName}! Your profile looks great — you're all set to find your perfect roommate. Ask me anything: who to swipe on, which neighborhoods fit your budget, how to stand out to hosts, or what to ask when you meet someone.`;
+}
+
+function getPiTitle(piMode: PiMode): string {
+  switch (piMode) {
+    case 'listing_advisor': return 'Pi Apartment Advisor';
+    case 'compatibility': return 'Pi Compatibility';
+    case 'general':
+    default: return 'Pi Assistant';
+  }
 }
 
 export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
-  const { user } = useAuth();
+  const { user, isPlaceSeeker, canAskPi, incrementPiUsage, isBasicUser } = useAuth();
   const insets = useSafeAreaInsets();
+  const route = useRoute();
+  const params = (route.params || {}) as { listingContext?: ListingContext; profileContext?: any; mode?: PiMode };
+
+  const listingContext = params.listingContext || null;
+  const profileContext = params.profileContext || null;
+
+  const piMode: PiMode = useMemo(() => {
+    if (params.mode) return params.mode;
+    if (listingContext && isPlaceSeeker()) return 'listing_advisor';
+    if (isPlaceSeeker()) return 'listing_advisor';
+    if (profileContext) return 'compatibility';
+    return 'general';
+  }, []);
+
+  const placeSeekerFlag = isPlaceSeeker();
+  const quickActions = placeSeekerFlag ? QUICK_ACTIONS_PLACE : QUICK_ACTIONS_ROOMMATE;
+
   const [messages, setMessages] = useState<AIMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -79,6 +180,9 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
   const sessionId = useRef(createSessionId());
   const prevCompletion = useRef<number>(0);
   const { showToast } = useNotificationContext();
+
+  const piAccess = canAskPi(piMode);
+  const showRemainingCounter = piMode !== 'general' && isBasicUser() && piAccess.limit !== Infinity;
 
   const checkProfileCompletion = async () => {
     if (!user) return 0;
@@ -108,13 +212,15 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
   useEffect(() => {
     checkProfileCompletion().then(pct => {
       prevCompletion.current = pct;
-      const userName = user?.name?.split(' ')[0] || 'there';
+      const introText = getPiIntro(piMode, placeSeekerFlag, listingContext, profileContext);
+      const suggestedQuestions = getSuggestedQuestions(piMode, placeSeekerFlag, listingContext);
       const welcomeMessage: AIMessage = {
         id: 'welcome',
-        text: getOpeningMessage(pct, userName),
+        text: introText,
         isUser: false,
         timestamp: new Date(),
-        isWelcome: pct >= 100,
+        isWelcome: true,
+        suggestions: suggestedQuestions,
       };
       setMessages([welcomeMessage]);
     });
@@ -137,6 +243,22 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
     if (!messageText) return;
     if (!user) return;
 
+    if (piMode !== 'general') {
+      const access = canAskPi(piMode);
+      if (!access.canAsk) {
+        const limitMsg: AIMessage = {
+          id: `limit_${Date.now()}`,
+          text: access.message || "You've reached your daily limit. Upgrade to Plus for unlimited access!",
+          isUser: false,
+          timestamp: new Date(),
+          isLimitMessage: true,
+        };
+        setMessages(prev => [...prev, limitMsg]);
+        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+        return;
+      }
+    }
+
     const userMessage: AIMessage = {
       id: `user_${Date.now()}`,
       text: messageText,
@@ -158,8 +280,27 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
     setMessages(prev => [...prev, aiMessage]);
 
     try {
+      let priceAnalysisAddition = '';
+      if (piMode === 'listing_advisor' && listingContext && isPriceQuestion(messageText)) {
+        try {
+          const analysis = await analyzePrice({
+            listingPrice: listingContext.price || 0,
+            bedrooms: listingContext.bedrooms || 1,
+            zipCode: listingContext.zipCode || '',
+            city: listingContext.city || '',
+          });
+          priceAnalysisAddition = `\n\nPRICE ANALYSIS DATA:\n${analysis.summary}\n\nRaw data:\n- Listing price: $${listingContext.price}/month\n- Area median (Rhome): ${analysis.rhomeMedian ? '$' + analysis.rhomeMedian : 'Not enough data'}\n- Comparable listings: ${analysis.rhomeCount}\n- HUD Fair Market Rent: ${analysis.hudFairMarketRent ? '$' + analysis.hudFairMarketRent : 'Not available'}\n- Market position: ${analysis.comparedToMarket}`;
+        } catch {
+          // Price analysis failed silently
+        }
+      }
+
+      const contextMessage = priceAnalysisAddition
+        ? `${messageText}\n\n[CONTEXT FOR PI: ${priceAnalysisAddition}]`
+        : messageText;
+
       await sendAIMessage(
-        messageText,
+        contextMessage,
         sessionId.current,
         (delta: string) => {
           setMessages(prev => prev.map(m =>
@@ -177,12 +318,17 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
 
       setIsTyping(false);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+
+      if (piMode !== 'general') {
+        await incrementPiUsage(piMode as 'listing_advisor' | 'price_analysis' | 'compatibility');
+      }
+
       await checkProfileCompletion();
     } catch {
       setIsTyping(false);
       setMessages(prev => prev.map(m =>
         m.id === aiMessageId
-          ? { ...m, text: "I'm having a bit of trouble connecting right now. Try sending your message again in a moment — I should be back up shortly." }
+          ? { ...m, text: "I'm having a bit of trouble connecting right now. Try sending your message again in a moment \u2014 I should be back up shortly." }
           : m
       ));
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
@@ -207,6 +353,21 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
       );
     }
 
+    if (item.isLimitMessage) {
+      return (
+        <View style={styles.messageWrapper}>
+          <View style={styles.messageRow}>
+            <LinearGradient colors={['#f59e0b', '#f97316']} style={styles.msgAvatar}>
+              <Feather name="lock" size={12} color="#fff" />
+            </LinearGradient>
+            <View style={[styles.aiBubble, styles.limitBubble]}>
+              <Text style={styles.aiBubbleText}>{item.text}</Text>
+            </View>
+          </View>
+        </View>
+      );
+    }
+
     return (
       <View style={styles.messageWrapper}>
         <View style={styles.messageRow}>
@@ -218,11 +379,11 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
           </View>
         </View>
 
-        {item.isWelcome ? (
+        {item.isWelcome && !listingContext ? (
           <View style={styles.quickActionsWrap}>
             <Text style={styles.quickActionsLabel}>Quick actions</Text>
             <View style={styles.quickActionsGrid}>
-              {QUICK_ACTIONS.map((qa) => (
+              {quickActions.map((qa) => (
                 <Pressable
                   key={qa.action}
                   style={styles.quickCard}
@@ -235,6 +396,20 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
                 </Pressable>
               ))}
             </View>
+          </View>
+        ) : null}
+
+        {item.suggestions && item.suggestions.length > 0 && (item.isWelcome && listingContext) ? (
+          <View style={styles.suggestionsContainer}>
+            {item.suggestions.map((suggestion, index) => (
+              <Pressable
+                key={index}
+                style={styles.suggestionChip}
+                onPress={() => handleSend(suggestion)}
+              >
+                <Text style={styles.suggestionChipText}>{suggestion}</Text>
+              </Pressable>
+            ))}
           </View>
         ) : null}
 
@@ -270,23 +445,45 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
         </LinearGradient>
         <View style={styles.aiTitleWrap}>
           <View style={styles.aiTitleRow}>
-            <Text style={styles.aiTitle}>AI Match Assistant</Text>
-            <View style={styles.premiumBadge}>
-              <Feather name="zap" size={9} color="#a855f7" />
-              <Text style={styles.premiumBadgeText}>PRO</Text>
-            </View>
+            <Text style={styles.aiTitle}>{getPiTitle(piMode)}</Text>
+            {piMode !== 'general' ? (
+              <View style={styles.premiumBadge}>
+                <Feather name="zap" size={9} color="#a855f7" />
+                <Text style={styles.premiumBadgeText}>
+                  {piMode === 'compatibility' ? 'MATCH' : 'ADVISOR'}
+                </Text>
+              </View>
+            ) : null}
           </View>
           <Text style={styles.aiSubtitle}>Powered by Rhome AI</Text>
         </View>
       </View>
 
-      {profileCompletion !== null && profileCompletion < 100 ? (
+      {showRemainingCounter ? (
+        <View style={styles.piLimitContainer}>
+          <Feather name="cpu" size={11} color="#ff6b5b" />
+          <Text style={styles.piLimitBadge}>
+            {canAskPi(piMode).remaining} {piMode === 'compatibility' ? 'matches' : 'questions'} left today
+          </Text>
+        </View>
+      ) : null}
+
+      {profileCompletion !== null && profileCompletion < 100 && piMode === 'general' ? (
         <View style={styles.completionBanner}>
           <View style={styles.completionBarTrack}>
             <View style={[styles.completionBarFill, { width: `${profileCompletion}%` }]} />
           </View>
           <Text style={styles.completionText}>
             Profile {profileCompletion}% complete {profileCompletion < 100 ? '\u2014 chat with me to finish it' : ''}
+          </Text>
+        </View>
+      ) : null}
+
+      {listingContext ? (
+        <View style={styles.listingBanner}>
+          <Feather name="home" size={14} color="#ff6b5b" />
+          <Text style={styles.listingBannerText} numberOfLines={1}>
+            {listingContext.title || 'Listing'} {listingContext.price ? `\u2014 $${listingContext.price}/mo` : ''}
           </Text>
         </View>
       ) : null}
@@ -408,6 +605,37 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.3)',
     fontWeight: '500',
   },
+  piLimitContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(255,107,91,0.08)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,107,91,0.15)',
+  },
+  piLimitBadge: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#ff6b5b',
+  },
+  listingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(255,107,91,0.06)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  listingBannerText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.6)',
+  },
   completionBanner: {
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -462,6 +690,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.07)',
+  },
+  limitBubble: {
+    borderColor: 'rgba(245,158,11,0.25)',
+    backgroundColor: 'rgba(245,158,11,0.08)',
   },
   aiBubbleText: {
     fontSize: 14,

@@ -6,7 +6,7 @@ import { NotificationsScreen } from '../screens/shared/NotificationsScreen';
 
 export type RoommatesStackParamList = {
   RoommatesList: undefined;
-  AIAssistant: undefined;
+  AIAssistant: { listingContext?: any; profileContext?: any; mode?: string } | undefined;
   Notifications: undefined;
 };
 

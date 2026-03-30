@@ -514,6 +514,10 @@ export interface User {
     questionsToday: number;
     lastResetDate: string;
   };
+  piMatchingData?: {
+    matchesToday: number;
+    lastResetDate: string;
+  };
   profileViews?: Array<{
     viewerId: string;
     viewerName: string;
