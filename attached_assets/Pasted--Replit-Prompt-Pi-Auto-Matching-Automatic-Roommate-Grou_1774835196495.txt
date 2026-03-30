@@ -1,0 +1,664 @@
+# Replit Prompt: Pi Auto-Matching — Automatic Roommate Group Assembly for Agents & Companies
+
+## GOAL
+
+Build an automated system where **Pi assembles roommate groups** without anyone manually swiping or searching. Pi runs on a schedule (nightly or triggered by new signups), analyzes the renter pool, and creates optimized roommate groups based on compatibility score, location preferences, desired group size, and gender preference. Renters are notified first ("Pi found you a match!"). Once renters accept, the confirmed group is packaged and made available to agents/companies on paid plans (Starter+).
+
+---
+
+## NEW FIELDS TO ADD
+
+### 1. Desired Roommate Count (How Many People They Want to Live With)
+
+This is a **new field separate from desired bedrooms** — a renter wanting a 3BR might want 1 or 2 roommates depending on whether they want a private room or shared.
+
+**Add to profiles table:**
+```sql
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS desired_roommate_count INTEGER;
+  -- Values: 1, 2, 3, 4 (meaning: I want to live with 1/2/3/4 other people)
+  -- NULL means no preference set
+```
+
+**Add to ProfileQuestionnaireScreen (optional, post-onboarding) AND EditProfileScreen:**
+- Label: "How many roommates do you want?"
+- Options: 1 roommate (2-person household), 2 roommates (3-person), 3 roommates (4-person), 4+ roommates (5+ person), No preference
+- Visual: number selector with icons showing household size
+- This is optional — if not set, Pi infers from desired_bedrooms (3BR = 2 roommates)
+
+**Add to types/models.ts:**
+```typescript
+// In Profile or RoommateProfile:
+desired_roommate_count?: number; // 1, 2, 3, 4, or null (no preference)
+```
+
+### 2. Gender Preference for Household
+
+**Add to profiles table:**
+```sql
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS household_gender_preference TEXT;
+  -- Values: 'same_gender', 'mixed', 'no_preference'
+  -- NULL treated as 'no_preference'
+```
+
+**Add to ProfileQuestionnaireScreen (step in the optional section after dealbreakers) AND EditProfileScreen:**
+- Label: "Who do you want to live with?"
+- Options:
+  - "Same gender only" — only matched with people of the same gender
+  - "Mixed household is fine" — open to any gender combination
+  - "No preference" — default, open to anything
+- This should also appear in the Dealbreakers step as an additional option, or as its own mini-step right after dealbreakers
+
+**Add to types/models.ts:**
+```typescript
+// In Profile or RoommateProfile:
+household_gender_preference?: 'same_gender' | 'mixed' | 'no_preference';
+```
+
+**Matching logic:**
+- If ANY member of a potential group has `same_gender` preference, ALL members in that group must be the same gender
+- If a user picks `mixed`, they're explicitly okay with mixed groups
+- `no_preference` is treated as open to anything
+- The user's `gender` field (male/female/other) determines which "same gender" pool they go into
+
+---
+
+## THE AUTO-MATCHING PIPELINE
+
+### How It Works (End to End)
+
+```
+1. TRIGGER
+   ├─ Nightly cron (2 AM local) runs for all active renters not in a group
+   ├─ New renter signup (after 24h grace period so they can fill out profile)
+   └─ Manual trigger: renter taps "Let Pi find my roommates" button
+
+2. PI ANALYZES RENTER POOL
+   ├─ Filter: only renters not already in a confirmed group
+   ├─ Filter: only renters active in last 30 days
+   ├─ Filter: only renters with at least budget + city set (minimum viable profile)
+   └─ Group by: city → desired_roommate_count → household_gender_preference
+
+3. PI ASSEMBLES CANDIDATE GROUPS
+   ├─ For each ungrouped renter, find the best 2-4 compatible partners
+   ├─ Use the full 100-point matching algorithm across ALL members
+   ├─ Factor in:
+   │   ├─ Compatibility score (all 16 categories + Pi parsed preferences)
+   │   ├─ Location: preferred_neighborhoods overlap + distance
+   │   ├─ Group size: desired_roommate_count alignment
+   │   ├─ Gender: household_gender_preference compliance
+   │   ├─ Budget alignment: combined budget should be realistic for the area
+   │   ├─ Move-in timeline: dates within 30 days of each other
+   │   └─ Dealbreaker check: no hard conflicts within the group
+   ├─ Score each candidate group as a whole (not just pairwise)
+   │   ├─ Group compatibility = average pairwise score across all member pairs
+   │   ├─ Minimum pairwise score must be > 50 (no weak links)
+   │   └─ Bonus: if all members share a neighborhood preference (+10)
+   └─ Select top group per renter (best overall score)
+
+4. PI SENDS TO CLAUDE FOR VALIDATION (Sonnet)
+   ├─ Claude reviews the candidate group holistically
+   ├─ Checks for subtle conflicts the algorithm might miss
+   ├─ Generates a group summary: why these people work together
+   └─ Returns: { approved: bool, confidence: high/medium/low, summary: string, risks: string[] }
+
+5. IF APPROVED → NOTIFY RENTERS
+   ├─ Create a "pi_auto_group" record with status "pending_acceptance"
+   ├─ Send push notification to each member:
+   │   "π Pi found your roommates! Meet [Name1], [Name2], and [Name3] — [compatibility]% compatible. Tap to see why."
+   ├─ Send email with same message + deep link to the group acceptance screen
+   ├─ Each renter sees:
+   │   ├─ Pi's group summary (why they were matched)
+   │   ├─ Each member's profile card with Pi's Take on compatibility
+   │   ├─ Location overlap visualization
+   │   ├─ Combined budget range
+   │   └─ Accept / Decline buttons
+   └─ Renters have 72 hours to accept or decline
+
+6. ACCEPTANCE FLOW
+   ├─ All members accept → group status changes to "confirmed"
+   │   ├─ Group becomes a real group in the groups table
+   │   ├─ Group chat is created
+   │   ├─ Group is packaged for agent/company marketplace
+   │   └─ Members get: "Your group is confirmed! Agents will reach out with listings."
+   ├─ One member declines → group status changes to "partial"
+   │   ├─ Remaining members are notified: "[Name] declined. Pi is looking for a replacement."
+   │   ├─ Pi searches for a replacement match
+   │   └─ New candidate is proposed to remaining members
+   ├─ No response in 72h → auto-decline
+   │   └─ Group is dissolved, members go back into the pool
+   └─ All decline → group is dissolved immediately
+
+7. CONFIRMED GROUP → PACKAGED FOR AGENTS/COMPANIES
+   ├─ Group appears in the "Pi Matched Groups" marketplace (new screen)
+   ├─ Only visible to agents/companies on Starter+ plans
+   ├─ Package includes:
+   │   ├─ Group size + member first names + ages
+   │   ├─ Combined budget range
+   │   ├─ Preferred neighborhoods (aggregated)
+   │   ├─ Move-in timeline
+   │   ├─ Compatibility score + Pi's group summary
+   │   ├─ Amenity must-haves (aggregated)
+   │   └─ "Claim Group" button
+   └─ Agent claims group → gets access to full profiles + group chat introduction
+```
+
+---
+
+## DATABASE CHANGES
+
+### New Tables
+
+```sql
+-- Pi Auto-Matched Groups
+CREATE TABLE IF NOT EXISTS public.pi_auto_groups (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  status TEXT NOT NULL DEFAULT 'pending_acceptance',
+    -- 'assembling', 'pending_acceptance', 'partial', 'confirmed', 'claimed', 'dissolved', 'expired'
+  target_size INTEGER NOT NULL, -- desired group size (2, 3, 4, 5)
+  city TEXT NOT NULL,
+  preferred_neighborhoods JSONB, -- aggregated from members
+  combined_budget_min NUMERIC,
+  combined_budget_max NUMERIC,
+  move_in_earliest DATE,
+  move_in_latest DATE,
+  household_gender TEXT, -- 'male', 'female', 'mixed'
+  group_compatibility_score NUMERIC, -- average pairwise score
+  min_pairwise_score NUMERIC, -- weakest link score
+  pi_summary TEXT, -- Pi's explanation of why this group works
+  pi_confidence TEXT, -- 'high', 'medium', 'low'
+  pi_risks JSONB, -- any risks Pi identified
+  amenity_must_haves JSONB, -- aggregated from members
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  acceptance_deadline TIMESTAMPTZ, -- 72 hours from notification
+  confirmed_at TIMESTAMPTZ,
+  claimed_by UUID REFERENCES public.users(id), -- agent/company who claimed
+  claimed_at TIMESTAMPTZ,
+  converted_group_id UUID REFERENCES public.groups(id), -- real group after confirmation
+  dissolved_reason TEXT -- 'declined', 'expired', 'replaced', 'manual'
+);
+
+CREATE INDEX idx_pi_auto_groups_status ON public.pi_auto_groups(status);
+CREATE INDEX idx_pi_auto_groups_city ON public.pi_auto_groups(city);
+CREATE INDEX idx_pi_auto_groups_claimed ON public.pi_auto_groups(claimed_by);
+
+-- Pi Auto-Group Members
+CREATE TABLE IF NOT EXISTS public.pi_auto_group_members (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  pi_auto_group_id UUID REFERENCES public.pi_auto_groups(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'pending',
+    -- 'pending', 'accepted', 'declined', 'expired', 'removed'
+  notified_at TIMESTAMPTZ,
+  responded_at TIMESTAMPTZ,
+  compatibility_with_group NUMERIC, -- this member's avg score with other members
+  pi_member_insight TEXT, -- Pi's take on what this person brings to the group
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(pi_auto_group_id, user_id)
+);
+
+CREATE INDEX idx_pi_auto_members_user ON public.pi_auto_group_members(user_id);
+CREATE INDEX idx_pi_auto_members_group ON public.pi_auto_group_members(pi_auto_group_id);
+
+-- Agent/Company Claims on Auto-Matched Groups
+CREATE TABLE IF NOT EXISTS public.pi_group_claims (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  pi_auto_group_id UUID REFERENCES public.pi_auto_groups(id) ON DELETE CASCADE,
+  agent_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+  listing_id UUID REFERENCES public.listings(id), -- optional: which listing they're matching to
+  status TEXT NOT NULL DEFAULT 'claimed',
+    -- 'claimed', 'contacted', 'applied', 'placed', 'released'
+  claimed_at TIMESTAMPTZ DEFAULT NOW(),
+  contacted_at TIMESTAMPTZ,
+  notes TEXT,
+  UNIQUE(pi_auto_group_id, agent_id)
+);
+
+CREATE INDEX idx_pi_claims_agent ON public.pi_group_claims(agent_id);
+```
+
+### Profile Table Updates
+
+```sql
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS desired_roommate_count INTEGER;
+
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS household_gender_preference TEXT DEFAULT 'no_preference';
+
+-- Track if user opted into Pi auto-matching
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS pi_auto_match_enabled BOOLEAN DEFAULT true;
+
+-- Track last time Pi attempted to match this user
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS pi_last_match_attempt TIMESTAMPTZ;
+```
+
+---
+
+## NEW EDGE FUNCTIONS
+
+### 1. `pi-auto-assemble/index.ts` (Main Pipeline)
+
+This is the core function that runs the auto-matching pipeline. Triggered by cron or on-demand.
+
+```typescript
+// Input: { city?: string, user_id?: string }
+// If city provided: process all ungrouped renters in that city
+// If user_id provided: find matches for this specific renter
+// If neither: process all cities
+
+// Steps:
+// 1. Query ungrouped renters (not in a group, active in 30 days, pi_auto_match_enabled = true)
+// 2. Group by city → desired_roommate_count → household_gender_preference
+// 3. For each pool, run matching algorithm on all pairs
+// 4. Use greedy best-match assembly:
+//    a. Find the highest-scoring pair
+//    b. If they need more members (desired_roommate_count > 1), find the best 3rd person compatible with BOTH
+//    c. Continue until group is full
+//    d. Verify: min pairwise score > 50, no dealbreaker conflicts, gender preference compliance
+// 5. Send top candidate groups to Claude for validation
+// 6. Create pi_auto_groups + pi_auto_group_members records
+// 7. Trigger notifications
+```
+
+**Claude Prompt for Group Validation:**
+```
+You are Pi, the AI matchmaker for Rhome. You've assembled a candidate roommate group using compatibility scoring. Now validate whether this group actually makes sense as a household.
+
+GROUP MEMBERS:
+${members.map(m => `
+  ${m.first_name} (${m.age}, ${m.gender})
+  - Occupation: ${m.occupation}
+  - Bio: ${m.bio}
+  - Ideal roommate: ${m.ideal_roommate_text}
+  - Budget: $${m.budget_min}-$${m.budget_max}
+  - Neighborhoods: ${m.preferred_neighborhoods?.join(', ')}
+  - Sleep: ${m.sleep_schedule}, Clean: ${m.cleanliness}
+  - Smoking: ${m.smoking}, Pets: ${m.pets}
+  - Work: ${m.work_location}, Guests: ${m.guest_policy}
+  - Noise: ${m.noise_tolerance}
+  - Roommate relationship: ${m.roommate_relationship}
+  - Interests: ${m.interest_tags?.join(', ')}
+  - Personality: q1=${m.personality_answers?.q1}, q2=${m.personality_answers?.q2}, q3=${m.personality_answers?.q3}, q4=${m.personality_answers?.q4}, q5=${m.personality_answers?.q5}
+  - Desired roommate count: ${m.desired_roommate_count}
+  - Gender preference: ${m.household_gender_preference}
+  - Dealbreakers: ${m.dealbreakers?.join(', ')}
+`).join('\n')}
+
+PAIRWISE SCORES:
+${pairwiseScores.map(p => `${p.userA} ↔ ${p.userB}: ${p.score}/100`).join('\n')}
+
+AVERAGE GROUP SCORE: ${avgScore}/100
+MIN PAIRWISE SCORE: ${minScore}/100
+
+VALIDATE:
+1. Does this group make sense as a real household? Consider lifestyle alignment, personality dynamics, and practical factors.
+2. Are there any subtle conflicts the scores might miss? (e.g., one person needs quiet for night shifts while another hosts gatherings)
+3. Would YOU recommend these people live together?
+
+Return JSON:
+{
+  "approved": true/false,
+  "confidence": "high" | "medium" | "low",
+  "summary": "2-3 sentence summary of why this group works (written as Pi, for the renters to read)",
+  "member_insights": {
+    "[user_id]": "What this person brings to the group (1 sentence)"
+  },
+  "risks": ["Any potential friction points (0-3 items)"],
+  "rejection_reason": "If not approved, explain why (null if approved)"
+}
+```
+
+**Use `claude-sonnet-4-5`** — this needs deep reasoning about group dynamics.
+
+### 2. `pi-auto-notify/index.ts` (Notification Sender)
+
+Triggered after groups are assembled and validated.
+
+```typescript
+// Input: { pi_auto_group_id: string }
+// 1. Load group + members
+// 2. For each member:
+//    a. Send push notification via existing notification service
+//    b. Send email via existing email service (if email notifications enabled)
+//    c. Create in-app notification
+// 3. Set acceptance_deadline to NOW() + 72 hours
+// 4. Update group status to 'pending_acceptance'
+
+// Push notification text:
+// "π Pi found your roommates! Meet [Name1] and [Name2] — [score]% compatible. Tap to see why Pi thinks you'd be great together."
+
+// Email includes:
+// - Pi's group summary
+// - Member names + ages + neighborhoods
+// - Combined budget range
+// - Deep link to group acceptance screen in app
+```
+
+### 3. `pi-auto-expire/index.ts` (Deadline Enforcer)
+
+Runs every hour via cron. Handles expired groups.
+
+```typescript
+// 1. Find all pi_auto_groups where status = 'pending_acceptance' AND acceptance_deadline < NOW()
+// 2. For each:
+//    a. Mark members who didn't respond as 'expired'
+//    b. If some accepted and some expired:
+//       - Set group status to 'partial'
+//       - Trigger pi-auto-assemble for replacement members
+//    c. If all expired or all declined:
+//       - Set group status to 'dissolved'
+//       - Members go back into the matching pool
+```
+
+---
+
+## NEW SERVICES
+
+### `services/piAutoMatchService.ts`
+
+```typescript
+// Assembly
+triggerAutoMatch(options?: { city?: string, userId?: string }): Promise<void>
+assembleGroupsForCity(city: string): Promise<PiAutoGroup[]>
+findBestGroupForRenter(userId: string): Promise<PiAutoGroup | null>
+
+// Renter-facing
+getPendingGroupInvite(userId: string): Promise<PiAutoGroup | null>
+acceptGroupInvite(userId: string, groupId: string): Promise<void>
+declineGroupInvite(userId: string, groupId: string): Promise<void>
+getMyAutoGroup(userId: string): Promise<PiAutoGroup | null>
+
+// Group management
+convertToRealGroup(piAutoGroupId: string): Promise<string> // returns real group_id
+dissolveGroup(piAutoGroupId: string, reason: string): Promise<void>
+findReplacementMember(piAutoGroupId: string): Promise<void>
+
+// Agent/Company facing
+getAvailableGroups(agentId: string, filters?: { city?: string, minScore?: number, maxBudget?: number, neighborhoods?: string[] }): Promise<PiAutoGroup[]>
+claimGroup(agentId: string, groupId: string, listingId?: string): Promise<void>
+releaseGroup(agentId: string, groupId: string): Promise<void>
+
+// Opt-in/out
+setAutoMatchEnabled(userId: string, enabled: boolean): Promise<void>
+isAutoMatchEnabled(userId: string): Promise<boolean>
+
+// Stats
+getAutoMatchStats(): Promise<{ totalGroups: number, confirmed: number, claimed: number, avgScore: number }>
+```
+
+---
+
+## NEW SCREENS
+
+### Renter Screens
+
+#### 1. PiGroupInviteScreen (`screens/renter/PiGroupInviteScreen.tsx`)
+
+Shown when a renter taps the push notification or navigates to their pending Pi group.
+
+**Layout:**
+- Header: "π Pi Found Your Roommates!"
+- Pi's group summary (2-3 sentences)
+- Group compatibility score with visual ring/gauge
+- Member cards (for each other member):
+  - Photo, name, age, occupation
+  - Pi's member insight ("What they bring to the group")
+  - Key stats: budget, neighborhood, sleep, cleanliness
+  - Compatibility with you: X%
+- Location overlap section:
+  - Map or list showing shared preferred neighborhoods
+  - "You all want [Neighborhood]" or "Your neighborhoods are within X miles"
+- Combined budget: "$X,XXX - $X,XXX/month for [X]BR"
+- Move-in window: "Everyone can move in between [Date] and [Date]"
+- Pi's risks (if any): yellow banner with potential friction points
+- **Accept** button (green, prominent)
+- **Decline** button (subtle, below)
+- "I need more time" link (extends deadline by 24h, once)
+- Countdown timer: "XX hours left to respond"
+
+#### 2. PiAutoMatchSettingsScreen (`screens/renter/PiAutoMatchSettingsScreen.tsx`)
+
+In profile settings:
+- Toggle: "Let Pi find roommates for me" (on/off)
+- Desired roommate count selector (1, 2, 3, 4+, no preference)
+- Household gender preference (same gender, mixed, no preference)
+- Status: "Pi is searching..." or "Pi found a match!" or "Not active"
+
+### Host Screens
+
+#### 3. PiMatchedGroupsScreen (`screens/host/PiMatchedGroupsScreen.tsx`)
+
+New tab in the host dashboard — the "marketplace" for Pi-assembled groups.
+
+**Layout:**
+- Header: "π Pi Matched Groups"
+- Filter bar: city, budget range, group size, neighborhood
+- Sort: compatibility score, budget fit, newest
+- Group cards (for each confirmed group):
+  - Group size badge: "3 Roommates"
+  - Combined budget: "$4,200-$4,800/mo"
+  - Neighborhoods: "Bushwick, Bed-Stuy, Williamsburg"
+  - Move-in: "Ready by April 15"
+  - Compatibility: "92% group compatibility"
+  - Pi summary snippet (1 line)
+  - Amenity must-haves icons
+  - **"Claim Group"** button
+- Empty state: "No matched groups available in your area yet. Pi is working on it!"
+
+#### 4. PiClaimedGroupDetailScreen (`screens/host/PiClaimedGroupDetailScreen.tsx`)
+
+After agent claims a group:
+- Full member profiles (photos, bios, preferences)
+- Pi's detailed group summary
+- "Send Introduction" button → opens group chat with agent intro message
+- "Match to Listing" button → select which listing to present to this group
+- "Release Group" button → unclaim and return to marketplace
+- Status tracker: Claimed → Contacted → Applied → Placed
+
+---
+
+## PLAN GATING
+
+### Renter Plans (Auto-Match Opt-In)
+
+All renters can opt into Pi auto-matching for free. This is a growth feature — more renters in the pool = better matches = more value for agents.
+
+- **Free/Basic:** Pi auto-match enabled. Limited to 1 pending group invite at a time.
+- **Plus:** Pi auto-match enabled. Priority matching (Plus users get matched first). Up to 2 pending invites.
+- **Elite:** Pi auto-match enabled. Highest priority. Up to 3 pending invites. Can see Pi's detailed reasoning.
+
+### Agent/Company Plans (Group Access)
+
+Auto-matched groups are a **premium feature — Starter+ plans only**.
+
+- **PayPerUse ($0):** ❌ Cannot see or claim Pi matched groups. Upgrade prompt shown.
+- **Agent Starter ($49):** 5 group claims/month. Browse all groups in their city.
+- **Agent Pro ($99):** 15 group claims/month. Browse all groups. Priority notification when new groups match their listings.
+- **Agent Business ($149):** Unlimited claims. Priority notification. Auto-match groups to their listings (Pi proactively sends: "This group is perfect for your Bushwick 3BR").
+- **Company Starter ($199):** 10 group claims/month. Browse + filter by all cities.
+- **Company Pro ($399):** 30 claims/month. Priority + auto-matching to listings.
+- **Company Enterprise (custom):** Unlimited. Exclusive first-look window (see groups 24h before other agents). Custom matching criteria.
+
+---
+
+## NOTIFICATION TEMPLATES
+
+### Push Notifications
+
+**Group assembled (to renters):**
+```
+π Pi found your roommates!
+Meet [Name1] and [Name2] — [score]% compatible.
+Tap to see why Pi thinks you'd be great together.
+```
+
+**Member accepted (to other members):**
+```
+[Name] accepted the group! Waiting on [Name2] to respond.
+[X/Y] members confirmed.
+```
+
+**Group confirmed (to all members):**
+```
+🎉 Your group is official!
+You, [Name1], and [Name2] are now roommates on Rhome.
+Agents with matching listings will reach out soon.
+```
+
+**Group confirmed (to matching agents on Business+ plans):**
+```
+π New Pi-matched group available!
+3 roommates, $4,200/mo budget, want Bushwick/Bed-Stuy.
+92% group compatibility. Claim them before someone else does.
+```
+
+**Member declined (to remaining members):**
+```
+[Name] passed on the group. Pi is finding a replacement — hang tight!
+```
+
+**Group expired:**
+```
+The group Pi assembled didn't come together in time.
+Don't worry — Pi is still looking for your perfect roommates.
+```
+
+### Email Templates
+
+Same content as push notifications but with:
+- Rhome branded header/footer
+- Deep link buttons ("View Your Match", "Accept Group", "Claim Group")
+- Unsubscribe link
+- Pi avatar/branding
+
+---
+
+## CRON SCHEDULE
+
+| Job | Schedule | Function |
+|-----|----------|----------|
+| Pi Auto-Assemble | Daily at 2 AM (per city timezone) | `pi-auto-assemble` |
+| Deadline Enforcer | Every hour | `pi-auto-expire` |
+| New Renter Match | 24h after signup (one-time trigger) | `pi-auto-assemble` with user_id |
+| Agent Notifications | Daily at 9 AM | Notify agents of new confirmed groups matching their listings |
+
+---
+
+## TYPE DEFINITIONS
+
+```typescript
+interface PiAutoGroup {
+  id: string;
+  status: 'assembling' | 'pending_acceptance' | 'partial' | 'confirmed' | 'claimed' | 'dissolved' | 'expired';
+  target_size: number;
+  city: string;
+  preferred_neighborhoods?: string[];
+  combined_budget_min?: number;
+  combined_budget_max?: number;
+  move_in_earliest?: string;
+  move_in_latest?: string;
+  household_gender?: 'male' | 'female' | 'mixed';
+  group_compatibility_score?: number;
+  min_pairwise_score?: number;
+  pi_summary?: string;
+  pi_confidence?: 'high' | 'medium' | 'low';
+  pi_risks?: string[];
+  amenity_must_haves?: string[];
+  members?: PiAutoGroupMember[];
+  created_at: string;
+  acceptance_deadline?: string;
+  confirmed_at?: string;
+  claimed_by?: string;
+  claimed_at?: string;
+  converted_group_id?: string;
+}
+
+interface PiAutoGroupMember {
+  id: string;
+  pi_auto_group_id: string;
+  user_id: string;
+  status: 'pending' | 'accepted' | 'declined' | 'expired' | 'removed';
+  notified_at?: string;
+  responded_at?: string;
+  compatibility_with_group?: number;
+  pi_member_insight?: string;
+  user?: User; // populated when loading
+}
+
+interface PiGroupClaim {
+  id: string;
+  pi_auto_group_id: string;
+  agent_id: string;
+  listing_id?: string;
+  status: 'claimed' | 'contacted' | 'applied' | 'placed' | 'released';
+  claimed_at: string;
+  contacted_at?: string;
+  notes?: string;
+}
+```
+
+---
+
+## FILES TO CREATE/MODIFY
+
+| File | Change |
+|------|--------|
+| `supabase/migrations/XXX_pi_auto_matching.sql` | **NEW** — All tables + profile columns |
+| `types/models.ts` | Add PiAutoGroup, PiAutoGroupMember, PiGroupClaim interfaces + profile fields |
+| `services/piAutoMatchService.ts` | **NEW** — Full auto-matching service |
+| `services/piMatchingService.ts` | Add group assembly scoring methods |
+| `services/notificationService.ts` | Add Pi auto-match notification templates |
+| `screens/renter/PiGroupInviteScreen.tsx` | **NEW** — Renter group acceptance screen |
+| `screens/renter/PiAutoMatchSettingsScreen.tsx` | **NEW** — Opt-in/out + preferences |
+| `screens/host/PiMatchedGroupsScreen.tsx` | **NEW** — Agent/company group marketplace |
+| `screens/host/PiClaimedGroupDetailScreen.tsx` | **NEW** — Claimed group detail + actions |
+| `screens/shared/ProfileQuestionnaireScreen.tsx` | Add desired_roommate_count + household_gender_preference (optional steps) |
+| `screens/shared/EditProfileScreen.tsx` | Add desired_roommate_count + household_gender_preference fields |
+| `utils/matchingAlgorithm.ts` | Add group-level scoring (avg pairwise, min pairwise, gender compliance check) |
+| `navigation/RenterTabs.tsx` | Add route for PiGroupInviteScreen |
+| `navigation/HostTabs.tsx` | Add Pi Matched Groups tab |
+| `constants/planFeatures.ts` | Add auto-match claim limits per plan |
+| `supabase/functions/pi-auto-assemble/index.ts` | **NEW** — Core assembly pipeline |
+| `supabase/functions/pi-auto-notify/index.ts` | **NEW** — Notification sender |
+| `supabase/functions/pi-auto-expire/index.ts` | **NEW** — Deadline enforcer |
+
+---
+
+## BUILD ORDER
+
+1. **Migration** — Create tables + add profile columns
+2. **Types** — Add all new interfaces
+3. **Profile fields** — Add desired_roommate_count + household_gender_preference to questionnaire and edit screens
+4. **Matching algorithm** — Add group-level scoring (avg pairwise, min pairwise, gender compliance)
+5. **Auto-match service** — Create `piAutoMatchService.ts`
+6. **Assembly edge function** — `pi-auto-assemble` with Claude validation
+7. **Notification edge function** — `pi-auto-notify` with push + email
+8. **Expiry edge function** — `pi-auto-expire` cron
+9. **Renter screens** — PiGroupInviteScreen + PiAutoMatchSettingsScreen
+10. **Host screens** — PiMatchedGroupsScreen + PiClaimedGroupDetailScreen
+11. **Navigation** — Wire up new screens + tabs
+12. **Plan gating** — Enforce claim limits per plan
+13. **Cron setup** — Schedule nightly assembly + hourly expiry
+14. **Test** — Verify with these scenarios:
+    - 3 renters all want Bushwick, 2 roommates, same budget range → Pi assembles group, all accept → group confirmed
+    - 1 renter wants "same gender only" (female) → only matched with other females
+    - Agent on Starter plan claims a group → gets full profiles → contacts group
+    - Agent on PayPerUse tries to view groups → sees upgrade prompt
+    - 1 of 3 members declines → Pi finds replacement → new member notified
+    - 72h passes with no response → group dissolved, members back in pool
+    - Business agent gets auto-notification: "New group matches your listing"
+
+## IMPORTANT NOTES
+
+- **Opt-in by default** — all new renters have `pi_auto_match_enabled = true`. They can turn it off in settings.
+- **One group at a time** — a renter can only be in ONE pending Pi auto-group at a time. If they decline, they go back in the pool.
+- **No duplicate matching** — if two renters were already in a dissolved group together, don't re-match them for at least 30 days.
+- **Privacy** — agents see limited info before claiming (first names, ages, budget, neighborhoods). Full profiles only after claiming.
+- **Gender preference is a HARD filter** — never override it. If someone says "same gender only," that's absolute.
+- **Minimum viable profile** — Pi only attempts to match renters who have at least: budget, city, and 1 photo. Encourages profile completion.
+- **Pi voice** — all notifications and summaries use Pi's warm, confident, slightly witty persona. Not robotic system messages.
+- **Conversion tracking** — track the full funnel: assembled → notified → accepted → confirmed → claimed → contacted → placed. This data is gold for measuring Pi's effectiveness.
