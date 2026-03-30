@@ -102,7 +102,7 @@ markers.forEach(function(m){
     iconSize:[44,70],
     iconAnchor:[22,70]
   });
-  var popup='<div class="popup-card" onclick="window.parent.postMessage(JSON.stringify({type:\\'propertyTap\\',id:\\''+m.id+'\\',token:\\'__MSG_TOKEN__\\'}),\\'*\\')">'
+  var popup='<div class="popup-card" onclick="var msg=JSON.stringify({type:\\'propertyTap\\',id:\\''+m.id+'\\',token:\\'__MSG_TOKEN__\\'});if(window.ReactNativeWebView){window.ReactNativeWebView.postMessage(msg)}else{window.parent.postMessage(msg,\\'*\\')}">'
     +'<img src="'+m.photo+'"/>'
     +'<div class="popup-info">'
     +'<div class="popup-price">$'+m.price+'/mo</div>'
@@ -181,32 +181,34 @@ export const PropertyMapView = ({
     });
   }, [propertiesWithCoords, hostProfiles, currentUser, saved]);
 
-  const [mapError, setMapError] = useState(false);
+  const htmlContent = buildLeafletHtml(
+    mapMarkers,
+    { lat: initialRegion.latitude, lng: initialRegion.longitude },
+    12,
+    isDark
+  );
+
+  const messageToken = React.useRef(`rhome_map_${Date.now()}_${Math.random().toString(36).slice(2)}`).current;
+  const htmlWithToken = htmlContent.replace('__MSG_TOKEN__', messageToken);
+
+  const handlePropertyTap = React.useCallback((id: string) => {
+    const property = properties.find(p => p.id === id);
+    if (property) onPropertyPress(property);
+  }, [properties, onPropertyPress]);
 
   if (Platform.OS === 'web') {
-    const htmlContent = buildLeafletHtml(
-      mapMarkers,
-      { lat: initialRegion.latitude, lng: initialRegion.longitude },
-      12,
-      isDark
-    );
-
-    const messageToken = React.useRef(`rhome_map_${Date.now()}_${Math.random().toString(36).slice(2)}`).current;
-    const htmlWithToken = htmlContent.replace('__MSG_TOKEN__', messageToken);
-
     React.useEffect(() => {
       const handleMessage = (event: MessageEvent) => {
         try {
           const data = JSON.parse(event.data);
           if (data.type === 'propertyTap' && data.token === messageToken) {
-            const property = properties.find(p => p.id === data.id);
-            if (property) onPropertyPress(property);
+            handlePropertyTap(data.id);
           }
         } catch {}
       };
       window.addEventListener('message', handleMessage);
       return () => window.removeEventListener('message', handleMessage);
-    }, [properties, messageToken, onPropertyPress]);
+    }, [messageToken, handlePropertyTap]);
 
     return (
       <View style={[styles.mapContainer, { paddingBottom: bottomInset }]}>
@@ -224,114 +226,25 @@ export const PropertyMapView = ({
     );
   }
 
-  const MapView = require('react-native-maps').default;
-  const { Marker, Callout, PROVIDER_GOOGLE } = require('react-native-maps');
-  const mapProvider = Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined;
-
-  if (mapError) {
-    return (
-      <View style={[styles.mapContainer, styles.mapErrorContainer]}>
-        <Feather name="map-pin" size={40} color="rgba(255,255,255,0.2)" />
-        <Text style={styles.mapErrorText}>Map couldn't load</Text>
-        <Text style={styles.mapErrorSubtext}>Check your connection and try again</Text>
-        <Pressable
-          onPress={() => setMapError(false)}
-          style={styles.mapRetryBtn}
-        >
-          <Text style={styles.mapRetryText}>Retry</Text>
-        </Pressable>
-      </View>
-    );
-  }
+  const WebView = require('react-native-webview').default;
 
   return (
-    <View style={styles.mapContainer}>
-      <MapView
-        provider={mapProvider}
+    <View style={[styles.mapContainer, { paddingBottom: bottomInset }]}>
+      <WebView
+        originWhitelist={['*']}
+        source={{ html: htmlWithToken }}
         style={styles.map}
-        initialRegion={initialRegion}
-        showsUserLocation={false}
-        showsCompass={true}
-        showsScale={true}
-        onMapReady={() => console.log('[PropertyMapView] Map loaded successfully')}
-        onError={(e: { nativeEvent?: { error?: string } }) => {
-          console.error('[PropertyMapView] Map failed to load:', e.nativeEvent?.error || e);
-          setMapError(true);
+        javaScriptEnabled
+        scrollEnabled={false}
+        onMessage={(event: { nativeEvent: { data: string } }) => {
+          try {
+            const data = JSON.parse(event.nativeEvent.data);
+            if (data.type === 'propertyTap' && data.token === messageToken) {
+              handlePropertyTap(data.id);
+            }
+          } catch {}
         }}
-      >
-        {propertiesWithCoords.map(property => {
-          const hostUser = property.hostProfileId ? hostProfiles.get(property.hostProfileId) : null;
-          const hostProfile = hostUser ? getUserAsRoommateProfile(hostUser) : null;
-          const compatibility = hostProfile && currentUser ? calculateCompatibility(currentUser, hostProfile) : null;
-
-          return (
-            <Marker
-              key={property.id}
-              coordinate={{
-                latitude: property.coordinates!.lat,
-                longitude: property.coordinates!.lng,
-              }}
-              tracksViewChanges={false}
-              onPress={() => onPropertyPress(property)}
-            >
-              <View style={styles.pinWrap}>
-                <View style={[
-                  styles.pinPhotoRing,
-                  saved.has(property.id) && styles.pinPhotoRingSaved,
-                ]}>
-                  {property.photos[0] ? (
-                    <Image
-                      source={{ uri: property.photos[0] }}
-                      style={styles.pinPhoto}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <View style={styles.pinPhotoFallback}>
-                      <Text style={styles.pinPhotoFallbackIcon}>&#127968;</Text>
-                    </View>
-                  )}
-                </View>
-                <View style={[styles.pinPricePill, saved.has(property.id) && styles.pinPricePillSaved]}>
-                  <Text style={styles.pinPriceText}>${property.price.toLocaleString()}</Text>
-                </View>
-                <View style={[styles.pinTip, saved.has(property.id) && styles.pinTipSaved]} />
-              </View>
-
-              <Callout tooltip onPress={() => onPropertyPress(property)}>
-                <View style={[styles.callout, { backgroundColor: theme.backgroundDefault }]}>
-                  <Image source={{ uri: property.photos[0] }} style={styles.calloutImage} />
-                  <View style={styles.calloutInfo}>
-                    <ThemedText style={[Typography.body, { fontWeight: '700' }]}>
-                      ${property.price}/mo
-                    </ThemedText>
-                    <ThemedText style={[Typography.caption, { color: theme.textSecondary }]} numberOfLines={1}>
-                      {property.title}
-                    </ThemedText>
-                    <View style={styles.calloutMeta}>
-                      <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
-                        {property.bedrooms}bd {property.bathrooms}ba
-                      </ThemedText>
-                      {compatibility !== null ? (
-                        <View style={[styles.miniMatchBadge, { backgroundColor: getMatchQualityColor(compatibility) + '20' }]}>
-                          <ThemedText style={[Typography.caption, { color: getMatchQualityColor(compatibility), fontWeight: '700', fontSize: 11 }]}>
-                            {compatibility}%
-                          </ThemedText>
-                        </View>
-                      ) : null}
-                    </View>
-                  </View>
-                  <Pressable
-                    style={styles.calloutSave}
-                    onPress={() => onToggleSave(property.id)}
-                  >
-                    <Feather name="heart" size={16} color={saved.has(property.id) ? '#EF4444' : theme.textSecondary} />
-                  </Pressable>
-                </View>
-              </Callout>
-            </Marker>
-          );
-        })}
-      </MapView>
+      />
       <View style={[styles.propertyCount, { backgroundColor: theme.backgroundDefault }]}>
         <Feather name="map-pin" size={14} color={theme.primary} />
         <ThemedText style={[Typography.caption, { color: theme.text, marginLeft: Spacing.xs, fontWeight: '600' }]}>
