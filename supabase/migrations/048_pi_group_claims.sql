@@ -124,7 +124,7 @@ BEGIN
       WHEN 'pay_per_use' THEN v_free_per_month := 0; v_extra_price_cents := 2500;
       WHEN 'starter'     THEN v_free_per_month := 3; v_extra_price_cents := 2000;
       WHEN 'pro'         THEN v_free_per_month := 10; v_extra_price_cents := 1500;
-      WHEN 'elite'       THEN v_free_per_month := 25; v_extra_price_cents := 1000;
+      WHEN 'business'    THEN v_free_per_month := 25; v_extra_price_cents := 1000;
       ELSE v_free_per_month := 0; v_extra_price_cents := 2500;
     END CASE;
   ELSIF v_host_type = 'company' THEN

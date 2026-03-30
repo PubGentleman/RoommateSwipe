@@ -377,11 +377,11 @@ export const PiClaimedGroupDetailScreen = () => {
             <View style={styles.amenityGrid}>
               {group.amenity_preferences.map(amenity => {
                 const iconMap: Record<string, string> = {
-                  laundry: 'wind', dishwasher: 'disc', parking: 'truck',
-                  gym: 'activity', pool: 'droplet', doorman: 'shield',
-                  elevator: 'arrow-up', ac: 'thermometer', pets: 'heart',
-                  wifi: 'wifi', storage: 'archive', balcony: 'sun',
-                  rooftop: 'sunrise',
+                  laundry: 'wind', dishwasher: 'circle', parking: 'grid',
+                  gym: 'zap', pool: 'droplet', doorman: 'shield',
+                  elevator: 'arrow-up', ac: 'wind', pets: 'heart',
+                  wifi: 'globe', storage: 'archive', balcony: 'maximize',
+                  rooftop: 'layers',
                 };
                 const icon = iconMap[amenity.toLowerCase()] || 'check';
                 return (
