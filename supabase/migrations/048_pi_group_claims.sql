@@ -90,10 +90,19 @@ DECLARE
   v_claim_id UUID;
   v_group_status TEXT;
   v_host_id UUID;
+  v_role TEXT;
 BEGIN
   v_host_id := auth.uid();
   IF v_host_id IS NULL THEN
     RAISE EXCEPTION 'Authentication required';
+  END IF;
+
+  SELECT role INTO v_role
+  FROM public.profiles
+  WHERE user_id = v_host_id;
+
+  IF v_role IS NULL OR v_role NOT IN ('host', 'agent', 'company') THEN
+    RAISE EXCEPTION 'Only hosts, agents, and companies can claim groups';
   END IF;
 
   SELECT status INTO v_group_status
@@ -132,10 +141,19 @@ CREATE OR REPLACE FUNCTION public.release_pi_group(
 DECLARE
   v_host_id UUID;
   v_rows INTEGER;
+  v_role TEXT;
 BEGIN
   v_host_id := auth.uid();
   IF v_host_id IS NULL THEN
     RAISE EXCEPTION 'Authentication required';
+  END IF;
+
+  SELECT role INTO v_role
+  FROM public.profiles
+  WHERE user_id = v_host_id;
+
+  IF v_role IS NULL OR v_role NOT IN ('host', 'agent', 'company') THEN
+    RAISE EXCEPTION 'Only hosts, agents, and companies can release groups';
   END IF;
 
   UPDATE public.pi_group_claims

@@ -178,14 +178,12 @@ export const PiClaimedGroupDetailScreen = () => {
       if (existingGroup) {
         linkedGroupId = existingGroup.id;
       } else {
-        const memberIds = members.map(m => m.id);
         const { data: newGroup, error: groupError } = await supabase
           .from('groups')
           .insert({
             name: `Pi Group - ${group?.city || 'Roommates'}`,
             type: 'roommate',
-            created_by: members[0]?.id || user.id,
-            member_ids: [...memberIds, user.id],
+            created_by: user.id,
             pi_auto_group_id: groupId,
           })
           .select()
@@ -199,6 +197,17 @@ export const PiClaimedGroupDetailScreen = () => {
           return;
         }
         linkedGroupId = newGroup.id;
+
+        const memberInserts = [
+          { group_id: linkedGroupId, user_id: user.id, role: 'admin', is_host: true },
+          ...members.map(m => ({
+            group_id: linkedGroupId,
+            user_id: m.id,
+            role: 'member' as const,
+            is_host: false,
+          })),
+        ];
+        await supabase.from('group_members').insert(memberInserts);
       }
 
       await sendGroupMessage(linkedGroupId, introMessage);
