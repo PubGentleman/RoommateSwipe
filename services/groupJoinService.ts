@@ -71,7 +71,7 @@ export async function getOpenGroups(
     .from('preformed_groups')
     .select('*, preformed_group_members(*)')
     .eq('open_to_requests', true)
-    .eq('status', 'active');
+    .in('status', ['active', 'forming', 'ready', 'searching']);
 
   if (userCity) preQuery = preQuery.eq('city', userCity);
 
@@ -100,6 +100,7 @@ export async function getOpenGroups(
         budgetMax: g.budget_max,
         desiredBedrooms: g.bedroom_count,
         createdAt: g.created_at,
+        needsReplacement: g.needs_replacement ?? false,
       });
     }
   }

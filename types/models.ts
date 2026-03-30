@@ -886,6 +886,8 @@ export interface PreformedGroup {
   created_at: string;
   converted_group_id?: string;
   open_to_requests?: boolean;
+  needs_replacement?: boolean;
+  replacement_slots?: number;
 }
 
 export interface PreformedGroupMember {
@@ -949,4 +951,5 @@ export interface OpenGroupListing {
   budgetMax?: number;
   desiredBedrooms?: number;
   createdAt: string;
+  needsReplacement?: boolean;
 }

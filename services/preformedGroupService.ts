@@ -181,9 +181,44 @@ export async function leavePreformedGroup(groupId: string): Promise<boolean> {
       .delete()
       .eq('preformed_group_id', groupId)
       .eq('user_id', user.id);
+
+    if (group.group_lead_id !== user.id) {
+      await supabase.from('notifications').insert({
+        user_id: group.group_lead_id,
+        type: 'group_member_left',
+        title: 'A member left your group',
+        body: `A member has left "${group.name || 'your group'}". You can find a replacement through Rhome.`,
+        data: { groupId },
+        read: false,
+      });
+    }
   }
 
   return true;
+}
+
+export async function enableReplacement(groupId: string, slots: number): Promise<boolean> {
+  const { error } = await supabase
+    .from('preformed_groups')
+    .update({
+      needs_replacement: true,
+      replacement_slots: slots,
+      open_to_requests: true,
+    })
+    .eq('id', groupId);
+  return !error;
+}
+
+export async function disableReplacement(groupId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('preformed_groups')
+    .update({
+      needs_replacement: false,
+      replacement_slots: 0,
+      open_to_requests: false,
+    })
+    .eq('id', groupId);
+  return !error;
 }
 
 export async function getGroupById(groupId: string): Promise<PreformedGroup | null> {

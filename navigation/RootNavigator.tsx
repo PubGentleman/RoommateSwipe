@@ -51,6 +51,8 @@ export const RootNavigator = () => {
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [intentCompletedForUserId, setIntentCompletedForUserId] = useState<string | null>(null);
+  const [hasPendingInvite, setHasPendingInvite] = useState(false);
+  const [pendingInviteChecked, setPendingInviteChecked] = useState(false);
 
   useEffect(() => {
     StorageService.isOnboardingCompleted().then((completed) => {
@@ -58,6 +60,25 @@ export const RootNavigator = () => {
       setOnboardingChecked(true);
     });
   }, []);
+
+  useEffect(() => {
+    AsyncStorage.getItem('pending_invite_code').then(val => {
+      setHasPendingInvite(!!val);
+      setPendingInviteChecked(true);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!user || !pendingInviteChecked) return;
+    const consumePendingInvite = async () => {
+      const code = await AsyncStorage.getItem('pending_invite_code');
+      if (!code) return;
+      await AsyncStorage.removeItem('pending_invite_code');
+      setHasPendingInvite(false);
+      await AsyncStorage.setItem('pending_group_join_code', code);
+    };
+    consumePendingInvite();
+  }, [user, pendingInviteChecked]);
 
   const handleOnboardingComplete = useCallback(() => {
     StorageService.setOnboardingCompleted(true);
@@ -86,7 +107,10 @@ export const RootNavigator = () => {
 
   const step = user.onboardingStep || 'complete';
 
-  const needsRenterIntent = user.role === 'renter' && intentCompletedForUserId !== user.id && !user.profileData?.apartment_search_type;
+  const needsRenterIntent = user.role === 'renter'
+    && intentCompletedForUserId !== user.id
+    && !user.profileData?.apartment_search_type
+    && !hasPendingInvite;
   if (needsRenterIntent) {
     return (
       <WhatAreYouLookingForScreen

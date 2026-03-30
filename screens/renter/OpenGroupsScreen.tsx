@@ -60,10 +60,19 @@ export default function OpenGroupsScreen() {
         }
       >
         <View style={styles.cardHeader}>
-          <View style={[styles.typeBadge, { backgroundColor: typeBadge.color + '20' }]}>
-            <Text style={[styles.typeBadgeText, { color: typeBadge.color }]}>
-              {typeBadge.label}
-            </Text>
+          <View style={styles.badgeRow}>
+            <View style={[styles.typeBadge, { backgroundColor: typeBadge.color + '20' }]}>
+              <Text style={[styles.typeBadgeText, { color: typeBadge.color }]}>
+                {typeBadge.label}
+              </Text>
+            </View>
+            {item.needsReplacement ? (
+              <View style={[styles.typeBadge, { backgroundColor: '#F59E0B20' }]}>
+                <Text style={[styles.typeBadgeText, { color: '#F59E0B' }]}>
+                  Looking for {item.spotsOpen} replacement{item.spotsOpen !== 1 ? 's' : ''}
+                </Text>
+              </View>
+            ) : null}
           </View>
           <Text style={[styles.spotsText, { color: theme.primary }]}>
             {item.spotsOpen} spot{item.spotsOpen !== 1 ? 's' : ''} open
@@ -230,6 +239,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    gap: 6,
+    flexShrink: 1,
+    flexWrap: 'wrap',
   },
   typeBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   typeBadgeText: { fontSize: 12, fontWeight: '700' },

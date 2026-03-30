@@ -25,6 +25,8 @@ import {
   updateGroupPreferences,
   removeMember,
   removeFromShortlist,
+  enableReplacement,
+  disableReplacement,
 } from '../../services/preformedGroupService';
 import { toggleOpenToRequests, getGroupRequests } from '../../services/groupJoinService';
 import { PreformedGroup, PreformedGroupMember, GroupShortlistItem } from '../../types/models';
@@ -93,6 +95,28 @@ export default function MyGroupScreen() {
     ]);
   };
 
+  const promptForReplacement = (freshGroup: PreformedGroup, freshMembers: PreformedGroupMember[]) => {
+    const freshJoined = freshMembers.filter(m => m.status === 'joined').length;
+    const freshOpenSlots = (freshGroup.group_size || 0) - freshJoined;
+
+    if (freshGroup.group_lead_id !== user?.id || freshOpenSlots <= 0) return;
+
+    Alert.alert(
+      'Need a Replacement?',
+      `Your group now has ${freshOpenSlots} open ${freshOpenSlots === 1 ? 'spot' : 'spots'}. Would you like to find a replacement roommate through Rhome?`,
+      [
+        { text: 'Not Now', style: 'cancel' },
+        {
+          text: 'Find a Replacement',
+          onPress: async () => {
+            await enableReplacement(freshGroup.id, freshOpenSlots);
+            loadData();
+          },
+        },
+      ]
+    );
+  };
+
   const handleRemoveMember = (memberId: string) => {
     if (!group) return;
     Alert.alert('Remove Member', 'Remove this person from the group?', [
@@ -102,7 +126,13 @@ export default function MyGroupScreen() {
         style: 'destructive',
         onPress: async () => {
           await removeMember(group.id, memberId);
-          loadData();
+          const freshGroup = await getUserPreformedGroup();
+          if (freshGroup) {
+            const freshMembers = await getGroupMembers(freshGroup.id);
+            setGroup(freshGroup);
+            setMembers(freshMembers);
+            promptForReplacement(freshGroup, freshMembers);
+          }
         },
       },
     ]);
@@ -120,7 +150,7 @@ export default function MyGroupScreen() {
     const url = Linking.createURL(`join/${group.invite_code}`);
     const displayName = group.name || 'our group';
     await Share.share({
-      message: `Join ${displayName} on Rhome!\n\nTap the link to join:\n${url}`,
+      message: `Join ${displayName} on Rhome!\n\nDownload the app and use this link to join:\n${url}\n\nOr enter invite code: ${group.invite_code}`,
     });
   };
 
@@ -147,15 +177,57 @@ export default function MyGroupScreen() {
 
   if (!group) {
     return (
-      <View style={[styles.container, { paddingTop: insets.top + 60, alignItems: 'center' }]}>
-        <Feather name="users" size={48} color="rgba(255,255,255,0.2)" />
-        <Text style={styles.emptyText}>No active group</Text>
-        <Pressable style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.backBtnText}>Go Back</Text>
-        </Pressable>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={styles.header}>
+          <View style={{ width: 36 }} />
+          <Text style={styles.headerTitle}>My Group</Text>
+          <View style={{ width: 36 }} />
+        </View>
+
+        <View style={styles.createGroupState}>
+          <View style={styles.createGroupIcon}>
+            <Feather name="users" size={40} color="#22C55E" />
+          </View>
+
+          <Text style={styles.createGroupTitle}>Start Your Group</Text>
+          <Text style={styles.createGroupSubtext}>
+            Create a group and invite your friends to search for apartments together.
+          </Text>
+
+          <Pressable
+            style={styles.createGroupBtn}
+            onPress={() => navigation.navigate('GroupSetup' as never)}
+          >
+            <Feather name="plus" size={18} color="#111" />
+            <Text style={styles.createGroupBtnText}>Create Group</Text>
+          </Pressable>
+
+          <View style={styles.featuresList}>
+            <View style={styles.featureRow}>
+              <Feather name="send" size={14} color="#22C55E" />
+              <Text style={styles.featureText}>Share an invite link with friends</Text>
+            </View>
+            <View style={styles.featureRow}>
+              <Feather name="heart" size={14} color="#22C55E" />
+              <Text style={styles.featureText}>Build a shared shortlist of apartments</Text>
+            </View>
+            <View style={styles.featureRow}>
+              <Feather name="thumbs-up" size={14} color="#22C55E" />
+              <Text style={styles.featureText}>Vote on listings together</Text>
+            </View>
+            <View style={styles.featureRow}>
+              <Feather name="search" size={14} color="#22C55E" />
+              <Text style={styles.featureText}>Browse listings before your group is full</Text>
+            </View>
+          </View>
+        </View>
       </View>
     );
   }
+
+  const joinedCount = members.filter(m => m.status === 'joined').length;
+  const openSlots = (group.group_size || 0) - joinedCount;
+  const hasDropout = openSlots > 0 && joinedCount < (group.group_size || 0);
 
   const renderTab = (tab: Tab, label: string, icon: string) => (
     <Pressable
@@ -290,44 +362,76 @@ export default function MyGroupScreen() {
             <Text style={styles.settingsValue}>{group.group_size} people</Text>
           </View>
 
-          {isLead ? (
-            <View style={styles.settingsField}>
-              <Text style={styles.settingsLabel}>Open to Join Requests</Text>
-              <View style={styles.editRow}>
-                <Text style={[styles.settingsValue, { flex: 1 }]}>
-                  {openToRequests ? 'Anyone can request to join' : 'Invite only'}
-                </Text>
-                <Switch
-                  value={openToRequests}
-                  onValueChange={async (val) => {
-                    if (!group) return;
-                    setOpenToRequests(val);
-                    await toggleOpenToRequests(group.id, 'preformed', val);
-                  }}
-                  trackColor={{ false: '#333', true: '#22C55E50' }}
-                  thumbColor={openToRequests ? '#22C55E' : '#888'}
-                />
+          {isLead && hasDropout ? (
+            <>
+              <View style={styles.settingsField}>
+                <Text style={styles.settingsLabel}>Open to Join Requests</Text>
+                <View style={styles.editRow}>
+                  <Text style={[styles.settingsValue, { flex: 1 }]}>
+                    {openToRequests ? 'Anyone can request to join' : 'Invite only'}
+                  </Text>
+                  <Switch
+                    value={openToRequests}
+                    onValueChange={async (val) => {
+                      if (!group) return;
+                      setOpenToRequests(val);
+                      await toggleOpenToRequests(group.id, 'preformed', val);
+                    }}
+                    trackColor={{ false: '#333', true: '#22C55E50' }}
+                    thumbColor={openToRequests ? '#22C55E' : '#888'}
+                  />
+                </View>
               </View>
-            </View>
-          ) : null}
 
-          {isLead && pendingRequestCount > 0 ? (
-            <Pressable
-              style={styles.reviewRequestsBtn}
-              onPress={() =>
-                navigation.navigate('GroupRequestReview' as never, {
-                  groupId: group.id,
-                  groupType: 'preformed',
-                  isLead: true,
-                  memberCount: members.length,
-                } as never)
-              }
-            >
-              <Feather name="inbox" size={16} color="#3B82F6" />
-              <Text style={styles.reviewRequestsBtnText}>
-                Review Join Requests ({pendingRequestCount})
-              </Text>
-            </Pressable>
+              {pendingRequestCount > 0 ? (
+                <Pressable
+                  style={styles.reviewRequestsBtn}
+                  onPress={() =>
+                    navigation.navigate('GroupRequestReview' as never, {
+                      groupId: group.id,
+                      groupType: 'preformed',
+                      isLead: true,
+                      memberCount: members.length,
+                    } as never)
+                  }
+                >
+                  <Feather name="inbox" size={16} color="#3B82F6" />
+                  <Text style={styles.reviewRequestsBtnText}>
+                    Review Join Requests ({pendingRequestCount})
+                  </Text>
+                </Pressable>
+              ) : null}
+
+              <View style={styles.settingsField}>
+                <Text style={styles.settingsLabel}>Find a Replacement</Text>
+                <Text style={styles.replacementSubtext}>
+                  {group.needs_replacement
+                    ? `Looking for ${group.replacement_slots || openSlots} replacement${(group.replacement_slots || openSlots) > 1 ? 's' : ''} on Rhome`
+                    : `${openSlots} open ${openSlots === 1 ? 'spot' : 'spots'} \u2014 find a roommate through Rhome`
+                  }
+                </Text>
+                <View style={{ marginTop: 8 }}>
+                  <Switch
+                    value={group.needs_replacement ?? false}
+                    onValueChange={async (val) => {
+                      if (val) {
+                        await enableReplacement(group.id, openSlots);
+                      } else {
+                        await disableReplacement(group.id);
+                      }
+                      loadData();
+                    }}
+                    trackColor={{ false: '#333', true: '#22C55E50' }}
+                    thumbColor={group.needs_replacement ? '#22C55E' : '#888'}
+                  />
+                </View>
+                {group.needs_replacement ? (
+                  <Text style={styles.replacementHint}>
+                    Your group is visible to other renters looking for roommates. They can request to join, and you'll review their compatibility in the join requests section.
+                  </Text>
+                ) : null}
+              </View>
+            </>
           ) : null}
 
           <Pressable style={styles.leaveBtn} onPress={handleLeave}>
@@ -576,5 +680,77 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#fff',
+  },
+  createGroupState: {
+    flex: 1,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    paddingHorizontal: 32,
+    paddingBottom: 80,
+  },
+  createGroupIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(34,197,94,0.1)',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(34,197,94,0.2)',
+  },
+  createGroupTitle: {
+    fontSize: 22,
+    fontWeight: '700' as const,
+    color: '#fff',
+    marginBottom: 8,
+  },
+  createGroupSubtext: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.5)',
+    textAlign: 'center' as const,
+    lineHeight: 20,
+    marginBottom: 28,
+  },
+  createGroupBtn: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 8,
+    backgroundColor: '#22C55E',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    width: '100%' as const,
+    marginBottom: 32,
+  },
+  createGroupBtnText: {
+    fontSize: 16,
+    fontWeight: '700' as const,
+    color: '#111',
+  },
+  featuresList: {
+    width: '100%' as const,
+    gap: 14,
+  },
+  featureRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 12,
+  },
+  featureText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.6)',
+  },
+  replacementSubtext: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.5)',
+    marginTop: 4,
+  },
+  replacementHint: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.4)',
+    marginTop: 8,
+    lineHeight: 18,
   },
 });

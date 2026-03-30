@@ -131,6 +131,12 @@ export const GroupsScreen = () => {
         navigation.navigate('GroupSetup' as never);
       }
     });
+    AsyncStorage.getItem('pending_group_join_code').then(val => {
+      if (val) {
+        AsyncStorage.removeItem('pending_group_join_code');
+        navigation.navigate('GroupInviteAccept' as never, { inviteCode: val } as never);
+      }
+    });
   }, []);
 
   useEffect(() => {

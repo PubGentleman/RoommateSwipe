@@ -17,6 +17,7 @@ import { ProfileReminderProvider } from "./contexts/ProfileReminderContext";
 import { ConfirmProvider } from "./contexts/ConfirmContext";
 import { StripeWrapper } from "./components/StripeWrapper";
 import { RevenueCatProvider } from "./contexts/RevenueCatContext";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StorageService } from "./utils/storage";
 import { isDev } from "./utils/dataUtils";
 import { checkDailyTrigger } from "./utils/insightRefresh";
@@ -35,6 +36,26 @@ export default function App() {
 
   useEffect(() => {
     SplashScreen.hideAsync();
+  }, []);
+
+  useEffect(() => {
+    const handleInitialDeepLink = async () => {
+      try {
+        const initialUrl = await Linking.getInitialURL();
+        if (!initialUrl) return;
+
+        const match = initialUrl.match(/join\/([A-Za-z0-9]+)/);
+        if (match && match[1]) {
+          const inviteCode = match[1];
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) {
+            await AsyncStorage.setItem('pending_invite_code', inviteCode);
+          }
+        }
+      } catch {}
+    };
+
+    handleInitialDeepLink();
   }, []);
 
   useEffect(() => {
