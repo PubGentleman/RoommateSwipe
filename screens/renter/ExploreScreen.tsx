@@ -796,9 +796,10 @@ export const ExploreScreen = () => {
         sublet: ['sublet'],
       };
       const allowedValues = TYPE_MAP[listingTypeFilter] ?? [];
-      filtered = filtered.filter(p =>
-        allowedValues.some(v => p.roomType?.toLowerCase() === v.toLowerCase())
-      );
+      filtered = filtered.filter(p => {
+        const rt = p.roomType?.toLowerCase() || '';
+        return allowedValues.some(v => rt === v.toLowerCase());
+      });
     }
 
     if (activeQuickFilters.has('under2k')) {
