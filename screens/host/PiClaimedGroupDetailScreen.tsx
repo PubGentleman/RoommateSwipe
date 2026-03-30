@@ -16,6 +16,7 @@ import {
   getGroupClaims,
   releaseGroup,
 } from '../../services/piAutoMatchService';
+import { sendGroupMessage } from '../../services/groupService';
 import { supabase } from '../../lib/supabase';
 
 const BG = '#111';
@@ -164,56 +165,49 @@ export const PiClaimedGroupDetailScreen = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     const introMessage = `Hi! I'm ${user.name || 'your potential host'} and I'd love to connect with your group about a place I have available. Looking forward to chatting!`;
-    const anchorMember = members[0];
 
     try {
-      const userId1 = user.id < anchorMember.id ? user.id : anchorMember.id;
-      const userId2 = user.id < anchorMember.id ? anchorMember.id : user.id;
-
-      const { data: existingMatch } = await supabase
-        .from('matches')
+      const { data: existingGroup } = await supabase
+        .from('groups')
         .select('id')
-        .eq('user_id_1', userId1)
-        .eq('user_id_2', userId2)
+        .eq('pi_auto_group_id', groupId)
         .maybeSingle();
 
-      let matchId: string;
+      let linkedGroupId: string;
 
-      if (existingMatch) {
-        matchId = existingMatch.id;
+      if (existingGroup) {
+        linkedGroupId = existingGroup.id;
       } else {
-        const { data: newMatch, error: matchError } = await supabase
-          .from('matches')
+        const memberIds = members.map(m => m.id);
+        const { data: newGroup, error: groupError } = await supabase
+          .from('groups')
           .insert({
-            user_id_1: userId1,
-            user_id_2: userId2,
-            match_type: 'pi_group',
-            status: 'matched',
+            name: `Pi Group - ${group?.city || 'Roommates'}`,
+            type: 'roommate',
+            created_by: members[0]?.id || user.id,
+            member_ids: [...memberIds, user.id],
+            pi_auto_group_id: groupId,
           })
           .select()
           .single();
 
-        if (matchError || !newMatch) {
+        if (groupError || !newGroup) {
           showAlert({
             title: 'Error',
-            message: 'Could not start conversation. Please try again.',
+            message: 'Could not start group conversation. Please try again.',
           });
           return;
         }
-        matchId = newMatch.id;
+        linkedGroupId = newGroup.id;
       }
 
-      await supabase.from('messages').insert({
-        match_id: matchId,
-        sender_id: user.id,
-        content: introMessage,
-      });
+      await sendGroupMessage(linkedGroupId, introMessage);
 
       if (claimStep === 'Claimed') setClaimStep('Contacted');
 
       navigation.navigate('Messages', {
         screen: 'Chat',
-        params: { conversationId: matchId },
+        params: { conversationId: `group-${linkedGroupId}` },
       });
     } catch (e) {
       console.warn('[handleSendIntro] error:', e);

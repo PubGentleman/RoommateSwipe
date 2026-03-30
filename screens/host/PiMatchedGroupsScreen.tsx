@@ -147,7 +147,7 @@ export const PiMatchedGroupsScreen = () => {
         cancelText: 'Not Now',
       });
       if (confirmed) {
-        navigation.navigate('HostSubscription');
+        navigation.navigate('Profile', { screen: 'HostSubscription' });
       }
       return;
     }
@@ -241,7 +241,7 @@ export const PiMatchedGroupsScreen = () => {
           </Text>
           <Pressable
             style={[styles.claimBtn, { marginTop: 24, paddingHorizontal: 32 }]}
-            onPress={() => navigation.navigate('HostSubscription')}
+            onPress={() => navigation.navigate('Profile', { screen: 'HostSubscription' })}
           >
             <Feather name="arrow-up-circle" size={16} color="#fff" />
             <Text style={styles.claimBtnText}>View Plans</Text>
