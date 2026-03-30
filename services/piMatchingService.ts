@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { getCompanyPiMonthlyLimit, getAutoClaimLimits, AGENT_PLAN_LIMITS, PLAN_LIMITS } from '../constants/planLimits';
+import { getCompanyPiMonthlyLimit, AGENT_PLAN_LIMITS, PLAN_LIMITS } from '../constants/planLimits';
 import { RENTER_PLAN_LIMITS } from '../constants/renterPlanLimits';
 import type { HostPlan } from '../constants/planLimits';
 import type { RenterPlan } from '../constants/renterPlanLimits';
@@ -9,9 +9,6 @@ import type {
   PiHostRecommendation,
   PiFeature,
   PiParsedPreferences,
-  PiAutoGroup,
-  PiAutoGroupMember,
-  PiGroupClaim,
 } from '../types/models';
 
 const DECK_SWIPED_INVALIDATION_RATIO = 0.5;
@@ -398,160 +395,13 @@ export async function invalidateAllCachesForUser(userId: string): Promise<void> 
 
 export const getMonthlyAIUsage = getMonthlyUsageCount;
 
-export async function getUserAutoGroups(
-  userId: string
-): Promise<PiAutoGroup[]> {
-  try {
-    const { data: memberRows } = await supabase
-      .from('pi_auto_group_members')
-      .select('group_id')
-      .eq('user_id', userId)
-      .in('status', ['pending', 'accepted']);
-
-    if (!memberRows || memberRows.length === 0) return [];
-
-    const groupIds = memberRows.map(r => r.group_id);
-    const { data } = await supabase
-      .from('pi_auto_groups')
-      .select('*')
-      .in('id', groupIds)
-      .order('created_at', { ascending: false });
-
-    return (data as PiAutoGroup[]) ?? [];
-  } catch {
-    return [];
-  }
-}
-
-export async function getAutoGroupMembers(
-  groupId: string
-): Promise<PiAutoGroupMember[]> {
-  try {
-    const { data } = await supabase
-      .from('pi_auto_group_members')
-      .select('*')
-      .eq('group_id', groupId)
-      .order('invited_at', { ascending: true });
-
-    return (data as PiAutoGroupMember[]) ?? [];
-  } catch {
-    return [];
-  }
-}
-
-export async function respondToAutoGroupInvite(
-  groupId: string,
-  accept: boolean
-): Promise<boolean> {
-  try {
-    const userId = await getCurrentUserId();
-    if (!userId) return false;
-
-    const now = new Date().toISOString();
-    const { error } = await supabase
-      .from('pi_auto_group_members')
-      .update({
-        status: accept ? 'accepted' : 'declined',
-        [accept ? 'accepted_at' : 'declined_at']: now,
-      })
-      .eq('group_id', groupId)
-      .eq('user_id', userId);
-
-    return !error;
-  } catch {
-    return false;
-  }
-}
-
-export async function getGroupClaims(
-  groupId: string
-): Promise<PiGroupClaim[]> {
-  try {
-    const { data } = await supabase
-      .from('pi_group_claims')
-      .select('*')
-      .eq('group_id', groupId)
-      .order('created_at', { ascending: false });
-
-    return (data as PiGroupClaim[]) ?? [];
-  } catch {
-    return [];
-  }
-}
-
-export async function getHostClaimsThisMonth(
-  hostId: string
-): Promise<{ total: number; free: number; paid: number }> {
-  try {
-    const monthStart = new Date();
-    monthStart.setDate(1);
-    monthStart.setHours(0, 0, 0, 0);
-
-    const { data } = await supabase
-      .from('pi_group_claims')
-      .select('is_free_claim')
-      .eq('host_id', hostId)
-      .gte('created_at', monthStart.toISOString());
-
-    if (!data) return { total: 0, free: 0, paid: 0 };
-
-    const free = data.filter(c => c.is_free_claim).length;
-    return { total: data.length, free, paid: data.length - free };
-  } catch {
-    return { total: 0, free: 0, paid: 0 };
-  }
-}
-
-export async function canHostClaimGroup(
-  hostId: string,
-  plan: string,
-  hostType?: string
-): Promise<{ allowed: boolean; isFree: boolean; priceCents: number; freeRemaining: number }> {
-  const limits = getAutoClaimLimits(plan, hostType);
-  if (limits.freePerMonth === -1) {
-    return { allowed: true, isFree: true, priceCents: 0, freeRemaining: -1 };
-  }
-
-  const usage = await getHostClaimsThisMonth(hostId);
-  const freeRemaining = Math.max(0, limits.freePerMonth - usage.free);
-
-  if (freeRemaining > 0) {
-    return { allowed: true, isFree: true, priceCents: 0, freeRemaining };
-  }
-
-  if (limits.extraPriceCents > 0) {
-    return { allowed: true, isFree: false, priceCents: limits.extraPriceCents, freeRemaining: 0 };
-  }
-
-  return { allowed: false, isFree: false, priceCents: 0, freeRemaining: 0 };
-}
-
-export async function getPendingAutoGroupCount(
-  userId: string
-): Promise<number> {
-  try {
-    const { count } = await supabase
-      .from('pi_auto_group_members')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .in('status', ['pending', 'accepted']);
-
-    return count ?? 0;
-  } catch {
-    return 0;
-  }
-}
-
-export async function canJoinAutoGroup(
-  userId: string,
-  renterPlan: string
-): Promise<{ allowed: boolean; current: number; limit: number }> {
-  const normalized = (renterPlan === 'basic' ? 'free' : renterPlan) as RenterPlan;
-  const limits = RENTER_PLAN_LIMITS[normalized] ?? RENTER_PLAN_LIMITS.free;
-  const current = await getPendingAutoGroupCount(userId);
-  return {
-    allowed: current < limits.maxPendingAutoGroups,
-    current,
-    limit: limits.maxPendingAutoGroups,
-  };
-}
+export {
+  getUserAutoGroups,
+  getAutoGroupMembers,
+  respondToAutoGroupInvite,
+  getGroupClaims,
+  getClaimsUsedThisMonth as getHostClaimsThisMonth,
+  getClaimAllowance as canHostClaimGroup,
+  getPendingAutoGroupCount,
+  canJoinAutoGroup,
+} from './piAutoMatchService';

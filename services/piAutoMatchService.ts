@@ -110,7 +110,7 @@ export async function respondToAutoGroupInvite(groupId: string, accept: boolean)
 export async function getMyAutoGroup(userId: string): Promise<PiAutoGroup | null> {
   try {
     const groups = await getUserAutoGroups(userId);
-    const active = groups.find(g => g.status === 'forming' || g.status === 'confirmed');
+    const active = groups.find(g => g.status === 'forming' || g.status === 'ready');
     return active ?? null;
   } catch {
     return null;
@@ -131,9 +131,10 @@ export async function convertToRealGroup(autoGroupId: string): Promise<string | 
 
 export async function dissolveGroup(autoGroupId: string): Promise<boolean> {
   try {
+    const now = new Date().toISOString();
     const { error } = await supabase
       .from('pi_auto_groups')
-      .update({ status: 'dissolved' })
+      .update({ status: 'dissolved', dissolved_at: now })
       .eq('id', autoGroupId);
     return !error;
   } catch {
@@ -161,12 +162,11 @@ export async function getAvailableGroups(filters?: {
     let query = supabase
       .from('pi_auto_groups')
       .select('*')
-      .eq('status', 'confirmed')
-      .is('claimed_by_host_id', null);
+      .eq('status', 'ready');
 
     if (filters?.city) query = query.eq('city', filters.city);
-    if (filters?.minSize) query = query.gte('target_size', filters.minSize);
-    if (filters?.maxSize) query = query.lte('target_size', filters.maxSize);
+    if (filters?.minSize) query = query.gte('max_members', filters.minSize);
+    if (filters?.maxSize) query = query.lte('max_members', filters.maxSize);
 
     const { data } = await query.order('created_at', { ascending: false });
     return (data as PiAutoGroup[]) ?? [];
@@ -178,24 +178,30 @@ export async function getAvailableGroups(filters?: {
 export async function claimGroup(
   groupId: string,
   hostId: string,
+  listingId: string,
   isFree: boolean,
   priceCents: number
 ): Promise<boolean> {
   try {
+    const now = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     const { error: claimError } = await supabase
       .from('pi_group_claims')
       .insert({
         group_id: groupId,
         host_id: hostId,
+        listing_id: listingId,
         is_free_claim: isFree,
-        price_cents: priceCents,
-        status: 'active',
+        claim_price_cents: priceCents,
+        status: 'pending',
+        created_at: now,
+        expires_at: expiresAt,
       });
     if (claimError) return false;
 
     await supabase
       .from('pi_auto_groups')
-      .update({ claimed_by_host_id: hostId })
+      .update({ status: 'claimed' })
       .eq('id', groupId);
 
     return true;
@@ -206,17 +212,19 @@ export async function claimGroup(
 
 export async function releaseGroup(groupId: string, hostId: string): Promise<boolean> {
   try {
+    const now = new Date().toISOString();
     const { error } = await supabase
       .from('pi_group_claims')
-      .update({ status: 'released' })
+      .update({ status: 'withdrawn', responded_at: now })
       .eq('group_id', groupId)
-      .eq('host_id', hostId);
+      .eq('host_id', hostId)
+      .eq('status', 'pending');
 
     if (error) return false;
 
     await supabase
       .from('pi_auto_groups')
-      .update({ claimed_by_host_id: null })
+      .update({ status: 'ready' })
       .eq('id', groupId);
 
     return true;
@@ -267,10 +275,8 @@ export async function getAutoMatchStats(userId: string): Promise<{
         .single(),
     ]);
 
-    const activeGroup = groups.find(g => g.status === 'forming' || g.status === 'confirmed') ?? null;
-    const pendingInvites = groups.filter(g =>
-      g.status === 'forming'
-    ).length;
+    const activeGroup = groups.find(g => g.status === 'forming' || g.status === 'ready') ?? null;
+    const pendingInvites = groups.filter(g => g.status === 'forming').length;
 
     return {
       totalGroups: groups.length,
