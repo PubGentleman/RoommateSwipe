@@ -42,6 +42,11 @@ export interface RoommateProfile {
     zip_code?: string;
     ideal_roommate_text?: string;
     pi_parsed_preferences?: PiParsedPreferences;
+    desired_roommate_count?: number;
+    desired_bedroom_count?: number;
+    household_gender_preference?: GenderPreference;
+    pi_auto_match_enabled?: boolean;
+    pi_last_match_attempt?: string;
     [key: string]: any;
   };
   references?: Reference[];
@@ -556,6 +561,11 @@ export interface User {
     personalityAnswers?: Record<string, string>;
     ideal_roommate_text?: string;
     pi_parsed_preferences?: PiParsedPreferences;
+    desired_roommate_count?: number;
+    desired_bedroom_count?: number;
+    household_gender_preference?: GenderPreference;
+    pi_auto_match_enabled?: boolean;
+    pi_last_match_attempt?: string;
     preferences?: {
       sleepSchedule?: 'early_sleeper' | 'late_sleeper' | 'flexible' | 'irregular';
       cleanliness?: 'very_tidy' | 'moderately_tidy' | 'relaxed';
