@@ -116,17 +116,20 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
         listing_type_preference: listingPref,
       }));
 
-      await updateUser({
+      updateUser({
         profileData: {
           ...user.profileData,
           listing_type_preference: listingPref,
           apartment_search_type: searchType,
         },
+      }).catch(err => {
+        console.warn('User state sync failed (non-blocking):', err);
       });
+
       setSaving(false);
       if (!skipComplete) onComplete();
     } catch (err) {
-      console.error('Failed to update local user state:', err);
+      console.error('Failed to save intent:', err);
       setSaving(false);
       setConfirmAction({
         title: 'Something went wrong',
