@@ -48,7 +48,7 @@ const PLAN_ICON: Record<RenterPlan, string> = {
   elite: 'zap',
 };
 
-const PLAN_FEATURES: Record<RenterPlan, { icon: string; label: string }[]> = {
+const PLAN_FEATURES_ROOMMATE: Record<RenterPlan, { icon: string; label: string }[]> = {
   free: [
     { icon: 'repeat', label: '10 swipes per day' },
     { icon: 'users', label: '1 group membership' },
@@ -65,6 +65,27 @@ const PLAN_FEATURES: Record<RenterPlan, { icon: string; label: string }[]> = {
     { icon: 'repeat', label: 'Unlimited swipes + unlimited groups' },
     { icon: 'bar-chart-2', label: 'Full match breakdown' },
     { icon: 'trending-up', label: 'Profile boost — appear higher in searches' },
+    { icon: 'eye', label: 'Read receipts on messages' },
+    { icon: 'headphones', label: 'Dedicated support' },
+  ],
+};
+
+const PLAN_FEATURES_PLACE: Record<RenterPlan, { icon: string; label: string }[]> = {
+  free: [
+    { icon: 'search', label: 'Unlimited listing views' },
+    { icon: 'heart', label: '15 interests per day' },
+    { icon: 'message-circle', label: '10 active chats' },
+    { icon: 'message-square', label: '10 cold messages per month' },
+  ],
+  plus: [
+    { icon: 'heart', label: 'Unlimited interests' },
+    { icon: 'message-circle', label: 'Unlimited Pi advisor' },
+    { icon: 'trending-up', label: 'Priority in host inboxes' },
+    { icon: 'check-circle', label: 'Verified profile badge' },
+  ],
+  elite: [
+    { icon: 'repeat', label: 'Unlimited everything' },
+    { icon: 'check-circle', label: 'Verified renter badge' },
     { icon: 'eye', label: 'Read receipts on messages' },
     { icon: 'headphones', label: 'Dedicated support' },
   ],
@@ -120,7 +141,8 @@ const PLAN_DISPLAY: PlanDisplayInfo[] = [
 
 export const PlansScreen = () => {
   const insets = useSafeAreaInsets();
-  const { user, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscriptionAtPeriodEnd, reactivateSubscription } = useAuth();
+  const { user, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscriptionAtPeriodEnd, reactivateSubscription, isPlaceSeeker } = useAuth();
+  const PLAN_FEATURES = isPlaceSeeker() ? PLAN_FEATURES_PLACE : PLAN_FEATURES_ROOMMATE;
   const { processPayment } = useStripePayment();
   const { restore } = useRevenueCat();
   const { alert } = useConfirm();

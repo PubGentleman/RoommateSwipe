@@ -510,6 +510,10 @@ export interface User {
     superLikesUsedToday: number;
     lastSuperLikeReset: Date;
   };
+  piAdvisorData?: {
+    questionsToday: number;
+    lastResetDate: string;
+  };
   profileViews?: Array<{
     viewerId: string;
     viewerName: string;

@@ -63,6 +63,7 @@ interface AuthContextType {
   getAdCredits: () => { rewinds: number; superLikes: number; boosts: number; messages: number };
   useAdCredit: (creditType: 'rewinds' | 'superLikes' | 'boosts' | 'messages') => Promise<boolean>;
   isBasicUser: () => boolean;
+  isPlaceSeeker: () => boolean;
   canViewListing: () => { canView: boolean; remaining: number; limit: number; message?: string };
   useListingView: () => Promise<void>;
   canSendInterest: () => Promise<{ canSend: boolean; remaining: number; reason?: string }>;
@@ -70,6 +71,8 @@ interface AuthContextType {
   useSuperInterestCredit: () => Promise<void>;
   canSendColdMessage: () => Promise<{ canSend: boolean; remaining: number; reason?: string }>;
   useColdMessage: () => Promise<void>;
+  canAskPiAdvisor: () => { canAsk: boolean; remaining: number; limit: number };
+  incrementPiAdvisorUsage: () => Promise<void>;
   getSuperInterestCount: () => number;
   upgradeHostPlan: (plan: string, billingCycle?: 'monthly' | '3month' | 'annual') => Promise<void>;
   downgradeHostPlan: (plan: string) => Promise<void>;
@@ -1347,6 +1350,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const userPlan = user.subscription?.plan || 'basic';
     if (userPlan === 'elite') return Infinity;
     if (userPlan === 'plus') return 10;
+    if (isPlaceSeeker()) return 10;
     return 3;
   };
 
@@ -1743,6 +1747,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return plan === 'basic' || status !== 'active';
   };
 
+  const isPlaceSeeker = (): boolean => {
+    if (!user) return false;
+    const searchType = user.profileData?.apartment_search_type;
+    return searchType === 'solo' || searchType === 'with_partner' || searchType === 'have_group';
+  };
+
   const getAdCredits = (): { rewinds: number; superLikes: number; boosts: number; messages: number } => {
     return {
       rewinds: user?.adCredits?.rewinds || 0,
@@ -1825,7 +1835,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) return { canView: false, remaining: 0, limit: 0, message: 'Not logged in' };
 
     const plan = user.subscription?.plan || 'basic';
-    if (plan === 'plus' || plan === 'elite') {
+    if (plan === 'plus' || plan === 'elite' || isPlaceSeeker()) {
       return { canView: true, remaining: Infinity, limit: Infinity };
     }
 
@@ -1858,7 +1868,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) return;
 
     const plan = user.subscription?.plan || 'basic';
-    if (plan === 'plus' || plan === 'elite') return;
+    if (plan === 'plus' || plan === 'elite' || isPlaceSeeker()) return;
 
     const now = new Date();
     const lastReset = user.listingViewData?.lastViewReset
@@ -1893,7 +1903,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { canSend: true, remaining: -1 };
     }
 
-    const DAILY_LIMIT = 5;
+    const DAILY_LIMIT = isPlaceSeeker() ? 15 : 5;
     const cards = await StorageService.getInterestCardsForRenter(user.id);
     const now = new Date();
     const todayCards = cards.filter(card => {
@@ -1999,7 +2009,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const canSendColdMessage = async (): Promise<{ canSend: boolean; remaining: number; reason?: string }> => {
     if (!user) return { canSend: false, remaining: 0, reason: 'Not logged in' };
     const plan = user.subscription?.plan || 'basic';
-    const limit = getDailyColdMessageLimit(plan);
+    const baseLimit = getDailyColdMessageLimit(plan);
+    const limit = (plan === 'basic' && isPlaceSeeker()) ? 10 : baseLimit;
     if (limit === Infinity) return { canSend: true, remaining: Infinity };
     const count = await getDailyColdMessageCount(user.id);
     const remaining = Math.max(0, limit - count);
@@ -2024,6 +2035,58 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       coldMessagesUsedThisMonth: used + 1,
       coldMessagesResetDate: now.toISOString(),
     };
+    await StorageService.setCurrentUser(updated);
+    await StorageService.addOrUpdateUser(updated);
+    setUser(updated);
+  };
+
+  const canAskPiAdvisor = (): { canAsk: boolean; remaining: number; limit: number } => {
+    if (!user) return { canAsk: false, remaining: 0, limit: 0 };
+
+    const plan = user.subscription?.plan || 'basic';
+
+    if (plan === 'plus' || plan === 'elite') {
+      return { canAsk: true, remaining: Infinity, limit: Infinity };
+    }
+
+    if (!isPlaceSeeker()) {
+      return { canAsk: false, remaining: 0, limit: 0 };
+    }
+
+    const now = new Date();
+    const lastReset = user.piAdvisorData?.lastResetDate
+      ? new Date(user.piAdvisorData.lastResetDate)
+      : null;
+
+    let questionsUsed = user.piAdvisorData?.questionsToday || 0;
+    if (!lastReset || !isSameDay(lastReset, now)) {
+      questionsUsed = 0;
+    }
+
+    const DAILY_LIMIT = 10;
+    const remaining = Math.max(0, DAILY_LIMIT - questionsUsed);
+
+    return { canAsk: remaining > 0, remaining, limit: DAILY_LIMIT };
+  };
+
+  const incrementPiAdvisorUsage = async () => {
+    if (!user) return;
+    const now = new Date();
+    const lastReset = user.piAdvisorData?.lastResetDate
+      ? new Date(user.piAdvisorData.lastResetDate)
+      : null;
+
+    let questionsToday = user.piAdvisorData?.questionsToday || 0;
+    if (!lastReset || !isSameDay(lastReset, now)) {
+      questionsToday = 0;
+    }
+
+    const updatedData = {
+      questionsToday: questionsToday + 1,
+      lastResetDate: now.toISOString(),
+    };
+
+    const updated = { ...user, piAdvisorData: updatedData };
     await StorageService.setCurrentUser(updated);
     await StorageService.addOrUpdateUser(updated);
     setUser(updated);
@@ -2375,7 +2438,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const canRespondToInquiries = teamRole !== null;
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout, abandonSignup, resetPassword, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, cancelSubscriptionAtPeriodEnd, reactivateSubscription, getSubscriptionDetails, updateUser, blockUser: blockUserAction, unblockUser: unblockUserAction, reportUser: reportUserAction, isUserBlocked: isUserBlockedCheck, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike, watchAdForCredit, getAdCredits, useAdCredit, isBasicUser, canViewListing, useListingView, canSendInterest, canSendSuperInterest, useSuperInterestCredit, canSendColdMessage, useColdMessage, getSuperInterestCount, upgradeHostPlan, downgradeHostPlan, getHostPlan, canAddListing, canRespondToInquiry, useInquiryResponse, purchaseListingBoost, purchaseHostVerification, purchaseSuperInterest, completeOnboardingStep, cancelHostSubscriptionAtPeriodEnd, reactivateHostSubscription, softDeleteAccount, recoverDeletedAccount, updateLastActive, activeMode: effectiveMode, canSwitchMode, isFirstTimeHost, switchMode, completeHostOnboarding, getTeamMembers, inviteTeamMember, resendTeamInvite, removeTeamMember, updateTeamMemberRole, getTeamSeatLimit, teamRole, canInviteMembers, canManageBilling, canDeleteListings, canRespondToInquiries }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout, abandonSignup, resetPassword, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, cancelSubscriptionAtPeriodEnd, reactivateSubscription, getSubscriptionDetails, updateUser, blockUser: blockUserAction, unblockUser: unblockUserAction, reportUser: reportUserAction, isUserBlocked: isUserBlockedCheck, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike, watchAdForCredit, getAdCredits, useAdCredit, isBasicUser, isPlaceSeeker, canViewListing, useListingView, canSendInterest, canSendSuperInterest, useSuperInterestCredit, canSendColdMessage, useColdMessage, canAskPiAdvisor, incrementPiAdvisorUsage, getSuperInterestCount, upgradeHostPlan, downgradeHostPlan, getHostPlan, canAddListing, canRespondToInquiry, useInquiryResponse, purchaseListingBoost, purchaseHostVerification, purchaseSuperInterest, completeOnboardingStep, cancelHostSubscriptionAtPeriodEnd, reactivateHostSubscription, softDeleteAccount, recoverDeletedAccount, updateLastActive, activeMode: effectiveMode, canSwitchMode, isFirstTimeHost, switchMode, completeHostOnboarding, getTeamMembers, inviteTeamMember, resendTeamInvite, removeTeamMember, updateTeamMemberRole, getTeamSeatLimit, teamRole, canInviteMembers, canManageBilling, canDeleteListings, canRespondToInquiries }}>
       {children}
     </AuthContext.Provider>
   );
