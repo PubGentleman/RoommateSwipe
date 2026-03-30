@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Image, Platform } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { ThemedText } from './ThemedText';
 import { useTheme } from '../hooks/useTheme';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
@@ -227,8 +228,6 @@ export const PropertyMapView = ({
       </View>
     );
   }
-
-  const WebView = require('react-native-webview').default;
 
   return (
     <View style={[styles.mapContainer, { paddingBottom: bottomInset }]}>
