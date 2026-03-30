@@ -112,7 +112,7 @@ export const PiGroupInviteScreen = () => {
         const groupRecord = groupData as PiAutoGroup;
         setGroup(groupRecord);
         setTimeRemaining(getTimeRemaining(groupData.expires_at));
-        if ((groupData as Record<string, unknown>).deadline_extended) {
+        if (groupRecord.deadline_extended) {
           setExtendedTime(true);
         }
       }
@@ -243,9 +243,21 @@ export const PiGroupInviteScreen = () => {
         return;
       }
 
+      const { data: updated } = await supabase
+        .from('pi_auto_groups')
+        .select('deadline_extended, expires_at')
+        .eq('id', invite.group_id)
+        .single();
+
+      if (!updated?.deadline_extended) {
+        Alert.alert('Error', 'Extension did not apply. Please try again.');
+        return;
+      }
+
       setExtendedTime(true);
-      setGroup(prev => prev ? { ...prev, expires_at: newExpiry } : prev);
-      setTimeRemaining(getTimeRemaining(newExpiry));
+      const confirmedExpiry = updated.expires_at ?? newExpiry;
+      setGroup(prev => prev ? { ...prev, expires_at: confirmedExpiry, deadline_extended: true } : prev);
+      setTimeRemaining(getTimeRemaining(confirmedExpiry));
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {
       Alert.alert('Error', 'Could not extend time.');
