@@ -50,6 +50,10 @@ export const mockProfileUsers: User[] = [
       },
     },
     personalityAnswers: { q1: 'alone', q2: 'clean', q3: 'spotless', q4: 'advance', q5: 'direct' },
+    desired_roommate_count: 1,
+    desired_bedroom_count: 2,
+    household_gender_preference: 'female_only' as const,
+    pi_auto_match_enabled: true,
     references: [
       { id: 'ref-s1', recipientId: '1', authorName: 'Alex Thompson', authorEmail: 'alex@email.com', authorRelationship: 'past_roommate', rating: 5, review: 'Excellent roommate! Very clean and respectful.', isVerified: true, createdAt: '2025-06-15' },
     ],
@@ -858,6 +862,10 @@ export const mockRoommateProfiles: RoommateProfile[] = [
     },
     compatibility: 92,
     personalityAnswers: { q1: 'alone', q2: 'clean', q3: 'spotless', q4: 'advance', q5: 'direct' },
+    desired_roommate_count: 1,
+    desired_bedroom_count: 2,
+    household_gender_preference: 'female_only',
+    pi_auto_match_enabled: true,
     apartmentPrefs: {
       desiredBedrooms: 2,
       budgetPerPersonMin: 1000,
