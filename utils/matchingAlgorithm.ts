@@ -1262,6 +1262,157 @@ export function countSoftPreferenceOverlap(prefs1: PiParsedPreferences, prefs2: 
   return overlap >= 1 ? 1 : 0;
 }
 
+export interface GroupCompatibilityResult {
+  averagePairwiseScore: number;
+  minPairwiseScore: number;
+  genderCompliant: boolean;
+  neighborhoodOverlapBonus: number;
+  budgetAligned: boolean;
+  moveInAligned: boolean;
+  dealbreakerConflicts: string[];
+  memberScores: Array<{ userId1: string; userId2: string; score: number }>;
+}
+
+export function calculateGroupCompatibility(
+  members: Array<User | RoommateProfile>
+): GroupCompatibilityResult {
+  const pairScores: Array<{ userId1: string; userId2: string; score: number }> = [];
+  const dealbreakerConflicts: string[] = [];
+
+  for (let i = 0; i < members.length; i++) {
+    for (let j = i + 1; j < members.length; j++) {
+      const a = members[i];
+      const b = members[j];
+      const aAsUser = a as User;
+      const bAsRoommate = b as RoommateProfile;
+      const score = calculateDetailedCompatibility(aAsUser, bAsRoommate);
+      pairScores.push({ userId1: a.id, userId2: b.id, score: score.totalScore });
+
+      if (score.totalScore === 0 && score.reasons.concerns.length > 0) {
+        dealbreakerConflicts.push(
+          `${(a as any).name || a.id} & ${(b as any).name || b.id}: ${score.reasons.concerns[0]}`
+        );
+      }
+    }
+  }
+
+  const scores = pairScores.map(p => p.score);
+  const avg = scores.length > 0 ? scores.reduce((s, v) => s + v, 0) / scores.length : 0;
+  const min = scores.length > 0 ? Math.min(...scores) : 0;
+
+  return {
+    averagePairwiseScore: Math.round(avg),
+    minPairwiseScore: Math.round(min),
+    genderCompliant: checkGenderCompliance(members),
+    neighborhoodOverlapBonus: calculateNeighborhoodOverlap(members),
+    budgetAligned: checkBudgetAlignment(members),
+    moveInAligned: checkMoveInAlignment(members),
+    dealbreakerConflicts,
+    memberScores: pairScores,
+  };
+}
+
+export function checkGenderCompliance(
+  members: Array<User | RoommateProfile>
+): boolean {
+  for (const member of members) {
+    const pref = (member as any).household_gender_preference ||
+      (member as any).profileData?.household_gender_preference;
+    if (!pref || pref === 'any') continue;
+
+    const memberGender = (member as any).profileData?.gender || (member as any).gender;
+    if (!memberGender) continue;
+
+    for (const other of members) {
+      if (other.id === member.id) continue;
+      const otherGender = (other as any).profileData?.gender || (other as any).gender;
+      if (!otherGender) continue;
+
+      if (pref === 'male_only' && otherGender !== 'male') return false;
+      if (pref === 'female_only' && otherGender !== 'female') return false;
+      if (pref === 'same_gender' && otherGender !== memberGender) return false;
+    }
+  }
+  return true;
+}
+
+export function checkGroupDealbreakers(
+  members: Array<User | RoommateProfile>
+): string[] {
+  const conflicts: string[] = [];
+  for (let i = 0; i < members.length; i++) {
+    for (let j = i + 1; j < members.length; j++) {
+      const a = members[i] as User;
+      const b = members[j] as RoommateProfile;
+      const score = calculateDetailedCompatibility(a, b);
+      if (score.totalScore === 0) {
+        conflicts.push(
+          `${(a as any).name || a.id} & ${(b as any).name || b.id}: dealbreaker conflict`
+        );
+      }
+    }
+  }
+  return conflicts;
+}
+
+export function calculateNeighborhoodOverlap(
+  members: Array<User | RoommateProfile>
+): number {
+  const memberNeighborhoods = members.map(m => {
+    const pd = (m as any).profileData;
+    return new Set<string>([
+      ...(pd?.preferred_neighborhoods || []),
+      ...(pd?.neighborhood ? [pd.neighborhood] : []),
+      ...((m as RoommateProfile).preferredNeighborhoods || []),
+    ].filter(Boolean).map((n: string) => n.toLowerCase()));
+  });
+
+  if (memberNeighborhoods.some(s => s.size === 0)) return 0;
+
+  let commonCount = 0;
+  const first = memberNeighborhoods[0];
+  for (const hood of first) {
+    if (memberNeighborhoods.every(s => s.has(hood))) commonCount++;
+  }
+
+  return commonCount >= 2 ? 10 : commonCount === 1 ? 5 : 0;
+}
+
+export function checkBudgetAlignment(
+  members: Array<User | RoommateProfile>
+): boolean {
+  const budgets = members
+    .map(m => (m as any).profileData?.budget || (m as RoommateProfile).budget)
+    .filter((b): b is number => typeof b === 'number' && b > 0);
+
+  if (budgets.length < 2) return true;
+
+  const max = Math.max(...budgets);
+  const min = Math.min(...budgets);
+  const spread = (max - min) / max;
+  return spread <= 0.35;
+}
+
+export function checkMoveInAlignment(
+  members: Array<User | RoommateProfile>
+): boolean {
+  const dates = members
+    .map(m => {
+      const dateStr = (m as any).profileData?.preferences?.moveInDate ||
+        (m as RoommateProfile).preferences?.moveInDate;
+      return dateStr ? parseMoveInDate(dateStr) : null;
+    })
+    .filter((d): d is Date => d !== null);
+
+  if (dates.length < 2) return true;
+
+  const timestamps = dates.map(d => d.getTime());
+  const maxTs = Math.max(...timestamps);
+  const minTs = Math.min(...timestamps);
+  const daysDiff = Math.round((maxTs - minTs) / (1000 * 60 * 60 * 24));
+  return daysDiff <= 30;
+}
+
 function matchesProfileVibe(vibe: string, profile: User | RoommateProfile): boolean {
   const vibeCluster = getCluster(vibe, VIBE_CLUSTERS);
   if (!vibeCluster) return false;

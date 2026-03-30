@@ -1,0 +1,441 @@
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import {
+  serializeFullContext, CORS_HEADERS, errorResponse, jsonResponse,
+  PI_AUTO_ASSEMBLE_PERSONA, stripName,
+} from '../_shared/pi-utils.ts';
+
+const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')!;
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+const MIN_PAIRWISE_SCORE = 50;
+const ELIGIBLE_ACTIVE_DAYS = 30;
+
+interface CandidateProfile {
+  user_id: string;
+  full_name: string;
+  age: number;
+  gender: string;
+  city: string;
+  budget: number;
+  desired_roommate_count: number;
+  household_gender_preference: string;
+  move_in_date: string | null;
+  userData: Record<string, any>;
+  profileData: Record<string, any>;
+}
+
+function calculatePairwiseScore(a: CandidateProfile, b: CandidateProfile): number {
+  let score = 0;
+  const maxScore = 100;
+
+  if (a.budget && b.budget) {
+    const diff = Math.abs(a.budget - b.budget) / Math.max(a.budget, b.budget);
+    if (diff <= 0.1) score += 20;
+    else if (diff <= 0.25) score += 14;
+    else if (diff <= 0.5) score += 6;
+  } else {
+    score += 10;
+  }
+
+  if (a.age && b.age) {
+    const ageDiff = Math.abs(a.age - b.age);
+    if (ageDiff <= 2) score += 15;
+    else if (ageDiff <= 5) score += 10;
+    else if (ageDiff <= 10) score += 5;
+  } else {
+    score += 7;
+  }
+
+  const aN = new Set((a.profileData?.preferred_neighborhoods || []).map((n: string) => n.toLowerCase()));
+  const bN = new Set((b.profileData?.preferred_neighborhoods || []).map((n: string) => n.toLowerCase()));
+  let overlap = 0;
+  for (const n of aN) { if (bN.has(n)) overlap++; }
+  if (overlap >= 2) score += 20;
+  else if (overlap === 1) score += 14;
+  else if (a.city === b.city) score += 8;
+
+  const aSleep = a.profileData?.preferences?.sleepSchedule;
+  const bSleep = b.profileData?.preferences?.sleepSchedule;
+  if (aSleep && bSleep) {
+    if (aSleep === bSleep) score += 15;
+    else if (aSleep === 'flexible' || bSleep === 'flexible') score += 10;
+    else score += 2;
+  } else {
+    score += 7;
+  }
+
+  const aClean = a.profileData?.preferences?.cleanliness;
+  const bClean = b.profileData?.preferences?.cleanliness;
+  if (aClean && bClean) {
+    if (aClean === bClean) score += 15;
+    else score += 5;
+  } else {
+    score += 7;
+  }
+
+  const aSmoke = a.profileData?.preferences?.smoking;
+  const bSmoke = b.profileData?.preferences?.smoking;
+  if (aSmoke === 'no' && bSmoke === 'no') score += 10;
+  else if (aSmoke === bSmoke) score += 8;
+  else if (!aSmoke || !bSmoke) score += 5;
+  else score += 0;
+
+  if (a.move_in_date && b.move_in_date) {
+    const aDate = new Date(a.move_in_date);
+    const bDate = new Date(b.move_in_date);
+    const daysDiff = Math.abs(aDate.getTime() - bDate.getTime()) / (1000 * 60 * 60 * 24);
+    if (daysDiff <= 14) score += 5;
+    else if (daysDiff <= 30) score += 3;
+    else score += 0;
+  } else {
+    score += 2;
+  }
+
+  return Math.min(Math.round((score / maxScore) * 100), 100);
+}
+
+function checkGenderCompatibility(members: CandidateProfile[]): boolean {
+  for (const m of members) {
+    const pref = m.household_gender_preference;
+    if (!pref || pref === 'any') continue;
+    for (const o of members) {
+      if (o.user_id === m.user_id) continue;
+      if (pref === 'male_only' && o.gender !== 'male') return false;
+      if (pref === 'female_only' && o.gender !== 'female') return false;
+      if (pref === 'same_gender' && o.gender !== m.gender) return false;
+    }
+  }
+  return true;
+}
+
+function greedyAssemble(pool: CandidateProfile[], targetSize: number): CandidateProfile[][] {
+  const groups: CandidateProfile[][] = [];
+  const used = new Set<string>();
+
+  const candidates = [...pool];
+
+  while (candidates.filter(c => !used.has(c.user_id)).length >= targetSize) {
+    const available = candidates.filter(c => !used.has(c.user_id));
+
+    let bestPair: [CandidateProfile, CandidateProfile] | null = null;
+    let bestPairScore = -1;
+
+    for (let i = 0; i < Math.min(available.length, 50); i++) {
+      for (let j = i + 1; j < Math.min(available.length, 50); j++) {
+        const score = calculatePairwiseScore(available[i], available[j]);
+        if (score > bestPairScore && checkGenderCompatibility([available[i], available[j]])) {
+          bestPairScore = score;
+          bestPair = [available[i], available[j]];
+        }
+      }
+    }
+
+    if (!bestPair || bestPairScore < MIN_PAIRWISE_SCORE) break;
+
+    const group = [...bestPair];
+    used.add(bestPair[0].user_id);
+    used.add(bestPair[1].user_id);
+
+    while (group.length < targetSize) {
+      const remaining = available.filter(c => !used.has(c.user_id));
+      if (remaining.length === 0) break;
+
+      let bestCandidate: CandidateProfile | null = null;
+      let bestAvgScore = -1;
+
+      for (const candidate of remaining.slice(0, 30)) {
+        const scores = group.map(m => calculatePairwiseScore(m, candidate));
+        const minScore = Math.min(...scores);
+        if (minScore < MIN_PAIRWISE_SCORE) continue;
+
+        const testGroup = [...group, candidate];
+        if (!checkGenderCompatibility(testGroup)) continue;
+
+        const avg = scores.reduce((s, v) => s + v, 0) / scores.length;
+        if (avg > bestAvgScore) {
+          bestAvgScore = avg;
+          bestCandidate = candidate;
+        }
+      }
+
+      if (!bestCandidate) break;
+      group.push(bestCandidate);
+      used.add(bestCandidate.user_id);
+    }
+
+    if (group.length >= 2) {
+      groups.push(group);
+    }
+  }
+
+  return groups;
+}
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
+
+  try {
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+    const body = await req.json().catch(() => ({}));
+    const filterCity: string | undefined = body.city;
+    const filterUserId: string | undefined = body.user_id;
+    const dryRun: boolean = body.dry_run ?? false;
+
+    const cutoffDate = new Date(Date.now() - ELIGIBLE_ACTIVE_DAYS * 24 * 60 * 60 * 1000).toISOString();
+
+    let profileQuery = supabase
+      .from('profiles')
+      .select('*')
+      .eq('pi_auto_match_enabled', true)
+      .gte('last_active_at', cutoffDate)
+      .not('city', 'is', null)
+      .not('budget', 'is', null);
+
+    if (filterCity) profileQuery = profileQuery.eq('city', filterCity);
+    if (filterUserId) profileQuery = profileQuery.eq('user_id', filterUserId);
+
+    const { data: profiles, error: profileError } = await profileQuery;
+    if (profileError) return errorResponse(`Profile query failed: ${profileError.message}`, 500);
+    if (!profiles || profiles.length === 0) return jsonResponse({ groups_created: 0, message: 'No eligible renters found' });
+
+    const profileUserIds = profiles.map((p: any) => p.user_id);
+
+    const { data: existingMembers } = await supabase
+      .from('pi_auto_group_members')
+      .select('user_id')
+      .in('user_id', profileUserIds)
+      .in('status', ['pending', 'accepted']);
+
+    const inGroupSet = new Set((existingMembers || []).map((m: any) => m.user_id));
+
+    const { data: users } = await supabase
+      .from('users')
+      .select('*')
+      .in('id', profileUserIds)
+      .eq('role', 'renter');
+
+    const userMap = new Map((users || []).map((u: any) => [u.id, u]));
+
+    const { data: photoCheck } = await supabase
+      .from('users')
+      .select('id, photos')
+      .in('id', profileUserIds);
+
+    const hasPhotoSet = new Set(
+      (photoCheck || [])
+        .filter((u: any) => u.photos && Array.isArray(u.photos) && u.photos.length > 0)
+        .map((u: any) => u.id)
+    );
+
+    const eligible: CandidateProfile[] = profiles
+      .filter((p: any) =>
+        !inGroupSet.has(p.user_id) &&
+        userMap.has(p.user_id) &&
+        hasPhotoSet.has(p.user_id)
+      )
+      .map((p: any) => {
+        const u = userMap.get(p.user_id)!;
+        return {
+          user_id: p.user_id,
+          full_name: u.full_name || u.name || 'User',
+          age: u.age || p.age,
+          gender: p.gender || u.gender || 'other',
+          city: p.city || '',
+          budget: p.budget || 0,
+          desired_roommate_count: p.desired_roommate_count ?? 0,
+          household_gender_preference: p.household_gender_preference || 'any',
+          move_in_date: p.preferences?.moveInDate || p.move_in_date || null,
+          userData: u,
+          profileData: p,
+        };
+      });
+
+    if (eligible.length < 2) {
+      return jsonResponse({ groups_created: 0, message: 'Not enough eligible renters' });
+    }
+
+    const cityPools = new Map<string, CandidateProfile[]>();
+    for (const c of eligible) {
+      const city = c.city.toLowerCase();
+      if (!cityPools.has(city)) cityPools.set(city, []);
+      cityPools.get(city)!.push(c);
+    }
+
+    const allCandidateGroups: CandidateProfile[][] = [];
+
+    for (const [, pool] of cityPools) {
+      if (pool.length < 2) continue;
+
+      const sizePools = new Map<number, CandidateProfile[]>();
+      for (const c of pool) {
+        const target = c.desired_roommate_count > 0 ? c.desired_roommate_count + 1 : 2;
+        if (!sizePools.has(target)) sizePools.set(target, []);
+        sizePools.get(target)!.push(c);
+      }
+
+      const noPreference = pool.filter(c => c.desired_roommate_count === 0);
+
+      for (const [size, sizePool] of sizePools) {
+        const combined = [...sizePool, ...noPreference.filter(c => !sizePool.includes(c))];
+        if (combined.length < size) continue;
+        const assembled = greedyAssemble(combined, Math.min(size, 5));
+        allCandidateGroups.push(...assembled);
+      }
+    }
+
+    if (allCandidateGroups.length === 0) {
+      return jsonResponse({ groups_created: 0, message: 'No viable groups assembled' });
+    }
+
+    let groupsCreated = 0;
+    const results: any[] = [];
+
+    for (const group of allCandidateGroups.slice(0, 10)) {
+      const memberContexts = group.map(m =>
+        serializeFullContext(m.userData, m.profileData, `MEMBER: ${stripName(m.full_name)} (${m.age}yo)`)
+      ).join('\n\n');
+
+      const scores = [];
+      for (let i = 0; i < group.length; i++) {
+        for (let j = i + 1; j < group.length; j++) {
+          scores.push({
+            pair: `${stripName(group[i].full_name)} & ${stripName(group[j].full_name)}`,
+            score: calculatePairwiseScore(group[i], group[j]),
+          });
+        }
+      }
+      const avgScore = Math.round(scores.reduce((s, v) => s + v.score, 0) / scores.length);
+      const minScore = Math.min(...scores.map(s => s.score));
+
+      const prompt = `${memberContexts}
+
+PAIRWISE SCORES:
+${scores.map(s => `- ${s.pair}: ${s.score}%`).join('\n')}
+Average: ${avgScore}% | Minimum: ${minScore}%
+
+Validate this candidate roommate group. Consider:
+1. Would these people actually enjoy living together?
+2. Are there any personality clashes the algorithm might have missed?
+3. Does the lifestyle rhythm work (sleep, work, socializing)?
+4. Any red flags or concerns?
+
+Respond with ONLY this JSON:
+{
+  "approved": true/false,
+  "confidence": 0.0-1.0,
+  "summary": "2-3 sentences in Pi's voice explaining why this group works (or doesn't)",
+  "member_insights": [
+    {"user_id": "id", "role_in_group": "e.g. the social connector, the stabilizer, etc.", "note": "one-sentence insight"}
+  ],
+  "risks": ["0-3 specific risks or concerns"]
+}`;
+
+      try {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'x-api-key': ANTHROPIC_API_KEY,
+            'anthropic-version': '2023-06-01',
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-5',
+            max_tokens: 1024,
+            system: PI_AUTO_ASSEMBLE_PERSONA,
+            messages: [{ role: 'user', content: prompt }],
+          }),
+        });
+
+        if (!response.ok) {
+          console.error('Claude API error:', response.status);
+          continue;
+        }
+
+        const claudeData = await response.json();
+        const rawText = claudeData.content?.[0]?.text ?? '';
+        let result: any = null;
+        try {
+          const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+          if (jsonMatch) result = JSON.parse(jsonMatch[0]);
+        } catch {}
+
+        if (!result) continue;
+
+        results.push({
+          members: group.map(m => ({ user_id: m.user_id, name: stripName(m.full_name) })),
+          avgScore,
+          minScore,
+          validation: result,
+        });
+
+        if (!result.approved) continue;
+        if (dryRun) { groupsCreated++; continue; }
+
+        const anchorUser = group[0];
+        const deadline = new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString();
+
+        const { data: newGroup, error: groupError } = await supabase
+          .from('pi_auto_groups')
+          .insert({
+            anchor_user_id: anchorUser.user_id,
+            city: anchorUser.city,
+            max_members: group.length,
+            status: 'forming',
+            pi_summary: result.summary,
+            pi_confidence: result.confidence,
+            pi_risks: result.risks || [],
+            acceptance_deadline: deadline,
+            avg_compatibility_score: avgScore,
+          })
+          .select('id')
+          .single();
+
+        if (groupError || !newGroup) {
+          console.error('Group insert error:', groupError);
+          continue;
+        }
+
+        const memberInserts = group.map((m, idx) => ({
+          group_id: newGroup.id,
+          user_id: m.user_id,
+          status: 'pending',
+          invited_at: new Date().toISOString(),
+          role_in_group: result.member_insights?.[idx]?.role_in_group || null,
+        }));
+
+        const { error: memberError } = await supabase
+          .from('pi_auto_group_members')
+          .insert(memberInserts);
+
+        if (memberError) {
+          console.error('Member insert error:', memberError);
+          continue;
+        }
+
+        groupsCreated++;
+
+        await supabase.from('pi_usage_log').insert({
+          user_id: anchorUser.user_id,
+          feature: 'auto_assemble',
+          tokens_used: (claudeData.usage?.input_tokens ?? 0) + (claudeData.usage?.output_tokens ?? 0),
+          model_used: 'claude-sonnet-4-5',
+        });
+      } catch (err) {
+        console.error('Group validation error:', err);
+        continue;
+      }
+    }
+
+    return jsonResponse({
+      groups_created: groupsCreated,
+      candidates_evaluated: allCandidateGroups.length,
+      eligible_renters: eligible.length,
+      results: dryRun ? results : undefined,
+    });
+  } catch (err: any) {
+    console.error('pi-auto-assemble error:', err);
+    return errorResponse('Auto-assemble pipeline failed', 500);
+  }
+});
