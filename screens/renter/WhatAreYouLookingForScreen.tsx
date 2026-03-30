@@ -96,15 +96,13 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
 
   const doSave = async (listingPref: 'room' | 'entire_apartment' | 'any', searchType: 'solo' | 'with_partner' | 'with_roommates' | 'have_group', skipComplete?: boolean) => {
     if (!user) return;
-    setSaving(true);
-    try {
-      await updateProfile({
-        listing_type_preference: listingPref,
-        apartment_search_type: searchType,
-      });
-    } catch (err) {
+
+    updateProfile({
+      listing_type_preference: listingPref,
+      apartment_search_type: searchType,
+    }).catch(err => {
       console.warn('Profile update failed during intent selection, will retry during onboarding:', err);
-    }
+    });
 
     try {
       await updateUser({
@@ -114,11 +112,9 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
           apartment_search_type: searchType,
         },
       });
-      setSaving(false);
       if (!skipComplete) onComplete();
     } catch (err) {
       console.error('Failed to update local user state:', err);
-      setSaving(false);
       Alert.alert(
         'Something went wrong',
         'Could not save your preference. Please try again.',
