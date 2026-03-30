@@ -83,14 +83,23 @@ CREATE OR REPLACE FUNCTION public.claim_pi_group(
   p_group_id UUID,
   p_host_id UUID DEFAULT NULL,
   p_listing_id TEXT DEFAULT NULL,
-  p_is_free BOOLEAN DEFAULT false,
-  p_price_cents INTEGER DEFAULT 0
+  p_confirm_paid BOOLEAN DEFAULT false,
+  p_unused INTEGER DEFAULT 0
 ) RETURNS UUID AS $$
 DECLARE
   v_claim_id UUID;
   v_group_status TEXT;
   v_host_id UUID;
   v_role TEXT;
+  v_host_plan TEXT;
+  v_host_type TEXT;
+  v_agent_plan TEXT;
+  v_free_per_month INTEGER;
+  v_extra_price_cents INTEGER;
+  v_free_used INTEGER;
+  v_is_free BOOLEAN;
+  v_price_cents INTEGER;
+  v_month_start TIMESTAMPTZ;
 BEGIN
   v_host_id := auth.uid();
   IF v_host_id IS NULL THEN
@@ -103,6 +112,58 @@ BEGIN
 
   IF v_role IS NULL OR v_role NOT IN ('host', 'agent', 'company') THEN
     RAISE EXCEPTION 'Only hosts, agents, and companies can claim groups';
+  END IF;
+
+  SELECT host_plan, host_type, agent_plan
+  INTO v_host_plan, v_host_type, v_agent_plan
+  FROM public.users
+  WHERE id = v_host_id;
+
+  IF v_host_type = 'agent' THEN
+    CASE COALESCE(v_agent_plan, 'pay_per_use')
+      WHEN 'pay_per_use' THEN v_free_per_month := 0; v_extra_price_cents := 2500;
+      WHEN 'starter'     THEN v_free_per_month := 3; v_extra_price_cents := 2000;
+      WHEN 'pro'         THEN v_free_per_month := 10; v_extra_price_cents := 1500;
+      WHEN 'elite'       THEN v_free_per_month := 25; v_extra_price_cents := 1000;
+      ELSE v_free_per_month := 0; v_extra_price_cents := 2500;
+    END CASE;
+  ELSIF v_host_type = 'company' THEN
+    CASE COALESCE(REPLACE(v_host_plan, 'company_', ''), 'starter')
+      WHEN 'starter'    THEN v_free_per_month := 10; v_extra_price_cents := 2000;
+      WHEN 'pro'        THEN v_free_per_month := 30; v_extra_price_cents := 1000;
+      WHEN 'enterprise' THEN v_free_per_month := -1; v_extra_price_cents := 0;
+      ELSE v_free_per_month := 10; v_extra_price_cents := 2000;
+    END CASE;
+  ELSE
+    IF COALESCE(v_host_plan, 'free') IN ('free', 'none') THEN
+      RAISE EXCEPTION 'Plan does not support group claims. Please upgrade.';
+    END IF;
+    v_free_per_month := 0;
+    v_extra_price_cents := 0;
+  END IF;
+
+  v_month_start := date_trunc('month', now());
+  SELECT COUNT(*) INTO v_free_used
+  FROM public.pi_group_claims
+  WHERE host_id = v_host_id
+    AND is_free_claim = true
+    AND created_at >= v_month_start;
+
+  IF v_free_per_month = -1 THEN
+    v_is_free := true;
+    v_price_cents := 0;
+  ELSIF v_free_per_month > 0 AND v_free_used < v_free_per_month THEN
+    v_is_free := true;
+    v_price_cents := 0;
+  ELSIF v_extra_price_cents > 0 THEN
+    IF NOT p_confirm_paid THEN
+      RAISE EXCEPTION 'PAID_CLAIM_REQUIRED:%;%', v_extra_price_cents,
+        GREATEST(0, v_free_per_month - v_free_used);
+    END IF;
+    v_is_free := false;
+    v_price_cents := v_extra_price_cents;
+  ELSE
+    RAISE EXCEPTION 'No claims remaining on your current plan.';
   END IF;
 
   SELECT status INTO v_group_status
@@ -119,7 +180,7 @@ BEGIN
   END IF;
 
   INSERT INTO public.pi_group_claims (group_id, host_id, listing_id, is_free_claim, claim_price_cents)
-  VALUES (p_group_id, v_host_id, p_listing_id, p_is_free, p_price_cents)
+  VALUES (p_group_id, v_host_id, p_listing_id, v_is_free, v_price_cents)
   RETURNING id INTO v_claim_id;
 
   UPDATE public.pi_auto_groups

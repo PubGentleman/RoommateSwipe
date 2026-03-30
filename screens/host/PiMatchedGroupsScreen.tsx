@@ -14,7 +14,6 @@ import { PiAutoGroup } from '../../types/models';
 import {
   getAvailableGroups,
   claimGroup,
-  getClaimAllowance,
   getClaimsUsedThisMonth,
 } from '../../services/piAutoMatchService';
 import { getAutoClaimLimits, type AgentPlan } from '../../constants/planLimits';
@@ -152,44 +151,58 @@ export const PiMatchedGroupsScreen = () => {
       return;
     }
 
-    const allowance = await getClaimAllowance(user.id, agentPlan || hostPlan, hostType);
+    setClaimingId(group.id);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    if (!allowance.allowed) {
-      showAlert({
-        title: 'Claims Not Available',
-        message: 'Your current plan does not include group claims. Upgrade to access Pi matched groups.',
-      });
+    const result = await claimGroup(group.id, user.id, '', false, 0, false);
+
+    if (result.success) {
+      setGroups(prev => prev.filter(g => g.id !== group.id));
+      setFilteredGroups(prev => prev.filter(g => g.id !== group.id));
+      setClaimsUsed(prev => prev + 1);
+      if (freeRemaining > 0) setFreeRemaining(prev => prev - 1);
+      setClaimingId(null);
+      navigation.navigate('PiClaimedGroupDetail', { groupId: group.id });
       return;
     }
 
-    if (!allowance.isFree && allowance.priceCents > 0) {
-      const price = (allowance.priceCents / 100).toFixed(2);
+    if (result.error?.includes('PAID_CLAIM_REQUIRED')) {
+      const parts = result.error.split(':');
+      const priceParts = parts[1]?.split(';') || [];
+      const priceCents = parseInt(priceParts[0] || '0', 10);
+      const price = (priceCents / 100).toFixed(2);
+
       const confirmed = await confirm({
         title: 'Confirm Paid Claim',
         message: `You've used all free claims this month. This claim costs $${price}. Confirm?`,
         confirmText: `Pay $${price}`,
         cancelText: 'Cancel',
       });
-      if (!confirmed) return;
-    }
 
-    setClaimingId(group.id);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-    const success = await claimGroup(
-      group.id, user.id, '', allowance.isFree, allowance.priceCents
-    );
-
-    if (success) {
-      setGroups(prev => prev.filter(g => g.id !== group.id));
-      setFilteredGroups(prev => prev.filter(g => g.id !== group.id));
-      setClaimsUsed(prev => prev + 1);
-      if (freeRemaining > 0) setFreeRemaining(prev => prev - 1);
-      navigation.navigate('PiClaimedGroupDetail', { groupId: group.id });
+      if (confirmed) {
+        const paidResult = await claimGroup(group.id, user.id, '', false, 0, true);
+        if (paidResult.success) {
+          setGroups(prev => prev.filter(g => g.id !== group.id));
+          setFilteredGroups(prev => prev.filter(g => g.id !== group.id));
+          setClaimsUsed(prev => prev + 1);
+          setClaimingId(null);
+          navigation.navigate('PiClaimedGroupDetail', { groupId: group.id });
+          return;
+        }
+        showAlert({
+          title: 'Claim Failed',
+          message: paidResult.error || 'Could not claim this group. Please try again.',
+        });
+      }
+    } else if (result.error?.includes('upgrade') || result.error?.includes('Plan does not support')) {
+      showAlert({
+        title: 'Upgrade Required',
+        message: result.error || 'Your plan does not support group claims.',
+      });
     } else {
       showAlert({
         title: 'Claim Failed',
-        message: 'Could not claim this group. It may have already been claimed by someone else.',
+        message: result.error || 'Could not claim this group. It may have already been claimed by someone else.',
       });
     }
     setClaimingId(null);

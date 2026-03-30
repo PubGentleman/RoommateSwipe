@@ -200,28 +200,27 @@ export async function getAvailableGroups(filters?: {
 
 export async function claimGroup(
   groupId: string,
-  hostId: string,
+  _hostId: string,
   listingId: string,
-  isFree: boolean,
-  priceCents: number
-): Promise<boolean> {
+  _isFree: boolean,
+  _priceCents: number,
+  confirmPaid: boolean = false
+): Promise<{ success: boolean; error?: string }> {
   try {
     const { data, error } = await supabase.rpc('claim_pi_group', {
       p_group_id: groupId,
-      p_host_id: hostId,
       p_listing_id: listingId || null,
-      p_is_free: isFree,
-      p_price_cents: priceCents,
+      p_confirm_paid: confirmPaid,
     });
 
     if (error) {
       console.warn('[claimGroup] RPC error:', error.message);
-      return false;
+      return { success: false, error: error.message };
     }
 
-    return !!data;
-  } catch {
-    return false;
+    return { success: !!data };
+  } catch (e: any) {
+    return { success: false, error: e?.message };
   }
 }
 
