@@ -49,7 +49,9 @@ interface Props {
 export default function WhatAreYouLookingForScreen({ onComplete, isSettings, initialIntent, initialSubIntent, initialListingPref }: Props) {
   const insets = useSafeAreaInsets();
   const { user, updateUser } = useAuth();
-  const [step, setStep] = useState<'intent' | 'roommate_sub' | 'place_sub' | 'group_prompt'>(initialIntent ? (initialIntent === 'find_roommates' ? 'roommate_sub' : 'place_sub') : 'intent');
+  const [step, setStep] = useState<'intent' | 'roommate_sub' | 'place_sub' | 'group_prompt'>(
+    isSettings ? 'intent' : (initialIntent ? (initialIntent === 'find_roommates' ? 'roommate_sub' : 'place_sub') : 'intent')
+  );
   const [intent, setIntent] = useState<RenterIntent | null>(initialIntent || null);
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const slideAnim = useRef(new Animated.Value(0)).current;
