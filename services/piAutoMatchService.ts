@@ -308,9 +308,9 @@ export async function getAutoMatchStats(userId: string): Promise<{
   lastMatchAttempt: string | null;
 }> {
   try {
-    const [groups, invite, profileData] = await Promise.all([
+    const [groups, pendingCount, profileData] = await Promise.all([
       getUserAutoGroups(userId),
-      getPendingGroupInvite(userId),
+      getPendingAutoGroupCount(userId),
       supabase
         .from('profiles')
         .select('pi_last_match_attempt')
@@ -319,12 +319,11 @@ export async function getAutoMatchStats(userId: string): Promise<{
     ]);
 
     const activeGroup = groups.find(g => g.status === 'forming' || g.status === 'ready') ?? null;
-    const pendingInvites = groups.filter(g => g.status === 'forming').length;
 
     return {
       totalGroups: groups.length,
       activeGroup,
-      pendingInvites: invite ? 1 : pendingInvites,
+      pendingInvites: pendingCount,
       lastMatchAttempt: profileData.data?.pi_last_match_attempt ?? null,
     };
   } catch {
