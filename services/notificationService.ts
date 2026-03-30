@@ -66,6 +66,7 @@ export interface PiNotificationData {
   deadline?: string;
   city?: string;
   memberCount?: number;
+  spotsNeeded?: number;
 }
 
 const PI_NOTIFICATION_TEMPLATES: Record<PiAutoMatchNotificationType, {
