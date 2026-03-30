@@ -76,9 +76,9 @@ export const EditProfileScreen = () => {
   const [idealRoommateText, setIdealRoommateText] = useState(user?.profileData?.ideal_roommate_text || user?.ideal_roommate_text || '');
   const [isSaving, setIsSaving] = useState(false);
 
-  const [desiredRoommateCount, setDesiredRoommateCount] = useState<number>(user?.profileData?.desired_roommate_count || user?.desired_roommate_count || 1);
-  const [desiredBedroomCount, setDesiredBedroomCount] = useState<number>(user?.profileData?.desired_bedroom_count || user?.desired_bedroom_count || 2);
-  const [householdGenderPref, setHouseholdGenderPref] = useState<'any' | 'male_only' | 'female_only' | 'same_gender'>(user?.profileData?.household_gender_preference || user?.household_gender_preference || 'any');
+  const [desiredRoommateCount, setDesiredRoommateCount] = useState<number>(user?.profileData?.desired_roommate_count ?? user?.desired_roommate_count ?? 0);
+  const [desiredBedroomCount, setDesiredBedroomCount] = useState<number>(user?.profileData?.desired_bedroom_count ?? user?.desired_bedroom_count ?? 0);
+  const [householdGenderPref, setHouseholdGenderPref] = useState<'any' | 'male_only' | 'female_only' | 'same_gender'>(user?.profileData?.household_gender_preference ?? user?.household_gender_preference ?? 'any');
   const [piAutoMatchEnabled, setPiAutoMatchEnabled] = useState<boolean>(user?.profileData?.pi_auto_match_enabled ?? user?.pi_auto_match_enabled ?? true);
 
   const pickImage = async () => {
@@ -924,6 +924,7 @@ export const EditProfileScreen = () => {
               How many roommates are you looking for?
             </ThemedText>
             <View style={styles.optionsRow}>
+              <OptionButton label="Any" value="0" isSelected={desiredRoommateCount === 0} onPress={() => setDesiredRoommateCount(0)} />
               <OptionButton label="1" value="1" isSelected={desiredRoommateCount === 1} onPress={() => setDesiredRoommateCount(1)} />
               <OptionButton label="2" value="2" isSelected={desiredRoommateCount === 2} onPress={() => setDesiredRoommateCount(2)} />
               <OptionButton label="3" value="3" isSelected={desiredRoommateCount === 3} onPress={() => setDesiredRoommateCount(3)} />
@@ -936,6 +937,7 @@ export const EditProfileScreen = () => {
               How many bedrooms do you need?
             </ThemedText>
             <View style={styles.optionsRow}>
+              <OptionButton label="Any" value="0" isSelected={desiredBedroomCount === 0} onPress={() => setDesiredBedroomCount(0)} />
               <OptionButton label="1" value="1" isSelected={desiredBedroomCount === 1} onPress={() => setDesiredBedroomCount(1)} />
               <OptionButton label="2" value="2" isSelected={desiredBedroomCount === 2} onPress={() => setDesiredBedroomCount(2)} />
               <OptionButton label="3" value="3" isSelected={desiredBedroomCount === 3} onPress={() => setDesiredBedroomCount(3)} />

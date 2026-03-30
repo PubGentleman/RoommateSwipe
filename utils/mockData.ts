@@ -106,6 +106,10 @@ export const mockProfileUsers: User[] = [
     references: [
       { id: 'ref-m1', recipientId: '2', authorName: 'David Lee', authorEmail: 'david@email.com', authorRelationship: 'landlord', rating: 4, review: 'Great tenant, always on time with rent.', isVerified: true, createdAt: '2025-04-10' },
     ],
+    desired_roommate_count: 2,
+    desired_bedroom_count: 3,
+    household_gender_preference: 'any' as const,
+    pi_auto_match_enabled: true,
     background_check_status: 'none' as const,
   },
   {
@@ -151,6 +155,10 @@ export const mockProfileUsers: User[] = [
       },
     },
     personalityAnswers: { q1: 'alone', q2: 'chill', q3: 'tidy', q4: 'headsup', q5: 'text' },
+    desired_roommate_count: 1,
+    desired_bedroom_count: 2,
+    household_gender_preference: 'female_only' as const,
+    pi_auto_match_enabled: true,
     background_check_status: 'none' as const,
   },
   {
@@ -198,6 +206,10 @@ export const mockProfileUsers: User[] = [
     references: [
       { id: 'ref-b1', recipientId: '4', authorName: 'Lisa Wang', authorEmail: 'lisa@email.com', authorRelationship: 'colleague', rating: 5, review: 'Bob is a wonderful person. Very easy-going.', isVerified: true, createdAt: '2025-02-18' },
     ],
+    desired_roommate_count: 0,
+    desired_bedroom_count: 2,
+    household_gender_preference: 'any' as const,
+    pi_auto_match_enabled: true,
     background_check_status: 'clear' as const,
   },
   {
@@ -248,6 +260,10 @@ export const mockProfileUsers: User[] = [
       { id: 'ref-j1', recipientId: '5', authorName: 'Sarah Kim', authorEmail: 'sarah.k@email.com', authorRelationship: 'past_roommate', rating: 5, review: 'Jessica was the best roommate I ever had. So considerate!', isVerified: true, createdAt: '2025-05-20' },
       { id: 'ref-j2', recipientId: '5', authorName: 'Dr. Patel', authorEmail: 'patel@email.com', authorRelationship: 'colleague', rating: 4, isVerified: false, createdAt: '2025-03-15' },
     ],
+    desired_roommate_count: 1,
+    desired_bedroom_count: 2,
+    household_gender_preference: 'same_gender' as const,
+    pi_auto_match_enabled: true,
     background_check_status: 'clear' as const,
   },
   {
