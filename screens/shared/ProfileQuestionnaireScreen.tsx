@@ -673,6 +673,8 @@ export const ProfileQuestionnaireScreen = () => {
         desired_bedroom_count: desiredBedroomCount,
         household_gender_preference: householdGenderPref,
         pi_auto_match_enabled: piAutoMatchEnabled,
+        listing_type_preference: user?.profileData?.listing_type_preference,
+        apartment_search_type: user?.profileData?.apartment_search_type,
       });
     } catch (e) {
       console.warn('[ProfileQuestionnaire] Profile sync failed:', e);

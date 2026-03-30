@@ -100,6 +100,11 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
         listing_type_preference: listingPref,
         apartment_search_type: searchType,
       });
+    } catch (err) {
+      console.warn('Profile update failed during intent selection, will retry during onboarding:', err);
+    }
+
+    try {
       await updateUser({
         profileData: {
           ...user.profileData,
@@ -108,8 +113,14 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
         },
       });
       onComplete();
-    } catch (_) {
+    } catch (err) {
+      console.error('Failed to update local user state:', err);
       setSaving(false);
+      Alert.alert(
+        'Something went wrong',
+        'Could not save your preference. Please try again.',
+        [{ text: 'OK' }]
+      );
     }
   };
 
@@ -187,6 +198,11 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
             listing_type_preference: listingPref,
             apartment_search_type: id,
           });
+        } catch (err) {
+          console.warn('Profile update failed during intent selection, will retry during onboarding:', err);
+        }
+
+        try {
           await updateUser({
             profileData: {
               ...user?.profileData,
@@ -196,8 +212,14 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
           });
           setSaving(false);
           animateForward(() => setStep('group_prompt'));
-        } catch (_) {
+        } catch (err) {
+          console.error('Failed to update local user state:', err);
           setSaving(false);
+          Alert.alert(
+            'Something went wrong',
+            'Could not save your preference. Please try again.',
+            [{ text: 'OK' }]
+          );
         }
       } else {
         saveAndContinue(listingPref, id);
