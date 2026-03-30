@@ -38,13 +38,14 @@ const PLACE_SUB_OPTIONS: { id: PlaceSubIntent; icon: string; label: string; desc
 ];
 
 interface Props {
-  onComplete: () => void;
+  onComplete: (action?: 'create_group') => void;
   isSettings?: boolean;
   initialIntent?: RenterIntent;
   initialSubIntent?: string;
+  initialListingPref?: string;
 }
 
-export default function WhatAreYouLookingForScreen({ onComplete, isSettings, initialIntent, initialSubIntent }: Props) {
+export default function WhatAreYouLookingForScreen({ onComplete, isSettings, initialIntent, initialSubIntent, initialListingPref }: Props) {
   const insets = useSafeAreaInsets();
   const { user, updateUser } = useAuth();
   const [step, setStep] = useState<'intent' | 'roommate_sub' | 'place_sub' | 'group_prompt'>(initialIntent ? (initialIntent === 'find_roommates' ? 'roommate_sub' : 'place_sub') : 'intent');
@@ -179,11 +180,13 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
     <View style={styles.typeGrid}>
       {options.map((opt) => {
         const isSelected = selectedCard === opt.id;
+        const isCurrent = isSettings && (initialSubIntent === opt.id || initialListingPref === opt.id);
         return (
           <Pressable
             key={opt.id}
             style={[
               styles.typeCard,
+              isCurrent ? { borderColor: opt.color, borderWidth: 2, backgroundColor: `${opt.color}10` } : null,
               isSelected ? { borderColor: opt.color, backgroundColor: `${opt.color}15` } : null,
             ]}
             onPress={() => onSelect(opt.id)}
@@ -193,6 +196,7 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
             </View>
             <Text style={styles.typeLabel}>{opt.label}</Text>
             <Text style={styles.typeDesc}>{opt.description}</Text>
+            {isCurrent ? <Text style={[styles.typeDesc, { color: opt.color, fontWeight: '600', marginTop: 2 }]}>Current</Text> : null}
           </Pressable>
         );
       })}
@@ -233,14 +237,14 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
               </View>
               <Pressable
                 style={styles.groupPromptBtn}
-                onPress={onComplete}
+                onPress={() => onComplete('create_group')}
               >
                 <Feather name="plus-circle" size={18} color="#FFFFFF" />
                 <Text style={styles.groupPromptBtnText}>Create Group Now</Text>
               </Pressable>
               <Pressable
                 style={styles.groupPromptSkip}
-                onPress={onComplete}
+                onPress={() => onComplete()}
               >
                 <Text style={styles.groupPromptSkipText}>Skip for now</Text>
               </Pressable>

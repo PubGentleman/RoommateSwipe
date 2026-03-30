@@ -32,6 +32,7 @@ import { RhomeAISheet } from '../../components/RhomeAISheet';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { AIGroupSuggestionCard } from '../../components/AIGroupSuggestionCard';
 import { getPendingAutoGroupCount, isAutoMatchEnabled } from '../../services/piAutoMatchService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - Spacing.xxl;
@@ -124,6 +125,16 @@ export const GroupsScreen = () => {
       }
     }, [user, activeCity, activeSubArea])
   );
+
+  useEffect(() => {
+    AsyncStorage.getItem('pending_group_create').then(val => {
+      if (val === 'true') {
+        AsyncStorage.removeItem('pending_group_create');
+        setActiveTab('create');
+        navigation.navigate('CreateGroup' as never);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     if (myGroups.length > 0 && user) {

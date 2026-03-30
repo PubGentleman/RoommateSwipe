@@ -363,6 +363,7 @@ export const ProfileStackNavigator = () => {
             onComplete={() => nav.goBack()}
             initialIntent={currentIntent}
             initialSubIntent={currentSearchType}
+            initialListingPref={user?.profileData?.listing_type_preference}
           />
         )}
       </Stack.Screen>

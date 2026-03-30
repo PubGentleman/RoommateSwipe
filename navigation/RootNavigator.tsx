@@ -19,6 +19,7 @@ import { ProfileCompletionScreen } from '../screens/shared/ProfileCompletionScre
 import { OccupationPickerScreen } from '../screens/shared/OccupationPickerScreen';
 import { LifestyleQuestionsScreen } from '../screens/shared/LifestyleQuestionsScreen';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../hooks/useTheme';
 import { StorageService } from '../utils/storage';
 
@@ -41,7 +42,6 @@ export type RootStackParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 function RenterMain() { return <RenterTabNavigator />; }
-RenterMain.displayName = 'RenterMain';
 function HostMain() { return <HostTabNavigator />; }
 HostMain.displayName = 'HostMain';
 
@@ -90,7 +90,12 @@ export const RootNavigator = () => {
   if (needsRenterIntent) {
     return (
       <WhatAreYouLookingForScreen
-        onComplete={() => setIntentCompletedForUserId(user.id)}
+        onComplete={(action) => {
+          if (action === 'create_group') {
+            AsyncStorage.setItem('pending_group_create', 'true');
+          }
+          setIntentCompletedForUserId(user.id);
+        }}
       />
     );
   }

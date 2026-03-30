@@ -790,18 +790,14 @@ export const ExploreScreen = () => {
 
     if (listingTypeFilter !== 'any') {
       const TYPE_MAP: Record<string, string[]> = {
-        room:   ['room', 'private_room', 'Private Room'],
-        entire: ['entire', 'entire_unit', 'Entire Unit', 'entire_apartment'],
-        entire_apartment: ['entire', 'entire_unit', 'Entire Unit', 'entire_apartment'],
-        sublet: ['sublet', 'Sublet'],
+        room:   ['room', 'private_room'],
+        entire: ['entire', 'entire_unit', 'entire_apartment'],
+        entire_apartment: ['entire', 'entire_unit', 'entire_apartment'],
+        sublet: ['sublet'],
       };
       const allowedValues = TYPE_MAP[listingTypeFilter] ?? [];
       filtered = filtered.filter(p =>
-        allowedValues.some(v =>
-          p.roomType?.toLowerCase() === v.toLowerCase() ||
-          (p as any).listing_type?.toLowerCase() === v.toLowerCase() ||
-          (p as any).type?.toLowerCase() === v.toLowerCase()
-        )
+        allowedValues.some(v => p.roomType?.toLowerCase() === v.toLowerCase())
       );
     }
 
