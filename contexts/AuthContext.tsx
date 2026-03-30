@@ -358,23 +358,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       mappedUser = await checkAndApplyScheduledChanges(mappedUser);
       mappedUser.lastActiveAt = new Date();
 
-      const localUser = await StorageService.getCurrentUser();
-      if (localUser?.id === mappedUser.id && localUser.profileData && mappedUser.profileData) {
-        const intentOverrides: Record<string, string> = {};
-        if (!mappedUser.profileData.apartment_search_type && localUser.profileData.apartment_search_type) {
-          intentOverrides.apartment_search_type = localUser.profileData.apartment_search_type;
-        }
-        if (!mappedUser.profileData.listing_type_preference && localUser.profileData.listing_type_preference) {
-          intentOverrides.listing_type_preference = localUser.profileData.listing_type_preference;
-        }
-        if (Object.keys(intentOverrides).length > 0) {
-          mappedUser = {
-            ...mappedUser,
-            profileData: { ...mappedUser.profileData, ...intentOverrides },
-          };
-        }
-      }
-
       if (userData.is_deleted) {
         const deletedAt = userData.deleted_at ? new Date(userData.deleted_at) : null;
         const RECOVERY_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
@@ -398,6 +381,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           await supabase.from('users').update({ last_active_at: new Date().toISOString() }).eq('id', session.user.id);
         } catch (e) {}
+      }
+
+      if (mappedUser.profileData) {
+        const localUser = await StorageService.getCurrentUser();
+        const intentOverrides: Record<string, string> = {};
+
+        if (localUser?.id === mappedUser.id && localUser.profileData) {
+          if (!mappedUser.profileData.apartment_search_type && localUser.profileData.apartment_search_type) {
+            intentOverrides.apartment_search_type = localUser.profileData.apartment_search_type;
+          }
+          if (!mappedUser.profileData.listing_type_preference && localUser.profileData.listing_type_preference) {
+            intentOverrides.listing_type_preference = localUser.profileData.listing_type_preference;
+          }
+        }
+
+        if (!intentOverrides.apartment_search_type) {
+          try {
+            const savedIntent = await AsyncStorage.getItem('@rhome/renter_intent');
+            if (savedIntent) {
+              const parsed = JSON.parse(savedIntent);
+              if (!mappedUser.profileData.apartment_search_type && parsed.apartment_search_type) {
+                intentOverrides.apartment_search_type = parsed.apartment_search_type;
+              }
+              if (!mappedUser.profileData.listing_type_preference && parsed.listing_type_preference) {
+                intentOverrides.listing_type_preference = parsed.listing_type_preference;
+              }
+            }
+          } catch {}
+        }
+
+        if (Object.keys(intentOverrides).length > 0) {
+          mappedUser = {
+            ...mappedUser,
+            profileData: { ...mappedUser.profileData, ...intentOverrides },
+          };
+        }
       }
 
       await StorageService.setCurrentUser(mappedUser);
@@ -428,6 +447,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loadUserFromStorage = async () => {
     await StorageService.initializeWithMockData();
     const currentUser = await StorageService.getCurrentUser();
+    if (currentUser && currentUser.profileData && !currentUser.profileData.apartment_search_type) {
+      try {
+        const savedIntent = await AsyncStorage.getItem('@rhome/renter_intent');
+        if (savedIntent) {
+          const parsed = JSON.parse(savedIntent);
+          if (parsed.apartment_search_type) {
+            currentUser.profileData.apartment_search_type = parsed.apartment_search_type;
+          }
+          if (parsed.listing_type_preference) {
+            currentUser.profileData.listing_type_preference = parsed.listing_type_preference;
+          }
+        }
+      } catch {}
+    }
     if (currentUser) {
       if (currentUser.messageCount === undefined) {
         currentUser.messageCount = 0;

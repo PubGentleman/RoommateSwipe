@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '../../components/VectorIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../contexts/AuthContext';
@@ -105,6 +106,11 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
     });
 
     try {
+      await AsyncStorage.setItem('@rhome/renter_intent', JSON.stringify({
+        apartment_search_type: searchType,
+        listing_type_preference: listingPref,
+      }));
+
       await updateUser({
         profileData: {
           ...user.profileData,
