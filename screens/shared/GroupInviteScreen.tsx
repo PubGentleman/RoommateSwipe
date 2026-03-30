@@ -42,7 +42,6 @@ export function GroupInviteScreen({ navigation, route }: any) {
   const [discoverable, setDiscoverable] = useState(false);
   const [discoverableLoaded, setDiscoverableLoaded] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [pasteCode, setPasteCode] = useState('');
 
   useEffect(() => {
     loadData();
@@ -120,7 +119,7 @@ export function GroupInviteScreen({ navigation, route }: any) {
   };
 
   const getDeepLink = () => {
-    return Linking.createURL('join-group', { queryParams: { code: inviteCode, group: groupName } });
+    return Linking.createURL(`join/${inviteCode}`);
   };
 
   const handleCopyCode = async () => {
@@ -143,18 +142,9 @@ export function GroupInviteScreen({ navigation, route }: any) {
     const deepLink = getDeepLink();
     try {
       await Share.share({
-        message: `Join my group "${groupName}" on Rhome!\n\nTap the link to join instantly:\n${deepLink}\n\nOr enter invite code: ${inviteCode}`,
+        message: `Join my group "${groupName}" on Rhome!\n\nTap the link to join:\n${deepLink}`,
         url: deepLink,
       });
-    } catch {}
-  };
-
-  const handlePasteCode = async () => {
-    try {
-      const text = await Clipboard.getStringAsync();
-      if (text && text.trim().length > 0) {
-        setPasteCode(text.trim().toUpperCase());
-      }
     } catch {}
   };
 
@@ -348,25 +338,6 @@ export function GroupInviteScreen({ navigation, route }: any) {
                 </ThemedText>
               </Pressable>
 
-              <View style={[styles.divider, { backgroundColor: theme.border }]} />
-
-              <ThemedText style={[Typography.small, { color: theme.textSecondary, textAlign: 'center', marginBottom: Spacing.sm }]}>
-                HAVE A CODE? PASTE IT HERE
-              </ThemedText>
-              <View style={[styles.pasteRow, { borderColor: theme.border, backgroundColor: theme.card }]}>
-                <TextInput
-                  style={[styles.pasteInput, { color: theme.text }]}
-                  placeholder="Enter invite code..."
-                  placeholderTextColor={theme.textSecondary}
-                  value={pasteCode}
-                  onChangeText={(t) => setPasteCode(t.toUpperCase())}
-                  autoCapitalize="characters"
-                  maxLength={8}
-                />
-                <Pressable onPress={handlePasteCode} hitSlop={8} style={{ marginRight: 6 }}>
-                  <Feather name="clipboard" size={18} color={theme.primary} />
-                </Pressable>
-              </View>
             </View>
           )}
 
@@ -573,19 +544,6 @@ const styles = StyleSheet.create({
   },
   regenBtn: {
     flexDirection: 'row', alignItems: 'center', marginTop: Spacing.sm,
-  },
-  divider: {
-    height: 1, width: '80%',
-    marginVertical: Spacing.xl,
-  },
-  pasteRow: {
-    flexDirection: 'row', alignItems: 'center',
-    borderRadius: 12, borderWidth: 1,
-    paddingHorizontal: Spacing.md, height: 48,
-    width: '100%',
-  },
-  pasteInput: {
-    flex: 1, fontSize: 16, fontWeight: '600', letterSpacing: 3,
   },
   infoBar: {
     flexDirection: 'row', alignItems: 'center',

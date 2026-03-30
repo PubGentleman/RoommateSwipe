@@ -9,7 +9,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { Group, RoommateProfile, GroupType } from '../../types/models';
 import { StorageService } from '../../utils/storage';
-import { getGroups as getGroupsFromSupabase, getMyGroups as getMyGroupsFromSupabase, getMyInquiryGroups as getMyInquiryGroupsFromSupabase, joinGroup as joinGroupSupabase, leaveGroup as leaveGroupSupabase, archiveGroup as archiveGroupSupabase, getMemberLimit, getMyPendingInvites, getMyPendingCompanyInvites, respondToInvite, joinGroupByCode, updateGroup as updateGroupSupabase } from '../../services/groupService';
+import { getGroups as getGroupsFromSupabase, getMyGroups as getMyGroupsFromSupabase, getMyInquiryGroups as getMyInquiryGroupsFromSupabase, joinGroup as joinGroupSupabase, leaveGroup as leaveGroupSupabase, archiveGroup as archiveGroupSupabase, getMemberLimit, getMyPendingInvites, getMyPendingCompanyInvites, respondToInvite, updateGroup as updateGroupSupabase } from '../../services/groupService';
 import { getMyListings } from '../../services/listingService';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -86,8 +86,6 @@ export const GroupsScreen = () => {
   const [showPastInquiries, setShowPastInquiries] = useState(false);
   const [pendingInvites, setPendingInvites] = useState<any[]>([]);
   const [companyInvites, setCompanyInvites] = useState<any[]>([]);
-  const [codeInput, setCodeInput] = useState('');
-  const [joiningByCode, setJoiningByCode] = useState(false);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
@@ -693,26 +691,6 @@ export const GroupsScreen = () => {
     }
   };
 
-  const handleJoinByCode = async () => {
-    if (codeInput.trim().length < 6) {
-      await showAlert({ title: 'Invalid Code', message: 'Please enter a 6-character invite code.', variant: 'warning' });
-      return;
-    }
-    setJoiningByCode(true);
-    try {
-      const { groupId, groupName: joinedName } = await joinGroupByCode(codeInput.trim());
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      await showAlert({ title: 'Joined!', message: `You have joined "${joinedName}".`, variant: 'success' });
-      setCodeInput('');
-      await loadGroups();
-      setActiveTab('my-groups');
-    } catch (err: any) {
-      await showAlert({ title: 'Could Not Join', message: err.message, variant: 'warning' });
-    } finally {
-      setJoiningByCode(false);
-    }
-  };
-
   const handleLeaveGroup = async (group: Group) => {
     if (!user) return;
     const isGroupAdmin = group.createdBy === user.id;
@@ -1216,31 +1194,6 @@ export const GroupsScreen = () => {
               ))}
             </View>
           ) : null}
-
-          <View style={[styles.redesignInviteCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <View style={[styles.inviteIconCircle, { backgroundColor: theme.primary + '20' }]}>
-              <Feather name="hash" size={16} color={theme.primary} />
-            </View>
-            <TextInput
-              style={[styles.redesignInviteInput, { color: theme.text }]}
-              placeholder="Enter invite code"
-              placeholderTextColor={theme.textSecondary}
-              value={codeInput}
-              onChangeText={text => setCodeInput(text.toUpperCase())}
-              maxLength={6}
-              autoCapitalize="characters"
-            />
-            <Pressable
-              style={[styles.redesignJoinBtn, { backgroundColor: codeInput.length === 6 ? theme.primary : theme.border }]}
-              onPress={handleJoinByCode}
-              disabled={joiningByCode || codeInput.length < 1}
-            >
-              {joiningByCode
-                ? <ActivityIndicator size="small" color="#fff" />
-                : <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Join</Text>
-              }
-            </Pressable>
-          </View>
 
           {bestGroupId && groupHealthScores[bestGroupId] && myGroups.length > 1 ? (
             <Pressable
@@ -3362,36 +3315,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 1.2,
-  },
-  redesignInviteCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 10,
-    marginBottom: Spacing.md,
-    marginHorizontal: Spacing.md,
-    gap: 8,
-  },
-  inviteIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  redesignInviteInput: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '700',
-    letterSpacing: 3,
-  },
-  redesignJoinBtn: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   companyInviteBadge: {
     flexDirection: 'row',

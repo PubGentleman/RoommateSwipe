@@ -113,7 +113,7 @@ export default function MyGroupScreen() {
     const url = Linking.createURL(`join/${group.invite_code}`);
     const displayName = group.name || 'our group';
     await Share.share({
-      message: `Join ${displayName} on Rhome! Use invite code: ${group.invite_code}\n\n${url}`,
+      message: `Join ${displayName} on Rhome!\n\nTap the link to join:\n${url}`,
     });
   };
 

@@ -24,7 +24,7 @@ export async function triggerAutoMatch(userId: string): Promise<{ success: boole
     if (excluded.includes(profile?.apartment_search_type)) {
       return { success: false };
     }
-    if (profile && !profile.pi_auto_match_enabled) {
+    if (profile && profile.pi_auto_match_enabled === false) {
       return { success: false };
     }
 

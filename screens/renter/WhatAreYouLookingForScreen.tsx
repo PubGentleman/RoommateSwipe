@@ -7,7 +7,6 @@ import {
   Easing,
   Dimensions,
   Text,
-  TextInput,
   ActivityIndicator,
   Alert,
 } from 'react-native';
@@ -15,7 +14,6 @@ import { Feather } from '../../components/VectorIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../contexts/AuthContext';
 import { updateProfile } from '../../services/profileService';
-import { joinGroupByCode } from '../../services/preformedGroupService';
 import { RhomeLogo } from '../../components/RhomeLogo';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -93,8 +91,6 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
   }, [slideAnim]);
 
   const [saving, setSaving] = useState(false);
-  const [showJoinInput, setShowJoinInput] = useState(false);
-  const [inviteCode, setInviteCode] = useState('');
 
   const doSave = async (listingPref: 'room' | 'entire_apartment' | 'any', searchType: 'solo' | 'with_partner' | 'with_roommates' | 'have_group') => {
     if (!user) return;
@@ -287,51 +283,6 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
                 <Feather name="plus-circle" size={18} color="#FFFFFF" />
                 <Text style={styles.groupPromptBtnText}>Create Group Now</Text>
               </Pressable>
-              {showJoinInput ? (
-                <View style={styles.joinInputWrap}>
-                  <TextInput
-                    style={styles.joinInput}
-                    placeholder="Enter invite code"
-                    placeholderTextColor="rgba(255,255,255,0.3)"
-                    value={inviteCode}
-                    onChangeText={setInviteCode}
-                    autoCapitalize="characters"
-                    maxLength={7}
-                  />
-                  <Pressable
-                    style={[styles.joinSubmitBtn, !inviteCode.trim() ? { opacity: 0.5 } : null]}
-                    disabled={!inviteCode.trim() || saving}
-                    onPress={async () => {
-                      if (!inviteCode.trim() || !user) return;
-                      setSaving(true);
-                      const result = await joinGroupByCode(inviteCode.trim(), user.profileData?.full_name || 'Member');
-                      setSaving(false);
-                      if (result.success) {
-                        await updateUser({
-                          profileData: {
-                            ...user.profileData,
-                            listing_type_preference: 'any',
-                            apartment_search_type: 'have_group',
-                          },
-                        });
-                        onComplete();
-                      } else {
-                        Alert.alert('Invalid Code', 'No active group found with that invite code. Check the code and try again.');
-                      }
-                    }}
-                  >
-                    <Text style={styles.joinSubmitText}>Join</Text>
-                  </Pressable>
-                </View>
-              ) : (
-                <Pressable
-                  style={styles.joinExistingBtn}
-                  onPress={() => setShowJoinInput(true)}
-                >
-                  <Feather name="log-out" size={16} color="#4a9eff" />
-                  <Text style={styles.joinExistingText}>Join Existing Group</Text>
-                </Pressable>
-              )}
               <Pressable
                 style={styles.groupPromptSkip}
                 onPress={() => onComplete()}
@@ -449,48 +400,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#FFFFFF',
-  },
-  joinExistingBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 14,
-  },
-  joinExistingText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#4a9eff',
-  },
-  joinInputWrap: {
-    flexDirection: 'row',
-    gap: 10,
-    width: '100%',
-    marginTop: 4,
-  },
-  joinInput: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    letterSpacing: 2,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-  },
-  joinSubmitBtn: {
-    backgroundColor: '#4a9eff',
-    borderRadius: 12,
-    paddingHorizontal: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  joinSubmitText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
   },
   groupPromptSkip: {
     paddingVertical: 12,
