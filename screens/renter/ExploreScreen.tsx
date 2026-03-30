@@ -798,7 +798,7 @@ export const ExploreScreen = () => {
       };
       const allowedValues = TYPE_MAP[listingTypeFilter] ?? [];
       filtered = filtered.filter(p => {
-        const rt = p.roomType?.toLowerCase() || '';
+        const rt = (p.roomType || p.listing_type || p.type || '').toLowerCase();
         return allowedValues.some(v => rt === v.toLowerCase());
       });
     }

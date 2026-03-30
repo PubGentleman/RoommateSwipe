@@ -1,3 +1,157 @@
+DROP POLICY IF EXISTS preformed_groups_select ON public.preformed_groups;
+CREATE POLICY preformed_groups_select ON public.preformed_groups
+  FOR SELECT USING (
+    auth.uid() = group_lead_id
+    OR EXISTS (
+      SELECT 1 FROM public.preformed_group_members pgm
+      WHERE pgm.preformed_group_id = id AND pgm.user_id = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS preformed_members_select ON public.preformed_group_members;
+CREATE POLICY preformed_members_select ON public.preformed_group_members
+  FOR SELECT USING (
+    auth.uid() = user_id
+    OR EXISTS (
+      SELECT 1 FROM public.preformed_groups pg
+      WHERE pg.id = preformed_group_id AND pg.group_lead_id = auth.uid()
+    )
+    OR EXISTS (
+      SELECT 1 FROM public.preformed_group_members other
+      WHERE other.preformed_group_id = preformed_group_members.preformed_group_id
+        AND other.user_id = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS shortlist_select ON public.group_shortlist;
+CREATE POLICY shortlist_select ON public.group_shortlist
+  FOR SELECT USING (
+    auth.uid() = added_by
+    OR EXISTS (
+      SELECT 1 FROM public.preformed_group_members pgm
+      WHERE pgm.preformed_group_id = group_shortlist.preformed_group_id
+        AND pgm.user_id = auth.uid()
+        AND pgm.status = 'joined'
+    )
+    OR EXISTS (
+      SELECT 1 FROM public.preformed_groups pg
+      WHERE pg.id = preformed_group_id AND pg.group_lead_id = auth.uid()
+    )
+  );
+
+CREATE OR REPLACE FUNCTION public.join_preformed_group_by_code(
+  p_invite_code TEXT,
+  p_user_name TEXT
+) RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_group RECORD;
+  v_existing RECORD;
+  v_pending RECORD;
+  v_joined_count INT;
+BEGIN
+  SELECT * INTO v_group
+  FROM preformed_groups
+  WHERE invite_code = UPPER(p_invite_code)
+    AND status IN ('forming', 'ready', 'searching');
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('success', false, 'message', 'Group not found');
+  END IF;
+
+  SELECT * INTO v_existing
+  FROM preformed_group_members
+  WHERE preformed_group_id = v_group.id
+    AND user_id = auth.uid();
+
+  IF FOUND THEN
+    RETURN jsonb_build_object('success', true, 'group_id', v_group.id);
+  END IF;
+
+  SELECT * INTO v_pending
+  FROM preformed_group_members
+  WHERE preformed_group_id = v_group.id
+    AND user_id IS NULL
+    AND status = 'invited'
+  LIMIT 1;
+
+  IF FOUND THEN
+    UPDATE preformed_group_members
+    SET user_id = auth.uid(),
+        name = p_user_name,
+        status = 'joined',
+        joined_at = NOW()
+    WHERE id = v_pending.id;
+  ELSE
+    INSERT INTO preformed_group_members (preformed_group_id, user_id, name, status, joined_at)
+    VALUES (v_group.id, auth.uid(), p_user_name, 'joined', NOW());
+  END IF;
+
+  UPDATE profiles
+  SET listing_type_preference = 'any',
+      apartment_search_type = 'have_group'
+  WHERE user_id = auth.uid();
+
+  SELECT COUNT(*) INTO v_joined_count
+  FROM preformed_group_members
+  WHERE preformed_group_id = v_group.id
+    AND status = 'joined';
+
+  IF v_joined_count >= v_group.group_size THEN
+    UPDATE preformed_groups
+    SET status = 'ready'
+    WHERE id = v_group.id;
+  END IF;
+
+  RETURN jsonb_build_object('success', true, 'group_id', v_group.id);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.lookup_preformed_group_by_code(
+  p_invite_code TEXT
+) RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_group RECORD;
+  v_members JSONB;
+BEGIN
+  SELECT * INTO v_group
+  FROM preformed_groups
+  WHERE invite_code = UPPER(p_invite_code)
+    AND status IN ('forming', 'ready', 'searching');
+
+  IF NOT FOUND THEN
+    RETURN NULL;
+  END IF;
+
+  SELECT jsonb_agg(jsonb_build_object(
+    'id', pgm.id,
+    'name', pgm.name,
+    'status', pgm.status,
+    'user_id', pgm.user_id
+  )) INTO v_members
+  FROM preformed_group_members pgm
+  WHERE pgm.preformed_group_id = v_group.id;
+
+  RETURN jsonb_build_object(
+    'id', v_group.id,
+    'name', v_group.name,
+    'group_size', v_group.group_size,
+    'status', v_group.status,
+    'invite_code', v_group.invite_code,
+    'city', v_group.city,
+    'group_lead_id', v_group.group_lead_id,
+    'members', COALESCE(v_members, '[]'::JSONB)
+  );
+END;
+$$;
+
 ALTER TABLE public.pi_auto_group_members
   DROP CONSTRAINT IF EXISTS pi_auto_group_members_status_check;
 

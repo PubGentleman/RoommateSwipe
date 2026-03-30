@@ -88,13 +88,12 @@ export async function getMyPreformedGroup(): Promise<PreformedGroup | null> {
 }
 
 export async function getGroupByInviteCode(code: string): Promise<PreformedGroup | null> {
-  const { data } = await supabase
-    .from('preformed_groups')
-    .select('*')
-    .eq('invite_code', code.toUpperCase())
-    .single();
+  const { data, error } = await supabase.rpc('lookup_preformed_group_by_code', {
+    p_invite_code: code,
+  });
 
-  return data as PreformedGroup | null;
+  if (error || !data) return null;
+  return data as PreformedGroup;
 }
 
 export async function getGroupMembers(groupId: string): Promise<PreformedGroupMember[]> {
@@ -111,53 +110,18 @@ export async function joinGroupByCode(code: string, userName: string): Promise<{
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { success: false };
 
-  const group = await getGroupByInviteCode(code);
-  if (!group) return { success: false };
+  const { data, error } = await supabase.rpc('join_preformed_group_by_code', {
+    p_invite_code: code,
+    p_user_name: userName,
+  });
 
-  const members = await getGroupMembers(group.id);
-  const existingMember = members.find(m => m.user_id === user.id);
-  if (existingMember) return { success: true, group };
+  if (error) return { success: false };
 
-  const pendingSlot = members.find(m => !m.user_id && m.status === 'invited');
+  const result = data as { success: boolean; group_id?: string; message?: string };
+  if (!result.success || !result.group_id) return { success: false };
 
-  if (pendingSlot) {
-    await supabase
-      .from('preformed_group_members')
-      .update({
-        user_id: user.id,
-        name: userName,
-        status: 'joined',
-        joined_at: new Date().toISOString(),
-      })
-      .eq('id', pendingSlot.id);
-  } else {
-    await supabase.from('preformed_group_members').insert({
-      preformed_group_id: group.id,
-      user_id: user.id,
-      name: userName,
-      status: 'joined',
-      joined_at: new Date().toISOString(),
-    });
-  }
-
-  await supabase
-    .from('profiles')
-    .update({
-      listing_type_preference: 'any',
-      apartment_search_type: 'have_group',
-    })
-    .eq('user_id', user.id);
-
-  const updatedMembers = await getGroupMembers(group.id);
-  const allJoined = updatedMembers.filter(m => m.status === 'joined').length >= group.group_size;
-  if (allJoined) {
-    await supabase
-      .from('preformed_groups')
-      .update({ status: 'ready' })
-      .eq('id', group.id);
-  }
-
-  return { success: true, group };
+  const group = await getGroupById(result.group_id);
+  return { success: true, group: group ?? undefined };
 }
 
 export async function acceptGroupInvite(groupId: string): Promise<boolean> {
