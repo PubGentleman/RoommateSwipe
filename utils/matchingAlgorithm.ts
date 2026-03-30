@@ -1327,12 +1327,15 @@ export function calculateGroupCompatibility(
     for (let j = i + 1; j < members.length; j++) {
       const a = members[i];
       const b = members[j];
-      const score = calculateDetailedCompatibility(a as User, b as RoommateProfile);
-      pairScores.push({ userId1: a.id, userId2: b.id, score: score.totalScore });
+      const scoreAB = calculateDetailedCompatibility(a as User, b as RoommateProfile);
+      const scoreBA = calculateDetailedCompatibility(b as User, a as RoommateProfile);
+      const pairScore = Math.min(scoreAB.totalScore, scoreBA.totalScore);
+      pairScores.push({ userId1: a.id, userId2: b.id, score: pairScore });
 
-      if (score.totalScore === 0 && score.reasons.concerns.length > 0) {
+      if (pairScore === 0) {
+        const concerns = [...scoreAB.reasons.concerns, ...scoreBA.reasons.concerns];
         dealbreakerConflicts.push(
-          `${getMemberName(a)} & ${getMemberName(b)}: ${score.reasons.concerns[0]}`
+          `${getMemberName(a)} & ${getMemberName(b)}: ${concerns[0] || 'dealbreaker conflict'}`
         );
       }
     }
@@ -1385,8 +1388,9 @@ export function checkGroupDealbreakers(
     for (let j = i + 1; j < members.length; j++) {
       const a = members[i];
       const b = members[j];
-      const score = calculateDetailedCompatibility(a as User, b as RoommateProfile);
-      if (score.totalScore === 0) {
+      const scoreAB = calculateDetailedCompatibility(a as User, b as RoommateProfile);
+      const scoreBA = calculateDetailedCompatibility(b as User, a as RoommateProfile);
+      if (scoreAB.totalScore === 0 || scoreBA.totalScore === 0) {
         conflicts.push(
           `${getMemberName(a)} & ${getMemberName(b)}: dealbreaker conflict`
         );

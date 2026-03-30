@@ -126,6 +126,36 @@ function getGenderPoolKey(pref: string, gender: string): string {
   return 'any';
 }
 
+function checkBudgetAlignment(members: CandidateProfile[]): boolean {
+  const budgets = members.map(m => m.budget).filter(b => b > 0);
+  if (budgets.length < 2) return true;
+  const max = Math.max(...budgets);
+  const min = Math.min(...budgets);
+  return (max - min) / max <= 0.35;
+}
+
+function checkMoveInAlignment(members: CandidateProfile[]): boolean {
+  const dates = members
+    .map(m => m.move_in_date ? new Date(m.move_in_date).getTime() : null)
+    .filter((d): d is number => d !== null && !isNaN(d));
+  if (dates.length < 2) return true;
+  const daysDiff = Math.round((Math.max(...dates) - Math.min(...dates)) / (1000 * 60 * 60 * 24));
+  return daysDiff <= 30;
+}
+
+function calculateNeighborhoodBonus(members: CandidateProfile[]): number {
+  const sets = members.map(m => {
+    const hoods = (m.profileData?.preferred_neighborhoods || []).map((n: string) => n.toLowerCase());
+    return new Set<string>(hoods);
+  });
+  if (sets.some(s => s.size === 0)) return 0;
+  let common = 0;
+  for (const hood of sets[0]) {
+    if (sets.every(s => s.has(hood))) common++;
+  }
+  return common >= 2 ? 10 : common === 1 ? 5 : 0;
+}
+
 function greedyAssemble(
   pool: CandidateProfile[],
   targetSize: number,
@@ -145,7 +175,10 @@ function greedyAssemble(
     for (let i = 0; i < Math.min(available.length, 50); i++) {
       for (let j = i + 1; j < Math.min(available.length, 50); j++) {
         const score = calculatePairwiseScore(available[i], available[j]);
-        if (score >= MIN_PAIRWISE_SCORE && score > bestPairScore && checkGenderCompatibility([available[i], available[j]])) {
+        if (score >= MIN_PAIRWISE_SCORE && score > bestPairScore &&
+            checkGenderCompatibility([available[i], available[j]]) &&
+            checkBudgetAlignment([available[i], available[j]]) &&
+            checkMoveInAlignment([available[i], available[j]])) {
           bestPairScore = score;
           bestPair = [available[i], available[j]];
         }
@@ -172,10 +205,14 @@ function greedyAssemble(
 
         const testGroup = [...group, candidate];
         if (!checkGenderCompatibility(testGroup)) continue;
+        if (!checkBudgetAlignment(testGroup)) continue;
+        if (!checkMoveInAlignment(testGroup)) continue;
 
         const avg = scores.reduce((s, v) => s + v, 0) / scores.length;
-        if (avg > bestAvgScore) {
-          bestAvgScore = avg;
+        const hoodBonus = calculateNeighborhoodBonus(testGroup);
+        const adjustedAvg = avg + hoodBonus;
+        if (adjustedAvg > bestAvgScore) {
+          bestAvgScore = adjustedAvg;
           bestCandidate = candidate;
         }
       }

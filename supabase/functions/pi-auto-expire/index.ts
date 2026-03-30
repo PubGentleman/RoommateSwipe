@@ -67,7 +67,7 @@ serve(async (req) => {
         .in('id', memberUserIds);
       const userMap = new Map((users || []).map((u: any) => [u.id, u]));
 
-      const meetsPartialThreshold = accepted.length >= 2 && accepted.length >= Math.ceil(group.max_members * 0.5);
+      const meetsPartialThreshold = accepted.length >= 1 && accepted.length < group.max_members;
 
       if (meetsPartialThreshold) {
         const spotsNeeded = group.max_members - accepted.length;
