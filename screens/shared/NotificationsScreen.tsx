@@ -242,12 +242,26 @@ export const NotificationsScreen = () => {
         break;
       case 'pi_group_assembled':
       case 'pi_member_accepted':
-      case 'pi_group_confirmed':
       case 'pi_replacement_found':
         if (notification.data?.groupId) {
           (navigation as any).navigate('Groups', {
             screen: 'PiGroupInvite',
             params: { groupId: notification.data.groupId },
+          });
+        } else {
+          (navigation as any).navigate('Groups');
+        }
+        break;
+      case 'pi_group_confirmed':
+        if (notification.data?.groupId) {
+          (navigation as any).navigate('Groups', {
+            screen: 'PiGroupInvite',
+            params: { groupId: notification.data.groupId },
+          });
+        } else if (notification.data?.conversationId) {
+          (navigation as any).navigate('Groups', {
+            screen: 'Chat',
+            params: { conversationId: notification.data.conversationId },
           });
         } else {
           (navigation as any).navigate('Groups');

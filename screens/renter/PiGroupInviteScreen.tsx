@@ -77,35 +77,62 @@ export const PiGroupInviteScreen = () => {
     try {
       const groupId = route.params?.groupId;
 
-      let pendingInvite: PiAutoGroupMember | null = null;
+      let memberRecord: PiAutoGroupMember | null = null;
       if (groupId) {
         const { data } = await supabase
           .from('pi_auto_group_members')
           .select('*')
           .eq('user_id', user.id)
           .eq('group_id', groupId)
-          .eq('status', 'pending')
+          .in('status', ['pending', 'accepted'])
           .limit(1)
           .single();
-        pendingInvite = (data as PiAutoGroupMember) ?? null;
+        memberRecord = (data as PiAutoGroupMember) ?? null;
       }
 
-      if (!pendingInvite) {
-        pendingInvite = await getPendingGroupInvite(user.id);
+      if (!memberRecord) {
+        memberRecord = await getPendingGroupInvite(user.id);
       }
 
-      if (!pendingInvite) {
+      if (!memberRecord) {
         setInvite(null);
         setLoading(false);
         return;
       }
 
-      setInvite(pendingInvite);
+      if (memberRecord.status === 'accepted') {
+        const { data: autoGroup } = await supabase
+          .from('pi_auto_groups')
+          .select('status')
+          .eq('id', memberRecord.group_id)
+          .single();
+
+        if (autoGroup?.status === 'placed') {
+          const { data: realGroup } = await supabase
+            .from('groups')
+            .select('id')
+            .eq('pi_auto_group_id', memberRecord.group_id)
+            .limit(1)
+            .maybeSingle();
+
+          if (realGroup) {
+            navigation.replace('Chat', { conversationId: `group-${realGroup.id}` });
+            return;
+          }
+        }
+
+        setResponded(true);
+        setResponseAction('accepted');
+        setLoading(false);
+        return;
+      }
+
+      setInvite(memberRecord);
 
       const { data: groupData } = await supabase
         .from('pi_auto_groups')
         .select('*')
-        .eq('id', pendingInvite.group_id)
+        .eq('id', memberRecord.group_id)
         .single();
 
       if (groupData) {
@@ -118,7 +145,7 @@ export const PiGroupInviteScreen = () => {
         }
       }
 
-      const memberList = await getAutoGroupMembers(pendingInvite.group_id);
+      const memberList = await getAutoGroupMembers(memberRecord.group_id);
       setAllMembers(memberList);
       const otherMembers = memberList.filter(
         m => m.user_id !== user.id && (m.status === 'pending' || m.status === 'accepted')
