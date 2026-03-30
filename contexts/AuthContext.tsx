@@ -332,11 +332,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      const { data: userData } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', session.user.id)
-        .single();
+      const [userResult, profileResult, subscriptionResult] = await Promise.all([
+        supabase.from('users').select('*').eq('id', session.user.id).single(),
+        supabase.from('profiles').select('*').eq('user_id', session.user.id).single(),
+        supabase.from('subscriptions').select('*').eq('user_id', session.user.id).single(),
+      ]);
+
+      const userData = userResult.data;
 
       if (!userData) {
         setUser(null);
@@ -344,17 +346,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .single();
-
-      const { data: subscriptionData } = await supabase
-        .from('subscriptions')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .single();
+      const profileData = profileResult.data;
+      const subscriptionData = subscriptionResult.data;
 
       if (userData.onboarding_step === 'abandoned') {
         await supabase.from('users').update({ onboarding_step: 'profile' }).eq('id', session.user.id);
@@ -470,15 +463,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loadUser = async () => {
     try {
-      if (!isSupabaseConfigured) {
-        await loadUserFromStorage();
-        return;
-      }
+      await loadUserFromStorage();
+
+      if (!isSupabaseConfigured) return;
+
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        await loadUserFromSupabase(session);
-      } else {
-        await loadUserFromStorage();
+        loadUserFromSupabase(session).catch((err) => {
+          console.warn('[Auth] Background Supabase sync failed:', err);
+        });
       }
     } catch (error) {
       console.error('Error loading user:', error);

@@ -3,6 +3,8 @@ import { User, RoommateProfile, Property, Group, Conversation, Message, Match, A
 import { getDefaultHostSubscription } from './hostPricing';
 import { shouldLoadMockData } from './dataUtils';
 
+let _mockDataInitialized = false;
+
 const STORAGE_KEYS = {
   CURRENT_USER: '@rhome/current_user',
   USERS: '@rhome/users',
@@ -1087,8 +1089,10 @@ export const StorageService = {
 
   async initializeWithMockData(): Promise<void> {
     try {
+      if (_mockDataInitialized) return;
+
       if (!shouldLoadMockData()) {
-        console.log('[StorageService] Production mode — skipping mock data initialization');
+        _mockDataInitialized = true;
         return;
       }
 
@@ -1117,6 +1121,7 @@ export const StorageService = {
         }
         
         await AsyncStorage.setItem(STORAGE_KEYS.MOCK_DATA_VERSION, MOCK_DATA_VERSION);
+        _mockDataInitialized = true;
         console.log('[StorageService] ✓ Mock data reloaded due to version change');
         return;
       }
@@ -1129,6 +1134,7 @@ export const StorageService = {
       const hasWalkScores = existingProperties.length > 0 && existingProperties.every(p => p.walkScore !== undefined);
       
       if (existingProperties.length > 0 && existingProfiles.length > 0 && existingGroups.length > 0 && existingUsers.length > 0 && hasWalkScores) {
+        _mockDataInitialized = true;
         console.log('[StorageService] Data already initialized, skipping mock data load');
         return;
       }
@@ -1159,6 +1165,7 @@ export const StorageService = {
       }
       
       await AsyncStorage.setItem(STORAGE_KEYS.MOCK_DATA_VERSION, MOCK_DATA_VERSION);
+      _mockDataInitialized = true;
       console.log('[StorageService] Mock data initialization complete!');
     } catch (error) {
       console.error('Error initializing with mock data:', error);

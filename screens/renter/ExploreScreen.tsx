@@ -240,7 +240,12 @@ export const ExploreScreen = () => {
       setIsLoading(true);
       setError(null);
 
-      let usedSupabase = false;
+      await StorageService.initializeWithMockData();
+      const localProperties = await StorageService.getProperties();
+      setProperties(localProperties);
+      setFilteredProperties(localProperties);
+      setIsLoading(false);
+
       try {
         const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000));
         const supabaseListings = await Promise.race([
@@ -253,22 +258,13 @@ export const ExploreScreen = () => {
           setFilteredProperties(mapped);
           loadDiscoverableGroups(mapped);
           getAgentsWithCriticalStatus().then(setCriticalAgentIds).catch(() => {});
-          usedSupabase = true;
         }
       } catch (supabaseErr) {
-        console.warn('Supabase getListings failed, falling back to StorageService:', supabaseErr);
-      }
-
-      if (!usedSupabase) {
-        await StorageService.initializeWithMockData();
-        const allProperties = await StorageService.getProperties();
-        setProperties(allProperties);
-        setFilteredProperties(allProperties);
+        console.warn('Supabase getListings failed, using local data:', supabaseErr);
       }
     } catch (err) {
       setError('Failed to load properties');
       console.error('Error loading properties:', err);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -349,6 +345,19 @@ export const ExploreScreen = () => {
 
   const loadHostProfiles = async () => {
     try {
+      const users = await StorageService.getUsers();
+      const profileMap = new Map<string, User>();
+      users.forEach(u => {
+        if (u.role === 'host') {
+          profileMap.set(u.id, u);
+        }
+      });
+      setHostProfiles(profileMap);
+    } catch (err) {
+      console.error('Error loading host profiles:', err);
+    }
+
+    try {
       const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000));
       const { data: supaUsers } = await Promise.race([
         supabase
@@ -375,23 +384,9 @@ export const ExploreScreen = () => {
           profileMap.set(u.id, mapped as User);
         });
         setHostProfiles(profileMap);
-        return;
       }
     } catch (err) {
-      console.warn('[ExploreScreen] Supabase host profiles failed, falling back to StorageService:', err);
-    }
-
-    try {
-      const users = await StorageService.getUsers();
-      const profileMap = new Map<string, User>();
-      users.forEach(u => {
-        if (u.role === 'host') {
-          profileMap.set(u.id, u);
-        }
-      });
-      setHostProfiles(profileMap);
-    } catch (err) {
-      console.error('Error loading host profiles:', err);
+      console.warn('[ExploreScreen] Supabase host profiles sync skipped:', err);
     }
   };
 
