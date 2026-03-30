@@ -55,23 +55,32 @@ export default function MyGroupScreen() {
 
   const isLead = group?.group_lead_id === user?.id;
 
+  const [error, setError] = useState<string | null>(null);
+
   const loadData = useCallback(async () => {
-    setLoading(true);
-    const g = await getUserPreformedGroup();
-    setGroup(g);
-    if (g) {
-      const [m, s] = await Promise.all([
-        getGroupMembers(g.id),
-        getShortlist(g.id),
-      ]);
-      setMembers(m);
-      setShortlist(s);
-      setGroupName(g.name || '');
-      setOpenToRequests(g.open_to_requests ?? false);
-      const reqs = await getGroupRequests(g.id, 'preformed');
-      setPendingRequestCount(reqs.length);
+    try {
+      setLoading(true);
+      setError(null);
+      const g = await getUserPreformedGroup();
+      setGroup(g);
+      if (g) {
+        const [m, s] = await Promise.all([
+          getGroupMembers(g.id),
+          getShortlist(g.id),
+        ]);
+        setMembers(m);
+        setShortlist(s);
+        setGroupName(g.name || '');
+        setOpenToRequests(g.open_to_requests ?? false);
+        const reqs = await getGroupRequests(g.id, 'preformed');
+        setPendingRequestCount(reqs.length);
+      }
+    } catch (err) {
+      console.error('[MyGroupScreen] Failed to load group data:', err);
+      setError('Failed to load your group. Pull down to retry.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
@@ -171,6 +180,18 @@ export default function MyGroupScreen() {
     return (
       <View style={[styles.container, { paddingTop: insets.top + 60 }]}>
         <ActivityIndicator color="#fff" size="large" />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top + 60, alignItems: 'center', justifyContent: 'center' }]}>
+        <Feather name="alert-circle" size={48} color="#FF6B6B" />
+        <Text style={{ color: '#fff', fontSize: 16, marginTop: 16, textAlign: 'center', paddingHorizontal: 32 }}>{error}</Text>
+        <Pressable onPress={loadData} style={{ marginTop: 20, backgroundColor: '#22C55E', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 }}>
+          <Text style={{ color: '#fff', fontWeight: '600', fontSize: 15 }}>Try Again</Text>
+        </Pressable>
       </View>
     );
   }

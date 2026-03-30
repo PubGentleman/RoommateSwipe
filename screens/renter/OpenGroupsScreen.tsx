@@ -29,14 +29,23 @@ export default function OpenGroupsScreen() {
   const [groups, setGroups] = useState<OpenGroupListing[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [error, setError] = useState<string | null>(null);
+
   const loadGroups = useCallback(async () => {
     if (!user) return;
-    setLoading(true);
-    const data = await getOpenGroups(user.id, {
-      city: user.profileData?.city,
-    });
-    setGroups(data);
-    setLoading(false);
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await getOpenGroups(user.id, {
+        city: user.profileData?.city,
+      });
+      setGroups(data);
+    } catch (err) {
+      console.error('[OpenGroupsScreen] Failed to load open groups:', err);
+      setError('Failed to load groups. Pull down to retry.');
+    } finally {
+      setLoading(false);
+    }
   }, [user]);
 
   useFocusEffect(
@@ -187,6 +196,14 @@ export default function OpenGroupsScreen() {
       {loading ? (
         <View style={styles.centered}>
           <ActivityIndicator color={theme.primary} size="large" />
+        </View>
+      ) : error ? (
+        <View style={styles.centered}>
+          <Feather name="alert-circle" size={48} color="#FF6B6B" />
+          <Text style={[styles.emptyTitle, { color: theme.text, marginTop: 12 }]}>{error}</Text>
+          <Pressable onPress={loadGroups} style={{ marginTop: 16, backgroundColor: theme.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 }}>
+            <Text style={{ color: '#fff', fontWeight: '600', fontSize: 15 }}>Try Again</Text>
+          </Pressable>
         </View>
       ) : groups.length === 0 ? (
         <View style={styles.centered}>

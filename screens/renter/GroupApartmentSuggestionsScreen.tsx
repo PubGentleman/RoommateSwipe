@@ -55,23 +55,28 @@ export default function GroupApartmentSuggestionsScreen() {
     loadSuggestions();
   }, [groupId]);
 
+  const [suggestionsError, setSuggestionsError] = useState<string | null>(null);
+
   const loadSuggestions = async () => {
-    setLoading(true);
     try {
+      setLoading(true);
+      setSuggestionsError(null);
       if (isSupabaseConfigured) {
         await loadFromSupabase();
       } else {
         await loadFromLocal();
       }
     } catch (error) {
-      console.error('Error loading suggestions:', error);
+      console.error('[GroupApartmentSuggestions] Error loading suggestions:', error);
       try {
         await loadFromLocal();
       } catch (fallbackErr) {
-        console.error('Fallback also failed:', fallbackErr);
+        console.error('[GroupApartmentSuggestions] Fallback also failed:', fallbackErr);
+        setSuggestionsError('Failed to load suggestions. Pull down to retry.');
       }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const loadFromSupabase = async () => {
@@ -545,6 +550,18 @@ export default function GroupApartmentSuggestionsScreen() {
         <ThemedText style={{ color: '#888', marginTop: 12 }}>
           Finding apartments for your group...
         </ThemedText>
+      </View>
+    );
+  }
+
+  if (suggestionsError) {
+    return (
+      <View style={[styles.container, styles.center, { paddingTop: insets.top }]}>
+        <Feather name="alert-circle" size={48} color="#FF6B6B" />
+        <ThemedText style={{ color: '#888', marginTop: 12, textAlign: 'center', paddingHorizontal: 32 }}>{suggestionsError}</ThemedText>
+        <Pressable onPress={loadSuggestions} style={{ marginTop: 20, backgroundColor: CORAL, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 }}>
+          <Text style={{ color: '#fff', fontWeight: '600', fontSize: 15 }}>Try Again</Text>
+        </Pressable>
       </View>
     );
   }

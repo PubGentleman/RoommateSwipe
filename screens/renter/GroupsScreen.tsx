@@ -33,6 +33,7 @@ import { useConfirm } from '../../contexts/ConfirmContext';
 import { AIGroupSuggestionCard } from '../../components/AIGroupSuggestionCard';
 import { getPendingAutoGroupCount, isAutoMatchEnabled } from '../../services/piAutoMatchService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { withTimeout } from '../../utils/queryTimeout';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - Spacing.xxl;
@@ -189,11 +190,14 @@ export const GroupsScreen = () => {
       let otherGroups: Group[] = [];
       
       try {
-        const [supabaseGroups, supabaseMyGroups, supabaseInquiryGroups] = await Promise.all([
-          getGroupsFromSupabase(activeCity || undefined, 'roommate'),
-          getMyGroupsFromSupabase('roommate'),
-          getMyInquiryGroupsFromSupabase(),
-        ]);
+        const [supabaseGroups, supabaseMyGroups, supabaseInquiryGroups] = await withTimeout(
+          Promise.all([
+            getGroupsFromSupabase(activeCity || undefined, 'roommate'),
+            getMyGroupsFromSupabase('roommate'),
+            getMyInquiryGroupsFromSupabase(),
+          ]),
+          15000
+        );
         const myGroupIds = new Set((supabaseMyGroups || []).map((g: any) => g.id));
         const mapGroup = (g: any): Group & { listingPhoto?: string } => ({
           id: g.id,
