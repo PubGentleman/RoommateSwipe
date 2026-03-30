@@ -462,6 +462,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } catch {}
     }
+    if (currentUser?.profileData?.apartment_search_type) {
+      await StorageService.setCurrentUser(currentUser);
+    }
     if (currentUser) {
       if (currentUser.messageCount === undefined) {
         currentUser.messageCount = 0;
@@ -583,7 +586,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (data.user) {
       try {
         await supabase.from('profiles').upsert(
-          { user_id: data.user.id },
+          {
+            user_id: data.user.id,
+            budget_min: 0,
+            budget_max: 0,
+            cleanliness: 3,
+            noise_tolerance: 3,
+            sleep_schedule: 'flexible',
+            smoking: 'no',
+            pets: 'no_pets',
+            drinking: 'sometimes',
+            guests: 'sometimes',
+          },
           { onConflict: 'user_id', ignoreDuplicates: true }
         );
       } catch (profileErr) {

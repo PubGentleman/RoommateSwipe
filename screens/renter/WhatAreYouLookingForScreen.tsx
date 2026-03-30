@@ -8,7 +8,6 @@ import {
   Dimensions,
   Text,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '../../components/VectorIcons';
@@ -56,6 +55,11 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
   const [intent, setIntent] = useState<RenterIntent | null>(initialIntent || null);
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const slideAnim = useRef(new Animated.Value(0)).current;
+  const [confirmAction, setConfirmAction] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
 
   const animateForward = useCallback((cb: () => void) => {
     Animated.timing(slideAnim, {
@@ -97,6 +101,7 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
 
   const doSave = async (listingPref: 'room' | 'entire_apartment' | 'any', searchType: 'solo' | 'with_partner' | 'with_roommates' | 'have_group', skipComplete?: boolean) => {
     if (!user) return;
+    setSaving(true);
 
     updateProfile({
       listing_type_preference: listingPref,
@@ -118,14 +123,16 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
           apartment_search_type: searchType,
         },
       });
+      setSaving(false);
       if (!skipComplete) onComplete();
     } catch (err) {
       console.error('Failed to update local user state:', err);
-      Alert.alert(
-        'Something went wrong',
-        'Could not save your preference. Please try again.',
-        [{ text: 'OK' }]
-      );
+      setSaving(false);
+      setConfirmAction({
+        title: 'Something went wrong',
+        message: 'Could not save your preference. Please try again.',
+        onConfirm: () => setConfirmAction(null),
+      });
     }
   };
 
@@ -141,29 +148,23 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
     const wasGroup = currentSearch === 'have_group';
 
     if (wasMatching && !willMatch) {
-      Alert.alert(
-        'Leave Roommate Matching?',
-        'This will remove you from roommate matching and Pi auto-groups. Continue?',
-        [
-          { text: 'Cancel', style: 'cancel', onPress: () => setSaving(false) },
-          { text: 'Continue', onPress: () => doSave(listingPref, searchType) },
-        ],
-      );
+      setConfirmAction({
+        title: 'Leave Roommate Matching?',
+        message: 'This will remove you from roommate matching and Pi auto-groups. Continue?',
+        onConfirm: () => { setConfirmAction(null); doSave(listingPref, searchType); },
+      });
     } else if (wasGroup) {
-      Alert.alert(
-        'Leave Your Group?',
-        'Changing your search intent will remove you from your current group. Continue?',
-        [
-          { text: 'Cancel', style: 'cancel', onPress: () => setSaving(false) },
-          { text: 'Continue', onPress: () => doSave(listingPref, searchType) },
-        ],
-      );
+      setConfirmAction({
+        title: 'Leave Your Group?',
+        message: 'Changing your search intent will remove you from your current group. Continue?',
+        onConfirm: () => { setConfirmAction(null); doSave(listingPref, searchType); },
+      });
     } else if (!wasMatching && willMatch) {
-      Alert.alert(
-        'Join Roommate Matching',
-        'You\'ll be added to the roommate matching pool. Pi will start looking for your ideal roommates!',
-        [{ text: 'Let\'s Go', onPress: () => doSave(listingPref, searchType) }],
-      );
+      setConfirmAction({
+        title: 'Join Roommate Matching',
+        message: "You'll be added to the roommate matching pool. Pi will start looking for your ideal roommates!",
+        onConfirm: () => { setConfirmAction(null); doSave(listingPref, searchType); },
+      });
     } else {
       doSave(listingPref, searchType);
     }
@@ -299,6 +300,28 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
           ) : null}
         </View>
       </Animated.View>
+      {confirmAction ? (
+        <View style={styles.confirmOverlay}>
+          <View style={styles.confirmBox}>
+            <Text style={styles.confirmTitle}>{confirmAction.title}</Text>
+            <Text style={styles.confirmMessage}>{confirmAction.message}</Text>
+            <View style={styles.confirmButtons}>
+              <Pressable
+                style={styles.confirmCancelBtn}
+                onPress={() => setConfirmAction(null)}
+              >
+                <Text style={styles.confirmCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={styles.confirmOkBtn}
+                onPress={confirmAction.onConfirm}
+              >
+                <Text style={styles.confirmOkText}>Continue</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -419,5 +442,62 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.3)',
     borderRadius: 18,
+  },
+  confirmOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 100,
+  },
+  confirmBox: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    padding: 24,
+    marginHorizontal: 32,
+    width: '85%',
+    maxWidth: 340,
+  },
+  confirmTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  confirmMessage: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.6)',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  confirmButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  confirmCancelBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+  },
+  confirmCancelText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.6)',
+  },
+  confirmOkBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: '#ff6b5b',
+    alignItems: 'center',
+  },
+  confirmOkText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });
