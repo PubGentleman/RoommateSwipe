@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Image, Platform } from 'react-native';
 import { ThemedText } from './ThemedText';
 import { useTheme } from '../hooks/useTheme';
@@ -181,6 +181,8 @@ export const PropertyMapView = ({
     });
   }, [propertiesWithCoords, hostProfiles, currentUser, saved]);
 
+  const [mapError, setMapError] = useState(false);
+
   if (Platform.OS === 'web') {
     const htmlContent = buildLeafletHtml(
       mapMarkers,
@@ -223,16 +225,38 @@ export const PropertyMapView = ({
   }
 
   const MapView = require('react-native-maps').default;
-  const { Marker, Callout } = require('react-native-maps');
+  const { Marker, Callout, PROVIDER_GOOGLE } = require('react-native-maps');
+
+  if (mapError) {
+    return (
+      <View style={[styles.mapContainer, styles.mapErrorContainer]}>
+        <Feather name="map-pin" size={40} color="rgba(255,255,255,0.2)" />
+        <Text style={styles.mapErrorText}>Map couldn't load</Text>
+        <Text style={styles.mapErrorSubtext}>Check your connection and try again</Text>
+        <Pressable
+          onPress={() => setMapError(false)}
+          style={styles.mapRetryBtn}
+        >
+          <Text style={styles.mapRetryText}>Retry</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.mapContainer}>
       <MapView
+        provider={PROVIDER_GOOGLE}
         style={styles.map}
         initialRegion={initialRegion}
         showsUserLocation={false}
         showsCompass={true}
         showsScale={true}
+        onMapReady={() => console.log('[PropertyMapView] Map loaded successfully')}
+        onError={(e: { nativeEvent?: { error?: string } }) => {
+          console.error('[PropertyMapView] Map failed to load:', e.nativeEvent?.error || e);
+          setMapError(true);
+        }}
       >
         {propertiesWithCoords.map(property => {
           const hostUser = property.hostProfileId ? hostProfiles.get(property.hostProfileId) : null;
@@ -448,5 +472,35 @@ const styles = StyleSheet.create({
   },
   pinTipSaved: {
     borderTopColor: '#EF4444',
+  },
+  mapErrorContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#111',
+  },
+  mapErrorText: {
+    color: 'rgba(255,255,255,0.5)',
+    marginTop: 12,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  mapErrorSubtext: {
+    color: 'rgba(255,255,255,0.3)',
+    marginTop: 4,
+    fontSize: 13,
+  },
+  mapRetryBtn: {
+    marginTop: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  mapRetryText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
