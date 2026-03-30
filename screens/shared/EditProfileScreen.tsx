@@ -76,6 +76,11 @@ export const EditProfileScreen = () => {
   const [idealRoommateText, setIdealRoommateText] = useState(user?.profileData?.ideal_roommate_text || user?.ideal_roommate_text || '');
   const [isSaving, setIsSaving] = useState(false);
 
+  const [desiredRoommateCount, setDesiredRoommateCount] = useState<number>(user?.profileData?.desired_roommate_count || user?.desired_roommate_count || 1);
+  const [desiredBedroomCount, setDesiredBedroomCount] = useState<number>(user?.profileData?.desired_bedroom_count || user?.desired_bedroom_count || 2);
+  const [householdGenderPref, setHouseholdGenderPref] = useState<'any' | 'male_only' | 'female_only' | 'same_gender'>(user?.profileData?.household_gender_preference || user?.household_gender_preference || 'any');
+  const [piAutoMatchEnabled, setPiAutoMatchEnabled] = useState<boolean>(user?.profileData?.pi_auto_match_enabled ?? user?.pi_auto_match_enabled ?? true);
+
   const pickImage = async () => {
     if (photos.length >= 6) {
       await alert({ title: 'Maximum Reached', message: 'You can upload up to 6 photos', variant: 'info' });
@@ -236,6 +241,10 @@ export const EditProfileScreen = () => {
         profile_note: profileNote.trim() || null,
         profile_note_updated_at: profileNote.trim() ? new Date().toISOString() : null,
         ideal_roommate_text: idealRoommateText.trim() || null,
+        desired_roommate_count: desiredRoommateCount,
+        desired_bedroom_count: desiredBedroomCount,
+        household_gender_preference: householdGenderPref,
+        pi_auto_match_enabled: piAutoMatchEnabled,
       });
 
       console.log('[EditProfileScreen] Supabase profile updated successfully');
@@ -260,6 +269,10 @@ export const EditProfileScreen = () => {
         gender,
         profileNote: profileNote.trim() || undefined,
         ideal_roommate_text: idealRoommateText.trim() || undefined,
+        desired_roommate_count: desiredRoommateCount,
+        desired_bedroom_count: desiredBedroomCount,
+        household_gender_preference: householdGenderPref,
+        pi_auto_match_enabled: piAutoMatchEnabled,
         preferences: {
           sleepSchedule,
           cleanliness,
@@ -894,6 +907,77 @@ export const EditProfileScreen = () => {
             </View>
           </View>
 
+        </View>
+
+        {/* Roommate Matching */}
+        <View style={styles.section}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: Spacing.xs }}>
+            <Feather name="cpu" size={18} color="#a855f7" />
+            <ThemedText style={[Typography.h3]}>Roommate Matching</ThemedText>
+          </View>
+          <ThemedText style={[Typography.small, { color: theme.textSecondary, marginBottom: Spacing.lg }]}>
+            Pi uses these to find your ideal roommate group
+          </ThemedText>
+
+          <View style={styles.inputGroup}>
+            <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
+              How many roommates are you looking for?
+            </ThemedText>
+            <View style={styles.optionsRow}>
+              <OptionButton label="1" value="1" isSelected={desiredRoommateCount === 1} onPress={() => setDesiredRoommateCount(1)} />
+              <OptionButton label="2" value="2" isSelected={desiredRoommateCount === 2} onPress={() => setDesiredRoommateCount(2)} />
+              <OptionButton label="3" value="3" isSelected={desiredRoommateCount === 3} onPress={() => setDesiredRoommateCount(3)} />
+              <OptionButton label="4+" value="4" isSelected={desiredRoommateCount >= 4} onPress={() => setDesiredRoommateCount(4)} />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
+              How many bedrooms do you need?
+            </ThemedText>
+            <View style={styles.optionsRow}>
+              <OptionButton label="1" value="1" isSelected={desiredBedroomCount === 1} onPress={() => setDesiredBedroomCount(1)} />
+              <OptionButton label="2" value="2" isSelected={desiredBedroomCount === 2} onPress={() => setDesiredBedroomCount(2)} />
+              <OptionButton label="3" value="3" isSelected={desiredBedroomCount === 3} onPress={() => setDesiredBedroomCount(3)} />
+              <OptionButton label="4+" value="4" isSelected={desiredBedroomCount >= 4} onPress={() => setDesiredBedroomCount(4)} />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <ThemedText style={[Typography.body, { marginBottom: Spacing.sm }]}>
+              Household gender preference
+            </ThemedText>
+            <View style={styles.optionsRow}>
+              <OptionButton label="No Preference" value="any" isSelected={householdGenderPref === 'any'} onPress={() => setHouseholdGenderPref('any')} />
+              <OptionButton label="Male Only" value="male_only" isSelected={householdGenderPref === 'male_only'} onPress={() => setHouseholdGenderPref('male_only')} />
+              <OptionButton label="Female Only" value="female_only" isSelected={householdGenderPref === 'female_only'} onPress={() => setHouseholdGenderPref('female_only')} />
+              <OptionButton label="Same Gender" value="same_gender" isSelected={householdGenderPref === 'same_gender'} onPress={() => setHouseholdGenderPref('same_gender')} />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Pressable
+              onPress={() => setPiAutoMatchEnabled(!piAutoMatchEnabled)}
+              style={[
+                styles.toggleButton,
+                {
+                  backgroundColor: piAutoMatchEnabled ? '#a855f7' : theme.backgroundSecondary,
+                  borderColor: piAutoMatchEnabled ? '#a855f7' : theme.border,
+                }
+              ]}
+            >
+              <Feather name="cpu" size={20} color={piAutoMatchEnabled ? '#FFFFFF' : theme.textSecondary} />
+              <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                <ThemedText style={[Typography.body, { color: piAutoMatchEnabled ? '#FFFFFF' : theme.text, fontWeight: piAutoMatchEnabled ? '600' : '400' }]}>
+                  Pi Auto-Match
+                </ThemedText>
+                <ThemedText style={[Typography.caption, { color: piAutoMatchEnabled ? 'rgba(255,255,255,0.7)' : theme.textSecondary, marginTop: 2 }]}>
+                  Let Pi automatically find compatible roommates
+                </ThemedText>
+              </View>
+              <Feather name={piAutoMatchEnabled ? 'check-circle' : 'circle'} size={20} color={piAutoMatchEnabled ? '#FFFFFF' : theme.textSecondary} />
+            </Pressable>
+          </View>
         </View>
 
         {/* Shared Expenses */}

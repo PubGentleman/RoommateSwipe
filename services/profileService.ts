@@ -28,6 +28,10 @@ export interface ProfileData {
   zip_code?: string;
   ideal_roommate_text?: string;
   pi_parsed_preferences?: Record<string, any>;
+  desired_roommate_count?: number;
+  desired_bedroom_count?: number;
+  household_gender_preference?: 'any' | 'male_only' | 'female_only' | 'same_gender';
+  pi_auto_match_enabled?: boolean;
 }
 
 export interface UserData {
@@ -158,6 +162,8 @@ const MATCHING_FIELDS: (keyof ProfileData)[] = [
   'sleep_schedule', 'pets', 'smoking', 'drinking', 'guests',
   'interests', 'preferred_neighborhoods', 'zip_code',
   'coordinates', 'ideal_roommate_text',
+  'desired_roommate_count', 'desired_bedroom_count',
+  'household_gender_preference', 'pi_auto_match_enabled',
 ];
 
 function hasMatchingFieldChanges(updates: ProfileData): boolean {

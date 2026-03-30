@@ -268,6 +268,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         pi_parsed_preferences: profile.pi_parsed_preferences || undefined,
         instagram_verified: profile.instagram_verified || false,
         instagram_handle: profile.instagram_handle || undefined,
+        desired_roommate_count: profile.desired_roommate_count ?? undefined,
+        desired_bedroom_count: profile.desired_bedroom_count ?? undefined,
+        household_gender_preference: profile.household_gender_preference || undefined,
+        pi_auto_match_enabled: profile.pi_auto_match_enabled ?? undefined,
       } : {
         neighborhood: supabaseUser.neighborhood || 'Williamsburg',
         city: supabaseUser.city || 'New York',
@@ -310,6 +314,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       activeMode: profile?.active_mode || 'renter',
       hasCompletedHostOnboarding: profile?.has_completed_host_onboarding || false,
       agentPlan: supabaseUser.agent_plan || 'pay_per_use',
+      desired_roommate_count: profile?.desired_roommate_count ?? undefined,
+      desired_bedroom_count: profile?.desired_bedroom_count ?? undefined,
+      household_gender_preference: profile?.household_gender_preference || undefined,
+      pi_auto_match_enabled: profile?.pi_auto_match_enabled ?? undefined,
+      pi_last_match_attempt: profile?.pi_last_match_attempt || undefined,
     };
   };
 

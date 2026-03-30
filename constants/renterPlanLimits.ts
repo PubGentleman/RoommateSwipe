@@ -1,5 +1,7 @@
 export type RenterPlan = 'free' | 'plus' | 'elite';
 
+export type AutoMatchPriority = 'standard' | 'priority' | 'highest';
+
 export interface RenterPlanLimits {
   plan: RenterPlan;
   label: string;
@@ -26,6 +28,8 @@ export interface RenterPlanLimits {
   piMessagesPerDay: number;
   piInsightLevel: 'summary' | 'highlights' | 'full';
   hasPiDeckReranking: boolean;
+  maxPendingAutoGroups: number;
+  autoMatchPriority: AutoMatchPriority;
 }
 
 export const RENTER_PLAN_LIMITS: Record<RenterPlan, RenterPlanLimits> = {
@@ -55,6 +59,8 @@ export const RENTER_PLAN_LIMITS: Record<RenterPlan, RenterPlanLimits> = {
     piMessagesPerDay: 5,
     piInsightLevel: 'summary',
     hasPiDeckReranking: false,
+    maxPendingAutoGroups: 1,
+    autoMatchPriority: 'standard',
   },
   plus: {
     plan: 'plus',
@@ -82,6 +88,8 @@ export const RENTER_PLAN_LIMITS: Record<RenterPlan, RenterPlanLimits> = {
     piMessagesPerDay: 50,
     piInsightLevel: 'highlights',
     hasPiDeckReranking: true,
+    maxPendingAutoGroups: 2,
+    autoMatchPriority: 'priority',
   },
   elite: {
     plan: 'elite',
@@ -109,6 +117,8 @@ export const RENTER_PLAN_LIMITS: Record<RenterPlan, RenterPlanLimits> = {
     piMessagesPerDay: 200,
     piInsightLevel: 'full',
     hasPiDeckReranking: true,
+    maxPendingAutoGroups: 3,
+    autoMatchPriority: 'highest',
   },
 };
 

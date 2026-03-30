@@ -526,6 +526,11 @@ export interface User {
   zip_code?: string;
   ideal_roommate_text?: string;
   pi_parsed_preferences?: PiParsedPreferences;
+  desired_roommate_count?: number;
+  desired_bedroom_count?: number;
+  household_gender_preference?: GenderPreference;
+  pi_auto_match_enabled?: boolean;
+  pi_last_match_attempt?: string;
   profileData?: {
     bio?: string;
     budget?: number;
@@ -568,6 +573,10 @@ export interface User {
       };
     };
     profileNote?: string;
+    desired_roommate_count?: number;
+    desired_bedroom_count?: number;
+    household_gender_preference?: GenderPreference;
+    pi_auto_match_enabled?: boolean;
   };
   personalityAnswers?: Record<string, string>;
   references?: Reference[];
@@ -763,7 +772,7 @@ export interface PiHostRecommendation {
   expires_at: string;
 }
 
-export type PiFeature = 'match_insight' | 'deck_rerank' | 'parse_preferences' | 'host_matchmaker';
+export type PiFeature = 'match_insight' | 'deck_rerank' | 'parse_preferences' | 'host_matchmaker' | 'auto_match';
 
 export interface PiUsageLog {
   id: string;
@@ -772,4 +781,58 @@ export interface PiUsageLog {
   tokens_used: number;
   model_used?: string;
   created_at: string;
+}
+
+export type GenderPreference = 'any' | 'male_only' | 'female_only' | 'same_gender';
+
+export type PiAutoMatchStatus = 'forming' | 'ready' | 'invited' | 'claimed' | 'placed' | 'expired' | 'dissolved';
+
+export interface PiAutoGroup {
+  id: string;
+  status: PiAutoMatchStatus;
+  match_score: number;
+  member_count: number;
+  max_members: number;
+  desired_bedrooms: number;
+  budget_min: number;
+  budget_max: number;
+  city?: string;
+  state?: string;
+  neighborhoods?: string[];
+  gender_composition?: string;
+  move_in_window_start?: string;
+  move_in_window_end?: string;
+  pi_rationale?: string;
+  model_used?: string;
+  created_at: string;
+  ready_at?: string;
+  expires_at?: string;
+  dissolved_at?: string;
+}
+
+export interface PiAutoGroupMember {
+  id: string;
+  group_id: string;
+  user_id: string;
+  role: 'member' | 'anchor';
+  compatibility_score?: number;
+  pi_reason?: string;
+  invited_at: string;
+  accepted_at?: string;
+  declined_at?: string;
+  status: 'pending' | 'accepted' | 'declined' | 'left';
+}
+
+export interface PiGroupClaim {
+  id: string;
+  group_id: string;
+  host_id: string;
+  listing_id: string;
+  status: 'pending' | 'accepted' | 'expired' | 'withdrawn';
+  claim_price_cents: number;
+  is_free_claim: boolean;
+  message?: string;
+  created_at: string;
+  responded_at?: string;
+  expires_at: string;
 }

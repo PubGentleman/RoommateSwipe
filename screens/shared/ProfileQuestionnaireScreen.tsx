@@ -46,7 +46,7 @@ import { getCoordinatesFromNeighborhood } from '../../utils/locationData';
 import { BOROUGH_NEIGHBORHOODS } from '../../constants/transitData';
 import { updateProfile } from '../../services/profileService';
 
-const TOTAL_STEPS = 11;
+const TOTAL_STEPS = 12;
 
 function EmojiTileGrid({
   options,
@@ -268,6 +268,7 @@ type StepId =
   | 'smokingPets'
   | 'lifestyle'
   | 'housing'
+  | 'roommateSetup'
   | 'interests'
   | 'personality'
   | 'profileNote'
@@ -282,6 +283,7 @@ const STEP_ORDER: StepId[] = [
   'smokingPets',
   'lifestyle',
   'housing',
+  'roommateSetup',
   'interests',
   'personality',
   'profileNote',
@@ -305,6 +307,7 @@ const STEP_TITLES: Record<StepId, string> = {
   smokingPets: 'Smoking & Pets',
   lifestyle: 'Your Lifestyle',
   housing: 'Housing Needs',
+  roommateSetup: 'Roommate Preferences',
   interests: 'Interests',
   personality: 'Your Living Style',
   profileNote: 'In Your Own Words',
@@ -320,6 +323,7 @@ const STEP_SUBTITLES: Record<StepId, string> = {
   smokingPets: 'Hard preferences \u2014 we use these to filter your matches.',
   lifestyle: 'How you actually live day-to-day.',
   housing: 'What you need in your next place.',
+  roommateSetup: 'Help Pi find your ideal roommate group.',
   interests: 'Pick at least 1 tag from each category.',
   personality: 'How you live with others.',
   profileNote: 'Write anything you want potential roommates to know about you.',
@@ -335,6 +339,7 @@ const STEP_ICONS: Record<StepId, keyof typeof Feather.glyphMap> = {
   smokingPets: 'wind',
   lifestyle: 'users',
   housing: 'home',
+  roommateSetup: 'users',
   interests: 'star',
   personality: 'cpu',
   profileNote: 'edit-3',
@@ -424,6 +429,11 @@ export const ProfileQuestionnaireScreen = () => {
   const idealRoommateTextRef = React.useRef(idealRoommateText);
   React.useEffect(() => { idealRoommateTextRef.current = idealRoommateText; }, [idealRoommateText]);
   const idealRoommateCharLimit = 500;
+
+  const [desiredRoommateCount, setDesiredRoommateCount] = useState<number>(user?.profileData?.desired_roommate_count || user?.desired_roommate_count || 1);
+  const [desiredBedroomCount, setDesiredBedroomCount] = useState<number>(user?.profileData?.desired_bedroom_count || user?.desired_bedroom_count || 2);
+  const [householdGenderPref, setHouseholdGenderPref] = useState<'any' | 'male_only' | 'female_only' | 'same_gender'>(user?.profileData?.household_gender_preference || user?.household_gender_preference || 'any');
+  const [piAutoMatchEnabled, setPiAutoMatchEnabled] = useState<boolean>(user?.profileData?.pi_auto_match_enabled ?? user?.pi_auto_match_enabled ?? true);
 
   useEffect(() => {
     if (user?.photos && user.photos.length > 0) {
@@ -580,6 +590,10 @@ export const ProfileQuestionnaireScreen = () => {
         personalityAnswers: Object.keys(personalityAnswers).length > 0 ? personalityAnswers : undefined,
         profileNote: profileNote.trim() || undefined,
         ideal_roommate_text: idealRoommateTextRef.current.trim() || undefined,
+        desired_roommate_count: desiredRoommateCount,
+        desired_bedroom_count: desiredBedroomCount,
+        household_gender_preference: householdGenderPref,
+        pi_auto_match_enabled: piAutoMatchEnabled,
         preferences: {
           sleepSchedule,
           cleanliness,
@@ -646,6 +660,10 @@ export const ProfileQuestionnaireScreen = () => {
         preferred_neighborhoods: preferredNeighborhoods.length > 0 ? preferredNeighborhoods : undefined,
         zip_code: zipCode.trim() || undefined,
         ideal_roommate_text: idealRoommateTextRef.current.trim() || undefined,
+        desired_roommate_count: desiredRoommateCount,
+        desired_bedroom_count: desiredBedroomCount,
+        household_gender_preference: householdGenderPref,
+        pi_auto_match_enabled: piAutoMatchEnabled,
       });
     } catch (e) {
       console.warn('[ProfileQuestionnaire] Profile sync failed:', e);
@@ -1075,6 +1093,77 @@ export const ProfileQuestionnaireScreen = () => {
                 />
               </>
             ) : null}
+          </View>
+        );
+
+      case 'roommateSetup':
+        return (
+          <View style={styles.stepInner}>
+            <ThemedText style={[styles.inputLabel, { marginBottom: 10 }]}>How many roommates?</ThemedText>
+            <EmojiTileGrid
+              options={[
+                { value: '1', emoji: '\uD83D\uDC64', label: '1 Roommate', subtitle: '2 people total' },
+                { value: '2', emoji: '\uD83D\uDC65', label: '2 Roommates', subtitle: '3 people total' },
+                { value: '3', emoji: '\uD83D\uDC6A', label: '3 Roommates', subtitle: '4 people total' },
+                { value: '4', emoji: '\uD83C\uDFE0', label: '4+ Roommates', subtitle: '5+ people total' },
+              ]}
+              selected={String(desiredRoommateCount)}
+              onSelect={(v) => setDesiredRoommateCount(parseInt(v))}
+            />
+
+            <View style={{ height: 28 }} />
+
+            <ThemedText style={[styles.inputLabel, { marginBottom: 10 }]}>How many bedrooms?</ThemedText>
+            <EmojiTileGrid
+              options={[
+                { value: '1', emoji: '\uD83D\uDECF\uFE0F', label: '1 Bedroom' },
+                { value: '2', emoji: '\uD83D\uDECF\uFE0F', label: '2 Bedrooms' },
+                { value: '3', emoji: '\uD83D\uDECF\uFE0F', label: '3 Bedrooms' },
+                { value: '4', emoji: '\uD83D\uDECF\uFE0F', label: '4+ Bedrooms' },
+              ]}
+              selected={String(desiredBedroomCount)}
+              onSelect={(v) => setDesiredBedroomCount(parseInt(v))}
+            />
+
+            <View style={{ height: 28 }} />
+
+            <ThemedText style={[styles.inputLabel, { marginBottom: 10 }]}>Household gender preference</ThemedText>
+            <EmojiTileGrid
+              options={[
+                { value: 'any', emoji: '\uD83C\uDF0D', label: 'No Preference', subtitle: 'Open to anyone' },
+                { value: 'male_only', emoji: '\uD83D\uDC68', label: 'Male Only' },
+                { value: 'female_only', emoji: '\uD83D\uDC69', label: 'Female Only' },
+                { value: 'same_gender', emoji: '\uD83E\uDD1D', label: 'Same Gender', subtitle: 'Match my gender' },
+              ]}
+              selected={householdGenderPref}
+              onSelect={(v) => setHouseholdGenderPref(v as any)}
+            />
+
+            <View style={{ height: 28 }} />
+
+            <Pressable
+              onPress={() => setPiAutoMatchEnabled(!piAutoMatchEnabled)}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                padding: 16,
+                backgroundColor: piAutoMatchEnabled ? theme.primary + '20' : theme.backgroundSecondary,
+                borderWidth: 2,
+                borderColor: piAutoMatchEnabled ? theme.primary : theme.border,
+                borderRadius: 14,
+                gap: 12,
+              }}
+            >
+              <Feather name={piAutoMatchEnabled ? 'check-circle' : 'circle'} size={22} color={piAutoMatchEnabled ? theme.primary : theme.textSecondary} />
+              <View style={{ flex: 1 }}>
+                <ThemedText style={{ fontSize: 15, fontWeight: '600', color: piAutoMatchEnabled ? theme.primary : theme.text }}>
+                  Pi Auto-Match
+                </ThemedText>
+                <ThemedText style={{ fontSize: 12, color: theme.textSecondary, marginTop: 2 }}>
+                  Let Pi automatically find compatible roommates for you
+                </ThemedText>
+              </View>
+            </Pressable>
           </View>
         );
 

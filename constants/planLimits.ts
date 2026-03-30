@@ -20,6 +20,8 @@ export interface PlanLimits {
   freeBoostsPerMonth: number;
   simultaneousBoosts: number;
   piCallsPerMonth: number;
+  freeAutoClaimsPerMonth: number;
+  extraClaimPriceCents: number;
 }
 
 export const PLAN_LIMITS: Record<HostPlan, PlanLimits> = {
@@ -43,6 +45,8 @@ export const PLAN_LIMITS: Record<HostPlan, PlanLimits> = {
     freeBoostsPerMonth: 0,
     simultaneousBoosts: 0,
     piCallsPerMonth: 5,
+    freeAutoClaimsPerMonth: 0,
+    extraClaimPriceCents: 0,
   },
   none: {
     plan: 'none',
@@ -64,6 +68,8 @@ export const PLAN_LIMITS: Record<HostPlan, PlanLimits> = {
     freeBoostsPerMonth: 0,
     simultaneousBoosts: 0,
     piCallsPerMonth: 5,
+    freeAutoClaimsPerMonth: 0,
+    extraClaimPriceCents: 0,
   },
   starter: {
     plan: 'starter',
@@ -85,6 +91,8 @@ export const PLAN_LIMITS: Record<HostPlan, PlanLimits> = {
     freeBoostsPerMonth: 1,
     simultaneousBoosts: 1,
     piCallsPerMonth: 30,
+    freeAutoClaimsPerMonth: 0,
+    extraClaimPriceCents: 0,
   },
   pro: {
     plan: 'pro',
@@ -106,6 +114,8 @@ export const PLAN_LIMITS: Record<HostPlan, PlanLimits> = {
     freeBoostsPerMonth: 1,
     simultaneousBoosts: 3,
     piCallsPerMonth: 100,
+    freeAutoClaimsPerMonth: 0,
+    extraClaimPriceCents: 0,
   },
   business: {
     plan: 'business',
@@ -127,6 +137,8 @@ export const PLAN_LIMITS: Record<HostPlan, PlanLimits> = {
     freeBoostsPerMonth: 2,
     simultaneousBoosts: 10,
     piCallsPerMonth: 200,
+    freeAutoClaimsPerMonth: 0,
+    extraClaimPriceCents: 0,
   },
 };
 
@@ -164,6 +176,8 @@ export interface AgentPlanLimits {
   hasClientManagement: boolean;
   teamSeats: number;
   piCallsPerMonth: number;
+  freeAutoClaimsPerMonth: number;
+  extraClaimPriceCents: number;
 }
 
 const _agentBase = {
@@ -185,6 +199,8 @@ const _agentBase = {
     hasClientManagement: false,
     teamSeats: 1,
     piCallsPerMonth: 20,
+    freeAutoClaimsPerMonth: 0,
+    extraClaimPriceCents: 2500,
   },
   starter: {
     plan: 'starter' as AgentPlan,
@@ -204,6 +220,8 @@ const _agentBase = {
     hasClientManagement: true,
     teamSeats: 1,
     piCallsPerMonth: 100,
+    freeAutoClaimsPerMonth: 3,
+    extraClaimPriceCents: 2000,
   },
   pro: {
     plan: 'pro' as AgentPlan,
@@ -223,6 +241,8 @@ const _agentBase = {
     hasClientManagement: true,
     teamSeats: 1,
     piCallsPerMonth: 200,
+    freeAutoClaimsPerMonth: 10,
+    extraClaimPriceCents: 1500,
   },
   business: {
     plan: 'business' as AgentPlan,
@@ -242,6 +262,8 @@ const _agentBase = {
     hasClientManagement: true,
     teamSeats: 5,
     piCallsPerMonth: 500,
+    freeAutoClaimsPerMonth: 25,
+    extraClaimPriceCents: 1000,
   },
 };
 
@@ -293,17 +315,34 @@ export interface CompanyPlanLimits {
   plan: CompanyPlan;
   label: string;
   piCallsPerMonth: number;
+  freeAutoClaimsPerMonth: number;
+  extraClaimPriceCents: number;
 }
 
 export const COMPANY_PI_LIMITS: Record<CompanyPlan, CompanyPlanLimits> = {
-  starter: { plan: 'starter', label: 'Company Starter', piCallsPerMonth: 200 },
-  pro: { plan: 'pro', label: 'Company Pro', piCallsPerMonth: 500 },
-  enterprise: { plan: 'enterprise', label: 'Company Enterprise', piCallsPerMonth: -1 },
+  starter: { plan: 'starter', label: 'Company Starter', piCallsPerMonth: 200, freeAutoClaimsPerMonth: 10, extraClaimPriceCents: 2000 },
+  pro: { plan: 'pro', label: 'Company Pro', piCallsPerMonth: 500, freeAutoClaimsPerMonth: 30, extraClaimPriceCents: 1000 },
+  enterprise: { plan: 'enterprise', label: 'Company Enterprise', piCallsPerMonth: -1, freeAutoClaimsPerMonth: -1, extraClaimPriceCents: 0 },
 };
 
 export function getCompanyPiMonthlyLimit(plan: string): number {
   const normalized = plan.replace('company_', '') as CompanyPlan;
   return COMPANY_PI_LIMITS[normalized]?.piCallsPerMonth ?? 200;
+}
+
+export function getAutoClaimLimits(plan: string, hostType?: string): { freePerMonth: number; extraPriceCents: number } {
+  if (hostType === 'agent') {
+    const limits = getAgentPlanLimits(plan);
+    return { freePerMonth: limits.freeAutoClaimsPerMonth, extraPriceCents: limits.extraClaimPriceCents };
+  }
+  if (hostType === 'company') {
+    const normalized = plan.replace('company_', '') as CompanyPlan;
+    const limits = COMPANY_PI_LIMITS[normalized] ?? COMPANY_PI_LIMITS.starter;
+    return { freePerMonth: limits.freeAutoClaimsPerMonth, extraPriceCents: limits.extraClaimPriceCents };
+  }
+  const hostPlan = plan as HostPlan;
+  const limits = PLAN_LIMITS[hostPlan] ?? PLAN_LIMITS.free;
+  return { freePerMonth: limits.freeAutoClaimsPerMonth, extraPriceCents: limits.extraClaimPriceCents };
 }
 
 export const UNLOCK_PACKAGES = [
