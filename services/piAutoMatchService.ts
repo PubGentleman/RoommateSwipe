@@ -159,6 +159,15 @@ export async function convertToRealGroup(autoGroupId: string): Promise<string | 
 
     const creatorId = autoGroup.anchor_user_id || members[0].user_id;
 
+    const { data: existingGroup } = await supabase
+      .from('groups')
+      .select('id')
+      .eq('pi_auto_group_id', autoGroupId)
+      .limit(1)
+      .maybeSingle();
+
+    if (existingGroup) return existingGroup.id;
+
     const { data: newGroup, error } = await supabase
       .from('groups')
       .insert({
@@ -170,7 +179,18 @@ export async function convertToRealGroup(autoGroupId: string): Promise<string | 
       .select('id')
       .single();
 
-    if (error || !newGroup) return null;
+    if (error || !newGroup) {
+      if (error?.code === '23505') {
+        const { data: raceGroup } = await supabase
+          .from('groups')
+          .select('id')
+          .eq('pi_auto_group_id', autoGroupId)
+          .limit(1)
+          .single();
+        return raceGroup?.id ?? null;
+      }
+      return null;
+    }
 
     const memberInserts = members.map((m: { user_id: string }) => ({
       group_id: newGroup.id,

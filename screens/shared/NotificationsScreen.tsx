@@ -314,6 +314,14 @@ export const NotificationsScreen = () => {
         return 'check-circle';
       case 'activity_nudge':
         return 'zap';
+      case 'pi_group_assembled':
+      case 'pi_member_accepted':
+      case 'pi_group_confirmed':
+      case 'pi_replacement_found':
+        return 'users';
+      case 'pi_member_declined':
+      case 'pi_group_expired':
+        return 'x-circle';
       default:
         return 'bell';
     }
