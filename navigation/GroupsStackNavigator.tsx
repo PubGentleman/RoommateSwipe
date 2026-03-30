@@ -18,7 +18,10 @@ import MyGroupScreen from '../screens/renter/MyGroupScreen';
 import GroupInviteAcceptScreen from '../screens/renter/GroupInviteAcceptScreen';
 import GroupSetupScreen from '../screens/renter/GroupSetupScreen';
 import InviteFriendsScreen from '../screens/renter/InviteFriendsScreen';
-import { RoommateProfile } from '../types/models';
+import OpenGroupsScreen from '../screens/renter/OpenGroupsScreen';
+import GroupRequestScreen from '../screens/renter/GroupRequestScreen';
+import GroupRequestReviewScreen from '../screens/renter/GroupRequestReviewScreen';
+import { RoommateProfile, OpenGroupListing } from '../types/models';
 
 export type GroupsStackParamList = {
   GroupsList: undefined;
@@ -75,6 +78,16 @@ export type GroupsStackParamList = {
     inviteCode: string;
   };
   GroupSetup: undefined;
+  OpenGroups: undefined;
+  GroupRequest: {
+    group: OpenGroupListing;
+  };
+  GroupRequestReview: {
+    groupId: string;
+    groupType: 'pi_auto' | 'preformed';
+    isLead?: boolean;
+    memberCount?: number;
+  };
   InviteFriends: {
     groupId: string;
     inviteCode: string;
@@ -103,6 +116,9 @@ export const GroupsStackNavigator = () => {
       <Stack.Screen name="PiReplacementVote" component={PiReplacementVoteScreen} />
       <Stack.Screen name="MyGroup" component={MyGroupScreen} />
       <Stack.Screen name="GroupInviteAccept" component={GroupInviteAcceptScreen} />
+      <Stack.Screen name="OpenGroups" component={OpenGroupsScreen} />
+      <Stack.Screen name="GroupRequest" component={GroupRequestScreen} />
+      <Stack.Screen name="GroupRequestReview" component={GroupRequestReviewScreen} />
       <Stack.Screen name="GroupSetup">
         {({ navigation: nav }) => (
           <GroupSetupScreen

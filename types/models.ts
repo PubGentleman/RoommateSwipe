@@ -829,6 +829,7 @@ export interface PiAutoGroup {
   ready_at?: string;
   expires_at?: string;
   acceptance_deadline?: string;
+  open_to_requests?: boolean;
   is_preformed?: boolean;
   dissolved_at?: string;
   deadline_extended?: boolean;
@@ -884,6 +885,7 @@ export interface PreformedGroup {
   move_in_date?: string;
   created_at: string;
   converted_group_id?: string;
+  open_to_requests?: boolean;
 }
 
 export interface PreformedGroupMember {
@@ -906,4 +908,45 @@ export interface GroupShortlistItem {
   vote_count: number;
   created_at: string;
   listing?: Property;
+}
+
+export interface GroupJoinRequest {
+  id: string;
+  pi_auto_group_id?: string;
+  preformed_group_id?: string;
+  requester_id: string;
+  status: 'pending' | 'approved' | 'declined' | 'expired' | 'withdrawn';
+  compatibility_score?: number;
+  pi_take?: string;
+  approved_by?: string[];
+  declined_by?: string[];
+  decided_by?: string;
+  created_at: string;
+  decided_at?: string;
+  expires_at?: string;
+  requester_message?: string;
+  requester?: User;
+}
+
+export interface OpenGroupListing {
+  id: string;
+  groupType: 'pi_auto' | 'preformed';
+  groupName?: string;
+  members: Array<{
+    user_id: string;
+    name: string;
+    age?: number;
+    photo?: string;
+    occupation?: string;
+  }>;
+  spotsOpen: number;
+  maxSize: number;
+  compatibility?: number;
+  piTake?: string;
+  city?: string;
+  neighborhoods?: string[];
+  budgetMin?: number;
+  budgetMax?: number;
+  desiredBedrooms?: number;
+  createdAt: string;
 }

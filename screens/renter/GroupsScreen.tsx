@@ -1293,9 +1293,27 @@ export const GroupsScreen = () => {
                   <Text style={styles.piCtaBtnText}>Enable Pi Auto-Match</Text>
                 </Pressable>
               )}
+              <Pressable
+                style={[styles.piCtaBtn, { backgroundColor: '#3B82F6', marginTop: 12 }]}
+                onPress={() => navigation.navigate('OpenGroups')}
+              >
+                <Feather name="search" size={16} color="#fff" />
+                <Text style={styles.piCtaBtnText}>Find a Group to Join</Text>
+              </Pressable>
             </View>
           ) : (
-            myGroups.map(group => renderMyGroup(group))
+            <>
+              {myGroups.map(group => renderMyGroup(group))}
+              <Pressable
+                style={[styles.findGroupBtn, { borderColor: theme.border }]}
+                onPress={() => navigation.navigate('OpenGroups')}
+              >
+                <Feather name="search" size={16} color={theme.primary} />
+                <Text style={[styles.findGroupBtnText, { color: theme.primary }]}>
+                  Find a Group to Join
+                </Text>
+              </Pressable>
+            </>
           )}
 
           <View style={[styles.sectionHeader, styles.sectionRow, { marginTop: 24 }]}>
@@ -3473,6 +3491,20 @@ const styles = StyleSheet.create({
   },
   piCtaBtnText: {
     color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  findGroupBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 12,
+    marginTop: 12,
+  },
+  findGroupBtnText: {
     fontSize: 14,
     fontWeight: '600',
   },

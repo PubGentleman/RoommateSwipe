@@ -294,11 +294,29 @@ serve(async (req) => {
       }
     }
 
+    let joinRequestsExpired = 0;
+    const { data: staleRequests } = await supabase
+      .from('group_join_requests')
+      .select('id, requester_id, pi_auto_group_id, preformed_group_id')
+      .eq('status', 'pending')
+      .lt('expires_at', nowIso);
+
+    if (staleRequests && staleRequests.length > 0) {
+      const staleIds = staleRequests.map((r: any) => r.id);
+      await supabase
+        .from('group_join_requests')
+        .update({ status: 'expired', decided_at: nowIso })
+        .in('id', staleIds);
+
+      joinRequestsExpired = staleIds.length;
+    }
+
     return jsonResponse({
       processed: expiredGroups.length,
       dissolved,
       partial_acceptance: partial,
       reminders_sent: remindersSent,
+      join_requests_expired: joinRequestsExpired,
       results,
     });
   } catch (err: any) {

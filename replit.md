@@ -60,6 +60,7 @@ The application is built using React Native, Expo, and TypeScript, employing Rea
 - **Area Info Cards:** Listing detail modals display area information (Transit, Restaurants, Grocery, Laundromat, Parks) powered by the Overpass API, with loading skeletons and graceful fallbacks.
 - **Renter/Host Mode Switch:** Allows individual hosts to toggle between modes.
 - **Affiliate Program:** Users can apply to become affiliates, receive unique referral codes (RHOME-XXXX format), and earn commissions ($10 for Plus, $20 for Elite referrals). Includes an affiliate dashboard with stats, referral history, PayPal email management, and native share integration. Referral codes can be entered during sign-up. Commission tracking triggers automatically on subscription upgrades.
+- **Request to Join Group:** Renters can browse open groups (Pi-matched and preformed) and send join requests with optional messages. Pi auto-groups default to open; preformed groups can be toggled by the group lead. Pi groups use majority member voting; preformed groups use lead decision. Requests expire after 48 hours via pi-auto-expire cron. Approved requesters are automatically added as members. Users with pending join requests are excluded from pi-auto-assemble pool. Screens: OpenGroupsScreen, GroupRequestScreen, GroupRequestReviewScreen. Service: groupJoinService.ts. Migration: 054. Notification templates: group_join_request_received/approved/declined.
 
 ## Backend (Supabase)
 

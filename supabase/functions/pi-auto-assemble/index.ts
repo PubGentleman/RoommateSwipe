@@ -330,12 +330,21 @@ serve(async (req) => {
         .map((u: any) => u.id)
     );
 
+    const { data: pendingJoinRequests } = await supabase
+      .from('group_join_requests')
+      .select('requester_id')
+      .in('requester_id', profileUserIds)
+      .eq('status', 'pending');
+
+    const pendingJoinSet = new Set((pendingJoinRequests || []).map((r: any) => r.requester_id));
+
     const excludeSet = new Set(excludeUsers);
 
     const eligible: CandidateProfile[] = profiles
       .filter((p: any) =>
         !inGroupSet.has(p.user_id) &&
         !excludeSet.has(p.user_id) &&
+        !pendingJoinSet.has(p.user_id) &&
         userMap.has(p.user_id) &&
         hasPhotoSet.has(p.user_id)
       )

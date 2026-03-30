@@ -26,7 +26,9 @@ import {
   removeMember,
   removeFromShortlist,
 } from '../../services/preformedGroupService';
+import { toggleOpenToRequests, getGroupRequests } from '../../services/groupJoinService';
 import { PreformedGroup, PreformedGroupMember, GroupShortlistItem } from '../../types/models';
+import { Switch } from 'react-native';
 import * as Linking from 'expo-linking';
 import { Spacing } from '../../constants/theme';
 
@@ -46,6 +48,8 @@ export default function MyGroupScreen() {
   const [editingName, setEditingName] = useState(false);
   const [groupName, setGroupName] = useState('');
   const [copied, setCopied] = useState(false);
+  const [openToRequests, setOpenToRequests] = useState(false);
+  const [pendingRequestCount, setPendingRequestCount] = useState(0);
 
   const isLead = group?.group_lead_id === user?.id;
 
@@ -61,6 +65,9 @@ export default function MyGroupScreen() {
       setMembers(m);
       setShortlist(s);
       setGroupName(g.name || '');
+      setOpenToRequests(g.open_to_requests ?? false);
+      const reqs = await getGroupRequests(g.id, 'preformed');
+      setPendingRequestCount(reqs.length);
     }
     setLoading(false);
   }, []);
@@ -283,6 +290,46 @@ export default function MyGroupScreen() {
             <Text style={styles.settingsValue}>{group.group_size} people</Text>
           </View>
 
+          {isLead ? (
+            <View style={styles.settingsField}>
+              <Text style={styles.settingsLabel}>Open to Join Requests</Text>
+              <View style={styles.editRow}>
+                <Text style={[styles.settingsValue, { flex: 1 }]}>
+                  {openToRequests ? 'Anyone can request to join' : 'Invite only'}
+                </Text>
+                <Switch
+                  value={openToRequests}
+                  onValueChange={async (val) => {
+                    if (!group) return;
+                    setOpenToRequests(val);
+                    await toggleOpenToRequests(group.id, 'preformed', val);
+                  }}
+                  trackColor={{ false: '#333', true: '#22C55E50' }}
+                  thumbColor={openToRequests ? '#22C55E' : '#888'}
+                />
+              </View>
+            </View>
+          ) : null}
+
+          {isLead && pendingRequestCount > 0 ? (
+            <Pressable
+              style={styles.reviewRequestsBtn}
+              onPress={() =>
+                navigation.navigate('GroupRequestReview' as never, {
+                  groupId: group.id,
+                  groupType: 'preformed',
+                  isLead: true,
+                  memberCount: members.length,
+                } as never)
+              }
+            >
+              <Feather name="inbox" size={16} color="#3B82F6" />
+              <Text style={styles.reviewRequestsBtnText}>
+                Review Join Requests ({pendingRequestCount})
+              </Text>
+            </Pressable>
+          ) : null}
+
           <Pressable style={styles.leaveBtn} onPress={handleLeave}>
             <Feather name="log-out" size={16} color="#EF4444" />
             <Text style={styles.leaveBtnText}>
@@ -500,6 +547,23 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#EF4444',
+  },
+  reviewRequestsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#3B82F630',
+    backgroundColor: '#3B82F610',
+    borderRadius: 12,
+    paddingVertical: 12,
+    marginBottom: 12,
+  },
+  reviewRequestsBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#3B82F6',
   },
   backBtn: {
     marginTop: 20,

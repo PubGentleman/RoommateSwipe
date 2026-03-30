@@ -61,7 +61,10 @@ export type PiAutoMatchNotificationType =
   | 'pi_replacement_approved'
   | 'pi_replacement_invited'
   | 'pi_no_replacement'
-  | 'pi_group_dissolved_member';
+  | 'pi_group_dissolved_member'
+  | 'group_join_request_received'
+  | 'group_join_request_approved'
+  | 'group_join_request_declined';
 
 export interface PiNotificationData {
   groupId: string;
@@ -153,6 +156,21 @@ const PI_NOTIFICATION_TEMPLATES: Record<PiAutoMatchNotificationType, {
   pi_group_dissolved_member: {
     title: () => 'Group dissolved',
     body: () => "A member chose to start fresh. Don't worry -- Pi is still looking for your perfect roommates.",
+  },
+  group_join_request_received: {
+    title: () => 'Someone wants to join your group',
+    body: (data) => {
+      const name = data.acceptedBy || 'A renter';
+      return `${name} sent a request to join your group. Review their profile and vote!`;
+    },
+  },
+  group_join_request_approved: {
+    title: () => 'Your join request was approved!',
+    body: () => "Great news -- the group voted you in! You're now a member. Head to the Groups tab to meet everyone.",
+  },
+  group_join_request_declined: {
+    title: () => 'Join request update',
+    body: () => "The group you applied to has filled up or decided to pass. Keep looking -- there are more groups open!",
   },
 };
 
