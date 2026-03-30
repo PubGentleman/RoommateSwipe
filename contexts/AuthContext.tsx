@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StorageService } from '../utils/storage';
 import { getDailyColdMessageLimit, getDailyColdMessageCount } from '../utils/messagingUtils';
 import { User, Notification, TeamMember } from '../types/models';
@@ -449,9 +450,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const currentUser = await StorageService.getCurrentUser();
     if (currentUser && currentUser.profileData && !currentUser.profileData.apartment_search_type) {
       try {
-        const savedIntent = await AsyncStorage.getItem('@rhome/renter_intent');
-        if (savedIntent) {
-          const parsed = JSON.parse(savedIntent);
+        const savedIntentRaw = await AsyncStorage.getItem('@rhome/renter_intent');
+        if (savedIntentRaw) {
+          const parsed = JSON.parse(savedIntentRaw);
           if (parsed.apartment_search_type) {
             currentUser.profileData.apartment_search_type = parsed.apartment_search_type;
           }
