@@ -60,9 +60,11 @@ function buildLeafletHtml(
 
   return `<!DOCTYPE html>
 <html><head>
+<meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body,#map{width:100%;height:100%}
@@ -232,10 +234,18 @@ export const PropertyMapView = ({
     <View style={[styles.mapContainer, { paddingBottom: bottomInset }]}>
       <WebView
         originWhitelist={['*']}
-        source={{ html: htmlWithToken }}
+        source={{ html: htmlWithToken, baseUrl: 'https://rhomeapp.io' }}
         style={styles.map}
         javaScriptEnabled
+        domStorageEnabled
+        mixedContentMode="always"
+        allowsInlineMediaPlayback
+        startInLoadingState={false}
+        scalesPageToFit={false}
         scrollEnabled={false}
+        bounces={false}
+        overScrollMode="never"
+        nestedScrollEnabled={false}
         onMessage={(event: { nativeEvent: { data: string } }) => {
           try {
             const data = JSON.parse(event.nativeEvent.data);
@@ -243,6 +253,9 @@ export const PropertyMapView = ({
               handlePropertyTap(data.id);
             }
           } catch {}
+        }}
+        onError={(syntheticEvent: { nativeEvent: { description?: string } }) => {
+          console.warn('[PropertyMapView] WebView error:', syntheticEvent.nativeEvent.description);
         }}
       />
       <View style={[styles.propertyCount, { backgroundColor: theme.backgroundDefault }]}>
