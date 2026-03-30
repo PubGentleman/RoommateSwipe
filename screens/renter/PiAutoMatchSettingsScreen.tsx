@@ -197,7 +197,7 @@ export const PiAutoMatchSettingsScreen = () => {
       return { text: 'Pi found a match!', color: '#4ade80', icon: 'check-circle' };
     }
     if (stats?.activeGroup) {
-      return { text: 'Group forming...', color: '#fbbf24', icon: 'loader' };
+      return { text: 'Pi is searching...', color: '#fbbf24', icon: 'loader' };
     }
     return { text: 'Pi is searching...', color: '#60a5fa', icon: 'search' };
   };
