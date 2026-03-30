@@ -163,7 +163,7 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
             onPress={() => onSelect(opt.id)}
           >
             <View style={[styles.typeIconWrap, { backgroundColor: `${opt.color}20` }]}>
-              <Feather name={opt.icon as any} size={22} color={opt.color} />
+              <Feather name={opt.icon} size={22} color={opt.color} />
             </View>
             <Text style={styles.typeLabel}>{opt.label}</Text>
             <Text style={styles.typeDesc}>{opt.description}</Text>

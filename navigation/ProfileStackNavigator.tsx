@@ -350,10 +350,10 @@ export const ProfileStackNavigator = () => {
         name="SearchIntent"
         options={{ headerShown: false }}
       >
-        {(props: any) => (
+        {({ navigation: nav }: { navigation: { goBack: () => void } }) => (
           <WhatAreYouLookingForScreen
             isSettings
-            onComplete={() => props.navigation.goBack()}
+            onComplete={() => nav.goBack()}
             initialIntent={undefined}
           />
         )}

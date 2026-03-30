@@ -2456,7 +2456,7 @@ export const ExploreScreen = () => {
                     ) : null}
                   </Pressable>
 
-                  {eligibleGroups.length > 0 && shouldShowRoommateFeatures(user) ? (
+                  {eligibleGroups.length > 0 && shouldShowRoommateFeatures(user?.profileData?.apartment_search_type) ? (
                     <Pressable
                       style={styles.pdActionSecondary}
                       onPress={() => {
