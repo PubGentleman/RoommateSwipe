@@ -31,7 +31,7 @@ import { CityPickerModal, CityPillButton } from '../../components/CityPickerModa
 import { RhomeAISheet } from '../../components/RhomeAISheet';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { AIGroupSuggestionCard } from '../../components/AIGroupSuggestionCard';
-import { getPendingAutoGroupCount } from '../../services/piAutoMatchService';
+import { getPendingAutoGroupCount, isAutoMatchEnabled } from '../../services/piAutoMatchService';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - Spacing.xxl;
@@ -95,6 +95,7 @@ export const GroupsScreen = () => {
   const [groupQuickStats, setGroupQuickStats] = useState<Record<string, GroupQuickStats>>({});
   const [savingEdit, setSavingEdit] = useState(false);
   const [piPendingCount, setPiPendingCount] = useState(0);
+  const [piAutoMatchActive, setPiAutoMatchActive] = useState(false);
 
   const userPlan = user?.subscription?.plan || 'basic';
 
@@ -244,7 +245,13 @@ export const GroupsScreen = () => {
       loadGroupLikeCounts(userGroups);
 
       if (user?.id) {
-        getPendingAutoGroupCount(user.id).then(c => setPiPendingCount(c)).catch(() => {});
+        Promise.all([
+          getPendingAutoGroupCount(user.id),
+          isAutoMatchEnabled(user.id),
+        ]).then(([count, active]) => {
+          setPiPendingCount(count);
+          setPiAutoMatchActive(active);
+        }).catch(() => {});
       }
     } catch (error) {
       console.error('Error loading groups:', error);
@@ -1292,15 +1299,27 @@ export const GroupsScreen = () => {
             <View style={[styles.emptyState, { paddingVertical: 30 }]}>
               <Feather name="users" size={40} color={theme.textSecondary} />
               <ThemedText style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.sm, textAlign: 'center' }]}>
-                No groups yet — let AI find your perfect roommates!
+                {piAutoMatchActive
+                  ? 'No groups yet — Pi is looking for your perfect roommates!'
+                  : 'No groups yet — let AI find your perfect roommates!'}
               </ThemedText>
-              <Pressable
-                style={[styles.piCtaBtn, { backgroundColor: '#ff6b5b', marginTop: 16 }]}
-                onPress={() => navigation.navigate('Profile', { screen: 'PiAutoMatchSettings' })}
-              >
-                <Text style={styles.piCtaIcon}>π</Text>
-                <Text style={styles.piCtaBtnText}>Enable Pi Auto-Match</Text>
-              </Pressable>
+              {piAutoMatchActive ? (
+                <Pressable
+                  style={[styles.piCtaBtn, { backgroundColor: '#ff6b5b', marginTop: 16 }]}
+                  onPress={() => navigation.navigate('PiGroupInvite', {})}
+                >
+                  <Text style={styles.piCtaIcon}>π</Text>
+                  <Text style={styles.piCtaBtnText}>Let Pi find my roommates</Text>
+                </Pressable>
+              ) : (
+                <Pressable
+                  style={[styles.piCtaBtn, { backgroundColor: '#ff6b5b', marginTop: 16 }]}
+                  onPress={() => navigation.navigate('Profile', { screen: 'PiAutoMatchSettings' })}
+                >
+                  <Text style={styles.piCtaIcon}>π</Text>
+                  <Text style={styles.piCtaBtnText}>Enable Pi Auto-Match</Text>
+                </Pressable>
+              )}
             </View>
           ) : (
             myGroups.map(group => renderMyGroup(group))

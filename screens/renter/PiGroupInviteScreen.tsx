@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator, ScrollView, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Feather } from '../../components/VectorIcons';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
@@ -13,16 +14,14 @@ import {
   acceptGroupInvite,
   declineGroupInvite,
   getAutoGroupMembers,
+  convertToRealGroup,
 } from '../../services/piAutoMatchService';
 import { supabase } from '../../lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import { GroupsStackParamList } from '../../navigation/GroupsStackNavigator';
 
-type RouteParams = {
-  PiGroupInvite: {
-    groupId?: string;
-  };
-};
+type ScreenNavProp = NativeStackNavigationProp<GroupsStackParamList, 'PiGroupInvite'>;
 
 interface MemberProfile {
   userId: string;
@@ -30,23 +29,44 @@ interface MemberProfile {
   age?: number;
   occupation?: string;
   photo?: string;
-  compatibility?: number;
+  compatibilityScore?: number;
+  piReason?: string;
+  neighborhoods?: string[];
+}
+
+function getTimeRemaining(expiresAt?: string): { hours: number; minutes: number; isUrgent: boolean; expired: boolean } {
+  if (!expiresAt) return { hours: 48, minutes: 0, isUrgent: false, expired: false };
+  const diff = new Date(expiresAt).getTime() - Date.now();
+  if (diff <= 0) return { hours: 0, minutes: 0, isUrgent: true, expired: true };
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  return { hours, minutes, isUrgent: hours < 12, expired: false };
+}
+
+function getCompatibilityColor(score: number): string {
+  if (score >= 80) return '#4ade80';
+  if (score >= 60) return '#fbbf24';
+  return '#f87171';
 }
 
 export const PiGroupInviteScreen = () => {
   const { theme } = useTheme();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation<any>();
-  const route = useRoute<RouteProp<RouteParams, 'PiGroupInvite'>>();
+  const navigation = useNavigation<ScreenNavProp>();
+  const route = useRoute<RouteProp<GroupsStackParamList, 'PiGroupInvite'>>();
 
   const [loading, setLoading] = useState(true);
   const [responding, setResponding] = useState(false);
   const [invite, setInvite] = useState<PiAutoGroupMember | null>(null);
   const [group, setGroup] = useState<PiAutoGroup | null>(null);
   const [members, setMembers] = useState<MemberProfile[]>([]);
+  const [allMembers, setAllMembers] = useState<PiAutoGroupMember[]>([]);
   const [responded, setResponded] = useState(false);
   const [responseAction, setResponseAction] = useState<'accepted' | 'declined' | null>(null);
+  const [timeRemaining, setTimeRemaining] = useState({ hours: 48, minutes: 0, isUrgent: false, expired: false });
+  const [extendedTime, setExtendedTime] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadInvite = useCallback(async () => {
     if (!user?.id) {
@@ -90,10 +110,12 @@ export const PiGroupInviteScreen = () => {
 
       if (groupData) {
         setGroup(groupData as PiAutoGroup);
+        setTimeRemaining(getTimeRemaining(groupData.expires_at));
       }
 
-      const allMembers = await getAutoGroupMembers(pendingInvite.group_id);
-      const otherMembers = allMembers.filter(
+      const memberList = await getAutoGroupMembers(pendingInvite.group_id);
+      setAllMembers(memberList);
+      const otherMembers = memberList.filter(
         m => m.user_id !== user.id && (m.status === 'pending' || m.status === 'accepted')
       );
 
@@ -101,16 +123,22 @@ export const PiGroupInviteScreen = () => {
       if (memberIds.length > 0) {
         const { data: profiles } = await supabase
           .from('profiles')
-          .select('user_id, full_name, age, occupation, avatar_url')
+          .select('user_id, full_name, age, occupation, avatar_url, preferred_neighborhoods')
           .in('user_id', memberIds);
 
-        const memberProfiles: MemberProfile[] = (profiles ?? []).map((p: any) => ({
-          userId: p.user_id,
-          name: p.full_name ?? 'Roommate',
-          age: p.age,
-          occupation: p.occupation,
-          photo: p.avatar_url,
-        }));
+        const memberProfiles: MemberProfile[] = (profiles ?? []).map((p: Record<string, unknown>) => {
+          const memberRow = otherMembers.find(m => m.user_id === p.user_id);
+          return {
+            userId: p.user_id as string,
+            name: (p.full_name as string) ?? 'Roommate',
+            age: p.age as number | undefined,
+            occupation: p.occupation as string | undefined,
+            photo: p.avatar_url as string | undefined,
+            compatibilityScore: memberRow?.compatibility_score,
+            piReason: memberRow?.pi_reason ?? undefined,
+            neighborhoods: (p.preferred_neighborhoods as string[]) ?? [],
+          };
+        });
         setMembers(memberProfiles);
       }
     } catch {
@@ -124,18 +152,46 @@ export const PiGroupInviteScreen = () => {
     loadInvite();
   }, [loadInvite]);
 
+  useEffect(() => {
+    if (group?.expires_at) {
+      timerRef.current = setInterval(() => {
+        setTimeRemaining(getTimeRemaining(group.expires_at));
+      }, 60000);
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [group?.expires_at]);
+
   const handleAccept = async () => {
     if (!invite) return;
     setResponding(true);
     try {
       const success = await acceptGroupInvite(invite.group_id);
-      if (success) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        setResponded(true);
-        setResponseAction('accepted');
-      } else {
+      if (!success) {
         Alert.alert('Error', 'Could not accept the invite. Please try again.');
+        setResponding(false);
+        return;
       }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      const updatedMembers = await getAutoGroupMembers(invite.group_id);
+      const allAccepted = updatedMembers.every(m => m.status === 'accepted');
+
+      if (allAccepted) {
+        const realGroupId = await convertToRealGroup(invite.group_id);
+        if (realGroupId) {
+          setResponded(true);
+          setResponseAction('accepted');
+          setTimeout(() => {
+            (navigation as any).replace('Chat', { conversationId: realGroupId });
+          }, 1500);
+          return;
+        }
+      }
+
+      setResponded(true);
+      setResponseAction('accepted');
     } catch {
       Alert.alert('Error', 'Something went wrong. Please try again.');
     } finally {
@@ -148,13 +204,14 @@ export const PiGroupInviteScreen = () => {
     setResponding(true);
     try {
       const success = await declineGroupInvite(invite.group_id);
-      if (success) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        setResponded(true);
-        setResponseAction('declined');
-      } else {
+      if (!success) {
         Alert.alert('Error', 'Could not decline the invite. Please try again.');
+        setResponding(false);
+        return;
       }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      setResponded(true);
+      setResponseAction('declined');
     } catch {
       Alert.alert('Error', 'Something went wrong. Please try again.');
     } finally {
@@ -162,20 +219,84 @@ export const PiGroupInviteScreen = () => {
     }
   };
 
-  const renderMemberCard = (member: MemberProfile) => (
-    <View key={member.userId} style={[styles.memberCard, { backgroundColor: theme.card }]}>
-      <View style={[styles.memberAvatar, { backgroundColor: theme.primary + '30' }]}>
-        <Feather name="user" size={20} color={theme.primary} />
+  const handleExtendTime = async () => {
+    if (!invite || extendedTime) return;
+    try {
+      const newExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      const { error } = await supabase
+        .from('pi_auto_groups')
+        .update({ expires_at: newExpiry })
+        .eq('id', invite.group_id);
+
+      if (!error) {
+        setExtendedTime(true);
+        setTimeRemaining(getTimeRemaining(newExpiry));
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+    } catch {
+      Alert.alert('Error', 'Could not extend time.');
+    }
+  };
+
+  const locationOverlap = (() => {
+    if (members.length === 0 || !group?.neighborhoods) return [];
+    const groupNeighborhoods = group.neighborhoods;
+    return groupNeighborhoods;
+  })();
+
+  const combinedBudget = group ? { min: group.budget_min, max: group.budget_max } : null;
+
+  const hasRisks = (() => {
+    if (!group) return false;
+    const pendingCount = allMembers.filter(m => m.status === 'pending').length;
+    return pendingCount > 1 || timeRemaining.isUrgent;
+  })();
+
+  const riskMessages: string[] = [];
+  if (allMembers.filter(m => m.status === 'pending').length > 1) {
+    riskMessages.push('Some members have not responded yet');
+  }
+  if (timeRemaining.isUrgent && !timeRemaining.expired) {
+    riskMessages.push('This invite expires soon');
+  }
+  if (timeRemaining.expired) {
+    riskMessages.push('This invite has expired');
+  }
+
+  const renderMemberCard = (member: MemberProfile) => {
+    const score = member.compatibilityScore ?? 0;
+    return (
+      <View key={member.userId} style={[styles.memberCard, { backgroundColor: theme.card }]}>
+        <View style={styles.memberTop}>
+          <View style={[styles.memberAvatar, { backgroundColor: theme.primary + '30' }]}>
+            <Feather name="user" size={20} color={theme.primary} />
+          </View>
+          <View style={styles.memberInfo}>
+            <ThemedText style={styles.memberName}>{member.name}</ThemedText>
+            <ThemedText style={[styles.memberMeta, { color: theme.textSecondary }]}>
+              {[member.age ? `${member.age}` : null, member.occupation].filter(Boolean).join(' · ') || 'Roommate'}
+            </ThemedText>
+          </View>
+          {score > 0 ? (
+            <View style={styles.scoreGauge}>
+              <View style={[styles.scoreCircle, { borderColor: getCompatibilityColor(score) }]}>
+                <Text style={[styles.scoreText, { color: getCompatibilityColor(score) }]}>{score}</Text>
+              </View>
+              <Text style={[styles.scoreLabel, { color: theme.textSecondary }]}>match</Text>
+            </View>
+          ) : null}
+        </View>
+        {member.piReason ? (
+          <View style={[styles.piInsight, { backgroundColor: theme.primary + '10' }]}>
+            <Text style={styles.piInsightIcon}>π</Text>
+            <ThemedText style={[styles.piInsightText, { color: theme.textSecondary }]}>
+              {member.piReason}
+            </ThemedText>
+          </View>
+        ) : null}
       </View>
-      <View style={styles.memberInfo}>
-        <ThemedText style={styles.memberName}>{member.name}</ThemedText>
-        <ThemedText style={[styles.memberMeta, { color: theme.textSecondary }]}>
-          {[member.age ? `${member.age}` : null, member.occupation].filter(Boolean).join(' · ') || 'Roommate'}
-        </ThemedText>
-      </View>
-      <View style={[styles.statusDot, { backgroundColor: '#4ade80' }]} />
-    </View>
-  );
+    );
+  };
 
   if (loading) {
     return (
@@ -219,14 +340,16 @@ export const PiGroupInviteScreen = () => {
               </ThemedText>
               <ThemedText style={[styles.responseSubtitle, { color: theme.textSecondary }]}>
                 {responseAction === 'accepted'
-                  ? 'Pi will finish building your group. Check back in My Groups soon.'
-                  : 'No worries — Pi will keep looking for better matches.'}
+                  ? 'Pi will finish building your group. You\'ll be taken to the group chat once everyone accepts.'
+                  : 'Pi is still looking for better matches for you. Check back later!'}
               </ThemedText>
               <Pressable
                 style={[styles.doneButton, { backgroundColor: theme.primary }]}
                 onPress={() => navigation.goBack()}
               >
-                <Text style={styles.doneButtonText}>Done</Text>
+                <Text style={styles.doneButtonText}>
+                  {responseAction === 'declined' ? 'Back to Groups' : 'Done'}
+                </Text>
               </Pressable>
             </>
           ) : (
@@ -284,9 +407,15 @@ export const PiGroupInviteScreen = () => {
               <View style={styles.metaItem}>
                 <Feather name="users" size={14} color="rgba(255,255,255,0.7)" />
                 <Text style={styles.metaText}>
-                  {group.max_members} {group.max_members === 1 ? 'person' : 'people'} group
+                  {group.max_members} {group.max_members === 1 ? 'person' : 'people'}
                 </Text>
               </View>
+              {group.desired_bedrooms > 0 ? (
+                <View style={styles.metaItem}>
+                  <Feather name="home" size={14} color="rgba(255,255,255,0.7)" />
+                  <Text style={styles.metaText}>{group.desired_bedrooms}BR target</Text>
+                </View>
+              ) : null}
               {group.city ? (
                 <View style={styles.metaItem}>
                   <Feather name="map-pin" size={14} color="rgba(255,255,255,0.7)" />
@@ -296,6 +425,37 @@ export const PiGroupInviteScreen = () => {
             </View>
           ) : null}
         </LinearGradient>
+
+        <View style={[styles.countdownBar, {
+          backgroundColor: timeRemaining.isUrgent ? '#f8717120' : '#fbbf2420',
+          borderColor: timeRemaining.isUrgent ? '#f8717140' : '#fbbf2440',
+        }]}>
+          <Feather name="clock" size={14} color={timeRemaining.isUrgent ? '#f87171' : '#fbbf24'} />
+          <Text style={[styles.countdownText, { color: timeRemaining.isUrgent ? '#f87171' : '#fbbf24' }]}>
+            {timeRemaining.expired
+              ? 'Invite expired'
+              : `${timeRemaining.hours}h ${timeRemaining.minutes}m remaining`}
+          </Text>
+          {timeRemaining.isUrgent && !timeRemaining.expired && !extendedTime ? (
+            <Pressable style={styles.extendBtn} onPress={handleExtendTime}>
+              <Text style={styles.extendBtnText}>I need more time</Text>
+            </Pressable>
+          ) : null}
+          {extendedTime ? (
+            <Text style={[styles.extendedLabel, { color: '#4ade80' }]}>+24h added</Text>
+          ) : null}
+        </View>
+
+        {hasRisks ? (
+          <View style={[styles.riskBanner, { backgroundColor: '#f8717115', borderColor: '#f8717130' }]}>
+            <Feather name="alert-triangle" size={16} color="#f87171" />
+            <View style={styles.riskContent}>
+              {riskMessages.map((msg, i) => (
+                <Text key={i} style={styles.riskText}>{msg}</Text>
+              ))}
+            </View>
+          </View>
+        ) : null}
 
         {members.length > 0 ? (
           <View style={styles.section}>
@@ -307,34 +467,22 @@ export const PiGroupInviteScreen = () => {
           </View>
         ) : null}
 
-        {(group?.budget_min || group?.neighborhoods?.length || group?.move_in_window_start) ? (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Feather name="sliders" size={16} color={theme.primary} />
-              <ThemedText style={styles.sectionTitle}>Match Criteria</ThemedText>
-            </View>
-            <View style={[styles.criteriaCard, { backgroundColor: theme.card }]}>
-              {group.budget_min ? (
-                <View style={styles.criteriaRow}>
-                  <Feather name="dollar-sign" size={14} color={theme.textSecondary} />
-                  <ThemedText style={[styles.criteriaText, { color: theme.textSecondary }]}>
-                    Budget: ${group.budget_min} - ${group.budget_max}
-                  </ThemedText>
-                </View>
-              ) : null}
-              {group.neighborhoods && group.neighborhoods.length > 0 ? (
-                <View style={styles.criteriaRow}>
-                  <Feather name="map-pin" size={14} color={theme.textSecondary} />
-                  <ThemedText style={[styles.criteriaText, { color: theme.textSecondary }]}>
-                    Areas: {group.neighborhoods.join(', ')}
-                  </ThemedText>
-                </View>
-              ) : null}
-              {group.move_in_window_start ? (
-                <View style={styles.criteriaRow}>
-                  <Feather name="calendar" size={14} color={theme.textSecondary} />
-                  <ThemedText style={[styles.criteriaText, { color: theme.textSecondary }]}>
-                    Move-in: {new Date(group.move_in_window_start).toLocaleDateString()}{group.move_in_window_end ? ` - ${new Date(group.move_in_window_end).toLocaleDateString()}` : ''}
+        {combinedBudget ? (
+          <View style={[styles.summaryCard, { backgroundColor: theme.card }]}>
+            <View style={styles.summaryRow}>
+              <View style={styles.summaryItem}>
+                <Feather name="dollar-sign" size={14} color={theme.primary} />
+                <ThemedText style={[styles.summaryLabel, { color: theme.textSecondary }]}>Budget Range</ThemedText>
+                <ThemedText style={styles.summaryValue}>
+                  ${combinedBudget.min.toLocaleString()} - ${combinedBudget.max.toLocaleString()}
+                </ThemedText>
+              </View>
+              {group?.desired_bedrooms ? (
+                <View style={styles.summaryItem}>
+                  <Feather name="home" size={14} color={theme.primary} />
+                  <ThemedText style={[styles.summaryLabel, { color: theme.textSecondary }]}>Apartment Size</ThemedText>
+                  <ThemedText style={styles.summaryValue}>
+                    {group.desired_bedrooms} {group.desired_bedrooms === 1 ? 'bedroom' : 'bedrooms'}
                   </ThemedText>
                 </View>
               ) : null}
@@ -342,19 +490,59 @@ export const PiGroupInviteScreen = () => {
           </View>
         ) : null}
 
-        <View style={styles.infoSection}>
-          <Feather name="info" size={14} color={theme.textSecondary} />
-          <ThemedText style={[styles.infoText, { color: theme.textSecondary }]}>
-            This invite expires in 48 hours. If all members accept, Pi will create your group automatically.
-          </ThemedText>
-        </View>
+        {locationOverlap.length > 0 ? (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Feather name="map-pin" size={16} color={theme.primary} />
+              <ThemedText style={styles.sectionTitle}>Shared Areas</ThemedText>
+            </View>
+            <View style={styles.tagContainer}>
+              {locationOverlap.map((area, idx) => (
+                <View key={idx} style={[styles.locationTag, { backgroundColor: theme.primary + '20' }]}>
+                  <Text style={[styles.locationTagText, { color: theme.primary }]}>{area}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
+        {(group?.move_in_window_start || group?.gender_composition) ? (
+          <View style={[styles.detailsCard, { backgroundColor: theme.card }]}>
+            {group.move_in_window_start ? (
+              <View style={styles.detailRow}>
+                <Feather name="calendar" size={14} color={theme.textSecondary} />
+                <ThemedText style={[styles.detailText, { color: theme.textSecondary }]}>
+                  Move-in: {new Date(group.move_in_window_start).toLocaleDateString()}
+                  {group.move_in_window_end ? ` - ${new Date(group.move_in_window_end).toLocaleDateString()}` : ''}
+                </ThemedText>
+              </View>
+            ) : null}
+            {group.gender_composition ? (
+              <View style={styles.detailRow}>
+                <Feather name="users" size={14} color={theme.textSecondary} />
+                <ThemedText style={[styles.detailText, { color: theme.textSecondary }]}>
+                  Household: {group.gender_composition}
+                </ThemedText>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+
+        {group?.pi_rationale ? (
+          <View style={[styles.piRationaleCard, { backgroundColor: theme.primary + '10' }]}>
+            <Text style={styles.piRationaleIcon}>π</Text>
+            <ThemedText style={[styles.piRationaleText, { color: theme.textSecondary }]}>
+              {group.pi_rationale}
+            </ThemedText>
+          </View>
+        ) : null}
       </ScrollView>
 
       <View style={[styles.actionBar, { paddingBottom: insets.bottom + 16 }]}>
         <Pressable
           style={[styles.declineBtn, { borderColor: '#f87171' }]}
           onPress={handleDecline}
-          disabled={responding}
+          disabled={responding || timeRemaining.expired}
         >
           {responding ? (
             <ActivityIndicator size="small" color="#f87171" />
@@ -366,9 +554,9 @@ export const PiGroupInviteScreen = () => {
           )}
         </Pressable>
         <Pressable
-          style={[styles.acceptBtn, { backgroundColor: '#4ade80' }]}
+          style={[styles.acceptBtn, { backgroundColor: timeRemaining.expired ? '#555' : '#4ade80' }]}
           onPress={handleAccept}
-          disabled={responding}
+          disabled={responding || timeRemaining.expired}
         >
           {responding ? (
             <ActivityIndicator size="small" color="#fff" />
@@ -385,9 +573,7 @@ export const PiGroupInviteScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -395,27 +581,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: 12,
   },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-  },
+  headerTitle: { fontSize: 17, fontWeight: '600' },
   centered: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: Spacing.xl,
   },
-  scrollContent: {
-    flex: 1,
-  },
-  scrollInner: {
-    paddingHorizontal: Spacing.md,
-  },
+  scrollContent: { flex: 1 },
+  scrollInner: { paddingHorizontal: Spacing.md },
   heroCard: {
     borderRadius: BorderRadius.lg,
     padding: 24,
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 12,
   },
   piIconWrapper: {
     width: 56,
@@ -426,11 +605,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 16,
   },
-  piIcon: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#ff6b5b',
-  },
+  piIcon: { fontSize: 28, fontWeight: '700', color: '#ff6b5b' },
   heroTitle: {
     fontSize: 22,
     fontWeight: '700',
@@ -444,40 +619,52 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
-  groupMeta: {
-    flexDirection: 'row',
-    gap: 16,
-    marginTop: 16,
-  },
-  metaItem: {
+  groupMeta: { flexDirection: 'row', gap: 16, marginTop: 16, flexWrap: 'wrap' },
+  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  metaText: { fontSize: 13, color: 'rgba(255,255,255,0.7)' },
+  countdownBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
+    padding: 12,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    marginBottom: 16,
   },
-  metaText: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.7)',
+  countdownText: { fontSize: 13, fontWeight: '600', flex: 1 },
+  extendBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
-  section: {
-    marginBottom: 20,
+  extendBtnText: { fontSize: 12, fontWeight: '600', color: '#fbbf24' },
+  extendedLabel: { fontSize: 12, fontWeight: '600' },
+  riskBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    padding: 12,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    marginBottom: 16,
   },
+  riskContent: { flex: 1, gap: 4 },
+  riskText: { fontSize: 13, color: '#f87171', lineHeight: 18 },
+  section: { marginBottom: 16 },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     marginBottom: 12,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  sectionTitle: { fontSize: 16, fontWeight: '600' },
   memberCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
     padding: 14,
     borderRadius: BorderRadius.md,
     marginBottom: 8,
   },
+  memberTop: { flexDirection: 'row', alignItems: 'center' },
   memberAvatar: {
     width: 44,
     height: 44,
@@ -485,48 +672,64 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  memberInfo: {
-    flex: 1,
-    marginLeft: 12,
+  memberInfo: { flex: 1, marginLeft: 12 },
+  memberName: { fontSize: 15, fontWeight: '600' },
+  memberMeta: { fontSize: 13, marginTop: 2 },
+  scoreGauge: { alignItems: 'center' },
+  scoreCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2.5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  memberName: {
-    fontSize: 15,
-    fontWeight: '600',
+  scoreText: { fontSize: 14, fontWeight: '700' },
+  scoreLabel: { fontSize: 10, marginTop: 2 },
+  piInsight: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 8,
   },
-  memberMeta: {
-    fontSize: 13,
-    marginTop: 2,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  criteriaCard: {
-    padding: 14,
+  piInsightIcon: { fontSize: 14, fontWeight: '700', color: '#ff6b5b' },
+  piInsightText: { fontSize: 13, lineHeight: 18, flex: 1 },
+  summaryCard: {
     borderRadius: BorderRadius.md,
+    padding: 16,
+    marginBottom: 16,
+  },
+  summaryRow: { flexDirection: 'row', gap: 16 },
+  summaryItem: { flex: 1, gap: 4 },
+  summaryLabel: { fontSize: 12 },
+  summaryValue: { fontSize: 16, fontWeight: '700' },
+  tagContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  locationTag: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  locationTagText: { fontSize: 13, fontWeight: '500' },
+  detailsCard: {
+    borderRadius: BorderRadius.md,
+    padding: 14,
+    marginBottom: 16,
     gap: 10,
   },
-  criteriaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  criteriaText: {
-    fontSize: 14,
-  },
-  infoSection: {
+  detailRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  detailText: { fontSize: 14 },
+  piRationaleCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 8,
-    paddingHorizontal: 4,
-    marginBottom: 20,
+    padding: 14,
+    borderRadius: BorderRadius.md,
+    marginBottom: 16,
   },
-  infoText: {
-    fontSize: 13,
-    lineHeight: 18,
-    flex: 1,
-  },
+  piRationaleIcon: { fontSize: 16, fontWeight: '700', color: '#ff6b5b' },
+  piRationaleText: { fontSize: 13, lineHeight: 18, flex: 1 },
   actionBar: {
     position: 'absolute',
     bottom: 0,
@@ -550,10 +753,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
     borderWidth: 1.5,
   },
-  declineBtnText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  declineBtnText: { fontSize: 16, fontWeight: '600' },
   acceptBtn: {
     flex: 1,
     flexDirection: 'row',
@@ -563,11 +763,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: BorderRadius.md,
   },
-  acceptBtnText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-  },
+  acceptBtnText: { fontSize: 16, fontWeight: '600', color: '#fff' },
   responseIcon: {
     width: 80,
     height: 80,
@@ -593,9 +789,5 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: BorderRadius.md,
   },
-  doneButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  doneButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });

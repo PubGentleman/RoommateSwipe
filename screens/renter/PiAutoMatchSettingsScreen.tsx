@@ -2,21 +2,26 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable, Switch, ActivityIndicator, ScrollView, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Feather } from '../../components/VectorIcons';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
-import { Spacing, BorderRadius, Typography } from '../../constants/theme';
-import { PiAutoGroup } from '../../types/models';
+import { Spacing, BorderRadius } from '../../constants/theme';
+import { PiAutoGroup, GenderPreference } from '../../types/models';
 import {
   isAutoMatchEnabled,
   setAutoMatchEnabled,
   getAutoMatchStats,
   getUserAutoGroups,
 } from '../../services/piAutoMatchService';
+import { supabase } from '../../lib/supabase';
 import { normalizeRenterPlan, getRenterPlanLimits } from '../../constants/renterPlanLimits';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import { ProfileStackParamList } from '../../navigation/ProfileStackNavigator';
+
+type ScreenNavProp = NativeStackNavigationProp<ProfileStackParamList, 'PiAutoMatchSettings'>;
 
 type AutoMatchStatusType = 'forming' | 'pending_acceptance' | 'partial' | 'ready' | 'invited' | 'claimed' | 'placed' | 'expired' | 'dissolved';
 
@@ -32,11 +37,34 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: string
   dissolved: { label: 'Dissolved', color: '#ef4444', icon: 'slash' },
 };
 
+const ROOMMATE_COUNT_OPTIONS = [
+  { value: 0, label: 'No Preference' },
+  { value: 1, label: '1 Roommate' },
+  { value: 2, label: '2 Roommates' },
+  { value: 3, label: '3 Roommates' },
+  { value: 4, label: '4+ Roommates' },
+];
+
+const BEDROOM_COUNT_OPTIONS = [
+  { value: 0, label: 'No Preference' },
+  { value: 1, label: '1 Bedroom' },
+  { value: 2, label: '2 Bedrooms' },
+  { value: 3, label: '3 Bedrooms' },
+  { value: 4, label: '4+ Bedrooms' },
+];
+
+const GENDER_PREF_OPTIONS: { value: GenderPreference; label: string }[] = [
+  { value: 'any', label: 'Any' },
+  { value: 'same_gender', label: 'Same Gender' },
+  { value: 'male_only', label: 'Male Only' },
+  { value: 'female_only', label: 'Female Only' },
+];
+
 export const PiAutoMatchSettingsScreen = () => {
   const { theme } = useTheme();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<ScreenNavProp>();
 
   const renterPlan = normalizeRenterPlan(user?.subscription?.plan);
   const planLimits = getRenterPlanLimits(renterPlan);
@@ -44,6 +72,7 @@ export const PiAutoMatchSettingsScreen = () => {
   const [loading, setLoading] = useState(true);
   const [enabled, setEnabled] = useState(true);
   const [toggling, setToggling] = useState(false);
+  const [savingPrefs, setSavingPrefs] = useState(false);
   const [stats, setStats] = useState<{
     totalGroups: number;
     activeGroup: PiAutoGroup | null;
@@ -51,6 +80,9 @@ export const PiAutoMatchSettingsScreen = () => {
     lastMatchAttempt: string | null;
   } | null>(null);
   const [groups, setGroups] = useState<PiAutoGroup[]>([]);
+  const [desiredRoommateCount, setDesiredRoommateCount] = useState(0);
+  const [desiredBedroomCount, setDesiredBedroomCount] = useState(0);
+  const [genderPreference, setGenderPreference] = useState<GenderPreference>('any');
 
   const loadData = useCallback(async () => {
     if (!user?.id) {
@@ -59,14 +91,24 @@ export const PiAutoMatchSettingsScreen = () => {
     }
     setLoading(true);
     try {
-      const [isEnabled, matchStats, userGroups] = await Promise.all([
+      const [isEnabled, matchStats, userGroups, profileData] = await Promise.all([
         isAutoMatchEnabled(user.id),
         getAutoMatchStats(user.id),
         getUserAutoGroups(user.id),
+        supabase
+          .from('profiles')
+          .select('desired_roommate_count, desired_bedroom_count, household_gender_preference')
+          .eq('user_id', user.id)
+          .single(),
       ]);
       setEnabled(isEnabled);
       setStats(matchStats);
       setGroups(userGroups);
+      if (profileData.data) {
+        setDesiredRoommateCount(profileData.data.desired_roommate_count ?? 0);
+        setDesiredBedroomCount(profileData.data.desired_bedroom_count ?? 0);
+        setGenderPreference((profileData.data.household_gender_preference as GenderPreference) ?? 'any');
+      }
     } catch {
       setEnabled(true);
     } finally {
@@ -97,6 +139,41 @@ export const PiAutoMatchSettingsScreen = () => {
     }
   };
 
+  const savePreference = async (field: string, value: number | string) => {
+    if (!user?.id) return;
+    setSavingPrefs(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ [field]: value })
+        .eq('user_id', user.id);
+      if (error) {
+        Alert.alert('Error', 'Could not save preference.');
+      } else {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+    } catch {
+      Alert.alert('Error', 'Could not save preference.');
+    } finally {
+      setSavingPrefs(false);
+    }
+  };
+
+  const handleRoommateCountChange = (value: number) => {
+    setDesiredRoommateCount(value);
+    savePreference('desired_roommate_count', value);
+  };
+
+  const handleBedroomCountChange = (value: number) => {
+    setDesiredBedroomCount(value);
+    savePreference('desired_bedroom_count', value);
+  };
+
+  const handleGenderPrefChange = (value: GenderPreference) => {
+    setGenderPreference(value);
+    savePreference('household_gender_preference', value);
+  };
+
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return 'Never';
     try {
@@ -115,6 +192,17 @@ export const PiAutoMatchSettingsScreen = () => {
     return STATUS_CONFIG[status] ?? { label: status, color: '#6b7280', icon: 'help-circle' };
   };
 
+  const getOverallStatus = (): { text: string; color: string; icon: string } => {
+    if (!enabled) return { text: 'Not active', color: '#6b7280', icon: 'pause-circle' };
+    if (stats?.pendingInvites && stats.pendingInvites > 0) {
+      return { text: 'Pi found a match!', color: '#4ade80', icon: 'check-circle' };
+    }
+    if (stats?.activeGroup) {
+      return { text: 'Group forming...', color: '#fbbf24', icon: 'loader' };
+    }
+    return { text: 'Pi is searching...', color: '#60a5fa', icon: 'search' };
+  };
+
   if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top }]}>
@@ -131,6 +219,8 @@ export const PiAutoMatchSettingsScreen = () => {
       </View>
     );
   }
+
+  const overallStatus = getOverallStatus();
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top }]}>
@@ -160,6 +250,16 @@ export const PiAutoMatchSettingsScreen = () => {
           </ThemedText>
         </LinearGradient>
 
+        <View style={[styles.statusIndicator, { backgroundColor: overallStatus.color + '15', borderColor: overallStatus.color + '40' }]}>
+          <Feather name={overallStatus.icon as string} size={16} color={overallStatus.color} />
+          <Text style={[styles.statusIndicatorText, { color: overallStatus.color }]}>
+            {overallStatus.text}
+          </Text>
+          {savingPrefs ? (
+            <ActivityIndicator size="small" color={theme.primary} />
+          ) : null}
+        </View>
+
         <View style={[styles.settingCard, { backgroundColor: theme.card }]}>
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
@@ -172,9 +272,94 @@ export const PiAutoMatchSettingsScreen = () => {
               value={enabled}
               onValueChange={handleToggle}
               disabled={toggling}
-              trackColor={{ false: '#3e3e3e', true: '#ff6b5b' + '80' }}
+              trackColor={{ false: '#3e3e3e', true: '#ff6b5b80' }}
               thumbColor={enabled ? '#ff6b5b' : '#888'}
             />
+          </View>
+        </View>
+
+        <View style={[styles.prefsCard, { backgroundColor: theme.card }]}>
+          <View style={styles.prefsHeader}>
+            <Feather name="sliders" size={16} color={theme.primary} />
+            <ThemedText style={styles.prefsTitle}>Matching Preferences</ThemedText>
+          </View>
+
+          <View style={styles.prefSection}>
+            <ThemedText style={[styles.prefLabel, { color: theme.textSecondary }]}>
+              Desired Roommates
+            </ThemedText>
+            <View style={styles.optionsRow}>
+              {ROOMMATE_COUNT_OPTIONS.map(opt => (
+                <Pressable
+                  key={opt.value}
+                  style={[
+                    styles.optionChip,
+                    { borderColor: desiredRoommateCount === opt.value ? theme.primary : theme.border },
+                    desiredRoommateCount === opt.value ? { backgroundColor: theme.primary + '20' } : null,
+                  ]}
+                  onPress={() => handleRoommateCountChange(opt.value)}
+                >
+                  <Text style={[
+                    styles.optionChipText,
+                    { color: desiredRoommateCount === opt.value ? theme.primary : theme.textSecondary },
+                  ]}>
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.prefSection}>
+            <ThemedText style={[styles.prefLabel, { color: theme.textSecondary }]}>
+              Desired Bedrooms
+            </ThemedText>
+            <View style={styles.optionsRow}>
+              {BEDROOM_COUNT_OPTIONS.map(opt => (
+                <Pressable
+                  key={opt.value}
+                  style={[
+                    styles.optionChip,
+                    { borderColor: desiredBedroomCount === opt.value ? theme.primary : theme.border },
+                    desiredBedroomCount === opt.value ? { backgroundColor: theme.primary + '20' } : null,
+                  ]}
+                  onPress={() => handleBedroomCountChange(opt.value)}
+                >
+                  <Text style={[
+                    styles.optionChipText,
+                    { color: desiredBedroomCount === opt.value ? theme.primary : theme.textSecondary },
+                  ]}>
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.prefSection}>
+            <ThemedText style={[styles.prefLabel, { color: theme.textSecondary }]}>
+              Household Gender Preference
+            </ThemedText>
+            <View style={styles.optionsRow}>
+              {GENDER_PREF_OPTIONS.map(opt => (
+                <Pressable
+                  key={opt.value}
+                  style={[
+                    styles.optionChip,
+                    { borderColor: genderPreference === opt.value ? theme.primary : theme.border },
+                    genderPreference === opt.value ? { backgroundColor: theme.primary + '20' } : null,
+                  ]}
+                  onPress={() => handleGenderPrefChange(opt.value)}
+                >
+                  <Text style={[
+                    styles.optionChipText,
+                    { color: genderPreference === opt.value ? theme.primary : theme.textSecondary },
+                  ]}>
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
           </View>
         </View>
 
@@ -209,14 +394,14 @@ export const PiAutoMatchSettingsScreen = () => {
                 Pi messages/day
               </ThemedText>
               <ThemedText style={styles.planValue}>
-                {planLimits.piMessagesPerDay === -1 ? 'Unlimited' : planLimits.piMessagesPerDay}
+                {planLimits.piMessagesPerDay === -1 ? 'Unlimited' : String(planLimits.piMessagesPerDay)}
               </ThemedText>
             </View>
           </View>
           {renterPlan === 'free' ? (
             <Pressable
               style={[styles.upgradeBtn, { backgroundColor: theme.primary }]}
-              onPress={() => navigation.navigate('Profile', { screen: 'Plans' })}
+              onPress={() => (navigation as NativeStackNavigationProp<ProfileStackParamList>).navigate('Plans')}
             >
               <Feather name="arrow-up-circle" size={16} color="#fff" />
               <Text style={styles.upgradeBtnText}>Upgrade for priority matching</Text>
@@ -270,7 +455,7 @@ export const PiAutoMatchSettingsScreen = () => {
                 >
                   <View style={styles.groupHeader}>
                     <View style={[styles.statusBadge, { backgroundColor: statusConf.color + '20' }]}>
-                      <Feather name={statusConf.icon as any} size={12} color={statusConf.color} />
+                      <Feather name={statusConf.icon as string} size={12} color={statusConf.color} />
                       <Text style={[styles.statusText, { color: statusConf.color }]}>
                         {statusConf.label}
                       </Text>
@@ -313,9 +498,7 @@ export const PiAutoMatchSettingsScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -323,26 +506,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: 12,
   },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scrollContent: {
-    flex: 1,
-  },
-  scrollInner: {
-    paddingHorizontal: Spacing.md,
-  },
+  headerTitle: { fontSize: 17, fontWeight: '600' },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  scrollContent: { flex: 1 },
+  scrollInner: { paddingHorizontal: Spacing.md },
   heroCard: {
     borderRadius: BorderRadius.lg,
     padding: 24,
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 12,
   },
   piIconWrapper: {
     width: 56,
@@ -353,11 +525,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 16,
   },
-  piIcon: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#ff6b5b',
-  },
+  piIcon: { fontSize: 28, fontWeight: '700', color: '#ff6b5b' },
   heroTitle: {
     fontSize: 22,
     fontWeight: '700',
@@ -371,6 +539,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
+  statusIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  statusIndicatorText: { fontSize: 14, fontWeight: '600', flex: 1 },
   settingCard: {
     borderRadius: BorderRadius.md,
     padding: 16,
@@ -381,19 +559,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  settingInfo: {
-    flex: 1,
-    marginRight: 12,
+  settingInfo: { flex: 1, marginRight: 12 },
+  settingLabel: { fontSize: 16, fontWeight: '600', marginBottom: 4 },
+  settingDesc: { fontSize: 13, lineHeight: 18 },
+  prefsCard: {
+    borderRadius: BorderRadius.md,
+    padding: 16,
+    marginBottom: 16,
   },
-  settingLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
+  prefsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
   },
-  settingDesc: {
-    fontSize: 13,
-    lineHeight: 18,
+  prefsTitle: { fontSize: 16, fontWeight: '600' },
+  prefSection: { marginBottom: 16 },
+  prefLabel: { fontSize: 14, fontWeight: '500', marginBottom: 8 },
+  optionsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
+  optionChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  optionChipText: { fontSize: 13, fontWeight: '500' },
   planCard: {
     borderRadius: BorderRadius.md,
     padding: 16,
@@ -405,25 +599,15 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 12,
   },
-  planTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  planDetails: {
-    gap: 8,
-  },
+  planTitle: { fontSize: 15, fontWeight: '600' },
+  planDetails: { gap: 8 },
   planRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  planLabel: {
-    fontSize: 14,
-  },
-  planValue: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
+  planLabel: { fontSize: 14 },
+  planValue: { fontSize: 14, fontWeight: '600' },
   upgradeBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -433,11 +617,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
     marginTop: 14,
   },
-  upgradeBtnText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
+  upgradeBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
   statsCard: {
     borderRadius: BorderRadius.md,
     padding: 16,
@@ -448,31 +628,17 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 4,
   },
-  statItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  statNumber: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  statLabel: {
-    fontSize: 12,
-    marginTop: 4,
-  },
-  section: {
-    marginBottom: 16,
-  },
+  statItem: { alignItems: 'center', flex: 1 },
+  statNumber: { fontSize: 20, fontWeight: '700' },
+  statLabel: { fontSize: 12, marginTop: 4 },
+  section: { marginBottom: 16 },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     marginBottom: 12,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  sectionTitle: { fontSize: 16, fontWeight: '600' },
   groupCard: {
     borderRadius: BorderRadius.md,
     padding: 14,
@@ -492,24 +658,11 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
   },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  groupDate: {
-    fontSize: 12,
-  },
-  groupDetails: {
-    gap: 6,
-  },
-  groupDetailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  groupDetailText: {
-    fontSize: 13,
-  },
+  statusText: { fontSize: 12, fontWeight: '600' },
+  groupDate: { fontSize: 12 },
+  groupDetails: { gap: 6 },
+  groupDetailRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  groupDetailText: { fontSize: 13 },
   infoSection: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -518,9 +671,5 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 20,
   },
-  infoText: {
-    fontSize: 13,
-    lineHeight: 18,
-    flex: 1,
-  },
+  infoText: { fontSize: 13, lineHeight: 18, flex: 1 },
 });
