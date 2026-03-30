@@ -835,7 +835,7 @@ export interface PiAutoGroupMember {
   invited_at: string;
   accepted_at?: string;
   declined_at?: string;
-  status: 'pending' | 'accepted' | 'declined' | 'left';
+  status: 'pending' | 'accepted' | 'declined' | 'expired' | 'left';
 }
 
 export interface PiGroupClaim {
