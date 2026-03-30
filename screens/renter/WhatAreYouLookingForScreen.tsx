@@ -94,7 +94,7 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
 
   const [saving, setSaving] = useState(false);
 
-  const doSave = async (listingPref: 'room' | 'entire_apartment' | 'any', searchType: 'solo' | 'with_partner' | 'with_roommates' | 'have_group') => {
+  const doSave = async (listingPref: 'room' | 'entire_apartment' | 'any', searchType: 'solo' | 'with_partner' | 'with_roommates' | 'have_group', skipComplete?: boolean) => {
     if (!user) return;
     setSaving(true);
     try {
@@ -114,7 +114,8 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
           apartment_search_type: searchType,
         },
       });
-      onComplete();
+      setSaving(false);
+      if (!skipComplete) onComplete();
     } catch (err) {
       console.error('Failed to update local user state:', err);
       setSaving(false);
@@ -190,39 +191,13 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
 
   const handlePlaceSubSelect = (id: PlaceSubIntent) => {
     setSelectedCard(id);
-    setTimeout(async () => {
+    setTimeout(() => {
       setSelectedCard(null);
       const listingPref = id === 'have_group' ? 'any' as const : 'entire_apartment' as const;
       if (id === 'have_group' && !isSettings) {
-        setSaving(true);
-        try {
-          await updateProfile({
-            listing_type_preference: listingPref,
-            apartment_search_type: id,
-          });
-        } catch (err) {
-          console.warn('Profile update failed during intent selection, will retry during onboarding:', err);
-        }
-
-        try {
-          await updateUser({
-            profileData: {
-              ...user?.profileData,
-              listing_type_preference: listingPref,
-              apartment_search_type: id,
-            },
-          });
-          setSaving(false);
+        doSave(listingPref, id, true).then(() => {
           animateForward(() => setStep('group_prompt'));
-        } catch (err) {
-          console.error('Failed to update local user state:', err);
-          setSaving(false);
-          Alert.alert(
-            'Something went wrong',
-            'Could not save your preference. Please try again.',
-            [{ text: 'OK' }]
-          );
-        }
+        });
       } else {
         saveAndContinue(listingPref, id);
       }
