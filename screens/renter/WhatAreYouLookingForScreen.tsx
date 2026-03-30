@@ -136,7 +136,8 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
     setSelectedCard(id);
     setTimeout(() => {
       setSelectedCard(null);
-      saveAndContinue('any', id);
+      const listingPref = id === 'have_group' ? 'any' as const : 'entire_apartment' as const;
+      saveAndContinue(listingPref, id);
     }, 150);
   };
 

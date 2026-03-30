@@ -12,6 +12,7 @@ import { ProfileStackNavigator } from './ProfileStackNavigator';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotificationContext } from '../contexts/NotificationContext';
+import { shouldShowRoommateFeatures } from '../utils/renterIntentUtils';
 
 export type RenterTabParamList = {
   Explore: { viewListingId?: string } | undefined;
@@ -134,8 +135,7 @@ const tabStyles = StyleSheet.create({
 
 export const RenterTabNavigator = () => {
   const { user } = useAuth();
-  const searchType = user?.profileData?.apartment_search_type;
-  const showRoommateFeatures = !searchType || searchType === 'with_roommates' || searchType === 'have_group';
+  const showRoommateFeatures = shouldShowRoommateFeatures(user?.profileData?.apartment_search_type);
 
   const tabKey = showRoommateFeatures ? 'full' : 'lite';
 

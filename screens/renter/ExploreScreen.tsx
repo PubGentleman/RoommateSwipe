@@ -182,6 +182,12 @@ export const ExploreScreen = () => {
   }, [activeCity]);
 
   useEffect(() => {
+    const newPref = user?.profileData?.listing_type_preference;
+    const mapped = newPref === 'room' ? 'room' as const : newPref === 'entire_apartment' ? 'entire' as const : 'any' as const;
+    setListingTypeFilter(mapped);
+  }, [user?.profileData?.listing_type_preference]);
+
+  useEffect(() => {
     applyFilters();
   }, [properties, filters, viewMode, saved, activeCity, activeSubArea, selectedNeighborhood, activeQuickFilters, listingTypeFilter]);
 

@@ -702,7 +702,7 @@ export const ProfileScreen = () => {
                   if (st === 'with_partner') return 'Finding a place with partner';
                   if (st === 'have_group') return 'Finding a place with your group';
                   if (st === 'with_roommates') return 'Finding roommates';
-                  return 'Set your search preference';
+                  return 'Choose how you want to search';
                 })()}
                 onPress={() => navigation.navigate('SearchIntent')}
               />
