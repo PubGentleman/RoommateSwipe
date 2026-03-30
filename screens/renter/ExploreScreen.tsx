@@ -1378,7 +1378,7 @@ export const ExploreScreen = () => {
           }}
         >
           <Feather
-            name={displayMode === 'list' ? 'map' : 'align-justify'}
+            name={displayMode === 'list' ? 'map' : 'list'}
             size={18}
             color={displayMode === 'map' ? '#ff6b5b' : 'rgba(255,255,255,0.6)'}
           />
