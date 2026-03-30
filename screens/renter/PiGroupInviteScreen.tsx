@@ -463,7 +463,7 @@ export const PiGroupInviteScreen = () => {
               ? 'Invite expired'
               : `${timeRemaining.hours}h ${timeRemaining.minutes}m remaining`}
           </Text>
-          {timeRemaining.isUrgent && !timeRemaining.expired && !extendedTime ? (
+          {!timeRemaining.expired && !extendedTime ? (
             <Pressable style={styles.extendBtn} onPress={handleExtendTime}>
               <Text style={styles.extendBtnText}>I need more time</Text>
             </Pressable>

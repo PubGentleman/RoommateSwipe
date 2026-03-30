@@ -661,7 +661,7 @@ export interface InterestCard {
 export interface Notification {
   id: string;
   userId: string;
-  type: 'match' | 'message' | 'group_invite' | 'group_accepted' | 'group_complete' | 'group_match' | 'company_group_invite' | 'meetup_suggestion' | 'property_update' | 'property_rented' | 'application_status' | 'system' | 'super_like' | 'interest_received' | 'interest_accepted' | 'interest_passed' | 'interest_expired' | 'agent_invite' | 'ai_group_suggestion' | 'background_check' | 'activity_nudge' | 'movein_checkin';
+  type: 'match' | 'message' | 'group_invite' | 'group_accepted' | 'group_complete' | 'group_match' | 'company_group_invite' | 'meetup_suggestion' | 'property_update' | 'property_rented' | 'application_status' | 'system' | 'super_like' | 'interest_received' | 'interest_accepted' | 'interest_passed' | 'interest_expired' | 'agent_invite' | 'ai_group_suggestion' | 'background_check' | 'activity_nudge' | 'movein_checkin' | 'pi_group_assembled' | 'pi_member_accepted' | 'pi_group_confirmed' | 'pi_member_declined' | 'pi_group_expired' | 'pi_replacement_found';
   title: string;
   body: string;
   isRead: boolean;
