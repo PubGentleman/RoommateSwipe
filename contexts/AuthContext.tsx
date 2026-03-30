@@ -272,6 +272,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         desired_bedroom_count: profile.desired_bedroom_count ?? undefined,
         household_gender_preference: profile.household_gender_preference || undefined,
         pi_auto_match_enabled: profile.pi_auto_match_enabled ?? undefined,
+        listing_type_preference: profile.listing_type_preference || 'any',
+        apartment_search_type: profile.apartment_search_type || null,
       } : {
         neighborhood: supabaseUser.neighborhood || 'Williamsburg',
         city: supabaseUser.city || 'New York',

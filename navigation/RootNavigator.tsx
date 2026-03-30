@@ -8,6 +8,7 @@ import { PlanSelectionScreen } from '../screens/shared/PlanSelectionScreen';
 import { HostTypeSelectScreen } from '../screens/host/onboarding/HostTypeSelectScreen';
 import { HostCompanySetupScreen } from '../screens/host/onboarding/HostCompanySetupScreen';
 import { HostAgentSetupScreen } from '../screens/host/onboarding/HostAgentSetupScreen';
+import WhatAreYouLookingForScreen from '../screens/renter/WhatAreYouLookingForScreen';
 import { RenterTabNavigator } from './RenterTabNavigator';
 import { HostTabNavigator } from './HostTabNavigator';
 import { ProfileReminderOverlay } from '../components/ProfileReminderOverlay';
@@ -49,6 +50,7 @@ export const RootNavigator = () => {
   const { theme } = useTheme();
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [intentCompletedForUserId, setIntentCompletedForUserId] = useState<string | null>(null);
 
   useEffect(() => {
     StorageService.isOnboardingCompleted().then((completed) => {
@@ -107,6 +109,15 @@ export const RootNavigator = () => {
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="OnboardingPlan" component={PlanSelectionScreen} />
       </Stack.Navigator>
+    );
+  }
+
+  const needsRenterIntent = user.role === 'renter' && intentCompletedForUserId !== user.id && !user.profileData?.apartment_search_type;
+  if (needsRenterIntent) {
+    return (
+      <WhatAreYouLookingForScreen
+        onComplete={() => setIntentCompletedForUserId(user.id)}
+      />
     );
   }
 

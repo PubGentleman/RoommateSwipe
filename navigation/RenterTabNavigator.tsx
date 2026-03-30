@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Pressable, StyleSheet, Platform, Text } from 'react-native';
 import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Feather } from '../components/VectorIcons';
@@ -10,6 +10,7 @@ import { GroupsStackNavigator } from './GroupsStackNavigator';
 import { MessagesStackNavigator } from './MessagesStackNavigator';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
 import { useTheme } from '../hooks/useTheme';
+import { useAuth } from '../contexts/AuthContext';
 import { useNotificationContext } from '../contexts/NotificationContext';
 
 export type RenterTabParamList = {
@@ -132,9 +133,16 @@ const tabStyles = StyleSheet.create({
 });
 
 export const RenterTabNavigator = () => {
+  const { user } = useAuth();
+  const searchType = user?.profileData?.apartment_search_type;
+  const showRoommateFeatures = !searchType || searchType === 'with_roommates' || searchType === 'have_group';
+
+  const tabKey = showRoommateFeatures ? 'full' : 'lite';
+
   return (
     <Tab.Navigator
-      initialRouteName="Roommates"
+      key={tabKey}
+      initialRouteName={showRoommateFeatures ? 'Roommates' : 'Explore'}
       tabBar={(props) => <CustomTabBar {...props} />}
       backBehavior="history"
       screenOptions={{
@@ -144,8 +152,12 @@ export const RenterTabNavigator = () => {
       }}
     >
       <Tab.Screen name="Explore" component={ExploreScreen} />
-      <Tab.Screen name="Roommates" component={RoommatesStackNavigator} />
-      <Tab.Screen name="Groups" component={GroupsStackNavigator} />
+      {showRoommateFeatures ? (
+        <Tab.Screen name="Roommates" component={RoommatesStackNavigator} />
+      ) : null}
+      {showRoommateFeatures ? (
+        <Tab.Screen name="Groups" component={GroupsStackNavigator} />
+      ) : null}
       <Tab.Screen name="Messages" component={MessagesStackNavigator} />
       <Tab.Screen name="Profile" component={ProfileStackNavigator} />
     </Tab.Navigator>

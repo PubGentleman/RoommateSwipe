@@ -689,6 +689,24 @@ export const ProfileScreen = () => {
               subtitle="Manage payment methods"
               onPress={() => navigation.navigate('Plans')}
             />
+            {user?.role === 'renter' ? (
+              <SettingsItem
+                iconName="target"
+                iconColor="#4a9eff"
+                iconBgColor="rgba(74,158,255,0.12)"
+                iconBorderColor="rgba(74,158,255,0.18)"
+                title="Search Intent"
+                subtitle={(() => {
+                  const st = user?.profileData?.apartment_search_type;
+                  if (st === 'solo') return 'Finding a place for yourself';
+                  if (st === 'with_partner') return 'Finding a place with partner';
+                  if (st === 'have_group') return 'Finding a place with your group';
+                  if (st === 'with_roommates') return 'Finding roommates';
+                  return 'Set your search preference';
+                })()}
+                onPress={() => navigation.navigate('SearchIntent')}
+              />
+            ) : null}
             <SettingsItem
               iconName="users"
               iconColor="#ff6b5b"

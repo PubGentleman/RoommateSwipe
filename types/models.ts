@@ -47,6 +47,8 @@ export interface RoommateProfile {
     household_gender_preference?: GenderPreference;
     pi_auto_match_enabled?: boolean;
     pi_last_match_attempt?: string;
+    listing_type_preference?: 'room' | 'entire_apartment' | 'any';
+    apartment_search_type?: 'solo' | 'with_partner' | 'with_roommates' | 'have_group' | null;
     [key: string]: any;
   };
   references?: Reference[];
@@ -545,6 +547,8 @@ export interface User {
     bio?: string;
     budget?: number;
     lookingFor?: 'room' | 'entire_apartment';
+    listing_type_preference?: 'room' | 'entire_apartment' | 'any';
+    apartment_search_type?: 'solo' | 'with_partner' | 'with_roommates' | 'have_group' | null;
     location?: string;
     neighborhood?: string;
     city?: string;

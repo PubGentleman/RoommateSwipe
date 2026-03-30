@@ -131,7 +131,10 @@ export const ExploreScreen = () => {
   const [paywallFeature, setPaywallFeature] = useState('');
   const [paywallPlan, setPaywallPlan] = useState<'plus' | 'elite'>('plus');
   const [activeQuickFilters, setActiveQuickFilters] = useState<Set<string>>(new Set(['bestMatch']));
-  const [listingTypeFilter, setListingTypeFilter] = useState<'any' | 'room' | 'entire' | 'sublet'>('any');
+  const intentPref = user?.profileData?.listing_type_preference;
+  const [listingTypeFilter, setListingTypeFilter] = useState<'any' | 'room' | 'entire' | 'sublet'>(
+    intentPref === 'room' ? 'room' : intentPref === 'entire_apartment' ? 'entire' : 'any'
+  );
   const [showAISheet, setShowAISheet] = useState(false);
   const [interestNote, setInterestNote] = useState('');
   const [userGroups, setUserGroups] = useState<Group[]>([]);

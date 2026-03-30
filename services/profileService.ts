@@ -32,6 +32,8 @@ export interface ProfileData {
   desired_bedroom_count?: number;
   household_gender_preference?: 'any' | 'male_only' | 'female_only' | 'same_gender';
   pi_auto_match_enabled?: boolean;
+  listing_type_preference?: 'room' | 'entire_apartment' | 'any';
+  apartment_search_type?: 'solo' | 'with_partner' | 'with_roommates' | 'have_group' | null;
 }
 
 export interface UserData {
