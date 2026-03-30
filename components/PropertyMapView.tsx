@@ -63,12 +63,10 @@ function buildLeafletHtml(
 <html><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
-<meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;"/>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-html,body,#map{width:100%;height:100%}
+html,body,#map{width:100%;height:100%;background:${isDark ? '#1a1a2e' : '#f0f0f0'}}
+#loading{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:${isDark ? 'rgba(255,255,255,0.4)' : '#999'};font-family:-apple-system,system-ui,sans-serif;font-size:13px}
 .popup-card{font-family:-apple-system,system-ui,sans-serif;width:220px;overflow:hidden;border-radius:12px;background:${isDark ? '#1a1a1a' : '#fff'};box-shadow:0 4px 20px rgba(0,0,0,0.3)}
 .popup-card img{width:100%;height:110px;object-fit:cover;display:block}
 .popup-info{padding:10px 12px}
@@ -77,48 +75,51 @@ html,body,#map{width:100%;height:100%}
 .popup-meta{display:flex;align-items:center;justify-content:space-between;margin-top:6px}
 .popup-beds{font-size:11px;color:${isDark ? 'rgba(255,255,255,0.5)' : '#888'}}
 .popup-match{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px}
-.leaflet-popup-content-wrapper{padding:0!important;border-radius:12px!important;background:transparent!important;box-shadow:none!important}
-.leaflet-popup-content{margin:0!important;width:auto!important}
-.leaflet-popup-tip{display:none}
 </style>
 </head><body>
-<div id="map"></div>
+<div id="map"><div id="loading">Loading map...</div></div>
 <script>
-var map=L.map('map',{zoomControl:false}).setView([${center.lat},${center.lng}],${zoom});
-L.tileLayer('${tileUrl}',{attribution:'',maxZoom:19}).addTo(map);
-L.control.zoom({position:'bottomright'}).addTo(map);
-var markers=${markersJson};
-markers.forEach(function(m){
-  var photoHtml = m.photo
-    ? '<img src="'+m.photo+'" style="width:44px;height:44px;object-fit:cover;border-radius:50%;display:block" onerror="this.style.display=\'none\';this.parentNode.innerHTML=\'<div style=\\\"width:44px;height:44px;border-radius:50%;background:#ff6b5b;display:flex;align-items:center;justify-content:center;font-size:18px\\\">&#127968;</div>\'">'
-    : '<div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#ff6b5b,#e83a2a);display:flex;align-items:center;justify-content:center;font-size:18px">&#127968;</div>';
-
-  var icon=L.divIcon({
-    className:'',
-    html:'<div style="display:flex;flex-direction:column;align-items:center;cursor:pointer">'
-      +'<div style="width:44px;height:44px;border-radius:50%;overflow:hidden;border:2.5px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,0.35)">'
-        +photoHtml
-      +'</div>'
-      +'<div style="background:linear-gradient(135deg,#ff6b5b,#e83a2a);color:#fff;font-weight:700;font-size:11px;font-family:-apple-system,system-ui,sans-serif;padding:3px 9px;border-radius:20px;margin-top:4px;white-space:nowrap;box-shadow:0 2px 6px rgba(255,80,60,0.45);border:1.5px solid rgba(255,255,255,0.25)">$'+m.price.toLocaleString()+'</div>'
-      +'<div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid #e83a2a;margin-top:-1px"></div>'
-    +'</div>',
-    iconSize:[44,70],
-    iconAnchor:[22,70]
+function loadCSS(url,cb){var l=document.createElement('link');l.rel='stylesheet';l.href=url;l.onload=cb;l.onerror=cb;document.head.appendChild(l)}
+function loadJS(url,cb){var s=document.createElement('script');s.src=url;s.onload=cb;s.onerror=function(){
+  var el=document.getElementById('loading');if(el)el.textContent='Map unavailable';
+};document.head.appendChild(s)}
+loadCSS('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',function(){
+  loadJS('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',function(){
+    if(typeof L==='undefined')return;
+    var el=document.getElementById('loading');if(el)el.remove();
+    var map=L.map('map',{zoomControl:false}).setView([${center.lat},${center.lng}],${zoom});
+    L.tileLayer('${tileUrl}',{attribution:'',maxZoom:19}).addTo(map);
+    L.control.zoom({position:'bottomright'}).addTo(map);
+    var markers=${markersJson};
+    markers.forEach(function(m){
+      var photoHtml=m.photo
+        ?'<img src="'+m.photo+'" style="width:44px;height:44px;object-fit:cover;border-radius:50%;display:block" onerror="this.style.display=\\'none\\';this.parentNode.innerHTML=\\'<div style=\\\\\"width:44px;height:44px;border-radius:50%;background:#ff6b5b;display:flex;align-items:center;justify-content:center;font-size:18px\\\\\">*</div>\\'">'
+        :'<div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#ff6b5b,#e83a2a);display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff">*</div>';
+      var icon=L.divIcon({
+        className:'',
+        html:'<div style="display:flex;flex-direction:column;align-items:center;cursor:pointer">'
+          +'<div style="width:44px;height:44px;border-radius:50%;overflow:hidden;border:2.5px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,0.35)">'
+          +photoHtml+'</div>'
+          +'<div style="background:linear-gradient(135deg,#ff6b5b,#e83a2a);color:#fff;font-weight:700;font-size:11px;font-family:-apple-system,system-ui,sans-serif;padding:3px 9px;border-radius:20px;margin-top:4px;white-space:nowrap;box-shadow:0 2px 6px rgba(255,80,60,0.45);border:1.5px solid rgba(255,255,255,0.25)">$'+m.price.toLocaleString()+'</div>'
+          +'<div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid #e83a2a;margin-top:-1px"></div>'
+          +'</div>',
+        iconSize:[44,70],iconAnchor:[22,70]
+      });
+      var popup='<div class="popup-card" onclick="var msg=JSON.stringify({type:\\'propertyTap\\',id:\\''+m.id+'\\',token:\\'__MSG_TOKEN__\\'});if(window.ReactNativeWebView){window.ReactNativeWebView.postMessage(msg)}else{window.parent.postMessage(msg,\\'*\\')}">'
+        +'<img src="'+m.photo+'"/><div class="popup-info">'
+        +'<div class="popup-price">$'+m.price+'/mo</div>'
+        +'<div class="popup-title">'+m.title+'</div>'
+        +'<div class="popup-meta"><span class="popup-beds">'+m.beds+'bd '+m.baths+'ba</span>'
+        +(m.matchPct!==null?'<span class="popup-match" style="background:'+m.matchColor+'20;color:'+m.matchColor+'">'+m.matchPct+'%</span>':'')
+        +'</div></div></div>';
+      L.marker([m.lat,m.lng],{icon:icon}).addTo(map).bindPopup(popup,{maxWidth:240,minWidth:220});
+    });
+    if(markers.length>1){
+      var bounds=L.latLngBounds(markers.map(function(m){return[m.lat,m.lng]}));
+      map.fitBounds(bounds,{padding:[40,40]});
+    }
   });
-  var popup='<div class="popup-card" onclick="var msg=JSON.stringify({type:\\'propertyTap\\',id:\\''+m.id+'\\',token:\\'__MSG_TOKEN__\\'});if(window.ReactNativeWebView){window.ReactNativeWebView.postMessage(msg)}else{window.parent.postMessage(msg,\\'*\\')}">'
-    +'<img src="'+m.photo+'"/>'
-    +'<div class="popup-info">'
-    +'<div class="popup-price">$'+m.price+'/mo</div>'
-    +'<div class="popup-title">'+m.title+'</div>'
-    +'<div class="popup-meta"><span class="popup-beds">'+m.beds+'bd '+m.baths+'ba</span>'
-    +(m.matchPct!==null?'<span class="popup-match" style="background:'+m.matchColor+'20;color:'+m.matchColor+'">'+m.matchPct+'%</span>':'')
-    +'</div></div></div>';
-  L.marker([m.lat,m.lng],{icon:icon}).addTo(map).bindPopup(popup,{maxWidth:240,minWidth:220});
 });
-if(markers.length>1){
-  var bounds=L.latLngBounds(markers.map(function(m){return[m.lat,m.lng]}));
-  map.fitBounds(bounds,{padding:[40,40]});
-}
 </script>
 </body></html>`;
 }
@@ -233,7 +234,7 @@ export const PropertyMapView = ({
     <View style={[styles.mapContainer, { paddingBottom: bottomInset }]}>
       <WebView
         originWhitelist={['*']}
-        source={{ html: htmlWithToken, baseUrl: 'https://rhomeapp.io' }}
+        source={{ html: htmlWithToken }}
         style={styles.map}
         javaScriptEnabled
         domStorageEnabled
