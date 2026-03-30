@@ -222,6 +222,35 @@ export const PiMatchedGroupsScreen = () => {
     return `${fmt(min)} - ${fmt(max)}`;
   };
 
+  if (isFreePlan) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={styles.header}>
+          <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <Feather name="arrow-left" size={20} color="#fff" />
+          </Pressable>
+          <Text style={styles.headerTitle}>{'\u03C0'} Pi Matched Groups</Text>
+        </View>
+        <View style={styles.emptyContainer}>
+          <View style={[styles.emptyIconWrap, { backgroundColor: ACCENT + '15' }]}>
+            <Feather name="lock" size={36} color={ACCENT} />
+          </View>
+          <Text style={styles.emptyTitle}>Starter Plan Required</Text>
+          <Text style={styles.emptySubtitle}>
+            Upgrade to a Starter plan or higher to browse and claim Pi-assembled roommate groups.
+          </Text>
+          <Pressable
+            style={[styles.claimBtn, { marginTop: 24, paddingHorizontal: 32 }]}
+            onPress={() => navigation.navigate('HostSubscription')}
+          >
+            <Feather name="arrow-up-circle" size={16} color="#fff" />
+            <Text style={styles.claimBtnText}>View Plans</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
   const AMENITY_ICONS: Record<string, string> = {
     laundry: 'wind', dishwasher: 'disc', parking: 'truck',
     gym: 'activity', pool: 'droplet', doorman: 'shield',
@@ -292,6 +321,29 @@ export const PiMatchedGroupsScreen = () => {
           <View style={styles.infoRow}>
             <Feather name="user" size={12} color="rgba(255,255,255,0.5)" />
             <Text style={styles.infoText}>{item.gender_composition}</Text>
+          </View>
+        ) : null}
+
+        {item.amenity_preferences && item.amenity_preferences.length > 0 ? (
+          <View style={styles.amenityRow}>
+            {item.amenity_preferences.slice(0, 6).map(amenity => {
+              const iconName = AMENITY_ICONS[amenity.toLowerCase()] || 'check';
+              return (
+                <View key={amenity} style={styles.amenityChip}>
+                  <Feather name={iconName as string} size={10} color="rgba(255,255,255,0.5)" />
+                  <Text style={styles.amenityChipText}>{amenity}</Text>
+                </View>
+              );
+            })}
+          </View>
+        ) : null}
+
+        {item.location_preferences && item.location_preferences.length > 0 ? (
+          <View style={styles.infoRow}>
+            <Feather name="navigation" size={12} color="rgba(255,255,255,0.5)" />
+            <Text style={styles.infoText} numberOfLines={1}>
+              Near: {item.location_preferences.slice(0, 3).join(', ')}
+            </Text>
           </View>
         ) : null}
 
@@ -559,6 +611,15 @@ const styles = StyleSheet.create({
     backgroundColor: PURPLE, borderRadius: 10, paddingVertical: 11, marginTop: 4,
   },
   claimBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  amenityRow: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6,
+  },
+  amenityChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 6,
+    paddingHorizontal: 6, paddingVertical: 3,
+  },
+  amenityChipText: { color: 'rgba(255,255,255,0.4)', fontSize: 10 },
   emptyContainer: { alignItems: 'center', paddingTop: 80, paddingHorizontal: 32 },
   emptyIconWrap: {
     width: 72, height: 72, borderRadius: 36,

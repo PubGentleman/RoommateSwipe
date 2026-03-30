@@ -826,6 +826,8 @@ export interface PiAutoGroup {
   dissolved_at?: string;
   deadline_extended?: boolean;
   anchor_user_id?: string;
+  amenity_preferences?: string[];
+  location_preferences?: string[];
 }
 
 export interface PiAutoGroupMember {

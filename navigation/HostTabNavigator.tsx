@@ -73,6 +73,8 @@ export type AgentBrowseStackParamList = {
   RenterProfileDetail: { renter: any };
   RenterCompatibility: { renters: any[] };
   AgentGroupBuilder: { preselectedIds?: string[]; listingId?: string };
+  PiMatchedGroups: undefined;
+  PiClaimedGroupDetail: { groupId: string };
 };
 
 export type AgentGroupsStackParamList = {
@@ -150,6 +152,8 @@ function AgentBrowseStackNavigator() {
       <AgentBrowseStack.Screen name="RenterProfileDetail" component={RenterProfileDetailScreen} />
       <AgentBrowseStack.Screen name="RenterCompatibility" component={RenterCompatibilityScreen} />
       <AgentBrowseStack.Screen name="AgentGroupBuilder" component={AgentGroupBuilderScreen} />
+      <AgentBrowseStack.Screen name="PiMatchedGroups" component={PiMatchedGroupsScreen} />
+      <AgentBrowseStack.Screen name="PiClaimedGroupDetail" component={PiClaimedGroupDetailScreen} />
     </AgentBrowseStack.Navigator>
   );
 }

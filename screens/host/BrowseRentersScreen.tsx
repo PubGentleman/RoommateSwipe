@@ -591,6 +591,18 @@ export const BrowseRentersScreen = () => {
         <Feather name="chevron-down" size={16} color="#999" />
       </Pressable>
 
+      <Pressable
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#a855f7' + '12', borderRadius: 10, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#a855f7' + '30' }}
+        onPress={() => navigation.navigate('PiMatchedGroups')}
+      >
+        <Feather name="users" size={16} color="#a855f7" />
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>{'\u03C0'} Pi Matched Groups</Text>
+          <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>Browse pre-vetted roommate groups</Text>
+        </View>
+        <Feather name="chevron-right" size={16} color="#a855f7" />
+      </Pressable>
+
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
         {selectedListing && piRecommendedIds.size > 0 ? (
           <Pressable

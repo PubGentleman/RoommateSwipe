@@ -327,6 +327,44 @@ export const PiClaimedGroupDetailScreen = () => {
           ) : null}
         </View>
 
+        {group.amenity_preferences && group.amenity_preferences.length > 0 ? (
+          <View style={[styles.summaryCard, { marginTop: 12 }]}>
+            <Text style={styles.sectionLabel}>AMENITY NEEDS</Text>
+            <View style={styles.amenityGrid}>
+              {group.amenity_preferences.map(amenity => {
+                const iconMap: Record<string, string> = {
+                  laundry: 'wind', dishwasher: 'disc', parking: 'truck',
+                  gym: 'activity', pool: 'droplet', doorman: 'shield',
+                  elevator: 'arrow-up', ac: 'thermometer', pets: 'heart',
+                  wifi: 'wifi', storage: 'archive', balcony: 'sun',
+                  rooftop: 'sunrise',
+                };
+                const icon = iconMap[amenity.toLowerCase()] || 'check';
+                return (
+                  <View key={amenity} style={styles.amenityTag}>
+                    <Feather name={icon as string} size={12} color={PURPLE} />
+                    <Text style={styles.amenityTagText}>{amenity}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        ) : null}
+
+        {group.location_preferences && group.location_preferences.length > 0 ? (
+          <View style={[styles.summaryCard, { marginTop: 12 }]}>
+            <Text style={styles.sectionLabel}>LOCATION PREFERENCES</Text>
+            <View style={styles.amenityGrid}>
+              {group.location_preferences.map(pref => (
+                <View key={pref} style={styles.amenityTag}>
+                  <Feather name="navigation" size={12} color="#3b82f6" />
+                  <Text style={[styles.amenityTagText, { color: '#3b82f6' }]}>{pref}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
         <Text style={[styles.sectionLabel, { marginTop: 20, marginBottom: 12 }]}>
           MEMBERS ({members.length})
         </Text>
@@ -534,6 +572,15 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.5)', fontSize: 12, lineHeight: 17, flex: 1,
     fontStyle: 'italic',
   },
+  amenityGrid: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8,
+  },
+  amenityTag: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 6,
+  },
+  amenityTagText: { color: 'rgba(255,255,255,0.6)', fontSize: 12 },
   memberCard: {
     backgroundColor: CARD_BG, borderRadius: 12, padding: 14, marginBottom: 10,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',

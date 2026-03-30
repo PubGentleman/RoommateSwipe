@@ -28,7 +28,9 @@ CREATE TABLE IF NOT EXISTS public.pi_auto_groups (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   ready_at TIMESTAMPTZ,
   expires_at TIMESTAMPTZ,
-  dissolved_at TIMESTAMPTZ
+  dissolved_at TIMESTAMPTZ,
+  amenity_preferences TEXT[] DEFAULT '{}',
+  location_preferences TEXT[] DEFAULT '{}'
 );
 
 CREATE INDEX IF NOT EXISTS idx_pi_auto_groups_status ON public.pi_auto_groups(status);
@@ -105,13 +107,20 @@ CREATE POLICY "Hosts can update their own claims" ON public.pi_group_claims
 -- RLS policies for pi_auto_groups
 ALTER TABLE public.pi_auto_groups ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can view groups they belong to" ON public.pi_auto_groups
+CREATE POLICY "Users can view groups they belong to or hosts browse marketplace" ON public.pi_auto_groups
   FOR SELECT USING (
     EXISTS (
       SELECT 1 FROM public.pi_auto_group_members m
       WHERE m.group_id = id AND m.user_id = auth.uid()
     )
-    OR status IN ('ready', 'claimed')
+    OR (
+      status IN ('ready', 'claimed')
+      AND EXISTS (
+        SELECT 1 FROM public.profiles p
+        WHERE p.user_id = auth.uid()
+          AND p.role IN ('host', 'agent', 'company')
+      )
+    )
   );
 
 -- RLS policies for pi_auto_group_members
