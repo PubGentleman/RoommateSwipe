@@ -216,6 +216,9 @@ export const PiGroupInviteScreen = () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       setResponded(true);
       setResponseAction('declined');
+      setTimeout(() => {
+        navigation.goBack();
+      }, 2000);
     } catch {
       Alert.alert('Error', 'Something went wrong. Please try again.');
     } finally {
@@ -474,8 +477,8 @@ export const PiGroupInviteScreen = () => {
         </View>
 
         {hasRisks ? (
-          <View style={[styles.riskBanner, { backgroundColor: '#f8717115', borderColor: '#f8717130' }]}>
-            <Feather name="alert-triangle" size={16} color="#f87171" />
+          <View style={[styles.riskBanner, { backgroundColor: '#fbbf2415', borderColor: '#fbbf2430' }]}>
+            <Feather name="alert-triangle" size={16} color="#fbbf24" />
             <View style={styles.riskContent}>
               {riskMessages.map((msg, i) => (
                 <Text key={i} style={styles.riskText}>{msg}</Text>
@@ -693,7 +696,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   riskContent: { flex: 1, gap: 4 },
-  riskText: { fontSize: 13, color: '#f87171', lineHeight: 18 },
+  riskText: { fontSize: 13, color: '#fbbf24', lineHeight: 18 },
   section: { marginBottom: 16 },
   sectionHeader: {
     flexDirection: 'row',
