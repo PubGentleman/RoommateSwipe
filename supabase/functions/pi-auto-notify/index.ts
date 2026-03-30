@@ -4,11 +4,23 @@ import { CORS_HEADERS, errorResponse, jsonResponse, stripName } from '../_shared
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const CRON_SECRET = Deno.env.get('CRON_SECRET') || '';
 
 const ACCEPTANCE_HOURS = 72;
 
+function verifyCronAuth(req: Request): boolean {
+  const authHeader = req.headers.get('Authorization') || '';
+  if (authHeader === `Bearer ${SUPABASE_SERVICE_KEY}`) return true;
+  if (CRON_SECRET && authHeader === `Bearer ${CRON_SECRET}`) return true;
+  return false;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
+
+  if (!verifyCronAuth(req)) {
+    return errorResponse('Unauthorized: service-role or cron secret required', 401);
+  }
 
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
@@ -53,8 +65,9 @@ serve(async (req) => {
       })
       .eq('id', groupId);
 
-    const notifications = [];
+    const avgScore = group.avg_compatibility_score || 0;
     let notificationsSent = 0;
+    let pushNotificationsSent = 0;
 
     for (const member of members) {
       const otherNames = members
@@ -64,13 +77,11 @@ serve(async (req) => {
           return stripName(u?.full_name || u?.name);
         });
 
-      const avgScore = group.avg_compatibility_score || 0;
       const scoreText = avgScore > 0 ? ` ${avgScore}% compatible.` : '';
-
       const title = 'Pi found your roommates!';
       const notifBody = `Meet ${otherNames.join(' & ')} --${scoreText} I put this group together because I think you'd genuinely enjoy living together. You have ${ACCEPTANCE_HOURS} hours to say yes.`;
 
-      notifications.push({
+      const { error: notifError } = await supabase.from('notifications').insert({
         user_id: member.user_id,
         type: 'pi_group_assembled',
         title,
@@ -85,17 +96,34 @@ serve(async (req) => {
           city: group.city,
         },
       });
-    }
 
-    if (notifications.length > 0) {
-      const { error: notifError } = await supabase
-        .from('notifications')
-        .insert(notifications);
+      if (!notifError) notificationsSent++;
 
-      if (notifError) {
-        console.error('Notification insert error:', notifError);
-      } else {
-        notificationsSent = notifications.length;
+      const { data: pushTokenData } = await supabase
+        .from('push_tokens')
+        .select('token')
+        .eq('user_id', member.user_id);
+
+      if (pushTokenData && pushTokenData.length > 0) {
+        for (const tokenRow of pushTokenData) {
+          try {
+            await fetch('https://exp.host/--/api/v2/push/send', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                to: tokenRow.token,
+                title,
+                body: notifBody,
+                data: { type: 'pi_group_assembled', groupId },
+                sound: 'default',
+                badge: 1,
+              }),
+            });
+            pushNotificationsSent++;
+          } catch (pushErr) {
+            console.error('Push send error:', pushErr);
+          }
+        }
       }
     }
 
@@ -103,6 +131,7 @@ serve(async (req) => {
       success: true,
       group_id: groupId,
       notifications_sent: notificationsSent,
+      push_notifications_sent: pushNotificationsSent,
       deadline,
       members_notified: memberUserIds,
     });

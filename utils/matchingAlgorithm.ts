@@ -1273,6 +1273,50 @@ export interface GroupCompatibilityResult {
   memberScores: Array<{ userId1: string; userId2: string; score: number }>;
 }
 
+function getMemberName(m: User | RoommateProfile): string {
+  const user = m as User;
+  const profile = m as RoommateProfile;
+  return user.name || profile.name || m.id;
+}
+
+function getMemberGender(m: User | RoommateProfile): string | undefined {
+  const user = m as User;
+  const profile = m as RoommateProfile;
+  return user.profileData?.gender || profile.profileData?.gender || profile.gender;
+}
+
+function getMemberGenderPreference(m: User | RoommateProfile): string | undefined {
+  const user = m as User;
+  const profile = m as RoommateProfile;
+  return user.household_gender_preference ||
+    user.profileData?.household_gender_preference ||
+    profile.household_gender_preference ||
+    profile.profileData?.household_gender_preference;
+}
+
+function getMemberBudget(m: User | RoommateProfile): number | undefined {
+  const user = m as User;
+  const profile = m as RoommateProfile;
+  return user.profileData?.budget || profile.budget;
+}
+
+function getMemberMoveInDate(m: User | RoommateProfile): string | undefined {
+  const user = m as User;
+  const profile = m as RoommateProfile;
+  return user.profileData?.preferences?.moveInDate || profile.preferences?.moveInDate;
+}
+
+function getMemberNeighborhoods(m: User | RoommateProfile): Set<string> {
+  const user = m as User;
+  const profile = m as RoommateProfile;
+  return new Set<string>([
+    ...(user.profileData?.preferred_neighborhoods || []),
+    ...(profile.profileData?.preferred_neighborhoods || []),
+    ...(user.profileData?.neighborhood ? [user.profileData.neighborhood] : []),
+    ...(profile.preferredNeighborhoods || []),
+  ].filter(Boolean).map((n: string) => n.toLowerCase()));
+}
+
 export function calculateGroupCompatibility(
   members: Array<User | RoommateProfile>
 ): GroupCompatibilityResult {
@@ -1283,14 +1327,12 @@ export function calculateGroupCompatibility(
     for (let j = i + 1; j < members.length; j++) {
       const a = members[i];
       const b = members[j];
-      const aAsUser = a as User;
-      const bAsRoommate = b as RoommateProfile;
-      const score = calculateDetailedCompatibility(aAsUser, bAsRoommate);
+      const score = calculateDetailedCompatibility(a as User, b as RoommateProfile);
       pairScores.push({ userId1: a.id, userId2: b.id, score: score.totalScore });
 
       if (score.totalScore === 0 && score.reasons.concerns.length > 0) {
         dealbreakerConflicts.push(
-          `${(a as any).name || a.id} & ${(b as any).name || b.id}: ${score.reasons.concerns[0]}`
+          `${getMemberName(a)} & ${getMemberName(b)}: ${score.reasons.concerns[0]}`
         );
       }
     }
@@ -1316,16 +1358,15 @@ export function checkGenderCompliance(
   members: Array<User | RoommateProfile>
 ): boolean {
   for (const member of members) {
-    const pref = (member as any).household_gender_preference ||
-      (member as any).profileData?.household_gender_preference;
+    const pref = getMemberGenderPreference(member);
     if (!pref || pref === 'any') continue;
 
-    const memberGender = (member as any).profileData?.gender || (member as any).gender;
+    const memberGender = getMemberGender(member);
     if (!memberGender) continue;
 
     for (const other of members) {
       if (other.id === member.id) continue;
-      const otherGender = (other as any).profileData?.gender || (other as any).gender;
+      const otherGender = getMemberGender(other);
       if (!otherGender) continue;
 
       if (pref === 'male_only' && otherGender !== 'male') return false;
@@ -1342,12 +1383,12 @@ export function checkGroupDealbreakers(
   const conflicts: string[] = [];
   for (let i = 0; i < members.length; i++) {
     for (let j = i + 1; j < members.length; j++) {
-      const a = members[i] as User;
-      const b = members[j] as RoommateProfile;
-      const score = calculateDetailedCompatibility(a, b);
+      const a = members[i];
+      const b = members[j];
+      const score = calculateDetailedCompatibility(a as User, b as RoommateProfile);
       if (score.totalScore === 0) {
         conflicts.push(
-          `${(a as any).name || a.id} & ${(b as any).name || b.id}: dealbreaker conflict`
+          `${getMemberName(a)} & ${getMemberName(b)}: dealbreaker conflict`
         );
       }
     }
@@ -1358,14 +1399,7 @@ export function checkGroupDealbreakers(
 export function calculateNeighborhoodOverlap(
   members: Array<User | RoommateProfile>
 ): number {
-  const memberNeighborhoods = members.map(m => {
-    const pd = (m as any).profileData;
-    return new Set<string>([
-      ...(pd?.preferred_neighborhoods || []),
-      ...(pd?.neighborhood ? [pd.neighborhood] : []),
-      ...((m as RoommateProfile).preferredNeighborhoods || []),
-    ].filter(Boolean).map((n: string) => n.toLowerCase()));
-  });
+  const memberNeighborhoods = members.map(m => getMemberNeighborhoods(m));
 
   if (memberNeighborhoods.some(s => s.size === 0)) return 0;
 
@@ -1382,7 +1416,7 @@ export function checkBudgetAlignment(
   members: Array<User | RoommateProfile>
 ): boolean {
   const budgets = members
-    .map(m => (m as any).profileData?.budget || (m as RoommateProfile).budget)
+    .map(m => getMemberBudget(m))
     .filter((b): b is number => typeof b === 'number' && b > 0);
 
   if (budgets.length < 2) return true;
@@ -1398,8 +1432,7 @@ export function checkMoveInAlignment(
 ): boolean {
   const dates = members
     .map(m => {
-      const dateStr = (m as any).profileData?.preferences?.moveInDate ||
-        (m as RoommateProfile).preferences?.moveInDate;
+      const dateStr = getMemberMoveInDate(m);
       return dateStr ? parseMoveInDate(dateStr) : null;
     })
     .filter((d): d is Date => d !== null);

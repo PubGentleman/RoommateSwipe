@@ -8,9 +8,17 @@ import {
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')!;
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const CRON_SECRET = Deno.env.get('CRON_SECRET') || '';
 
 const MIN_PAIRWISE_SCORE = 50;
 const ELIGIBLE_ACTIVE_DAYS = 30;
+
+function verifyCronAuth(req: Request): boolean {
+  const authHeader = req.headers.get('Authorization') || '';
+  if (authHeader === `Bearer ${SUPABASE_SERVICE_KEY}`) return true;
+  if (CRON_SECRET && authHeader === `Bearer ${CRON_SECRET}`) return true;
+  return false;
+}
 
 interface CandidateProfile {
   user_id: string;
@@ -110,14 +118,18 @@ function checkGenderCompatibility(members: CandidateProfile[]): boolean {
   return true;
 }
 
-function greedyAssemble(pool: CandidateProfile[], targetSize: number): CandidateProfile[][] {
+function greedyAssemble(
+  pool: CandidateProfile[],
+  targetSize: number,
+  globalReserved: Set<string>
+): CandidateProfile[][] {
   const groups: CandidateProfile[][] = [];
-  const used = new Set<string>();
+  const localUsed = new Set<string>();
 
-  const candidates = [...pool];
+  const candidates = pool.filter(c => !globalReserved.has(c.user_id));
 
-  while (candidates.filter(c => !used.has(c.user_id)).length >= targetSize) {
-    const available = candidates.filter(c => !used.has(c.user_id));
+  while (candidates.filter(c => !localUsed.has(c.user_id)).length >= targetSize) {
+    const available = candidates.filter(c => !localUsed.has(c.user_id));
 
     let bestPair: [CandidateProfile, CandidateProfile] | null = null;
     let bestPairScore = -1;
@@ -135,11 +147,11 @@ function greedyAssemble(pool: CandidateProfile[], targetSize: number): Candidate
     if (!bestPair || bestPairScore < MIN_PAIRWISE_SCORE) break;
 
     const group = [...bestPair];
-    used.add(bestPair[0].user_id);
-    used.add(bestPair[1].user_id);
+    localUsed.add(bestPair[0].user_id);
+    localUsed.add(bestPair[1].user_id);
 
     while (group.length < targetSize) {
-      const remaining = available.filter(c => !used.has(c.user_id));
+      const remaining = available.filter(c => !localUsed.has(c.user_id));
       if (remaining.length === 0) break;
 
       let bestCandidate: CandidateProfile | null = null;
@@ -162,10 +174,11 @@ function greedyAssemble(pool: CandidateProfile[], targetSize: number): Candidate
 
       if (!bestCandidate) break;
       group.push(bestCandidate);
-      used.add(bestCandidate.user_id);
+      localUsed.add(bestCandidate.user_id);
     }
 
     if (group.length >= 2) {
+      for (const m of group) globalReserved.add(m.user_id);
       groups.push(group);
     }
   }
@@ -175,6 +188,10 @@ function greedyAssemble(pool: CandidateProfile[], targetSize: number): Candidate
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
+
+  if (!verifyCronAuth(req)) {
+    return errorResponse('Unauthorized: service-role or cron secret required', 401);
+  }
 
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
@@ -263,6 +280,7 @@ serve(async (req) => {
       cityPools.get(city)!.push(c);
     }
 
+    const globalReserved = new Set<string>();
     const allCandidateGroups: CandidateProfile[][] = [];
 
     for (const [, pool] of cityPools) {
@@ -280,7 +298,7 @@ serve(async (req) => {
       for (const [size, sizePool] of sizePools) {
         const combined = [...sizePool, ...noPreference.filter(c => !sizePool.includes(c))];
         if (combined.length < size) continue;
-        const assembled = greedyAssemble(combined, Math.min(size, 5));
+        const assembled = greedyAssemble(combined, Math.min(size, 5), globalReserved);
         allCandidateGroups.push(...assembled);
       }
     }
@@ -411,6 +429,7 @@ Respond with ONLY this JSON:
 
         if (memberError) {
           console.error('Member insert error:', memberError);
+          await supabase.from('pi_auto_groups').delete().eq('id', newGroup.id);
           continue;
         }
 
