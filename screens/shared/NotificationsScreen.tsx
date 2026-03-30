@@ -253,15 +253,15 @@ export const NotificationsScreen = () => {
         }
         break;
       case 'pi_group_confirmed':
-        if (notification.data?.groupId) {
-          (navigation as any).navigate('Groups', {
-            screen: 'PiGroupInvite',
-            params: { groupId: notification.data.groupId },
-          });
-        } else if (notification.data?.conversationId) {
+        if (notification.data?.conversationId) {
           (navigation as any).navigate('Groups', {
             screen: 'Chat',
             params: { conversationId: notification.data.conversationId },
+          });
+        } else if (notification.data?.groupId) {
+          (navigation as any).navigate('Groups', {
+            screen: 'PiGroupInvite',
+            params: { groupId: notification.data.groupId },
           });
         } else {
           (navigation as any).navigate('Groups');
