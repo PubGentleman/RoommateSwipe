@@ -108,7 +108,7 @@ export async function respondToAutoGroupInvite(groupId: string, accept: boolean)
       .from('pi_auto_group_members')
       .update({
         status: accept ? 'accepted' : 'declined',
-        [accept ? 'accepted_at' : 'declined_at']: now,
+        responded_at: now,
       })
       .eq('group_id', groupId)
       .eq('user_id', userId);

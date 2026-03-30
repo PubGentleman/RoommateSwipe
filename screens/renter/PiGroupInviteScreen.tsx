@@ -258,48 +258,32 @@ export const PiGroupInviteScreen = () => {
 
   const handleExtendTime = async () => {
     if (!invite || extendedTime) return;
-    const currentDeadline = group?.acceptance_deadline ?? group?.expires_at;
-    if (!currentDeadline) return;
     try {
-      const currentTime = new Date(currentDeadline).getTime();
-      const newDeadline = new Date(currentTime + 24 * 60 * 60 * 1000).toISOString();
-      const { error } = await supabase
-        .from('pi_auto_groups')
-        .update({ acceptance_deadline: newDeadline, deadline_extended: true })
-        .eq('id', invite.group_id)
-        .not('deadline_extended', 'eq', true);
+      const { data, error } = await supabase.functions.invoke('pi-extend-deadline', {
+        body: { auto_group_id: invite.group_id },
+      });
 
       if (error) {
-        const { data: check } = await supabase
-          .from('pi_auto_groups')
-          .select('deadline_extended')
-          .eq('id', invite.group_id)
-          .single();
-        if (check?.deadline_extended) {
-          Alert.alert('Already Extended', 'The deadline has already been extended for this group.');
-          setExtendedTime(true);
-        } else {
-          Alert.alert('Error', 'Could not extend time. Please try again.');
-        }
+        Alert.alert('Error', 'Could not extend time. Please try again.');
         return;
       }
 
-      const { data: updated } = await supabase
-        .from('pi_auto_groups')
-        .select('deadline_extended, acceptance_deadline')
-        .eq('id', invite.group_id)
-        .single();
-
-      if (!updated?.deadline_extended) {
-        Alert.alert('Error', 'Extension did not apply. Please try again.');
+      if (data?.error === 'Already extended') {
+        Alert.alert('Already Extended', 'The deadline has already been extended for this group.');
+        setExtendedTime(true);
         return;
       }
 
-      setExtendedTime(true);
-      const confirmedDeadline = updated.acceptance_deadline ?? newDeadline;
-      setGroup(prev => prev ? { ...prev, acceptance_deadline: confirmedDeadline, deadline_extended: true } : prev);
-      setTimeRemaining(getTimeRemaining(confirmedDeadline));
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (data?.acceptance_deadline) {
+        setExtendedTime(true);
+        setGroup(prev => prev ? {
+          ...prev,
+          acceptance_deadline: data.acceptance_deadline,
+          deadline_extended: true,
+        } : prev);
+        setTimeRemaining(getTimeRemaining(data.acceptance_deadline));
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
     } catch {
       Alert.alert('Error', 'Could not extend time.');
     }
