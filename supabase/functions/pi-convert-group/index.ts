@@ -123,7 +123,7 @@ serve(async (req: Request) => {
       .insert({
         name: 'Pi Match Group',
         created_by: creatorId,
-        group_type: 'roommate',
+        type: 'roommate',
         pi_auto_group_id: auto_group_id,
       })
       .select('id')
