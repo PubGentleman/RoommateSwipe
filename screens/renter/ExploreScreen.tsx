@@ -791,7 +791,8 @@ export const ExploreScreen = () => {
     if (listingTypeFilter !== 'any') {
       const TYPE_MAP: Record<string, string[]> = {
         room:   ['room', 'private_room', 'Private Room'],
-        entire: ['entire', 'entire_unit', 'Entire Unit'],
+        entire: ['entire', 'entire_unit', 'Entire Unit', 'entire_apartment'],
+        entire_apartment: ['entire', 'entire_unit', 'Entire Unit', 'entire_apartment'],
         sublet: ['sublet', 'Sublet'],
       };
       const allowedValues = TYPE_MAP[listingTypeFilter] ?? [];

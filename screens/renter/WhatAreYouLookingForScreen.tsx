@@ -7,6 +7,7 @@ import {
   Easing,
   Dimensions,
   Text,
+  ActivityIndicator,
 } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -46,7 +47,7 @@ interface Props {
 export default function WhatAreYouLookingForScreen({ onComplete, isSettings, initialIntent, initialSubIntent }: Props) {
   const insets = useSafeAreaInsets();
   const { user, updateUser } = useAuth();
-  const [step, setStep] = useState<'intent' | 'roommate_sub' | 'place_sub'>(initialIntent ? (initialIntent === 'find_roommates' ? 'roommate_sub' : 'place_sub') : 'intent');
+  const [step, setStep] = useState<'intent' | 'roommate_sub' | 'place_sub' | 'group_prompt'>(initialIntent ? (initialIntent === 'find_roommates' ? 'roommate_sub' : 'place_sub') : 'intent');
   const [intent, setIntent] = useState<RenterIntent | null>(initialIntent || null);
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -134,15 +135,40 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
 
   const handlePlaceSubSelect = (id: PlaceSubIntent) => {
     setSelectedCard(id);
-    setTimeout(() => {
+    setTimeout(async () => {
       setSelectedCard(null);
       const listingPref = id === 'have_group' ? 'any' as const : 'entire_apartment' as const;
-      saveAndContinue(listingPref, id);
+      if (id === 'have_group' && !isSettings) {
+        setSaving(true);
+        try {
+          await updateProfile({
+            listing_type_preference: listingPref,
+            apartment_search_type: id,
+          });
+          await updateUser({
+            profileData: {
+              ...user?.profileData,
+              listing_type_preference: listingPref,
+              apartment_search_type: id,
+            },
+          });
+          setSaving(false);
+          animateForward(() => setStep('group_prompt'));
+        } catch (_) {
+          setSaving(false);
+        }
+      } else {
+        saveAndContinue(listingPref, id);
+      }
     }, 150);
   };
 
   const handleBack = () => {
     if (step === 'intent') return;
+    if (step === 'group_prompt') {
+      animateBack(() => setStep('place_sub'));
+      return;
+    }
     animateBack(() => setStep('intent'));
   };
 
@@ -177,6 +203,7 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
     intent: { headline: 'What are you looking for?', subheadline: 'This personalizes your Rhome experience' },
     roommate_sub: { headline: 'What kind of place?', subheadline: 'Help us find the right match' },
     place_sub: { headline: "Who's moving in?", subheadline: 'This helps us show the right listings' },
+    group_prompt: { headline: 'Set up your group', subheadline: 'Create a group so you can search together' },
   };
 
   const config = STEP_CONFIG[step];
@@ -199,6 +226,31 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
           {step === 'intent' ? renderCards(INTENT_OPTIONS, handleIntentSelect) : null}
           {step === 'roommate_sub' ? renderCards(ROOMMATE_SUB_OPTIONS, handleRoommateSubSelect) : null}
           {step === 'place_sub' ? renderCards(PLACE_SUB_OPTIONS, handlePlaceSubSelect) : null}
+          {step === 'group_prompt' ? (
+            <View style={styles.groupPromptWrap}>
+              <View style={[styles.typeIconWrap, { backgroundColor: 'rgba(46,204,113,0.15)', alignSelf: 'center', marginBottom: 16 }]}>
+                <Feather name="users" size={28} color="#2ecc71" />
+              </View>
+              <Pressable
+                style={styles.groupPromptBtn}
+                onPress={onComplete}
+              >
+                <Feather name="plus-circle" size={18} color="#FFFFFF" />
+                <Text style={styles.groupPromptBtnText}>Create Group Now</Text>
+              </Pressable>
+              <Pressable
+                style={styles.groupPromptSkip}
+                onPress={onComplete}
+              >
+                <Text style={styles.groupPromptSkipText}>Skip for now</Text>
+              </Pressable>
+            </View>
+          ) : null}
+          {saving ? (
+            <View style={styles.savingOverlay}>
+              <ActivityIndicator color="#ff6b5b" size="small" />
+            </View>
+          ) : null}
         </View>
       </Animated.View>
     </View>
@@ -282,5 +334,44 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.45)',
     textAlign: 'center',
     lineHeight: 16,
+  },
+  groupPromptWrap: {
+    alignItems: 'center',
+    marginTop: 24,
+    gap: 16,
+  },
+  groupPromptBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#2ecc71',
+    borderRadius: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 28,
+    width: '100%',
+    justifyContent: 'center',
+  },
+  groupPromptBtnText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  groupPromptSkip: {
+    paddingVertical: 12,
+  },
+  groupPromptSkipText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.5)',
+  },
+  savingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 18,
   },
 });

@@ -2,6 +2,7 @@ import React from 'react';
 import { Pressable } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Feather } from '../components/VectorIcons';
+import { useAuth } from '../contexts/AuthContext';
 import { ProfileScreen } from '../screens/shared/ProfileScreen';
 import { PaymentScreen } from '../screens/shared/PaymentScreen';
 import { PlansScreen } from '../screens/shared/PlansScreen';
@@ -86,6 +87,12 @@ const darkHeaderOptions = {
 };
 
 export const ProfileStackNavigator = () => {
+  const { user } = useAuth();
+  const currentSearchType = user?.profileData?.apartment_search_type;
+  const currentIntent = currentSearchType === 'with_roommates' ? 'find_roommates' as const
+    : currentSearchType === 'solo' || currentSearchType === 'with_partner' || currentSearchType === 'have_group' ? 'find_place' as const
+    : undefined;
+
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="ProfileMain" component={ProfileScreen} />
@@ -354,7 +361,8 @@ export const ProfileStackNavigator = () => {
           <WhatAreYouLookingForScreen
             isSettings
             onComplete={() => nav.goBack()}
-            initialIntent={undefined}
+            initialIntent={currentIntent}
+            initialSubIntent={currentSearchType}
           />
         )}
       </Stack.Screen>
