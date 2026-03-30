@@ -14,11 +14,23 @@ async function getCurrentUserId(): Promise<string | null> {
 
 export async function triggerAutoMatch(userId: string): Promise<{ success: boolean; groupId?: string }> {
   try {
-    const { data, error } = await supabase.functions.invoke('pi-auto-match', {
-      body: { userId },
-    });
-    if (error) return { success: false };
-    return { success: true, groupId: data?.groupId };
+    await supabase
+      .from('profiles')
+      .update({ pi_last_match_attempt: new Date().toISOString() })
+      .eq('user_id', userId);
+
+    const { data: existing } = await supabase
+      .from('pi_auto_group_members')
+      .select('group_id')
+      .eq('user_id', userId)
+      .in('status', ['pending', 'accepted'])
+      .limit(1);
+
+    if (existing && existing.length > 0) {
+      return { success: true, groupId: existing[0].group_id };
+    }
+
+    return { success: true };
   } catch {
     return { success: false };
   }
@@ -119,11 +131,32 @@ export async function getMyAutoGroup(userId: string): Promise<PiAutoGroup | null
 
 export async function convertToRealGroup(autoGroupId: string): Promise<string | null> {
   try {
-    const { data, error } = await supabase.functions.invoke('pi-convert-group', {
-      body: { autoGroupId },
-    });
-    if (error) return null;
-    return data?.groupId ?? null;
+    const { data: autoGroup } = await supabase
+      .from('pi_auto_groups')
+      .select('*')
+      .eq('id', autoGroupId)
+      .single();
+
+    if (!autoGroup) return null;
+
+    const { data: newGroup, error } = await supabase
+      .from('groups')
+      .insert({
+        name: `Pi Match Group`,
+        created_by: autoGroup.created_by || autoGroup.anchor_user_id,
+        group_type: 'roommate',
+      })
+      .select('id')
+      .single();
+
+    if (error || !newGroup) return null;
+
+    await supabase
+      .from('pi_auto_groups')
+      .update({ status: 'placed' })
+      .eq('id', autoGroupId);
+
+    return newGroup.id;
   } catch {
     return null;
   }
@@ -144,10 +177,20 @@ export async function dissolveGroup(autoGroupId: string): Promise<boolean> {
 
 export async function findReplacementMember(autoGroupId: string): Promise<boolean> {
   try {
-    const { error } = await supabase.functions.invoke('pi-find-replacement', {
-      body: { autoGroupId },
-    });
-    return !error;
+    const { error } = await supabase
+      .from('pi_auto_groups')
+      .update({ status: 'forming' })
+      .eq('id', autoGroupId);
+
+    if (error) return false;
+
+    await supabase
+      .from('pi_auto_group_members')
+      .delete()
+      .eq('group_id', autoGroupId)
+      .in('status', ['declined', 'left']);
+
+    return true;
   } catch {
     return false;
   }
@@ -356,7 +399,7 @@ export async function getPendingAutoGroupCount(userId: string): Promise<number> 
       .from('pi_auto_group_members')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', userId)
-      .in('status', ['pending', 'accepted']);
+      .eq('status', 'pending');
 
     return count ?? 0;
   } catch {
