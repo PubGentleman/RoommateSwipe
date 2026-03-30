@@ -240,26 +240,31 @@ export const ExploreScreen = () => {
       setIsLoading(true);
       setError(null);
 
+      let usedSupabase = false;
       try {
-        const supabaseListings = await getListings(
-          activeCity ? { city: activeCity } : undefined
-        );
+        const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000));
+        const supabaseListings = await Promise.race([
+          getListings(activeCity ? { city: activeCity } : undefined),
+          timeout,
+        ]);
         if (supabaseListings && supabaseListings.length > 0) {
           const mapped: Property[] = supabaseListings.map((l: any) => mapListingToProperty(l));
           setProperties(mapped);
           setFilteredProperties(mapped);
           loadDiscoverableGroups(mapped);
           getAgentsWithCriticalStatus().then(setCriticalAgentIds).catch(() => {});
-          return;
+          usedSupabase = true;
         }
       } catch (supabaseErr) {
         console.warn('Supabase getListings failed, falling back to StorageService:', supabaseErr);
       }
 
-      await StorageService.initializeWithMockData();
-      const allProperties = await StorageService.getProperties();
-      setProperties(allProperties);
-      setFilteredProperties(allProperties);
+      if (!usedSupabase) {
+        await StorageService.initializeWithMockData();
+        const allProperties = await StorageService.getProperties();
+        setProperties(allProperties);
+        setFilteredProperties(allProperties);
+      }
     } catch (err) {
       setError('Failed to load properties');
       console.error('Error loading properties:', err);
@@ -344,10 +349,14 @@ export const ExploreScreen = () => {
 
   const loadHostProfiles = async () => {
     try {
-      const { data: supaUsers } = await supabase
-        .from('users')
-        .select('id, full_name, avatar_url, host_type, company_name, agency_name, license_verified, units_managed')
-        .eq('role', 'host');
+      const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000));
+      const { data: supaUsers } = await Promise.race([
+        supabase
+          .from('users')
+          .select('id, full_name, avatar_url, host_type, company_name, agency_name, license_verified, units_managed')
+          .eq('role', 'host'),
+        timeout,
+      ]) as { data: any[] | null };
 
       if (supaUsers && supaUsers.length > 0) {
         const profileMap = new Map<string, User>();
