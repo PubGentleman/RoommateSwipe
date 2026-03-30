@@ -17,8 +17,6 @@ import { getConversations as getSupabaseConversations, subscribeToAllMessages } 
 import { getMyInquiryGroups } from '../../services/groupService';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { Group } from '../../types/models';
-import { normalizeRenterPlan, getRenterPlanLimits } from '../../constants/renterPlanLimits';
-import { PaywallSheet } from '../../components/PaywallSheet';
 
 type MessagesScreenNavigationProp = NativeStackNavigationProp<MessagesStackParamList, 'MessagesList'>;
 
@@ -46,7 +44,7 @@ export const MessagesScreen = () => {
   const role: 'host' | 'renter' = route.params?.role || 'renter';
   const isHostMode = role === 'host';
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, isPlaceSeeker } = useAuth();
   const { alert } = useConfirm();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [profilesMap, setProfilesMap] = useState<Map<string, RoommateProfile>>(new Map());
@@ -705,19 +703,7 @@ export const MessagesScreen = () => {
     );
   };
 
-  const renterPlan = normalizeRenterPlan(user?.subscription?.plan);
-  const renterLimits = getRenterPlanLimits(renterPlan);
-  const hasAIAccess = renterLimits.hasAIGroupSuggestions;
-  const aiBadgeLabel = renterPlan === 'elite' ? 'Elite' : renterPlan === 'plus' ? 'Plus' : 'Plus';
-  const aiBadgeLocked = !hasAIAccess;
-
-  const [showPaywall, setShowPaywall] = useState(false);
-
   const handleAIAssistantPress = async () => {
-    if (aiBadgeLocked) {
-      setShowPaywall(true);
-      return;
-    }
     (navigation as any).navigate('AIMatchAssistant');
   };
 
@@ -738,13 +724,11 @@ export const MessagesScreen = () => {
             </LinearGradient>
             <View style={styles.aiConvContent}>
               <View style={styles.convTopRow}>
-                <Text style={styles.aiConvName}>AI Match Assistant</Text>
-                <View style={[styles.proBadge, aiBadgeLocked ? styles.lockedBadge : null]}>
-                  {aiBadgeLocked ? <Feather name="lock" size={8} color="#a855f7" /> : null}
-                  <Text style={styles.proBadgeText}>{aiBadgeLabel.toUpperCase()}</Text>
-                </View>
+                <Text style={styles.aiConvName}>Pi Assistant</Text>
               </View>
-              <Text style={styles.aiConvSubtitle}>Find roommates, neighborhoods, zodiac tips...</Text>
+              <Text style={styles.aiConvSubtitle}>
+                {isPlaceSeeker() ? 'Apartment advice, neighborhoods, pricing...' : 'Roommate tips, compatibility, co-living advice...'}
+              </Text>
             </View>
             <Feather name="chevron-right" size={18} color="rgba(255,255,255,0.25)" />
           </Pressable>
@@ -961,14 +945,6 @@ export const MessagesScreen = () => {
         scrollEventThrottle={16}
       />
 
-      <PaywallSheet
-        visible={showPaywall}
-        featureName="AI Match Assistant"
-        requiredPlan="plus"
-        role="renter"
-        onUpgrade={() => { setShowPaywall(false); (navigation as any).navigate('Plans'); }}
-        onDismiss={() => setShowPaywall(false)}
-      />
     </View>
   );
 };
