@@ -276,13 +276,16 @@ serve(async (req) => {
 
     const cutoffDate = new Date(Date.now() - ELIGIBLE_ACTIVE_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
+    const matchCooloff = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
+
     let profileQuery = supabase
       .from('profiles')
       .select('*')
       .eq('pi_auto_match_enabled', true)
       .gte('last_active_at', cutoffDate)
       .not('city', 'is', null)
-      .not('budget', 'is', null);
+      .not('budget', 'is', null)
+      .or(`pi_last_match_attempt.is.null,pi_last_match_attempt.lt.${matchCooloff}`);
 
     if (filterCity) profileQuery = profileQuery.eq('city', filterCity);
     if (filterUserId) profileQuery = profileQuery.eq('user_id', filterUserId);
@@ -571,6 +574,14 @@ Respond with ONLY this JSON:
         console.error('Group validation error:', err);
         continue;
       }
+    }
+
+    if (!dryRun && eligible.length > 0) {
+      const processedIds = eligible.map(c => c.user_id);
+      await supabase
+        .from('profiles')
+        .update({ pi_last_match_attempt: new Date().toISOString() })
+        .in('user_id', processedIds);
     }
 
     return jsonResponse({

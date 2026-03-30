@@ -14,6 +14,20 @@ async function getCurrentUserId(): Promise<string | null> {
 
 export async function triggerAutoMatch(userId: string): Promise<{ success: boolean; groupId?: string }> {
   try {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('apartment_search_type, pi_auto_match_enabled')
+      .eq('user_id', userId)
+      .single();
+
+    const excluded: (string | null | undefined)[] = ['solo', 'with_partner', 'have_group'];
+    if (excluded.includes(profile?.apartment_search_type)) {
+      return { success: false };
+    }
+    if (profile && !profile.pi_auto_match_enabled) {
+      return { success: false };
+    }
+
     await supabase
       .from('profiles')
       .update({ pi_last_match_attempt: new Date().toISOString() })
