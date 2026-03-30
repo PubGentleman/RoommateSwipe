@@ -70,56 +70,14 @@ ALTER TABLE public.profiles
     CHECK (household_gender_preference IN ('any', 'same_gender', 'male_only', 'female_only')),
   ADD COLUMN IF NOT EXISTS pi_auto_match_enabled BOOLEAN DEFAULT true;
 
--- Pi Group Claims: host claims on ready groups
-CREATE TABLE IF NOT EXISTS public.pi_group_claims (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  group_id UUID NOT NULL REFERENCES public.pi_auto_groups(id) ON DELETE CASCADE,
-  host_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  listing_id TEXT,
-  is_free_claim BOOLEAN NOT NULL DEFAULT false,
-  claim_price_cents INTEGER NOT NULL DEFAULT 0,
-  status TEXT NOT NULL DEFAULT 'pending'
-    CHECK (status IN ('pending','accepted','expired','withdrawn')),
-  message TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  responded_at TIMESTAMPTZ,
-  expires_at TIMESTAMPTZ NOT NULL DEFAULT (now() + interval '7 days')
-);
-
-CREATE INDEX IF NOT EXISTS idx_pi_group_claims_group ON public.pi_group_claims(group_id);
-CREATE INDEX IF NOT EXISTS idx_pi_group_claims_host ON public.pi_group_claims(host_id);
-CREATE INDEX IF NOT EXISTS idx_pi_group_claims_status ON public.pi_group_claims(status);
-
--- RLS policies for pi_group_claims
-ALTER TABLE public.pi_group_claims ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Hosts can view their own claims" ON public.pi_group_claims
-  FOR SELECT USING (host_id = auth.uid());
-
-CREATE POLICY "Hosts can insert claims" ON public.pi_group_claims
-  FOR INSERT WITH CHECK (host_id = auth.uid());
-
-CREATE POLICY "Hosts can update their own claims" ON public.pi_group_claims
-  FOR UPDATE USING (host_id = auth.uid())
-  WITH CHECK (host_id = auth.uid());
-
--- Hosts can view ready groups (marketplace)
 -- RLS policies for pi_auto_groups
 ALTER TABLE public.pi_auto_groups ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can view groups they belong to or hosts browse marketplace" ON public.pi_auto_groups
+CREATE POLICY "Users can view groups they belong to" ON public.pi_auto_groups
   FOR SELECT USING (
     EXISTS (
       SELECT 1 FROM public.pi_auto_group_members m
       WHERE m.group_id = id AND m.user_id = auth.uid()
-    )
-    OR (
-      status IN ('ready', 'claimed')
-      AND EXISTS (
-        SELECT 1 FROM public.profiles p
-        WHERE p.user_id = auth.uid()
-          AND p.role IN ('host', 'agent', 'company')
-      )
     )
   );
 
@@ -131,12 +89,6 @@ CREATE POLICY "Users can view members of their groups" ON public.pi_auto_group_m
     EXISTS (
       SELECT 1 FROM public.pi_auto_group_members m
       WHERE m.group_id = pi_auto_group_members.group_id AND m.user_id = auth.uid()
-    )
-    OR EXISTS (
-      SELECT 1 FROM public.pi_group_claims c
-      WHERE c.group_id = pi_auto_group_members.group_id
-        AND c.host_id = auth.uid()
-        AND c.status IN ('pending', 'accepted')
     )
   );
 

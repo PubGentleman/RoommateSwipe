@@ -206,28 +206,20 @@ export async function claimGroup(
   priceCents: number
 ): Promise<boolean> {
   try {
-    const now = new Date().toISOString();
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-    const { error: claimError } = await supabase
-      .from('pi_group_claims')
-      .insert({
-        group_id: groupId,
-        host_id: hostId,
-        listing_id: listingId,
-        is_free_claim: isFree,
-        claim_price_cents: priceCents,
-        status: 'pending',
-        created_at: now,
-        expires_at: expiresAt,
-      });
-    if (claimError) return false;
+    const { data, error } = await supabase.rpc('claim_pi_group', {
+      p_group_id: groupId,
+      p_host_id: hostId,
+      p_listing_id: listingId || null,
+      p_is_free: isFree,
+      p_price_cents: priceCents,
+    });
 
-    await supabase
-      .from('pi_auto_groups')
-      .update({ status: 'claimed' })
-      .eq('id', groupId);
+    if (error) {
+      console.warn('[claimGroup] RPC error:', error.message);
+      return false;
+    }
 
-    return true;
+    return !!data;
   } catch {
     return false;
   }
