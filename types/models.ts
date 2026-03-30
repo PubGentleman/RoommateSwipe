@@ -48,6 +48,11 @@ export interface RoommateProfile {
   apartmentPrefs?: ApartmentPreferences;
   instagram_verified?: boolean;
   instagram_handle?: string;
+  desired_roommate_count?: number;
+  desired_bedroom_count?: number;
+  household_gender_preference?: GenderPreference;
+  pi_auto_match_enabled?: boolean;
+  pi_last_match_attempt?: string;
 }
 
 export interface ApartmentPreferences {

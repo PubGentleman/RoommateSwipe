@@ -1136,7 +1136,7 @@ export const ProfileQuestionnaireScreen = () => {
                 { value: 'same_gender', emoji: '\uD83E\uDD1D', label: 'Same Gender', subtitle: 'Match my gender' },
               ]}
               selected={householdGenderPref}
-              onSelect={(v) => setHouseholdGenderPref(v as any)}
+              onSelect={(v) => setHouseholdGenderPref(v as 'any' | 'male_only' | 'female_only' | 'same_gender')}
             />
 
             <View style={{ height: 28 }} />
