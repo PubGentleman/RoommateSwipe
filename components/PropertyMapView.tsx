@@ -100,13 +100,15 @@ loadCSS('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',function(){
       var icon = L.divIcon({
         className: '',
         html: '<div style="'
+          + 'display:inline-flex;align-items:center;justify-content:center;'
           + 'background:${chipBg};'
           + 'color:${chipColor};'
           + 'font-weight:700;font-size:12px;font-family:-apple-system,system-ui,sans-serif;'
-          + 'padding:6px 12px;border-radius:20px;white-space:nowrap;'
-          + 'box-shadow:0 2px 8px rgba(0,0,0,0.3);'
+          + 'padding:6px 10px;border-radius:8px;white-space:nowrap;'
+          + 'box-shadow:0 2px 8px rgba(0,0,0,0.35);'
           + 'border:1.5px solid ${chipBorder};'
           + 'cursor:pointer;transition:all 0.15s ease;'
+          + 'line-height:1;'
           + '"'
           + ' data-id="' + m.id + '"'
           + '>$' + m.price.toLocaleString()
@@ -128,7 +130,7 @@ loadCSS('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',function(){
           chip.style.background = '#ff6b5b';
           chip.style.color = '#fff';
           chip.style.borderColor = '#ff6b5b';
-          chip.style.transform = 'scale(1.1)';
+          chip.style.transform = 'scale(1.08)';
           window._activeChip = chip;
         }
         var msg = JSON.stringify({
