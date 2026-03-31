@@ -13,10 +13,27 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  const url = new URL(req.url);
-  const action = url.searchParams.get('action') || 'autocomplete';
-  const input = url.searchParams.get('input') || '';
-  const placeId = url.searchParams.get('place_id') || '';
+  let action = 'autocomplete';
+  let input = '';
+  let placeId = '';
+
+  if (req.method === 'POST') {
+    try {
+      const body = await req.json();
+      action = body.action || 'autocomplete';
+      input = body.input || '';
+      placeId = body.place_id || '';
+    } catch {
+      // fallback to URL params
+    }
+  }
+
+  if (!input && !placeId) {
+    const url = new URL(req.url);
+    action = url.searchParams.get('action') || action;
+    input = url.searchParams.get('input') || input;
+    placeId = url.searchParams.get('place_id') || placeId;
+  }
 
   if (!GOOGLE_KEY) {
     return new Response(

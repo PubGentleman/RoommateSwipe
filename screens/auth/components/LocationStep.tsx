@@ -11,6 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import { Feather } from '../../../components/VectorIcons';
+import { supabase } from '../../../lib/supabase';
 
 type AccountType = 'renter' | 'individual' | 'agent' | 'company';
 
@@ -41,9 +42,6 @@ interface SelectedLocation {
   lat: number;
   lng: number;
 }
-
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://lnjupgvvsbdooomvdjho.supabase.co';
-const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 
 export const LocationStep: React.FC<LocationStepProps> = ({
   accountType,
@@ -76,17 +74,11 @@ export const LocationStep: React.FC<LocationStepProps> = ({
     setError(null);
 
     try {
-      const response = await fetch(
-        `${SUPABASE_URL}/functions/v1/places-proxy?action=autocomplete&input=${encodeURIComponent(text)}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      const { data, error: fnError } = await supabase.functions.invoke('places-proxy', {
+        body: { action: 'autocomplete', input: text },
+      });
 
-      const data = await response.json();
+      if (fnError) throw fnError;
 
       if (data.status === 'OK' && data.predictions) {
         setPredictions(
@@ -129,17 +121,11 @@ export const LocationStep: React.FC<LocationStepProps> = ({
     setError(null);
 
     try {
-      const response = await fetch(
-        `${SUPABASE_URL}/functions/v1/places-proxy?action=details&place_id=${encodeURIComponent(prediction.placeId)}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      const { data, error: fnError } = await supabase.functions.invoke('places-proxy', {
+        body: { action: 'details', place_id: prediction.placeId },
+      });
 
-      const data = await response.json();
+      if (fnError) throw fnError;
 
       if (data.status === 'OK' && data.result) {
         const components = data.result.address_components || [];
