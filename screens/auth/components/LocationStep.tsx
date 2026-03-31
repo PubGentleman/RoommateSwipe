@@ -42,12 +42,38 @@ interface SelectedLocation {
   lng: number;
 }
 
-// ============================================================
-// HARDCODED VALUES — same as lib/supabase.ts
-// The anon key is safe to expose (public/anonymous access only)
-// ============================================================
+const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 const SUPABASE_URL = 'https://lnjupgvvsbdooomvdjho.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuanVwZ3Z2c2Jkb29vbXZkamhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwOTEwODAsImV4cCI6MjA4ODY2NzA4MH0.XAGtYsRhSRRPe9yc3jqrO9viqgIZzvFGx_cd1D1y9BU';
+
+const placesAutocomplete = async (text: string) => {
+  if (Platform.OS !== 'web' && GOOGLE_API_KEY) {
+    const res = await fetch(
+      `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(text)}&types=geocode&components=country:us&key=${GOOGLE_API_KEY}`
+    );
+    return res.json();
+  }
+  const res = await fetch(
+    `${SUPABASE_URL}/functions/v1/places-proxy?action=autocomplete&input=${encodeURIComponent(text)}`,
+    { headers: { 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' } }
+  );
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+};
+
+const placesDetails = async (placeId: string) => {
+  if (Platform.OS !== 'web' && GOOGLE_API_KEY) {
+    const res = await fetch(
+      `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(placeId)}&fields=address_components,geometry&key=${GOOGLE_API_KEY}`
+    );
+    return res.json();
+  }
+  const res = await fetch(
+    `${SUPABASE_URL}/functions/v1/places-proxy?action=details&place_id=${encodeURIComponent(placeId)}`,
+    { headers: { 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' } }
+  );
+  return res.json();
+};
 
 export const LocationStep: React.FC<LocationStepProps> = ({
   accountType,
@@ -81,21 +107,7 @@ export const LocationStep: React.FC<LocationStepProps> = ({
     setError(null);
 
     try {
-      const response = await fetch(
-        `${SUPABASE_URL}/functions/v1/places-proxy?action=autocomplete&input=${encodeURIComponent(text)}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await placesAutocomplete(text);
 
       if (data.status === 'OK' && data.predictions) {
         setSearchFailed(false);
@@ -144,17 +156,7 @@ export const LocationStep: React.FC<LocationStepProps> = ({
     setError(null);
 
     try {
-      const response = await fetch(
-        `${SUPABASE_URL}/functions/v1/places-proxy?action=details&place_id=${encodeURIComponent(prediction.placeId)}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      const data = await response.json();
+      const data = await placesDetails(prediction.placeId);
 
       if (data.status === 'OK' && data.result) {
         const components = data.result.address_components || [];
