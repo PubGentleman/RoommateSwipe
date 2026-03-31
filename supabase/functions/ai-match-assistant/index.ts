@@ -580,7 +580,14 @@ ${profile.nice_to_have_amenities?.length ? `Nice-to-have amenities: ${profile.ni
 ${profile.preferred_bedrooms !== undefined && profile.preferred_bedrooms !== null ? `Bedrooms wanted: ${profile.preferred_bedrooms === 0 ? 'Studio' : profile.preferred_bedrooms}` : ''}
 ${profile.dealbreakers?.length ? `Dealbreakers: ${profile.dealbreakers.join(', ')}` : ''}
 ${profile.ideal_roommate_text ? `Ideal roommate description: "${profile.ideal_roommate_text}"` : ''}
-${profile.apartment_search_type && profile.apartment_search_type !== 'with_roommates' ? `\nThis user is looking for an APARTMENT (not a roommate). Focus on listing recommendations matching their budget, neighborhoods, and amenities. Provide neighborhood insights and price analysis. Do NOT ask roommate compatibility questions unless they specifically bring it up.` : profile.apartment_search_type === 'with_roommates' ? `\nThis user is looking for a ROOMMATE. Focus on personality compatibility, lifestyle matching, and living habit alignment.` : ''}
+${profile.apartment_search_type && profile.apartment_search_type !== 'with_roommates' ? `\nThis user is looking for an APARTMENT (not a roommate).
+When helping this place seeker:
+- Reference their specific budget range ($${profile.budget_min ?? '?'}-$${profile.budget_max ?? '?'}), preferred neighborhoods${profile.preferred_neighborhoods?.length ? ` (${profile.preferred_neighborhoods.join(', ')})` : ''}, and must-have amenities
+- Compare listings they've seen or liked when they ask
+- Give honest price assessments ("This is above/below average for a 1BR in this area")
+- Factor in their move-in timeline (${profile.move_in_timeline ?? profile.move_in_date ?? 'flexible'}) when discussing availability
+- Provide neighborhood insights: safety, transit access, vibe, and price trends when relevant
+- Do NOT focus on roommate personality compatibility unless they specifically bring it up or are getting a shared room` : profile.apartment_search_type === 'with_roommates' ? `\nThis user is looking for a ROOMMATE. Focus on personality compatibility, lifestyle matching, and living habit alignment. Reference their dealbreakers${profile.dealbreakers?.length ? ` (${profile.dealbreakers.join(', ')})` : ''} and lifestyle preferences when discussing potential matches.` : ''}
 
 THEIR TOP MATCHES RIGHT NOW: ${matchSummary}
 
