@@ -249,7 +249,8 @@ export const ExploreScreen = () => {
       setError(null);
 
       await StorageService.initializeWithMockData();
-      const localProperties = await StorageService.getProperties();
+      const localProperties = (await StorageService.getProperties())
+        .filter((p: Property) => p.hostId !== user?.id);
       setProperties(localProperties);
       setFilteredProperties(localProperties);
       setIsLoading(false);
@@ -257,11 +258,13 @@ export const ExploreScreen = () => {
       try {
         const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000));
         const supabaseListings = await Promise.race([
-          getListings(activeCity ? { city: activeCity } : undefined),
+          getListings({ ...(activeCity ? { city: activeCity } : {}), excludeHostId: user?.id }),
           timeout,
         ]);
         if (supabaseListings && supabaseListings.length > 0) {
-          const mapped: Property[] = supabaseListings.map((l: any) => mapListingToProperty(l));
+          const mapped: Property[] = supabaseListings
+            .map((l: any) => mapListingToProperty(l))
+            .filter((p: Property) => p.hostId !== user?.id);
           setProperties(mapped);
           setFilteredProperties(mapped);
           loadDiscoverableGroups(mapped);

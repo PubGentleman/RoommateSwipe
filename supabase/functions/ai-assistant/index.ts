@@ -57,7 +57,7 @@ serve(async (req) => {
     ]);
     const isAgent = plan.startsWith('agent_');
     const topMatches = isAgent ? [] : await getTopMatches(supabase, user.id);
-    const nearbyListings = await getNearbyListings(supabase, profile);
+    const nearbyListings = await getNearbyListings(supabase, profile, user.id);
     const history = await getConversationHistory(supabase, user.id, sessionId);
 
     const memoryContext = buildMemoryContext(aiMemory);
@@ -291,11 +291,11 @@ async function getTopMatches(supabase: any, userId: string) {
   });
 }
 
-async function getNearbyListings(supabase: any, profile: any) {
+async function getNearbyListings(supabase: any, profile: any, userId?: string) {
   if (!profile.city) return [];
-  const { data } = await supabase
+  let query = supabase
     .from('listings')
-    .select('title, price, type, neighborhood, bedrooms, bathrooms, is_featured, host_badge')
+    .select('title, price, type, neighborhood, bedrooms, bathrooms, is_featured, host_badge, host_id')
     .eq('city', profile.city)
     .gte('price', profile.budget_min ?? 0)
     .lte('price', profile.budget_max ?? 999999)
@@ -303,6 +303,10 @@ async function getNearbyListings(supabase: any, profile: any) {
     .eq('is_active', true)
     .order('is_featured', { ascending: false })
     .limit(5);
+
+  if (userId) query = query.neq('host_id', userId);
+
+  const { data } = await query;
   return data ?? [];
 }
 

@@ -96,6 +96,7 @@ export async function getListings(filters?: {
   maxRent?: number;
   bedrooms?: number;
   roomType?: string;
+  excludeHostId?: string;
 }) {
   let query = supabase
     .from('listings')
@@ -105,6 +106,7 @@ export async function getListings(filters?: {
     .eq('is_paused', false)
     .order('created_at', { ascending: false });
 
+  if (filters?.excludeHostId) query = query.neq('host_id', filters.excludeHostId);
   if (filters?.city) query = query.eq('city', filters.city);
   if (filters?.minRent) query = query.gte('rent', filters.minRent);
   if (filters?.maxRent) query = query.lte('rent', filters.maxRent);
