@@ -550,6 +550,12 @@ export interface User {
   freeMessageUnlockUsed?: boolean;
   freeMessageUnlockConversationId?: string;
   freeMessageUnlockUsedAt?: string;
+  typeOnboardingComplete?: boolean;
+  preferredNeighborhoods?: string[];
+  preferredBedrooms?: number | null;
+  amenityPreferences?: string[];
+  niceToHaveAmenities?: string[];
+  moveInTimeline?: string;
   zip_code?: string;
   ideal_roommate_text?: string;
   pi_parsed_preferences?: PiParsedPreferences;

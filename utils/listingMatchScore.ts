@@ -42,7 +42,10 @@ export function calculateListingMatchScore(
 }
 
 function isRoommateSeekerUser(user: User): boolean {
-  const searchType = (user as any).apartmentSearchType || (user as any).apartment_search_type;
+  const searchType =
+    (user as any).profileData?.apartment_search_type ||
+    (user as any).apartmentSearchType ||
+    (user as any).apartment_search_type;
   return searchType === 'with_roommates' || searchType === 'have_group';
 }
 
@@ -69,14 +72,23 @@ function getMatchBreakdown(user: User, listing: ListingMatchInput): MatchScoreBr
     breakdown.budget = 15;
   }
 
-  const preferredNeighborhoods = (user as any).profileData?.preferred_neighborhoods || (user as any).preferred_neighborhoods || [];
+  const preferredNeighborhoods =
+    (user as any).preferredNeighborhoods ||
+    (user as any).preferred_neighborhoods ||
+    (user as any).profileData?.preferred_neighborhoods ||
+    [];
   const userCity = (user as any).profileData?.city || (user as any).city;
   const userNeighborhood = (user as any).profileData?.neighborhood || (user as any).neighborhood;
 
   if (preferredNeighborhoods.length > 0 && listing.neighborhood) {
-    const listingArea = listing.neighborhood.toLowerCase();
+    const listingArea = listing.neighborhood.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    const listingAreaRaw = listing.neighborhood.toLowerCase();
     const isPreferred = preferredNeighborhoods.some(
-      (n: string) => listingArea.includes(n.toLowerCase()) || n.toLowerCase().includes(listingArea)
+      (n: string) => {
+        const normN = n.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        return listingArea.includes(normN) || normN.includes(listingArea)
+          || listingAreaRaw.includes(n.toLowerCase()) || n.toLowerCase().includes(listingAreaRaw);
+      }
     );
     if (isPreferred) {
       breakdown.location = 25;
@@ -94,7 +106,15 @@ function getMatchBreakdown(user: User, listing: ListingMatchInput): MatchScoreBr
     breakdown.location = 12;
   }
 
-  const userAmenities = (user as any).profileData?.preferences?.amenities || (user as any).amenityPreferences || [];
+  const userAmenities =
+    (user as any).amenityPreferences ||
+    (user as any).amenity_preferences ||
+    (user as any).profileData?.preferences?.amenities ||
+    [];
+  const userNiceToHaves =
+    (user as any).niceToHaveAmenities ||
+    (user as any).nice_to_have_amenities ||
+    [];
   if (userAmenities.length > 0 && listing.amenities.length > 0) {
     const listingAmenityIds = listing.amenities.map((a: string) => normalizeLegacyAmenity(a));
     const matchCount = userAmenities.filter((pref: string) => {
@@ -103,6 +123,15 @@ function getMatchBreakdown(user: User, listing: ListingMatchInput): MatchScoreBr
     }).length;
     const matchPercent = matchCount / userAmenities.length;
     breakdown.amenities = Math.round(matchPercent * 20);
+
+    if (userNiceToHaves.length > 0) {
+      const niceMatchCount = userNiceToHaves.filter((pref: string) => {
+        const prefId = normalizeLegacyAmenity(pref);
+        return listingAmenityIds.includes(prefId);
+      }).length;
+      const niceBonus = Math.round((niceMatchCount / userNiceToHaves.length) * 5);
+      breakdown.amenities = Math.min(20, breakdown.amenities + niceBonus);
+    }
   } else {
     breakdown.amenities = 10;
   }

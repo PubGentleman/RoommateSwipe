@@ -294,8 +294,6 @@ const ONBOARDING_STEPS: StepId[] = [
   'photos',
   'basicInfo',
   'budgetLocation',
-  'dealbreakers',
-  'idealRoommate',
 ];
 
 const ONBOARDING_STEPS_LITE: StepId[] = [

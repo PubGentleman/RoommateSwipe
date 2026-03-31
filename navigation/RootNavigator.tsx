@@ -9,6 +9,8 @@ import { HostTypeSelectScreen } from '../screens/host/onboarding/HostTypeSelectS
 import { HostCompanySetupScreen } from '../screens/host/onboarding/HostCompanySetupScreen';
 import { HostAgentSetupScreen } from '../screens/host/onboarding/HostAgentSetupScreen';
 import WhatAreYouLookingForScreen from '../screens/renter/WhatAreYouLookingForScreen';
+import PlaceSeekerOnboardingScreen from '../screens/renter/onboarding/PlaceSeekerOnboardingScreen';
+import RoommateOnboardingScreen from '../screens/renter/onboarding/RoommateOnboardingScreen';
 import { RenterTabNavigator } from './RenterTabNavigator';
 import { HostTabNavigator } from './HostTabNavigator';
 import { ProfileReminderOverlay } from '../components/ProfileReminderOverlay';
@@ -148,6 +150,18 @@ export const RootNavigator = () => {
         <Stack.Screen name="OnboardingPlan" component={PlanSelectionScreen} />
       </Stack.Navigator>
     );
+  }
+
+  const searchType = user.profileData?.apartment_search_type;
+  const needsTypeOnboarding = user.role === 'renter'
+    && searchType
+    && !user.typeOnboardingComplete;
+
+  if (needsTypeOnboarding) {
+    if (searchType === 'with_roommates') {
+      return <RoommateOnboardingScreen />;
+    }
+    return <PlaceSeekerOnboardingScreen />;
   }
 
   const route = getInitialRoute(user);
