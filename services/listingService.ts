@@ -96,18 +96,15 @@ export async function getListings(filters?: {
   maxRent?: number;
   bedrooms?: number;
   roomType?: string;
-  excludeHostId?: string;
 }) {
   let query = supabase
     .from('listings')
-    .select('*, host:users!host_id(id, full_name, avatar_url, host_type)')
-    .eq('status', 'active')
+    .select('*')
     .eq('is_active', true)
     .eq('is_rented', false)
     .eq('is_paused', false)
     .order('created_at', { ascending: false });
 
-  if (filters?.excludeHostId) query = query.neq('host_id', filters.excludeHostId);
   if (filters?.city) query = query.eq('city', filters.city);
   if (filters?.minRent) query = query.gte('rent', filters.minRent);
   if (filters?.maxRent) query = query.lte('rent', filters.maxRent);
@@ -122,7 +119,7 @@ export async function getListings(filters?: {
 export async function getListing(id: string) {
   const { data, error } = await supabase
     .from('listings')
-    .select('*, host:users!host_id(id, full_name, avatar_url, bio, host_type)')
+    .select('*')
     .eq('id', id)
     .single();
 
@@ -315,7 +312,7 @@ export async function getCompanyListingsWithAgents(companyUserId: string): Promi
 
     const { data, error } = await supabase
       .from('listings')
-      .select('*, host:users!host_id(id, full_name, avatar_url, host_type)')
+      .select('*')
       .in('host_id', allHostIds)
       .order('created_at', { ascending: false });
 

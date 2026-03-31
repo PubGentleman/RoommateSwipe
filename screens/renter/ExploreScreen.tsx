@@ -256,10 +256,9 @@ export const ExploreScreen = () => {
       setIsLoading(false);
 
       try {
-        const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000));
         const supabaseListings = await Promise.race([
-          getListings({ ...(activeCity ? { city: activeCity } : {}), excludeHostId: user?.id }),
-          timeout,
+          getListings({ ...(activeCity ? { city: activeCity } : {}) }),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
         ]);
         if (supabaseListings && supabaseListings.length > 0) {
           const mapped: Property[] = supabaseListings
@@ -369,14 +368,14 @@ export const ExploreScreen = () => {
     }
 
     try {
-      const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000));
-      const { data: supaUsers } = await Promise.race([
+      const result = await Promise.race([
         supabase
           .from('users')
           .select('id, full_name, avatar_url, host_type, company_name, agency_name, license_verified, units_managed')
           .eq('role', 'host'),
-        timeout,
-      ]) as { data: any[] | null };
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
+      ]);
+      const supaUsers = result && typeof result === 'object' && 'data' in result ? (result as any).data : null;
 
       if (supaUsers && supaUsers.length > 0) {
         const profileMap = new Map<string, User>();

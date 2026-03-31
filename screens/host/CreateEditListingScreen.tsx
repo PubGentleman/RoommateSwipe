@@ -331,11 +331,9 @@ export const CreateEditListingScreen = () => {
         amenities: selectedAmenities,
         photos: photos,
         available_date: resolvedAvailableDate,
-        status: 'active',
         is_active: true,
         is_paused: false,
         is_rented: false,
-        published_at: new Date().toISOString(),
         host_name: user?.name || '',
         host_profile_id: user?.id || '',
       };
