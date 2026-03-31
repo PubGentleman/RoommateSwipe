@@ -914,7 +914,7 @@ export function GroupInfoScreen({ route, navigation }: Props) {
         ) : null}
 
         <Section
-          label={`MEMBERS (${memberCount}/${memberLimit})`}
+          label={`MEMBERS (${memberCount}/${memberLimit}) · ${memberCount} room${memberCount !== 1 ? 's' : ''} needed`}
           action={
             isAdmin && memberCount < memberLimit
               ? {
@@ -964,10 +964,18 @@ export function GroupInfoScreen({ route, navigation }: Props) {
                       </View>
                     ) : null}
                   </View>
-                  <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
-                    {member.role === 'host' ? 'Host' : 'Renter'}
-                    {member.verified ? ' · Verified' : ''}
-                  </ThemedText>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <ThemedText style={[Typography.small, { color: theme.textSecondary }]}>
+                      {member.role === 'host' ? 'Host' : 'Renter'}
+                      {member.verified ? ' · Verified' : ''}
+                    </ThemedText>
+                    {member.isCouple ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(236,72,153,0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
+                        <Feather name="heart" size={9} color="#ec4899" />
+                        <ThemedText style={{ fontSize: 10, color: '#ec4899', fontWeight: '700' }}>Couple</ThemedText>
+                      </View>
+                    ) : null}
+                  </View>
                   {!isCurrentUser && memberPiSummaries[member.id] ? (
                     <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 4, marginTop: 4 }}>
                       <Feather name="cpu" size={10} color="#a855f7" />
@@ -980,6 +988,25 @@ export function GroupInfoScreen({ route, navigation }: Props) {
 
                 {isAdmin && !isCurrentUser && !isMemberAdmin ? (
                   <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <Pressable
+                      style={[styles.iconBtn, { borderColor: member.isCouple ? '#ec4899' : theme.border }]}
+                      onPress={async () => {
+                        try {
+                          const { updateMemberCouple } = await import('../../services/groupService');
+                          await updateMemberCouple(groupId, member.id, !member.isCouple);
+                          loadGroup();
+                        } catch {
+                          const members = [...(group?.members || [])];
+                          const idx = members.findIndex((m: any) => m.id === member.id);
+                          if (idx >= 0) {
+                            members[idx] = { ...members[idx], isCouple: !member.isCouple };
+                            setGroup((prev: any) => prev ? { ...prev, members } : prev);
+                          }
+                        }
+                      }}
+                    >
+                      <Feather name="heart" size={13} color={member.isCouple ? '#ec4899' : theme.textSecondary} />
+                    </Pressable>
                     <Pressable
                       style={[styles.iconBtn, { borderColor: theme.primary }]}
                       onPress={() => handlePromoteMember(member.id, member.name)}

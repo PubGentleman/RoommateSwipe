@@ -114,7 +114,7 @@ export const ExploreScreen = () => {
   const route = useRoute<any>();
   const insets = useSafeAreaInsets();
   const { refreshUnreadCount } = useNotificationContext();
-  const { alert: showAlert } = useConfirm();
+  const { alert: showAlert, confirm } = useConfirm();
   const [properties, setProperties] = useState<Property[]>([]);
   const [filteredProperties, setFilteredProperties] = useState<Property[]>([]);
   const [saved, setSaved] = useState<Set<string>>(new Set());
@@ -191,9 +191,16 @@ export const ExploreScreen = () => {
   });
   const AnimatedFlatList = Animated.createAnimatedComponent(FlatList);
 
-  const eligibleGroups = userGroups.filter(g =>
-    (g.type === 'roommate' || !g.type) && !g.listingId
-  );
+  const eligibleGroups = userGroups.filter(g => {
+    if (g.type !== 'roommate' && g.type) return false;
+    if ((g as any).listingId) return false;
+    const details = (g as any)?._memberDetails || [];
+    const activeNonHost = details.filter((m: any) => !m.is_host && (m.status === 'active' || !m.status));
+    const memberCount = activeNonHost.length || (Array.isArray(g.members) ? g.members.length : 0);
+    if (memberCount < 1) return false;
+    const hasCoupleOrMultiple = memberCount >= 2 || activeNonHost.some((m: any) => m.is_couple);
+    return hasCoupleOrMultiple;
+  });
 
   useEffect(() => {
     loadProperties();
@@ -418,15 +425,19 @@ export const ExploreScreen = () => {
       const { getMyGroups } = await import('../../services/groupService');
       const supabaseGroups = await getMyGroups('roommate');
       if (supabaseGroups && supabaseGroups.length > 0) {
-        const mapped = supabaseGroups.map((g: any) => ({
-          id: g.id,
-          name: g.name,
-          type: 'roommate',
-          members: [],
-          listingId: g.listing_id || null,
-          maxMembers: g.max_members || 4,
-          createdBy: g.created_by,
-        }));
+        const mapped = supabaseGroups.map((g: any) => {
+          const activeMembers = (g.members || []).filter((m: any) => m.status === 'active' || !m.status);
+          return {
+            id: g.id,
+            name: g.name,
+            type: 'roommate',
+            members: activeMembers.map((m: any) => m.user_id),
+            _memberDetails: activeMembers,
+            listingId: g.listing_id || null,
+            maxMembers: g.max_members || 4,
+            createdBy: g.created_by,
+          };
+        });
         setUserGroups(mapped as any);
         return;
       }
@@ -2697,19 +2708,44 @@ export const ExploreScreen = () => {
                     ) : null}
                   </Pressable>
 
-                  {eligibleGroups.length > 0 && shouldShowRoommateFeatures(user?.profileData?.apartment_search_type) ? (
-                    <Pressable
-                      style={styles.pdActionSecondary}
-                      onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        if (eligibleGroups.length === 1) handleInquireAsGroup(eligibleGroups[0]);
-                        else setShowGroupPickerModal(true);
-                      }}
-                    >
-                      <Feather name="users" size={17} color="#ff6b5b" />
-                      <Text style={styles.pdActionSecondaryText}>Group</Text>
-                    </Pressable>
-                  ) : null}
+                  {eligibleGroups.length > 0 && shouldShowRoommateFeatures(user?.profileData?.apartment_search_type) ? (() => {
+                    const roomsAvail = selectedProperty?.rooms_available ?? selectedProperty?.bedrooms ?? null;
+                    const firstGroup = eligibleGroups[0];
+                    const memberDetails = (firstGroup as any)?._memberDetails || [];
+                    const activeNonHost = memberDetails.filter((m: any) => !m.is_host);
+                    const unitsNeeded = activeNonHost.length || (Array.isArray(firstGroup.members) ? firstGroup.members.length : 0);
+                    const tooBig = roomsAvail != null && roomsAvail > 0 && unitsNeeded > roomsAvail;
+
+                    return (
+                      <Pressable
+                        style={[styles.pdActionSecondary, tooBig ? { opacity: 0.45 } : undefined]}
+                        onPress={() => {
+                          if (tooBig) {
+                            showAlert({
+                              title: 'Group Too Large',
+                              message: `Your group needs ${unitsNeeded} room${unitsNeeded !== 1 ? 's' : ''} but this listing only has ${roomsAvail} available.`,
+                              variant: 'warning',
+                            });
+                            return;
+                          }
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          if (eligibleGroups.length === 1) {
+                            confirm({
+                              title: 'Send Group Inquiry?',
+                              message: `Send inquiry to "${selectedProperty?.title}" on behalf of "${firstGroup.name}" (${unitsNeeded} room${unitsNeeded !== 1 ? 's' : ''} needed)?`,
+                              confirmText: 'Send Inquiry',
+                              cancelText: 'Cancel',
+                            }).then((yes) => { if (yes) handleInquireAsGroup(firstGroup); });
+                          } else {
+                            setShowGroupPickerModal(true);
+                          }
+                        }}
+                      >
+                        <Feather name="users" size={17} color={tooBig ? '#888' : '#ff6b5b'} />
+                        <Text style={[styles.pdActionSecondaryText, tooBig ? { color: '#888' } : undefined]}>Group</Text>
+                      </Pressable>
+                    );
+                  })() : null}
                 </View>
               );
             })() : null}
@@ -3126,26 +3162,54 @@ export const ExploreScreen = () => {
             </ThemedText>
             <ScrollView style={{ maxHeight: 300 }} showsVerticalScrollIndicator={false}>
               {eligibleGroups.map((g) => {
-                const memberCount = Array.isArray(g.members) ? g.members.length : 0;
+                const details = (g as any)?._memberDetails || [];
+                const nonHost = details.filter((m: any) => !m.is_host);
+                const memberCount = nonHost.length || (Array.isArray(g.members) ? g.members.length : 0);
+                const couples = nonHost.filter((m: any) => m.is_couple).length;
+                const singles = memberCount - couples;
+                const roomsAvail = selectedProperty?.rooms_available ?? selectedProperty?.bedrooms ?? null;
+                const tooBig = roomsAvail != null && roomsAvail > 0 && memberCount > roomsAvail;
+
                 return (
                   <Pressable
                     key={g.id}
-                    style={[styles.groupPickerItem, { borderColor: theme.border }]}
-                    onPress={() => handleInquireAsGroup(g)}
+                    style={[styles.groupPickerItem, { borderColor: theme.border }, tooBig ? { opacity: 0.45 } : undefined]}
+                    onPress={() => {
+                      if (tooBig) {
+                        showAlert({
+                          title: 'Group Too Large',
+                          message: `This group needs ${memberCount} room${memberCount !== 1 ? 's' : ''} but the listing only has ${roomsAvail} available.`,
+                          variant: 'warning',
+                        });
+                        return;
+                      }
+                      confirm({
+                        title: 'Send Group Inquiry?',
+                        message: `Send inquiry to "${selectedProperty?.title}" on behalf of "${g.name}" (${memberCount} room${memberCount !== 1 ? 's' : ''} needed)?`,
+                        confirmText: 'Send Inquiry',
+                        cancelText: 'Cancel',
+                      }).then((yes) => { if (yes) handleInquireAsGroup(g); });
+                    }}
                   >
                     <View style={styles.groupPickerItemLeft}>
-                      <View style={[styles.groupPickerIcon, { backgroundColor: 'rgba(255,107,91,0.12)' }]}>
-                        <Feather name="users" size={16} color="#ff6b5b" />
+                      <View style={[styles.groupPickerIcon, { backgroundColor: tooBig ? 'rgba(136,136,136,0.12)' : 'rgba(255,107,91,0.12)' }]}>
+                        <Feather name="users" size={16} color={tooBig ? '#888' : '#ff6b5b'} />
                       </View>
                       <View style={{ flex: 1 }}>
                         <ThemedText style={{ fontWeight: '700', fontSize: 15 }}>{g.name}</ThemedText>
                         <ThemedText style={{ color: theme.textSecondary, fontSize: 12, marginTop: 2 }}>
                           {memberCount} {memberCount === 1 ? 'member' : 'members'}
-                          {g.city ? ` \u00B7 ${g.city}` : ''}
+                          {couples > 0 ? ` (${couples} couple${couples > 1 ? 's' : ''}, ${singles} single${singles !== 1 ? 's' : ''})` : ''}
+                          {' · '}{memberCount} room{memberCount !== 1 ? 's' : ''} needed
                         </ThemedText>
+                        {tooBig ? (
+                          <ThemedText style={{ color: '#ef4444', fontSize: 11, marginTop: 2 }}>
+                            Needs {memberCount} rooms — listing has {roomsAvail}
+                          </ThemedText>
+                        ) : null}
                       </View>
                     </View>
-                    <Feather name="chevron-right" size={18} color={theme.textSecondary} />
+                    <Feather name={tooBig ? 'x-circle' : 'chevron-right'} size={18} color={tooBig ? '#888' : theme.textSecondary} />
                   </Pressable>
                 );
               })}

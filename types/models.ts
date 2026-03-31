@@ -198,6 +198,8 @@ export interface GroupMember {
   userId: string;
   role: GroupMemberRole;
   isHost: boolean;
+  isCouple?: boolean;
+  partnerUserId?: string;
   status: GroupMemberStatus;
   joinedAt?: string;
   user?: {

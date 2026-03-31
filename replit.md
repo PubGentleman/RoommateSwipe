@@ -65,6 +65,21 @@ A tiered subscription model exists for renters, hosts, and agents, with payments
 
 Supabase PostgreSQL serves as the primary data store, complemented by AsyncStorage for local caching. TypeScript interfaces define data models. A centralized `listingService.ts` manages CRUD operations. The group system handles roommate and listing inquiry groups with plan-based limits.
 
+## Couple & Room-Matching System
+
+Groups support couple members who share one bedroom. Key behavior:
+- `group_members` table has `is_couple` (boolean) and `partner_user_id` (uuid nullable) columns (migration 065)
+- Each member entry = 1 room needed (couples are 1 entry sharing 1 room)
+- Utility functions in `utils/groupUtils.ts`: `getGroupUnitCount()`, `getGroupRoomsNeeded()`, `getGroupCompositionLabel()`, `canGroupFitListing()`
+- Listings have a computed `rooms_available` column (migration 023): `bedrooms - host_lives_in - existing_roommates_count`
+- Group Inquiry button on listing detail: **hidden** if no groups or groups have <2 members; **disabled** (grayed, 45% opacity) if group needs more rooms than listing has; **enabled** if group fits
+- Confirmation modal shown before sending group inquiry
+- Group picker modal shows room composition and "too big" warnings per group
+- GroupInfoScreen: Admin can toggle couple status via heart button on member rows
+- CreateGroupScreen: "Adding as a couple?" toggle when adding matched user
+- Host inquiry view: Shows couple badges and room composition summary
+- No auto-generated "My Apartment Search" groups — groups require explicit creation
+
 ## Amenity System
 
 Centralized amenity definitions live in `constants/amenities.ts` — the single source of truth for all amenity data across the app. Contains 42 amenities in 6 categories (unit_features, kitchen_bath, building_amenities, outdoor_spaces, utilities_services, accessibility_safety). Key exports:

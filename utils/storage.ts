@@ -1231,24 +1231,8 @@ export const StorageService = {
           (g.members as string[]).push(userId);
         }
       }
-      if (!groups.some(g => g.id === `user-group-${userId.slice(0, 8)}`)) {
-        groups.push({
-          id: `user-group-${userId.slice(0, 8)}`,
-          name: 'My Apartment Search',
-          description: 'Looking for a 2BR in Brooklyn with a chill roommate',
-          members: [userId, '1'],
-          pendingMembers: ['3'],
-          maxMembers: 3,
-          budget: 2200,
-          preferredLocation: 'Williamsburg',
-          createdAt: new Date(now - 1000 * 60 * 60 * 24 * 5),
-          type: 'roommate' as const,
-          isArchived: false,
-          createdBy: userId,
-        });
-      }
       await this.setGroups(groups);
-      console.log('[StorageService] Added user to groups + created personal group');
+      console.log('[StorageService] Added user to existing groups');
 
       const existingMatches = await this.getMatches();
       const matchesToAdd: Match[] = [

@@ -40,6 +40,7 @@ interface MemberDetail {
   smoking: boolean;
   interests: string[];
   verified: boolean;
+  isCouple?: boolean;
 }
 
 export const HostRenterGroupDetailScreen = () => {
@@ -94,12 +95,15 @@ export const HostRenterGroupDetailScreen = () => {
       const groups = await StorageService.getGroups();
       const fullGroup = groups.find(g => g.id === group.groupId);
       if (fullGroup && Array.isArray(fullGroup.members)) {
-        const memberIds = fullGroup.members.map((m: any) => typeof m === 'string' ? m : m.userId || m.id);
-        const memberDetails: MemberDetail[] = memberIds.map((uid: string, i: number) => {
-          const profile = profiles.find(p => p.userId === uid);
+        const memberEntries = fullGroup.members.map((m: any) => {
+          if (typeof m === 'string') return { uid: m, isCouple: false };
+          return { uid: m.userId || m.id || m.user_id, isCouple: m.is_couple || m.isCouple || false };
+        });
+        const memberDetails: MemberDetail[] = memberEntries.map((entry: any) => {
+          const profile = profiles.find(p => p.id === entry.uid || (p as any).userId === entry.uid);
           if (profile) {
             return {
-              id: uid,
+              id: entry.uid,
               name: profile.name,
               age: profile.age,
               photo: profile.photos?.[0] || '',
@@ -112,6 +116,7 @@ export const HostRenterGroupDetailScreen = () => {
               smoking: profile.lifestyle?.smoking ?? false,
               interests: profile.profileData?.interests ?? [],
               verified: !!profile.verification?.phone,
+              isCouple: entry.isCouple,
             };
           }
           return null;
@@ -355,7 +360,18 @@ export const HostRenterGroupDetailScreen = () => {
           ) : null}
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Members ({members.length})</Text>
+            <Text style={styles.sectionTitle}>
+              Members ({members.length})
+              {(() => {
+                const couples = members.filter(m => m.isCouple).length;
+                const singles = members.length - couples;
+                const roomsNeeded = members.length;
+                if (couples > 0) {
+                  return ` · ${couples} couple${couples > 1 ? 's' : ''}, ${singles} single${singles !== 1 ? 's' : ''} · ${roomsNeeded} room${roomsNeeded !== 1 ? 's' : ''} needed`;
+                }
+                return ` · ${roomsNeeded} room${roomsNeeded !== 1 ? 's' : ''} needed`;
+              })()}
+            </Text>
             {members.map(member => (
               <View key={member.id} style={styles.memberCard}>
                 <View style={styles.memberHeader}>
@@ -376,6 +392,12 @@ export const HostRenterGroupDetailScreen = () => {
                       ) : null}
                     </View>
                     <Text style={styles.memberOccupation}>{member.occupation}</Text>
+                    {member.isCouple ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3, backgroundColor: 'rgba(236,72,153,0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, alignSelf: 'flex-start' }}>
+                        <Feather name="heart" size={9} color="#ec4899" />
+                        <Text style={{ fontSize: 10, color: '#ec4899', fontWeight: '700' }}>Couple</Text>
+                      </View>
+                    ) : null}
                   </View>
                 </View>
                 {member.bio ? (

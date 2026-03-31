@@ -27,7 +27,7 @@ export async function getGroups(city?: string, type?: GroupType) {
     .from('groups')
     .select(`
       *,
-      members:group_members(user_id)
+      members:group_members(user_id, is_couple, is_host, status)
     `)
     .order('created_at', { ascending: false });
 
@@ -55,7 +55,7 @@ export async function getGroup(id: string) {
     .from('groups')
     .select(`
       *,
-      members:group_members(*, user:users(id, full_name, avatar_url, age, occupation)),
+      members:group_members(*, is_couple, partner_user_id, user:users(id, full_name, avatar_url, age, occupation)),
       creator:users!created_by(id, full_name, avatar_url)
     `)
     .eq('id', id)
@@ -73,7 +73,7 @@ export async function getGroupDetails(groupId: string) {
     .select(`
       *,
       members:group_members(
-        user_id, role, is_admin, is_host, status,
+        user_id, role, is_admin, is_host, is_couple, partner_user_id, status,
         user:users(id, full_name, avatar_url, age, role)
       ),
       listing:listings(id, title, address, city, state, rent, bedrooms, photos, status)
@@ -93,6 +93,8 @@ export async function getGroupDetails(groupId: string) {
       role: m.user?.role || m.role || 'renter',
       isAdmin: m.is_admin || false,
       isHost: m.is_host || false,
+      isCouple: m.is_couple || false,
+      partnerUserId: m.partner_user_id || null,
     }));
 
   const listing = data.listing;
@@ -156,7 +158,7 @@ export async function getMyGroups(type?: GroupType, userId?: string) {
     .from('groups')
     .select(`
       *,
-      members:group_members(user_id),
+      members:group_members(user_id, is_couple, is_host, status),
       listing:listings(id, title, photos, rent)
     `)
     .in('id', groupIds);
@@ -308,7 +310,12 @@ export async function createListingInquiryGroup(
   }
 }
 
-export async function addMemberToGroup(groupId: string, userId: string, userRole: 'renter' | 'host' = 'renter') {
+export async function addMemberToGroup(
+  groupId: string,
+  userId: string,
+  userRole: 'renter' | 'host' = 'renter',
+  options?: { isCouple?: boolean; partnerUserId?: string }
+) {
   const { data: group } = await supabase
     .from('groups')
     .select('type')
@@ -326,7 +333,30 @@ export async function addMemberToGroup(groupId: string, userId: string, userRole
       user_id: userId,
       role: 'member',
       is_host: userRole === 'host',
+      is_couple: options?.isCouple || false,
+      partner_user_id: options?.partnerUserId || null,
     })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function updateMemberCouple(
+  groupId: string,
+  userId: string,
+  isCouple: boolean,
+  partnerUserId?: string
+) {
+  const { data, error } = await supabase
+    .from('group_members')
+    .update({
+      is_couple: isCouple,
+      partner_user_id: isCouple ? (partnerUserId || null) : null,
+    })
+    .eq('group_id', groupId)
+    .eq('user_id', userId)
     .select()
     .single();
 
@@ -477,6 +507,8 @@ export function mapGroupMember(row: any): GroupMember {
     userId: row.user_id,
     role: row.role || 'member',
     isHost: row.is_host || false,
+    isCouple: row.is_couple || false,
+    partnerUserId: row.partner_user_id || undefined,
     status: row.status || 'active',
     joinedAt: row.created_at,
     user: row.user,

@@ -32,6 +32,7 @@ export const CreateGroupScreen = ({ navigation, route }: any) => {
   const [showPropertySearch, setShowPropertySearch] = useState(false);
   const [nameFocused, setNameFocused] = useState(false);
   const [descFocused, setDescFocused] = useState(false);
+  const [matchedIsCouple, setMatchedIsCouple] = useState(false);
 
   const matchedUserId = route.params?.matchedUserId;
   const matchedUserName = route.params?.matchedUserName;
@@ -82,7 +83,7 @@ export const CreateGroupScreen = ({ navigation, route }: any) => {
         if (matchedUserId) {
           try {
             const { addMemberToGroup } = await import('../../services/groupService');
-            await addMemberToGroup(group.id, matchedUserId);
+            await addMemberToGroup(group.id, matchedUserId, 'renter', { isCouple: matchedIsCouple });
           } catch {}
         }
 
@@ -177,6 +178,26 @@ export const CreateGroupScreen = ({ navigation, route }: any) => {
           </View>
           <Feather name="check-circle" size={18} color={ACCENT} />
         </View>
+      ) : null}
+
+      {matchedUserName ? (
+        <Pressable
+          style={[styles.coupleToggle, matchedIsCouple ? styles.coupleToggleActive : undefined]}
+          onPress={() => setMatchedIsCouple(!matchedIsCouple)}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+            <Feather name="heart" size={16} color={matchedIsCouple ? '#ec4899' : theme.textSecondary} />
+            <View>
+              <ThemedText style={{ fontWeight: '600', fontSize: 14 }}>Adding as a couple?</ThemedText>
+              <ThemedText style={{ color: theme.textSecondary, fontSize: 11, marginTop: 1 }}>
+                Couples share 1 bedroom and count as 1 unit
+              </ThemedText>
+            </View>
+          </View>
+          <View style={[styles.coupleCheck, matchedIsCouple ? { backgroundColor: '#ec4899', borderColor: '#ec4899' } : { borderColor: theme.border }]}>
+            {matchedIsCouple ? <Feather name="check" size={12} color="#fff" /> : null}
+          </View>
+        </Pressable>
       ) : null}
 
       <View style={[styles.field, nameFocused && styles.fieldFocused]}>
@@ -440,6 +461,29 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.4)',
     fontSize: 12,
     marginTop: 1,
+  },
+  coupleToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 20,
+    marginBottom: 14,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+  },
+  coupleToggleActive: {
+    borderColor: 'rgba(236,72,153,0.3)',
+    backgroundColor: 'rgba(236,72,153,0.06)',
+  },
+  coupleCheck: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   field: {
     marginHorizontal: 20,

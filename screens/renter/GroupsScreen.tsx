@@ -964,6 +964,10 @@ export const GroupsScreen = () => {
                 </View>
                 <Text style={[styles.slotText, { color: theme.textSecondary }]}>{filled}/{total}</Text>
               </View>
+              <Text style={{ color: theme.textSecondary, fontSize: 11, marginTop: 2 }}>
+                {filled} member{filled !== 1 ? 's' : ''} · {filled} room{filled !== 1 ? 's' : ''} needed
+              </Text>
+
             </View>
 
             {pendingCount > 0 ? (
