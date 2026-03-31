@@ -258,6 +258,133 @@ export const createHostMockNotifications = (userId: string): Notification[] => {
   ];
 };
 
+export const createAgentMockNotifications = (userId: string): Notification[] => {
+  const now = Date.now();
+  return [
+    {
+      id: `anotif-${userId.slice(0, 6)}-1`,
+      userId,
+      type: 'interest_received',
+      title: 'New Client Lead',
+      body: 'Sarah Johnson is interested in your managed listing at 123 Main St.',
+      isRead: false,
+      createdAt: new Date(now - 1000 * 60 * 30),
+      data: { fromUserId: '1', fromUserName: 'Sarah Johnson', fromUserPhoto: 'https://picsum.photos/100/100?random=1', interestCardId: 'ic-1' },
+    },
+    {
+      id: `anotif-${userId.slice(0, 6)}-2`,
+      userId,
+      type: 'agent_invite',
+      title: 'Team Invitation',
+      body: 'You\'ve been invited to join Metro Realty as a licensed agent.',
+      isRead: false,
+      createdAt: new Date(now - 1000 * 60 * 60 * 2),
+      data: { companyId: 'company1', companyName: 'Metro Realty' },
+    },
+    {
+      id: `anotif-${userId.slice(0, 6)}-3`,
+      userId,
+      type: 'message',
+      title: 'Client Message',
+      body: 'Michael Chen: Can you arrange a viewing for this Friday?',
+      isRead: true,
+      createdAt: new Date(now - 1000 * 60 * 60 * 5),
+      data: { conversationId: '2', fromUserId: '2', fromUserName: 'Michael Chen' },
+    },
+    {
+      id: `anotif-${userId.slice(0, 6)}-4`,
+      userId,
+      type: 'pi_group_assembled',
+      title: 'Pi Matched a Group',
+      body: 'A group of renters has been assembled that fits one of your listings.',
+      isRead: false,
+      createdAt: new Date(now - 1000 * 60 * 60 * 8),
+      data: { groupId: '1' },
+    },
+    {
+      id: `anotif-${userId.slice(0, 6)}-5`,
+      userId,
+      type: 'system',
+      title: 'License Verified',
+      body: 'Your real estate license has been verified. You now have access to agent tools.',
+      isRead: true,
+      createdAt: new Date(now - 1000 * 60 * 60 * 24),
+    },
+    {
+      id: `anotif-${userId.slice(0, 6)}-6`,
+      userId,
+      type: 'activity_nudge',
+      title: 'Pending Inquiries',
+      body: 'You have 5 unresponded inquiries. Quick responses improve your agent ranking.',
+      isRead: false,
+      createdAt: new Date(now - 1000 * 60 * 60 * 12),
+    },
+  ];
+};
+
+export const createCompanyMockNotifications = (userId: string): Notification[] => {
+  const now = Date.now();
+  return [
+    {
+      id: `cnotif-${userId.slice(0, 6)}-1`,
+      userId,
+      type: 'interest_received',
+      title: 'Portfolio Inquiry',
+      body: 'Emily Rodriguez is interested in your company listing at 456 Park Ave.',
+      isRead: false,
+      createdAt: new Date(now - 1000 * 60 * 20),
+      data: { fromUserId: '3', fromUserName: 'Emily Rodriguez', fromUserPhoto: 'https://picsum.photos/100/100?random=3', interestCardId: 'ic-3' },
+    },
+    {
+      id: `cnotif-${userId.slice(0, 6)}-2`,
+      userId,
+      type: 'company_group_invite',
+      title: 'Group Booking Request',
+      body: 'A group of 4 renters wants to book your 4BR listing together.',
+      isRead: false,
+      createdAt: new Date(now - 1000 * 60 * 60 * 3),
+      data: { listingId: '5', groupId: '2' },
+    },
+    {
+      id: `cnotif-${userId.slice(0, 6)}-3`,
+      userId,
+      type: 'message',
+      title: 'Team Update',
+      body: 'Alex Kim (Agent): Just completed the showing at Williamsburg listing.',
+      isRead: true,
+      createdAt: new Date(now - 1000 * 60 * 60 * 6),
+      data: { conversationId: '4', fromUserId: '7', fromUserName: 'Alex Kim' },
+    },
+    {
+      id: `cnotif-${userId.slice(0, 6)}-4`,
+      userId,
+      type: 'system',
+      title: 'Monthly Analytics',
+      body: 'Your portfolio received 156 views this month. 12 new inquiries across 8 listings.',
+      isRead: true,
+      createdAt: new Date(now - 1000 * 60 * 60 * 24),
+    },
+    {
+      id: `cnotif-${userId.slice(0, 6)}-5`,
+      userId,
+      type: 'property_update',
+      title: 'Listing Expiring Soon',
+      body: 'Your listing at 789 Broadway expires in 3 days. Renew to keep it active.',
+      isRead: false,
+      createdAt: new Date(now - 1000 * 60 * 60 * 36),
+    },
+    {
+      id: `cnotif-${userId.slice(0, 6)}-6`,
+      userId,
+      type: 'activity_nudge',
+      title: 'Team Performance',
+      body: 'Your team has 8 pending inquiries. Assign agents to maintain response times.',
+      isRead: false,
+      createdAt: new Date(now - 1000 * 60 * 60 * 10),
+    },
+  ];
+};
+
 export const createMockHostConversations = (hostId: string): Conversation[] => {
   const now = Date.now();
   return [

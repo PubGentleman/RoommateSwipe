@@ -1440,10 +1440,19 @@ export const StorageService = {
         console.log('[StorageService] Seeded company team members');
       }
 
-      const { createMockNotifications, createHostMockNotifications, createMockInterestCards, createMockReceivedLikes, MOCK_SAVED_PROPERTY_IDS, createMockHostConversations } = await import('./mockSeedData');
+      const { createMockNotifications, createHostMockNotifications, createAgentMockNotifications, createCompanyMockNotifications, createMockInterestCards, createMockReceivedLikes, MOCK_SAVED_PROPERTY_IDS, createMockHostConversations } = await import('./mockSeedData');
 
       const isHost = userRole === 'host' || hostType;
-      const mockNotifs = isHost ? createHostMockNotifications(userId) : createMockNotifications(userId);
+      let mockNotifs: Notification[];
+      if (hostType === 'company') {
+        mockNotifs = createCompanyMockNotifications(userId);
+      } else if (hostType === 'agent') {
+        mockNotifs = createAgentMockNotifications(userId);
+      } else if (isHost) {
+        mockNotifs = createHostMockNotifications(userId);
+      } else {
+        mockNotifs = createMockNotifications(userId);
+      }
       const existingNotifs = await AsyncStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
       const allNotifs: Notification[] = existingNotifs ? JSON.parse(existingNotifs) : [];
       const userNotifIds = new Set(allNotifs.filter(n => n.userId === userId).map(n => n.id));

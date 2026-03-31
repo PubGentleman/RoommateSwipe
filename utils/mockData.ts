@@ -4,7 +4,7 @@ import { additionalProfiles } from './additionalProfiles';
 import { extraProfiles } from './extraProfiles';
 import { extraConversations, extraProperties, extraGroups, extraApplications } from './extraMockData';
 
-export const MOCK_DATA_VERSION = '3.0.1';
+export const MOCK_DATA_VERSION = '3.1.0';
 
 export const mockProfileUsers: User[] = [
   {
