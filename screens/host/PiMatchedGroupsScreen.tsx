@@ -15,6 +15,7 @@ import {
   getAvailableGroups,
   claimGroup,
   getClaimsUsedThisMonth,
+  getGroupAcceptanceProgress,
 } from '../../services/piAutoMatchService';
 import { supabase } from '../../lib/supabase';
 import { getAutoClaimLimits, type AgentPlan } from '../../constants/planLimits';
@@ -49,6 +50,7 @@ export const PiMatchedGroupsScreen = () => {
   const [budgetMinFilter, setBudgetMinFilter] = useState('');
   const [budgetMaxFilter, setBudgetMaxFilter] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('score');
+  const [acceptanceProgress, setAcceptanceProgress] = useState<Record<string, { total: number; accepted: number; pending: number }>>({});
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [tempCity, setTempCity] = useState('');
   const [tempNeighborhood, setTempNeighborhood] = useState('');
@@ -67,7 +69,7 @@ export const PiMatchedGroupsScreen = () => {
     if (!user) return;
     try {
       const [available, usage, preformedResult] = await Promise.all([
-        getAvailableGroups(cityFilter ? { city: cityFilter } : undefined),
+        getAvailableGroups({ city: cityFilter || undefined, includeForming: true }),
         getClaimsUsedThisMonth(user.id),
         (() => {
           let q = supabase
@@ -104,6 +106,21 @@ export const PiMatchedGroupsScreen = () => {
       const allGroups = [...available, ...preformedAsAuto];
       setGroups(allGroups);
       applyFiltersAndSort(allGroups, sizeFilter, sortBy, neighborhoodFilter, budgetMinFilter, budgetMaxFilter);
+
+      const formingGroups = available.filter(g => g.status === 'forming');
+      if (formingGroups.length > 0) {
+        const progressEntries = await Promise.all(
+          formingGroups.map(async (g) => {
+            const progress = await getGroupAcceptanceProgress(g.id);
+            return [g.id, progress] as const;
+          })
+        );
+        const progressMap: Record<string, { total: number; accepted: number; pending: number }> = {};
+        for (const [id, p] of progressEntries) {
+          progressMap[id] = p;
+        }
+        setAcceptanceProgress(progressMap);
+      }
     } catch {
       setGroups([]);
       setFilteredGroups([]);
@@ -302,16 +319,20 @@ export const PiMatchedGroupsScreen = () => {
     rooftop: 'layers',
   };
 
+  const FORMING_COLOR = '#f59e0b';
+
   const renderGroupCard = ({ item }: { item: PiAutoGroup }) => {
     const score = item.match_score || 0;
     const scoreColor = getScoreColor(score);
     const isClaiming = claimingId === item.id;
+    const isForming = item.status === 'forming';
+    const progress = acceptanceProgress[item.id];
     const moveIn = item.move_in_window_start
       ? new Date(item.move_in_window_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
       : null;
 
     return (
-      <View style={styles.card}>
+      <View style={[styles.card, isForming ? { borderColor: FORMING_COLOR + '30', borderWidth: 1 } : null]}>
         <View style={styles.cardHeader}>
           <View style={styles.cardHeaderLeft}>
             <View style={[styles.sizeBadge, { backgroundColor: PURPLE + '20' }]}>
@@ -326,6 +347,12 @@ export const PiMatchedGroupsScreen = () => {
                 <Text style={[styles.sizeBadgeText, { color: '#3b82f6' }]}>
                   {item.desired_bedrooms === -1 ? 'Studio' : `${item.desired_bedrooms}BR`}
                 </Text>
+              </View>
+            ) : null}
+            {isForming ? (
+              <View style={[styles.sizeBadge, { backgroundColor: FORMING_COLOR + '20' }]}>
+                <Feather name="clock" size={12} color={FORMING_COLOR} />
+                <Text style={[styles.sizeBadgeText, { color: FORMING_COLOR }]}>Forming</Text>
               </View>
             ) : null}
           </View>
@@ -403,6 +430,28 @@ export const PiMatchedGroupsScreen = () => {
           </Text>
         ) : null}
 
+        {isForming && progress ? (
+          <View style={styles.progressSection}>
+            <View style={styles.progressHeader}>
+              <Feather name="loader" size={12} color={FORMING_COLOR} />
+              <Text style={styles.progressLabel}>
+                {progress.accepted}/{progress.total} members accepted
+              </Text>
+            </View>
+            <View style={styles.progressBar}>
+              <View
+                style={[
+                  styles.progressFill,
+                  {
+                    width: `${progress.total > 0 ? (progress.accepted / progress.total) * 100 : 0}%`,
+                    backgroundColor: FORMING_COLOR,
+                  },
+                ]}
+              />
+            </View>
+          </View>
+        ) : null}
+
         {item.is_preformed ? (
           <Pressable
             style={[styles.claimBtn, { backgroundColor: GREEN }]}
@@ -411,6 +460,13 @@ export const PiMatchedGroupsScreen = () => {
             <Feather name="message-circle" size={16} color="#fff" />
             <Text style={styles.claimBtnText}>Contact Group</Text>
           </Pressable>
+        ) : isForming ? (
+          <View style={styles.formingFooter}>
+            <Feather name="eye" size={14} color={FORMING_COLOR} />
+            <Text style={[styles.formingFooterText, { color: FORMING_COLOR }]}>
+              Group is still forming — claimable once all members accept
+            </Text>
+          </View>
         ) : (
           <Pressable
             style={[styles.claimBtn, isClaiming ? { opacity: 0.5 } : null]}
@@ -680,6 +736,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6, paddingVertical: 3,
   },
   amenityChipText: { color: 'rgba(255,255,255,0.4)', fontSize: 10 },
+  progressSection: { marginTop: 8, marginBottom: 4 },
+  progressHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+  progressLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: '500' },
+  progressBar: {
+    height: 4, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressFill: { height: '100%', borderRadius: 2 },
+  formingFooter: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingVertical: 10, paddingHorizontal: 4, marginTop: 4,
+  },
+  formingFooterText: { fontSize: 12, flex: 1 },
   emptyContainer: { alignItems: 'center', paddingTop: 80, paddingHorizontal: 32 },
   emptyIconWrap: {
     width: 72, height: 72, borderRadius: 36,

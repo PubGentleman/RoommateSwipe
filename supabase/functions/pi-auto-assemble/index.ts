@@ -28,6 +28,7 @@ interface CandidateProfile {
   city: string;
   budget: number;
   desired_roommate_count: number;
+  max_roommates: number;
   household_gender_preference: string;
   move_in_date: string | null;
   userData: Record<string, any>;
@@ -358,6 +359,7 @@ serve(async (req) => {
           city: p.city || '',
           budget: p.budget || 0,
           desired_roommate_count: p.desired_roommate_count ?? 0,
+          max_roommates: p.max_roommates ?? 0,
           household_gender_preference: p.household_gender_preference || 'any',
           move_in_date: p.preferences?.moveInDate || p.move_in_date || null,
           userData: u,
@@ -406,12 +408,15 @@ serve(async (req) => {
 
         const sizePools = new Map<number, CandidateProfile[]>();
         for (const c of combinedPool) {
-          const target = c.desired_roommate_count > 0 ? c.desired_roommate_count + 1 : 2;
+          const roommateCount = c.desired_roommate_count > 0
+            ? c.desired_roommate_count
+            : (c.max_roommates > 0 ? c.max_roommates : 0);
+          const target = roommateCount > 0 ? roommateCount + 1 : 2;
           if (!sizePools.has(target)) sizePools.set(target, []);
           sizePools.get(target)!.push(c);
         }
 
-        const noPreference = combinedPool.filter(c => c.desired_roommate_count === 0);
+        const noPreference = combinedPool.filter(c => c.desired_roommate_count === 0 && c.max_roommates === 0);
 
         for (const [size, sizePool] of sizePools) {
           const combined = [...sizePool, ...noPreference.filter(c => !sizePool.includes(c))];
@@ -426,12 +431,15 @@ serve(async (req) => {
         if (remainingAny.length >= 2) {
           const sizePools = new Map<number, CandidateProfile[]>();
           for (const c of remainingAny) {
-            const target = c.desired_roommate_count > 0 ? c.desired_roommate_count + 1 : 2;
+            const roommateCount = c.desired_roommate_count > 0
+              ? c.desired_roommate_count
+              : (c.max_roommates > 0 ? c.max_roommates : 0);
+            const target = roommateCount > 0 ? roommateCount + 1 : 2;
             if (!sizePools.has(target)) sizePools.set(target, []);
             sizePools.get(target)!.push(c);
           }
 
-          const noPreference = remainingAny.filter(c => c.desired_roommate_count === 0);
+          const noPreference = remainingAny.filter(c => c.desired_roommate_count === 0 && c.max_roommates === 0);
 
           for (const [size, sizePool] of sizePools) {
             const combined = [...sizePool, ...noPreference.filter(c => !sizePool.includes(c))];
@@ -648,6 +656,7 @@ async function handleReplacementFlow(
       city: group.city || '',
       budget: u.budget || 0,
       desired_roommate_count: 0,
+      max_roommates: 0,
       household_gender_preference: u.household_gender_preference || 'any',
       move_in_date: null,
       userData: u,

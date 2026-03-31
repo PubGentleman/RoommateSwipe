@@ -318,12 +318,17 @@ export async function getAvailableGroups(filters?: {
   city?: string;
   minSize?: number;
   maxSize?: number;
+  includeForming?: boolean;
 }): Promise<PiAutoGroup[]> {
   try {
+    const statuses = filters?.includeForming
+      ? ['ready', 'forming']
+      : ['ready'];
+
     let query = supabase
       .from('pi_auto_groups')
       .select('*')
-      .eq('status', 'ready');
+      .in('status', statuses);
 
     if (filters?.city) query = query.eq('city', filters.city);
     if (filters?.minSize) query = query.gte('max_members', filters.minSize);
@@ -333,6 +338,31 @@ export async function getAvailableGroups(filters?: {
     return (data as PiAutoGroup[]) ?? [];
   } catch {
     return [];
+  }
+}
+
+export async function getGroupAcceptanceProgress(groupId: string): Promise<{
+  total: number;
+  accepted: number;
+  pending: number;
+  declined: number;
+}> {
+  try {
+    const { data } = await supabase
+      .from('pi_auto_group_members')
+      .select('status')
+      .eq('group_id', groupId);
+
+    if (!data) return { total: 0, accepted: 0, pending: 0, declined: 0 };
+
+    return {
+      total: data.length,
+      accepted: data.filter(m => m.status === 'accepted').length,
+      pending: data.filter(m => m.status === 'pending').length,
+      declined: data.filter(m => m.status === 'declined').length,
+    };
+  } catch {
+    return { total: 0, accepted: 0, pending: 0, declined: 0 };
   }
 }
 
