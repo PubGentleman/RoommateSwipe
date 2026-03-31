@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, StyleSheet, Pressable, Image,
-  ActivityIndicator, Modal, TextInput, ScrollView,
+  ActivityIndicator, Modal, TextInput, ScrollView, Alert,
 } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
@@ -381,7 +381,13 @@ export const BrowseRentersScreen = () => {
     }
 
     try {
-      await addToShortlist(user.id, renter.id, selectedListing?.id);
+      const result = await addToShortlist(user.id, renter.id, selectedListing?.id);
+      if (!result.success) {
+        if (result.error) {
+          Alert.alert('Cannot Shortlist', result.error);
+        }
+        return;
+      }
       if (isCompanyHost) {
         await companyShortlistRenter(user.id, renter.id, selectedListing?.id);
       }

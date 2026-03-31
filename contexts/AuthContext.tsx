@@ -302,6 +302,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             : existing?.background_check,
         };
       })(),
+      acceptAgentOffers: supabaseUser.accept_agent_offers ?? true,
       privacySettings: supabaseUser.privacy_settings || undefined,
       hostType: supabaseUser.host_type || undefined,
       companyName: supabaseUser.company_name || undefined,
@@ -1031,6 +1032,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const supabaseFields: Record<string, any> = {};
     if (updates.verification !== undefined) supabaseFields.verification = updates.verification;
+    if (updates.acceptAgentOffers !== undefined) supabaseFields.accept_agent_offers = updates.acceptAgentOffers;
     if (updates.privacySettings !== undefined) supabaseFields.privacy_settings = updates.privacySettings;
     if (updates.name !== undefined) supabaseFields.full_name = updates.name;
     if (updates.profilePicture !== undefined) supabaseFields.avatar_url = updates.profilePicture;

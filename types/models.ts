@@ -463,6 +463,7 @@ export interface User {
     expiryMonth: number;
     expiryYear: number;
   }>;
+  acceptAgentOffers?: boolean;
   privacySettings?: {
     profileVisible: boolean;
     showOnlineStatus: boolean;

@@ -70,15 +70,25 @@ export async function getShortlistedRenterIds(agentId: string): Promise<string[]
   return (data || []).map(s => s.renter_id);
 }
 
-export async function addToShortlist(agentId: string, renterId: string, listingId?: string): Promise<boolean> {
+export async function addToShortlist(agentId: string, renterId: string, listingId?: string): Promise<{ success: boolean; error?: string }> {
   if (!isSupabaseConfigured) {
     const data = await StorageService.getData(SHORTLIST_KEY);
     const list = data ? JSON.parse(data) : [];
     const exists = list.find((s: any) => s.agentId === agentId && s.renterId === renterId);
-    if (exists) return false;
+    if (exists) return { success: false, error: 'Already shortlisted' };
     list.push({ id: `sl_${Date.now()}`, agentId, renterId, listingId, createdAt: new Date().toISOString() });
     await StorageService.storeData(SHORTLIST_KEY, JSON.stringify(list));
-    return true;
+    return { success: true };
+  }
+
+  const { data: renter } = await supabase
+    .from('users')
+    .select('accept_agent_offers')
+    .eq('id', renterId)
+    .maybeSingle();
+
+  if (renter && renter.accept_agent_offers === false) {
+    return { success: false, error: 'This renter is not accepting offers from agents' };
   }
 
   const { data: existing } = await supabase
@@ -88,7 +98,7 @@ export async function addToShortlist(agentId: string, renterId: string, listingI
     .eq('renter_id', renterId)
     .maybeSingle();
 
-  if (existing) return false;
+  if (existing) return { success: false, error: 'Already shortlisted' };
 
   const { error } = await supabase
     .from('agent_shortlists')
@@ -96,9 +106,9 @@ export async function addToShortlist(agentId: string, renterId: string, listingI
 
   if (error) {
     console.warn('[AgentService] addToShortlist error:', error.message);
-    return false;
+    return { success: false, error: error.message };
   }
-  return true;
+  return { success: true };
 }
 
 export async function removeFromShortlist(agentId: string, renterId: string): Promise<void> {
@@ -320,7 +330,19 @@ export async function sendAgentInvites(
     return;
   }
 
-  const rows = renterIds.map(renterId => ({
+  const { data: eligibleRenters } = await supabase
+    .from('users')
+    .select('id')
+    .in('id', renterIds)
+    .eq('accept_agent_offers', true);
+
+  const eligibleIds = (eligibleRenters || []).map(r => r.id);
+  if (eligibleIds.length === 0) {
+    console.warn('[AgentService] No eligible renters accept agent offers');
+    return;
+  }
+
+  const rows = eligibleIds.map(renterId => ({
     agent_id: agentId,
     renter_id: renterId,
     group_id: groupId,

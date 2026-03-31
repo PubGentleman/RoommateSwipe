@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Pressable, TextInput, Switch, Modal } from 'react-native';
+import { View, StyleSheet, Pressable, TextInput, Switch, Modal, Alert } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -30,6 +30,7 @@ export const PrivacySecurityScreen = () => {
   const [showLastActive, setShowLastActive] = useState(false);
   const [twoFactorAuth, setTwoFactorAuth] = useState(false);
   
+  const [acceptAgentOffers, setAcceptAgentOffers] = useState(true);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showPasswordSuccessModal, setShowPasswordSuccessModal] = useState(false);
   const [passwordError, setPasswordError] = useState('');
@@ -41,7 +42,47 @@ export const PrivacySecurityScreen = () => {
       setShowLastActive(user.privacySettings.showLastActive ?? false);
       setTwoFactorAuth(user.privacySettings.twoFactorEnabled ?? false);
     }
+    setAcceptAgentOffers(user?.acceptAgentOffers ?? true);
   }, [user]);
+
+  const handleToggleAgentOffers = async (value: boolean) => {
+    if (!user?.id) return;
+    setAcceptAgentOffers(value);
+
+    const { error } = await supabase
+      .from('users')
+      .update({ accept_agent_offers: value })
+      .eq('id', user.id);
+
+    if (error) {
+      setAcceptAgentOffers(!value);
+      Alert.alert('Error', 'Could not update preference. Please try again.');
+      return;
+    }
+
+    await updateUser({ acceptAgentOffers: value });
+
+    if (!value) {
+      supabase
+        .from('agent_shortlists')
+        .delete()
+        .eq('renter_id', user.id)
+        .then(() => {});
+
+      supabase
+        .from('company_shortlisted_renters')
+        .delete()
+        .eq('renter_id', user.id)
+        .then(() => {});
+
+      supabase
+        .from('agent_group_invites')
+        .update({ status: 'cancelled' })
+        .eq('renter_id', user.id)
+        .eq('status', 'pending')
+        .then(() => {});
+    }
+  };
 
   const updatePrivacySettings = async (settings: Partial<NonNullable<typeof user.privacySettings>>) => {
     if (!user) return;
@@ -302,6 +343,28 @@ export const PrivacySecurityScreen = () => {
             await updatePrivacySettings({ showLastActive: value });
           }}
         />
+
+        {user?.role === 'renter' ? (
+          <View style={[styles.agentOffersRow, { backgroundColor: '#1a1a1a', borderColor: '#333333' }]}>
+            <View style={styles.agentOffersInfo}>
+              <View style={styles.agentOffersLabelRow}>
+                <Feather name="briefcase" size={20} color="#A0A0A0" />
+                <ThemedText style={[Typography.body, { marginLeft: Spacing.md, fontWeight: '600' }]}>
+                  Receive agent & company offers
+                </ThemedText>
+              </View>
+              <ThemedText style={{ fontSize: 13, lineHeight: 18, color: theme.textSecondary, marginTop: 4, marginLeft: 32 }}>
+                Allow licensed agents and property management companies to send you group invites and listing recommendations
+              </ThemedText>
+            </View>
+            <Switch
+              value={acceptAgentOffers}
+              onValueChange={handleToggleAgentOffers}
+              trackColor={{ false: theme.border, true: theme.primary }}
+              thumbColor={theme.backgroundSecondary}
+            />
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.section}>
@@ -569,6 +632,23 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: 'rgba(255,255,255,0.6)',
     marginBottom: 3,
+  },
+  agentOffersRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.sm,
+    borderWidth: 1,
+  },
+  agentOffersInfo: {
+    flex: 1,
+    marginRight: 16,
+  },
+  agentOffersLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   agentLockSub: {
     fontSize: 12,

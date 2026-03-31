@@ -41,8 +41,18 @@ export async function shortlistRenter(
   renterId: string,
   listingId?: string,
   notes?: string
-): Promise<void> {
+): Promise<{ success: boolean; error?: string }> {
   if (isSupabaseConfigured) {
+    const { data: renter } = await supabase
+      .from('users')
+      .select('accept_agent_offers')
+      .eq('id', renterId)
+      .maybeSingle();
+
+    if (renter && renter.accept_agent_offers === false) {
+      return { success: false, error: 'This renter is not accepting offers from companies' };
+    }
+
     const { error } = await supabase
       .from('company_shortlisted_renters')
       .upsert({
@@ -51,7 +61,8 @@ export async function shortlistRenter(
         listing_id: listingId || null,
         notes: notes || null,
       }, { onConflict: 'company_host_id,renter_id,listing_id' });
-    if (error) throw error;
+    if (error) return { success: false, error: error.message };
+    return { success: true };
   } else {
     const key = `company_shortlist_${companyHostId}`;
     const existing = JSON.parse(await StorageService.getItem(key) || '[]');
@@ -60,6 +71,7 @@ export async function shortlistRenter(
       existing.push({ id: `cs-${Date.now()}`, renterId, listingId: listingId || null, notes, shortlistedAt: new Date().toISOString() });
       await StorageService.setItem(key, JSON.stringify(existing));
     }
+    return { success: true };
   }
 }
 
