@@ -1433,7 +1433,77 @@ export const StorageService = {
           await this.setProperties(properties);
           console.log(`[StorageService] Assigned ${companyListingIds.length} listings to company host`);
         }
+
+        const { createMockTeamMembers } = await import('./mockSeedData');
+        const teamMembers = createMockTeamMembers(userId);
+        await AsyncStorage.setItem(`@rhome/team_members_${userId}`, JSON.stringify(teamMembers));
+        console.log('[StorageService] Seeded company team members');
       }
+
+      const { createMockNotifications, createHostMockNotifications, createMockInterestCards, createMockReceivedLikes, MOCK_SAVED_PROPERTY_IDS, createMockHostConversations } = await import('./mockSeedData');
+
+      const isHost = userRole === 'host' || hostType;
+      const mockNotifs = isHost ? createHostMockNotifications(userId) : createMockNotifications(userId);
+      const existingNotifs = await AsyncStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
+      const allNotifs: Notification[] = existingNotifs ? JSON.parse(existingNotifs) : [];
+      const userNotifIds = new Set(allNotifs.filter(n => n.userId === userId).map(n => n.id));
+      for (const n of mockNotifs) {
+        if (!userNotifIds.has(n.id)) allNotifs.push(n);
+      }
+      await AsyncStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(allNotifs));
+      console.log(`[StorageService] Seeded ${mockNotifs.length} notifications`);
+
+      if (isHost) {
+        const hostProperties = (await this.getProperties()).filter(p => p.hostId === userId);
+        const hostPropIds = hostProperties.map(p => p.id);
+        if (hostPropIds.length > 0) {
+          const interestCards = createMockInterestCards(userId, hostPropIds);
+          for (const card of interestCards) {
+            const prop = hostProperties.find(p => p.id === card.propertyId);
+            if (prop) card.propertyTitle = prop.title;
+          }
+          const existingCards = await this.getInterestCards();
+          const existingCardIds = new Set(existingCards.map(c => c.id));
+          for (const card of interestCards) {
+            if (!existingCardIds.has(card.id)) existingCards.push(card);
+          }
+          await this.setInterestCards(existingCards);
+          console.log(`[StorageService] Seeded ${interestCards.length} interest cards for host`);
+        }
+
+        const hostConversations = createMockHostConversations(userId);
+        for (const hc of hostConversations) {
+          const idx = conversations.findIndex(c => c.id === hc.id);
+          if (idx < 0) conversations.push(hc as any);
+        }
+        await AsyncStorage.setItem(STORAGE_KEYS.CONVERSATIONS, JSON.stringify(conversations));
+        console.log('[StorageService] Seeded host conversations');
+      }
+
+      if (!isHost) {
+        const savedData = await AsyncStorage.getItem(STORAGE_KEYS.SAVED_PROPERTIES);
+        const allSaved: Record<string, string[]> = savedData ? JSON.parse(savedData) : {};
+        if (!allSaved[userId] || allSaved[userId].length === 0) {
+          allSaved[userId] = MOCK_SAVED_PROPERTY_IDS;
+          await AsyncStorage.setItem(STORAGE_KEYS.SAVED_PROPERTIES, JSON.stringify(allSaved));
+          console.log('[StorageService] Seeded saved properties');
+        }
+      }
+
+      const receivedLikes = createMockReceivedLikes(userId);
+      const users = await this.getUsers();
+      const userIdx = users.findIndex(u => u.id === userId);
+      if (userIdx >= 0) {
+        users[userIdx].receivedLikes = receivedLikes.map(l => ({
+          likerId: l.fromUserId,
+          likerName: l.fromUserName,
+          likerPhoto: l.fromUserPhoto,
+          likedAt: new Date(l.timestamp),
+          isSuperLike: l.isSuperLike,
+        }));
+        await AsyncStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+      }
+      console.log('[StorageService] Seeded received likes / profile views');
 
       await AsyncStorage.setItem(seedKey, 'true');
       console.log('[StorageService] User-specific mock data seeding complete');

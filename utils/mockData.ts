@@ -4,7 +4,7 @@ import { additionalProfiles } from './additionalProfiles';
 import { extraProfiles } from './extraProfiles';
 import { extraConversations, extraProperties, extraGroups, extraApplications } from './extraMockData';
 
-export const MOCK_DATA_VERSION = '2.7.1';
+export const MOCK_DATA_VERSION = '3.0.1';
 
 export const mockProfileUsers: User[] = [
   {
@@ -1846,6 +1846,7 @@ export const mockProperties: Property[] = [
       { gender: 'female', onApp: false },
     ],
     hostProfileId: '1',
+    preferred_tenant_gender: 'female_only',
     walkScore: 94,
     transitInfo: {
       stops: [
@@ -2003,6 +2004,7 @@ export const mockProperties: Property[] = [
       { gender: 'female', onApp: false },
     ],
     hostProfileId: '3',
+    preferred_tenant_gender: 'female_only',
     walkScore: 93,
     transitInfo: {
       stops: [
@@ -2081,6 +2083,7 @@ export const mockProperties: Property[] = [
       { gender: 'female', onApp: false },
     ],
     hostProfileId: '4',
+    preferred_tenant_gender: 'male_only',
     walkScore: 90,
     transitInfo: {
       stops: [

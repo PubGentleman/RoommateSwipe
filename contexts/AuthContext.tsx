@@ -2434,6 +2434,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         joinedAt: d.joined_at ?? undefined,
       }));
     }
+    try {
+      const localData = await AsyncStorage.getItem(`@rhome/team_members_${user.id}`);
+      if (localData) {
+        const members = JSON.parse(localData);
+        return members.map((m: any) => ({
+          id: m.id,
+          companyUserId: user.id,
+          memberUserId: m.user_id,
+          email: m.email,
+          fullName: m.name,
+          role: m.role,
+          status: m.status || 'active',
+          invitedAt: m.joined_at || new Date().toISOString(),
+          joinedAt: m.joined_at,
+        }));
+      }
+    } catch {}
     return [];
   };
 

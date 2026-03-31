@@ -1,0 +1,374 @@
+import { Notification, InterestCard } from '../types/models';
+
+export const createMockNotifications = (userId: string): Notification[] => {
+  const now = Date.now();
+  return [
+    {
+      id: `notif-${userId.slice(0, 6)}-1`,
+      userId,
+      type: 'match',
+      title: 'New Match!',
+      body: 'You and Sarah Johnson matched! Start chatting to see if you\'re compatible roommates.',
+      isRead: false,
+      createdAt: new Date(now - 1000 * 60 * 30),
+      data: { matchId: `match-${userId.slice(0, 6)}-1`, fromUserId: '1', fromUserName: 'Sarah Johnson', fromUserPhoto: 'https://picsum.photos/100/100?random=1' },
+    },
+    {
+      id: `notif-${userId.slice(0, 6)}-2`,
+      userId,
+      type: 'super_like',
+      title: 'Someone sent you a Super Interest!',
+      body: 'Emily Rodriguez is very interested in rooming with you.',
+      isRead: false,
+      createdAt: new Date(now - 1000 * 60 * 60 * 2),
+      data: { fromUserId: '3', fromUserName: 'Emily Rodriguez', fromUserPhoto: 'https://picsum.photos/100/100?random=3' },
+    },
+    {
+      id: `notif-${userId.slice(0, 6)}-3`,
+      userId,
+      type: 'message',
+      title: 'New Message',
+      body: 'Michael Chen: Hey, are you still looking in Brooklyn?',
+      isRead: true,
+      createdAt: new Date(now - 1000 * 60 * 60 * 5),
+      data: { conversationId: '2', fromUserId: '2', fromUserName: 'Michael Chen' },
+    },
+    {
+      id: `notif-${userId.slice(0, 6)}-4`,
+      userId,
+      type: 'group_invite',
+      title: 'Group Invitation',
+      body: 'You\'ve been invited to join "Williamsburg Trio" group.',
+      isRead: false,
+      createdAt: new Date(now - 1000 * 60 * 60 * 8),
+      data: { group_id: '1', fromUserName: 'Sarah Johnson' },
+    },
+    {
+      id: `notif-${userId.slice(0, 6)}-5`,
+      userId,
+      type: 'interest_received',
+      title: 'New Interest Card',
+      body: 'A renter is interested in your listing "Cozy Suburban House".',
+      isRead: true,
+      createdAt: new Date(now - 1000 * 60 * 60 * 12),
+      data: { propertyId: '2', fromUserName: 'Jessica Park', interestCardId: 'ic-1' },
+    },
+    {
+      id: `notif-${userId.slice(0, 6)}-6`,
+      userId,
+      type: 'system',
+      title: 'Welcome to Rhome!',
+      body: 'Complete your profile to get better matches and increase your visibility.',
+      isRead: true,
+      createdAt: new Date(now - 1000 * 60 * 60 * 24 * 2),
+    },
+    {
+      id: `notif-${userId.slice(0, 6)}-7`,
+      userId,
+      type: 'property_update',
+      title: 'Price Drop Alert',
+      body: 'A listing you saved in Williamsburg just dropped its price by $200/mo.',
+      isRead: false,
+      createdAt: new Date(now - 1000 * 60 * 60 * 18),
+      data: { propertyId: '2' },
+    },
+    {
+      id: `notif-${userId.slice(0, 6)}-8`,
+      userId,
+      type: 'interest_accepted',
+      title: 'Interest Accepted!',
+      body: 'Your interest in "Modern Downtown Apartment" was accepted. You can now chat with the host.',
+      isRead: false,
+      createdAt: new Date(now - 1000 * 60 * 60 * 4),
+      data: { propertyId: '1', conversationId: '5' },
+    },
+    {
+      id: `notif-${userId.slice(0, 6)}-9`,
+      userId,
+      type: 'pi_group_assembled',
+      title: 'Pi Found a Group for You!',
+      body: 'Pi assembled a potential roommate group based on your preferences. Check it out!',
+      isRead: false,
+      createdAt: new Date(now - 1000 * 60 * 60 * 6),
+      data: { groupId: '14' },
+    },
+    {
+      id: `notif-${userId.slice(0, 6)}-10`,
+      userId,
+      type: 'activity_nudge',
+      title: 'Don\'t Miss Out!',
+      body: '3 new listings in your preferred neighborhoods were posted today.',
+      isRead: true,
+      createdAt: new Date(now - 1000 * 60 * 60 * 36),
+    },
+    {
+      id: `notif-${userId.slice(0, 6)}-11`,
+      userId,
+      type: 'agent_invite',
+      title: 'Agent Invitation',
+      body: 'Agent Derek Ward has a listing that matches your preferences.',
+      isRead: false,
+      createdAt: new Date(now - 1000 * 60 * 60 * 10),
+      data: { agentName: 'Derek Ward', listingTitle: 'Luxury Penthouse Suite', listingRent: 3500 },
+    },
+    {
+      id: `notif-${userId.slice(0, 6)}-12`,
+      userId,
+      type: 'group_accepted',
+      title: 'Joined Group!',
+      body: 'You\'ve been accepted into "Brooklyn Creatives" group.',
+      isRead: true,
+      createdAt: new Date(now - 1000 * 60 * 60 * 24),
+      data: { groupId: '2' },
+    },
+  ];
+};
+
+export const createMockInterestCards = (hostId: string, propertyIds: string[]): InterestCard[] => {
+  const now = Date.now();
+  const cards: InterestCard[] = [];
+
+  const renterData = [
+    { id: '1', name: 'Sarah Johnson', photo: 'https://picsum.photos/100/100?random=1', budget: '$1,000 - $1,400', tags: ['Clean', 'Quiet', 'Professional', 'Morning Person'], note: 'I work from home 3 days a week and keep shared spaces very clean. Would love to see the place!' },
+    { id: '2', name: 'Michael Chen', photo: 'https://picsum.photos/100/100?random=2', budget: '$1,200 - $1,600', tags: ['Social', 'Gym Goer', 'Tech Professional'], note: 'Looking for a place close to the subway. I\'m tidy and respectful of shared spaces.' },
+    { id: '3', name: 'Emily Rodriguez', photo: 'https://picsum.photos/100/100?random=3', budget: '$900 - $1,300', tags: ['Creative', 'Plant Lover', 'Yoga', 'Early Bird'], note: 'UX designer who loves a peaceful home environment. I have a small collection of indoor plants!' },
+    { id: '5', name: 'Jessica Park', photo: 'https://picsum.photos/100/100?random=5', budget: '$1,100 - $1,500', tags: ['Pet Friendly', 'Foodie', 'Active'], note: 'Marketing manager looking for a lively neighborhood. I love cooking and hosting small dinners.' },
+    { id: '7', name: 'Alex Kim', photo: 'https://picsum.photos/100/100?random=7', budget: '$1,000 - $1,400', tags: ['Creative', 'Night Owl', 'Music'], note: 'Graphic designer who works late but uses headphones. Very respectful of noise levels.' },
+    { id: '9', name: 'Sophia Nguyen', photo: 'https://picsum.photos/100/100?random=9', budget: '$900 - $1,200', tags: ['Writer', 'Introvert', 'Book Lover'], note: 'Content writer who needs a quiet work space. I\'m neat and keep to myself mostly.' },
+  ];
+
+  for (let i = 0; i < Math.min(propertyIds.length, renterData.length); i++) {
+    const renter = renterData[i];
+    cards.push({
+      id: `ic-${hostId.slice(0, 6)}-${i + 1}`,
+      renterId: renter.id,
+      renterName: renter.name,
+      renterPhoto: renter.photo,
+      hostId,
+      propertyId: propertyIds[i % propertyIds.length],
+      propertyTitle: '',
+      compatibilityScore: 70 + Math.floor(Math.random() * 25),
+      budgetRange: renter.budget,
+      moveInDate: new Date(now + (14 + i * 7) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      lifestyleTags: renter.tags,
+      personalNote: renter.note,
+      status: i === 0 ? 'accepted' : i === 4 ? 'passed' : 'pending',
+      isSuperInterest: i === 1 || i === 3,
+      createdAt: new Date(now - (i + 1) * 1000 * 60 * 60 * 12).toISOString(),
+      respondedAt: i === 0 ? new Date(now - 1000 * 60 * 60 * 6).toISOString() : undefined,
+    });
+  }
+
+  return cards;
+};
+
+export const createMockReceivedLikes = (userId: string) => {
+  const now = Date.now();
+  return [
+    { id: `like-${userId.slice(0, 6)}-1`, fromUserId: '1', fromUserName: 'Sarah Johnson', fromUserPhoto: 'https://picsum.photos/100/100?random=1', fromUserAge: 28, fromUserOccupation: 'Software Engineer', compatibility: 89, timestamp: new Date(now - 1000 * 60 * 60 * 3).toISOString(), isSuperLike: false },
+    { id: `like-${userId.slice(0, 6)}-2`, fromUserId: '3', fromUserName: 'Emily Rodriguez', fromUserPhoto: 'https://picsum.photos/100/100?random=3', fromUserAge: 26, fromUserOccupation: 'UX Designer', compatibility: 85, timestamp: new Date(now - 1000 * 60 * 60 * 8).toISOString(), isSuperLike: true },
+    { id: `like-${userId.slice(0, 6)}-3`, fromUserId: '5', fromUserName: 'Jessica Park', fromUserPhoto: 'https://picsum.photos/100/100?random=5', fromUserAge: 29, fromUserOccupation: 'Marketing Manager', compatibility: 78, timestamp: new Date(now - 1000 * 60 * 60 * 24).toISOString(), isSuperLike: false },
+    { id: `like-${userId.slice(0, 6)}-4`, fromUserId: '7', fromUserName: 'Alex Kim', fromUserPhoto: 'https://picsum.photos/100/100?random=7', fromUserAge: 27, fromUserOccupation: 'Graphic Designer', compatibility: 82, timestamp: new Date(now - 1000 * 60 * 60 * 48).toISOString(), isSuperLike: false },
+    { id: `like-${userId.slice(0, 6)}-5`, fromUserId: '9', fromUserName: 'Sophia Nguyen', fromUserPhoto: 'https://picsum.photos/100/100?random=9', fromUserAge: 25, fromUserOccupation: 'Content Writer', compatibility: 91, timestamp: new Date(now - 1000 * 60 * 60 * 72).toISOString(), isSuperLike: true },
+  ];
+};
+
+export const MOCK_SAVED_PROPERTY_IDS = ['1', '2', '5', '8', '12'];
+
+export const createHostMockNotifications = (userId: string): Notification[] => {
+  const now = Date.now();
+  return [
+    {
+      id: `hnotif-${userId.slice(0, 6)}-1`,
+      userId,
+      type: 'interest_received',
+      title: 'New Interest Card!',
+      body: 'Sarah Johnson is interested in your listing. 89% compatibility match!',
+      isRead: false,
+      createdAt: new Date(now - 1000 * 60 * 45),
+      data: { fromUserId: '1', fromUserName: 'Sarah Johnson', fromUserPhoto: 'https://picsum.photos/100/100?random=1', interestCardId: 'ic-1' },
+    },
+    {
+      id: `hnotif-${userId.slice(0, 6)}-2`,
+      userId,
+      type: 'interest_received',
+      title: 'Super Interest Received!',
+      body: 'Michael Chen sent a Super Interest for your listing. They\'re very eager to connect.',
+      isRead: false,
+      createdAt: new Date(now - 1000 * 60 * 60 * 3),
+      data: { fromUserId: '2', fromUserName: 'Michael Chen', fromUserPhoto: 'https://picsum.photos/100/100?random=2', interestCardId: 'ic-2' },
+    },
+    {
+      id: `hnotif-${userId.slice(0, 6)}-3`,
+      userId,
+      type: 'message',
+      title: 'New Message',
+      body: 'Emily Rodriguez: When would be a good time to see the apartment?',
+      isRead: true,
+      createdAt: new Date(now - 1000 * 60 * 60 * 8),
+      data: { conversationId: '3', fromUserId: '3', fromUserName: 'Emily Rodriguez' },
+    },
+    {
+      id: `hnotif-${userId.slice(0, 6)}-4`,
+      userId,
+      type: 'pi_group_assembled',
+      title: 'Pi Found a Group Match!',
+      body: 'A group of 3 renters matches your listing requirements. Review them now.',
+      isRead: false,
+      createdAt: new Date(now - 1000 * 60 * 60 * 6),
+      data: { groupId: '1' },
+    },
+    {
+      id: `hnotif-${userId.slice(0, 6)}-5`,
+      userId,
+      type: 'system',
+      title: 'Listing Performance',
+      body: 'Your listing has received 24 views this week. Consider boosting for more visibility.',
+      isRead: true,
+      createdAt: new Date(now - 1000 * 60 * 60 * 24),
+    },
+    {
+      id: `hnotif-${userId.slice(0, 6)}-6`,
+      userId,
+      type: 'property_update',
+      title: 'Boost Expired',
+      body: 'Your listing boost has expired. Renew it to keep your listing at the top.',
+      isRead: true,
+      createdAt: new Date(now - 1000 * 60 * 60 * 48),
+    },
+    {
+      id: `hnotif-${userId.slice(0, 6)}-7`,
+      userId,
+      type: 'interest_accepted',
+      title: 'Renter Confirmed',
+      body: 'Jessica Park accepted your response. You can now finalize details.',
+      isRead: false,
+      createdAt: new Date(now - 1000 * 60 * 60 * 12),
+      data: { fromUserId: '5', fromUserName: 'Jessica Park' },
+    },
+    {
+      id: `hnotif-${userId.slice(0, 6)}-8`,
+      userId,
+      type: 'activity_nudge',
+      title: 'Respond to Inquiries',
+      body: 'You have 3 pending interest cards. Responding quickly improves your host rating.',
+      isRead: false,
+      createdAt: new Date(now - 1000 * 60 * 60 * 16),
+    },
+  ];
+};
+
+export const createMockHostConversations = (hostId: string) => {
+  const now = Date.now();
+  return [
+    {
+      id: `hconv-${hostId.slice(0, 6)}-1`,
+      participant: { id: '1', name: 'Sarah Johnson', photo: 'https://picsum.photos/100/100?random=1', online: true },
+      lastMessage: 'Can I schedule a viewing for this weekend?',
+      timestamp: new Date(now - 1000 * 60 * 20),
+      unread: 2,
+      messages: [
+        { id: 'hm1a', senderId: '1', text: 'Hi! I\'m very interested in the listing.', content: 'Hi! I\'m very interested in the listing.', timestamp: new Date(now - 1000 * 60 * 60 * 2) },
+        { id: 'hm1b', senderId: hostId, text: 'Thanks for your interest! The apartment is available for viewing.', content: 'Thanks for your interest! The apartment is available for viewing.', timestamp: new Date(now - 1000 * 60 * 60) },
+        { id: 'hm1c', senderId: '1', text: 'Can I schedule a viewing for this weekend?', content: 'Can I schedule a viewing for this weekend?', timestamp: new Date(now - 1000 * 60 * 20) },
+      ],
+      isInquiryThread: true,
+      inquiryStatus: 'accepted',
+      hostId,
+      listingTitle: 'Cozy Suburban House - Room Available',
+      listingPhoto: 'https://picsum.photos/800/600?random=11',
+      listingPrice: 900,
+    },
+    {
+      id: `hconv-${hostId.slice(0, 6)}-2`,
+      participant: { id: '2', name: 'Michael Chen', photo: 'https://picsum.photos/100/100?random=2', online: false },
+      lastMessage: 'Is the apartment pet-friendly?',
+      timestamp: new Date(now - 1000 * 60 * 60 * 4),
+      unread: 1,
+      messages: [
+        { id: 'hm2a', senderId: '2', text: 'Hello! I saw your listing and have a few questions.', content: 'Hello! I saw your listing and have a few questions.', timestamp: new Date(now - 1000 * 60 * 60 * 6) },
+        { id: 'hm2b', senderId: hostId, text: 'Of course, happy to answer any questions!', content: 'Of course, happy to answer any questions!', timestamp: new Date(now - 1000 * 60 * 60 * 5) },
+        { id: 'hm2c', senderId: '2', text: 'Is the apartment pet-friendly?', content: 'Is the apartment pet-friendly?', timestamp: new Date(now - 1000 * 60 * 60 * 4) },
+      ],
+      isInquiryThread: true,
+      inquiryStatus: 'pending',
+      hostId,
+      listingTitle: 'Bright Studio in Park Slope',
+      listingPhoto: 'https://picsum.photos/800/600?random=14',
+      listingPrice: 1800,
+    },
+    {
+      id: `hconv-${hostId.slice(0, 6)}-3`,
+      participant: { id: '3', name: 'Emily Rodriguez', photo: 'https://picsum.photos/100/100?random=3', online: true },
+      lastMessage: 'The lease terms work for me. When can I sign?',
+      timestamp: new Date(now - 1000 * 60 * 60 * 10),
+      unread: 0,
+      messages: [
+        { id: 'hm3a', senderId: '3', text: 'Hi, I loved the apartment during my visit!', content: 'Hi, I loved the apartment during my visit!', timestamp: new Date(now - 1000 * 60 * 60 * 24) },
+        { id: 'hm3b', senderId: hostId, text: 'Great to hear! I can send you the lease agreement.', content: 'Great to hear! I can send you the lease agreement.', timestamp: new Date(now - 1000 * 60 * 60 * 20) },
+        { id: 'hm3c', senderId: '3', text: 'The lease terms work for me. When can I sign?', content: 'The lease terms work for me. When can I sign?', timestamp: new Date(now - 1000 * 60 * 60 * 10) },
+      ],
+      isInquiryThread: true,
+      inquiryStatus: 'accepted',
+      hostId,
+      listingTitle: 'Cozy Suburban House - Room Available',
+      listingPhoto: 'https://picsum.photos/800/600?random=11',
+      listingPrice: 900,
+    },
+  ];
+};
+
+export const createMockTeamMembers = (companyId: string) => [
+  {
+    id: `team-${companyId.slice(0, 6)}-1`,
+    user_id: `member-${companyId.slice(0, 6)}-1`,
+    company_id: companyId,
+    role: 'admin' as const,
+    name: 'Alex Rivera',
+    email: 'alex@company.com',
+    avatar_url: 'https://picsum.photos/100/100?random=41',
+    listings_managed: 8,
+    active_inquiries: 5,
+    joined_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 90).toISOString(),
+    status: 'active' as const,
+  },
+  {
+    id: `team-${companyId.slice(0, 6)}-2`,
+    user_id: `member-${companyId.slice(0, 6)}-2`,
+    company_id: companyId,
+    role: 'member' as const,
+    name: 'Jordan Lee',
+    email: 'jordan@company.com',
+    avatar_url: 'https://picsum.photos/100/100?random=42',
+    listings_managed: 5,
+    active_inquiries: 3,
+    joined_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 60).toISOString(),
+    status: 'active' as const,
+  },
+  {
+    id: `team-${companyId.slice(0, 6)}-3`,
+    user_id: `member-${companyId.slice(0, 6)}-3`,
+    company_id: companyId,
+    role: 'member' as const,
+    name: 'Taylor Morgan',
+    email: 'taylor@company.com',
+    avatar_url: 'https://picsum.photos/100/100?random=43',
+    listings_managed: 3,
+    active_inquiries: 2,
+    joined_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30).toISOString(),
+    status: 'active' as const,
+  },
+  {
+    id: `team-${companyId.slice(0, 6)}-4`,
+    user_id: `member-${companyId.slice(0, 6)}-4`,
+    company_id: companyId,
+    role: 'member' as const,
+    name: 'Casey Brooks',
+    email: 'casey@company.com',
+    avatar_url: 'https://picsum.photos/100/100?random=44',
+    listings_managed: 0,
+    active_inquiries: 0,
+    invited_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString(),
+    status: 'pending' as const,
+  },
+];
