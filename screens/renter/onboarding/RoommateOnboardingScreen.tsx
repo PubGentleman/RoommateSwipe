@@ -355,22 +355,28 @@ export default function RoommateOnboardingScreen() {
 
       const userUpdates: Record<string, any> = {
         typeOnboardingComplete: true,
-      };
-
-      if (idealRoommate.trim()) {
-        userUpdates.ideal_roommate_text = idealRoommate.trim();
-      }
-
-      if (sleepSchedule || cleanliness || noiseTolerance) {
-        userUpdates.profileData = {
+        profileData: {
           ...user.profileData,
+          budget: budgetMax,
+          budgetMin: budgetMin,
+          budgetMax: budgetMax,
+          roomType: roomTypes.join(',') || undefined,
+          lookingFor: roomTypes.includes('apartment') ? 'entire_apartment' : (roomTypes.length > 0 ? 'room' : undefined),
+          dealbreakers: dealbreakers,
           preferences: {
             ...user.profileData?.preferences,
             ...(sleepSchedule ? { sleepSchedule } : {}),
             ...(cleanliness ? { cleanliness } : {}),
             ...(noiseTolerance ? { noiseTolerance } : {}),
+            ...(dealbreakers.includes('smoking') ? { smoking: 'no' } : {}),
+            ...(dealbreakers.includes('pets') ? { pets: 'no_pets' } : dealbreakers.length > 0 ? { pets: 'open_to_pets' } : {}),
           },
-        };
+        },
+      };
+
+      if (idealRoommate.trim()) {
+        userUpdates.ideal_roommate_text = idealRoommate.trim();
+        userUpdates.profileData.ideal_roommate_text = idealRoommate.trim();
       }
 
       await updateUser(userUpdates);
@@ -426,7 +432,7 @@ export default function RoommateOnboardingScreen() {
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {step === 1 ? renderStep1() : step === 2 ? renderStep2() : renderStep3()}
+        {step === 1 ? renderBudgetStep() : step === 2 ? renderStep1() : step === 3 ? renderStep2() : renderStep3()}
       </ScrollView>
 
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 8 }]}>
@@ -524,6 +530,31 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'right',
     marginTop: 6,
+  },
+  roomCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    gap: 12,
+  },
+  roomIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  roomLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  roomDesc: {
+    fontSize: 12,
+    marginTop: 2,
   },
   bottomBar: {
     flexDirection: 'row',

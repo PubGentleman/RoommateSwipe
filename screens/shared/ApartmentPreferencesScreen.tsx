@@ -49,19 +49,38 @@ export default function ApartmentPreferencesScreen() {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
 
+  const pd = user?.profileData || {};
+  const prefs = pd.preferences || {};
+
   const [step, setStep] = useState(0);
-  const [bedrooms, setBedrooms] = useState<number | null>(null);
-  const [budgetMin, setBudgetMin] = useState<number>(1000);
-  const [budgetMax, setBudgetMax] = useState<number>(2000);
+  const [bedrooms, setBedrooms] = useState<number | null>(
+    user?.preferredBedrooms ?? prefs.bedrooms ?? null
+  );
+  const [budgetMin, setBudgetMin] = useState<number>(
+    pd.budgetMin ?? 1000
+  );
+  const [budgetMax, setBudgetMax] = useState<number>(
+    pd.budgetMax ?? pd.budget ?? 2000
+  );
   const [selectedTrains, setSelectedTrains] = useState<string[]>([]);
   const [hasCar, setHasCar] = useState(false);
-  const [isWfh, setIsWfh] = useState(false);
-  const [moveInFlexible, setMoveInFlexible] = useState(false);
-  const [moveInDate, setMoveInDate] = useState('');
-  const [amenities, setAmenities] = useState<string[]>([]);
-  const [neighborhoods, setNeighborhoods] = useState<string[]>([]);
-  const [zipCode, setZipCode] = useState('');
-  const [piIdealText, setPiIdealText] = useState(user?.profileData?.ideal_roommate_text || '');
+  const [isWfh, setIsWfh] = useState(
+    prefs.workLocation === 'wfh_fulltime'
+  );
+  const [moveInFlexible, setMoveInFlexible] = useState(
+    user?.moveInTimeline === 'flexible'
+  );
+  const [moveInDate, setMoveInDate] = useState(
+    prefs.moveInDate || user?.moveInTimeline || ''
+  );
+  const [amenities, setAmenities] = useState<string[]>(
+    user?.amenityPreferences || []
+  );
+  const [neighborhoods, setNeighborhoods] = useState<string[]>(
+    user?.preferredNeighborhoods || pd.preferred_neighborhoods || []
+  );
+  const [zipCode, setZipCode] = useState(pd.zip_code || user?.zip_code || '');
+  const [piIdealText, setPiIdealText] = useState(pd.ideal_roommate_text || '');
   const [saving, setSaving] = useState(false);
 
   const canProceed = useCallback(() => {
@@ -501,7 +520,7 @@ export default function ApartmentPreferencesScreen() {
         <Pressable onPress={handleBack} style={styles.backBtn}>
           <Feather name="arrow-left" size={22} color="#fff" />
         </Pressable>
-        <ThemedText style={styles.headerTitle}>Apartment Preferences</ThemedText>
+        <ThemedText style={styles.headerTitle}>Edit Preferences</ThemedText>
         <View style={{ width: 40 }} />
       </View>
 

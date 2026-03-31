@@ -376,6 +376,31 @@ export const ProfileQuestionnaireScreen = () => {
   );
   const missingStepsParam = (route.params as any)?.missingSteps as string[] | undefined;
   const allStepsForType = isPlaceSeekerUser ? PLACE_SEEKER_STEPS : STEP_ORDER;
+
+  const shouldSkipStep = (stepName: StepId): boolean => {
+    if (!user) return false;
+    const pd = user.profileData || {};
+    const prefs = pd.preferences || {};
+    switch (stepName) {
+      case 'budgetLocation':
+        return !!((pd.budget || pd.budgetMin || pd.budgetMax) && (pd.city || user.city));
+      case 'sleepCleanliness':
+        return !!(prefs.sleepSchedule && prefs.cleanliness);
+      case 'smokingPets':
+        return !!((prefs.smoking || pd.dealbreakers?.includes?.('smoking')) && (prefs.pets || pd.dealbreakers?.includes?.('pets')));
+      case 'dealbreakers':
+        return Array.isArray(pd.dealbreakers) && pd.dealbreakers.length > 0;
+      case 'housing':
+        return !!(prefs.moveInDate || user.moveInTimeline || pd.lookingFor);
+      case 'roommateSetup':
+        return !!(user.preferredBedrooms !== undefined && user.preferredBedrooms !== null);
+      case 'idealRoommate':
+        return !!((pd.ideal_roommate_text || user.ideal_roommate_text)?.trim()?.length >= 10);
+      default:
+        return false;
+    }
+  };
+
   const filteredSteps = React.useMemo(() => {
     if (missingStepsParam?.length) {
       return missingStepsParam.filter(s => allStepsForType.includes(s as StepId)) as StepId[];
@@ -383,9 +408,14 @@ export const ProfileQuestionnaireScreen = () => {
     return null;
   }, []);
   const isMissingMode = !!filteredSteps;
-  const stepsToShow = filteredSteps || (isLiteOnboarding ? ONBOARDING_STEPS_LITE : isOnboarding ? ONBOARDING_STEPS : allStepsForType);
+  const autoFilteredSteps = React.useMemo(() => {
+    if (filteredSteps || isOnboarding) return null;
+    return allStepsForType.filter(s => !shouldSkipStep(s));
+  }, [allStepsForType, user]);
+  const stepsToShow = filteredSteps || autoFilteredSteps || (isLiteOnboarding ? ONBOARDING_STEPS_LITE : isOnboarding ? ONBOARDING_STEPS : allStepsForType);
   const [currentFilteredIndex, setCurrentFilteredIndex] = useState(0);
-  const currentStep = (isMissingMode || isOnboarding || isPlaceSeekerUser)
+  const useFilteredMapping = isMissingMode || isOnboarding || isPlaceSeekerUser || !!autoFilteredSteps;
+  const currentStep = useFilteredMapping
     ? STEP_ORDER.indexOf(stepsToShow[currentFilteredIndex])
     : currentFilteredIndex;
   const [direction, setDirection] = useState<'forward' | 'back'>('forward');
