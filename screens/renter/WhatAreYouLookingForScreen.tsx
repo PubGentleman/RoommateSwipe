@@ -187,7 +187,7 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
       if (id === 'find_roommates') {
         saveAndContinue('room', 'with_roommates');
       } else {
-        animateForward(() => setStep('place_sub'));
+        saveAndContinue('entire_apartment', 'solo');
       }
     }, 150);
   };
