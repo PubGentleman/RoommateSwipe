@@ -622,6 +622,7 @@ export const ProfileQuestionnaireScreen = () => {
       photos: photos.length > 0 ? photos : user?.photos,
       profilePicture: photos[0] || user?.profilePicture,
       profileData: {
+        ...user?.profileData,
         bio: bio.trim() || undefined,
         budget: budget.trim() ? parseInt(budget) : undefined,
         budgetMin: budgetMin.trim() ? parseInt(budgetMin) : undefined,
