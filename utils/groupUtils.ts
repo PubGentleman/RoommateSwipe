@@ -34,3 +34,36 @@ export function canGroupFitListing(
   const needed = getGroupRoomsNeeded(members);
   return needed <= roomsAvailable ? 'fits' : 'too_big';
 }
+
+export interface GroupMemberWithGender extends GroupMemberUnit {
+  gender?: string;
+}
+
+export function isGroupGenderCompatible(
+  members: GroupMemberWithGender[],
+  preferredTenantGender?: string | null
+): { compatible: boolean; reason?: string } {
+  if (!preferredTenantGender || preferredTenantGender === 'any') {
+    return { compatible: true };
+  }
+
+  const nonHost = members.filter(m => !m.is_host && !m.isHost);
+
+  for (const member of nonHost) {
+    const g = (member.gender || '').toLowerCase();
+    if (preferredTenantGender === 'female_only' && g !== 'female') {
+      return {
+        compatible: false,
+        reason: 'This listing is for women only. Your group includes non-female members.',
+      };
+    }
+    if (preferredTenantGender === 'male_only' && g !== 'male') {
+      return {
+        compatible: false,
+        reason: 'This listing is for men only. Your group includes non-male members.',
+      };
+    }
+  }
+
+  return { compatible: true };
+}

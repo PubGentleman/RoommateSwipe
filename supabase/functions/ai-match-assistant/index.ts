@@ -66,7 +66,12 @@ serve(async (req) => {
       : buildSystemPrompt(profile, topMatches, nearbyListings, plan, memoryContext);
 
     if (listing_context && !isAgent) {
-      systemPrompt += `\n\nThe user is currently viewing this listing:\n- Title: ${listing_context.title || 'Unknown'}\n- Price: $${listing_context.price || '?'}/mo\n- Location: ${listing_context.neighborhood || listing_context.location || '?'}\n- Bedrooms: ${listing_context.bedrooms ?? '?'}, Bathrooms: ${listing_context.bathrooms ?? '?'}\n- Sqft: ${listing_context.sqft || 'N/A'}\n- Amenities: ${listing_context.amenities?.join(', ') || 'not listed'}\n- Available: ${listing_context.available_date || 'not specified'}\n- Host: ${listing_context.host_name || 'Unknown'}\n- About: ${listing_context.description || listing_context.about_text || 'No description provided'}\n\nAnswer questions about THIS specific listing. Compare it to the user's preferences and other listings they've viewed when relevant.\n\nWhen analyzing listings, pay attention to the "About" description for compatibility signals:\n- Gender mentions ("female roommate", "male household") — check against the user's gender preference\n- Lifestyle mentions ("420 friendly", "quiet household", "social") — compare with user's lifestyle preferences\n- Pet mentions ("no pets", "cat-friendly") — check against user's pet preference\n- Couple/group mentions ("couple welcome", "looking for 2 roommates") — check against user's search type\n- Vibe indicators ("modern", "cozy", "minimalist") — use for personality matching\n- Dealbreakers in free text that aren't in structured fields — flag these proactively\n\nWhen recommending a listing, reference specific compatibility signals from the About text. If there's a conflict between structured data and the About text, mention both and let the user clarify.`;
+      const tenantGenderPref = listing_context.preferred_tenant_gender === 'female_only'
+        ? 'Women only'
+        : listing_context.preferred_tenant_gender === 'male_only'
+          ? 'Men only'
+          : 'Open to any gender';
+      systemPrompt += `\n\nThe user is currently viewing this listing:\n- Title: ${listing_context.title || 'Unknown'}\n- Price: $${listing_context.price || '?'}/mo\n- Location: ${listing_context.neighborhood || listing_context.location || '?'}\n- Bedrooms: ${listing_context.bedrooms ?? '?'}, Bathrooms: ${listing_context.bathrooms ?? '?'}\n- Sqft: ${listing_context.sqft || 'N/A'}\n- Tenant Gender Preference: ${tenantGenderPref}\n- Amenities: ${listing_context.amenities?.join(', ') || 'not listed'}\n- Available: ${listing_context.available_date || 'not specified'}\n- Host: ${listing_context.host_name || 'Unknown'}\n- About: ${listing_context.description || listing_context.about_text || 'No description provided'}\n\nAnswer questions about THIS specific listing. Compare it to the user's preferences and other listings they've viewed when relevant.\n\nWhen analyzing listings, pay attention to the "About" description for compatibility signals:\n- Gender mentions ("female roommate", "male household") — check against the user's gender preference\n- Lifestyle mentions ("420 friendly", "quiet household", "social") — compare with user's lifestyle preferences\n- Pet mentions ("no pets", "cat-friendly") — check against user's pet preference\n- Couple/group mentions ("couple welcome", "looking for 2 roommates") — check against user's search type\n- Vibe indicators ("modern", "cozy", "minimalist") — use for personality matching\n- Dealbreakers in free text that aren't in structured fields — flag these proactively\n\nWhen recommending a listing, reference specific compatibility signals from the About text. If there's a conflict between structured data and the About text, mention both and let the user clarify.`;
     }
 
     const remainingMessages = dailyLimit - todayCount - 1;
@@ -327,7 +332,7 @@ async function getNearbyListings(supabase: any, profile: any) {
   if (!profile.city) return [];
   const { data } = await supabase
     .from('listings')
-    .select('title, price, type, neighborhood, bedrooms, bathrooms, is_featured, description')
+    .select('title, price, type, neighborhood, bedrooms, bathrooms, is_featured, description, preferred_tenant_gender')
     .eq('city', profile.city)
     .gte('price', profile.budget_min ?? 0)
     .lte('price', profile.budget_max ?? 999999)
@@ -468,7 +473,7 @@ function buildSystemPrompt(profile: any, topMatches: any[], listings: any[], pla
 
   const listingSummary = listings.length > 0
     ? listings.map((l: any) =>
-        `"${l.title}" — $${l.price}/mo, ${l.type}, ${l.bedrooms}bd/${l.bathrooms}ba in ${l.neighborhood}${l.is_featured ? ' (featured)' : ''}${l.description ? ` — About: "${l.description.slice(0, 200)}"` : ''}`
+        `"${l.title}" — $${l.price}/mo, ${l.type}, ${l.bedrooms}bd/${l.bathrooms}ba in ${l.neighborhood}${l.preferred_tenant_gender && l.preferred_tenant_gender !== 'any' ? ` (${l.preferred_tenant_gender === 'female_only' ? 'Women only' : 'Men only'})` : ''}${l.is_featured ? ' (featured)' : ''}${l.description ? ` — About: "${l.description.slice(0, 200)}"` : ''}`
       ).join('; ')
     : 'no listings in their price range right now';
 

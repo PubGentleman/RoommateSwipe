@@ -28,6 +28,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import { formatMoveInDate, calculateCompatibility, getMatchQualityColor, getGenderSymbol, formatLocation } from '../../utils/matchingAlgorithm';
+import { isGroupGenderCompatible } from '../../utils/groupUtils';
 import { calculateListingMatchScore, ListingMatchInput } from '../../utils/listingMatchScore';
 import { getNeighborhoodsByCity, getAllCities, NEIGHBORHOODS } from '../../utils/locationData';
 import { fetchAreaInfo, formatNearestAmenity, AreaInfo, NearbyAmenity } from '../../services/neighborhoodService';
@@ -879,6 +880,30 @@ export const ExploreScreen = () => {
       });
     }
 
+    const renterGender = (user?.profileData?.gender || '').toLowerCase();
+    const renterHouseholdPref = user?.profileData?.household_gender_preference;
+
+    filtered = filtered.filter(p => {
+      const listingPref = p.preferred_tenant_gender || 'any';
+      if (listingPref === 'any') return true;
+      if (!renterGender || renterGender === 'non_binary' || renterGender === 'prefer_not_to_say' || renterGender === 'other') return false;
+      if (listingPref === 'female_only' && renterGender !== 'female') return false;
+      if (listingPref === 'male_only' && renterGender !== 'male') return false;
+      return true;
+    });
+
+    if (renterHouseholdPref === 'female_only') {
+      filtered = filtered.filter(p => {
+        const lp = p.preferred_tenant_gender || 'any';
+        return lp === 'any' || lp === 'female_only';
+      });
+    } else if (renterHouseholdPref === 'male_only') {
+      filtered = filtered.filter(p => {
+        const lp = p.preferred_tenant_gender || 'any';
+        return lp === 'any' || lp === 'male_only';
+      });
+    }
+
     if (leaseTypeFilter.length > 0) {
       filtered = filtered.filter(p => {
         const pt = ((p as any).propertyType || '').toLowerCase();
@@ -1224,6 +1249,18 @@ export const ExploreScreen = () => {
                 {item.roomType === 'entire' ? 'ENTIRE UNIT' : 'PRIVATE ROOM'}
               </Text>
             </View>
+            {item.preferred_tenant_gender === 'female_only' ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5, backgroundColor: 'rgba(236,72,153,0.85)', gap: 3 }}>
+                <Feather name="user" size={9} color="#fff" />
+                <Text style={[styles.tagText, { color: '#fff' }]}>WOMEN ONLY</Text>
+              </View>
+            ) : null}
+            {item.preferred_tenant_gender === 'male_only' ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5, backgroundColor: 'rgba(59,130,246,0.85)', gap: 3 }}>
+                <Feather name="user" size={9} color="#fff" />
+                <Text style={[styles.tagText, { color: '#fff' }]}>MEN ONLY</Text>
+              </View>
+            ) : null}
             {item.featured ? (
               <View style={styles.tagFeatured}>
                 <Feather name="star" size={9} color="#1a1200" />
@@ -2248,6 +2285,20 @@ export const ExploreScreen = () => {
                       </View>
                     </View>
 
+                    {selectedProperty.preferred_tenant_gender && selectedProperty.preferred_tenant_gender !== 'any' ? (
+                      <View style={{
+                        flexDirection: 'row', alignItems: 'center', gap: 8,
+                        paddingHorizontal: 16, paddingVertical: 10, marginHorizontal: 16,
+                        borderRadius: 10, marginBottom: 12,
+                        backgroundColor: selectedProperty.preferred_tenant_gender === 'female_only' ? 'rgba(236,72,153,0.12)' : 'rgba(59,130,246,0.12)',
+                      }}>
+                        <Feather name="user" size={15} color={selectedProperty.preferred_tenant_gender === 'female_only' ? '#ec4899' : '#3b82f6'} />
+                        <Text style={{ color: selectedProperty.preferred_tenant_gender === 'female_only' ? '#ec4899' : '#3b82f6', fontSize: 14, fontWeight: '600' }}>
+                          {selectedProperty.preferred_tenant_gender === 'female_only' ? 'Women Only' : 'Men Only'}
+                        </Text>
+                      </View>
+                    ) : null}
+
                     <View style={styles.pdHostCard}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                         {detailHostPhoto ? (
@@ -2719,11 +2770,21 @@ export const ExploreScreen = () => {
                     const activeNonHost = memberDetails.filter((m: any) => !m.is_host);
                     const unitsNeeded = activeNonHost.length || (Array.isArray(firstGroup.members) ? firstGroup.members.length : 0);
                     const tooBig = roomsAvail != null && roomsAvail > 0 && unitsNeeded > roomsAvail;
+                    const genderCheck = isGroupGenderCompatible(activeNonHost, selectedProperty?.preferred_tenant_gender);
+                    const blocked = tooBig || !genderCheck.compatible;
 
                     return (
                       <Pressable
-                        style={[styles.pdActionSecondary, tooBig ? { opacity: 0.45 } : undefined]}
+                        style={[styles.pdActionSecondary, blocked ? { opacity: 0.45 } : undefined]}
                         onPress={() => {
+                          if (!genderCheck.compatible) {
+                            showAlert({
+                              title: 'Gender Preference Mismatch',
+                              message: genderCheck.reason || 'Your group does not meet this listing\'s gender preference.',
+                              variant: 'warning',
+                            });
+                            return;
+                          }
                           if (tooBig) {
                             showAlert({
                               title: 'Group Too Large',
@@ -2745,8 +2806,8 @@ export const ExploreScreen = () => {
                           }
                         }}
                       >
-                        <Feather name="users" size={17} color={tooBig ? '#888' : '#ff6b5b'} />
-                        <Text style={[styles.pdActionSecondaryText, tooBig ? { color: '#888' } : undefined]}>Group</Text>
+                        <Feather name="users" size={17} color={blocked ? '#888' : '#ff6b5b'} />
+                        <Text style={[styles.pdActionSecondaryText, blocked ? { color: '#888' } : undefined]}>Group</Text>
                       </Pressable>
                     );
                   })() : null}
@@ -2792,6 +2853,7 @@ export const ExploreScreen = () => {
                       amenities: selectedProperty.amenities,
                       description: selectedProperty.description,
                       hostName: selectedProperty.hostName,
+                      preferred_tenant_gender: selectedProperty.preferred_tenant_gender,
                     },
                     mode: 'listing_advisor',
                   },
@@ -3173,12 +3235,22 @@ export const ExploreScreen = () => {
                 const singles = memberCount - couples;
                 const roomsAvail = selectedProperty?.rooms_available ?? selectedProperty?.bedrooms ?? null;
                 const tooBig = roomsAvail != null && roomsAvail > 0 && memberCount > roomsAvail;
+                const gCheck = isGroupGenderCompatible(nonHost, selectedProperty?.preferred_tenant_gender);
+                const isBlocked = tooBig || !gCheck.compatible;
 
                 return (
                   <Pressable
                     key={g.id}
-                    style={[styles.groupPickerItem, { borderColor: theme.border }, tooBig ? { opacity: 0.45 } : undefined]}
+                    style={[styles.groupPickerItem, { borderColor: theme.border }, isBlocked ? { opacity: 0.45 } : undefined]}
                     onPress={() => {
+                      if (!gCheck.compatible) {
+                        showAlert({
+                          title: 'Gender Preference Mismatch',
+                          message: gCheck.reason || 'This group does not meet the listing\'s gender preference.',
+                          variant: 'warning',
+                        });
+                        return;
+                      }
                       if (tooBig) {
                         showAlert({
                           title: 'Group Too Large',
@@ -3196,8 +3268,8 @@ export const ExploreScreen = () => {
                     }}
                   >
                     <View style={styles.groupPickerItemLeft}>
-                      <View style={[styles.groupPickerIcon, { backgroundColor: tooBig ? 'rgba(136,136,136,0.12)' : 'rgba(255,107,91,0.12)' }]}>
-                        <Feather name="users" size={16} color={tooBig ? '#888' : '#ff6b5b'} />
+                      <View style={[styles.groupPickerIcon, { backgroundColor: isBlocked ? 'rgba(136,136,136,0.12)' : 'rgba(255,107,91,0.12)' }]}>
+                        <Feather name="users" size={16} color={isBlocked ? '#888' : '#ff6b5b'} />
                       </View>
                       <View style={{ flex: 1 }}>
                         <ThemedText style={{ fontWeight: '700', fontSize: 15 }}>{g.name}</ThemedText>
@@ -3211,9 +3283,14 @@ export const ExploreScreen = () => {
                             Needs {memberCount} rooms — listing has {roomsAvail}
                           </ThemedText>
                         ) : null}
+                        {!gCheck.compatible ? (
+                          <ThemedText style={{ color: '#ef4444', fontSize: 11, marginTop: 2 }}>
+                            {selectedProperty?.preferred_tenant_gender === 'female_only' ? 'Women only listing' : 'Men only listing'}
+                          </ThemedText>
+                        ) : null}
                       </View>
                     </View>
-                    <Feather name={tooBig ? 'x-circle' : 'chevron-right'} size={18} color={tooBig ? '#888' : theme.textSecondary} />
+                    <Feather name={isBlocked ? 'x-circle' : 'chevron-right'} size={18} color={isBlocked ? '#888' : theme.textSecondary} />
                   </Pressable>
                 );
               })}

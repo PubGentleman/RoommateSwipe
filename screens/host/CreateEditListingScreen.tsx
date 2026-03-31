@@ -93,6 +93,7 @@ export const CreateEditListingScreen = () => {
   const [hostLivesIn, setHostLivesIn] = useState(false);
   const [existingRoommatesCount, setExistingRoommatesCount] = useState(0);
   const [requiresBackgroundCheck, setRequiresBackgroundCheck] = useState(false);
+  const [preferredTenantGender, setPreferredTenantGender] = useState<'any' | 'female_only' | 'male_only'>('any');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [saving, setSaving] = useState(false);
   const [assignedAgentId, setAssignedAgentId] = useState<string>('');
@@ -158,6 +159,7 @@ export const CreateEditListingScreen = () => {
     if (prop.host_lives_in !== undefined) setHostLivesIn(!!prop.host_lives_in);
     if (prop.existingRoommatesCount !== undefined) setExistingRoommatesCount(prop.existingRoommatesCount);
     if (prop.requires_background_check !== undefined) setRequiresBackgroundCheck(!!prop.requires_background_check);
+    if (prop.preferred_tenant_gender) setPreferredTenantGender(prop.preferred_tenant_gender);
     if (prop.transitInfo?.manualOverride) {
       setTransitOverride(prop.transitInfo.manualOverride);
     }
@@ -328,6 +330,7 @@ export const CreateEditListingScreen = () => {
         zip_code: zipCode.trim() || undefined,
         room_type: roomType,
         listing_type: roomType === 'entire' ? 'entire_apartment' : 'room',
+        preferred_tenant_gender: roomType === 'room' && !isCompanyHost && user?.hostType !== 'agent' ? preferredTenantGender : 'any',
         amenities: selectedAmenities,
         photos: photos,
         available_date: resolvedAvailableDate,
@@ -789,8 +792,53 @@ export const CreateEditListingScreen = () => {
           { label: 'Entire Place', value: 'entire', icon: 'home' },
           { label: 'Private Room', value: 'room', icon: 'user' },
           roomType,
-          setRoomType,
+          (val: 'room' | 'entire') => {
+            setRoomType(val);
+            if (val === 'entire') setPreferredTenantGender('any');
+          },
         )}
+
+        {roomType === 'room' && !isCompanyHost && user?.hostType !== 'agent' ? (
+          <View style={{ marginTop: 16 }}>
+            <ThemedText style={styles.label}>Tenant Gender Preference</ThemedText>
+            <ThemedText style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12, marginBottom: 10 }}>
+              Shared living spaces can specify a preference
+            </ThemedText>
+            {([
+              { key: 'any', label: 'Any gender', sub: 'Open to everyone', icon: 'users' },
+              { key: 'female_only', label: 'Women only', sub: 'Female tenants only', icon: 'user' },
+              { key: 'male_only', label: 'Men only', sub: 'Male tenants only', icon: 'user' },
+            ] as const).map(opt => {
+              const sel = preferredTenantGender === opt.key;
+              return (
+                <Pressable
+                  key={opt.key}
+                  onPress={() => setPreferredTenantGender(opt.key)}
+                  style={{
+                    flexDirection: 'row', alignItems: 'center', gap: 12,
+                    padding: 14, borderRadius: 10, marginBottom: 8,
+                    backgroundColor: sel ? 'rgba(255,107,91,0.15)' : 'rgba(255,255,255,0.06)',
+                    borderWidth: 1, borderColor: sel ? '#ff6b5b' : 'rgba(255,255,255,0.08)',
+                  }}
+                >
+                  <Feather name={opt.icon as any} size={18} color={sel ? '#ff6b5b' : 'rgba(255,255,255,0.4)'} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: sel ? '#fff' : 'rgba(255,255,255,0.7)', fontSize: 15, fontWeight: sel ? '600' : '400' }}>
+                      {opt.label}
+                    </Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 2 }}>
+                      {opt.sub}
+                    </Text>
+                  </View>
+                  {sel ? <Feather name="check-circle" size={18} color="#ff6b5b" /> : null}
+                </Pressable>
+              );
+            })}
+            <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11, marginTop: 4, lineHeight: 15 }}>
+              Gender preferences are permitted for shared living spaces under the Fair Housing Act's roommate exemption.
+            </Text>
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.card}>
