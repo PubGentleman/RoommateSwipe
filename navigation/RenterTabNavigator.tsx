@@ -10,11 +10,10 @@ import { GroupsStackNavigator } from './GroupsStackNavigator';
 import { MessagesStackNavigator } from './MessagesStackNavigator';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
 import SavedListingsScreen from '../screens/renter/SavedListingsScreen';
-import MyGroupScreen from '../screens/renter/MyGroupScreen';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotificationContext } from '../contexts/NotificationContext';
-import { needsRoommates, isPreformedGroup, isFastLane } from '../utils/renterIntentUtils';
+import { needsRoommates, isFastLane } from '../utils/renterIntentUtils';
 
 export type RenterTabParamList = {
   Explore: { viewListingId?: string } | undefined;
@@ -23,7 +22,6 @@ export type RenterTabParamList = {
   Messages: undefined;
   Profile: undefined;
   Saved: undefined;
-  MyGroup: undefined;
 };
 
 const Tab = createBottomTabNavigator<RenterTabParamList>();
@@ -35,7 +33,6 @@ const TAB_CONFIG: Record<string, { icon: string; label: string }> = {
   Messages: { icon: 'message-circle', label: 'Chat' },
   Profile: { icon: 'user', label: 'Profile' },
   Saved: { icon: 'bookmark', label: 'Saved' },
-  MyGroup: { icon: 'grid', label: 'My Group' },
 };
 
 function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
@@ -144,10 +141,9 @@ export const RenterTabNavigator = () => {
   const searchType = user?.profileData?.apartment_search_type;
 
   const showRoommates = needsRoommates(searchType);
-  const showMyGroup = isPreformedGroup(searchType);
   const showSaved = isFastLane(searchType);
 
-  const tabKey = showRoommates ? 'full' : showMyGroup ? 'group' : 'lite';
+  const tabKey = showRoommates ? 'full' : 'lite';
 
   return (
     <Tab.Navigator
@@ -165,12 +161,7 @@ export const RenterTabNavigator = () => {
       {showRoommates ? (
         <Tab.Screen name="Roommates" component={RoommatesStackNavigator} />
       ) : null}
-      {showRoommates ? (
-        <Tab.Screen name="Groups" component={GroupsStackNavigator} />
-      ) : null}
-      {showMyGroup ? (
-        <Tab.Screen name="MyGroup" component={MyGroupScreen} />
-      ) : null}
+      <Tab.Screen name="Groups" component={GroupsStackNavigator} />
       {showSaved ? (
         <Tab.Screen name="Saved" component={SavedListingsScreen} />
       ) : null}
