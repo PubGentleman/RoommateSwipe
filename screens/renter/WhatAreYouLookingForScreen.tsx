@@ -185,7 +185,7 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
     setTimeout(() => {
       setSelectedCard(null);
       if (id === 'find_roommates') {
-        animateForward(() => setStep('roommate_sub'));
+        saveAndContinue('room', 'with_roommates');
       } else {
         animateForward(() => setStep('place_sub'));
       }
