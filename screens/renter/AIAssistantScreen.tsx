@@ -8,6 +8,7 @@ import { sendAIMessage, createSessionId } from '../../utils/aiService';
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { StorageService } from '../../utils/storage';
 import { analyzePrice, isPriceQuestion } from '../../utils/priceAnalysis';
+import { getAreaDemand } from '../../utils/demandIntelligence';
 import { useRoute } from '@react-navigation/native';
 
 type PiMode = 'general' | 'listing_advisor' | 'price_analysis' | 'photo_analysis' | 'compatibility';
@@ -68,15 +69,15 @@ function getSuggestedQuestions(piMode: PiMode, placeSeekerFlag: boolean, listing
     return [
       "Is this a good price for this area?",
       "Tell me about this neighborhood",
+      "How competitive is this area?",
       "What should I ask the host?",
-      "Is this pet-friendly?",
     ];
   }
   if (piMode === 'listing_advisor') {
     return [
+      "Where's demand lowest right now?",
       "What should I look for in an apartment?",
       "How do I negotiate rent?",
-      "What questions should I ask on a tour?",
       "What red flags should I watch for?",
     ];
   }
@@ -291,13 +292,29 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
           });
           priceAnalysisAddition = `\n\nPRICE ANALYSIS DATA:\n${analysis.summary}\n\nRaw data:\n- Listing price: $${listingContext.price}/month\n- Area median (Rhome): ${analysis.rhomeMedian ? '$' + analysis.rhomeMedian : 'Not enough data'}\n- Comparable listings: ${analysis.rhomeCount}\n- HUD Fair Market Rent: ${analysis.hudFairMarketRent ? '$' + analysis.hudFairMarketRent : 'Not available'}\n- Market position: ${analysis.comparedToMarket}`;
         } catch {
-          // Price analysis failed silently
         }
       }
 
-      const contextMessage = priceAnalysisAddition
-        ? `${messageText}\n\n[CONTEXT FOR PI: ${priceAnalysisAddition}]`
-        : messageText;
+      let demandAddition = '';
+      if (piMode === 'listing_advisor') {
+        try {
+          const city = listingContext?.city || user?.profileData?.preferred_city;
+          if (city) {
+            const neighborhood = listingContext?.location?.split(',')[0]?.trim();
+            const demand = await getAreaDemand(city, neighborhood);
+            if (demand) {
+              demandAddition = `\n\nMARKET DEMAND DATA:\n${demand.summary}`;
+            }
+          }
+        } catch {
+        }
+      }
+
+      const contextParts = [messageText];
+      if (priceAnalysisAddition || demandAddition) {
+        contextParts.push(`[CONTEXT FOR PI: ${priceAnalysisAddition}${demandAddition}]`);
+      }
+      const contextMessage = contextParts.join('\n\n');
 
       await sendAIMessage(
         contextMessage,

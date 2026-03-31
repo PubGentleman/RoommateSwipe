@@ -20,6 +20,7 @@ import { useCityContext } from '../../contexts/CityContext';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
 import { StorageService } from '../../utils/storage';
 import { getListings, mapListingToProperty, recordListingView } from '../../services/listingService';
+import { trackListingView, trackListingSave, trackInterestSent, trackSearchFilter, trackNeighborhoodSearch } from '../../utils/demandTracking';
 import { getDiscoverableGroupsForListing } from '../../services/groupService';
 import { getUserPreformedGroup, addToShortlist } from '../../services/preformedGroupService';
 import { Property, PropertyFilter, User, RoommateProfile, InterestCard, Conversation, Group } from '../../types/models';
@@ -482,6 +483,14 @@ export const ExploreScreen = () => {
   useEffect(() => {
     if (selectedProperty?.id) {
       recordListingView(selectedProperty.id);
+      trackListingView({
+        id: selectedProperty.id,
+        city: selectedProperty.city,
+        neighborhood: selectedProperty.neighborhood,
+        zip_code: selectedProperty.zipCode,
+        bedrooms: selectedProperty.bedrooms,
+        rent: selectedProperty.price,
+      });
     }
   }, [selectedProperty?.id]);
 
@@ -573,6 +582,13 @@ export const ExploreScreen = () => {
         console.warn('Supabase interest insert failed, using StorageService fallback:', supaErr);
       }
       await StorageService.addInterestCard(interestRecord);
+      trackInterestSent({
+        id: selectedProperty.id,
+        city: selectedProperty.city,
+        zip_code: selectedProperty.zipCode,
+        bedrooms: selectedProperty.bedrooms,
+        rent: selectedProperty.price,
+      });
 
       const systemMessageText = isSuperInterest
         ? 'You sent a Super Interest. The host will see this at the top of their list.'
@@ -731,6 +747,7 @@ export const ExploreScreen = () => {
     setLocationSearchQuery('');
     setLocationSearchResults([]);
     setShowLocationSheet(false);
+    trackNeighborhoodSearch(result.city, result.neighborhood || undefined);
   }, [setActiveCity, setActiveSubArea]);
 
   const applyFilters = () => {
@@ -933,6 +950,14 @@ export const ExploreScreen = () => {
     }
     setFilters(tempFilters);
     setShowFilterModal(false);
+    trackSearchFilter({
+      city: activeCity || undefined,
+      neighborhood: selectedNeighborhood || undefined,
+      priceMin: tempFilters.minPrice,
+      priceMax: tempFilters.maxPrice,
+      bedrooms: tempFilters.minBedrooms,
+      amenities: tempFilters.amenities,
+    });
   };
 
   const handleClearFilters = () => {
@@ -969,6 +994,17 @@ export const ExploreScreen = () => {
       newSaved.delete(id);
     } else {
       newSaved.add(id);
+      const prop = properties.find(p => p.id === id);
+      if (prop) {
+        trackListingSave({
+          id: prop.id,
+          city: prop.city,
+          neighborhood: prop.neighborhood,
+          zip_code: prop.zipCode,
+          bedrooms: prop.bedrooms,
+          rent: prop.price,
+        });
+      }
     }
     setSaved(newSaved);
 

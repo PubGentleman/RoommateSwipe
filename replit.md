@@ -1,6 +1,6 @@
 # Overview
 
-Rhome is a React Native mobile application designed to simplify housing and roommate searches by connecting renters and hosts through a role-based, swipe-based matching platform. It aims to be a comprehensive and intuitive solution, offering AI-powered matching, property listings, group functionalities, and secure communication to facilitate the discovery of compatible roommates and suitable properties.
+Rhome is a React Native mobile application designed to simplify housing and roommate searches by connecting renters and hosts through a role-based, swipe-based matching platform. It aims to be a comprehensive and intuitive solution, offering AI-powered matching, property listings, group functionalities, and secure communication to facilitate the discovery of compatible roommates and suitable properties. The project envisions becoming the leading platform for seamless housing and roommate discovery.
 
 # User Preferences
 
@@ -27,40 +27,25 @@ Preferred communication style: Simple, everyday language.
 The application is built using React Native, Expo, and TypeScript, employing React Navigation for role-based access (Renter, Host, Agent/Landlord). It supports light/dark modes, animations with React Native Reanimated, and state management via React Context API and AsyncStorage.
 
 **Key Features:**
-- **Matching & Profiles:** Features a compatibility algorithm, interest tags, personality quizzes, and a post-signup Profile Completion system. Location matching supports multi-neighborhood preferences (cap 3), zip code, and coordinate-based proximity scoring via haversine distance.
+- **Matching & Profiles:** Compatibility algorithms, interest tags, personality quizzes, post-signup profile completion, and location matching with multi-neighborhood, zip code, and coordinate-based proximity scoring.
 - **Role-Specific Features:**
-    - **Renter:** Swipe-based matching, 1-on-1 messaging, group management, property exploration with advanced filters and transit integration, saved properties, AI Match Assistant, property reviews, chat scheduling (visit requests + booking offers), and notifications. Renter Intent System: after signup, renters choose "Find Roommates" (room vs entire apartment sub-intent) or "Find a Place" (solo/partner/group sub-intent). Intent is stored in profiles table (`listing_type_preference`, `apartment_search_type`). Solo/partner renters see a lite tab bar (Explore, Chat, Profile only — no Match/Groups). Explore screen auto-filters listing type based on intent. Intent can be changed from Profile > Search Intent settings.
-    - **Host:** Dashboard for listing management (create, edit, delete, boost), inquiry handling, analytics, property review management with host replies, and group matches monetization. Supports Individual, Company, and Agent host types with varying UI/features.
-    - **Property Reviews:** Renters can rate and review listings, with hosts able to reply. Ratings and review counts are aggregated and displayed.
-    - **Chat Scheduling & Booking:** In-chat actions allow scheduling visits and sending booking offers, which render as rich action cards and create records in the `bookings` table upon acceptance.
-    - **Rhome Select Badge:** A gold badge awarded to top-rated hosts meeting specific criteria (average rating, review count, tenure, cancellation rate, booking history).
-    - **Company Teams:** Multi-seat team access for company accounts with role-based permissions, invite systems, and seat limits based on subscription plans.
-    - **Company Agent Assignment & Routing:** Allows company accounts to assign agents to listings, routing inquiries, conversations, and notifications directly to the assigned agent. Includes features for monitoring agent response times and reassigning conversations.
-    - **Verified Agent Badge:** A blue badge displayed for agents with verified licenses.
-    - **Company Group Invites:** Company hosts can send group invites for specific listings via edge function. Renters see pending property invites in the Groups tab, with badges on group cards. The `GroupApartmentSuggestionsScreen` fetches data from Supabase (with local fallback), pins highlighted listings from company invites, and supports group voting synced via Supabase.
-    - **Group Bookings:** Visit/booking action cards support group contexts, with only group leaders able to accept/decline.
-    - **Agent Response Tracking & Company Alerts:** Tracks agent response times, escalates status, and provides alerts to companies for delayed or unresponsive agents, impacting Rhome Select eligibility.
-- **AI-Powered Enhancements:** Includes an AI Assistant for personalized housing help, AI-generated match explanations, group and listing suggestions, AI tools for agents/companies, AI-suggested meetups, AI-generated "Question of the Day," "Ask AI About This Person" multi-turn chat, and AI Neighborhood Intelligence providing localized information with follow-up chat capabilities. Both `ai-neighborhood-info` (briefing) and `neighborhood-chat` (follow-up) edge functions now fetch real data before calling Claude: Walk Score API, Overpass API amenities (transit, restaurants, grocery, parks, cafes, laundromats, gyms, bars), and NYC Open Data crime statistics (for NYC-area listings). Claude receives all real data as context, eliminating vague "check local forums" responses.
-- **Pi AI Matchmaker:** Pi is Rhome's AI matchmaker persona. Full implementation includes: DB tables (`pi_match_insights`, `pi_deck_rankings`, `pi_host_recommendations`, `pi_usage_log`), profile columns (`ideal_roommate_text`, `pi_parsed_preferences`), TypeScript interfaces, core service (`services/piMatchingService.ts`) with cache-aware getters, edge function callers, usage tracking and quota enforcement. Plan-gated: renter daily limits (free:5, plus:50, elite:200), agent/company monthly limits tiered by plan. Pi is additive — layers on existing 100-pt deterministic algorithm. Unified access via `canAskPi(mode)` and `incrementPiUsage(mode)` supporting 4 modes: `general` (unlimited all), `listing_advisor`/`price_analysis` (10/day basic place seekers), `compatibility` (3/day basic roommate seekers). Plus/Elite unlimited all modes. Price analysis utility (`utils/priceAnalysis.ts`) compares listing prices against Rhome comparables and HUD Fair Market Rent data.
-  - **Renter UI:** Swipe card "π Pi's Take" summary with loading skeleton, "π Pi Pick" badge for Plus/Elite reranked candidates, `WhyThisMatchModal` with plan-gated content (free=summary, plus=+highlights, elite=+warnings+confidence), ideal roommate free-text in onboarding/edit/apartment prefs, "π Looking for:" on profile cards, group member Pi summaries.
-  - **Host UI:** "π Pi Matchmaker" card on Host Dashboard linking to Browse Renters, "π Pi Recommended" sort filter on BrowseRentersScreen with Pi Pick badges and reason text on renter cards, "π Pi's Picks" action button on each active listing card in MyListingsScreen.
-  - **EditProfile:** "Pi extracted:" tag display below ideal roommate text showing parsed preferences (vibe, social style, personality signals, cleanliness hints, schedule hints, hard nos).
-  - **Edge Functions:** `pi-match-insight` (Haiku), `pi-rerank-deck` (Sonnet), `pi-parse-preferences` (Haiku), `pi-host-matchmaker` (Sonnet).
-- **Contact Info Protection:** Platform-level contact info blurring in chat messages. Free users see contact info blurred with "Contact info hidden" lock banner and actionable CTAs ("Book a Showing" / "Upgrade"). Plus/Elite renters and Business/Company hosts see contact info freely. All users auto-unlock contact info for a specific conversation once a visit request or booking offer is confirmed/accepted in that thread. No user-facing toggle — this is a platform default computed from plan + booking status + role.
-- **Support System:** All users get email support via mailto links. Renters contact `support@rhome.com`, agents/companies contact `hosts@rhome.com`. Subject lines include plan tier and role for automatic prioritization. Paid users see "Priority support" messaging.
-- **Verification & Safety:** Features Instagram verification, multi-photo enforcement, chat leakage detection, background checks, identity verification, a References System, and Agent License Verification (including state board scraping, document upload, and verification statuses).
-- **Profile Pause ("I Found a Place"):** Renters can pause their search profile from the Profile screen. Paused profiles stop appearing in Match, Explore, and Groups. Subscriptions remain active while paused. A daily cron edge function (`movein-checkin`) sends check-in notifications to paused users. Users can resume search at any time.
-- **Benefit Callouts:** Role-specific benefit lists are displayed during host onboarding.
-- **Activity Decay Ranking:** Inactive users progressively sink in discovery surfaces (Match, Explore, Groups Discover, and host-facing Browse Renters). A `recency_score` multiplier is applied based on days since last app open (0–3d: 1.0, 4–7d: 0.8, 8–14d: 0.5, 15–30d: 0.2, 30+d: hidden). `last_active_at` is updated on app foreground via AppState listener. A daily `activity-nudge` edge function sends re-engagement notifications at day 14 before users are hidden.
+    - **Renter:** Swipe-based matching, 1-on-1 messaging, group management, property exploration with advanced filters and transit integration, saved properties, AI Match Assistant, property reviews, chat scheduling (visit requests + booking offers), and notifications. Features an "Renter Intent System" for personalized search experiences.
+    - **Host:** Dashboard for listing management (create, edit, delete, boost), inquiry handling, analytics, property review management, and group matches monetization. Supports Individual, Company, and Agent host types. Includes features like Rhome Select Badge, Company Teams with role-based permissions, Company Agent Assignment & Routing, Verified Agent Badge, and Group Bookings.
+- **AI-Powered Enhancements:** AI Assistant for personalized housing help, AI-generated match explanations, group and listing suggestions, AI tools for agents/companies, AI-suggested meetups, AI-generated "Question of the Day," "Ask AI About This Person" multi-turn chat, and AI Neighborhood Intelligence providing localized information with follow-up chat capabilities utilizing real-time data from external APIs.
+- **Pi AI Matchmaker:** Rhome's AI matchmaker persona, providing match insights, deck rankings, host recommendations, and preference parsing. This is integrated with a subscription-tiered usage and quota enforcement system. Includes "Pi's Take" summaries, "Pi Pick" badges, and plan-gated `WhyThisMatchModal` content.
+- **Pi Demand Intelligence:** Anonymous renter activity tracking feeds market context into Pi's listing advisor mode, tracking events like listing views and searches to aggregate neighborhood and listing demand.
+- **Contact Info Protection:** Platform-level contact info blurring in chat messages for free users, with auto-unlocking upon confirmed visit requests or booking offers.
+- **Support System:** Email support for all users, with priority for paid users.
+- **Verification & Safety:** Instagram verification, multi-photo enforcement, chat leakage detection, background checks, identity verification, a References System, and Agent License Verification.
+- **Profile Pause ("I Found a Place"):** Renters can pause their search profiles, removing them from discovery surfaces while retaining subscriptions, with a daily check-in cron.
+- **Activity Decay Ranking:** Inactive users' profiles progressively sink in discovery surfaces, with a `recency_score` multiplier and re-engagement notifications.
 - **Boost System:** A tier-based system to increase visibility for listings and profiles.
-- **Account Management:** Includes soft-delete functionality with a recovery window.
-- **Subscription Management:** Tiered subscription plans for renters, hosts, and agents with a hybrid payment architecture (RevenueCat for native, Stripe for web).
-- **UI/UX:** Adheres to a consistent dark theme, uses collapsible/sticky headers, and adapts for platform-specific interactions.
-- **Location System:** The Explore screen uses search autocomplete for cities, neighborhoods, and ZIP codes via geocoding, supplemented by popular city chips and Google Places Autocomplete for onboarding.
-- **Area Info Cards:** Listing detail modals display area information (Transit, Restaurants, Grocery, Laundromat, Parks) powered by the Overpass API, with loading skeletons and graceful fallbacks.
+- **Account Management:** Soft-delete functionality with a recovery window.
+- **Subscription Management:** Tiered subscription plans for renters, hosts, and agents with a hybrid payment architecture.
+- **UI/UX:** Consistent dark theme, collapsible/sticky headers, platform-specific interactions, and comprehensive location system with search autocomplete and popular city chips. Area Info Cards display dynamic neighborhood data.
 - **Renter/Host Mode Switch:** Allows individual hosts to toggle between modes.
-- **Affiliate Program:** Users can apply to become affiliates, receive unique referral codes (RHOME-XXXX format), and earn commissions ($10 for Plus, $20 for Elite referrals). Includes an affiliate dashboard with stats, referral history, PayPal email management, and native share integration. Referral codes can be entered during sign-up. Commission tracking triggers automatically on subscription upgrades.
-- **Request to Join Group:** Renters can browse open groups (Pi-matched and preformed) and send join requests with optional messages. Pi auto-groups default to open; preformed groups can be toggled by the group lead. Pi groups use majority member voting; preformed groups use lead decision. Requests expire after 48 hours via pi-auto-expire cron. Approved requesters are automatically added as members. Users with pending join requests are excluded from pi-auto-assemble pool. Screens: OpenGroupsScreen, GroupRequestScreen, GroupRequestReviewScreen. Service: groupJoinService.ts. Migration: 054. Notification templates: group_join_request_received/approved/declined.
+- **Affiliate Program:** Users can apply to become affiliates, receive unique referral codes, and earn commissions, with a dedicated affiliate dashboard.
+- **Request to Join Group:** Renters can browse and send join requests to open groups, with voting mechanisms and automated expiration for requests.
 
 ## Backend (Supabase)
 
@@ -85,41 +70,19 @@ The architecture incorporates a Babel module resolver, platform-specific UI, per
 
 # External Dependencies
 
-**Core Framework:**
 - `expo`
 - `react-native`
 - `react-navigation`
-
-**UI Components & Styling:**
-- `expo-blur`
-- `expo-symbols`
-- `@expo/vector-icons`
-- `react-native-safe-area-context`
-- `expo-system-ui`
 - `@react-native-community/datetimepicker`
-
-**Animations & Gestures:**
 - `react-native-reanimated`
-- `react-native-gesture-handler`
-- `react-native-worklets`
-- `expo-haptics`
-
-**Payments:**
 - `@stripe/stripe-react-native`
 - `react-native-purchases` (RevenueCat)
-
-**Storage & State:**
 - `@react-native-async-storage/async-storage`
-
-**Maps:**
 - `react-native-maps`
 - `react-native-google-places-autocomplete`
 - `react-native-webview`
-
-**Utilities:**
-- `expo-linking`
-- `expo-web-browser`
-- `expo-constants`
-- `expo-splash-screen`
-- `expo-image`
-- `react-native-keyboard-controller`
+- Supabase (Auth, Database, Realtime, Storage, Edge Functions)
+- Claude (for AI operations)
+- Walk Score API
+- Overpass API (for amenities and area info)
+- NYC Open Data (for crime statistics in NYC)
