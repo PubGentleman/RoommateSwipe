@@ -335,7 +335,7 @@ export const ProfileScreen = () => {
                   onPress={() => navigation.navigate('MatchesList')}
                 >
                   <Text style={[styles.statValue, styles.statCoral]}>{matchCount}</Text>
-                  <Text style={styles.statLabel}>Matches</Text>
+                  <Text style={styles.statLabel}>{isPlaceSeeker() ? 'Applications' : 'Matches'}</Text>
                 </Pressable>
                 <View style={styles.statDivider} />
                 <Pressable
@@ -343,7 +343,7 @@ export const ProfileScreen = () => {
                   onPress={() => navigation.navigate('ProfileViews')}
                 >
                   <Text style={styles.statValue}>{profileViewCount}</Text>
-                  <Text style={styles.statLabel}>Likes</Text>
+                  <Text style={styles.statLabel}>{isPlaceSeeker() ? 'Responses' : 'Likes'}</Text>
                 </Pressable>
                 {!isPlaceSeeker() ? (
                   <>
@@ -410,7 +410,7 @@ export const ProfileScreen = () => {
                 <Text style={styles.sectionAction}>View all</Text>
               </Pressable>
             </View>
-            <ProfileCompletionCard user={user} onEditProfile={(missingSteps) => {
+            <ProfileCompletionCard user={user} searchType={user?.profileData?.apartment_search_type} onEditProfile={(missingSteps) => {
               navigation.navigate('ProfileQuestionnaire', { missingSteps });
             }} />
           </View>

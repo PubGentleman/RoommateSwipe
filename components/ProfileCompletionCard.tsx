@@ -20,7 +20,7 @@ interface ProfileField {
   check: (user: User) => boolean;
 }
 
-const PROFILE_FIELDS: ProfileField[] = [
+const ROOMMATE_SEEKER_FIELDS: ProfileField[] = [
   {
     key: 'photo',
     label: 'Add a Profile Photo',
@@ -117,14 +117,95 @@ const PROFILE_FIELDS: ProfileField[] = [
   },
 ];
 
+const PLACE_SEEKER_FIELDS: ProfileField[] = [
+  {
+    key: 'photo',
+    label: 'Add a Profile Photo',
+    icon: 'camera',
+    tip: 'with a photo',
+    boostText: '3x more responses',
+    weight: 15,
+    check: (u) => !!(u.photos?.length || u.profilePicture),
+  },
+  {
+    key: 'bio',
+    label: 'Write a Bio',
+    icon: 'edit-2',
+    tip: 'Stand out to hosts',
+    boostText: 'with a bio',
+    weight: 15,
+    check: (u) => !!(u.profileData?.bio && u.profileData.bio.trim().length >= 20),
+  },
+  {
+    key: 'birthday',
+    label: 'Set Your Birthday',
+    icon: 'calendar',
+    tip: 'auto-updates from your birthday',
+    boostText: 'Age verification',
+    weight: 10,
+    check: (u) => !!u.birthday,
+  },
+  {
+    key: 'occupation',
+    label: 'Add Occupation',
+    icon: 'briefcase',
+    tip: 'hosts prefer verified tenants',
+    boostText: 'Builds trust',
+    weight: 15,
+    check: (u) => !!(u.profileData?.occupation && u.profileData.occupation.trim().length > 0),
+  },
+  {
+    key: 'work',
+    label: 'Work Info',
+    icon: 'map-pin',
+    tip: 'for faster approvals',
+    boostText: 'Verify employment',
+    weight: 15,
+    check: (u) => !!(u.profileData?.preferences?.workLocation || u.profileData?.preferences?.workSchedule),
+  },
+  {
+    key: 'moveInDate',
+    label: 'Move-in Date',
+    icon: 'clock',
+    tip: 'with available listings',
+    boostText: 'Match timing',
+    weight: 15,
+    check: (u) => !!(u.profileData?.preferences?.moveInDate || u.profileData?.moveInDate),
+  },
+  {
+    key: 'interests',
+    label: 'Add Interests',
+    icon: 'heart',
+    tip: 'helps hosts know you',
+    boostText: 'Show personality',
+    weight: 15,
+    check: (u) => {
+      const interests = u.profileData?.interests;
+      return Array.isArray(interests) && interests.length >= 3;
+    },
+  },
+];
+
+const PROFILE_FIELDS = ROOMMATE_SEEKER_FIELDS;
 const TOTAL_WEIGHT = PROFILE_FIELDS.reduce((sum, f) => sum + f.weight, 0);
 
-function getCompletionData(user: User) {
+type SearchType = 'solo' | 'with_partner' | 'with_roommates' | 'have_group' | null | undefined;
+
+function getFieldsForType(searchType: SearchType): ProfileField[] {
+  if (searchType && searchType !== 'with_roommates') {
+    return PLACE_SEEKER_FIELDS;
+  }
+  return ROOMMATE_SEEKER_FIELDS;
+}
+
+function getCompletionData(user: User, searchType?: SearchType) {
+  const fields = getFieldsForType(searchType);
+  const totalWeight = fields.reduce((sum, f) => sum + f.weight, 0);
   let completedWeight = 0;
   const missing: ProfileField[] = [];
   const completed: ProfileField[] = [];
 
-  for (const field of PROFILE_FIELDS) {
+  for (const field of fields) {
     if (field.check(user)) {
       completedWeight += field.weight;
       completed.push(field);
@@ -133,8 +214,8 @@ function getCompletionData(user: User) {
     }
   }
 
-  const percentage = Math.min(Math.round((completedWeight / TOTAL_WEIGHT) * 100), 100);
-  return { percentage, missing, completed, total: PROFILE_FIELDS.length, completedCount: completed.length };
+  const percentage = Math.min(Math.round((completedWeight / totalWeight) * 100), 100);
+  return { percentage, missing, completed, total: fields.length, completedCount: completed.length };
 }
 
 const FIELD_TO_STEP: Record<string, string> = {
@@ -154,11 +235,12 @@ const FIELD_TO_STEP: Record<string, string> = {
 
 interface ProfileCompletionCardProps {
   user: User;
+  searchType?: SearchType;
   onEditProfile: (missingSteps?: string[]) => void;
 }
 
-export const ProfileCompletionCard = ({ user, onEditProfile }: ProfileCompletionCardProps) => {
-  const { percentage, missing, completedCount, total } = getCompletionData(user);
+export const ProfileCompletionCard = ({ user, searchType, onEditProfile }: ProfileCompletionCardProps) => {
+  const { percentage, missing, completedCount, total } = getCompletionData(user, searchType);
 
   const progressWidth = useSharedValue(0);
 
@@ -209,7 +291,11 @@ export const ProfileCompletionCard = ({ user, onEditProfile }: ProfileCompletion
           </Animated.View>
         </View>
 
-        <Text style={styles.progressHint}>Complete your profile to unlock better matches</Text>
+        <Text style={styles.progressHint}>
+          {searchType && searchType !== 'with_roommates'
+            ? 'Complete your profile to stand out to hosts'
+            : 'Complete your profile to unlock better matches'}
+        </Text>
 
         {topMissing.map((field) => {
           const allMissingSteps = [...new Set(missing.map(f => FIELD_TO_STEP[f.key]))];
@@ -246,7 +332,7 @@ export const ProfileCompletionCard = ({ user, onEditProfile }: ProfileCompletion
   );
 };
 
-export { getCompletionData, PROFILE_FIELDS, TOTAL_WEIGHT };
+export { getCompletionData, PROFILE_FIELDS, TOTAL_WEIGHT, PLACE_SEEKER_FIELDS, ROOMMATE_SEEKER_FIELDS, getFieldsForType };
 
 const styles = StyleSheet.create({
   card: {

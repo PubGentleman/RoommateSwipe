@@ -302,6 +302,16 @@ const ONBOARDING_STEPS_LITE: StepId[] = [
   'budgetLocation',
 ];
 
+const PLACE_SEEKER_STEPS: StepId[] = [
+  'photos',
+  'basicInfo',
+  'budgetLocation',
+  'lifestyle',
+  'housing',
+  'interests',
+  'profileNote',
+];
+
 const STEP_TITLES: Record<StepId, string> = {
   photos: 'Add Your Photos',
   basicInfo: 'About You',
@@ -359,20 +369,23 @@ export const ProfileQuestionnaireScreen = () => {
   const insets = useSafeAreaInsets();
 
   const isOnboarding = user?.onboardingStep === 'profile';
+  const searchType = user?.profileData?.apartment_search_type;
+  const isPlaceSeekerUser = !!searchType && searchType !== 'with_roommates';
   const isLiteOnboarding = isOnboarding && user?.role === 'renter' && (
-    user?.profileData?.apartment_search_type === 'solo' || user?.profileData?.apartment_search_type === 'with_partner'
+    searchType === 'solo' || searchType === 'with_partner'
   );
   const missingStepsParam = (route.params as any)?.missingSteps as string[] | undefined;
+  const allStepsForType = isPlaceSeekerUser ? PLACE_SEEKER_STEPS : STEP_ORDER;
   const filteredSteps = React.useMemo(() => {
     if (missingStepsParam?.length) {
-      return missingStepsParam.filter(s => STEP_ORDER.includes(s as StepId)) as StepId[];
+      return missingStepsParam.filter(s => allStepsForType.includes(s as StepId)) as StepId[];
     }
     return null;
   }, []);
   const isMissingMode = !!filteredSteps;
-  const stepsToShow = filteredSteps || (isLiteOnboarding ? ONBOARDING_STEPS_LITE : isOnboarding ? ONBOARDING_STEPS : STEP_ORDER);
+  const stepsToShow = filteredSteps || (isLiteOnboarding ? ONBOARDING_STEPS_LITE : isOnboarding ? ONBOARDING_STEPS : allStepsForType);
   const [currentFilteredIndex, setCurrentFilteredIndex] = useState(0);
-  const currentStep = (isMissingMode || isOnboarding)
+  const currentStep = (isMissingMode || isOnboarding || isPlaceSeekerUser)
     ? STEP_ORDER.indexOf(stepsToShow[currentFilteredIndex])
     : currentFilteredIndex;
   const [direction, setDirection] = useState<'forward' | 'back'>('forward');
