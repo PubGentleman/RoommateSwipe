@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ExploreScreen } from '../screens/renter/ExploreScreen';
 import { RoommatesStackNavigator } from './RoommatesStackNavigator';
 import { GroupsStackNavigator } from './GroupsStackNavigator';
+import { MyGroupStackNavigator } from './MyGroupStackNavigator';
 import { MessagesStackNavigator } from './MessagesStackNavigator';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
 import SavedListingsScreen from '../screens/renter/SavedListingsScreen';
@@ -19,6 +20,7 @@ export type RenterTabParamList = {
   Explore: { viewListingId?: string } | undefined;
   Roommates: undefined;
   Groups: undefined;
+  MyGroup: undefined;
   Messages: undefined;
   Profile: undefined;
   Saved: undefined;
@@ -33,6 +35,7 @@ const TAB_CONFIG: Record<string, { icon: string; label: string }> = {
   Messages: { icon: 'message-circle', label: 'Chat' },
   Profile: { icon: 'user', label: 'Profile' },
   Saved: { icon: 'bookmark', label: 'Saved' },
+  MyGroup: { icon: 'users', label: 'My Group' },
 };
 
 function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
@@ -141,10 +144,10 @@ export const RenterTabNavigator = () => {
   const searchType = user?.profileData?.apartment_search_type;
 
   const showRoommates = needsRoommates(searchType);
-  const showGroups = showRoommates || isPreformedGroup(searchType);
+  const showMyGroup = isPreformedGroup(searchType);
   const showSaved = isFastLane(searchType);
 
-  const tabKey = showRoommates ? 'full' : showGroups ? 'group' : 'lite';
+  const tabKey = showRoommates ? 'full' : showMyGroup ? 'group' : 'lite';
 
   return (
     <Tab.Navigator
@@ -162,10 +165,13 @@ export const RenterTabNavigator = () => {
       {showRoommates ? (
         <Tab.Screen name="Roommates" component={RoommatesStackNavigator} />
       ) : null}
-      {showGroups ? (
+      {showRoommates ? (
         <Tab.Screen name="Groups" component={GroupsStackNavigator} />
       ) : null}
-      {showSaved ? (
+      {showMyGroup ? (
+        <Tab.Screen name="MyGroup" component={MyGroupStackNavigator} />
+      ) : null}
+      {(showSaved || showMyGroup) ? (
         <Tab.Screen name="Saved" component={SavedListingsScreen} />
       ) : null}
       <Tab.Screen name="Messages" component={MessagesStackNavigator} />
