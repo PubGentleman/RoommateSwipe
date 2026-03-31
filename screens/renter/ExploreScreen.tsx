@@ -829,6 +829,18 @@ export const ExploreScreen = () => {
       );
     }
 
+    const userNeighborhoods = user?.preferredNeighborhoods;
+    if (!selectedNeighborhood && userNeighborhoods && userNeighborhoods.length > 0) {
+      filtered = filtered.filter(p => {
+        const pNeighborhood = (p.neighborhood || '').toLowerCase();
+        const pAddress = (p.address || '').toLowerCase();
+        return userNeighborhoods.some(n => {
+          const nl = n.toLowerCase();
+          return pNeighborhood.includes(nl) || pAddress.includes(nl);
+        });
+      });
+    }
+
     if (filters.minPrice !== undefined) {
       filtered = filtered.filter(p => p.price >= filters.minPrice!);
     }
