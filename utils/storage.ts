@@ -1474,7 +1474,7 @@ export const StorageService = {
         const hostConversations = createMockHostConversations(userId);
         for (const hc of hostConversations) {
           const idx = conversations.findIndex(c => c.id === hc.id);
-          if (idx < 0) conversations.push(hc as any);
+          if (idx < 0) conversations.push(hc);
         }
         await AsyncStorage.setItem(STORAGE_KEYS.CONVERSATIONS, JSON.stringify(conversations));
         console.log('[StorageService] Seeded host conversations');

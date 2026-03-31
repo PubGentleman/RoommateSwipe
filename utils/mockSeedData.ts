@@ -1,4 +1,4 @@
-import { Notification, InterestCard } from '../types/models';
+import { Notification, InterestCard, Conversation } from '../types/models';
 
 export const createMockNotifications = (userId: string): Notification[] => {
   const now = Date.now();
@@ -258,7 +258,7 @@ export const createHostMockNotifications = (userId: string): Notification[] => {
   ];
 };
 
-export const createMockHostConversations = (hostId: string) => {
+export const createMockHostConversations = (hostId: string): Conversation[] => {
   const now = Date.now();
   return [
     {

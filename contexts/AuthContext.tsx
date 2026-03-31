@@ -2446,11 +2446,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           fullName: m.name,
           role: m.role,
           status: m.status || 'active',
-          invitedAt: m.joined_at || new Date().toISOString(),
+          invitedAt: m.invited_at || m.joined_at || new Date().toISOString(),
           joinedAt: m.joined_at,
         }));
       }
-    } catch {}
+    } catch (e) {
+      console.warn('[AuthContext] Failed to load local team members:', e);
+    }
     return [];
   };
 
