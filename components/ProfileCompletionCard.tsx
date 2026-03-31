@@ -300,14 +300,8 @@ export const ProfileCompletionCard = ({ user, searchType, onEditProfile }: Profi
 
         {topMissing.map((field) => {
           const tappedStep = FIELD_TO_STEP[field.key];
-          const allMissingSteps = [...new Set(
-            missing.map(f => FIELD_TO_STEP[f.key]).filter(Boolean)
-          )];
-          const reordered = tappedStep
-            ? [tappedStep, ...allMissingSteps.filter(s => s !== tappedStep)]
-            : allMissingSteps;
           return (
-            <Pressable key={field.key} style={styles.completionItem} onPress={() => onEditProfile(reordered.length > 0 ? reordered : undefined)}>
+            <Pressable key={field.key} style={styles.completionItem} onPress={() => onEditProfile(tappedStep ? [tappedStep] : undefined)}>
               <View style={styles.completionIcon}>
                 <Feather name={field.icon} size={17} color="#ff6b5b" />
               </View>
