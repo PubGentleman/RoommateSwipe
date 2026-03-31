@@ -65,6 +65,8 @@ const QUICK_FILTERS = [
   { key: 'petFriendly', label: 'Pet Friendly', icon: 'heart' as const },
   { key: 'noFee', label: 'No Fee', icon: 'slash' as const },
   { key: 'availableNow', label: 'Available Now', icon: 'clock' as const },
+  { key: 'lease', label: 'Lease', icon: 'file-text' as const },
+  { key: 'sublet', label: 'Sublet', icon: 'repeat' as const },
 ];
 
 const LISTING_TYPE_CHIPS: { key: string; label: string; icon: 'user' | 'home' | 'file-text' | 'clock' }[] = [
@@ -902,6 +904,18 @@ export const ExploreScreen = () => {
         return availDate <= today;
       });
     }
+    if (activeQuickFilters.has('lease')) {
+      filtered = filtered.filter(p => {
+        const pt = ((p as any).propertyType || '').toLowerCase();
+        return pt === 'lease' || pt === '';
+      });
+    }
+    if (activeQuickFilters.has('sublet')) {
+      filtered = filtered.filter(p => {
+        const pt = ((p as any).propertyType || '').toLowerCase();
+        return pt === 'sublet';
+      });
+    }
 
     const PLACEMENT_PRIORITY: Record<string, number> = { featured: 4, top: 3, priority: 2, standard: 1 };
     const getHostPlanPriority = (property: Property) => {
@@ -1103,8 +1117,13 @@ export const ExploreScreen = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setActiveQuickFilters(prev => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        if (key === 'lease') next.delete('sublet');
+        if (key === 'sublet') next.delete('lease');
+        next.add(key);
+      }
       return next;
     });
   };
