@@ -13,7 +13,7 @@ import SavedListingsScreen from '../screens/renter/SavedListingsScreen';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotificationContext } from '../contexts/NotificationContext';
-import { needsRoommates, isFastLane } from '../utils/renterIntentUtils';
+import { needsRoommates, isPreformedGroup, isFastLane } from '../utils/renterIntentUtils';
 
 export type RenterTabParamList = {
   Explore: { viewListingId?: string } | undefined;
@@ -141,9 +141,10 @@ export const RenterTabNavigator = () => {
   const searchType = user?.profileData?.apartment_search_type;
 
   const showRoommates = needsRoommates(searchType);
+  const showGroups = showRoommates || isPreformedGroup(searchType);
   const showSaved = isFastLane(searchType);
 
-  const tabKey = showRoommates ? 'full' : 'lite';
+  const tabKey = showRoommates ? 'full' : showGroups ? 'group' : 'lite';
 
   return (
     <Tab.Navigator
@@ -161,7 +162,9 @@ export const RenterTabNavigator = () => {
       {showRoommates ? (
         <Tab.Screen name="Roommates" component={RoommatesStackNavigator} />
       ) : null}
-      <Tab.Screen name="Groups" component={GroupsStackNavigator} />
+      {showGroups ? (
+        <Tab.Screen name="Groups" component={GroupsStackNavigator} />
+      ) : null}
       {showSaved ? (
         <Tab.Screen name="Saved" component={SavedListingsScreen} />
       ) : null}

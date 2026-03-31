@@ -35,7 +35,7 @@ const ROOMMATE_SUB_OPTIONS: { id: RoommateSubIntent; icon: string; label: string
 const PLACE_SUB_OPTIONS: { id: PlaceSubIntent; icon: string; label: string; description: string; color: string }[] = [
   { id: 'solo', icon: 'user', label: 'Just Me', description: 'Looking for my own place', color: '#4a9eff' },
   { id: 'with_partner', icon: 'heart', label: 'Me & Partner', description: 'Moving in with my significant other', color: '#e83a7a' },
-  { id: 'have_group', icon: 'users', label: 'My Group', description: 'Already have roommates lined up', color: '#2ecc71' },
+  { id: 'have_group', icon: 'users', label: 'With My Group', description: 'Already have roommates lined up', color: '#2ecc71' },
 ];
 
 interface Props {
@@ -187,7 +187,7 @@ export default function WhatAreYouLookingForScreen({ onComplete, isSettings, ini
       if (id === 'find_roommates') {
         saveAndContinue('room', 'with_roommates');
       } else {
-        saveAndContinue('entire_apartment', 'solo');
+        animateForward(() => setStep('place_sub'));
       }
     }, 150);
   };
