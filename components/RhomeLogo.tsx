@@ -22,7 +22,8 @@ export const RhomeLogo: React.FC<RhomeLogoProps> = ({
   darkBackground = true,
   onPress,
 }) => {
-  const { icon: iconSize, wordmarkFontSize, spacing } = SIZES[size];
+  const sizeConfig = SIZES[size] || SIZES.md;
+  const { icon: iconSize, wordmarkFontSize, spacing } = sizeConfig;
   const accentColor = '#FF6B6B';
   const wordmarkColor = darkBackground ? '#FFFFFF' : '#1A1A2E';
 

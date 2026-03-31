@@ -263,9 +263,13 @@ export default function MyGroupScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.headerBack}>
-          <Feather name="arrow-left" size={22} color="#fff" />
-        </Pressable>
+        {navigation.canGoBack() ? (
+          <Pressable onPress={() => navigation.goBack()} style={styles.headerBack}>
+            <Feather name="arrow-left" size={22} color="#fff" />
+          </Pressable>
+        ) : (
+          <View style={{ width: 36 }} />
+        )}
         <Text style={styles.headerTitle}>{group.name || 'Your Group'}</Text>
         <Pressable onPress={shareInvite} style={styles.headerAction}>
           <Feather name="send" size={18} color="#22C55E" />
