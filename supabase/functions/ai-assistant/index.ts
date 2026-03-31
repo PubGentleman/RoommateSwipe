@@ -295,7 +295,7 @@ async function getNearbyListings(supabase: any, profile: any) {
   if (!profile.city) return [];
   const { data } = await supabase
     .from('listings')
-    .select('title, price, type, neighborhood, bedrooms, bathrooms, is_featured')
+    .select('title, price, type, neighborhood, bedrooms, bathrooms, is_featured, host_badge')
     .eq('city', profile.city)
     .gte('price', profile.budget_min ?? 0)
     .lte('price', profile.budget_max ?? 999999)
@@ -434,9 +434,15 @@ function buildSystemPrompt(profile: any, topMatches: any[], listings: any[], pla
       ).join('; ')
     : 'no top matches yet';
 
+  const badgeLabels: Record<string, string> = {
+    rhome_select: 'Rhome Select Host (top-rated, trusted)',
+    top_agent: 'Top Agent (verified, high-performing)',
+    top_company: 'Top Company (trusted property management)',
+  };
+
   const listingSummary = listings.length > 0
     ? listings.map((l: any) =>
-        `"${l.title}" — $${l.price}/mo, ${l.type}, ${l.bedrooms}bd/${l.bathrooms}ba in ${l.neighborhood}${l.is_featured ? ' (featured)' : ''}`
+        `"${l.title}" — $${l.price}/mo, ${l.type}, ${l.bedrooms}bd/${l.bathrooms}ba in ${l.neighborhood}${l.is_featured ? ' (featured)' : ''}${l.host_badge ? ` [${badgeLabels[l.host_badge] || l.host_badge}]` : ''}`
       ).join('; ')
     : 'no listings in their price range right now';
 

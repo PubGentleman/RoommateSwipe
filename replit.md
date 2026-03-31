@@ -75,6 +75,21 @@ Centralized amenity definitions live in `constants/amenities.ts` — the single 
 
 All three amenity surfaces (ExploreScreen filters, CreateEditListingScreen, ApartmentPreferencesScreen) use collapsible categorized sections with badge counts. Legacy listing amenities are normalized on load/filter. Migration 057 provides a PostgreSQL `normalize_amenity()` function for server-side backward compatibility.
 
+## Host Badge System
+
+Three earned achievement badges for host quality signaling:
+- **Rhome Select** (Gold `#D4AF37`, `award` icon) — Individual hosts: 3+ months, 10+ reviews, 4.8+ rating, 90%+ response, <10% cancellation, 1+ confirmed booking
+- **Top Agent** (Amber `#F59E0B`, `star` icon) — Agents: 2+ months, verified license, paid plan, 5+ reviews, 4.7+ rating, 85%+ response, 3+ placements, <15% cancellation
+- **Top Company** (Green `#22C55E`, `shield` icon) — Companies: 3+ months, Pro/Enterprise plan, 5+ active listings, 10+ reviews, 4.6+ rating, 90%+ response, <45d vacancy, 60%+ fill rate, 2+ team members
+
+Key files:
+- `hooks/useHostBadge.ts` — Unified badge determination (checks cached `host_badge` column first, falls back to live calculation)
+- `hooks/useTopAgent.ts`, `hooks/useTopCompany.ts`, `hooks/useRhomeSelect.ts` — Individual check functions (exported as both hooks and standalone `checkX` functions)
+- `components/HostBadge.tsx` — Reusable small/large badge display component
+- `components/BadgeProgressCard.tsx` — Dashboard progress card showing criteria checklist
+- `supabase/functions/recalculate-badges/index.ts` — Daily cron Edge Function to refresh cached badge columns on `users` and `listings` tables
+- Migration 058 adds `host_badge` column to both `listings` and `users` tables
+
 ## Technical Decisions
 
 The architecture incorporates a Babel module resolver, platform-specific UI, performance optimizations (React Native's New Architecture, React Compiler, Reanimated), and robust error handling. Navigation uses separate stack navigators with history behavior, and efficient data fetching prevents N+1 issues.

@@ -11,6 +11,9 @@ import { useConfirm } from '../../contexts/ConfirmContext';
 import { StorageService } from '../../utils/storage';
 import { Property, InterestCard, Message, Conversation, HostSubscriptionData } from '../../types/models';
 import { useNotificationContext } from '../../contexts/NotificationContext';
+import { useHostBadge } from '../../hooks/useHostBadge';
+import { HostBadge } from '../../components/HostBadge';
+import { BadgeProgressCard } from '../../components/BadgeProgressCard';
 import { getMyListings, mapListingToProperty, getAgentStats, getCompanyAgents, reassignListingAgent, getCompanyListingsWithAgents, getAgentDetailData, reassignConversation, AgentConversationSummary, AgentBookingSummary } from '../../services/listingService';
 import { getReceivedInterestCards, acceptInterestCard, rejectInterestCard } from '../../services/discoverService';
 import { supabase } from '../../lib/supabase';
@@ -84,6 +87,8 @@ export const HostDashboardScreen = () => {
   const { refreshUnreadCount } = useNotificationContext();
   const hostPlan = getHostPlan();
   const isAgent = user?.hostType === 'agent';
+  const isCompany = user?.hostType === 'company';
+  const { badge: hostBadge } = useHostBadge(user?.id);
   const agentPlan = isAgent ? (user?.agentPlan as AgentPlan) || 'pay_per_use' : null;
   const agentLimits = agentPlan ? getAgentPlanLimits(agentPlan) : null;
   const canUseAI = isAgent ? (agentLimits?.hasAIChat ?? false) : true;
@@ -715,6 +720,40 @@ export const HostDashboardScreen = () => {
             </View>
             <Feather name="chevron-right" size={18} color="#888" />
           </Pressable>
+        ) : null}
+
+        {(isAgent || isCompany) && !hostBadge ? (
+          <BadgeProgressCard
+            badgeType={isAgent ? 'top_agent' : 'top_company'}
+            earned={false}
+            checks={isAgent ? [
+              { label: 'License verified', met: user?.licenseVerificationStatus === 'verified' },
+              { label: 'Paid plan', met: !!agentPlan && agentPlan !== 'pay_per_use' },
+              { label: '2+ months on Rhome', met: !!user?.createdAt && (Date.now() - new Date(user.createdAt).getTime()) > 60 * 24 * 60 * 60 * 1000 },
+              { label: '85%+ response rate', met: (user?.responseRate || 0) >= 85 },
+              { label: '3+ successful placements', met: false },
+              { label: '5+ reviews', met: false },
+              { label: '4.7+ average rating', met: false },
+              { label: '<15% cancellation rate', met: true },
+            ] : [
+              { label: 'Company name set', met: !!user?.companyName },
+              { label: 'Pro or Enterprise plan', met: false },
+              { label: '3+ months on Rhome', met: !!user?.createdAt && (Date.now() - new Date(user.createdAt).getTime()) > 90 * 24 * 60 * 60 * 1000 },
+              { label: '90%+ response rate', met: (user?.responseRate || 0) >= 90 },
+              { label: '5+ active listings', met: listings.filter(l => l.available).length >= 5 },
+              { label: '10+ reviews', met: false },
+              { label: '4.6+ average rating', met: false },
+              { label: 'Under 45 day avg vacancy', met: true },
+              { label: '60%+ fill rate', met: true },
+              { label: '2+ team members', met: false },
+            ]}
+          />
+        ) : null}
+
+        {hostBadge ? (
+          <View style={{ marginBottom: 12 }}>
+            <HostBadge badge={hostBadge} size="large" />
+          </View>
         ) : null}
 
         {(user?.hostType === 'agent' || user?.hostType === 'company') ? (

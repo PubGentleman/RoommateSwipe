@@ -173,6 +173,7 @@ export interface Property {
   review_count?: number;
   assigned_agent_id?: string;
   hostType?: 'individual' | 'company' | 'agent';
+  host_badge?: 'rhome_select' | 'top_agent' | 'top_company' | null;
 }
 
 export interface PropertyFilter {

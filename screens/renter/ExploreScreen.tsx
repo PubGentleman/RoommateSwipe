@@ -51,6 +51,8 @@ import {
   AmenityCategory,
   normalizeLegacyAmenity,
 } from '../../constants/amenities';
+import { HostBadge } from '../../components/HostBadge';
+import { useHostBadge, BADGE_CONFIG, HostBadgeType } from '../../hooks/useHostBadge';
 
 const BG = '#111';
 const CARD_BG = '#1a1a1a';
@@ -1166,11 +1168,10 @@ export const ExploreScreen = () => {
                 <Text style={styles.ratingBadgeCount}>({item.review_count})</Text>
               </View>
             ) : null}
-            {(item.average_rating || 0) >= 4.8 && (item.review_count || 0) >= 10 ? (
-              <View style={styles.rhomeSelectBadge}>
-                <Feather name="award" size={10} color="#D4AF37" />
-                <Text style={styles.rhomeSelectText}>Rhome Select</Text>
-              </View>
+            {item.host_badge ? (
+              <HostBadge badge={item.host_badge} size="small" />
+            ) : (item.average_rating || 0) >= 4.8 && (item.review_count || 0) >= 10 ? (
+              <HostBadge badge="rhome_select" size="small" />
             ) : null}
             {item.assigned_agent_id && criticalAgentIds.includes(item.assigned_agent_id) ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(245,158,11,0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)' }}>
@@ -2149,12 +2150,10 @@ export const ExploreScreen = () => {
                           </View>
                         ) : null}
                       </View>
-                      {(selectedProperty.average_rating || 0) >= 4.8 && (selectedProperty.review_count || 0) >= 10 ? (
-                        <View style={styles.rhomeSelectDetailBadge}>
-                          <Feather name="award" size={14} color="#D4AF37" />
-                          <Text style={styles.rhomeSelectDetailText}>Rhome Select Host</Text>
-                          <Text style={styles.rhomeSelectDetailSubtext}>Top-rated, trusted host on Rhome</Text>
-                        </View>
+                      {selectedProperty.host_badge ? (
+                        <HostBadge badge={selectedProperty.host_badge} size="large" />
+                      ) : (selectedProperty.average_rating || 0) >= 4.8 && (selectedProperty.review_count || 0) >= 10 ? (
+                        <HostBadge badge="rhome_select" size="large" />
                       ) : null}
 
                       {detailShowMatch && detailCompatibility !== null ? (
@@ -4763,47 +4762,6 @@ const styles = StyleSheet.create({
   ratingBadgeCount: {
     fontSize: 10,
     color: 'rgba(255,215,0,0.7)',
-  },
-  rhomeSelectBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(212,175,55,0.12)',
-    borderColor: 'rgba(212,175,55,0.3)',
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  rhomeSelectText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#D4AF37',
-    letterSpacing: 0.3,
-  },
-  rhomeSelectDetailBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(212,175,55,0.08)',
-    borderColor: 'rgba(212,175,55,0.2)',
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    flexWrap: 'wrap',
-  },
-  rhomeSelectDetailText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#D4AF37',
-    flex: 1,
-  },
-  rhomeSelectDetailSubtext: {
-    fontSize: 12,
-    color: 'rgba(212,175,55,0.7)',
-    width: '100%',
-    marginLeft: 22,
   },
   pdReviewsHeader: {
     flexDirection: 'row',

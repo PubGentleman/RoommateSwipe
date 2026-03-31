@@ -86,6 +86,7 @@ export function mapListingToProperty(l: any, fallbackHostName?: string): Propert
     review_count: l.review_count ?? 0,
     assigned_agent_id: l.assigned_agent_id ?? undefined,
     hostType: l.host?.host_type || l.host_type || undefined,
+    host_badge: l.host_badge ?? null,
   };
 }
 
