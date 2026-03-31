@@ -838,6 +838,26 @@ export const ProfileQuestionnaireScreen = () => {
               selected={gender || ''}
               onSelect={(v) => setGender(v as any)}
             />
+            <View style={{ marginTop: 20 }}>
+              <ThemedText style={styles.inputLabel}>About You</ThemedText>
+              <ThemedText style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>
+                Write a short bio to introduce yourself
+              </ThemedText>
+              <TextInput
+                style={styles.bioInput}
+                multiline
+                numberOfLines={4}
+                maxLength={500}
+                value={bio}
+                onChangeText={setBio}
+                placeholder="Tell people a bit about yourself..."
+                placeholderTextColor="rgba(255,255,255,0.3)"
+                textAlignVertical="top"
+              />
+              <ThemedText style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', textAlign: 'right', marginTop: 4 }}>
+                {bio.length}/500
+              </ThemedText>
+            </View>
           </View>
         );
 

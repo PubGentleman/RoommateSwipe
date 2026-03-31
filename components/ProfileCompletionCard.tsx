@@ -220,6 +220,7 @@ function getCompletionData(user: User, searchType?: SearchType) {
 
 const FIELD_TO_STEP: Record<string, string> = {
   photo: 'photos',
+  bio: 'basicInfo',
   birthday: 'basicInfo',
   budget: 'budgetLocation',
   location: 'budgetLocation',
@@ -298,11 +299,9 @@ export const ProfileCompletionCard = ({ user, searchType, onEditProfile }: Profi
         </Text>
 
         {topMissing.map((field) => {
-          const allMissingSteps = [...new Set(missing.map(f => FIELD_TO_STEP[f.key]))];
           const tappedStep = FIELD_TO_STEP[field.key];
-          const orderedSteps = [tappedStep, ...allMissingSteps.filter(s => s !== tappedStep)];
           return (
-            <Pressable key={field.key} style={styles.completionItem} onPress={() => onEditProfile(orderedSteps)}>
+            <Pressable key={field.key} style={styles.completionItem} onPress={() => onEditProfile(tappedStep ? [tappedStep] : undefined)}>
               <View style={styles.completionIcon}>
                 <Feather name={field.icon} size={17} color="#ff6b5b" />
               </View>
@@ -321,8 +320,10 @@ export const ProfileCompletionCard = ({ user, searchType, onEditProfile }: Profi
 
         {missing.length > 3 ? (
           <Pressable style={styles.moreLink} onPress={() => {
-            const allMissingSteps = [...new Set(missing.map(f => FIELD_TO_STEP[f.key]))];
-            onEditProfile(allMissingSteps);
+            const allMissingSteps = [...new Set(
+              missing.map(f => FIELD_TO_STEP[f.key]).filter(Boolean)
+            )];
+            onEditProfile(allMissingSteps.length > 0 ? allMissingSteps : undefined);
           }}>
             <Text style={styles.moreLinkText}>+{missing.length - 3} more to complete</Text>
           </Pressable>
