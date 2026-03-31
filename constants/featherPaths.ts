@@ -16,6 +16,7 @@ export const featherSvgData: Record<string, string> = {
   "check": "<polyline points=\"20 6 9 17 4 12\"></polyline>",
   "check-circle": "<path d=\"M22 11.08V12a10 10 0 1 1-5.93-9.14\"></path><polyline points=\"22 4 12 14.01 9 11.01\"></polyline>",
   "chevron-down": "<polyline points=\"6 9 12 15 18 9\"></polyline>",
+  "chevron-up": "<polyline points=\"18 15 12 9 6 15\"></polyline>",
   "chevron-left": "<polyline points=\"15 18 9 12 15 6\"></polyline>",
   "chevron-right": "<polyline points=\"9 18 15 12 9 6\"></polyline>",
   "circle": "<circle cx=\"12\" cy=\"12\" r=\"10\"></circle>",
