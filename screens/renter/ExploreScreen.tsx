@@ -1360,12 +1360,17 @@ export const ExploreScreen = () => {
                   ? `${hostUser?.unitsManaged ?? 1} units managed`
                   : itemHostType === 'agent'
                     ? hostUser?.agencyName ?? 'Licensed Agent'
-                    : `Member · ${hostUser ? Math.max(1, (item.hostProfileId?.charCodeAt(0) || 0) % 6 + 1) : 1} listings`}
+                    : (() => {
+                        const count = hostUser?.unitsManaged ?? 1;
+                        return `Host · ${count} ${count === 1 ? 'listing' : 'listings'}`;
+                      })()}
               </Text>
             </View>
-            <View style={styles.respBadge}>
-              <Text style={styles.respBadgeText}>Fast reply</Text>
-            </View>
+            {(hostUser?.licenseVerified || hostUser?.verifiedBusiness || (hostUser?.hostPlan && hostUser.hostPlan !== 'free' && hostUser.hostPlan !== 'none') || itemHostType === 'company' || itemHostType === 'agent') ? (
+              <View style={styles.respBadge}>
+                <Text style={styles.respBadgeText}>Fast reply</Text>
+              </View>
+            ) : null}
           </View>
           {discoverableGroups.has(item.id) ? (
             <Pressable
