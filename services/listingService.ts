@@ -101,6 +101,7 @@ export async function getListings(filters?: {
   let query = supabase
     .from('listings')
     .select('*, host:users!host_id(id, full_name, avatar_url, host_type)')
+    .eq('status', 'active')
     .eq('is_active', true)
     .eq('is_rented', false)
     .eq('is_paused', false)

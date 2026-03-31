@@ -305,6 +305,11 @@ export const CreateEditListingScreen = () => {
         console.warn('Transit fetch failed:', transitError);
       }
 
+      const today = new Date().toISOString().split('T')[0];
+      const resolvedAvailableDate = availableDate && availableDate !== 'flexible'
+        ? new Date(availableDate).toISOString()
+        : new Date(today).toISOString();
+
       const supaData: any = {
         title: title.trim(),
         description: fullDescription,
@@ -325,10 +330,12 @@ export const CreateEditListingScreen = () => {
         listing_type: roomType === 'entire' ? 'entire_apartment' : 'room',
         amenities: selectedAmenities,
         photos: photos,
-        available_date: availableDate && availableDate !== 'flexible' ? new Date(availableDate).toISOString() : undefined,
+        available_date: resolvedAvailableDate,
+        status: 'active',
         is_active: true,
         is_paused: false,
         is_rented: false,
+        published_at: new Date().toISOString(),
         host_name: user?.name || '',
         host_profile_id: user?.id || '',
       };
@@ -360,7 +367,7 @@ export const CreateEditListingScreen = () => {
           neighborhood: neighborhood.trim() || undefined,
           zip_code: zipCode.trim() || undefined,
           address: address.trim(),
-          availableDate: availableDate ? new Date(availableDate) : undefined,
+          availableDate: new Date(resolvedAvailableDate),
           amenities: selectedAmenities,
           photos: photos,
           available: !availableDate || new Date(availableDate).setHours(0,0,0,0) <= new Date().setHours(0,0,0,0),
