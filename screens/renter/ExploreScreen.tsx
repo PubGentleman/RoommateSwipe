@@ -791,6 +791,13 @@ export const ExploreScreen = () => {
 
     filtered = filtered.filter(p => p.available);
 
+    if (isEntireApartmentSeeker) {
+      filtered = filtered.filter(p => {
+        const rt = (p.roomType || p.listing_type || p.type || '').toLowerCase();
+        return ['entire', 'entire_unit', 'entire_apartment'].includes(rt);
+      });
+    }
+
     if (viewMode === 'saved') {
       filtered = filtered.filter(p => saved.has(p.id));
     }
