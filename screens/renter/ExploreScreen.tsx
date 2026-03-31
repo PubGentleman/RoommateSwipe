@@ -63,10 +63,10 @@ const ACCENT = '#ff6b5b';
 const QUICK_FILTERS = [
   { key: 'under2k', label: 'Under $2k', icon: 'dollar-sign' as const },
   { key: 'petFriendly', label: 'Pet Friendly', icon: 'heart' as const },
-  { key: 'noFee', label: 'No Fee', icon: 'slash' as const },
-  { key: 'availableNow', label: 'Available Now', icon: 'clock' as const },
   { key: 'lease', label: 'Lease', icon: 'file-text' as const },
   { key: 'sublet', label: 'Sublet', icon: 'repeat' as const },
+  { key: 'noFee', label: 'No Fee', icon: 'slash' as const },
+  { key: 'availableNow', label: 'Available Now', icon: 'clock' as const },
 ];
 
 const LISTING_TYPE_CHIPS: { key: string; label: string; icon: 'user' | 'home' | 'file-text' | 'clock' }[] = [
