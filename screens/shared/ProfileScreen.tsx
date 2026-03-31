@@ -82,6 +82,8 @@ export const ProfileScreen = () => {
   const [matchCount, setMatchCount] = useState(0);
   const [profileViewCount, setProfileViewCount] = useState(0);
   const [likesCount, setLikesCount] = useState(0);
+  const [savedCount, setSavedCount] = useState(0);
+  const [inquirySentCount, setInquirySentCount] = useState(0);
   const [hostListingCount, setHostListingCount] = useState(0);
   const [hostInquiryCount, setHostInquiryCount] = useState(0);
   const [hostViewCount, setHostViewCount] = useState(0);
@@ -120,6 +122,12 @@ export const ProfileScreen = () => {
             const receivedLikes = currentUser?.receivedLikes || [];
             setProfileViewCount(receivedLikes.filter((l: any) => !l.isSuperLike).length);
             setLikesCount(receivedLikes.filter((l: any) => l.isSuperLike).length);
+            const saved = await StorageService.getSavedProperties(userId);
+            if (!isMounted) return;
+            setSavedCount(saved.length);
+            const renterCards = await StorageService.getInterestCardsForRenter(userId);
+            if (!isMounted) return;
+            setInquirySentCount(renterCards.length);
           }
 
           const cards = await StorageService.getInterestCardsForRenter(userId);
@@ -328,6 +336,24 @@ export const ProfileScreen = () => {
                   <Text style={styles.statLabel}>Active</Text>
                 </Pressable>
               </>
+            ) : isPlaceSeeker() ? (
+              <>
+                <Pressable
+                  style={styles.statBox}
+                  onPress={() => navigation.navigate('SavedListings')}
+                >
+                  <Text style={[styles.statValue, styles.statCoral]}>{savedCount}</Text>
+                  <Text style={styles.statLabel}>Saved</Text>
+                </Pressable>
+                <View style={styles.statDivider} />
+                <Pressable
+                  style={styles.statBox}
+                  onPress={() => navigation.navigate('InterestCards')}
+                >
+                  <Text style={styles.statValue}>{inquirySentCount}</Text>
+                  <Text style={styles.statLabel}>Inquiries</Text>
+                </Pressable>
+              </>
             ) : (
               <>
                 <Pressable
@@ -345,18 +371,14 @@ export const ProfileScreen = () => {
                   <Text style={styles.statValue}>{profileViewCount}</Text>
                   <Text style={styles.statLabel}>Likes</Text>
                 </Pressable>
-                {!isPlaceSeeker() ? (
-                  <>
-                    <View style={styles.statDivider} />
-                    <Pressable
-                      style={styles.statBox}
-                      onPress={() => navigation.navigate('WhoLikedMe')}
-                    >
-                      <Text style={[styles.statValue, styles.statCoral]}>{likesCount}</Text>
-                      <Text style={styles.statLabel}>Super Likes</Text>
-                    </Pressable>
-                  </>
-                ) : null}
+                <View style={styles.statDivider} />
+                <Pressable
+                  style={styles.statBox}
+                  onPress={() => navigation.navigate('WhoLikedMe')}
+                >
+                  <Text style={[styles.statValue, styles.statCoral]}>{likesCount}</Text>
+                  <Text style={styles.statLabel}>Super Likes</Text>
+                </Pressable>
               </>
             )}
           </View>
