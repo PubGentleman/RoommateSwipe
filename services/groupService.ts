@@ -27,8 +27,7 @@ export async function getGroups(city?: string, type?: GroupType) {
     .from('groups')
     .select(`
       *,
-      members:group_members(user_id),
-      creator:users!created_by(id, full_name, avatar_url, last_active_at)
+      members:group_members(user_id)
     `)
     .order('created_at', { ascending: false });
 
@@ -36,17 +35,17 @@ export async function getGroups(city?: string, type?: GroupType) {
   if (type) query = query.eq('type', type);
 
   const { data, error } = await query;
-  if (error) throw error;
+  if (error) {
+    console.error('[getGroups] Query error:', error.message);
+    throw error;
+  }
 
   const groups = data || [];
   return groups
-    .filter((g: any) => {
-      const creatorLastActive = g.creator?.last_active_at;
-      return isWithinActivityCutoff(creatorLastActive);
-    })
+    .filter((g: any) => isWithinActivityCutoff(g.updated_at || g.created_at))
     .sort((a: any, b: any) => {
-      const scoreA = getRecencyMultiplier(a.creator?.last_active_at);
-      const scoreB = getRecencyMultiplier(b.creator?.last_active_at);
+      const scoreA = getRecencyMultiplier(a.updated_at || a.created_at);
+      const scoreB = getRecencyMultiplier(b.updated_at || b.created_at);
       return scoreB - scoreA;
     });
 }
@@ -125,15 +124,29 @@ export async function getGroupDetails(groupId: string) {
   };
 }
 
-export async function getMyGroups(type?: GroupType) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
+export async function getMyGroups(type?: GroupType, userId?: string) {
+  let uid = userId;
+  if (!uid) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      uid = user?.id;
+    } catch (authErr) {
+      console.warn('[getMyGroups] Auth failed:', authErr);
+      return [];
+    }
+  }
+  if (!uid) return [];
 
-  const { data: memberships } = await supabase
+  const { data: memberships, error: memberError } = await supabase
     .from('group_members')
     .select('group_id')
-    .eq('user_id', user.id)
+    .eq('user_id', uid)
     .eq('status', 'active');
+
+  if (memberError) {
+    console.error('[getMyGroups] Membership query error:', memberError);
+    throw memberError;
+  }
 
   if (!memberships || memberships.length === 0) return [];
 
@@ -144,15 +157,17 @@ export async function getMyGroups(type?: GroupType) {
     .select(`
       *,
       members:group_members(user_id),
-      creator:users!created_by(id, full_name, avatar_url),
-      listing:listings(id, title, photos, rent),
-      host:users!host_id(id, full_name, avatar_url)
+      listing:listings(id, title, photos, rent)
     `)
     .in('id', groupIds);
 
   if (type) query = query.eq('type', type);
 
-  const { data } = await query;
+  const { data, error } = await query;
+  if (error) {
+    console.error('[getMyGroups] Groups query error:', error.message);
+    throw error;
+  }
   return data || [];
 }
 
@@ -160,8 +175,8 @@ export async function getMyRoommateGroups() {
   return getMyGroups('roommate');
 }
 
-export async function getMyInquiryGroups() {
-  return getMyGroups('listing_inquiry');
+export async function getMyInquiryGroups(userId?: string) {
+  return getMyGroups('listing_inquiry', userId);
 }
 
 export async function createGroup(group: GroupData) {

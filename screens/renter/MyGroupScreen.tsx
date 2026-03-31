@@ -61,7 +61,7 @@ export default function MyGroupScreen() {
     try {
       setLoading(true);
       setError(null);
-      const g = await getUserPreformedGroup();
+      const g = await getUserPreformedGroup(user?.id);
       setGroup(g);
       if (g) {
         const [m, s] = await Promise.all([
@@ -81,7 +81,7 @@ export default function MyGroupScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.id]);
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 

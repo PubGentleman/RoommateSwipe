@@ -75,14 +75,19 @@ export async function getMyPreformedGroup(): Promise<PreformedGroup | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('preformed_groups')
     .select('*')
     .eq('group_lead_id', user.id)
     .in('status', ['forming', 'ready', 'searching'])
     .order('created_at', { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle();
+
+  if (error) {
+    console.error('[getMyPreformedGroup] Query error:', error);
+    return null;
+  }
 
   return data as PreformedGroup | null;
 }
@@ -320,17 +325,30 @@ export async function removeMember(groupId: string, memberId: string): Promise<b
   return !error;
 }
 
-export async function getUserPreformedGroup(): Promise<PreformedGroup | null> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+export async function getUserPreformedGroup(userId?: string): Promise<PreformedGroup | null> {
+  let uid = userId;
+  if (!uid) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      uid = user?.id;
+    } catch {
+      return null;
+    }
+  }
+  if (!uid) return null;
 
-  const { data: memberData } = await supabase
+  const { data: memberData, error } = await supabase
     .from('preformed_group_members')
     .select('preformed_group_id')
-    .eq('user_id', user.id)
+    .eq('user_id', uid)
     .eq('status', 'joined')
     .limit(1)
-    .single();
+    .maybeSingle();
+
+  if (error) {
+    console.error('[getUserPreformedGroup] Query error:', error);
+    return null;
+  }
 
   if (!memberData) return null;
 

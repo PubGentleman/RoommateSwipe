@@ -190,14 +190,29 @@ export const GroupsScreen = () => {
       let otherGroups: Group[] = [];
       
       try {
-        const [supabaseGroups, supabaseMyGroups, supabaseInquiryGroups] = await withTimeout(
-          Promise.all([
+        const [discoverResult, myGroupsResult, inquiryResult] = await withTimeout(
+          Promise.allSettled([
             getGroupsFromSupabase(activeCity || undefined, 'roommate'),
-            getMyGroupsFromSupabase('roommate'),
-            getMyInquiryGroupsFromSupabase(),
+            getMyGroupsFromSupabase('roommate', user.id),
+            getMyInquiryGroupsFromSupabase(user.id),
           ]),
           15000
         );
+
+        const supabaseGroups = discoverResult.status === 'fulfilled' ? discoverResult.value : [];
+        const supabaseMyGroups = myGroupsResult.status === 'fulfilled' ? myGroupsResult.value : [];
+        const supabaseInquiryGroups = inquiryResult.status === 'fulfilled' ? inquiryResult.value : [];
+
+        if (discoverResult.status === 'rejected') {
+          console.warn('[GroupsScreen] Discover groups failed:', discoverResult.reason);
+        }
+        if (myGroupsResult.status === 'rejected') {
+          console.warn('[GroupsScreen] My groups failed:', myGroupsResult.reason);
+        }
+        if (inquiryResult.status === 'rejected') {
+          console.warn('[GroupsScreen] Inquiry groups failed:', inquiryResult.reason);
+        }
+
         const myGroupIds = new Set((supabaseMyGroups || []).map((g: any) => g.id));
         const mapGroup = (g: any): Group & { listingPhoto?: string } => ({
           id: g.id,
@@ -222,7 +237,7 @@ export const GroupsScreen = () => {
           listingAddress: g.listing_address,
           isArchived: g.is_archived || false,
           memberCount: Array.isArray(g.members) ? g.members.length : 0,
-          hostName: g.host?.full_name || g.creator?.full_name || 'Host',
+          hostName: g.host_name || 'Group',
           listingPhoto: g.listing?.photos?.[0] || undefined,
           inquiryStatus: g.inquiry_status || 'pending',
           addressRevealed: g.address_revealed || false,
