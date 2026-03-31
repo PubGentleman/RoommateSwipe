@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, Pressable, ScrollView, StyleSheet, ActivityIndicator,
 } from 'react-native';
@@ -59,8 +59,19 @@ export default function PlaceSeekerOnboardingScreen() {
   const [niceToHaves, setNiceToHaves] = useState<string[]>([]);
   const [budgetMin, setBudgetMin] = useState<number>(1000);
   const [budgetMax, setBudgetMax] = useState<number>(2500);
-  const [roomTypes, setRoomTypes] = useState<string[]>([]);
+  const listingPref = user?.profileData?.listing_type_preference;
+  const roomTypeKnown = listingPref === 'entire_apartment' || listingPref === 'room';
+  const [roomTypes, setRoomTypes] = useState<string[]>(
+    listingPref === 'entire_apartment' ? ['apartment'] :
+    listingPref === 'room' ? ['private'] : []
+  );
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (roomTypeKnown && roomTypes.length === 0) {
+      setRoomTypes(listingPref === 'entire_apartment' ? ['apartment'] : ['private']);
+    }
+  }, [listingPref]);
 
   const userCity = user?.profileData?.city || user?.profileData?.neighborhood || '';
   const boroughGroups = getNeighborhoodsByBorough(userCity);
@@ -113,39 +124,43 @@ export default function PlaceSeekerOnboardingScreen() {
         height={160}
       />
 
-      <Text style={[styles.sectionLabel, { color: theme.text, marginTop: 28 }]}>Room Type</Text>
-      <Text style={[styles.sectionHint, { color: theme.textTertiary }]}>
-        Select all that apply
-      </Text>
-      <View style={{ gap: 10 }}>
-        {ROOM_TYPES.map(rt => {
-          const isActive = roomTypes.includes(rt.id);
-          return (
-            <Pressable
-              key={rt.id}
-              style={[
-                styles.roomCard,
-                { borderColor: isActive ? theme.primary : 'rgba(255,255,255,0.15)' },
-                isActive && { backgroundColor: `${theme.primary}15` },
-              ]}
-              onPress={() => toggleRoomType(rt.id)}
-            >
-              <View style={[styles.roomIconWrap, isActive && { backgroundColor: `${theme.primary}20` }]}>
-                <Feather name={rt.icon} size={20} color={isActive ? theme.primary : theme.textSecondary} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.roomLabel, { color: isActive ? theme.primary : theme.text }]}>
-                  {rt.label}
-                </Text>
-                <Text style={[styles.roomDesc, { color: theme.textTertiary }]}>{rt.desc}</Text>
-              </View>
-              {isActive ? (
-                <Feather name="check-circle" size={20} color={theme.primary} />
-              ) : null}
-            </Pressable>
-          );
-        })}
-      </View>
+      {!roomTypeKnown ? (
+        <>
+          <Text style={[styles.sectionLabel, { color: theme.text, marginTop: 28 }]}>Room Type</Text>
+          <Text style={[styles.sectionHint, { color: theme.textTertiary }]}>
+            Select all that apply
+          </Text>
+          <View style={{ gap: 10 }}>
+            {ROOM_TYPES.map(rt => {
+              const isActive = roomTypes.includes(rt.id);
+              return (
+                <Pressable
+                  key={rt.id}
+                  style={[
+                    styles.roomCard,
+                    { borderColor: isActive ? theme.primary : 'rgba(255,255,255,0.15)' },
+                    isActive && { backgroundColor: `${theme.primary}15` },
+                  ]}
+                  onPress={() => toggleRoomType(rt.id)}
+                >
+                  <View style={[styles.roomIconWrap, isActive && { backgroundColor: `${theme.primary}20` }]}>
+                    <Feather name={rt.icon} size={20} color={isActive ? theme.primary : theme.textSecondary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.roomLabel, { color: isActive ? theme.primary : theme.text }]}>
+                      {rt.label}
+                    </Text>
+                    <Text style={[styles.roomDesc, { color: theme.textTertiary }]}>{rt.desc}</Text>
+                  </View>
+                  {isActive ? (
+                    <Feather name="check-circle" size={20} color={theme.primary} />
+                  ) : null}
+                </Pressable>
+              );
+            })}
+          </View>
+        </>
+      ) : null}
     </View>
   );
 
@@ -370,8 +385,8 @@ export default function PlaceSeekerOnboardingScreen() {
           budget: budgetMax,
           budgetMin: budgetMin,
           budgetMax: budgetMax,
-          roomType: roomTypes.join(',') || undefined,
-          lookingFor: roomTypes.includes('apartment') ? 'entire_apartment' : (roomTypes.length > 0 ? 'room' : undefined),
+          roomType: roomTypes.join(',') || (listingPref === 'entire_apartment' ? 'apartment' : listingPref === 'room' ? 'private' : undefined),
+          lookingFor: roomTypes.includes('apartment') ? 'entire_apartment' : (roomTypes.length > 0 ? 'room' : (listingPref === 'entire_apartment' ? 'entire_apartment' : listingPref === 'room' ? 'room' : undefined)),
         },
       });
     } catch (err) {
