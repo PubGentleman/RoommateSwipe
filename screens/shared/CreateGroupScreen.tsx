@@ -14,6 +14,9 @@ import { supabase } from '../../lib/supabase';
 import { ScreenKeyboardAwareScrollView } from '../../components/ScreenKeyboardAwareScrollView';
 import { Image } from 'expo-image';
 import { GroupPropertySearchModal } from '../../components/GroupPropertySearchModal';
+import { LinearGradient } from 'expo-linear-gradient';
+
+const ACCENT = '#ff6b5b';
 
 export const CreateGroupScreen = ({ navigation, route }: any) => {
   const { theme } = useTheme();
@@ -27,10 +30,13 @@ export const CreateGroupScreen = ({ navigation, route }: any) => {
   const [selectedListing, setSelectedListing] = useState<any | null>(null);
   const [creating, setCreating] = useState(false);
   const [showPropertySearch, setShowPropertySearch] = useState(false);
+  const [nameFocused, setNameFocused] = useState(false);
+  const [descFocused, setDescFocused] = useState(false);
 
   const matchedUserId = route.params?.matchedUserId;
   const matchedUserName = route.params?.matchedUserName;
   const canCreate = name.trim().length > 0;
+  const memberLimit = getMemberLimit((user as any)?.subscription?.plan || 'basic', selectedListing?.bedrooms || null);
 
   const handleCreate = async () => {
     if (!user) return;
@@ -130,10 +136,10 @@ export const CreateGroupScreen = ({ navigation, route }: any) => {
         <ThemedText style={styles.headerTitle}>New Group</ThemedText>
         <Pressable onPress={handleCreate} disabled={creating || !canCreate}>
           {creating ? (
-            <ActivityIndicator size="small" color="#ff6b5b" />
+            <ActivityIndicator size="small" color={ACCENT} />
           ) : (
             <ThemedText style={[styles.headerAction, {
-              color: canCreate ? '#ff6b5b' : 'rgba(255,255,255,0.25)',
+              color: canCreate ? ACCENT : 'rgba(255,255,255,0.25)',
             }]}>
               Create
             </ThemedText>
@@ -141,104 +147,167 @@ export const CreateGroupScreen = ({ navigation, route }: any) => {
         </Pressable>
       </View>
 
+      <View style={styles.heroSection}>
+        <View style={styles.heroIconWrap}>
+          <LinearGradient
+            colors={['rgba(255,107,91,0.25)', 'rgba(255,107,91,0.08)']}
+            style={styles.heroIconGradient}
+          >
+            <Feather name="users" size={28} color={ACCENT} />
+          </LinearGradient>
+        </View>
+        <ThemedText style={styles.heroTitle}>Start your search together</ThemedText>
+        <ThemedText style={styles.heroSubtitle}>
+          Create a group to find roommates and browse listings as a team
+        </ThemedText>
+      </View>
+
       {matchedUserName ? (
         <View style={styles.matchBanner}>
-          <Feather name="users" size={18} color="#ff6b5b" />
-          <ThemedText style={styles.matchBannerText}>
-            Starting a group with {matchedUserName}
-          </ThemedText>
+          <View style={styles.matchAvatarPlaceholder}>
+            <Feather name="user-plus" size={16} color={ACCENT} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <ThemedText style={styles.matchBannerTitle}>
+              Starting with {matchedUserName}
+            </ThemedText>
+            <ThemedText style={styles.matchBannerSub}>
+              They'll be added as the first member
+            </ThemedText>
+          </View>
+          <Feather name="check-circle" size={18} color={ACCENT} />
         </View>
       ) : null}
 
-      <View style={styles.field}>
-        <ThemedText style={styles.label}>GROUP NAME *</ThemedText>
+      <View style={[styles.field, nameFocused && styles.fieldFocused]}>
+        <View style={styles.labelRow}>
+          <View style={styles.labelIcon}>
+            <Feather name="edit-3" size={12} color={nameFocused ? ACCENT : 'rgba(255,255,255,0.4)'} />
+          </View>
+          <ThemedText style={[styles.label, nameFocused && { color: ACCENT }]}>GROUP NAME</ThemedText>
+          <ThemedText style={styles.required}>Required</ThemedText>
+        </View>
         <TextInput
           style={styles.input}
           placeholder="e.g. Looking for 2BR Downtown"
-          placeholderTextColor="rgba(255,255,255,0.25)"
+          placeholderTextColor="rgba(255,255,255,0.2)"
           value={name}
           onChangeText={setName}
           maxLength={60}
+          onFocus={() => setNameFocused(true)}
+          onBlur={() => setNameFocused(false)}
         />
+        <View style={styles.inputFooter}>
+          <ThemedText style={styles.charCount}>{name.length}/60</ThemedText>
+        </View>
       </View>
 
-      <View style={styles.field}>
-        <ThemedText style={styles.label}>DESCRIPTION (OPTIONAL)</ThemedText>
+      <View style={[styles.field, descFocused && styles.fieldFocused]}>
+        <View style={styles.labelRow}>
+          <View style={styles.labelIcon}>
+            <Feather name="align-left" size={12} color={descFocused ? ACCENT : 'rgba(255,255,255,0.4)'} />
+          </View>
+          <ThemedText style={[styles.label, descFocused && { color: ACCENT }]}>DESCRIPTION</ThemedText>
+          <ThemedText style={styles.optional}>Optional</ThemedText>
+        </View>
         <TextInput
-          style={[styles.input, { minHeight: 80, textAlignVertical: 'top' }]}
-          placeholder="What is this group for?"
-          placeholderTextColor="rgba(255,255,255,0.25)"
+          style={[styles.input, { minHeight: 72, textAlignVertical: 'top' }]}
+          placeholder="What is this group looking for?"
+          placeholderTextColor="rgba(255,255,255,0.2)"
           value={description}
           onChangeText={setDescription}
           multiline
           maxLength={200}
+          onFocus={() => setDescFocused(true)}
+          onBlur={() => setDescFocused(false)}
         />
+        <View style={styles.inputFooter}>
+          <ThemedText style={styles.charCount}>{description.length}/200</ThemedText>
+        </View>
       </View>
 
-      <View style={styles.field}>
-        <ThemedText style={styles.label}>LINK TO A PROPERTY (OPTIONAL)</ThemedText>
-        <ThemedText style={styles.fieldHint}>
-          Attaching a listing pins the property details to the top of your group chat.
-        </ThemedText>
+      <View style={styles.divider} />
 
-        {selectedListing ? (
-          <Pressable
-            style={styles.selectedListing}
-            onPress={() => setShowPropertySearch(true)}
-          >
-            {selectedListing.photos?.[0] ? (
-              <Image source={{ uri: selectedListing.photos[0] }} style={styles.selectedListingThumb} />
-            ) : null}
-            <View style={{ flex: 1, marginLeft: 10 }}>
-              <ThemedText style={styles.listingTitle} numberOfLines={1}>
-                {selectedListing.title}
-              </ThemedText>
-              <ThemedText style={styles.listingAddress} numberOfLines={1}>
-                {selectedListing.address}, {selectedListing.city}
-              </ThemedText>
-              <ThemedText style={styles.listingPrice}>
-                ${selectedListing.rent?.toLocaleString()}/mo · {selectedListing.bedrooms} BR
-              </ThemedText>
+      <View style={styles.sectionHeader}>
+        <Feather name="home" size={15} color="rgba(255,255,255,0.5)" />
+        <ThemedText style={styles.sectionTitle}>Link a Property</ThemedText>
+        <ThemedText style={styles.optional}>Optional</ThemedText>
+      </View>
+      <ThemedText style={styles.sectionHint}>
+        Pin a listing to the group so everyone can see the property details
+      </ThemedText>
+
+      {selectedListing ? (
+        <Pressable
+          style={styles.selectedListing}
+          onPress={() => setShowPropertySearch(true)}
+        >
+          {selectedListing.photos?.[0] ? (
+            <Image source={{ uri: selectedListing.photos[0] }} style={styles.selectedListingThumb} />
+          ) : (
+            <View style={[styles.selectedListingThumb, { backgroundColor: 'rgba(255,107,91,0.15)', alignItems: 'center', justifyContent: 'center' }]}>
+              <Feather name="home" size={20} color={ACCENT} />
             </View>
-            <Pressable
-              onPress={() => { setSelectedListing(null); setSelectedListingId(null); }}
-              hitSlop={8}
-              style={styles.clearListingBtn}
-            >
-              <Feather name="x" size={14} color="rgba(255,255,255,0.5)" />
-            </Pressable>
-          </Pressable>
-        ) : (
-          <Pressable
-            style={styles.searchTrigger}
-            onPress={() => setShowPropertySearch(true)}
-          >
-            <Feather name="search" size={17} color="rgba(255,255,255,0.35)" />
-            <ThemedText style={styles.searchTriggerText}>
-              Search for a listing to link...
+          )}
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <ThemedText style={styles.listingTitle} numberOfLines={1}>
+              {selectedListing.title}
             </ThemedText>
+            <ThemedText style={styles.listingAddress} numberOfLines={1}>
+              {selectedListing.address}, {selectedListing.city}
+            </ThemedText>
+            <ThemedText style={styles.listingPrice}>
+              ${selectedListing.rent?.toLocaleString()}/mo · {selectedListing.bedrooms} BR
+            </ThemedText>
+          </View>
+          <Pressable
+            onPress={() => { setSelectedListing(null); setSelectedListingId(null); }}
+            hitSlop={8}
+            style={styles.clearListingBtn}
+          >
+            <Feather name="x" size={14} color="rgba(255,255,255,0.5)" />
           </Pressable>
-        )}
-      </View>
+        </Pressable>
+      ) : (
+        <Pressable
+          style={styles.searchTrigger}
+          onPress={() => setShowPropertySearch(true)}
+        >
+          <View style={styles.searchIconWrap}>
+            <Feather name="search" size={16} color="rgba(255,255,255,0.5)" />
+          </View>
+          <ThemedText style={styles.searchTriggerText}>
+            Search for a listing to link...
+          </ThemedText>
+          <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.2)" />
+        </Pressable>
+      )}
 
-      <View style={[
-        styles.memberCapNote,
-        selectedListing?.bedrooms ? styles.memberCapNoteActive : styles.memberCapNoteDefault,
-      ]}>
-        <Feather
-          name="users"
-          size={14}
-          color={selectedListing?.bedrooms ? '#ff6b5b' : 'rgba(255,255,255,0.4)'}
-        />
-        <ThemedText style={[
-          styles.memberCapText,
-          { color: selectedListing?.bedrooms ? '#ff6b5b' : 'rgba(255,255,255,0.4)' },
-        ]}>
-          {selectedListing?.bedrooms
-            ? `Up to ${selectedListing.bedrooms + 1} members (${selectedListing.bedrooms} bedrooms + 1)`
-            : `Member limit: ${getMemberLimit((user as any)?.subscription?.plan || 'basic')} (no listing linked)`
-          }
-        </ThemedText>
+      <View style={styles.memberCapNote}>
+        <View style={[styles.memberCapIconWrap, selectedListing?.bedrooms ? styles.memberCapIconActive : null]}>
+          <Feather
+            name="users"
+            size={14}
+            color={selectedListing?.bedrooms ? ACCENT : 'rgba(255,255,255,0.4)'}
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <ThemedText style={[
+            styles.memberCapLabel,
+            { color: selectedListing?.bedrooms ? '#fff' : 'rgba(255,255,255,0.5)' },
+          ]}>
+            {selectedListing?.bedrooms
+              ? `Up to ${selectedListing.bedrooms + 1} members`
+              : `Up to ${memberLimit} members`
+            }
+          </ThemedText>
+          <ThemedText style={styles.memberCapSub}>
+            {selectedListing?.bedrooms
+              ? `Based on ${selectedListing.bedrooms} bedroom${selectedListing.bedrooms > 1 ? 's' : ''}`
+              : 'Link a listing to adjust the limit'
+            }
+          </ThemedText>
+        </View>
       </View>
 
       <Pressable
@@ -248,8 +317,21 @@ export const CreateGroupScreen = ({ navigation, route }: any) => {
       >
         {creating ? (
           <ActivityIndicator size="small" color="#fff" />
+        ) : canCreate ? (
+          <LinearGradient
+            colors={[ACCENT, '#ff8a7a']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.createButtonGradient}
+          >
+            <Feather name="plus-circle" size={18} color="#fff" />
+            <ThemedText style={styles.createButtonText}>Create Group</ThemedText>
+          </LinearGradient>
         ) : (
-          <ThemedText style={styles.createButtonText}>Create Group</ThemedText>
+          <View style={styles.createButtonGradient}>
+            <Feather name="plus-circle" size={18} color="rgba(255,255,255,0.3)" />
+            <ThemedText style={[styles.createButtonText, { color: 'rgba(255,255,255,0.3)' }]}>Create Group</ThemedText>
+          </View>
         )}
       </Pressable>
 
@@ -277,7 +359,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 58,
-    paddingBottom: 16,
+    paddingBottom: 12,
   },
   closeBtn: {
     width: 34,
@@ -298,56 +380,162 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  heroSection: {
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    paddingTop: 8,
+    paddingBottom: 28,
+  },
+  heroIconWrap: {
+    marginBottom: 14,
+  },
+  heroIconGradient: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.2)',
+  },
+  heroTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  heroSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.4)',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
   matchBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: 20,
-    marginBottom: 16,
+    marginBottom: 20,
     padding: 14,
     borderRadius: 14,
-    backgroundColor: 'rgba(255,107,91,0.1)',
+    backgroundColor: 'rgba(255,107,91,0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255,107,91,0.2)',
+    borderColor: 'rgba(255,107,91,0.15)',
   },
-  matchBannerText: {
-    color: '#ff6b5b',
+  matchAvatarPlaceholder: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,107,91,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  matchBannerTitle: {
+    color: '#fff',
     fontSize: 14,
     fontWeight: '600',
-    marginLeft: 10,
+  },
+  matchBannerSub: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 12,
+    marginTop: 1,
   },
   field: {
     marginHorizontal: 20,
-    marginBottom: 16,
+    marginBottom: 14,
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: 'rgba(255,255,255,0.03)',
     borderColor: 'rgba(255,255,255,0.08)',
+  },
+  fieldFocused: {
+    borderColor: 'rgba(255,107,91,0.35)',
+    backgroundColor: 'rgba(255,107,91,0.03)',
+  },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    gap: 6,
+  },
+  labelIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   label: {
     fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 1,
+    fontWeight: '700',
+    letterSpacing: 0.8,
     color: 'rgba(255,255,255,0.4)',
-    marginBottom: 10,
+    flex: 1,
   },
-  fieldHint: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.3)',
-    marginBottom: 12,
-    lineHeight: 17,
+  required: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: ACCENT,
+    letterSpacing: 0.3,
+  },
+  optional: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.2)',
+    letterSpacing: 0.3,
   },
   input: {
     fontSize: 16,
     color: '#fff',
+    lineHeight: 22,
+  },
+  inputFooter: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 8,
+  },
+  charCount: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.15)',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    marginHorizontal: 20,
+    marginTop: 6,
+    marginBottom: 20,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 6,
+    gap: 8,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+    flex: 1,
+  },
+  sectionHint: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.3)',
+    paddingHorizontal: 20,
+    marginBottom: 14,
+    lineHeight: 18,
   },
   selectedListing: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 10,
-    borderRadius: 12,
+    marginHorizontal: 20,
+    padding: 12,
+    borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: '#ff6b5b',
+    borderColor: ACCENT,
     backgroundColor: 'rgba(255,107,91,0.06)',
   },
   selectedListingThumb: {
@@ -368,7 +556,7 @@ const styles = StyleSheet.create({
   listingPrice: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#ff6b5b',
+    color: ACCENT,
     marginTop: 3,
   },
   clearListingBtn: {
@@ -383,55 +571,76 @@ const styles = StyleSheet.create({
   searchTrigger: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    marginHorizontal: 20,
     borderRadius: 14,
-    borderWidth: 1.5,
-    borderStyle: 'dashed' as any,
-    borderColor: 'rgba(255,255,255,0.15)',
-    backgroundColor: '#1a1a1a',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+  },
+  searchIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   searchTriggerText: {
-    marginLeft: 10,
-    color: 'rgba(255,255,255,0.35)',
+    flex: 1,
+    marginLeft: 12,
+    color: 'rgba(255,255,255,0.3)',
     fontSize: 14,
   },
   memberCapNote: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
     marginHorizontal: 20,
-    marginBottom: 8,
-  },
-  memberCapNoteActive: {
-    backgroundColor: 'rgba(255,107,91,0.08)',
-    borderColor: 'rgba(255,107,91,0.2)',
-    borderWidth: 1,
+    marginTop: 14,
+    padding: 12,
     borderRadius: 12,
-  },
-  memberCapNoteDefault: {
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.03)',
     borderWidth: 1,
-    borderRadius: 12,
+    borderColor: 'rgba(255,255,255,0.06)',
+    gap: 10,
   },
-  memberCapText: {
-    fontSize: 13,
-    fontWeight: '500',
-    marginLeft: 8,
-    flex: 1,
-  },
-  createButton: {
-    backgroundColor: '#ff6b5b',
-    borderRadius: 28,
-    paddingVertical: 16,
-    marginHorizontal: 20,
-    marginTop: 32,
+  memberCapIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.06)',
     alignItems: 'center',
     justifyContent: 'center',
   },
+  memberCapIconActive: {
+    backgroundColor: 'rgba(255,107,91,0.12)',
+  },
+  memberCapLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  memberCapSub: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.25)',
+    marginTop: 1,
+  },
+  createButton: {
+    marginHorizontal: 20,
+    marginTop: 32,
+    borderRadius: 28,
+    overflow: 'hidden',
+  },
   createButtonDisabled: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 28,
+  },
+  createButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 8,
   },
   createButtonText: {
     color: '#fff',
