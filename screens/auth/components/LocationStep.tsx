@@ -195,27 +195,52 @@ export const LocationStep: React.FC<LocationStepProps> = ({
     }
 
     const trimmed = query.trim();
-    const parts = trimmed.split(',').map(s => s.trim());
 
-    if (parts.length >= 2 && parts[0].length >= 2 && parts[1].length >= 2) {
+    const parts = trimmed.split(',').map(s => s.trim());
+    if (parts.length >= 2 && parts[0].length >= 2 && parts[1].length >= 1) {
       onLocationSelect({
         city: parts[0],
         state: parts[1],
         lat: 0,
         lng: 0,
       });
-    } else if (/^\d{5}$/.test(trimmed)) {
+      return;
+    }
+
+    if (error && trimmed.length >= 2) {
+      onLocationSelect({
+        city: trimmed,
+        state: '',
+        lat: 0,
+        lng: 0,
+      });
+      return;
+    }
+
+    if (/^\d{5}$/.test(trimmed)) {
+      if (error) {
+        onLocationSelect({
+          city: trimmed,
+          state: '',
+          lat: 0,
+          lng: 0,
+        });
+      } else {
+        Alert.alert(
+          'Select from results',
+          'Please wait for search results to appear and select your location, or enter your city and state (e.g. "Brooklyn, NY").'
+        );
+      }
+      return;
+    }
+
+    if (trimmed.length < 2) {
+      Alert.alert('Enter a location', 'Please type a city, neighborhood, or ZIP code.');
+    } else {
       Alert.alert(
-        'Select from results',
-        'Please wait for search results to appear and select your location, or enter your city and state (e.g. "Brooklyn, NY").'
-      );
-    } else if (trimmed.length >= 2) {
-      Alert.alert(
-        'Enter city and state',
+        'Add your state',
         'Please enter your location as "City, State" (e.g. "Brooklyn, NY") or select from search results.'
       );
-    } else {
-      Alert.alert('Enter a location', 'Please type a city, neighborhood, or ZIP code.');
     }
   };
 
@@ -335,6 +360,7 @@ const s = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 24,
     paddingTop: 8,
+    backgroundColor: '#111111',
   },
   headline: {
     fontSize: 26,
