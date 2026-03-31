@@ -1902,7 +1902,7 @@ export const mockProperties: Property[] = [
   },
   {
     id: '4',
-    title: 'Charming Studio - Roommate Needed',
+    title: 'Cozy Room in Bushwick Apartment',
     price: 700,
     bedrooms: 1,
     bathrooms: 1,
@@ -1914,7 +1914,7 @@ export const mockProperties: Property[] = [
     coordinates: getCoordinatesFromNeighborhood('Bushwick') || undefined,
     photos: ['https://picsum.photos/800/600?random=13'],
     amenities: ['Laundry', 'Pet Friendly'],
-    description: 'Cozy studio perfect for young professionals. Walk to public transit. Male roommate and female roommate already living there.',
+    description: 'Private room in a shared apartment, perfect for young professionals. Walk to public transit. Two roommates already living here.',
     available: true,
     hostId: 'host1',
     hostName: 'Marcus Thompson',
