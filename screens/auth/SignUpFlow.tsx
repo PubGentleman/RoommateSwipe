@@ -24,6 +24,7 @@ import { RhomeLogo } from '../../components/RhomeLogo';
 import * as ImagePicker from 'expo-image-picker';
 import { LocationStep } from './components/LocationStep';
 import { PreferencesStep } from './components/PreferencesStep';
+import OnboardingHeader from '../../components/OnboardingHeader';
 import { getStateNameFromCode } from '../../utils/locationData';
 import { saveReferralCode } from '../../services/affiliateService';
 
@@ -284,23 +285,6 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
   };
 
 
-  const progressIndex = Math.max(0, currentStep - 1);
-
-  const ProgressDots = () => (
-    <View style={styles.dotsRow}>
-      {Array.from({ length: totalProgressSteps }).map((_, i) => (
-        <View
-          key={i}
-          style={[
-            styles.dot,
-            i < progressIndex ? styles.dotComplete : null,
-            i === progressIndex ? styles.dotActive : null,
-          ]}
-        />
-      ))}
-    </View>
-  );
-
   const renderStep = () => {
     switch (currentStepId) {
       case 'accountType': return renderAccountType();
@@ -368,11 +352,12 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
     };
     return (
       <View style={styles.stepContainer}>
-        <View style={styles.stepTopBar}>
-          <View style={styles.topBarSpacer} />
-          <ProgressDots />
-          <View style={styles.topBarSpacer} />
-        </View>
+        <OnboardingHeader
+          showBack={currentStep > 0}
+          onBack={goBack}
+          step={currentStep}
+          totalSteps={totalProgressSteps}
+        />
         <ScrollView
           style={styles.scrollArea}
           contentContainerStyle={styles.scrollContent}
@@ -517,11 +502,12 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
 
   const renderLocation = () => (
     <View style={styles.stepContainer}>
-      <View style={styles.stepTopBar}>
-        <View style={styles.topBarSpacer} />
-        <ProgressDots />
-        <View style={styles.topBarSpacer} />
-      </View>
+      <OnboardingHeader
+        showBack={currentStep > 0}
+        onBack={goBack}
+        step={currentStep}
+        totalSteps={totalProgressSteps}
+      />
       <LocationStep
         accountType={state.accountType!}
         onLocationSelect={handleLocationSelect}
@@ -618,11 +604,12 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
 
     return (
       <View style={styles.stepContainer}>
-        <View style={styles.stepTopBar}>
-          <View style={styles.topBarSpacer} />
-          <ProgressDots />
-          <View style={styles.topBarSpacer} />
-        </View>
+        <OnboardingHeader
+          showBack={currentStep > 0}
+          onBack={goBack}
+          step={currentStep}
+          totalSteps={totalProgressSteps}
+        />
         {state.accountType === 'renter' ? (
           <PreferencesStep onSubmit={handlePreferencesSubmit} />
         ) : (
@@ -663,11 +650,17 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
 
   const renderPhoto = () => (
     <View style={styles.stepContainer}>
-      <View style={styles.stepTopBar}>
-        <View style={styles.topBarSpacer} />
-        <ProgressDots />
-        <View style={styles.topBarSpacer} />
-      </View>
+      <OnboardingHeader
+        showBack={currentStep > 0}
+        onBack={goBack}
+        step={currentStep}
+        totalSteps={totalProgressSteps}
+        rightAction={
+          <Pressable onPress={goForward} hitSlop={8}>
+            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 15 }}>Skip</Text>
+          </Pressable>
+        }
+      />
       <View style={styles.stepContent}>
         <Text style={styles.headline}>Add a photo</Text>
         <Text style={styles.subheadline}>Help others recognize you</Text>
@@ -703,11 +696,11 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
     };
     return (
       <View style={styles.stepContainer}>
-        <View style={styles.stepTopBar}>
-          <View style={styles.topBarSpacer} />
-          <ProgressDots />
-          <View style={styles.topBarSpacer} />
-        </View>
+        <OnboardingHeader
+          showBack={false}
+          step={currentStep}
+          totalSteps={totalProgressSteps}
+        />
         <View style={[styles.stepContent, styles.stepContentCenter]}>
           <View style={styles.checkCircle}>
             <Feather name="check" size={48} color="#22C55E" />
@@ -781,13 +774,6 @@ const styles = StyleSheet.create({
   stepContainer: {
     flex: 1,
   },
-  stepTopBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
   stepHeader: {
     alignItems: 'center',
     paddingTop: 24,
@@ -812,30 +798,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 24,
     paddingBottom: 32,
-  },
-  topBarSpacer: {
-    width: 40,
-    height: 40,
-  },
-  dotsRow: {
-    flexDirection: 'row',
-    gap: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-  },
-  dotComplete: {
-    backgroundColor: 'rgba(255,107,91,0.5)',
-  },
-  dotActive: {
-    backgroundColor: '#ff6b5b',
-    width: 20,
-    borderRadius: 4,
   },
   headline: {
     fontSize: 26,

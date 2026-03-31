@@ -9,6 +9,7 @@ import { useTheme } from '../../../hooks/useTheme';
 import { supabase } from '../../../lib/supabase';
 import { getNeighborhoodsByBorough, getNeighborhoodsForCity } from '../../../constants/neighborhoods';
 import { getRenterPreferenceAmenities } from '../../../constants/amenities';
+import OnboardingHeader from '../../../components/OnboardingHeader';
 
 const TOTAL_STEPS = 3;
 
@@ -321,11 +322,32 @@ export default function PlaceSeekerOnboardingScreen() {
     }
   };
 
+  const handleBack = async () => {
+    if (step > 1) {
+      setStep(s => s - 1);
+    } else {
+      if (user?.id) {
+        await supabase.from('users').update({ apartment_search_type: null }).eq('id', user.id);
+        await updateUser({ profileData: { ...user.profileData, apartment_search_type: undefined } });
+      }
+    }
+  };
+
   return (
-    <View style={[styles.container, { backgroundColor: theme.backgroundRoot, paddingTop: insets.top }]}>
-      <View style={styles.progressBar}>
-        <View style={[styles.progressFill, { width: `${(step / TOTAL_STEPS) * 100}%`, backgroundColor: theme.primary }]} />
-      </View>
+    <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+      <OnboardingHeader
+        showBack
+        onBack={handleBack}
+        step={step}
+        totalSteps={TOTAL_STEPS}
+        rightAction={
+          step === 1 ? (
+            <Pressable onPress={handleSkip} disabled={loading} hitSlop={8}>
+              <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14 }}>Skip</Text>
+            </Pressable>
+          ) : undefined
+        }
+      />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {step === 1 ? renderStep1() : step === 2 ? renderStep2() : renderStep3()}
@@ -337,9 +359,7 @@ export default function PlaceSeekerOnboardingScreen() {
             <Text style={[styles.backButtonText, { color: theme.textSecondary }]}>Back</Text>
           </Pressable>
         ) : (
-          <Pressable style={styles.skipButton} onPress={handleSkip} disabled={loading}>
-            <Text style={[styles.skipButtonText, { color: theme.textTertiary }]}>Skip for now</Text>
-          </Pressable>
+          <View style={{ width: 80 }} />
         )}
 
         <Pressable
@@ -369,14 +389,6 @@ export default function PlaceSeekerOnboardingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  progressBar: {
-    height: 3,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 2,
   },
   scrollContent: {
     padding: 24,
@@ -477,14 +489,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   backButtonText: {
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  skipButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-  },
-  skipButtonText: {
     fontSize: 15,
     fontWeight: '500',
   },
