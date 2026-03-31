@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../contexts/AuthContext';
@@ -41,6 +42,8 @@ interface SignUpState {
   locationState: string;
   locationBorough: string;
   locationNeighborhood: string;
+  locationLat: number;
+  locationLng: number;
   licenseNumber: string;
   agencyName: string;
   companyName: string;
@@ -87,6 +90,8 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
     locationState: '',
     locationBorough: '',
     locationNeighborhood: '',
+    locationLat: 0,
+    locationLng: 0,
     licenseNumber: '',
     agencyName: '',
     companyName: '',
@@ -216,12 +221,22 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
   };
 
   const handleLocationSelect = (location: { state: string; city: string; borough?: string; neighborhood?: string; lat?: number; lng?: number }) => {
-    const displayCity = `${location.city}, ${location.state}`;
+    const city = location.city || '';
+    const stateVal = location.state || '';
+    const displayCity = stateVal ? `${city}, ${stateVal}` : city;
+
+    if (!city.trim()) {
+      Alert.alert('Location required', 'Please enter a valid city or neighborhood.');
+      return;
+    }
+
     updateState({
       city: displayCity,
-      locationState: location.state,
+      locationState: stateVal,
       locationBorough: location.borough || '',
       locationNeighborhood: location.neighborhood || '',
+      locationLat: location.lat || 0,
+      locationLng: location.lng || 0,
     });
     setTimeout(goForward, 150);
   };

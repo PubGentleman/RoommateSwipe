@@ -1,13 +1,14 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
   TextInput,
-  FlatList,
   Pressable,
   StyleSheet,
   ActivityIndicator,
   Platform,
+  Keyboard,
+  Alert,
 } from 'react-native';
 import { Feather } from '../../../components/VectorIcons';
 
@@ -26,12 +27,19 @@ interface LocationStepProps {
 }
 
 interface Prediction {
-  place_id: string;
+  placeId: string;
+  mainText: string;
+  secondaryText: string;
   description: string;
-  structured_formatting: {
-    main_text: string;
-    secondary_text: string;
-  };
+}
+
+interface SelectedLocation {
+  city: string;
+  state: string;
+  neighborhood: string;
+  borough?: string;
+  lat: number;
+  lng: number;
 }
 
 const GOOGLE_PLACES_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
@@ -43,8 +51,17 @@ export const LocationStep: React.FC<LocationStepProps> = ({
   const [query, setQuery] = useState('');
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedPlace, setSelectedPlace] = useState<string | null>(null);
+  const [selected, setSelected] = useState<SelectedLocation | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const inputRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    if (!GOOGLE_PLACES_KEY) {
+      console.warn('EXPO_PUBLIC_GOOGLE_MAPS_API_KEY is not set.');
+      setError('Location search is temporarily unavailable. You can type your city and continue.');
+    }
+  }, []);
 
   const headlines: Record<AccountType, string> = {
     renter: 'Where are you looking?',
@@ -54,24 +71,38 @@ export const LocationStep: React.FC<LocationStepProps> = ({
   };
 
   const fetchPredictions = useCallback(async (text: string) => {
-    if (text.length < 3 || !GOOGLE_PLACES_KEY) {
+    if (text.length < 2 || !GOOGLE_PLACES_KEY) {
       setPredictions([]);
       return;
     }
 
     setLoading(true);
+    setError(null);
+
     try {
-      const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(text)}&types=(regions)&components=country:us&key=${GOOGLE_PLACES_KEY}`;
+      const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(text)}&types=geocode&components=country:us&key=${GOOGLE_PLACES_KEY}`;
       const response = await fetch(url);
       const data = await response.json();
 
-      if (data.status === 'OK') {
-        setPredictions(data.predictions || []);
+      if (data.status === 'OK' && data.predictions) {
+        setPredictions(
+          data.predictions.slice(0, 5).map((p: any) => ({
+            placeId: p.place_id,
+            mainText: p.structured_formatting?.main_text || p.description?.split(',')[0] || '',
+            secondaryText: p.structured_formatting?.secondary_text || '',
+            description: p.description || '',
+          }))
+        );
+      } else if (data.status === 'REQUEST_DENIED') {
+        console.error('Google Places API denied:', data.error_message);
+        setError('Location search unavailable. Type your city and tap Next.');
+        setPredictions([]);
       } else {
         setPredictions([]);
       }
-    } catch (error) {
-      console.error('Places autocomplete error:', error);
+    } catch (err) {
+      console.error('Location search error:', err);
+      setError('Search failed. Type your city and tap Next.');
       setPredictions([]);
     } finally {
       setLoading(false);
@@ -80,19 +111,20 @@ export const LocationStep: React.FC<LocationStepProps> = ({
 
   const handleTextChange = (text: string) => {
     setQuery(text);
-    if (selectedPlace) setSelectedPlace(null);
+    setSelected(null);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => fetchPredictions(text), 300);
   };
 
   const handleSelect = async (prediction: Prediction) => {
-    setPredictions([]);
+    Keyboard.dismiss();
     setQuery(prediction.description);
-    setSelectedPlace(prediction.description);
+    setPredictions([]);
     setLoading(true);
+    setError(null);
 
     try {
-      const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${prediction.place_id}&fields=address_components,geometry&key=${GOOGLE_PLACES_KEY}`;
+      const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${prediction.placeId}&fields=address_components,geometry&key=${GOOGLE_PLACES_KEY}`;
       const response = await fetch(url);
       const data = await response.json();
 
@@ -116,28 +148,73 @@ export const LocationStep: React.FC<LocationStepProps> = ({
         }
 
         if (!neighborhood && borough) neighborhood = borough;
+        if (!city && borough) city = borough;
+        if (!city) city = prediction.mainText;
 
-        onLocationSelect({
+        setSelected({
+          city,
           state: stateCode,
-          city: city || prediction.structured_formatting.main_text,
-          borough: borough || undefined,
-          neighborhood: neighborhood || undefined,
-          lat: geo?.lat,
-          lng: geo?.lng,
+          neighborhood,
+          borough,
+          lat: geo?.lat || 0,
+          lng: geo?.lng || 0,
+        });
+      } else {
+        setSelected({
+          city: prediction.mainText,
+          state: prediction.secondaryText.replace(/, USA$/i, '').trim(),
+          neighborhood: '',
+          lat: 0,
+          lng: 0,
         });
       }
-    } catch (error) {
-      console.error('Place details error:', error);
+    } catch (err) {
+      console.error('Place details error:', err);
+      setSelected({
+        city: prediction.mainText,
+        state: prediction.secondaryText.replace(/, USA$/i, '').trim(),
+        neighborhood: '',
+        lat: 0,
+        lng: 0,
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleClear = () => {
-    setSelectedPlace(null);
-    setQuery('');
-    setPredictions([]);
+  const handleNext = () => {
+    if (selected) {
+      onLocationSelect({
+        city: selected.city,
+        state: selected.state,
+        neighborhood: selected.neighborhood || undefined,
+        borough: selected.borough || undefined,
+        lat: selected.lat,
+        lng: selected.lng,
+      });
+    } else if (query.trim().length >= 2) {
+      const parts = query.trim().split(',').map(s => s.trim());
+      const city = parts[0] || query.trim();
+      const state = parts[1] || '';
+      onLocationSelect({ city, state, lat: 0, lng: 0 });
+    } else {
+      Alert.alert('Enter a location', 'Please type a city, neighborhood, or ZIP code.');
+    }
   };
+
+  const handleClear = () => {
+    setQuery('');
+    setSelected(null);
+    setPredictions([]);
+    setError(null);
+    inputRef.current?.focus();
+  };
+
+  const selectedDisplay = selected
+    ? selected.neighborhood
+      ? `${selected.neighborhood}, ${selected.city}, ${selected.state}`
+      : `${selected.city}${selected.state ? `, ${selected.state}` : ''}`
+    : '';
 
   return (
     <View style={s.container}>
@@ -149,17 +226,19 @@ export const LocationStep: React.FC<LocationStepProps> = ({
       <View style={s.autocompleteWrap}>
         <View style={s.inputContainer}>
           <TextInput
+            ref={inputRef}
             style={s.input}
             value={query}
             onChangeText={handleTextChange}
-            placeholder="Search city, neighborhood, or ZIP..."
+            placeholder="e.g. Brooklyn, NY or 11222"
             placeholderTextColor="rgba(255,255,255,0.35)"
             returnKeyType="search"
-            autoFocus={!selectedPlace}
+            autoCorrect={false}
+            autoFocus
           />
           {loading ? (
             <ActivityIndicator style={s.inputIcon} color="#ff6b5b" size="small" />
-          ) : query.length > 0 && !selectedPlace ? (
+          ) : query.length > 0 ? (
             <Pressable onPress={handleClear} hitSlop={8} style={s.inputIcon}>
               <Feather name="x" size={16} color="rgba(255,255,255,0.4)" />
             </Pressable>
@@ -167,43 +246,54 @@ export const LocationStep: React.FC<LocationStepProps> = ({
         </View>
 
         {predictions.length > 0 ? (
-          <FlatList
-            data={predictions}
-            keyExtractor={item => item.place_id}
-            style={s.listView}
-            keyboardShouldPersistTaps="handled"
-            renderItem={({ item }) => (
-              <Pressable style={s.row} onPress={() => handleSelect(item)}>
-                <Text style={s.mainText}>
-                  {item.structured_formatting.main_text}
-                </Text>
-                <Text style={s.secondaryText}>
-                  {item.structured_formatting.secondary_text}
-                </Text>
+          <View style={s.listView}>
+            {predictions.map(item => (
+              <Pressable
+                key={item.placeId}
+                style={s.row}
+                onPress={() => handleSelect(item)}
+              >
+                <Text style={s.mainText}>{item.mainText}</Text>
+                <Text style={s.secondaryText}>{item.secondaryText}</Text>
               </Pressable>
-            )}
-          />
+            ))}
+          </View>
         ) : null}
       </View>
 
-      {selectedPlace ? (
+      {error ? (
+        <Text style={s.errorText}>{error}</Text>
+      ) : null}
+
+      {selected ? (
         <View style={s.selectedCard}>
           <View style={s.selectedInfo}>
             <Feather name="map-pin" size={18} color="#ff6b5b" />
-            <Text style={s.selectedText}>{selectedPlace}</Text>
+            <Text style={s.selectedText}>{selectedDisplay}</Text>
           </View>
           <Pressable onPress={handleClear} hitSlop={8}>
             <Feather name="x" size={18} color="rgba(255,255,255,0.4)" />
           </Pressable>
         </View>
-      ) : (
+      ) : !error ? (
         <View style={s.hintContainer}>
           <Feather name="info" size={14} color="rgba(255,255,255,0.3)" />
           <Text style={s.hintText}>
-            Type at least 3 characters to see suggestions
+            Type at least 2 characters to see suggestions
           </Text>
         </View>
-      )}
+      ) : null}
+
+      <Pressable
+        style={[
+          s.nextButton,
+          (query.length < 2 && !selected) ? s.nextButtonDisabled : null,
+        ]}
+        onPress={handleNext}
+        disabled={query.length < 2 && !selected}
+      >
+        <Text style={s.nextButtonText}>Next</Text>
+      </Pressable>
     </View>
   );
 };
@@ -257,6 +347,7 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
     maxHeight: 300,
+    overflow: 'hidden',
     ...(Platform.OS === 'web' ? { zIndex: 1000 } : {}),
   },
   row: {
@@ -274,6 +365,12 @@ const s = StyleSheet.create({
     color: 'rgba(255,255,255,0.45)',
     fontSize: 13,
     marginTop: 2,
+  },
+  errorText: {
+    fontSize: 13,
+    color: '#F59E0B',
+    marginTop: 10,
+    textAlign: 'center',
   },
   selectedCard: {
     flexDirection: 'row',
@@ -296,7 +393,7 @@ const s = StyleSheet.create({
   selectedText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#ff6b5b',
     flex: 1,
   },
   hintContainer: {
@@ -309,5 +406,20 @@ const s = StyleSheet.create({
   hintText: {
     fontSize: 13,
     color: 'rgba(255,255,255,0.3)',
+  },
+  nextButton: {
+    backgroundColor: '#ff6b5b',
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 24,
+  },
+  nextButtonDisabled: {
+    opacity: 0.4,
+  },
+  nextButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });
