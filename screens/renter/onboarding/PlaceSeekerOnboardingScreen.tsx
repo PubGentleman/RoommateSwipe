@@ -373,6 +373,19 @@ export default function PlaceSeekerOnboardingScreen() {
     );
   };
 
+  const convertTimelineToDate = (timeline: string | null): string | null => {
+    if (!timeline) return null;
+    const now = new Date();
+    switch (timeline) {
+      case 'asap': return now.toISOString().split('T')[0];
+      case '1_month': return new Date(now.getTime() + 30 * 86400000).toISOString().split('T')[0];
+      case '2_months': return new Date(now.getTime() + 60 * 86400000).toISOString().split('T')[0];
+      case '3_months': return new Date(now.getTime() + 90 * 86400000).toISOString().split('T')[0];
+      case 'flexible': return null;
+      default: return null;
+    }
+  };
+
   const handleComplete = async () => {
     if (!user) return;
     setLoading(true);
@@ -391,6 +404,9 @@ export default function PlaceSeekerOnboardingScreen() {
 
       if (error) throw error;
 
+      const roomTypeVal = roomTypes.join(',') || (listingPref === 'entire_apartment' ? 'apartment' : listingPref === 'room' ? 'private' : undefined);
+      const lookingForVal = roomTypes.includes('apartment') ? 'entire_apartment' : (roomTypes.length > 0 ? 'room' : (listingPref === 'entire_apartment' ? 'entire_apartment' : listingPref === 'room' ? 'room' : undefined));
+
       await updateUser({
         typeOnboardingComplete: true,
         preferredNeighborhoods: selectedNeighborhoods,
@@ -403,10 +419,40 @@ export default function PlaceSeekerOnboardingScreen() {
           budget: budgetMax,
           budgetMin: budgetMin,
           budgetMax: budgetMax,
-          roomType: roomTypes.join(',') || (listingPref === 'entire_apartment' ? 'apartment' : listingPref === 'room' ? 'private' : undefined),
-          lookingFor: roomTypes.includes('apartment') ? 'entire_apartment' : (roomTypes.length > 0 ? 'room' : (listingPref === 'entire_apartment' ? 'entire_apartment' : listingPref === 'room' ? 'room' : undefined)),
+          roomType: roomTypeVal,
+          lookingFor: lookingForVal,
         },
       });
+
+      try {
+        await supabase
+          .from('profiles')
+          .upsert({
+            user_id: user.id,
+            budget_min: budgetMin,
+            budget_max: budgetMax,
+            preferred_neighborhoods: selectedNeighborhoods,
+            desired_bedrooms: bedrooms,
+            amenity_must_haves: selectedAmenities,
+            room_type: roomTypeVal || null,
+            move_in_date: convertTimelineToDate(moveInDate),
+          }, { onConflict: 'user_id' });
+      } catch (syncErr) {
+        console.warn('Profiles sync failed:', syncErr);
+      }
+
+      try {
+        await supabase.from('user_ai_memory').upsert({
+          user_id: user.id,
+          budget_stated: budgetMax,
+          move_in_timeline: moveInDate || 'flexible',
+          must_haves: selectedAmenities,
+          preferred_neighborhoods: selectedNeighborhoods,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' });
+      } catch (memErr) {
+        console.warn('AI memory sync failed:', memErr);
+      }
     } catch (err) {
       console.error('Error saving place seeker preferences:', err);
     } finally {

@@ -347,12 +347,19 @@ export default function RoommateOnboardingScreen() {
       if (userError) throw userError;
 
       const profileFields: Record<string, any> = {};
+      if (budgetMin) profileFields.budget_min = budgetMin;
+      if (budgetMax) profileFields.budget_max = budgetMax;
       if (sleepSchedule) profileFields.sleep_schedule = sleepSchedule;
       if (cleanliness) profileFields.cleanliness = mapCleanlinessToInt(cleanliness);
       if (noiseTolerance) profileFields.noise_tolerance = mapNoiseToInt(noiseTolerance);
       if (idealRoommate.trim()) profileFields.ideal_roommate_text = idealRoommate.trim();
-      if (dealbreakers.length > 0) profileFields.smoking = dealbreakers.includes('smoking') ? 'no' : undefined;
+      if (dealbreakers.length > 0) {
+        profileFields.smoking = dealbreakers.includes('smoking') ? 'no' : undefined;
+        profileFields.dealbreakers = dealbreakers;
+      }
       if (dealbreakers.includes('pets')) profileFields.pets = 'no_pets';
+      const roomTypeVal = roomTypes.join(',') || (listingPref === 'entire_apartment' ? 'apartment' : listingPref === 'room' ? 'private' : undefined);
+      if (roomTypeVal) profileFields.room_type = roomTypeVal;
 
       if (Object.keys(profileFields).length > 0) {
         const cleanFields = Object.fromEntries(
@@ -360,8 +367,7 @@ export default function RoommateOnboardingScreen() {
         );
         const { error: profileError } = await supabase
           .from('profiles')
-          .update(cleanFields)
-          .eq('user_id', user.id);
+          .upsert({ user_id: user.id, ...cleanFields }, { onConflict: 'user_id' });
 
         if (profileError) {
           console.error('Error saving profile preferences:', profileError);
@@ -395,6 +401,16 @@ export default function RoommateOnboardingScreen() {
       }
 
       await updateUser(userUpdates);
+
+      try {
+        await supabase.from('user_ai_memory').upsert({
+          user_id: user.id,
+          dealbreakers: dealbreakers,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' });
+      } catch (memErr) {
+        console.warn('AI memory sync failed:', memErr);
+      }
     } catch (err) {
       console.error('Error saving roommate preferences:', err);
     } finally {

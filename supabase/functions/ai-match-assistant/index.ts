@@ -217,7 +217,15 @@ async function getUsageCount(supabase: any, userId: string): Promise<number> {
 async function getUserProfile(supabase: any, userId: string) {
   const { data: userData } = await supabase
     .from('users')
-    .select('full_name, age, occupation, bio, city, neighborhood, zodiac_sign')
+    .select(`
+      full_name, age, occupation, bio, city, neighborhood, zodiac_sign,
+      apartment_search_type,
+      preferred_neighborhoods,
+      nice_to_have_amenities,
+      amenity_preferences,
+      move_in_timeline,
+      preferred_bedrooms
+    `)
     .eq('id', userId)
     .single();
 
@@ -231,10 +239,17 @@ async function getUserProfile(supabase: any, userId: string) {
       room_type, desired_bedrooms,
       budget_per_person_max, preferred_trains,
       amenity_must_haves, apartment_prefs_complete,
-      profile_note
+      profile_note,
+      ideal_roommate_text,
+      dealbreakers,
+      preferred_neighborhoods
     `)
     .eq('user_id', userId)
     .single();
+
+  const neighborhoods = profileData?.preferred_neighborhoods?.length
+    ? profileData.preferred_neighborhoods
+    : userData?.preferred_neighborhoods || [];
 
   return {
     name: userData?.full_name,
@@ -244,6 +259,12 @@ async function getUserProfile(supabase: any, userId: string) {
     city: userData?.city,
     neighborhood: userData?.neighborhood,
     zodiac_sign: userData?.zodiac_sign,
+    apartment_search_type: userData?.apartment_search_type,
+    preferred_neighborhoods: neighborhoods,
+    nice_to_have_amenities: userData?.nice_to_have_amenities || [],
+    amenity_preferences: userData?.amenity_preferences || [],
+    move_in_timeline: userData?.move_in_timeline,
+    preferred_bedrooms: userData?.preferred_bedrooms || profileData?.desired_bedrooms,
     budget_min: profileData?.budget_min,
     budget_max: profileData?.budget_max,
     move_in_date: profileData?.move_in_date,
@@ -256,6 +277,8 @@ async function getUserProfile(supabase: any, userId: string) {
     pets: profileData?.pets,
     interests: profileData?.interests,
     profile_note: profileData?.profile_note,
+    ideal_roommate_text: profileData?.ideal_roommate_text,
+    dealbreakers: profileData?.dealbreakers || [],
     profile: profileData,
   };
 }
@@ -545,11 +568,19 @@ Name: ${profile.name ?? 'the user'}
 Age: ${profile.age ?? 'unknown'}, ${profile.occupation ?? 'unknown occupation'}
 Budget: $${profile.budget_min ?? '?'}-$${profile.budget_max ?? '?'}/mo
 Looking in: ${profile.neighborhood ?? profile.city ?? 'New York'}
-Move-in: ${profile.move_in_date ?? 'flexible'}
+Move-in: ${profile.move_in_date ?? profile.move_in_timeline ?? 'flexible'}
 Zodiac: ${profile.zodiac_sign ?? 'unknown'}
 Interests: ${profile.interests?.join(', ') ?? 'not set'}
 Pets: ${profile.pets ?? 'none'}
 Cleanliness: ${profile.cleanliness ?? '?'}/5, Sleep: ${profile.sleep_schedule ?? '?'}, Noise tolerance: ${profile.noise_tolerance ?? '?'}/5${profile.profile_note ? `\nIn their own words: "${profile.profile_note}"` : ''}
+${profile.apartment_search_type === 'with_roommates' ? 'Search type: Looking for a roommate' : profile.apartment_search_type === 'solo' ? 'Search type: Looking for an apartment (solo)' : profile.apartment_search_type === 'with_partner' ? 'Search type: Looking for an apartment (with partner)' : profile.apartment_search_type === 'have_group' ? 'Search type: Looking for an apartment (with group)' : ''}
+${profile.preferred_neighborhoods?.length ? `Preferred neighborhoods: ${profile.preferred_neighborhoods.join(', ')}` : ''}
+${profile.amenity_preferences?.length ? `Must-have amenities: ${profile.amenity_preferences.join(', ')}` : ''}
+${profile.nice_to_have_amenities?.length ? `Nice-to-have amenities: ${profile.nice_to_have_amenities.join(', ')}` : ''}
+${profile.preferred_bedrooms !== undefined && profile.preferred_bedrooms !== null ? `Bedrooms wanted: ${profile.preferred_bedrooms === 0 ? 'Studio' : profile.preferred_bedrooms}` : ''}
+${profile.dealbreakers?.length ? `Dealbreakers: ${profile.dealbreakers.join(', ')}` : ''}
+${profile.ideal_roommate_text ? `Ideal roommate description: "${profile.ideal_roommate_text}"` : ''}
+${profile.apartment_search_type && profile.apartment_search_type !== 'with_roommates' ? `\nThis user is looking for an APARTMENT (not a roommate). Focus on listing recommendations matching their budget, neighborhoods, and amenities. Provide neighborhood insights and price analysis. Do NOT ask roommate compatibility questions unless they specifically bring it up.` : profile.apartment_search_type === 'with_roommates' ? `\nThis user is looking for a ROOMMATE. Focus on personality compatibility, lifestyle matching, and living habit alignment.` : ''}
 
 THEIR TOP MATCHES RIGHT NOW: ${matchSummary}
 

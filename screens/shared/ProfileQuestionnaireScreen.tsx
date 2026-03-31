@@ -305,9 +305,7 @@ const ONBOARDING_STEPS_LITE: StepId[] = [
 const PLACE_SEEKER_STEPS: StepId[] = [
   'photos',
   'basicInfo',
-  'budgetLocation',
   'lifestyle',
-  'housing',
   'interests',
   'profileNote',
 ];
@@ -382,6 +380,8 @@ export const ProfileQuestionnaireScreen = () => {
     const pd = user.profileData || {};
     const prefs = pd.preferences || {};
     switch (stepName) {
+      case 'photos':
+        return (Array.isArray(user.photos) && user.photos.length > 0) || !!user.profile_picture;
       case 'budgetLocation':
         return !!((pd.budget || pd.budgetMin || pd.budgetMax) && (pd.city || user.city));
       case 'sleepCleanliness':
@@ -391,11 +391,13 @@ export const ProfileQuestionnaireScreen = () => {
       case 'dealbreakers':
         return Array.isArray(pd.dealbreakers) && pd.dealbreakers.length > 0;
       case 'housing':
-        return !!(prefs.moveInDate || user.moveInTimeline || pd.lookingFor);
+        return isPlaceSeekerUser || !!(prefs.moveInDate || user.moveInTimeline || pd.lookingFor);
       case 'roommateSetup':
         return !!(user.preferredBedrooms !== undefined && user.preferredBedrooms !== null);
       case 'idealRoommate':
         return !!((pd.ideal_roommate_text || user.ideal_roommate_text)?.trim()?.length >= 10);
+      case 'lifestyle':
+        return !!(prefs.workLocation && prefs.guestPolicy && prefs.noiseTolerance);
       default:
         return false;
     }
@@ -412,7 +414,12 @@ export const ProfileQuestionnaireScreen = () => {
     if (filteredSteps || isOnboarding) return null;
     return allStepsForType.filter(s => !shouldSkipStep(s));
   }, [allStepsForType, user]);
-  const stepsToShow = filteredSteps || autoFilteredSteps || (isLiteOnboarding ? ONBOARDING_STEPS_LITE : isOnboarding ? ONBOARDING_STEPS : allStepsForType);
+  const renterOnboarding = isOnboarding && user?.role === 'renter';
+  const baseOnboardingSteps = isLiteOnboarding ? ONBOARDING_STEPS_LITE : isOnboarding ? ONBOARDING_STEPS : allStepsForType;
+  const onboardingSteps = renterOnboarding
+    ? baseOnboardingSteps.filter(s => s !== 'budgetLocation' && s !== 'housing')
+    : baseOnboardingSteps;
+  const stepsToShow = filteredSteps || autoFilteredSteps || onboardingSteps;
   const [currentFilteredIndex, setCurrentFilteredIndex] = useState(0);
   const useFilteredMapping = isMissingMode || isOnboarding || isPlaceSeekerUser || !!autoFilteredSteps;
   const currentStep = useFilteredMapping
