@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,6 @@ import {
   Alert,
 } from 'react-native';
 import { Feather } from '../../../components/VectorIcons';
-import { supabase } from '../../../lib/supabase';
 
 type AccountType = 'renter' | 'individual' | 'agent' | 'company';
 
@@ -43,6 +42,13 @@ interface SelectedLocation {
   lng: number;
 }
 
+// ============================================================
+// HARDCODED VALUES — same as lib/supabase.ts
+// The anon key is safe to expose (public/anonymous access only)
+// ============================================================
+const SUPABASE_URL = 'https://lnjupgvvsbdooomvdjho.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuanVwZ3Z2c2Jkb29vbXZkamhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwOTEwODAsImV4cCI6MjA4ODY2NzA4MH0.XAGtYsRhSRRPe9yc3jqrO9viqgIZzvFGx_cd1D1y9BU';
+
 export const LocationStep: React.FC<LocationStepProps> = ({
   accountType,
   onLocationSelect,
@@ -53,6 +59,7 @@ export const LocationStep: React.FC<LocationStepProps> = ({
   const [searched, setSearched] = useState(false);
   const [selected, setSelected] = useState<SelectedLocation | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [searchFailed, setSearchFailed] = useState(false);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const inputRef = useRef<TextInput>(null);
 
@@ -74,13 +81,24 @@ export const LocationStep: React.FC<LocationStepProps> = ({
     setError(null);
 
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('places-proxy', {
-        body: { action: 'autocomplete', input: text },
-      });
+      const response = await fetch(
+        `${SUPABASE_URL}/functions/v1/places-proxy?action=autocomplete&input=${encodeURIComponent(text)}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
-      if (fnError) throw fnError;
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
 
       if (data.status === 'OK' && data.predictions) {
+        setSearchFailed(false);
         setPredictions(
           data.predictions.slice(0, 5).map((p: any) => ({
             placeId: p.place_id,
@@ -92,11 +110,16 @@ export const LocationStep: React.FC<LocationStepProps> = ({
       } else if (data.status === 'ZERO_RESULTS') {
         setPredictions([]);
       } else {
-        console.error('Places proxy error:', data.status, data.error_message);
+        // API returned but with an error (e.g. missing Google key)
+        console.warn('Places proxy error:', data.status, data.error_message);
+        setSearchFailed(true);
+        setError('Search unavailable. Type your city, state and tap Next.');
         setPredictions([]);
       }
-    } catch (err) {
-      console.error('Location search error:', err);
+    } catch (err: any) {
+      // Network error, 401, 404, etc.
+      console.warn('Location search error:', err?.message || err);
+      setSearchFailed(true);
       setError('Search unavailable. Type your city, state and tap Next.');
       setPredictions([]);
     } finally {
@@ -121,11 +144,17 @@ export const LocationStep: React.FC<LocationStepProps> = ({
     setError(null);
 
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('places-proxy', {
-        body: { action: 'details', place_id: prediction.placeId },
-      });
+      const response = await fetch(
+        `${SUPABASE_URL}/functions/v1/places-proxy?action=details&place_id=${encodeURIComponent(prediction.placeId)}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
-      if (fnError) throw fnError;
+      const data = await response.json();
 
       if (data.status === 'OK' && data.result) {
         const components = data.result.address_components || [];
@@ -168,7 +197,7 @@ export const LocationStep: React.FC<LocationStepProps> = ({
         });
       }
     } catch (err) {
-      console.error('Place details error:', err);
+      console.warn('Place details error:', err);
       setSelected({
         city: prediction.mainText,
         state: prediction.secondaryText.replace(/, USA$/i, '').trim(),
@@ -182,6 +211,7 @@ export const LocationStep: React.FC<LocationStepProps> = ({
   };
 
   const handleNext = () => {
+    // Option A: User selected from dropdown — best case
     if (selected) {
       onLocationSelect({
         city: selected.city,
@@ -196,6 +226,7 @@ export const LocationStep: React.FC<LocationStepProps> = ({
 
     const trimmed = query.trim();
 
+    // Option B: "City, State" format (e.g. "Brooklyn, NY")
     const parts = trimmed.split(',').map(s => s.trim());
     if (parts.length >= 2 && parts[0].length >= 2 && parts[1].length >= 1) {
       onLocationSelect({
@@ -207,7 +238,9 @@ export const LocationStep: React.FC<LocationStepProps> = ({
       return;
     }
 
-    if (error && trimmed.length >= 2) {
+    // Option C: Search is broken — accept any text 2+ chars
+    // Don't trap the user on this screen if the API is down
+    if (searchFailed && trimmed.length >= 2) {
       onLocationSelect({
         city: trimmed,
         state: '',
@@ -217,8 +250,9 @@ export const LocationStep: React.FC<LocationStepProps> = ({
       return;
     }
 
+    // Option D: ZIP code
     if (/^\d{5}$/.test(trimmed)) {
-      if (error) {
+      if (searchFailed) {
         onLocationSelect({
           city: trimmed,
           state: '',
@@ -228,18 +262,19 @@ export const LocationStep: React.FC<LocationStepProps> = ({
       } else {
         Alert.alert(
           'Select from results',
-          'Please wait for search results to appear and select your location, or enter your city and state (e.g. "Brooklyn, NY").'
+          'Please wait for search results and select your location, or type "City, State" (e.g. "Brooklyn, NY").'
         );
       }
       return;
     }
 
+    // Not enough input
     if (trimmed.length < 2) {
       Alert.alert('Enter a location', 'Please type a city, neighborhood, or ZIP code.');
     } else {
       Alert.alert(
         'Add your state',
-        'Please enter your location as "City, State" (e.g. "Brooklyn, NY") or select from search results.'
+        'Try entering as "City, State" (e.g. "Brooklyn, NY") for best results.'
       );
     }
   };
@@ -250,6 +285,7 @@ export const LocationStep: React.FC<LocationStepProps> = ({
     setPredictions([]);
     setError(null);
     setSearched(false);
+    setSearchFailed(false);
     inputRef.current?.focus();
   };
 
@@ -259,6 +295,7 @@ export const LocationStep: React.FC<LocationStepProps> = ({
       : `${selected.city}${selected.state ? `, ${selected.state}` : ''}`
     : '';
 
+  // Next button enabled if: something selected, OR 2+ chars typed
   const nextDisabled = !selected && query.trim().length < 2;
 
   return (
@@ -318,7 +355,7 @@ export const LocationStep: React.FC<LocationStepProps> = ({
       ) : null}
 
       {!loading && !error && searched && query.length >= 2 && predictions.length === 0 && !selected ? (
-        <Text style={s.hintText}>No results found. Try a different search.</Text>
+        <Text style={s.hintText}>No results found. Try a different search or type "City, State".</Text>
       ) : null}
 
       {!loading && !error && !searched && query.length > 0 && query.length < 2 ? (
@@ -390,10 +427,11 @@ const s = StyleSheet.create({
   },
   input: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 16,
     color: '#FFFFFF',
     paddingVertical: 14,
     height: 52,
+    ...(Platform.OS === 'web' ? { outlineStyle: 'none' as any } : {}),
   },
   inputIcon: {
     marginLeft: 8,
