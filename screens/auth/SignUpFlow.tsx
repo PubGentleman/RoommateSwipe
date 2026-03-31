@@ -14,6 +14,7 @@ import {
   KeyboardAvoidingView,
   ScrollView,
   Alert,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../contexts/AuthContext';
@@ -27,6 +28,7 @@ import { PreferencesStep } from './components/PreferencesStep';
 import OnboardingHeader from '../../components/OnboardingHeader';
 import { getStateNameFromCode } from '../../utils/locationData';
 import { saveReferralCode } from '../../services/affiliateService';
+import { isPersonalEmail } from '../../constants/blockedEmailDomains';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SWIPE_THRESHOLD = 80;
@@ -122,6 +124,7 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
   const [showPassword, setShowPassword] = useState(false);
   const [agentNotice, setAgentNotice] = useState(false);
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
+  const [personalEmailBlocked, setPersonalEmailBlocked] = useState(false);
 
   const slideAnim = useRef(new Animated.Value(0)).current;
   const dragAnim = useRef(new Animated.Value(0)).current;
@@ -213,13 +216,26 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
     }
   };
 
+  const handleContactSupport = () => {
+    const subject = encodeURIComponent('Agent/Company Account Verification Request');
+    const body = encodeURIComponent(
+      `Hi Rhome Support,\n\nI'd like to sign up as an agent/company but I don't have a company email.\n\nName: ${state.firstName} ${state.lastName}\nCompany/Brokerage: \nLicense Number: \nPhone: \nEmail I'd like to use: ${state.email}\n\nThank you!`
+    );
+    Linking.openURL(`mailto:hello@rhomeapp.io?subject=${subject}&body=${body}`);
+  };
+
   const handleCredentialsSubmit = async () => {
     setError('');
+    setPersonalEmailBlocked(false);
     if (!state.firstName.trim()) { setError('Please enter your first name'); return; }
     if (!state.lastName.trim()) { setError('Please enter your last name'); return; }
     if (state.accountType === 'company' && !state.companyName.trim()) { setError('Please enter your company name'); return; }
     if (!state.email.trim()) { setError('Please enter your email'); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.email.trim())) { setError('Please enter a valid email'); return; }
+    if ((state.accountType === 'agent' || state.accountType === 'company') && isPersonalEmail(state.email.trim())) {
+      setPersonalEmailBlocked(true);
+      return;
+    }
     if (!state.password || state.password.length < 6) { setError('Password must be at least 6 characters'); return; }
     goForward();
   };
@@ -469,35 +485,69 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
               <Text style={styles.errorText}>{error}</Text>
             </View>
           ) : null}
-          <Pressable onPress={handleCredentialsSubmit}>
-            <LinearGradient
-              colors={['#ff6b5b', '#e83a2a']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.continueBtn}
-            >
-              <Text style={styles.continueBtnText}>Continue</Text>
-              <Feather name="arrow-right" size={16} color="#FFFFFF" />
-            </LinearGradient>
-          </Pressable>
-          <View style={styles.orRow}>
-            <View style={styles.orLine} />
-            <Text style={styles.orText}>OR CONTINUE WITH</Text>
-            <View style={styles.orLine} />
-          </View>
-          <View style={styles.socialRow}>
-            <Pressable style={styles.socialBtn} onPress={() => showAlert({ title: 'Google Sign In', message: 'Google authentication will be available in a future update.', variant: 'info' })}>
-              <Feather name="globe" size={16} color="rgba(255,255,255,0.75)" />
-              <Text style={styles.socialBtnText}>Google</Text>
-            </Pressable>
-            <Pressable style={styles.socialBtn} onPress={() => showAlert({ title: 'Apple Sign In', message: 'Apple authentication will be available in a future update.', variant: 'info' })}>
-              <Feather name="smartphone" size={16} color="rgba(255,255,255,0.75)" />
-              <Text style={styles.socialBtnText}>Apple</Text>
-            </Pressable>
-          </View>
-          <Pressable onPress={onBackToLogin} hitSlop={8} style={styles.switchRowCenter}>
-            <Text style={styles.switchLink}>Already have an account? <Text style={styles.switchLinkBold}>Sign In</Text></Text>
-          </Pressable>
+          {personalEmailBlocked ? (
+            <View style={styles.blockedEmailCard}>
+              <View style={styles.blockedEmailIconWrap}>
+                <Feather name="briefcase" size={28} color="#ff6b5b" />
+              </View>
+              <Text style={styles.blockedEmailTitle}>Company Email Required</Text>
+              <Text style={styles.blockedEmailDesc}>
+                To sign up as {state.accountType === 'company' ? 'a company' : 'an agent'}, please use your business email address (e.g., name@yourbrokerage.com).
+              </Text>
+              <Text style={styles.blockedEmailSubtext}>
+                This helps us verify your identity and build trust with renters on the platform.
+              </Text>
+              <Pressable style={styles.blockedEmailSupportBtn} onPress={handleContactSupport}>
+                <Feather name="mail" size={16} color="#fff" />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.blockedEmailSupportTitle}>Contact Support</Text>
+                  <Text style={styles.blockedEmailSupportSub}>Don't have a company email? We can verify your account manually.</Text>
+                </View>
+              </Pressable>
+              <Pressable
+                style={styles.blockedEmailBackBtn}
+                onPress={() => {
+                  setPersonalEmailBlocked(false);
+                  updateState({ email: '' });
+                }}
+              >
+                <Feather name="arrow-left" size={14} color="rgba(255,255,255,0.5)" />
+                <Text style={styles.blockedEmailBackText}>Use a different email</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <>
+              <Pressable onPress={handleCredentialsSubmit}>
+                <LinearGradient
+                  colors={['#ff6b5b', '#e83a2a']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.continueBtn}
+                >
+                  <Text style={styles.continueBtnText}>Continue</Text>
+                  <Feather name="arrow-right" size={16} color="#FFFFFF" />
+                </LinearGradient>
+              </Pressable>
+              <View style={styles.orRow}>
+                <View style={styles.orLine} />
+                <Text style={styles.orText}>OR CONTINUE WITH</Text>
+                <View style={styles.orLine} />
+              </View>
+              <View style={styles.socialRow}>
+                <Pressable style={styles.socialBtn} onPress={() => showAlert({ title: 'Google Sign In', message: 'Google authentication will be available in a future update.', variant: 'info' })}>
+                  <Feather name="globe" size={16} color="rgba(255,255,255,0.75)" />
+                  <Text style={styles.socialBtnText}>Google</Text>
+                </Pressable>
+                <Pressable style={styles.socialBtn} onPress={() => showAlert({ title: 'Apple Sign In', message: 'Apple authentication will be available in a future update.', variant: 'info' })}>
+                  <Feather name="smartphone" size={16} color="rgba(255,255,255,0.75)" />
+                  <Text style={styles.socialBtnText}>Apple</Text>
+                </Pressable>
+              </View>
+              <Pressable onPress={onBackToLogin} hitSlop={8} style={styles.switchRowCenter}>
+                <Text style={styles.switchLink}>Already have an account? <Text style={styles.switchLinkBold}>Sign In</Text></Text>
+              </Pressable>
+            </>
+          )}
         </ScrollView>
       </View>
     );
@@ -1134,5 +1184,75 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: 'rgba(255,255,255,0.85)',
+  },
+  blockedEmailCard: {
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.2)',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  blockedEmailIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,107,91,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  blockedEmailTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  blockedEmailDesc: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.6)',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 6,
+  },
+  blockedEmailSubtext: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.4)',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 20,
+  },
+  blockedEmailSupportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#ff6b5b',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    width: '100%',
+    marginBottom: 12,
+  },
+  blockedEmailSupportTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  blockedEmailSupportSub: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.75)',
+    marginTop: 2,
+  },
+  blockedEmailBackBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+  },
+  blockedEmailBackText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.5)',
   },
 });

@@ -36,7 +36,7 @@ The application uses React Native, Expo, and TypeScript, with React Navigation f
 - **Pi Demand Intelligence:** Anonymous renter activity tracking feeds market context into Pi's listing advisor mode, aggregating neighborhood and listing demand.
 - **Contact Info Protection:** Platform-level contact info blurring in chat messages for free users, with auto-unlocking upon confirmed actions.
 - **Agent/Company Messaging Paywall:** Free-tier agents and companies have blurred message previews, with paid plans granting full access.
-- **Verification & Safety:** Instagram verification, multi-photo enforcement, chat leakage detection, background checks, identity verification, a References System, and Agent License Verification.
+- **Verification & Safety:** Instagram verification, multi-photo enforcement, chat leakage detection, background checks, identity verification, a References System, Agent License Verification, and **Agent/Company Email Domain Blocking** (personal emails blocked at signup with support contact flow; `blocked_email_domains` + `whitelisted_emails` tables, DB trigger on `auth.users`).
 - **Profile Pause ("I Found a Place"):** Renters can pause their search profiles.
 - **Activity Decay Ranking:** Inactive users' profiles progressively sink in discovery surfaces.
 - **Boost System:** A tier-based system to increase visibility for listings and profiles.
