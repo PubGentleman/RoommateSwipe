@@ -46,10 +46,18 @@ export async function getSwipeDeck(city?: string, filters?: {
 
   const { data: currentProfile } = await supabase
     .from('profiles')
-    .select('apartment_search_type')
+    .select('apartment_search_type, household_gender_preference')
     .eq('user_id', user.id)
     .single();
   const currentSearchType = currentProfile?.apartment_search_type;
+
+  const { data: currentUserData } = await supabase
+    .from('users')
+    .select('gender')
+    .eq('id', user.id)
+    .single();
+  const currentGender = currentUserData?.gender;
+  const genderPref = currentProfile?.household_gender_preference;
 
   let profiles = (data || []).filter(p => {
     if (p.profile?.search_paused === true) return false;
@@ -62,6 +70,31 @@ export async function getSwipeDeck(city?: string, filters?: {
 
   if (currentSearchType === 'solo' || currentSearchType === 'with_partner') {
     return [];
+  }
+
+  if (genderPref && genderPref !== 'any') {
+    profiles = profiles.filter(p => {
+      const candidateGender = p.gender;
+      if (!candidateGender) return true;
+      if (genderPref === 'female_only' && candidateGender !== 'female') return false;
+      if (genderPref === 'male_only' && candidateGender !== 'male') return false;
+      if (genderPref === 'same_gender' && currentGender && candidateGender !== currentGender) return false;
+      return true;
+    });
+  }
+
+  if (currentGender) {
+    profiles = profiles.filter(p => {
+      const candidatePref = p.profile?.household_gender_preference;
+      if (!candidatePref || candidatePref === 'any') return true;
+      if (candidatePref === 'female_only' && currentGender !== 'female') return false;
+      if (candidatePref === 'male_only' && currentGender !== 'male') return false;
+      if (candidatePref === 'same_gender') {
+        const candidateGender = p.gender;
+        if (candidateGender && candidateGender !== currentGender) return false;
+      }
+      return true;
+    });
   }
 
   if (filters?.budgetMin || filters?.budgetMax) {

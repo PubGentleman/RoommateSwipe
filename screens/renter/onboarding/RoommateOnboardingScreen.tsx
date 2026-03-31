@@ -10,7 +10,16 @@ import { supabase } from '../../../lib/supabase';
 import OnboardingHeader from '../../../components/OnboardingHeader';
 import { PricePickerPair } from '../../../components/PricePicker';
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 6;
+
+type GenderPref = 'any' | 'female_only' | 'male_only' | 'same_gender';
+
+const GENDER_PREF_OPTIONS: { value: GenderPref; icon: string; label: string; desc: string }[] = [
+  { value: 'any', icon: 'users', label: 'Anyone', desc: 'Open to all' },
+  { value: 'female_only', icon: 'user', label: 'Women only', desc: 'Female household' },
+  { value: 'male_only', icon: 'user', label: 'Men only', desc: 'Male household' },
+  { value: 'same_gender', icon: 'repeat', label: 'Same gender', desc: 'Match my gender' },
+];
 
 const ROOM_TYPES = [
   { id: 'private', icon: 'lock' as const, label: 'Private Room', desc: 'Your own space with shared common areas' },
@@ -71,6 +80,7 @@ export default function RoommateOnboardingScreen() {
     listingPref === 'room' ? ['private'] : []
   );
   const [maxRoommates, setMaxRoommates] = useState(2);
+  const [genderPreference, setGenderPreference] = useState<GenderPref | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -329,6 +339,45 @@ export default function RoommateOnboardingScreen() {
     </View>
   );
 
+  const renderGenderPrefStep = () => (
+    <View>
+      <Text style={[styles.stepTitle, { color: theme.text }]}>Who are you comfortable living with?</Text>
+      <Text style={[styles.stepSubtitle, { color: theme.textSecondary }]}>
+        This helps us find roommates you'll feel at home with
+      </Text>
+
+      <View style={{ gap: 10 }}>
+        {GENDER_PREF_OPTIONS.map(opt => {
+          const isActive = genderPreference === opt.value;
+          return (
+            <Pressable
+              key={opt.value}
+              style={[
+                styles.roomCard,
+                { borderColor: isActive ? theme.primary : 'rgba(255,255,255,0.15)' },
+                isActive && { backgroundColor: `${theme.primary}15` },
+              ]}
+              onPress={() => setGenderPreference(opt.value)}
+            >
+              <View style={[styles.roomIconWrap, isActive && { backgroundColor: `${theme.primary}20` }]}>
+                <Feather name={opt.icon as any} size={20} color={isActive ? theme.primary : theme.textSecondary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.roomLabel, { color: isActive ? theme.primary : theme.text }]}>
+                  {opt.label}
+                </Text>
+                <Text style={[styles.roomDesc, { color: theme.textTertiary }]}>{opt.desc}</Text>
+              </View>
+              {isActive ? (
+                <Feather name="check-circle" size={20} color={theme.primary} />
+              ) : null}
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+
   const renderStep3 = () => (
     <View>
       <Text style={[styles.stepTitle, { color: theme.text }]}>Your ideal roommate</Text>
@@ -396,6 +445,7 @@ export default function RoommateOnboardingScreen() {
       }
       if (dealbreakers.includes('pets')) profileFields.pets = 'no_pets';
       profileFields.max_roommates = maxRoommates;
+      if (genderPreference) profileFields.household_gender_preference = genderPreference;
       const roomTypeVal = roomTypes.join(',') || (listingPref === 'entire_apartment' ? 'apartment' : listingPref === 'room' ? 'private' : undefined);
       if (roomTypeVal) profileFields.room_type = roomTypeVal;
 
@@ -435,6 +485,11 @@ export default function RoommateOnboardingScreen() {
 
       userUpdates.max_roommates = maxRoommates;
       userUpdates.profileData.max_roommates = maxRoommates;
+
+      if (genderPreference) {
+        userUpdates.household_gender_preference = genderPreference;
+        userUpdates.profileData.household_gender_preference = genderPreference;
+      }
 
       if (idealRoommate.trim()) {
         userUpdates.ideal_roommate_text = idealRoommate.trim();
@@ -499,12 +554,16 @@ export default function RoommateOnboardingScreen() {
             <Pressable onPress={handleSkip} disabled={loading} hitSlop={8}>
               <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14 }}>Skip</Text>
             </Pressable>
+          ) : step === 5 ? (
+            <Pressable onPress={() => { setGenderPreference('any'); setStep(s => s + 1); }} hitSlop={8}>
+              <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14 }}>Skip</Text>
+            </Pressable>
           ) : undefined
         }
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {step === 1 ? renderBudgetStep() : step === 2 ? renderRoommateCountStep() : step === 3 ? renderStep1() : step === 4 ? renderStep2() : renderStep3()}
+        {step === 1 ? renderBudgetStep() : step === 2 ? renderRoommateCountStep() : step === 3 ? renderStep1() : step === 4 ? renderStep2() : step === 5 ? renderGenderPrefStep() : renderStep3()}
       </ScrollView>
 
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 8 }]}>
@@ -520,6 +579,9 @@ export default function RoommateOnboardingScreen() {
           style={[styles.nextButton, { backgroundColor: theme.primary, opacity: loading ? 0.6 : 1 }]}
           onPress={() => {
             if (step < TOTAL_STEPS) {
+              if (step === 5 && !genderPreference) {
+                setGenderPreference('any');
+              }
               setStep(s => s + 1);
             } else {
               handleComplete();

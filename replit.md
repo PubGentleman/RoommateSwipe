@@ -47,6 +47,7 @@ The application uses React Native, Expo, and TypeScript, with React Navigation f
 - **Affiliate Program:** Users can apply to become affiliates with unique referral codes and a dedicated dashboard.
 - **Request to Join Group:** Renters can browse and send join requests to open groups.
 - **Couple & Room-Matching System:** Groups support couple members sharing one bedroom, with utility functions for managing room needs and group composition. Listings have a computed `rooms_available` column. Group inquiry functionality is dynamically enabled/disabled based on group-listing compatibility.
+- **Household Gender Preference:** Collected during roommate onboarding (step 5 of 6), saved to both `users` and `profiles` tables. Used for bidirectional swipe feed filtering (hard filter for explicit preferences). Displayed in ProfileCompletionCard. Pi AI reads this field for matching context.
 - **Amenity System:** Centralized amenity definitions in `constants/amenities.ts` provide a single source of truth, supporting categorized display, host listing creation, renter preferences, and legacy amenity normalization.
 - **Host Badge System:** Three earned achievement badges (Rhome Select, Top Agent, Top Company) signal host quality, with criteria-based progression and daily recalculation via an Edge Function.
 - **Apartment Seeker Group System:** Redesigned group experience with an invite system (email/phone, couple option, deep linking), shared liked listings (shortlist with real-time sync and member avatars), and tour scheduling with RSVP functionality.

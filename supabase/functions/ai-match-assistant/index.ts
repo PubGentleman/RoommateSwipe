@@ -66,7 +66,7 @@ serve(async (req) => {
       : buildSystemPrompt(profile, topMatches, nearbyListings, plan, memoryContext);
 
     if (listing_context && !isAgent) {
-      systemPrompt += `\n\nThe user is currently viewing this listing:\n- Title: ${listing_context.title || 'Unknown'}\n- Price: $${listing_context.price || '?'}/mo\n- Location: ${listing_context.neighborhood || listing_context.location || '?'}\n- Bedrooms: ${listing_context.bedrooms ?? '?'}, Bathrooms: ${listing_context.bathrooms ?? '?'}\n- Sqft: ${listing_context.sqft || 'N/A'}\n- Amenities: ${listing_context.amenities?.join(', ') || 'not listed'}\n- Available: ${listing_context.available_date || 'not specified'}\n- Host: ${listing_context.host_name || 'Unknown'}\n\nAnswer questions about THIS specific listing. Compare it to the user's preferences and other listings they've viewed when relevant.`;
+      systemPrompt += `\n\nThe user is currently viewing this listing:\n- Title: ${listing_context.title || 'Unknown'}\n- Price: $${listing_context.price || '?'}/mo\n- Location: ${listing_context.neighborhood || listing_context.location || '?'}\n- Bedrooms: ${listing_context.bedrooms ?? '?'}, Bathrooms: ${listing_context.bathrooms ?? '?'}\n- Sqft: ${listing_context.sqft || 'N/A'}\n- Amenities: ${listing_context.amenities?.join(', ') || 'not listed'}\n- Available: ${listing_context.available_date || 'not specified'}\n- Host: ${listing_context.host_name || 'Unknown'}\n- About: ${listing_context.description || listing_context.about_text || 'No description provided'}\n\nAnswer questions about THIS specific listing. Compare it to the user's preferences and other listings they've viewed when relevant.\n\nWhen analyzing listings, pay attention to the "About" description for compatibility signals:\n- Gender mentions ("female roommate", "male household") — check against the user's gender preference\n- Lifestyle mentions ("420 friendly", "quiet household", "social") — compare with user's lifestyle preferences\n- Pet mentions ("no pets", "cat-friendly") — check against user's pet preference\n- Couple/group mentions ("couple welcome", "looking for 2 roommates") — check against user's search type\n- Vibe indicators ("modern", "cozy", "minimalist") — use for personality matching\n- Dealbreakers in free text that aren't in structured fields — flag these proactively\n\nWhen recommending a listing, reference specific compatibility signals from the About text. If there's a conflict between structured data and the About text, mention both and let the user clarify.`;
     }
 
     const remainingMessages = dailyLimit - todayCount - 1;
@@ -222,7 +222,7 @@ async function getUserProfile(supabase: any, userId: string) {
   const { data: userData } = await supabase
     .from('users')
     .select(`
-      full_name, age, occupation, bio, city, neighborhood, zodiac_sign,
+      full_name, age, occupation, bio, city, neighborhood, zodiac_sign, gender,
       apartment_search_type,
       preferred_neighborhoods,
       nice_to_have_amenities,
@@ -247,7 +247,8 @@ async function getUserProfile(supabase: any, userId: string) {
       ideal_roommate_text,
       dealbreakers,
       max_roommates,
-      preferred_neighborhoods
+      preferred_neighborhoods,
+      household_gender_preference
     `)
     .eq('user_id', userId)
     .single();
@@ -261,10 +262,12 @@ async function getUserProfile(supabase: any, userId: string) {
     age: userData?.age,
     occupation: userData?.occupation,
     bio: userData?.bio,
+    gender: userData?.gender,
     city: userData?.city,
     neighborhood: userData?.neighborhood,
     zodiac_sign: userData?.zodiac_sign,
     apartment_search_type: userData?.apartment_search_type,
+    household_gender_preference: profileData?.household_gender_preference,
     preferred_neighborhoods: neighborhoods,
     nice_to_have_amenities: userData?.nice_to_have_amenities || [],
     amenity_preferences: userData?.amenity_preferences || [],
@@ -324,7 +327,7 @@ async function getNearbyListings(supabase: any, profile: any) {
   if (!profile.city) return [];
   const { data } = await supabase
     .from('listings')
-    .select('title, price, type, neighborhood, bedrooms, bathrooms, is_featured')
+    .select('title, price, type, neighborhood, bedrooms, bathrooms, is_featured, description')
     .eq('city', profile.city)
     .gte('price', profile.budget_min ?? 0)
     .lte('price', profile.budget_max ?? 999999)
@@ -465,7 +468,7 @@ function buildSystemPrompt(profile: any, topMatches: any[], listings: any[], pla
 
   const listingSummary = listings.length > 0
     ? listings.map((l: any) =>
-        `"${l.title}" — $${l.price}/mo, ${l.type}, ${l.bedrooms}bd/${l.bathrooms}ba in ${l.neighborhood}${l.is_featured ? ' (featured)' : ''}`
+        `"${l.title}" — $${l.price}/mo, ${l.type}, ${l.bedrooms}bd/${l.bathrooms}ba in ${l.neighborhood}${l.is_featured ? ' (featured)' : ''}${l.description ? ` — About: "${l.description.slice(0, 200)}"` : ''}`
       ).join('; ')
     : 'no listings in their price range right now';
 
@@ -578,7 +581,7 @@ Move-in: ${profile.move_in_date ?? profile.move_in_timeline ?? 'flexible'}
 Zodiac: ${profile.zodiac_sign ?? 'unknown'}
 Interests: ${profile.interests?.join(', ') ?? 'not set'}
 Pets: ${profile.pets ?? 'none'}
-Cleanliness: ${profile.cleanliness ?? '?'}/5, Sleep: ${profile.sleep_schedule ?? '?'}, Noise tolerance: ${profile.noise_tolerance ?? '?'}/5${profile.profile_note ? `\nIn their own words: "${profile.profile_note}"` : ''}
+Cleanliness: ${profile.cleanliness ?? '?'}/5, Sleep: ${profile.sleep_schedule ?? '?'}, Noise tolerance: ${profile.noise_tolerance ?? '?'}/5${profile.bio ? `\nBio: "${profile.bio}"` : ''}${profile.profile_note ? `\nIn their own words: "${profile.profile_note}"` : ''}
 ${profile.apartment_search_type === 'with_roommates' ? 'Search type: Looking for a roommate' : profile.apartment_search_type === 'solo' ? 'Search type: Looking for an apartment (solo)' : profile.apartment_search_type === 'with_partner' ? 'Search type: Looking for an apartment (with partner)' : profile.apartment_search_type === 'have_group' ? 'Search type: Looking for an apartment (with group)' : ''}
 ${profile.preferred_neighborhoods?.length ? `Preferred neighborhoods: ${profile.preferred_neighborhoods.join(', ')}` : ''}
 ${profile.amenity_preferences?.length ? `Must-have amenities: ${profile.amenity_preferences.join(', ')}` : ''}
@@ -587,6 +590,8 @@ ${profile.preferred_bedrooms !== undefined && profile.preferred_bedrooms !== nul
 ${profile.max_roommates ? `Max roommates: ${profile.max_roommates === 4 ? '4+' : profile.max_roommates}` : ''}
 ${profile.dealbreakers?.length ? `Dealbreakers: ${profile.dealbreakers.join(', ')}` : ''}
 ${profile.ideal_roommate_text ? `Ideal roommate description: "${profile.ideal_roommate_text}"` : ''}
+${profile.household_gender_preference ? `Household gender preference: ${profile.household_gender_preference === 'any' ? 'Open to all' : profile.household_gender_preference === 'female_only' ? 'Women only' : profile.household_gender_preference === 'male_only' ? 'Men only' : 'Same gender'}` : ''}
+${profile.gender ? `Gender: ${profile.gender}` : ''}
 ${profile.apartment_search_type && profile.apartment_search_type !== 'with_roommates' ? `\nThis user is looking for an APARTMENT (not a roommate).
 When helping this place seeker:
 - Reference their specific budget range ($${profile.budget_min ?? '?'}-$${profile.budget_max ?? '?'}), preferred neighborhoods${profile.preferred_neighborhoods?.length ? ` (${profile.preferred_neighborhoods.join(', ')})` : ''}, and must-have amenities
@@ -601,6 +606,12 @@ THEIR TOP MATCHES RIGHT NOW: ${matchSummary}
 LISTINGS IN THEIR BUDGET: ${listingSummary}
 
 PLAN: ${plan}
+
+Always cross-reference the About/bio text with structured preference fields.
+Free-text descriptions often contain more current or nuanced information than checkbox fields.
+When there's a conflict between structured data and free text, mention both to the user and let them clarify.
+When free text adds information not captured in any structured field, treat it as valid preference data.
+Use the user's bio for roommate matching (shared interests, lifestyle signals) and listing recommendations (proximity to activities mentioned).
 
 Only reference listings and matches that are listed above — never make up names or prices.
 If they ask about someone not in the matches list, say you don't have info on that person yet.`;

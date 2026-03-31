@@ -108,6 +108,14 @@ const ROOMMATE_SEEKER_FIELDS: ProfileField[] = [
     check: (u) => u.profileData?.max_roommates != null || u.max_roommates != null,
   },
   {
+    key: 'genderPreference',
+    label: 'Household Gender Preference',
+    icon: 'users',
+    tip: 'Filter by gender compatibility',
+    weight: 5,
+    check: (u) => !!(u.profileData?.household_gender_preference || u.household_gender_preference),
+  },
+  {
     key: 'work',
     label: 'Work Info',
     icon: 'briefcase',
@@ -239,6 +247,7 @@ const FIELD_TO_STEP: Record<string, string> = {
   smoking: 'smokingPets',
   pets: 'smokingPets',
   maxRoommates: 'lifestyle',
+  genderPreference: 'lifestyle',
   work: 'lifestyle',
   moveInDate: 'housing',
 };
