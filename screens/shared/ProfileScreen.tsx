@@ -446,104 +446,6 @@ export const ProfileScreen = () => {
           </View>
         ) : null}
 
-        {/* TODO: References section — build invite-based reference system post-launch */}
-
-        {!isHost ? (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionTitleRow}>
-                <View style={styles.sectionTitleBar} />
-                <Text style={styles.sectionTitle}>Background Check</Text>
-              </View>
-            </View>
-            <Pressable
-              style={styles.bgCheckCard}
-              onPress={() => navigation.navigate('BackgroundCheck')}
-            >
-              <View style={styles.bgCheckLeft}>
-                <View style={styles.bgCheckIcon}>
-                  <Feather name="shield" size={20} color="#22c55e" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.bgCheckTitle}>
-                    {user?.background_check_status === 'clear' ? 'Background Cleared' :
-                     user?.background_check_status === 'pending' ? 'Check in Progress' :
-                     'Get Background Checked'}
-                  </Text>
-                  <Text style={styles.bgCheckDesc}>
-                    {user?.background_check_status === 'clear' ? 'Verified and visible to hosts. Tap to view details.' :
-                     user?.background_check_status === 'pending' ? 'Results typically available within minutes' :
-                     'Increase trust with hosts. Starting at $15'}
-                  </Text>
-                </View>
-              </View>
-              {user?.background_check_status === 'clear' ? (
-                <View style={styles.bgCheckClearedBadge}>
-                  <Feather name="check" size={14} color="#22c55e" />
-                </View>
-              ) : user?.background_check_status === 'pending' ? (
-                <View style={styles.bgCheckPendingBadge}>
-                  <Feather name="clock" size={14} color="#f59e0b" />
-                </View>
-              ) : (
-                <Feather name="chevron-right" size={20} color="#999" />
-              )}
-            </Pressable>
-          </View>
-        ) : null}
-
-        {!isHost ? (
-          <View style={styles.pauseCard}>
-            {searchPaused ? (
-              <>
-                <View style={styles.pauseCardHeader}>
-                  <View style={styles.pauseIconWrap}>
-                    <Feather name="pause-circle" size={20} color="#667eea" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.pauseTitle}>Your search is paused</Text>
-                    <Text style={styles.pauseSubtitle}>
-                      You're not visible in searches or matches
-                    </Text>
-                  </View>
-                </View>
-                {renterPlan === 'plus' || renterPlan === 'elite' ? (
-                  <Text style={styles.pauseSubscriptionNote}>
-                    Your {renterPlan === 'elite' ? 'Elite' : 'Plus'} subscription is still active — your benefits are preserved.
-                  </Text>
-                ) : null}
-                <Pressable
-                  style={styles.resumeButton}
-                  onPress={handleResumeSearch}
-                >
-                  <Feather name="search" size={15} color="#fff" />
-                  <Text style={styles.resumeButtonText}>Resume Search</Text>
-                </Pressable>
-              </>
-            ) : (
-              <>
-                <View style={styles.pauseCardHeader}>
-                  <View style={[styles.pauseIconWrap, { backgroundColor: 'rgba(76,175,80,0.12)' }]}>
-                    <Feather name="home" size={20} color="#4CAF50" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.pauseTitle}>Found your place?</Text>
-                    <Text style={styles.pauseSubtitle}>
-                      Pause your profile — you can always come back
-                    </Text>
-                  </View>
-                </View>
-                <Pressable
-                  style={styles.foundPlaceButton}
-                  onPress={handleFoundPlace}
-                >
-                  <Text style={styles.foundPlaceButtonText}>I Found a Place</Text>
-                </Pressable>
-              </>
-            )}
-          </View>
-        ) : null}
-
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleRow}>
@@ -619,7 +521,7 @@ export const ProfileScreen = () => {
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleRow}>
               <View style={styles.sectionTitleBar} />
-              <Text style={styles.sectionTitle}>Settings</Text>
+              <Text style={styles.sectionTitle}>Account</Text>
             </View>
           </View>
           <View style={styles.settingsCard}>
@@ -684,45 +586,6 @@ export const ProfileScreen = () => {
               subtitle="Name, bio, photos, preferences"
               onPress={() => navigation.navigate('ProfileQuestionnaire')}
             />
-            <SettingsItem
-              iconName="heart"
-              iconColor="#ff6b5b"
-              iconBgColor="rgba(255,107,91,0.12)"
-              iconBorderColor="rgba(255,107,91,0.18)"
-              title="My Interests"
-              subtitle="Interest cards you've sent"
-              onPress={() => navigation.navigate('MyInterests')}
-              badge={pendingInterestCount}
-            />
-            <SettingsItem
-              iconName="bell"
-              iconColor="#2ecc71"
-              iconBgColor="rgba(46,204,113,0.12)"
-              iconBorderColor="rgba(46,204,113,0.18)"
-              title="Notifications"
-              subtitle="Matches, messages, activity"
-              onPress={() => navigation.navigate('Notifications')}
-              badge={unreadCount}
-            />
-            <SettingsItem
-              iconName="lock"
-              iconColor="orange"
-              iconBgColor="rgba(255,165,0,0.12)"
-              iconBorderColor="rgba(255,165,0,0.18)"
-              title="Privacy & Safety"
-              subtitle="Blocked users, data, visibility"
-              onPress={() => navigation.navigate('PrivacySecurity')}
-            />
-
-            <SettingsItem
-              iconName="credit-card"
-              iconColor="#667eea"
-              iconBgColor="rgba(102,126,234,0.15)"
-              iconBorderColor="rgba(102,126,234,0.2)"
-              title="Payment"
-              subtitle="Manage payment methods"
-              onPress={() => navigation.navigate('Plans')}
-            />
             {user?.role === 'renter' ? (
               <SettingsItem
                 iconName="target"
@@ -742,15 +605,6 @@ export const ProfileScreen = () => {
               />
             ) : null}
             <SettingsItem
-              iconName="users"
-              iconColor="#ff6b5b"
-              iconBgColor="rgba(255,107,91,0.12)"
-              iconBorderColor="rgba(255,107,91,0.18)"
-              title="Affiliate Program"
-              subtitle={hasAffiliate ? 'View dashboard & earnings' : 'Earn by referring friends'}
-              onPress={() => navigation.navigate(hasAffiliate ? 'AffiliateDashboard' : 'AffiliateApply')}
-            />
-            <SettingsItem
               iconName="check-circle"
               iconColor="#3ECF8E"
               iconBgColor="rgba(62,207,142,0.12)"
@@ -758,6 +612,64 @@ export const ProfileScreen = () => {
               title="Verify Identity"
               subtitle="Phone, ID, social verification"
               onPress={() => navigation.navigate('Verification')}
+            />
+            {!isHost ? (
+              <SettingsItem
+                iconName="shield"
+                iconColor="#22c55e"
+                iconBgColor="rgba(34,197,94,0.12)"
+                iconBorderColor="rgba(34,197,94,0.18)"
+                title={user?.background_check_status === 'clear' ? 'Background Cleared' :
+                       user?.background_check_status === 'pending' ? 'Check in Progress' :
+                       'Background Check'}
+                subtitle={user?.background_check_status === 'clear' ? 'Verified and visible to hosts' :
+                          user?.background_check_status === 'pending' ? 'Results typically available within minutes' :
+                          'Increase trust with hosts'}
+                onPress={() => navigation.navigate('BackgroundCheck')}
+                isLast
+              />
+            ) : (
+              <SettingsItem
+                iconName="credit-card"
+                iconColor="#667eea"
+                iconBgColor="rgba(102,126,234,0.15)"
+                iconBorderColor="rgba(102,126,234,0.2)"
+                title="Payment"
+                subtitle="Manage payment methods"
+                onPress={() => navigation.navigate(isHost ? 'HostSubscription' : 'Plans')}
+                isLast
+              />
+            )}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleRow}>
+              <View style={styles.sectionTitleBar} />
+              <Text style={styles.sectionTitle}>Activity</Text>
+            </View>
+          </View>
+          <View style={styles.settingsCard}>
+            <SettingsItem
+              iconName="heart"
+              iconColor="#ff6b5b"
+              iconBgColor="rgba(255,107,91,0.12)"
+              iconBorderColor="rgba(255,107,91,0.18)"
+              title="My Interests"
+              subtitle="Interest cards you've sent"
+              onPress={() => navigation.navigate('MyInterests')}
+              badge={pendingInterestCount}
+            />
+            <SettingsItem
+              iconName="bell"
+              iconColor="#2ecc71"
+              iconBgColor="rgba(46,204,113,0.12)"
+              iconBorderColor="rgba(46,204,113,0.18)"
+              title="Notifications"
+              subtitle="Matches, messages, activity"
+              onPress={() => navigation.navigate('Notifications')}
+              badge={unreadCount}
               isLast
             />
           </View>
@@ -767,10 +679,104 @@ export const ProfileScreen = () => {
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleRow}>
               <View style={styles.sectionTitleBar} />
-              <Text style={styles.sectionTitle}>Support</Text>
+              <Text style={styles.sectionTitle}>Settings</Text>
             </View>
           </View>
           <View style={styles.settingsCard}>
+            <SettingsItem
+              iconName="lock"
+              iconColor="orange"
+              iconBgColor="rgba(255,165,0,0.12)"
+              iconBorderColor="rgba(255,165,0,0.18)"
+              title="Privacy & Safety"
+              subtitle="Blocked users, data, visibility"
+              onPress={() => navigation.navigate('PrivacySecurity')}
+              isLast={isHost}
+            />
+            {!isHost ? (
+              <SettingsItem
+                iconName="credit-card"
+                iconColor="#667eea"
+                iconBgColor="rgba(102,126,234,0.15)"
+                iconBorderColor="rgba(102,126,234,0.2)"
+                title="Payment"
+                subtitle="Manage payment methods"
+                onPress={() => navigation.navigate('Plans')}
+                isLast
+              />
+            ) : null}
+          </View>
+        </View>
+
+        {!isHost ? (
+          <View style={styles.pauseCard}>
+            {searchPaused ? (
+              <>
+                <View style={styles.pauseCardHeader}>
+                  <View style={styles.pauseIconWrap}>
+                    <Feather name="pause-circle" size={20} color="#667eea" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.pauseTitle}>Your search is paused</Text>
+                    <Text style={styles.pauseSubtitle}>
+                      You're not visible in searches or matches
+                    </Text>
+                  </View>
+                </View>
+                {renterPlan === 'plus' || renterPlan === 'elite' ? (
+                  <Text style={styles.pauseSubscriptionNote}>
+                    Your {renterPlan === 'elite' ? 'Elite' : 'Plus'} subscription is still active — your benefits are preserved.
+                  </Text>
+                ) : null}
+                <Pressable
+                  style={styles.resumeButton}
+                  onPress={handleResumeSearch}
+                >
+                  <Feather name="search" size={15} color="#fff" />
+                  <Text style={styles.resumeButtonText}>Resume Search</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <View style={styles.pauseCardHeader}>
+                  <View style={[styles.pauseIconWrap, { backgroundColor: 'rgba(76,175,80,0.12)' }]}>
+                    <Feather name="home" size={20} color="#4CAF50" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.pauseTitle}>Found your place?</Text>
+                    <Text style={styles.pauseSubtitle}>
+                      Pause your profile — you can always come back
+                    </Text>
+                  </View>
+                </View>
+                <Pressable
+                  style={styles.foundPlaceButton}
+                  onPress={handleFoundPlace}
+                >
+                  <Text style={styles.foundPlaceButtonText}>I Found a Place</Text>
+                </Pressable>
+              </>
+            )}
+          </View>
+        ) : null}
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleRow}>
+              <View style={styles.sectionTitleBar} />
+              <Text style={styles.sectionTitle}>More</Text>
+            </View>
+          </View>
+          <View style={styles.settingsCard}>
+            <SettingsItem
+              iconName="users"
+              iconColor="#ff6b5b"
+              iconBgColor="rgba(255,107,91,0.12)"
+              iconBorderColor="rgba(255,107,91,0.18)"
+              title="Affiliate Program"
+              subtitle={hasAffiliate ? 'View dashboard & earnings' : 'Earn by referring friends'}
+              onPress={() => navigation.navigate(hasAffiliate ? 'AffiliateDashboard' : 'AffiliateApply')}
+            />
             <SettingsItem
                 iconName="mail"
                 iconColor="#667eea"
