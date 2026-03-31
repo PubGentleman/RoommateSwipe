@@ -1152,7 +1152,7 @@ export const ExploreScreen = () => {
   const isBasic = renterPlan === 'free';
 
 
-  const renderProperty = ({ item }: { item: Property }) => {
+  const renderProperty = ({ item, index }: { item: Property; index: number }) => {
     const hostUser = item.hostProfileId ? hostProfiles.get(item.hostProfileId) : null;
     const hostProfile = hostUser ? getUserAsRoommateProfile(hostUser) : null;
     const compatibility = hostProfile && user ? calculateCompatibility(user, hostProfile) : null;
@@ -1302,16 +1302,34 @@ export const ExploreScreen = () => {
                 </Text>
               </View>
             ) : null}
-            {isPetFriendly ? (
-              <View style={styles.availBadge}>
-                <Text style={styles.availBadgeText}>Pet OK</Text>
-              </View>
-            ) : null}
-            {laundryType ? (
-              <View style={styles.availBadge}>
-                <Text style={styles.availBadgeText}>{laundryType === 'In-unit' ? 'W/D In-unit' : 'Laundry'}</Text>
-              </View>
-            ) : null}
+            {(() => {
+              const amenityTags: string[] = [];
+              if (laundryType) amenityTags.push(laundryType === 'In-unit' ? 'W/D In-unit' : 'Laundry');
+              if (isPetFriendly) amenityTags.push('Pet OK');
+              const dishwasher = item.amenities?.find(a => a.toLowerCase().includes('dishwasher'));
+              if (dishwasher && amenityTags.length < 2) amenityTags.push('Dishwasher');
+              const doorman = item.amenities?.find(a => a.toLowerCase().includes('doorman'));
+              if (doorman && amenityTags.length < 2) amenityTags.push('Doorman');
+              const gym = item.amenities?.find(a => a.toLowerCase().includes('gym') || a.toLowerCase().includes('fitness'));
+              if (gym && amenityTags.length < 2) amenityTags.push('Gym');
+              const totalAmenities = item.amenities?.length || 0;
+              const shown = amenityTags.slice(0, 2);
+              const extraCount = totalAmenities - shown.length;
+              return (
+                <>
+                  {shown.map((tag, idx) => (
+                    <View key={idx} style={styles.availBadge}>
+                      <Text style={styles.availBadgeText}>{tag}</Text>
+                    </View>
+                  ))}
+                  {extraCount > 0 ? (
+                    <View style={[styles.availBadge, { borderColor: 'rgba(255,255,255,0.15)' }]}>
+                      <Text style={[styles.availBadgeText, { color: 'rgba(255,255,255,0.4)' }]}>+{extraCount} more</Text>
+                    </View>
+                  ) : null}
+                </>
+              );
+            })()}
           </View>
           <View style={styles.locationRow2}>
             <Feather name="map-pin" size={12} color="rgba(255,107,91,0.55)" />
@@ -1406,12 +1424,12 @@ export const ExploreScreen = () => {
               <Feather name="heart" size={14} color={ACCENT} />
               <Text style={styles.inquireTogetherText}>I'm Interested</Text>
             </Pressable>
-          ) : (
+          ) : isBasic && (index % 4 === 3) ? (
             <View style={styles.premiumRow}>
               <Feather name="lock" size={13} color="rgba(255,215,0,0.6)" />
               <Text style={styles.premiumText}>Upgrade to Plus to contact host & schedule a tour</Text>
             </View>
-          )}
+          ) : null}
         </View>
       </Pressable>
     );
@@ -2695,6 +2713,54 @@ export const ExploreScreen = () => {
                 </View>
               );
             })() : null}
+
+            {isBasic && selectedProperty ? (
+              <Pressable
+                style={styles.pdUpgradeBanner}
+                onPress={() => {
+                  setPaywallFeature('Unlimited Messaging');
+                  setPaywallPlan('plus');
+                  setShowPaywall(true);
+                }}
+              >
+                <Feather name="lock" size={14} color="#fff" />
+                <Text style={styles.pdUpgradeBannerText}>
+                  Upgrade to Plus to message {selectedProperty.hostName || 'this host'} & schedule a tour
+                </Text>
+                <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.7)" />
+              </Pressable>
+            ) : null}
+
+            <Pressable
+              style={styles.askPiFab}
+              onPress={() => {
+                if (!selectedProperty) return;
+                setShowPropertyDetail(false);
+                (navigation as any).navigate('Messages', {
+                  screen: 'AIMatchAssistant',
+                  params: {
+                    listingContext: {
+                      listingId: selectedProperty.id,
+                      title: selectedProperty.title,
+                      price: selectedProperty.price,
+                      location: formatLocation(selectedProperty),
+                      zipCode: selectedProperty.zipCode,
+                      city: selectedProperty.city || user?.city,
+                      bedrooms: selectedProperty.bedrooms,
+                      bathrooms: selectedProperty.bathrooms,
+                      sqft: selectedProperty.sqft,
+                      amenities: selectedProperty.amenities,
+                      description: selectedProperty.description,
+                      hostName: selectedProperty.hostName,
+                    },
+                    mode: 'listing_advisor',
+                  },
+                });
+              }}
+            >
+              <Feather name="message-circle" size={20} color="#fff" />
+              <Text style={styles.askPiFabLabel}>Ask Pi</Text>
+            </Pressable>
 
           </View>
         </View>
@@ -4499,6 +4565,47 @@ const styles = StyleSheet.create({
   pdRoommateName: {
     fontSize: 14,
     fontWeight: '600',
+    color: '#fff',
+  },
+  pdUpgradeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginHorizontal: 16,
+    marginBottom: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,215,0,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,215,0,0.2)',
+  },
+  pdUpgradeBannerText: {
+    flex: 1,
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: 'rgba(255,215,0,0.85)',
+  },
+  askPiFab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 100,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 24,
+    backgroundColor: ACCENT,
+    shadowColor: ACCENT,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  askPiFabLabel: {
+    fontSize: 14,
+    fontWeight: '700',
     color: '#fff',
   },
   pdActionBar: {

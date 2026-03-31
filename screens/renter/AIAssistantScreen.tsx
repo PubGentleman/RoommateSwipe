@@ -331,6 +331,7 @@ export const AIAssistantScreen = ({ navigation }: AIAssistantScreenProps) => {
             setLimitWarning(`${remaining} AI message${remaining !== 1 ? 's' : ''} remaining today`);
           }
         },
+        listingContext,
       );
 
       setIsTyping(false);

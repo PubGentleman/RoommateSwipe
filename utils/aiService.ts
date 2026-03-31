@@ -80,9 +80,13 @@ export async function sendAIMessage(
   sessionId: string,
   onChunk?: (text: string) => void,
   onComplete?: (remainingMessages: number, plan: string) => void,
+  listingContext?: Record<string, any> | null,
 ): Promise<AIResponse> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Not authenticated');
+
+  const body: Record<string, any> = { message, sessionId };
+  if (listingContext) body.listing_context = listingContext;
 
   const response = await fetch(
     `${supabaseUrl}/functions/v1/ai-match-assistant`,
@@ -92,7 +96,7 @@ export async function sendAIMessage(
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session.access_token}`,
       },
-      body: JSON.stringify({ message, sessionId }),
+      body: JSON.stringify(body),
     }
   );
 

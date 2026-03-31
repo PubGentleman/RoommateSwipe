@@ -36,7 +36,7 @@ serve(async (req) => {
     );
     if (authError || !user) return errorResponse('Unauthorized', 401);
 
-    const { message, sessionId } = await req.json();
+    const { message, sessionId, listing_context } = await req.json();
     if (!message?.trim()) return errorResponse('Message is required', 400);
 
     const plan = await getUserPlan(supabase, user.id);
@@ -61,9 +61,13 @@ serve(async (req) => {
     const history = await getConversationHistory(supabase, user.id, sessionId);
 
     const memoryContext = buildMemoryContext(aiMemory);
-    const systemPrompt = isAgent
+    let systemPrompt = isAgent
       ? buildAgentSystemPrompt(profile, nearbyListings, plan)
       : buildSystemPrompt(profile, topMatches, nearbyListings, plan, memoryContext);
+
+    if (listing_context && !isAgent) {
+      systemPrompt += `\n\nThe user is currently viewing this listing:\n- Title: ${listing_context.title || 'Unknown'}\n- Price: $${listing_context.price || '?'}/mo\n- Location: ${listing_context.neighborhood || listing_context.location || '?'}\n- Bedrooms: ${listing_context.bedrooms ?? '?'}, Bathrooms: ${listing_context.bathrooms ?? '?'}\n- Sqft: ${listing_context.sqft || 'N/A'}\n- Amenities: ${listing_context.amenities?.join(', ') || 'not listed'}\n- Available: ${listing_context.available_date || 'not specified'}\n- Host: ${listing_context.host_name || 'Unknown'}\n\nAnswer questions about THIS specific listing. Compare it to the user's preferences and other listings they've viewed when relevant.`;
+    }
 
     const remainingMessages = dailyLimit - todayCount - 1;
     const conversationMessages = [
