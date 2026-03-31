@@ -9,6 +9,8 @@ import {
   Alert,
   Share,
   FlatList,
+  ScrollView,
+  Switch,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Feather } from '../../components/VectorIcons';
@@ -29,12 +31,26 @@ import {
   disableReplacement,
 } from '../../services/preformedGroupService';
 import { toggleOpenToRequests, getGroupRequests } from '../../services/groupJoinService';
+import {
+  getGroupShortlist,
+  getGroupTours,
+  createTourEvent,
+  updateTourRSVP,
+  cancelTourEvent,
+  getPendingInvitesForGroup,
+  resendGroupInvite,
+  transferGroupLead,
+  GroupShortlistListing,
+} from '../../services/groupService';
 import { PreformedGroup, PreformedGroupMember, GroupShortlistItem } from '../../types/models';
-import { Switch } from 'react-native';
+import { GroupShortlistCard } from '../../components/GroupShortlistCard';
+import { TourEventCard } from '../../components/TourEventCard';
+import { TourScheduleForm } from '../../components/TourScheduleForm';
 import * as Linking from 'expo-linking';
 import { Spacing } from '../../constants/theme';
+import { supabase } from '../../lib/supabase';
 
-type Tab = 'members' | 'shortlist' | 'settings';
+type Tab = 'members' | 'shortlist' | 'tours' | 'settings';
 
 export default function MyGroupScreen() {
   const insets = useSafeAreaInsets();
@@ -45,6 +61,9 @@ export default function MyGroupScreen() {
   const [group, setGroup] = useState<PreformedGroup | null>(null);
   const [members, setMembers] = useState<PreformedGroupMember[]>([]);
   const [shortlist, setShortlist] = useState<GroupShortlistItem[]>([]);
+  const [groupShortlist, setGroupShortlist] = useState<GroupShortlistListing[]>([]);
+  const [tours, setTours] = useState<any[]>([]);
+  const [pendingInvites, setPendingInvites] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('members');
   const [editingName, setEditingName] = useState(false);
@@ -52,6 +71,9 @@ export default function MyGroupScreen() {
   const [copied, setCopied] = useState(false);
   const [openToRequests, setOpenToRequests] = useState(false);
   const [pendingRequestCount, setPendingRequestCount] = useState(0);
+  const [showTourForm, setShowTourForm] = useState(false);
+  const [tourSubmitting, setTourSubmitting] = useState(false);
+  const [shortlistFilter, setShortlistFilter] = useState<'all' | 'everyone' | 'mine'>('all');
 
   const isLead = group?.group_lead_id === user?.id;
 
@@ -74,6 +96,19 @@ export default function MyGroupScreen() {
         setOpenToRequests(g.open_to_requests ?? false);
         const reqs = await getGroupRequests(g.id, 'preformed');
         setPendingRequestCount(reqs.length);
+
+        try {
+          const [gs, t, inv] = await Promise.all([
+            getGroupShortlist(g.id),
+            getGroupTours(g.id),
+            getPendingInvitesForGroup(g.id),
+          ]);
+          setGroupShortlist(gs);
+          setTours(t);
+          setPendingInvites(inv);
+        } catch {
+          console.warn('[MyGroupScreen] Failed to load extended data');
+        }
       }
     } catch (err) {
       console.error('[MyGroupScreen] Failed to load group data:', err);
@@ -225,20 +260,20 @@ export default function MyGroupScreen() {
 
           <View style={styles.featuresList}>
             <View style={styles.featureRow}>
-              <Feather name="send" size={14} color="#22C55E" />
-              <Text style={styles.featureText}>Share an invite link with friends</Text>
+              <Feather name="mail" size={14} color="#22C55E" />
+              <Text style={styles.featureText}>Invite friends by email or phone</Text>
             </View>
             <View style={styles.featureRow}>
               <Feather name="heart" size={14} color="#22C55E" />
-              <Text style={styles.featureText}>Build a shared shortlist of apartments</Text>
+              <Text style={styles.featureText}>See what everyone likes in a shared shortlist</Text>
             </View>
             <View style={styles.featureRow}>
-              <Feather name="thumbs-up" size={14} color="#22C55E" />
-              <Text style={styles.featureText}>Vote on listings together</Text>
+              <Feather name="calendar" size={14} color="#22C55E" />
+              <Text style={styles.featureText}>Schedule tours and RSVP together</Text>
             </View>
             <View style={styles.featureRow}>
-              <Feather name="search" size={14} color="#22C55E" />
-              <Text style={styles.featureText}>Browse listings before your group is full</Text>
+              <Feather name="message-circle" size={14} color="#22C55E" />
+              <Text style={styles.featureText}>Group chat with hosts when you inquire</Text>
             </View>
           </View>
         </View>
@@ -290,7 +325,8 @@ export default function MyGroupScreen() {
 
       <View style={styles.tabRow}>
         {renderTab('members', 'Members', 'users')}
-        {renderTab('shortlist', `Shortlist (${shortlist.length})`, 'heart')}
+        {renderTab('shortlist', `Shortlist`, 'heart')}
+        {renderTab('tours', `Tours${tours.length > 0 ? ` (${tours.filter(t => t.status === 'scheduled').length})` : ''}`, 'calendar')}
         {renderTab('settings', 'Settings', 'settings')}
       </View>
 
@@ -308,6 +344,39 @@ export default function MyGroupScreen() {
               onRemove={() => handleRemoveMember(item.id)}
             />
           )}
+          ListHeaderComponent={
+            pendingInvites.length > 0 ? (
+              <View style={{ marginBottom: 12 }}>
+                <Text style={{ color: '#999', fontSize: 12, fontWeight: '600', marginBottom: 8, textTransform: 'uppercase' }}>
+                  Pending Invites
+                </Text>
+                {pendingInvites.map((inv: any) => (
+                  <View key={inv.id} style={styles.pendingInviteRow}>
+                    <Feather name={inv.invite_email ? 'mail' : 'phone'} size={14} color="#F59E0B" />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: '#ccc', fontSize: 13 }}>
+                        {inv.invite_email || inv.invite_phone}
+                      </Text>
+                      <Text style={{ color: '#666', fontSize: 11 }}>
+                        Waiting to join{inv.is_couple ? ' (couple)' : ''}
+                      </Text>
+                    </View>
+                    {isLead ? (
+                      <Pressable
+                        onPress={() => {
+                          resendGroupInvite(inv.id).catch(() => {});
+                          Alert.alert('Invite Resent', 'The invite has been resent.');
+                        }}
+                        style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: 'rgba(245,158,11,0.1)', borderRadius: 8 }}
+                      >
+                        <Text style={{ color: '#F59E0B', fontSize: 12, fontWeight: '600' }}>Resend</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                ))}
+              </View>
+            ) : null
+          }
           ListFooterComponent={
             <Pressable style={styles.inviteMemberBtn} onPress={shareInvite}>
               <Feather name="plus-circle" size={16} color="#22C55E" />
@@ -318,38 +387,146 @@ export default function MyGroupScreen() {
       ) : null}
 
       {activeTab === 'shortlist' ? (
-        shortlist.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Feather name="heart" size={36} color="rgba(255,255,255,0.15)" />
-            <Text style={styles.emptyText}>No shortlisted listings yet</Text>
-            <Text style={styles.emptySubtext}>
-              Save listings from Explore to see them here
-            </Text>
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}>
+          <View style={styles.shortlistFilterRow}>
+            {(['all', 'everyone', 'mine'] as const).map(f => (
+              <Pressable
+                key={f}
+                style={[styles.shortlistFilterBtn, shortlistFilter === f && styles.shortlistFilterBtnActive]}
+                onPress={() => setShortlistFilter(f)}
+              >
+                <Text style={[styles.shortlistFilterText, shortlistFilter === f && { color: '#ff6b5b' }]}>
+                  {f === 'all' ? 'All' : f === 'everyone' ? 'Liked by All' : 'Liked by Me'}
+                </Text>
+              </Pressable>
+            ))}
           </View>
-        ) : (
-          <FlatList
-            data={shortlist}
-            keyExtractor={item => item.id}
-            contentContainerStyle={styles.listContent}
-            renderItem={({ item }) => (
-              <View style={styles.shortlistCard}>
-                <View style={styles.shortlistInfo}>
-                  <Text style={styles.shortlistTitle}>Listing</Text>
-                  {item.notes ? (
-                    <Text style={styles.shortlistNotes}>{item.notes}</Text>
-                  ) : null}
-                  <View style={styles.shortlistMeta}>
-                    <Feather name="thumbs-up" size={12} color="#22C55E" />
-                    <Text style={styles.shortlistVotes}>{item.vote_count}</Text>
-                  </View>
+
+          {(() => {
+            const totalMembers = members.filter(m => m.status === 'joined').length;
+            let filtered = groupShortlist;
+            if (shortlistFilter === 'everyone') {
+              filtered = groupShortlist.filter(s => s.like_count >= totalMembers && totalMembers > 0);
+            } else if (shortlistFilter === 'mine') {
+              filtered = groupShortlist.filter(s => s.liked_by.some(l => l.user_id === user?.id));
+            }
+
+            if (filtered.length === 0) {
+              return (
+                <View style={styles.emptyState}>
+                  <Feather name="heart" size={36} color="rgba(255,255,255,0.15)" />
+                  <Text style={styles.emptyText}>
+                    {shortlistFilter === 'everyone' ? 'No listings liked by everyone yet' : 'No liked listings yet'}
+                  </Text>
+                  <Text style={styles.emptySubtext}>
+                    Start exploring to build your group's shortlist!
+                  </Text>
                 </View>
-                <Pressable onPress={() => handleRemoveShortlist(item)}>
-                  <Feather name="x" size={16} color="#EF4444" />
-                </Pressable>
-              </View>
-            )}
-          />
-        )
+              );
+            }
+
+            return filtered.map(item => (
+              <GroupShortlistCard
+                key={item.listing_id}
+                listing={item.listing}
+                likeCount={item.like_count}
+                totalMembers={totalMembers}
+                likedBy={item.liked_by}
+                onPress={() => {
+                  if (item.listing?.id) {
+                    (navigation as any).navigate('Explore', { viewListingId: item.listing.id });
+                  }
+                }}
+              />
+            ));
+          })()}
+        </ScrollView>
+      ) : null}
+
+      {activeTab === 'tours' ? (
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}>
+          <Pressable
+            style={styles.scheduleTourBtn}
+            onPress={() => setShowTourForm(!showTourForm)}
+          >
+            <Feather name="plus" size={16} color="#fff" />
+            <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>Schedule a Tour</Text>
+          </Pressable>
+
+          {showTourForm ? (
+            <View style={{ marginTop: 12 }}>
+              <TourScheduleForm
+                onSubmit={async (data) => {
+                  if (!group) return;
+                  setTourSubmitting(true);
+                  try {
+                    await createTourEvent({
+                      groupId: group.id,
+                      tourDate: data.tourDate,
+                      tourTime: data.tourTime,
+                      durationMinutes: data.durationMinutes,
+                      location: data.location,
+                      notes: data.notes,
+                    });
+                    setShowTourForm(false);
+                    loadData();
+                  } catch (e) {
+                    Alert.alert('Error', 'Failed to schedule tour. Please try again.');
+                  } finally {
+                    setTourSubmitting(false);
+                  }
+                }}
+                onCancel={() => setShowTourForm(false)}
+                submitting={tourSubmitting}
+              />
+            </View>
+          ) : null}
+
+          {tours.length === 0 && !showTourForm ? (
+            <View style={styles.emptyState}>
+              <Feather name="calendar" size={36} color="rgba(255,255,255,0.15)" />
+              <Text style={styles.emptyText}>No tours scheduled</Text>
+              <Text style={styles.emptySubtext}>
+                Schedule a tour to visit listings with your group
+              </Text>
+            </View>
+          ) : null}
+
+          {tours.map((tour: any) => (
+            <View key={tour.id} style={{ marginTop: 12 }}>
+              <TourEventCard
+                tour={tour}
+                currentUserId={user?.id}
+                isCreator={tour.created_by === user?.id}
+                onRSVP={async (tourId, status) => {
+                  try {
+                    await updateTourRSVP(tourId, status);
+                    loadData();
+                  } catch {
+                    Alert.alert('Error', 'Failed to update RSVP.');
+                  }
+                }}
+                onCancel={async (tourId) => {
+                  Alert.alert('Cancel Tour', 'Are you sure you want to cancel this tour?', [
+                    { text: 'No', style: 'cancel' },
+                    {
+                      text: 'Yes, Cancel',
+                      style: 'destructive',
+                      onPress: async () => {
+                        try {
+                          await cancelTourEvent(tourId);
+                          loadData();
+                        } catch {
+                          Alert.alert('Error', 'Failed to cancel tour.');
+                        }
+                      },
+                    },
+                  ]);
+                }}
+              />
+            </View>
+          ))}
+        </ScrollView>
       ) : null}
 
       {activeTab === 'settings' ? (
@@ -457,6 +634,54 @@ export default function MyGroupScreen() {
                 ) : null}
               </View>
             </>
+          ) : null}
+
+          {isLead && members.filter(m => m.status === 'joined' && m.user_id !== user?.id).length > 0 ? (
+            <View style={styles.settingsField}>
+              <Text style={styles.settingsLabel}>Transfer Leadership</Text>
+              <Text style={styles.replacementSubtext}>
+                Hand over group lead to another member
+              </Text>
+              {members
+                .filter(m => m.status === 'joined' && m.user_id !== user?.id)
+                .map(m => (
+                  <Pressable
+                    key={m.id}
+                    onPress={() => {
+                      Alert.alert(
+                        'Transfer Lead',
+                        `Make ${m.name || 'this member'} the group lead? You'll remain as a regular member.`,
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          {
+                            text: 'Transfer',
+                            onPress: async () => {
+                              try {
+                                await transferGroupLead(group.id, m.user_id);
+                                Alert.alert('Done', `${m.name || 'Member'} is now the group lead.`);
+                                loadData();
+                              } catch {
+                                Alert.alert('Error', 'Failed to transfer leadership.');
+                              }
+                            },
+                          },
+                        ]
+                      );
+                    }}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 8,
+                      paddingVertical: 8,
+                      marginTop: 4,
+                    }}
+                  >
+                    <Feather name="user" size={14} color="rgba(255,255,255,0.5)" />
+                    <Text style={{ color: '#ccc', fontSize: 13, flex: 1 }}>{m.name || 'Member'}</Text>
+                    <Feather name="chevron-right" size={14} color="rgba(255,255,255,0.3)" />
+                  </Pressable>
+                ))}
+            </View>
           ) : null}
 
           <Pressable style={styles.leaveBtn} onPress={handleLeave}>
@@ -777,5 +1002,49 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.4)',
     marginTop: 8,
     lineHeight: 18,
+  },
+  pendingInviteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(245,158,11,0.06)',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(245,158,11,0.15)',
+    marginBottom: 6,
+  },
+  shortlistFilterRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+    marginTop: 4,
+  },
+  shortlistFilterBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  shortlistFilterBtnActive: {
+    backgroundColor: 'rgba(255,107,91,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.3)',
+  },
+  shortlistFilterText: {
+    color: '#888',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  scheduleTourBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#ff6b5b',
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 4,
   },
 });

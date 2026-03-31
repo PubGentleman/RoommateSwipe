@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, StyleSheet, Pressable, TextInput, ActivityIndicator,
+  View, StyleSheet, Pressable, TextInput, ActivityIndicator, Switch,
 } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { ThemedText } from '../../components/ThemedText';
@@ -8,7 +8,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../contexts/AuthContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { Spacing, Typography } from '../../constants/theme';
-import { createGroup as createGroupSupabase, getGroupLimit, getMemberLimit } from '../../services/groupService';
+import { createGroup as createGroupSupabase, getGroupLimit, getMemberLimit, sendGroupInvites, GroupInviteInput } from '../../services/groupService';
 import { StorageService } from '../../utils/storage';
 import { supabase } from '../../lib/supabase';
 import { ScreenKeyboardAwareScrollView } from '../../components/ScreenKeyboardAwareScrollView';
@@ -17,6 +17,13 @@ import { GroupPropertySearchModal } from '../../components/GroupPropertySearchMo
 import { LinearGradient } from 'expo-linear-gradient';
 
 const ACCENT = '#ff6b5b';
+
+interface InviteEntry {
+  id: string;
+  type: 'email' | 'phone';
+  value: string;
+  isCouple: boolean;
+}
 
 export const CreateGroupScreen = ({ navigation, route }: any) => {
   const { theme } = useTheme();
@@ -34,10 +41,35 @@ export const CreateGroupScreen = ({ navigation, route }: any) => {
   const [descFocused, setDescFocused] = useState(false);
   const [matchedIsCouple, setMatchedIsCouple] = useState(false);
 
+  const [invites, setInvites] = useState<InviteEntry[]>([]);
+  const [newInviteType, setNewInviteType] = useState<'email' | 'phone'>('email');
+  const [newInviteValue, setNewInviteValue] = useState('');
+  const [newInviteCouple, setNewInviteCouple] = useState(false);
+  const [inviteFocused, setInviteFocused] = useState(false);
+
   const matchedUserId = route.params?.matchedUserId;
   const matchedUserName = route.params?.matchedUserName;
   const canCreate = name.trim().length > 0;
   const memberLimit = getMemberLimit((user as any)?.subscription?.plan || 'basic', selectedListing?.bedrooms || null);
+
+  const addInvite = () => {
+    const val = newInviteValue.trim();
+    if (!val) return;
+    if (newInviteType === 'email' && !val.includes('@')) return;
+    if (invites.some(i => i.value === val)) return;
+    setInvites(prev => [...prev, {
+      id: `inv_${Date.now()}`,
+      type: newInviteType,
+      value: val,
+      isCouple: newInviteCouple,
+    }]);
+    setNewInviteValue('');
+    setNewInviteCouple(false);
+  };
+
+  const removeInvite = (id: string) => {
+    setInvites(prev => prev.filter(i => i.id !== id));
+  };
 
   const handleCreate = async () => {
     if (!user) return;
@@ -85,6 +117,19 @@ export const CreateGroupScreen = ({ navigation, route }: any) => {
             const { addMemberToGroup } = await import('../../services/groupService');
             await addMemberToGroup(group.id, matchedUserId, 'renter', { isCouple: matchedIsCouple });
           } catch {}
+        }
+
+        if (invites.length > 0) {
+          try {
+            const inviteInputs: GroupInviteInput[] = invites.map(inv => ({
+              email: inv.type === 'email' ? inv.value : undefined,
+              phone: inv.type === 'phone' ? inv.value : undefined,
+              isCouple: inv.isCouple,
+            }));
+            await sendGroupInvites(group.id, inviteInputs);
+          } catch (invErr) {
+            console.warn('[CreateGroupScreen] Failed to send some invites:', invErr);
+          }
         }
 
         navigation.goBack();
@@ -246,6 +291,85 @@ export const CreateGroupScreen = ({ navigation, route }: any) => {
           <ThemedText style={styles.charCount}>{description.length}/200</ThemedText>
         </View>
       </View>
+
+      <View style={styles.divider} />
+
+      <View style={styles.sectionHeader}>
+        <Feather name="mail" size={15} color="rgba(255,255,255,0.5)" />
+        <ThemedText style={styles.sectionTitle}>Invite Your Crew</ThemedText>
+        <ThemedText style={styles.optional}>Optional</ThemedText>
+      </View>
+      <ThemedText style={styles.sectionHint}>
+        Add friends by email or phone number
+      </ThemedText>
+
+      <View style={styles.inviteTypeToggle}>
+        <Pressable
+          style={[styles.inviteTypeBtn, newInviteType === 'email' && styles.inviteTypeBtnActive]}
+          onPress={() => setNewInviteType('email')}
+        >
+          <Feather name="mail" size={13} color={newInviteType === 'email' ? '#fff' : '#888'} />
+          <ThemedText style={[styles.inviteTypeBtnText, newInviteType === 'email' && { color: '#fff' }]}>Email</ThemedText>
+        </Pressable>
+        <Pressable
+          style={[styles.inviteTypeBtn, newInviteType === 'phone' && styles.inviteTypeBtnActive]}
+          onPress={() => setNewInviteType('phone')}
+        >
+          <Feather name="phone" size={13} color={newInviteType === 'phone' ? '#fff' : '#888'} />
+          <ThemedText style={[styles.inviteTypeBtnText, newInviteType === 'phone' && { color: '#fff' }]}>Phone</ThemedText>
+        </Pressable>
+      </View>
+
+      <View style={[styles.inviteInputRow, inviteFocused && { borderColor: ACCENT }]}>
+        <TextInput
+          style={styles.inviteInput}
+          placeholder={newInviteType === 'email' ? 'friend@email.com' : '+1 (555) 123-4567'}
+          placeholderTextColor="rgba(255,255,255,0.2)"
+          value={newInviteValue}
+          onChangeText={setNewInviteValue}
+          keyboardType={newInviteType === 'email' ? 'email-address' : 'phone-pad'}
+          autoCapitalize="none"
+          onFocus={() => setInviteFocused(true)}
+          onBlur={() => setInviteFocused(false)}
+          onSubmitEditing={addInvite}
+        />
+        <Pressable style={styles.addInviteBtn} onPress={addInvite}>
+          <Feather name="plus" size={16} color={ACCENT} />
+        </Pressable>
+      </View>
+
+      <Pressable
+        style={[styles.inviteCoupleRow, newInviteCouple && { borderColor: '#ec4899' + '40' }]}
+        onPress={() => setNewInviteCouple(!newInviteCouple)}
+      >
+        <Feather name="heart" size={13} color={newInviteCouple ? '#ec4899' : '#666'} />
+        <ThemedText style={{ color: newInviteCouple ? '#ec4899' : '#888', fontSize: 12, flex: 1 }}>
+          Joining as a couple?
+        </ThemedText>
+        <View style={[styles.coupleCheck, newInviteCouple ? { backgroundColor: '#ec4899', borderColor: '#ec4899' } : { borderColor: '#444' }]}>
+          {newInviteCouple ? <Feather name="check" size={10} color="#fff" /> : null}
+        </View>
+      </Pressable>
+
+      {invites.length > 0 ? (
+        <View style={styles.inviteList}>
+          {invites.map(inv => (
+            <View key={inv.id} style={styles.inviteItem}>
+              <Feather name={inv.type === 'email' ? 'mail' : 'phone'} size={13} color="#888" />
+              <ThemedText style={styles.inviteItemText} numberOfLines={1}>{inv.value}</ThemedText>
+              {inv.isCouple ? (
+                <View style={styles.inviteCoupleBadge}>
+                  <Feather name="heart" size={8} color="#ec4899" />
+                  <ThemedText style={{ color: '#ec4899', fontSize: 9 }}>Couple</ThemedText>
+                </View>
+              ) : null}
+              <Pressable onPress={() => removeInvite(inv.id)} hitSlop={8}>
+                <Feather name="x" size={14} color="#666" />
+              </Pressable>
+            </View>
+          ))}
+        </View>
+      ) : null}
 
       <View style={styles.divider} />
 
@@ -690,5 +814,99 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '700',
+  },
+  inviteTypeToggle: {
+    flexDirection: 'row',
+    marginHorizontal: 20,
+    marginTop: 4,
+    gap: 8,
+  },
+  inviteTypeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  inviteTypeBtnActive: {
+    borderColor: ACCENT,
+    backgroundColor: 'rgba(255,107,91,0.1)',
+  },
+  inviteTypeBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#888',
+  },
+  inviteInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 20,
+    marginTop: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    paddingRight: 6,
+  },
+  inviteInput: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  addInviteBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255,107,91,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inviteCoupleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 20,
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  inviteList: {
+    marginHorizontal: 20,
+    marginTop: 10,
+    gap: 6,
+  },
+  inviteItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  inviteItemText: {
+    color: '#ccc',
+    fontSize: 13,
+    flex: 1,
+  },
+  inviteCoupleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    backgroundColor: 'rgba(236,72,153,0.12)',
   },
 });

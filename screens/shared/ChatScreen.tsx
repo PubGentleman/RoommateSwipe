@@ -1304,6 +1304,31 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
               </Pressable>
             </Animated.View>
           ) : null}
+          {inquiryStatus === 'accepted' && !inquiryGroup?.isArchived && !isHost ? (
+            <Pressable
+              onPress={() => {
+                navigation.navigate('MyGroup' as never);
+              }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                marginHorizontal: 16,
+                marginTop: 6,
+                paddingVertical: 10,
+                backgroundColor: 'rgba(255,107,91,0.1)',
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: 'rgba(255,107,91,0.2)',
+              }}
+            >
+              <Feather name="calendar" size={14} color="#ff6b5b" />
+              <ThemedText style={{ fontSize: 13, fontWeight: '600', color: '#ff6b5b' }}>
+                Schedule a Tour
+              </ThemedText>
+            </Pressable>
+          ) : null}
           {inquiryGroup?.isArchived ? (
             <View style={styles.archivedBanner}>
               <Feather name="archive" size={14} color="rgba(255,255,255,0.5)" />

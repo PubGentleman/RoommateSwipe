@@ -1107,6 +1107,10 @@ export const ExploreScreen = () => {
             const myGroup = await getUserPreformedGroup();
             if (myGroup) {
               await addToShortlist(myGroup.id, id);
+              try {
+                const { likeListingForGroup } = await import('../../services/groupService');
+                await likeListingForGroup(myGroup.id, id);
+              } catch {}
             }
           } catch (shortlistErr) {
             console.warn('Could not add to group shortlist:', shortlistErr);

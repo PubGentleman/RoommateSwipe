@@ -1507,3 +1507,287 @@ export async function checkMutualInterest(groupId: string): Promise<boolean> {
     .maybeSingle();
   return data?.admin_liked_back ?? false;
 }
+
+function generateGroupInviteCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 8; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
+export interface GroupInviteInput {
+  email?: string;
+  phone?: string;
+  isCouple?: boolean;
+}
+
+export async function sendGroupInvites(groupId: string, invites: GroupInviteInput[]): Promise<void> {
+  const rows = invites.map(inv => ({
+    group_id: groupId,
+    invite_email: inv.email || null,
+    invite_phone: inv.phone || null,
+    invite_code: generateGroupInviteCode(),
+    is_couple: inv.isCouple || false,
+    delivery_method: inv.email ? 'email' : 'sms',
+    delivery_status: 'pending',
+    status: 'pending',
+  }));
+  const { error } = await supabase.from('group_invites').insert(rows);
+  if (error) throw error;
+
+  for (const row of rows) {
+    try {
+      await supabase.functions.invoke('send-group-invite', {
+        body: {
+          groupId,
+          inviteCode: row.invite_code,
+          email: row.invite_email,
+          phone: row.invite_phone,
+          isCouple: row.is_couple,
+        },
+      });
+    } catch (e) {
+      console.warn('[sendGroupInvites] Edge function failed for invite:', e);
+    }
+  }
+}
+
+export async function getPendingInvitesForGroup(groupId: string) {
+  const { data, error } = await supabase
+    .from('group_invites')
+    .select('*')
+    .eq('group_id', groupId)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function resendGroupInvite(inviteId: string): Promise<void> {
+  const { data: invite, error } = await supabase
+    .from('group_invites')
+    .select('*')
+    .eq('id', inviteId)
+    .single();
+  if (error || !invite) throw error || new Error('Invite not found');
+
+  await supabase.functions.invoke('send-group-invite', {
+    body: {
+      groupId: invite.group_id,
+      inviteCode: invite.invite_code,
+      email: invite.invite_email,
+      phone: invite.invite_phone,
+      isCouple: invite.is_couple,
+    },
+  });
+
+  await supabase
+    .from('group_invites')
+    .update({ delivery_status: 'pending' })
+    .eq('id', inviteId);
+}
+
+export async function checkPendingInvitesForUser(email?: string, phone?: string) {
+  if (!email && !phone) return [];
+  let query = supabase.from('group_invites').select('*, group:groups(id, name, created_by)').eq('status', 'pending');
+  if (email && phone) {
+    query = query.or(`invite_email.eq.${email},invite_phone.eq.${phone}`);
+  } else if (email) {
+    query = query.eq('invite_email', email);
+  } else if (phone) {
+    query = query.eq('invite_phone', phone);
+  }
+  const { data, error } = await query;
+  if (error) return [];
+  return data || [];
+}
+
+export async function acceptGroupInvite(inviteCode: string, userId: string): Promise<{ groupId: string } | null> {
+  const { data: invite, error } = await supabase
+    .from('group_invites')
+    .select('*')
+    .eq('invite_code', inviteCode)
+    .eq('status', 'pending')
+    .maybeSingle();
+  if (error || !invite) return null;
+
+  await supabase.from('group_invites').update({ status: 'accepted' }).eq('id', invite.id);
+
+  await addMemberToGroup(invite.group_id, userId, 'renter', { isCouple: invite.is_couple });
+  return { groupId: invite.group_id };
+}
+
+export async function declineGroupInvite(inviteCode: string): Promise<void> {
+  await supabase
+    .from('group_invites')
+    .update({ status: 'declined' })
+    .eq('invite_code', inviteCode);
+}
+
+export async function likeListingForGroup(groupId: string, listingId: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+  const { error } = await supabase.from('group_listing_likes').upsert({
+    group_id: groupId,
+    listing_id: listingId,
+    user_id: user.id,
+  }, { onConflict: 'group_id,listing_id,user_id' });
+  if (error) throw error;
+}
+
+export async function unlikeListingForGroup(groupId: string, listingId: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase
+    .from('group_listing_likes')
+    .delete()
+    .eq('group_id', groupId)
+    .eq('listing_id', listingId)
+    .eq('user_id', user.id);
+}
+
+export interface GroupShortlistListing {
+  listing_id: string;
+  like_count: number;
+  liked_by: { user_id: string; name?: string; avatar_url?: string }[];
+  listing?: any;
+}
+
+export async function getGroupShortlist(groupId: string): Promise<GroupShortlistListing[]> {
+  const { data: likes, error } = await supabase
+    .from('group_listing_likes')
+    .select('listing_id, user_id, user:users(id, full_name, avatar_url)')
+    .eq('group_id', groupId);
+  if (error) throw error;
+
+  const byListing: Record<string, { users: any[] }> = {};
+  for (const like of (likes || [])) {
+    if (!byListing[like.listing_id]) {
+      byListing[like.listing_id] = { users: [] };
+    }
+    byListing[like.listing_id].users.push({
+      user_id: like.user_id,
+      name: (like.user as any)?.full_name || 'Unknown',
+      avatar_url: (like.user as any)?.avatar_url || null,
+    });
+  }
+
+  const listingIds = Object.keys(byListing);
+  if (listingIds.length === 0) return [];
+
+  const { data: listings } = await supabase
+    .from('listings')
+    .select('id, title, address, city, state, rent, bedrooms, photos')
+    .in('id', listingIds);
+
+  const listingMap: Record<string, any> = {};
+  for (const l of (listings || [])) {
+    listingMap[l.id] = l;
+  }
+
+  return listingIds
+    .map(lid => ({
+      listing_id: lid,
+      like_count: byListing[lid].users.length,
+      liked_by: byListing[lid].users,
+      listing: listingMap[lid] || null,
+    }))
+    .sort((a, b) => b.like_count - a.like_count);
+}
+
+export interface TourEventInput {
+  groupId: string;
+  listingId?: string;
+  tourDate: string;
+  tourTime: string;
+  durationMinutes?: number;
+  location?: string;
+  notes?: string;
+}
+
+export async function createTourEvent(input: TourEventInput) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { data, error } = await supabase
+    .from('group_tour_events')
+    .insert({
+      group_id: input.groupId,
+      listing_id: input.listingId || null,
+      created_by: user.id,
+      tour_date: input.tourDate,
+      tour_time: input.tourTime,
+      duration_minutes: input.durationMinutes || 30,
+      location: input.location || null,
+      notes: input.notes || null,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+
+  const { data: members } = await supabase
+    .from('group_members')
+    .select('user_id')
+    .eq('group_id', input.groupId)
+    .eq('status', 'active');
+
+  const rsvpRows = (members || []).map((m: any) => ({
+    tour_id: data.id,
+    user_id: m.user_id,
+    status: m.user_id === user.id ? 'going' : 'pending',
+    responded_at: m.user_id === user.id ? new Date().toISOString() : null,
+  }));
+
+  if (rsvpRows.length > 0) {
+    await supabase.from('group_tour_rsvps').insert(rsvpRows);
+  }
+
+  return data;
+}
+
+export async function getGroupTours(groupId: string) {
+  const { data, error } = await supabase
+    .from('group_tour_events')
+    .select(`
+      *,
+      rsvps:group_tour_rsvps(user_id, status, responded_at),
+      creator:users!created_by(full_name, avatar_url),
+      listing:listings(id, title, address, city, photos)
+    `)
+    .eq('group_id', groupId)
+    .order('tour_date', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function updateTourRSVP(tourId: string, status: 'going' | 'maybe' | 'not_going'): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  await supabase.from('group_tour_rsvps').upsert({
+    tour_id: tourId,
+    user_id: user.id,
+    status,
+    responded_at: new Date().toISOString(),
+  }, { onConflict: 'tour_id,user_id' });
+}
+
+export async function cancelTourEvent(tourId: string): Promise<void> {
+  await supabase
+    .from('group_tour_events')
+    .update({ status: 'cancelled' })
+    .eq('id', tourId);
+}
+
+export async function transferGroupLead(groupId: string, newLeadId: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  await supabase
+    .from('preformed_groups')
+    .update({ group_lead_id: newLeadId })
+    .eq('id', groupId)
+    .eq('group_lead_id', user.id);
+}

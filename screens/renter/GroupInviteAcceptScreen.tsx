@@ -15,6 +15,8 @@ import {
   getGroupMembers,
   joinGroupByCode,
 } from '../../services/preformedGroupService';
+import { acceptGroupInvite, declineGroupInvite } from '../../services/groupService';
+import { supabase } from '../../lib/supabase';
 import { PreformedGroup, PreformedGroupMember } from '../../types/models';
 import { RhomeLogo } from '../../components/RhomeLogo';
 
@@ -34,6 +36,7 @@ export default function GroupInviteAcceptScreen() {
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState('');
+  const [emailInvite, setEmailInvite] = useState<any>(null);
 
   useEffect(() => {
     loadGroup();
@@ -46,22 +49,52 @@ export default function GroupInviteAcceptScreen() {
       return;
     }
     const g = await getGroupByInviteCode(inviteCode);
-    if (!g) {
-      setError('Group not found or invite has expired');
+    if (g) {
+      const m = await getGroupMembers(g.id);
+      setGroup(g);
+      setMembers(m);
       setLoading(false);
       return;
     }
-    const m = await getGroupMembers(g.id);
-    setGroup(g);
-    setMembers(m);
+
+    try {
+      const { data: inv } = await supabase
+        .from('group_invites')
+        .select('*, preformed_groups(id, name, group_size, status, invite_code, group_lead_id, city)')
+        .eq('invite_code', inviteCode)
+        .eq('status', 'pending')
+        .single();
+
+      if (inv?.preformed_groups) {
+        setEmailInvite(inv);
+        const pg = inv.preformed_groups as any;
+        setGroup(pg);
+        const m = await getGroupMembers(pg.id);
+        setMembers(m);
+        setLoading(false);
+        return;
+      }
+    } catch {}
+
+    setError('Group not found or invite has expired');
     setLoading(false);
   };
 
   const handleAccept = async () => {
     if (!user || !group) return;
     setJoining(true);
-    const result = await joinGroupByCode(inviteCode, user.name || 'Member');
-    if (result.success) {
+
+    try {
+      if (emailInvite) {
+        await acceptGroupInvite(emailInvite.invite_code, user.id);
+      } else {
+        const result = await joinGroupByCode(inviteCode, user.name || 'Member');
+        if (!result.success) {
+          setError('Failed to join group');
+          setJoining(false);
+          return;
+        }
+      }
       await updateUser({
         profileData: {
           ...user.profileData,
@@ -70,13 +103,18 @@ export default function GroupInviteAcceptScreen() {
         },
       });
       navigation.navigate('GroupsList' as never);
-    } else {
+    } catch {
       setError('Failed to join group');
     }
     setJoining(false);
   };
 
-  const handleDecline = () => {
+  const handleDecline = async () => {
+    if (emailInvite?.invite_code) {
+      try {
+        await declineGroupInvite(emailInvite.invite_code);
+      } catch {}
+    }
     navigation.goBack();
   };
 
@@ -137,6 +175,13 @@ export default function GroupInviteAcceptScreen() {
           <View style={styles.detailRow}>
             <Feather name="map-pin" size={14} color="rgba(255,255,255,0.5)" />
             <Text style={styles.detailText}>{group.city}</Text>
+          </View>
+        ) : null}
+
+        {emailInvite?.is_couple ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: 'rgba(236,72,153,0.1)', borderRadius: 8 }}>
+            <Feather name="heart" size={12} color="#EC4899" />
+            <Text style={{ fontSize: 12, color: '#EC4899', fontWeight: '500' }}>Joining as a couple (sharing 1 bedroom)</Text>
           </View>
         ) : null}
 
