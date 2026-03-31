@@ -10,7 +10,7 @@ import { supabase } from '../../../lib/supabase';
 import OnboardingHeader from '../../../components/OnboardingHeader';
 import { PricePickerPair } from '../../../components/PricePicker';
 
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 5;
 
 const ROOM_TYPES = [
   { id: 'private', icon: 'lock' as const, label: 'Private Room', desc: 'Your own space with shared common areas' },
@@ -70,6 +70,7 @@ export default function RoommateOnboardingScreen() {
     listingPref === 'entire_apartment' ? ['apartment'] :
     listingPref === 'room' ? ['private'] : []
   );
+  const [maxRoommates, setMaxRoommates] = useState(2);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -142,6 +143,42 @@ export default function RoommateOnboardingScreen() {
           </View>
         </>
       ) : null}
+    </View>
+  );
+
+  const renderRoommateCountStep = () => (
+    <View>
+      <Text style={[styles.stepTitle, { color: theme.text }]}>How many roommates are you open to living with?</Text>
+      <Text style={[styles.stepSubtitle, { color: theme.textSecondary }]}>
+        This helps us find the right matches for you
+      </Text>
+
+      <View style={styles.stepperContainer}>
+        <Pressable
+          style={[styles.stepperButton, maxRoommates <= 1 && styles.stepperButtonDisabled]}
+          onPress={() => setMaxRoommates(prev => Math.max(1, prev - 1))}
+          disabled={maxRoommates <= 1}
+        >
+          <Feather name="minus" size={24} color={maxRoommates <= 1 ? 'rgba(255,255,255,0.2)' : '#fff'} />
+        </Pressable>
+
+        <View style={styles.stepperValueWrap}>
+          <Text style={[styles.stepperValue, { color: theme.primary }]}>
+            {maxRoommates === 4 ? '4+' : maxRoommates}
+          </Text>
+          <Text style={[styles.stepperLabel, { color: theme.textSecondary }]}>
+            {maxRoommates === 1 ? 'roommate' : 'roommates'}
+          </Text>
+        </View>
+
+        <Pressable
+          style={[styles.stepperButton, maxRoommates >= 4 && styles.stepperButtonDisabled]}
+          onPress={() => setMaxRoommates(prev => Math.min(4, prev + 1))}
+          disabled={maxRoommates >= 4}
+        >
+          <Feather name="plus" size={24} color={maxRoommates >= 4 ? 'rgba(255,255,255,0.2)' : '#fff'} />
+        </Pressable>
+      </View>
     </View>
   );
 
@@ -358,6 +395,7 @@ export default function RoommateOnboardingScreen() {
         profileFields.dealbreakers = dealbreakers;
       }
       if (dealbreakers.includes('pets')) profileFields.pets = 'no_pets';
+      profileFields.max_roommates = maxRoommates;
       const roomTypeVal = roomTypes.join(',') || (listingPref === 'entire_apartment' ? 'apartment' : listingPref === 'room' ? 'private' : undefined);
       if (roomTypeVal) profileFields.room_type = roomTypeVal;
 
@@ -394,6 +432,9 @@ export default function RoommateOnboardingScreen() {
           },
         },
       };
+
+      userUpdates.max_roommates = maxRoommates;
+      userUpdates.profileData.max_roommates = maxRoommates;
 
       if (idealRoommate.trim()) {
         userUpdates.ideal_roommate_text = idealRoommate.trim();
@@ -463,7 +504,7 @@ export default function RoommateOnboardingScreen() {
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {step === 1 ? renderBudgetStep() : step === 2 ? renderStep1() : step === 3 ? renderStep2() : renderStep3()}
+        {step === 1 ? renderBudgetStep() : step === 2 ? renderRoommateCountStep() : step === 3 ? renderStep1() : step === 4 ? renderStep2() : renderStep3()}
       </ScrollView>
 
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 8 }]}>
@@ -561,6 +602,41 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'right',
     marginTop: 6,
+  },
+  stepperContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 32,
+    marginTop: 48,
+    marginBottom: 24,
+  },
+  stepperButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepperButtonDisabled: {
+    opacity: 0.4,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  stepperValueWrap: {
+    alignItems: 'center',
+    minWidth: 80,
+  },
+  stepperValue: {
+    fontSize: 64,
+    fontWeight: '700',
+  },
+  stepperLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginTop: -4,
   },
   roomCard: {
     flexDirection: 'row',

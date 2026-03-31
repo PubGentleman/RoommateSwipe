@@ -91,6 +91,7 @@ Key files:
 - `supabase/functions/recalculate-badges/index.ts` — Daily cron Edge Function to refresh cached badge columns on `users` and `listings` tables
 - Migration 058 adds `host_badge` column to both `listings` and `users` tables
 - Migration 060 adds `published_at` column to `listings`, backfills existing active listings, and syncs `status` for listings with `is_active = true`
+- Migration 064 adds `max_roommates` (integer, nullable) to `profiles` table for roommate count preference
 
 ## Technical Decisions
 

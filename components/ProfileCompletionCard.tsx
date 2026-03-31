@@ -100,6 +100,14 @@ const ROOMMATE_SEEKER_FIELDS: ProfileField[] = [
     check: (u) => !!u.profileData?.preferences?.pets,
   },
   {
+    key: 'maxRoommates',
+    label: 'Roommate Count Preference',
+    icon: 'hash',
+    tip: 'Better match accuracy',
+    weight: 5,
+    check: (u) => u.profileData?.max_roommates != null || u.max_roommates != null,
+  },
+  {
     key: 'work',
     label: 'Work Info',
     icon: 'briefcase',
@@ -230,6 +238,7 @@ const FIELD_TO_STEP: Record<string, string> = {
   cleanliness: 'sleepCleanliness',
   smoking: 'smokingPets',
   pets: 'smokingPets',
+  maxRoommates: 'lifestyle',
   work: 'lifestyle',
   moveInDate: 'housing',
 };

@@ -246,6 +246,7 @@ async function getUserProfile(supabase: any, userId: string) {
       profile_note,
       ideal_roommate_text,
       dealbreakers,
+      max_roommates,
       preferred_neighborhoods
     `)
     .eq('user_id', userId)
@@ -283,6 +284,7 @@ async function getUserProfile(supabase: any, userId: string) {
     profile_note: profileData?.profile_note,
     ideal_roommate_text: profileData?.ideal_roommate_text,
     dealbreakers: profileData?.dealbreakers || [],
+    max_roommates: profileData?.max_roommates,
     profile: profileData,
   };
 }
@@ -582,6 +584,7 @@ ${profile.preferred_neighborhoods?.length ? `Preferred neighborhoods: ${profile.
 ${profile.amenity_preferences?.length ? `Must-have amenities: ${profile.amenity_preferences.join(', ')}` : ''}
 ${profile.nice_to_have_amenities?.length ? `Nice-to-have amenities: ${profile.nice_to_have_amenities.join(', ')}` : ''}
 ${profile.preferred_bedrooms !== undefined && profile.preferred_bedrooms !== null ? `Bedrooms wanted: ${profile.preferred_bedrooms === 0 ? 'Studio' : profile.preferred_bedrooms}` : ''}
+${profile.max_roommates ? `Max roommates: ${profile.max_roommates === 4 ? '4+' : profile.max_roommates}` : ''}
 ${profile.dealbreakers?.length ? `Dealbreakers: ${profile.dealbreakers.join(', ')}` : ''}
 ${profile.ideal_roommate_text ? `Ideal roommate description: "${profile.ideal_roommate_text}"` : ''}
 ${profile.apartment_search_type && profile.apartment_search_type !== 'with_roommates' ? `\nThis user is looking for an APARTMENT (not a roommate).
