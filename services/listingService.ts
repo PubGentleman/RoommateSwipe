@@ -207,14 +207,10 @@ export async function recordListingView(listingId: string): Promise<void> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    const today = new Date().toISOString().slice(0, 10);
-    await supabase
-      .from('listing_views')
-      .upsert(
-        { listing_id: listingId, viewer_id: user.id, view_date: today },
-        { onConflict: 'listing_id,viewer_id,view_date' }
-      )
-      .then(() => {});
+    await supabase.rpc('record_listing_view', {
+      p_listing_id: listingId,
+      p_viewer_id: user.id,
+    });
   } catch {}
 }
 
@@ -227,26 +223,24 @@ export interface ListingViewStats {
 
 export async function getListingViewStats(listingIds: string[]): Promise<ListingViewStats[]> {
   if (!listingIds.length) return [];
+  const empty = () => listingIds.map(id => ({ listingId: id, totalViews: 0, last30Days: 0, last90Days: 0 }));
   try {
-    const ninety = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    const thirty = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const { data } = await supabase
-      .from('listing_views')
-      .select('listing_id, view_date')
-      .in('listing_id', listingIds)
-      .gte('view_date', ninety);
-    if (!data) return listingIds.map(id => ({ listingId: id, totalViews: 0, last30Days: 0, last90Days: 0 }));
+      .from('listing_view_stats')
+      .select('listing_id, unique_viewers, viewers_last_30')
+      .in('listing_id', listingIds);
+    if (!data) return empty();
     return listingIds.map(id => {
-      const rows = data.filter((r: any) => r.listing_id === id);
+      const row = data.find((r: any) => r.listing_id === id);
       return {
         listingId: id,
-        totalViews: rows.length,
-        last30Days: rows.filter((r: any) => r.view_date >= thirty).length,
-        last90Days: rows.length,
+        totalViews: row?.unique_viewers ?? 0,
+        last30Days: row?.viewers_last_30 ?? 0,
+        last90Days: row?.unique_viewers ?? 0,
       };
     });
   } catch {
-    return listingIds.map(id => ({ listingId: id, totalViews: 0, last30Days: 0, last90Days: 0 }));
+    return empty();
   }
 }
 

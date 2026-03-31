@@ -118,7 +118,7 @@ export const HostAnalyticsScreen = () => {
   const estimatedViews    = totalInquiries * 15;
   const estimatedSaves    = totalInquiries * 8;
   const displayViews      = isAdvanced ? totalRealViews : estimatedViews;
-  const displayViewsLabel = isAdvanced ? 'Listing Views' : 'Est. Views';
+  const displayViewsLabel = isAdvanced ? 'Unique Viewers' : 'Est. Views';
 
   const now = Date.now();
   const windowMs = trendWindow * 24 * 60 * 60 * 1000;
@@ -241,7 +241,7 @@ export const HostAnalyticsScreen = () => {
   };
 
   const handleCompanyExport = async () => {
-    const header = 'Listing,Price,Status,Views,Inquiries,Accept Rate,Days Listed\n';
+    const header = 'Listing,Price,Status,Unique Viewers,Inquiries,Accept Rate,Days Listed\n';
     const rows = perListingInquiries.map(({ property, inquiryCount, viewCount }) => {
       const accepted = inquiries.filter(i => i.propertyId === property.id && i.status === 'accepted').length;
       const rate = inquiryCount > 0 ? Math.round((accepted / inquiryCount) * 100) : 0;
@@ -257,7 +257,7 @@ export const HostAnalyticsScreen = () => {
   };
 
   const handleAgentExport = async () => {
-    const header = 'Listing,Price,Days Listed,Views,Inquiries,Accepted,Accept Rate,Health Score,Status\n';
+    const header = 'Listing,Price,Days Listed,Unique Viewers,Inquiries,Accepted,Accept Rate,Health Score,Status\n';
     const rows = perListingInquiries.map(({ property, inquiryCount, viewCount }) => {
       const accepted = inquiries.filter(i => i.propertyId === property.id && i.status === 'accepted').length;
       const daysListed = property.createdAt
@@ -376,7 +376,7 @@ export const HostAnalyticsScreen = () => {
 
             {isAdvanced ? (
               <View style={[styles.barRow, { marginBottom: Spacing.xs }]}>
-                <ThemedText style={{ color: ACCENT2, width: 80, fontSize: 12 }}>{viewCount} views</ThemedText>
+                <ThemedText style={{ color: ACCENT2, width: 80, fontSize: 12 }}>{viewCount} viewers</ThemedText>
                 <View style={styles.barContainer}>
                   <View style={[styles.bar, {
                     width: `${Math.max((viewCount / Math.max(...perListingInquiries.map(p => p.viewCount), 1)) * 100, viewCount > 0 ? 8 : 0)}%`,
@@ -398,7 +398,7 @@ export const HostAnalyticsScreen = () => {
 
             {isAdvanced && viewCount > 0 ? (
               <ThemedText style={{ color: '#666', fontSize: 11, marginTop: 4 }}>
-                {Math.round((inquiryCount / viewCount) * 100)}% view-to-inquiry rate
+                {Math.round((inquiryCount / viewCount) * 100)}% viewer-to-inquiry rate
               </ThemedText>
             ) : null}
           </View>
@@ -607,7 +607,7 @@ export const HostAnalyticsScreen = () => {
           <View style={[styles.card, { backgroundColor: CARD_BG, padding: 0, overflow: 'hidden' }]}>
             <View style={[styles.tableRow, { borderBottomWidth: 1, borderBottomColor: '#2a2a2a' }]}>
               <ThemedText style={[styles.tableCell, styles.tableHeader, { flex: 2 }]}>Listing</ThemedText>
-              <ThemedText style={[styles.tableCell, styles.tableHeader]}>Views</ThemedText>
+              <ThemedText style={[styles.tableCell, styles.tableHeader]}>Viewers</ThemedText>
               <ThemedText style={[styles.tableCell, styles.tableHeader]}>Inq.</ThemedText>
               <ThemedText style={[styles.tableCell, styles.tableHeader]}>Status</ThemedText>
             </View>
@@ -705,7 +705,7 @@ export const HostAnalyticsScreen = () => {
                   <View style={{ flexDirection: 'row', gap: 16 }}>
                     <View>
                       <ThemedText style={{ color: ACCENT2, fontWeight: '700' }}>{viewCount}</ThemedText>
-                      <ThemedText style={{ color: '#666', fontSize: 11 }}>Views</ThemedText>
+                      <ThemedText style={{ color: '#666', fontSize: 11 }}>Viewers</ThemedText>
                     </View>
                     <View>
                       <ThemedText style={{ color: ACCENT, fontWeight: '700' }}>{inquiryCount}</ThemedText>
