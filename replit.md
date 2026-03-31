@@ -35,6 +35,7 @@ The application is built using React Native, Expo, and TypeScript, employing Rea
 - **Pi AI Matchmaker:** Rhome's AI matchmaker persona, providing match insights, deck rankings, host recommendations, and preference parsing. This is integrated with a subscription-tiered usage and quota enforcement system. Includes "Pi's Take" summaries, "Pi Pick" badges, and plan-gated `WhyThisMatchModal` content.
 - **Pi Demand Intelligence:** Anonymous renter activity tracking feeds market context into Pi's listing advisor mode, tracking events like listing views and searches to aggregate neighborhood and listing demand.
 - **Contact Info Protection:** Platform-level contact info blurring in chat messages for free users, with auto-unlocking upon confirmed visit requests or booking offers.
+- **Agent/Company Messaging Paywall:** Free-tier agents (pay_per_use) and companies see blurred message previews and content. Each account gets 1 lifetime free conversation unlock. Paid plans get full messaging access. Service-level guard blocks sends on locked conversations.
 - **Support System:** Email support for all users, with priority for paid users.
 - **Verification & Safety:** Instagram verification, multi-photo enforcement, chat leakage detection, background checks, identity verification, a References System, and Agent License Verification.
 - **Profile Pause ("I Found a Place"):** Renters can pause their search profiles, removing them from discovery surfaces while retaining subscriptions, with a daily check-in cron.

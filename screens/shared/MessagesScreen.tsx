@@ -6,6 +6,7 @@ import { Conversation, Match, RoommateProfile } from '../../types/models';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StorageService } from '../../utils/storage';
 import { useAuth } from '../../contexts/AuthContext';
+import { canAccessMessages, canAccessConversation } from '../../utils/messagingAccess';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MessagesStackParamList } from '../../navigation/MessagesStackNavigator';
@@ -583,12 +584,29 @@ export const MessagesScreen = () => {
           </View>
 
           <View style={styles.convMidRow}>
-            <Text
-              style={[styles.convPreview, isUnmatched && styles.convPreviewMuted]}
-              numberOfLines={1}
-            >
-              {isNew ? 'You matched! Say hello' : item.lastMessage}
-            </Text>
+            {(() => {
+              const hasMessagingAccess = canAccessMessages(user || null);
+              const convUnlocked = canAccessConversation(user || null, item.id);
+              const showBlur = !hasMessagingAccess && !convUnlocked && !isNew;
+              if (showBlur) {
+                return (
+                  <View style={styles.blurredPreviewContainer}>
+                    <Text style={[styles.convPreview, styles.blurredPreviewText]} numberOfLines={1}>
+                      {item.lastMessage || 'Message content hidden'}
+                    </Text>
+                    <View style={styles.blurPreviewOverlay} />
+                  </View>
+                );
+              }
+              return (
+                <Text
+                  style={[styles.convPreview, isUnmatched && styles.convPreviewMuted]}
+                  numberOfLines={1}
+                >
+                  {isNew ? 'You matched! Say hello' : item.lastMessage}
+                </Text>
+              );
+            })()}
             {hasUnread && !isUnmatched ? (
               <View style={styles.unreadBadge}>
                 <Text style={styles.unreadBadgeText}>{item.unread}</Text>
@@ -1562,5 +1580,22 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: 'rgba(255,255,255,0.2)',
     letterSpacing: 0.8,
+  },
+  blurredPreviewContainer: {
+    position: 'relative' as const,
+    overflow: 'hidden' as const,
+    height: 18,
+    flex: 1,
+  },
+  blurredPreviewText: {
+    opacity: 0.3,
+  },
+  blurPreviewOverlay: {
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
 });

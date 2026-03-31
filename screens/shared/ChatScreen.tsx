@@ -41,6 +41,13 @@ import {
   requestDifferentAgent,
   getHoursSinceMessage,
 } from '../../services/responseTrackingService';
+import {
+  canAccessMessages,
+  canAccessConversation,
+  hasFreeUnlockAvailable,
+  useFreeMessageUnlock,
+  getMessagingUpgradePlan,
+} from '../../utils/messagingAccess';
 
 type ChatScreenProps = {
   route: {
@@ -57,7 +64,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const { conversationId, otherUser: routeOtherUser, inquiryGroup, matchId: routeMatchId } = route.params;
   const isInquiryChat = !!inquiryGroup || conversationId.startsWith('inquiry_');
   const { theme } = useTheme();
-  const { user, incrementMessageCount, canSendMessage, canStartNewChat, incrementActiveChatCount, watchAdForCredit, isBasicUser, blockUser, reportUser, canSendColdMessage, useColdMessage, getHostPlan } = useAuth();
+  const { user, incrementMessageCount, canSendMessage, canStartNewChat, incrementActiveChatCount, watchAdForCredit, isBasicUser, blockUser, reportUser, canSendColdMessage, useColdMessage, getHostPlan, updateUser } = useAuth();
   const insets = useSafeAreaInsets();
   const { confirm, alert } = useConfirm();
   const { refreshUnreadCount } = useNotificationContext();
@@ -100,6 +107,13 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [isGroupLeader, setIsGroupLeader] = useState<boolean>(true);
   const [responseDelayHours, setResponseDelayHours] = useState<number>(0);
   const [requestedDifferentAgent, setRequestedDifferentAgent] = useState(false);
+  const [showUnlockModal, setShowUnlockModal] = useState(false);
+
+  const hasMessagingAccess = canAccessMessages(user || null);
+  const isConvUnlocked = canAccessConversation(user || null, conversationId);
+  const canUnlock = hasFreeUnlockAvailable(user || null);
+  const upgradePlan = getMessagingUpgradePlan(user || null);
+  const messagingLocked = !hasMessagingAccess && !isConvUnlocked;
 
   const [inquiryStatus, setInquiryStatus] = useState<'pending' | 'accepted' | 'declined'>(
     inquiryGroup?.inquiryStatus || inquiryGroup?.inquiry_status || 'pending'
@@ -215,6 +229,27 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         ? conversationId.slice(5)
         : conversationId);
   const [conversationListingId, setConversationListingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (messagingLocked && canUnlock) {
+      setShowUnlockModal(true);
+    }
+  }, [messagingLocked, canUnlock]);
+
+  const handleUnlockConversation = async () => {
+    if (!user) return;
+    const result = await useFreeMessageUnlock(user.id, conversationId);
+    if (result.success) {
+      if (updateUser) {
+        await updateUser({
+          freeMessageUnlockUsed: true,
+          freeMessageUnlockConversationId: conversationId,
+          freeMessageUnlockUsedAt: new Date().toISOString(),
+        });
+      }
+      setShowUnlockModal(false);
+    }
+  };
 
   useEffect(() => {
     loadMessages();
@@ -651,6 +686,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const sendMessage = async () => {
     if (!inputText.trim() || !user) return;
 
+    if (messagingLocked) return;
+
     if (isColdMessage && !coldMessageResponded) {
       const coldCheck = await canSendColdMessage();
       if (!coldCheck.canSend) {
@@ -1017,6 +1054,25 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
 
     const msgType = (item as any).message_type;
     if (msgType === 'visit_request' || msgType === 'booking_offer') {
+      if (messagingLocked) {
+        return (
+          <View style={{ opacity: 0.3, overflow: 'hidden' }}>
+            <ChatActionCard
+              message={item}
+              currentUserId={user?.id || ''}
+              onConfirmVisit={() => {}}
+              onDeclineVisit={() => {}}
+              onProposeNewTime={() => {}}
+              onAcceptBooking={() => {}}
+              onDeclineBooking={() => {}}
+              actionLoading={false}
+              agentInfo={chatAgentInfo}
+              groupSize={chatGroupSize}
+              isGroupLeader={isGroupLeader}
+            />
+          </View>
+        );
+      }
       return (
         <ChatActionCard
           message={item}
@@ -1039,7 +1095,8 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
     const showLockedReceipt = isOwnMessage && showLockedReadReceipt;
     const isRead = item.readAt || item.read;
     const isHostMessage = isInquiryChat && inquiryGroup?.hostId && item.senderId === inquiryGroup.hostId;
-    return (
+
+    const bubbleContent = (
       <View
         style={[
           styles.messageContainer,
@@ -1108,6 +1165,17 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         ) : null}
       </View>
     );
+
+    if (messagingLocked) {
+      return (
+        <View style={styles.blurredMessageWrapper}>
+          {bubbleContent}
+          <View style={styles.messageBlurOverlay} />
+        </View>
+      );
+    }
+
+    return bubbleContent;
   };
 
   const isGroupChat = conversationId.startsWith('group-');
@@ -1671,46 +1739,87 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           <Text style={{ color: '#3b82f6', fontSize: 12, flex: 1 }}>Agent reassignment requested. The company admin has been notified.</Text>
         </View>
       ) : null}
-      <View style={[styles.inputContainer, { backgroundColor: theme.backgroundRoot, paddingBottom: TAB_BAR_HEIGHT }]}>
-        {isInquiryChat && inquiryStatus === 'accepted' ? (
+      {messagingLocked ? (
+        <View style={styles.messagingPaywall}>
+          <View style={styles.paywallContent}>
+            <Feather name="lock" size={18} color="#F59E0B" />
+            <View style={styles.paywallTextContainer}>
+              <Text style={styles.paywallTitle}>
+                {canUnlock ? 'Use your free unlock or upgrade' : 'Upgrade to reply'}
+              </Text>
+              <Text style={styles.paywallSubtitle}>
+                Renters are reaching out — unlock messaging to connect
+              </Text>
+            </View>
+          </View>
+          {canUnlock ? (
+            <Pressable
+              style={styles.paywallFreeUnlockButton}
+              onPress={() => setShowUnlockModal(true)}
+            >
+              <Feather name="gift" size={14} color="#F59E0B" />
+              <Text style={styles.paywallFreeUnlockText}>Use Free Unlock</Text>
+            </Pressable>
+          ) : null}
           <Pressable
-            onPress={() => setShowChatActions(true)}
-            style={[styles.chatActionBtn, { backgroundColor: theme.backgroundSecondary }]}
+            style={styles.paywallUpgradeButton}
+            onPress={() => navigation.navigate('Plans' as any)}
           >
-            <Feather name="plus" size={22} color="#ff6b5b" />
+            <Text style={styles.paywallUpgradeText}>
+              {upgradePlan.plan} — {upgradePlan.price}
+            </Text>
           </Pressable>
-        ) : null}
-        <TextInput
-          style={[
-            styles.input,
-            {
-              backgroundColor: theme.backgroundSecondary,
-              color: theme.text,
-            },
-          ]}
-          placeholder={inquiryGroup?.isArchived ? 'This inquiry is archived' : 'Type a message...'}
-          placeholderTextColor={theme.textSecondary}
-          value={inputText}
-          onChangeText={setInputText}
-          onSubmitEditing={sendMessage}
-          blurOnSubmit={false}
-          returnKeyType="send"
-          multiline
-          maxLength={500}
-          editable={!inquiryGroup?.isArchived && canSendMessage()}
-        />
-        <Pressable
-          onPress={sendMessage}
-          style={[
-            styles.sendButton,
-            {
-              backgroundColor: inputText.trim() && canSendMessage() ? theme.primary : theme.backgroundSecondary,
-            },
-          ]}
-          disabled={!inputText.trim() || !canSendMessage()}
-        >
-          <Feather name="send" size={20} color="#FFFFFF" />
-        </Pressable>
+        </View>
+      ) : null}
+      <View style={[styles.inputContainer, { backgroundColor: theme.backgroundRoot, paddingBottom: TAB_BAR_HEIGHT }]}>
+        {messagingLocked ? (
+          <View style={styles.lockedInputRow}>
+            <Feather name="lock" size={16} color="#666" />
+            <Text style={styles.lockedInputText}>Upgrade plan to send messages</Text>
+          </View>
+        ) : (
+          <>
+            {isInquiryChat && inquiryStatus === 'accepted' ? (
+              <Pressable
+                onPress={() => setShowChatActions(true)}
+                style={[styles.chatActionBtn, { backgroundColor: theme.backgroundSecondary }]}
+              >
+                <Feather name="plus" size={22} color="#ff6b5b" />
+              </Pressable>
+            ) : null}
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: theme.backgroundSecondary,
+                  color: theme.text,
+                },
+              ]}
+              placeholder={inquiryGroup?.isArchived ? 'This inquiry is archived' : 'Type a message...'}
+              placeholderTextColor={theme.textSecondary}
+              value={inputText}
+              onChangeText={setInputText}
+              onSubmitEditing={sendMessage}
+              blurOnSubmit={false}
+              returnKeyType="send"
+              multiline
+              maxLength={500}
+              editable={!inquiryGroup?.isArchived && canSendMessage()}
+            />
+            <Pressable
+              onPress={sendMessage}
+              style={[
+                styles.sendButton,
+                {
+                  backgroundColor: inputText.trim() && canSendMessage() ? theme.primary : theme.backgroundSecondary,
+                },
+              ]}
+              disabled={!inputText.trim() || !canSendMessage()}
+            >
+              <Feather name="send" size={20} color="#FFFFFF" />
+            </Pressable>
+          </>
+        )}
       </View>
       {userPlan === 'basic' && (
         <View style={{ backgroundColor: theme.backgroundRoot, paddingBottom: 2, paddingHorizontal: 16 }}>
@@ -1842,6 +1951,35 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         address={inquiryGroup?.listingAddress || 'Property'}
         defaultRent={inquiryGroup?.listingPrice || 0}
       />
+
+      {showUnlockModal ? (
+        <Modal transparent animationType="fade" onRequestClose={() => setShowUnlockModal(false)}>
+          <View style={styles.unlockModalOverlay}>
+            <View style={styles.unlockModalCard}>
+              <View style={styles.unlockModalIcon}>
+                <Feather name="gift" size={32} color="#F59E0B" />
+              </View>
+              <Text style={styles.unlockModalTitle}>1 Free Message Unlock</Text>
+              <Text style={styles.unlockModalBody}>
+                Read and reply to this entire conversation for free. You only get one — make it count!
+              </Text>
+              <Pressable
+                style={styles.unlockModalButton}
+                onPress={handleUnlockConversation}
+              >
+                <Feather name="unlock" size={16} color="#000" />
+                <Text style={styles.unlockModalButtonText}>Unlock This Conversation</Text>
+              </Pressable>
+              <Pressable
+                style={styles.unlockModalSecondary}
+                onPress={() => setShowUnlockModal(false)}
+              >
+                <Text style={styles.unlockModalSecondaryText}>Save For Later</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
+      ) : null}
 
       <Modal visible={showDailyLimitModal} transparent animationType="fade" onRequestClose={() => setShowDailyLimitModal(false)}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
@@ -2282,5 +2420,148 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
+  },
+  blurredMessageWrapper: {
+    position: 'relative' as const,
+    overflow: 'hidden' as const,
+  },
+  messageBlurOverlay: {
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(20, 20, 20, 0.85)',
+    borderRadius: 16,
+  },
+  messagingPaywall: {
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(245, 158, 11, 0.2)',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  paywallContent: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 10,
+    marginBottom: 12,
+  },
+  paywallTextContainer: {
+    flex: 1,
+  },
+  paywallTitle: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    color: '#F59E0B',
+  },
+  paywallSubtitle: {
+    fontSize: 12,
+    color: 'rgba(245, 158, 11, 0.7)',
+    marginTop: 2,
+  },
+  paywallUpgradeButton: {
+    backgroundColor: '#F59E0B',
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center' as const,
+  },
+  paywallUpgradeText: {
+    color: '#000',
+    fontSize: 14,
+    fontWeight: '700' as const,
+  },
+  paywallFreeUnlockButton: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.4)',
+    borderRadius: 10,
+    paddingVertical: 10,
+    marginBottom: 8,
+  },
+  paywallFreeUnlockText: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: '#F59E0B',
+  },
+  lockedInputRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    justifyContent: 'center' as const,
+    flex: 1,
+  },
+  lockedInputText: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500' as const,
+  },
+  unlockModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    paddingHorizontal: 32,
+  },
+  unlockModalCard: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 20,
+    padding: 28,
+    alignItems: 'center' as const,
+    width: '100%' as const,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+  },
+  unlockModalIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    marginBottom: 16,
+  },
+  unlockModalTitle: {
+    fontSize: 20,
+    fontWeight: '700' as const,
+    color: '#fff',
+    marginBottom: 8,
+  },
+  unlockModalBody: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center' as const,
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  unlockModalButton: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+    backgroundColor: '#F59E0B',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    width: '100%' as const,
+    justifyContent: 'center' as const,
+    marginBottom: 12,
+  },
+  unlockModalButtonText: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    color: '#000',
+  },
+  unlockModalSecondary: {
+    paddingVertical: 10,
+  },
+  unlockModalSecondaryText: {
+    fontSize: 14,
+    color: '#888',
+    fontWeight: '500' as const,
   },
 });

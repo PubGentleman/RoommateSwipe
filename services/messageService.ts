@@ -1,4 +1,34 @@
 import { supabase } from '../lib/supabase';
+import { canAccessMessages, canAccessConversation } from '../utils/messagingAccess';
+
+async function checkMessagingPaywall(conversationId?: string) {
+  const { data: { user: authUser } } = await supabase.auth.getUser();
+  if (!authUser) return;
+
+  const { data: userRow } = await supabase
+    .from('users')
+    .select('role, host_type, agent_plan, free_message_unlock_used, free_message_unlock_conversation_id')
+    .eq('id', authUser.id)
+    .single();
+
+  if (!userRow) return;
+
+  const fakeUser = {
+    role: userRow.role,
+    hostType: userRow.host_type,
+    agentPlan: userRow.agent_plan,
+    freeMessageUnlockUsed: userRow.free_message_unlock_used,
+    freeMessageUnlockConversationId: userRow.free_message_unlock_conversation_id,
+    hostSubscription: { plan: 'free' },
+  } as any;
+
+  if (!canAccessMessages(fakeUser)) {
+    if (conversationId && canAccessConversation(fakeUser, conversationId)) {
+      return;
+    }
+    throw new Error('Messaging is locked. Upgrade your plan to send messages.');
+  }
+}
 
 export async function getConversations() {
   const { data: { user } } = await supabase.auth.getUser();
@@ -68,6 +98,8 @@ export async function sendMessage(matchId: string, content: string) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
+  await checkMessagingPaywall(matchId);
+
   const { data, error } = await supabase
     .from('messages')
     .insert({
@@ -90,6 +122,8 @@ export async function sendStructuredMessage(
 ) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
+
+  await checkMessagingPaywall(matchId);
 
   const { data, error } = await supabase
     .from('messages')
