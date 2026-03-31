@@ -28,6 +28,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import { formatMoveInDate, calculateCompatibility, getMatchQualityColor, getGenderSymbol, formatLocation } from '../../utils/matchingAlgorithm';
+import { calculateListingMatchScore, ListingMatchInput } from '../../utils/listingMatchScore';
 import { getNeighborhoodsByCity, getAllCities, NEIGHBORHOODS } from '../../utils/locationData';
 import { fetchAreaInfo, formatNearestAmenity, AreaInfo, NearbyAmenity } from '../../services/neighborhoodService';
 import { getZodiacSymbol } from '../../utils/zodiacUtils';
@@ -59,10 +60,10 @@ const CARD_BG = '#1a1a1a';
 const ACCENT = '#ff6b5b';
 
 const QUICK_FILTERS = [
-  { key: 'bestMatch', label: 'Best Match', icon: 'heart' as const },
-  { key: 'under2k', label: 'Under $2k' },
-  { key: 'petFriendly', label: 'Pet Friendly' },
-  { key: 'availableNow', label: 'Available Now' },
+  { key: 'under2k', label: 'Under $2k', icon: 'dollar-sign' as const },
+  { key: 'petFriendly', label: 'Pet Friendly', icon: 'heart' as const },
+  { key: 'noFee', label: 'No Fee', icon: 'slash' as const },
+  { key: 'availableNow', label: 'Available Now', icon: 'clock' as const },
 ];
 
 const LISTING_TYPE_CHIPS: { key: 'room' | 'entire' | 'sublet'; label: string; icon: 'user' | 'home' }[] = [
@@ -137,7 +138,7 @@ export const ExploreScreen = () => {
   const [showPaywall, setShowPaywall] = useState(false);
   const [paywallFeature, setPaywallFeature] = useState('');
   const [paywallPlan, setPaywallPlan] = useState<'plus' | 'elite'>('plus');
-  const [activeQuickFilters, setActiveQuickFilters] = useState<Set<string>>(new Set(['bestMatch']));
+  const [activeQuickFilters, setActiveQuickFilters] = useState<Set<string>>(new Set());
   const intentPref = user?.profileData?.listing_type_preference;
   const [listingTypeFilter, setListingTypeFilter] = useState<string[]>(() => {
     if (intentPref === 'room') return ['room'];
@@ -756,6 +757,27 @@ export const ExploreScreen = () => {
     trackNeighborhoodSearch(result.city, result.neighborhood || undefined);
   }, [setActiveCity, setActiveSubArea]);
 
+  const propertyToMatchInput = (property: Property): ListingMatchInput => {
+    const now = new Date();
+    const created = (property as any).createdAt ? new Date((property as any).createdAt) : now;
+    const daysListed = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+    return {
+      price: property.price || 0,
+      bedrooms: property.bedrooms || 0,
+      neighborhood: property.neighborhood || (property as any).area,
+      city: property.city,
+      amenities: property.amenities || [],
+      roomType: property.roomType || (property as any).room_type,
+      availableFrom: (property as any).availableFrom || (property as any).available_from,
+      averageRating: (property as any).averageRating || (property as any).average_rating,
+      reviewCount: (property as any).reviewCount || (property as any).review_count,
+      hostBadge: (property as any).hostBadge || (property as any).host_badge || null,
+      hostResponseRate: (property as any).hostResponseRate,
+      daysListed,
+      photoCount: (property as any).images?.length || property.photos?.length || 0,
+    };
+  };
+
   const applyFilters = () => {
     let filtered = [...properties];
 
@@ -842,6 +864,12 @@ export const ExploreScreen = () => {
         (p as any).pets_allowed === true
       );
     }
+    if (activeQuickFilters.has('noFee')) {
+      filtered = filtered.filter(p => {
+        const amenityIds = (p.amenities || []).map(a => normalizeLegacyAmenity(a));
+        return amenityIds.includes('no_fee') || (p as any).noFee === true || (p as any).no_fee === true;
+      });
+    }
     if (activeQuickFilters.has('availableNow')) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -911,21 +939,31 @@ export const ExploreScreen = () => {
       const planB = getHostPlanPriority(b);
       if (planA !== planB) return planB - planA;
 
-      if (activeQuickFilters.has('bestMatch')) {
-        if (user) {
+      if (user) {
+        const listingA = propertyToMatchInput(a);
+        const listingB = propertyToMatchInput(b);
+
+        let roommateCompA: number | undefined;
+        let roommateCompB: number | undefined;
+
+        const searchType = (user as any).apartmentSearchType || (user as any).apartment_search_type;
+        if (searchType === 'with_roommates' || searchType === 'have_group') {
           const hostA = a.hostProfileId ? hostProfiles.get(a.hostProfileId) : null;
           const hostB = b.hostProfileId ? hostProfiles.get(b.hostProfileId) : null;
           const profileA = hostA ? getUserAsRoommateProfile(hostA) : null;
           const profileB = hostB ? getUserAsRoommateProfile(hostB) : null;
-          const compA = profileA ? calculateCompatibility(user, profileA) : 0;
-          const compB = profileB ? calculateCompatibility(user, profileB) : 0;
-          return compB - compA;
+          roommateCompA = profileA ? calculateCompatibility(user, profileA) : undefined;
+          roommateCompB = profileB ? calculateCompatibility(user, profileB) : undefined;
         }
-        const scoreA = (a as any).matchScore ?? (a as any).match_score ?? (a as any).score ?? 0;
-        const scoreB = (b as any).matchScore ?? (b as any).match_score ?? (b as any).score ?? 0;
+
+        const scoreA = calculateListingMatchScore(user, listingA, roommateCompA);
+        const scoreB = calculateListingMatchScore(user, listingB, roommateCompB);
         return scoreB - scoreA;
       }
-      return 0;
+
+      const createdA = (a as any).createdAt ? new Date((a as any).createdAt).getTime() : 0;
+      const createdB = (b as any).createdAt ? new Date((b as any).createdAt).getTime() : 0;
+      return createdB - createdA;
     });
 
     const seen = new Set<string>();
@@ -1480,15 +1518,6 @@ export const ExploreScreen = () => {
           style={styles.filterScrollView}
           contentContainerStyle={styles.chipScrollContent}
         >
-          {QUICK_FILTERS.slice(0, 2).map(f => {
-            const active = activeQuickFilters.has(f.key);
-            return (
-              <Pressable key={f.key} style={active ? styles.chipSelected : styles.chipUnselected} onPress={() => toggleQuickFilter(f.key)}>
-                {f.icon ? <Feather name={f.icon} size={10} color={active ? '#fff' : 'rgba(255,255,255,0.45)'} /> : null}
-                <Text style={active ? styles.chipSelectedText : styles.chipUnselectedText}>{f.label}</Text>
-              </Pressable>
-            );
-          })}
           {LISTING_TYPE_CHIPS.map(t => {
             const active = listingTypeFilter.includes(t.key);
             return (
@@ -1498,10 +1527,11 @@ export const ExploreScreen = () => {
               </Pressable>
             );
           })}
-          {QUICK_FILTERS.slice(2).map(f => {
+          {QUICK_FILTERS.map(f => {
             const active = activeQuickFilters.has(f.key);
             return (
               <Pressable key={f.key} style={active ? styles.chipSelected : styles.chipUnselected} onPress={() => toggleQuickFilter(f.key)}>
+                {f.icon ? <Feather name={f.icon} size={10} color={active ? '#fff' : 'rgba(255,255,255,0.45)'} /> : null}
                 <Text style={active ? styles.chipSelectedText : styles.chipUnselectedText}>{f.label}</Text>
               </Pressable>
             );
