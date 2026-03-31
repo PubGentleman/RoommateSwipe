@@ -42,7 +42,8 @@ interface SelectedLocation {
   lng: number;
 }
 
-const GOOGLE_PLACES_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://lnjupgvvsbdooomvdjho.supabase.co';
+const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 
 export const LocationStep: React.FC<LocationStepProps> = ({
   accountType,
@@ -51,17 +52,11 @@ export const LocationStep: React.FC<LocationStepProps> = ({
   const [query, setQuery] = useState('');
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searched, setSearched] = useState(false);
   const [selected, setSelected] = useState<SelectedLocation | null>(null);
   const [error, setError] = useState<string | null>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const inputRef = useRef<TextInput>(null);
-
-  useEffect(() => {
-    if (!GOOGLE_PLACES_KEY) {
-      console.warn('EXPO_PUBLIC_GOOGLE_MAPS_API_KEY is not set.');
-      setError('Location search is temporarily unavailable. You can type your city and continue.');
-    }
-  }, []);
 
   const headlines: Record<AccountType, string> = {
     renter: 'Where are you looking?',
@@ -71,8 +66,9 @@ export const LocationStep: React.FC<LocationStepProps> = ({
   };
 
   const fetchPredictions = useCallback(async (text: string) => {
-    if (text.length < 2 || !GOOGLE_PLACES_KEY) {
+    if (text.length < 2) {
       setPredictions([]);
+      setSearched(false);
       return;
     }
 
@@ -80,8 +76,16 @@ export const LocationStep: React.FC<LocationStepProps> = ({
     setError(null);
 
     try {
-      const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(text)}&types=geocode&components=country:us&key=${GOOGLE_PLACES_KEY}`;
-      const response = await fetch(url);
+      const response = await fetch(
+        `${SUPABASE_URL}/functions/v1/places-proxy?action=autocomplete&input=${encodeURIComponent(text)}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
       const data = await response.json();
 
       if (data.status === 'OK' && data.predictions) {
@@ -93,25 +97,26 @@ export const LocationStep: React.FC<LocationStepProps> = ({
             description: p.description || '',
           }))
         );
-      } else if (data.status === 'REQUEST_DENIED') {
-        console.error('Google Places API denied:', data.error_message);
-        setError('Location search unavailable. Type your city and tap Next.');
+      } else if (data.status === 'ZERO_RESULTS') {
         setPredictions([]);
       } else {
+        console.error('Places proxy error:', data.status, data.error_message);
         setPredictions([]);
       }
     } catch (err) {
       console.error('Location search error:', err);
-      setError('Search failed. Type your city and tap Next.');
+      setError('Search unavailable. Type your city, state and tap Next.');
       setPredictions([]);
     } finally {
       setLoading(false);
+      setSearched(true);
     }
   }, []);
 
   const handleTextChange = (text: string) => {
     setQuery(text);
     setSelected(null);
+    setSearched(false);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => fetchPredictions(text), 300);
   };
@@ -124,8 +129,16 @@ export const LocationStep: React.FC<LocationStepProps> = ({
     setError(null);
 
     try {
-      const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${prediction.placeId}&fields=address_components,geometry&key=${GOOGLE_PLACES_KEY}`;
-      const response = await fetch(url);
+      const response = await fetch(
+        `${SUPABASE_URL}/functions/v1/places-proxy?action=details&place_id=${encodeURIComponent(prediction.placeId)}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
       const data = await response.json();
 
       if (data.status === 'OK' && data.result) {
@@ -192,11 +205,29 @@ export const LocationStep: React.FC<LocationStepProps> = ({
         lat: selected.lat,
         lng: selected.lng,
       });
-    } else if (query.trim().length >= 2) {
-      const parts = query.trim().split(',').map(s => s.trim());
-      const city = parts[0] || query.trim();
-      const state = parts[1] || '';
-      onLocationSelect({ city, state, lat: 0, lng: 0 });
+      return;
+    }
+
+    const trimmed = query.trim();
+    const parts = trimmed.split(',').map(s => s.trim());
+
+    if (parts.length >= 2 && parts[0].length >= 2 && parts[1].length >= 2) {
+      onLocationSelect({
+        city: parts[0],
+        state: parts[1],
+        lat: 0,
+        lng: 0,
+      });
+    } else if (/^\d{5}$/.test(trimmed)) {
+      Alert.alert(
+        'Select from results',
+        'Please wait for search results to appear and select your location, or enter your city and state (e.g. "Brooklyn, NY").'
+      );
+    } else if (trimmed.length >= 2) {
+      Alert.alert(
+        'Enter city and state',
+        'Please enter your location as "City, State" (e.g. "Brooklyn, NY") or select from search results.'
+      );
     } else {
       Alert.alert('Enter a location', 'Please type a city, neighborhood, or ZIP code.');
     }
@@ -207,6 +238,7 @@ export const LocationStep: React.FC<LocationStepProps> = ({
     setSelected(null);
     setPredictions([]);
     setError(null);
+    setSearched(false);
     inputRef.current?.focus();
   };
 
@@ -215,6 +247,8 @@ export const LocationStep: React.FC<LocationStepProps> = ({
       ? `${selected.neighborhood}, ${selected.city}, ${selected.state}`
       : `${selected.city}${selected.state ? `, ${selected.state}` : ''}`
     : '';
+
+  const nextDisabled = !selected && query.trim().length < 2;
 
   return (
     <View style={s.container}>
@@ -261,8 +295,23 @@ export const LocationStep: React.FC<LocationStepProps> = ({
         ) : null}
       </View>
 
+      {loading ? (
+        <View style={s.searchingRow}>
+          <ActivityIndicator size="small" color="#ff6b5b" />
+          <Text style={s.searchingText}>Searching...</Text>
+        </View>
+      ) : null}
+
       {error ? (
         <Text style={s.errorText}>{error}</Text>
+      ) : null}
+
+      {!loading && !error && searched && query.length >= 2 && predictions.length === 0 && !selected ? (
+        <Text style={s.hintText}>No results found. Try a different search.</Text>
+      ) : null}
+
+      {!loading && !error && !searched && query.length > 0 && query.length < 2 ? (
+        <Text style={s.hintText}>Type at least 2 characters</Text>
       ) : null}
 
       {selected ? (
@@ -275,22 +324,19 @@ export const LocationStep: React.FC<LocationStepProps> = ({
             <Feather name="x" size={18} color="rgba(255,255,255,0.4)" />
           </Pressable>
         </View>
-      ) : !error ? (
+      ) : !error && !loading && !searched ? (
         <View style={s.hintContainer}>
           <Feather name="info" size={14} color="rgba(255,255,255,0.3)" />
-          <Text style={s.hintText}>
-            Type at least 2 characters to see suggestions
+          <Text style={s.hintInfoText}>
+            Select a suggestion, or type "City, State" and tap Next
           </Text>
         </View>
       ) : null}
 
       <Pressable
-        style={[
-          s.nextButton,
-          (query.length < 2 && !selected) ? s.nextButtonDisabled : null,
-        ]}
+        style={[s.nextButton, nextDisabled ? s.nextButtonDisabled : null]}
         onPress={handleNext}
-        disabled={query.length < 2 && !selected}
+        disabled={nextDisabled}
       >
         <Text style={s.nextButtonText}>Next</Text>
       </Pressable>
@@ -366,9 +412,26 @@ const s = StyleSheet.create({
     fontSize: 13,
     marginTop: 2,
   },
+  searchingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 12,
+    justifyContent: 'center',
+  },
+  searchingText: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.5)',
+  },
   errorText: {
     fontSize: 13,
     color: '#F59E0B',
+    marginTop: 10,
+    textAlign: 'center',
+  },
+  hintText: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.35)',
     marginTop: 10,
     textAlign: 'center',
   },
@@ -403,7 +466,7 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 24,
   },
-  hintText: {
+  hintInfoText: {
     fontSize: 13,
     color: 'rgba(255,255,255,0.3)',
   },
