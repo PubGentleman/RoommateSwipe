@@ -595,11 +595,11 @@ export const ProfileScreen = () => {
                 title="Search Intent"
                 subtitle={(() => {
                   const st = user?.profileData?.apartment_search_type;
-                  if (st === 'solo') return 'Finding a place for yourself';
-                  if (st === 'with_partner') return 'Finding a place with partner';
-                  if (st === 'have_group') return 'Finding a place with your group';
-                  if (st === 'with_roommates') return 'Finding roommates';
-                  return 'Choose how you want to search';
+                  if (st === 'solo') return 'Looking solo';
+                  if (st === 'with_partner') return 'Looking with a partner';
+                  if (st === 'have_group') return 'Looking with your group';
+                  if (st === 'with_roommates') return 'Open to roommates';
+                  return 'Set your search preference';
                 })()}
                 onPress={() => navigation.navigate('SearchIntent')}
               />
