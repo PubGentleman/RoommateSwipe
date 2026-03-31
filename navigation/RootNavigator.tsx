@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth, getInitialRoute } from '../contexts/AuthContext';
 import { LoginScreen } from '../screens/auth/LoginScreen';
+import { NewPasswordScreen } from '../screens/auth/NewPasswordScreen';
+import { VerificationPendingScreen } from '../screens/auth/VerificationPendingScreen';
 import { OnboardingScreen } from '../screens/shared/OnboardingScreen';
 import { ProfileQuestionnaireScreen } from '../screens/shared/ProfileQuestionnaireScreen';
 import { PlanSelectionScreen } from '../screens/shared/PlanSelectionScreen';
@@ -48,7 +50,7 @@ function HostMain() { return <HostTabNavigator />; }
 HostMain.displayName = 'HostMain';
 
 export const RootNavigator = () => {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, passwordRecoveryMode, clearPasswordRecovery, logout } = useAuth();
   const { theme } = useTheme();
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -99,11 +101,30 @@ export const RootNavigator = () => {
     return <OnboardingScreen onComplete={handleOnboardingComplete} />;
   }
 
+  if (passwordRecoveryMode) {
+    return (
+      <NewPasswordScreen onComplete={async () => {
+        clearPasswordRecovery();
+        try { await logout(); } catch {}
+      }} />
+    );
+  }
+
   if (!user) {
     return (
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Login" component={LoginScreen} />
       </Stack.Navigator>
+    );
+  }
+
+  if (user.emailVerified === false) {
+    return (
+      <VerificationPendingScreen
+        email={user.email}
+        onVerified={() => {}}
+        onBackToLogin={async () => { try { await logout(); } catch {} }}
+      />
     );
   }
 

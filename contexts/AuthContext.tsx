@@ -32,6 +32,8 @@ interface AuthContextType {
   logout: () => Promise<void>;
   abandonSignup: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  passwordRecoveryMode: boolean;
+  clearPasswordRecovery: () => void;
   upgradeToPlus: (billingCycle?: 'monthly' | '3month' | 'annual', stripeSubscriptionId?: string) => Promise<void>;
   upgradeToElite: (billingCycle?: 'monthly' | '3month' | 'annual', stripeSubscriptionId?: string) => Promise<void>;
   downgradeToPlan: (plan: 'basic' | 'plus') => Promise<void>;
@@ -112,6 +114,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [passwordRecoveryMode, setPasswordRecoveryMode] = useState(false);
 
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
 
@@ -126,6 +129,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await loadUserFromSupabase(session);
         } else if (event === 'SIGNED_OUT') {
           setUser(null);
+        } else if (event === 'PASSWORD_RECOVERY') {
+          setPasswordRecoveryMode(true);
         }
       }
     );
@@ -372,6 +377,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       let mappedUser = mapSupabaseToUser(userData, profileData, subscriptionData);
       mappedUser = await checkAndApplyScheduledChanges(mappedUser);
       mappedUser.lastActiveAt = new Date();
+      mappedUser.emailVerified = !!session.user.email_confirmed_at;
 
       if (userData.is_deleted) {
         const deletedAt = userData.deleted_at ? new Date(userData.deleted_at) : null;
@@ -621,6 +627,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data.session) {
         await loadUserFromSupabase(data.session);
       } else {
+        const isVerified = !!data.user.email_confirmed_at;
         const nextStep = role === 'host' ? 'hostType' : 'complete';
         const agentOccupation = hostType === 'agent' ? 'Real Estate Agent' : undefined;
         const newUser: User = {
@@ -630,6 +637,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           firstName: firstName ?? undefined,
           lastName: lastName ?? undefined,
           role,
+          emailVerified: isVerified,
           onboardingStep: nextStep,
           hostType: hostType ?? undefined,
           companyName: companyName ?? undefined,
@@ -794,9 +802,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const resetPassword = async (email: string) => {
     const sanitizedEmail = email.trim().toLowerCase();
-    const { error } = await supabase.auth.resetPasswordForEmail(sanitizedEmail);
+    const { error } = await supabase.auth.resetPasswordForEmail(sanitizedEmail, {
+      redirectTo: 'rhome://auth/reset-password',
+    });
     if (error) throw error;
   };
+
+  const clearPasswordRecovery = () => setPasswordRecoveryMode(false);
 
   const getExpiryForCycle = (cycle: 'monthly' | '3month' | 'annual') => {
     const d = new Date();
@@ -2521,7 +2533,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const canRespondToInquiries = teamRole !== null;
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout, abandonSignup, resetPassword, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, cancelSubscriptionAtPeriodEnd, reactivateSubscription, getSubscriptionDetails, updateUser, blockUser: blockUserAction, unblockUser: unblockUserAction, reportUser: reportUserAction, isUserBlocked: isUserBlockedCheck, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike, watchAdForCredit, getAdCredits, useAdCredit, isBasicUser, isPlaceSeeker, canViewListing, useListingView, canSendInterest, canSendSuperInterest, useSuperInterestCredit, canSendColdMessage, useColdMessage, canAskPi, incrementPiUsage, getSuperInterestCount, upgradeHostPlan, downgradeHostPlan, getHostPlan, canAddListing, canRespondToInquiry, useInquiryResponse, purchaseListingBoost, purchaseHostVerification, purchaseSuperInterest, completeOnboardingStep, cancelHostSubscriptionAtPeriodEnd, reactivateHostSubscription, softDeleteAccount, recoverDeletedAccount, updateLastActive, activeMode: effectiveMode, canSwitchMode, isFirstTimeHost, switchMode, completeHostOnboarding, getTeamMembers, inviteTeamMember, resendTeamInvite, removeTeamMember, updateTeamMemberRole, getTeamSeatLimit, teamRole, canInviteMembers, canManageBilling, canDeleteListings, canRespondToInquiries }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout, abandonSignup, resetPassword, passwordRecoveryMode, clearPasswordRecovery, upgradeToPlus, upgradeToElite, downgradeToPlan, cancelSubscription, cancelSubscriptionAtPeriodEnd, reactivateSubscription, getSubscriptionDetails, updateUser, blockUser: blockUserAction, unblockUser: unblockUserAction, reportUser: reportUserAction, isUserBlocked: isUserBlockedCheck, incrementMessageCount, canSendMessage, activateBoost, canBoost, checkAndUpdateBoostStatus, purchaseBoost, purchaseUndoPass, hasActiveUndoPass, getActiveChatLimit, canStartNewChat, incrementActiveChatCount, canRewind, useRewind, canSuperLike, useSuperLike, watchAdForCredit, getAdCredits, useAdCredit, isBasicUser, isPlaceSeeker, canViewListing, useListingView, canSendInterest, canSendSuperInterest, useSuperInterestCredit, canSendColdMessage, useColdMessage, canAskPi, incrementPiUsage, getSuperInterestCount, upgradeHostPlan, downgradeHostPlan, getHostPlan, canAddListing, canRespondToInquiry, useInquiryResponse, purchaseListingBoost, purchaseHostVerification, purchaseSuperInterest, completeOnboardingStep, cancelHostSubscriptionAtPeriodEnd, reactivateHostSubscription, softDeleteAccount, recoverDeletedAccount, updateLastActive, activeMode: effectiveMode, canSwitchMode, isFirstTimeHost, switchMode, completeHostOnboarding, getTeamMembers, inviteTeamMember, resendTeamInvite, removeTeamMember, updateTeamMemberRole, getTeamSeatLimit, teamRole, canInviteMembers, canManageBilling, canDeleteListings, canRespondToInquiries }}>
       {children}
     </AuthContext.Provider>
   );

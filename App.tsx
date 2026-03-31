@@ -44,6 +44,10 @@ export default function App() {
         const initialUrl = await Linking.getInitialURL();
         if (!initialUrl) return;
 
+        if (initialUrl.includes('auth/verify') || initialUrl.includes('auth/reset-password')) {
+          return;
+        }
+
         const match = initialUrl.match(/join\/([A-Za-z0-9]+)/);
         if (match && match[1]) {
           const inviteCode = match[1];

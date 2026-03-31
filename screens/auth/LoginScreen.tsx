@@ -9,12 +9,17 @@ import { Feather } from '../../components/VectorIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RhomeLogo } from '../../components/RhomeLogo';
 import { SignUpFlow } from './SignUpFlow';
+import { ForgotPasswordScreen } from './ForgotPasswordScreen';
+import { ResetEmailSentScreen } from './ResetEmailSentScreen';
+import { VerificationPendingScreen } from './VerificationPendingScreen';
+
+type AuthView = 'login' | 'signup' | 'forgot' | 'resetSent' | 'verification';
 
 export const LoginScreen = () => {
-  const { login, resetPassword } = useAuth();
+  const { login } = useAuth();
   const { alert: showAlert } = useConfirm();
   const insets = useSafeAreaInsets();
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [authView, setAuthView] = useState<AuthView>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -22,9 +27,38 @@ export const LoginScreen = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState('');
 
-  if (isSignUp) {
-    return <SignUpFlow onBackToLogin={() => setIsSignUp(false)} />;
+  if (authView === 'signup') {
+    return <SignUpFlow onBackToLogin={() => setAuthView('login')} />;
+  }
+
+  if (authView === 'verification') {
+    return (
+      <VerificationPendingScreen
+        email={pendingEmail}
+        onVerified={() => setAuthView('login')}
+        onBackToLogin={() => setAuthView('login')}
+      />
+    );
+  }
+
+  if (authView === 'forgot') {
+    return (
+      <ForgotPasswordScreen
+        onResetSent={(sentEmail) => { setPendingEmail(sentEmail); setAuthView('resetSent'); }}
+        onBackToLogin={() => setAuthView('login')}
+      />
+    );
+  }
+
+  if (authView === 'resetSent') {
+    return (
+      <ResetEmailSentScreen
+        email={pendingEmail}
+        onBackToLogin={() => setAuthView('login')}
+      />
+    );
   }
 
   const handleSubmit = async () => {
@@ -109,18 +143,7 @@ export const LoginScreen = () => {
         </View>
 
         <View style={styles.forgotRow}>
-          <Pressable hitSlop={8} onPress={async () => {
-            if (!email.trim()) {
-              await showAlert({ title: 'Enter Email', message: 'Please enter your email address first, then tap Forgot Password.', variant: 'info' });
-              return;
-            }
-            try {
-              await resetPassword(email.trim().toLowerCase());
-              await showAlert({ title: 'Check Your Email', message: 'A password reset link has been sent to your email address.', variant: 'success' });
-            } catch (err: any) {
-              await showAlert({ title: 'Error', message: err.message || 'Failed to send reset email. Please try again.', variant: 'warning' });
-            }
-          }}>
+          <Pressable hitSlop={8} onPress={() => setAuthView('forgot')}>
             <Text style={styles.forgotText}>Forgot password?</Text>
           </Pressable>
         </View>
@@ -169,7 +192,7 @@ export const LoginScreen = () => {
 
         <View style={styles.switchRow}>
           <Text style={styles.switchText}>Don't have an account? </Text>
-          <Pressable onPress={() => setIsSignUp(true)} hitSlop={8}>
+          <Pressable onPress={() => setAuthView('signup')} hitSlop={8}>
             <Text style={styles.switchLink}>Sign Up</Text>
           </Pressable>
         </View>
