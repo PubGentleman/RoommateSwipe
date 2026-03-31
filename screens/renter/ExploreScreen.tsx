@@ -148,7 +148,8 @@ export const ExploreScreen = () => {
   const [paywallPlan, setPaywallPlan] = useState<'plus' | 'elite'>('plus');
   const [activeQuickFilters, setActiveQuickFilters] = useState<Set<string>>(new Set());
   const intentPref = user?.profileData?.listing_type_preference;
-  const isEntireApartmentSeeker = intentPref === 'entire_apartment';
+  const searchType = user?.profileData?.apartment_search_type;
+  const isEntireApartmentSeeker = intentPref === 'entire_apartment' || (intentPref !== 'room' && (searchType === 'solo' || searchType === 'with_partner' || searchType === 'have_group'));
   const [listingTypeFilter, setListingTypeFilter] = useState<string[]>(() => {
     if (intentPref === 'room') return ['room'];
     if (intentPref === 'entire_apartment') return ['entire'];
