@@ -42,37 +42,51 @@ interface SelectedLocation {
   lng: number;
 }
 
-const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
-const SUPABASE_URL = 'https://lnjupgvvsbdooomvdjho.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuanVwZ3Z2c2Jkb29vbXZkamhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwOTEwODAsImV4cCI6MjA4ODY2NzA4MH0.XAGtYsRhSRRPe9yc3jqrO9viqgIZzvFGx_cd1D1y9BU';
+const NOMINATIM_BASE = 'https://nominatim.openstreetmap.org';
 
-const placesAutocomplete = async (text: string) => {
-  if (Platform.OS !== 'web' && GOOGLE_API_KEY) {
-    const res = await fetch(
-      `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(text)}&types=geocode&components=country:us&key=${GOOGLE_API_KEY}`
-    );
-    return res.json();
-  }
+interface NominatimResult {
+  place_id: number;
+  display_name: string;
+  lat: string;
+  lon: string;
+  address?: {
+    city?: string;
+    town?: string;
+    village?: string;
+    hamlet?: string;
+    suburb?: string;
+    neighbourhood?: string;
+    borough?: string;
+    county?: string;
+    state?: string;
+    state_code?: string;
+    country?: string;
+  };
+}
+
+const searchLocations = async (text: string): Promise<NominatimResult[]> => {
   const res = await fetch(
-    `${SUPABASE_URL}/functions/v1/places-proxy?action=autocomplete&input=${encodeURIComponent(text)}`,
-    { headers: { 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' } }
+    `${NOMINATIM_BASE}/search?q=${encodeURIComponent(text)}&countrycodes=us&format=json&addressdetails=1&limit=5`,
+    { headers: { 'User-Agent': 'RhomeApp/1.0' } }
   );
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 };
 
-const placesDetails = async (placeId: string) => {
-  if (Platform.OS !== 'web' && GOOGLE_API_KEY) {
-    const res = await fetch(
-      `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(placeId)}&fields=address_components,geometry&key=${GOOGLE_API_KEY}`
-    );
-    return res.json();
-  }
-  const res = await fetch(
-    `${SUPABASE_URL}/functions/v1/places-proxy?action=details&place_id=${encodeURIComponent(placeId)}`,
-    { headers: { 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' } }
-  );
-  return res.json();
+const extractLocation = (result: NominatimResult) => {
+  const addr = result.address || {};
+  const city = addr.city || addr.town || addr.village || addr.hamlet || addr.borough || addr.county || '';
+  const state = addr.state || '';
+  const neighborhood = addr.neighbourhood || addr.suburb || '';
+  const borough = addr.borough || '';
+  return {
+    city,
+    state,
+    neighborhood,
+    borough,
+    lat: parseFloat(result.lat) || 0,
+    lng: parseFloat(result.lon) || 0,
+  };
 };
 
 export const LocationStep: React.FC<LocationStepProps> = ({
@@ -96,6 +110,8 @@ export const LocationStep: React.FC<LocationStepProps> = ({
     company: 'Where are your properties?',
   };
 
+  const nominatimResults = useRef<NominatimResult[]>([]);
+
   const fetchPredictions = useCallback(async (text: string) => {
     if (text.length < 2) {
       setPredictions([]);
@@ -107,29 +123,28 @@ export const LocationStep: React.FC<LocationStepProps> = ({
     setError(null);
 
     try {
-      const data = await placesAutocomplete(text);
+      const results = await searchLocations(text);
+      nominatimResults.current = results;
+      setSearchFailed(false);
 
-      if (data.status === 'OK' && data.predictions) {
-        setSearchFailed(false);
-        setPredictions(
-          data.predictions.slice(0, 5).map((p: any) => ({
-            placeId: p.place_id,
-            mainText: p.structured_formatting?.main_text || p.description?.split(',')[0] || '',
-            secondaryText: p.structured_formatting?.secondary_text || '',
-            description: p.description || '',
-          }))
-        );
-      } else if (data.status === 'ZERO_RESULTS') {
+      if (results.length === 0) {
         setPredictions([]);
       } else {
-        // API returned but with an error (e.g. missing Google key)
-        console.warn('Places proxy error:', data.status, data.error_message);
-        setSearchFailed(true);
-        setError('Search unavailable. Type your city, state and tap Next.');
-        setPredictions([]);
+        setPredictions(
+          results.map((r) => {
+            const parts = r.display_name.split(', ');
+            const mainText = parts[0] || '';
+            const secondaryText = parts.slice(1, 3).join(', ');
+            return {
+              placeId: String(r.place_id),
+              mainText,
+              secondaryText,
+              description: r.display_name,
+            };
+          })
+        );
       }
     } catch (err: any) {
-      // Network error, 401, 404, etc.
       console.warn('Location search error:', err?.message || err);
       setSearchFailed(true);
       setError('Search unavailable. Type your city, state and tap Next.');
@@ -148,58 +163,26 @@ export const LocationStep: React.FC<LocationStepProps> = ({
     debounceRef.current = setTimeout(() => fetchPredictions(text), 300);
   };
 
-  const handleSelect = async (prediction: Prediction) => {
+  const handleSelect = (prediction: Prediction) => {
     Keyboard.dismiss();
-    setQuery(prediction.description);
+    setQuery(prediction.mainText + (prediction.secondaryText ? ', ' + prediction.secondaryText : ''));
     setPredictions([]);
-    setLoading(true);
-    setError(null);
 
-    try {
-      const data = await placesDetails(prediction.placeId);
+    const result = nominatimResults.current.find(
+      (r) => String(r.place_id) === prediction.placeId
+    );
 
-      if (data.status === 'OK' && data.result) {
-        const components = data.result.address_components || [];
-        const geo = data.result.geometry?.location;
-
-        let city = '';
-        let stateCode = '';
-        let neighborhood = '';
-        let borough = '';
-
-        for (const comp of components) {
-          const types: string[] = comp.types || [];
-          if (types.includes('locality')) city = comp.long_name;
-          if (types.includes('administrative_area_level_1')) stateCode = comp.short_name;
-          if (types.includes('neighborhood')) neighborhood = comp.long_name;
-          if (types.includes('sublocality') || types.includes('sublocality_level_1')) {
-            borough = comp.long_name;
-          }
-        }
-
-        if (!neighborhood && borough) neighborhood = borough;
-        if (!city && borough) city = borough;
-        if (!city) city = prediction.mainText;
-
-        setSelected({
-          city,
-          state: stateCode,
-          neighborhood,
-          borough,
-          lat: geo?.lat || 0,
-          lng: geo?.lng || 0,
-        });
-      } else {
-        setSelected({
-          city: prediction.mainText,
-          state: prediction.secondaryText.replace(/, USA$/i, '').trim(),
-          neighborhood: '',
-          lat: 0,
-          lng: 0,
-        });
-      }
-    } catch (err) {
-      console.warn('Place details error:', err);
+    if (result) {
+      const loc = extractLocation(result);
+      setSelected({
+        city: loc.city || prediction.mainText,
+        state: loc.state,
+        neighborhood: loc.neighborhood,
+        borough: loc.borough,
+        lat: loc.lat,
+        lng: loc.lng,
+      });
+    } else {
       setSelected({
         city: prediction.mainText,
         state: prediction.secondaryText.replace(/, USA$/i, '').trim(),
@@ -207,8 +190,6 @@ export const LocationStep: React.FC<LocationStepProps> = ({
         lat: 0,
         lng: 0,
       });
-    } finally {
-      setLoading(false);
     }
   };
 

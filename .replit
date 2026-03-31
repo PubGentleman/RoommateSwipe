@@ -6,6 +6,10 @@ channel = "stable-24_05"
 packages = ["supabase-cli"]
 
 [[ports]]
+localPort = 3001
+externalPort = 3002
+
+[[ports]]
 localPort = 8081
 externalPort = 80
 
