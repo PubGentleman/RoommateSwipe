@@ -604,22 +604,6 @@ export const ProfileScreen = () => {
                 onPress={() => navigation.navigate('SearchIntent')}
               />
             ) : null}
-            {user?.role === 'renter' ? (
-              <SettingsItem
-                iconName="sliders"
-                iconColor="#ff9f43"
-                iconBgColor="rgba(255,159,67,0.12)"
-                iconBorderColor="rgba(255,159,67,0.18)"
-                title="Search Preferences"
-                subtitle={(() => {
-                  const lp = user?.profileData?.listing_type_preference;
-                  if (lp === 'entire_apartment') return 'Entire apartment';
-                  if (lp === 'room') return 'Private room';
-                  return 'Budget, rooms, amenities';
-                })()}
-                onPress={() => navigation.navigate('ApartmentPreferences')}
-              />
-            ) : null}
             <SettingsItem
               iconName="check-circle"
               iconColor="#3ECF8E"
