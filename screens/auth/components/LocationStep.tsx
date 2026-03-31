@@ -1,13 +1,15 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
+  TextInput,
+  FlatList,
   Pressable,
+  StyleSheet,
+  ActivityIndicator,
   Platform,
 } from 'react-native';
 import { Feather } from '../../../components/VectorIcons';
-import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 
 type AccountType = 'renter' | 'individual' | 'agent' | 'company';
 
@@ -23,14 +25,26 @@ interface LocationStepProps {
   }) => void;
 }
 
+interface Prediction {
+  place_id: string;
+  description: string;
+  structured_formatting: {
+    main_text: string;
+    secondary_text: string;
+  };
+}
+
 const GOOGLE_PLACES_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
 export const LocationStep: React.FC<LocationStepProps> = ({
   accountType,
   onLocationSelect,
 }) => {
+  const [query, setQuery] = useState('');
+  const [predictions, setPredictions] = useState<Prediction[]>([]);
+  const [loading, setLoading] = useState(false);
   const [selectedPlace, setSelectedPlace] = useState<string | null>(null);
-  const ref = useRef<any>(null);
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   const headlines: Record<AccountType, string> = {
     renter: 'Where are you looking?',
@@ -39,54 +53,90 @@ export const LocationStep: React.FC<LocationStepProps> = ({
     company: 'Where are your properties?',
   };
 
-  const handlePlaceSelect = (data: any, details: any) => {
-    if (!details) return;
-
-    const components = details.address_components || [];
-    let city = '';
-    let stateCode = '';
-    let neighborhood = '';
-    let borough = '';
-
-    for (const comp of components) {
-      const types: string[] = comp.types || [];
-      if (types.includes('locality')) {
-        city = comp.long_name;
-      }
-      if (types.includes('administrative_area_level_1')) {
-        stateCode = comp.short_name;
-      }
-      if (types.includes('neighborhood')) {
-        neighborhood = comp.long_name;
-      }
-      if (types.includes('sublocality') || types.includes('sublocality_level_1')) {
-        borough = comp.long_name;
-      }
+  const fetchPredictions = useCallback(async (text: string) => {
+    if (text.length < 3 || !GOOGLE_PLACES_KEY) {
+      setPredictions([]);
+      return;
     }
 
-    if (!city && !stateCode) {
-      city = data.description?.split(',')[0] || '';
+    setLoading(true);
+    try {
+      const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(text)}&types=(regions)&components=country:us&key=${GOOGLE_PLACES_KEY}`;
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data.status === 'OK') {
+        setPredictions(data.predictions || []);
+      } else {
+        setPredictions([]);
+      }
+    } catch (error) {
+      console.error('Places autocomplete error:', error);
+      setPredictions([]);
+    } finally {
+      setLoading(false);
     }
+  }, []);
 
-    const lat = details.geometry?.location?.lat;
-    const lng = details.geometry?.location?.lng;
+  const handleTextChange = (text: string) => {
+    setQuery(text);
+    if (selectedPlace) setSelectedPlace(null);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => fetchPredictions(text), 300);
+  };
 
-    setSelectedPlace(data.description);
+  const handleSelect = async (prediction: Prediction) => {
+    setPredictions([]);
+    setQuery(prediction.description);
+    setSelectedPlace(prediction.description);
+    setLoading(true);
 
-    onLocationSelect({
-      state: stateCode,
-      city: city || data.description?.split(',')[0] || '',
-      borough: borough || undefined,
-      neighborhood: neighborhood || undefined,
-      lat,
-      lng,
-    });
+    try {
+      const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${prediction.place_id}&fields=address_components,geometry&key=${GOOGLE_PLACES_KEY}`;
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data.status === 'OK' && data.result) {
+        const components = data.result.address_components || [];
+        const geo = data.result.geometry?.location;
+
+        let city = '';
+        let stateCode = '';
+        let neighborhood = '';
+        let borough = '';
+
+        for (const comp of components) {
+          const types: string[] = comp.types || [];
+          if (types.includes('locality')) city = comp.long_name;
+          if (types.includes('administrative_area_level_1')) stateCode = comp.short_name;
+          if (types.includes('neighborhood')) neighborhood = comp.long_name;
+          if (types.includes('sublocality') || types.includes('sublocality_level_1')) {
+            borough = comp.long_name;
+          }
+        }
+
+        if (!neighborhood && borough) neighborhood = borough;
+
+        onLocationSelect({
+          state: stateCode,
+          city: city || prediction.structured_formatting.main_text,
+          borough: borough || undefined,
+          neighborhood: neighborhood || undefined,
+          lat: geo?.lat,
+          lng: geo?.lng,
+        });
+      }
+    } catch (error) {
+      console.error('Place details error:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleClear = () => {
     setSelectedPlace(null);
-    ref.current?.clear();
-    ref.current?.setAddressText('');
+    setQuery('');
+    setPredictions([]);
   };
 
   return (
@@ -97,63 +147,43 @@ export const LocationStep: React.FC<LocationStepProps> = ({
       </Text>
 
       <View style={s.autocompleteWrap}>
-        <GooglePlacesAutocomplete
-          ref={ref}
-          placeholder="Search city, neighborhood, or ZIP..."
-          fetchDetails={true}
-          onPress={handlePlaceSelect}
-          query={{
-            key: GOOGLE_PLACES_KEY,
-            language: 'en',
-            types: '(regions)',
-            components: 'country:us',
-          }}
-          textInputProps={{
-            placeholderTextColor: 'rgba(255,255,255,0.35)',
-            returnKeyType: 'search',
-          }}
-          styles={{
-            container: { flex: 0 },
-            textInputContainer: {
-              backgroundColor: 'transparent',
-            },
-            textInput: {
-              backgroundColor: 'rgba(255,255,255,0.07)',
-              color: '#FFFFFF',
-              borderRadius: 14,
-              paddingHorizontal: 16,
-              height: 52,
-              fontSize: 15,
-              borderWidth: 1,
-              borderColor: 'rgba(255,255,255,0.12)',
-            },
-            listView: {
-              backgroundColor: 'rgba(30,30,30,0.98)',
-              borderRadius: 14,
-              marginTop: 6,
-              borderWidth: 1,
-              borderColor: 'rgba(255,255,255,0.1)',
-              ...(Platform.OS === 'web' ? { zIndex: 1000 } : {}),
-            },
-            row: {
-              backgroundColor: 'transparent',
-              paddingHorizontal: 16,
-              paddingVertical: 14,
-            },
-            description: {
-              color: 'rgba(255,255,255,0.85)',
-              fontSize: 14,
-            },
-            separator: {
-              backgroundColor: 'rgba(255,255,255,0.06)',
-            },
-            poweredContainer: {
-              display: 'none',
-            },
-          }}
-          enablePoweredByContainer={false}
-          debounce={300}
-        />
+        <View style={s.inputContainer}>
+          <TextInput
+            style={s.input}
+            value={query}
+            onChangeText={handleTextChange}
+            placeholder="Search city, neighborhood, or ZIP..."
+            placeholderTextColor="rgba(255,255,255,0.35)"
+            returnKeyType="search"
+            autoFocus={!selectedPlace}
+          />
+          {loading ? (
+            <ActivityIndicator style={s.inputIcon} color="#ff6b5b" size="small" />
+          ) : query.length > 0 && !selectedPlace ? (
+            <Pressable onPress={handleClear} hitSlop={8} style={s.inputIcon}>
+              <Feather name="x" size={16} color="rgba(255,255,255,0.4)" />
+            </Pressable>
+          ) : null}
+        </View>
+
+        {predictions.length > 0 ? (
+          <FlatList
+            data={predictions}
+            keyExtractor={item => item.place_id}
+            style={s.listView}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item }) => (
+              <Pressable style={s.row} onPress={() => handleSelect(item)}>
+                <Text style={s.mainText}>
+                  {item.structured_formatting.main_text}
+                </Text>
+                <Text style={s.secondaryText}>
+                  {item.structured_formatting.secondary_text}
+                </Text>
+              </Pressable>
+            )}
+          />
+        ) : null}
       </View>
 
       {selectedPlace ? (
@@ -200,6 +230,50 @@ const s = StyleSheet.create({
   },
   autocompleteWrap: {
     zIndex: 100,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    paddingHorizontal: 16,
+  },
+  input: {
+    flex: 1,
+    fontSize: 15,
+    color: '#FFFFFF',
+    paddingVertical: 14,
+    height: 52,
+  },
+  inputIcon: {
+    marginLeft: 8,
+  },
+  listView: {
+    backgroundColor: 'rgba(30,30,30,0.98)',
+    borderRadius: 14,
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    maxHeight: 300,
+    ...(Platform.OS === 'web' ? { zIndex: 1000 } : {}),
+  },
+  row: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  mainText: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  secondaryText: {
+    color: 'rgba(255,255,255,0.45)',
+    fontSize: 13,
+    marginTop: 2,
   },
   selectedCard: {
     flexDirection: 'row',
