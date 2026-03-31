@@ -8,8 +8,15 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { useTheme } from '../../../hooks/useTheme';
 import { supabase } from '../../../lib/supabase';
 import OnboardingHeader from '../../../components/OnboardingHeader';
+import { PricePickerPair } from '../../../components/PricePicker';
 
-const TOTAL_STEPS = 3;
+const TOTAL_STEPS = 4;
+
+const ROOM_TYPES = [
+  { id: 'private', icon: 'lock' as const, label: 'Private Room', desc: 'Your own space with shared common areas' },
+  { id: 'shared', icon: 'users' as const, label: 'Shared Room', desc: 'Share a bedroom to save on rent' },
+  { id: 'apartment', icon: 'home' as const, label: 'Full Apartment', desc: 'An entire place to yourself' },
+];
 
 type DealbreakerId = 'smoking' | 'pets' | 'overnight_guests' | 'drinking' | 'loud_music' | 'drugs';
 
@@ -55,6 +62,9 @@ export default function RoommateOnboardingScreen() {
   const [cleanliness, setCleanliness] = useState<Cleanliness | null>(null);
   const [noiseTolerance, setNoiseTolerance] = useState<NoiseTolerance | null>(null);
   const [idealRoommate, setIdealRoommate] = useState('');
+  const [budgetMin, setBudgetMin] = useState<number>(1000);
+  const [budgetMax, setBudgetMax] = useState<number>(2500);
+  const [roomTypes, setRoomTypes] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
   const toggleDealbreaker = (id: DealbreakerId) => {
@@ -64,6 +74,61 @@ export default function RoommateOnboardingScreen() {
         : [...prev, id]
     );
   };
+
+  const toggleRoomType = (id: string) => {
+    setRoomTypes(prev =>
+      prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]
+    );
+  };
+
+  const renderBudgetStep = () => (
+    <View>
+      <Text style={[styles.stepTitle, { color: theme.text }]}>What's your budget?</Text>
+      <Text style={[styles.stepSubtitle, { color: theme.textSecondary }]}>
+        Set your monthly rent range to find compatible roommates
+      </Text>
+
+      <Text style={[styles.sectionLabel, { color: theme.text }]}>Monthly Budget</Text>
+      <PricePickerPair
+        minValue={budgetMin}
+        maxValue={budgetMax}
+        onMinChange={setBudgetMin}
+        onMaxChange={setBudgetMax}
+        height={160}
+      />
+
+      <Text style={[styles.sectionLabel, { color: theme.text, marginTop: 28 }]}>Room Type</Text>
+      <View style={{ gap: 10 }}>
+        {ROOM_TYPES.map(rt => {
+          const isActive = roomTypes.includes(rt.id);
+          return (
+            <Pressable
+              key={rt.id}
+              style={[
+                styles.roomCard,
+                { borderColor: isActive ? theme.primary : 'rgba(255,255,255,0.15)' },
+                isActive && { backgroundColor: `${theme.primary}15` },
+              ]}
+              onPress={() => toggleRoomType(rt.id)}
+            >
+              <View style={[styles.roomIconWrap, isActive && { backgroundColor: `${theme.primary}20` }]}>
+                <Feather name={rt.icon} size={20} color={isActive ? theme.primary : theme.textSecondary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.roomLabel, { color: isActive ? theme.primary : theme.text }]}>
+                  {rt.label}
+                </Text>
+                <Text style={[styles.roomDesc, { color: theme.textTertiary }]}>{rt.desc}</Text>
+              </View>
+              {isActive ? (
+                <Feather name="check-circle" size={20} color={theme.primary} />
+              ) : null}
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
 
   const renderStep1 = () => (
     <View>

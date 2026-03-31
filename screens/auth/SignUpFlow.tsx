@@ -108,6 +108,9 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
   type StepId = 'accountType' | 'credentials' | 'location' | 'details' | 'photo' | 'complete';
 
   const getSteps = (): StepId[] => {
+    if (state.accountType === 'renter') {
+      return ['accountType', 'credentials', 'location', 'photo', 'complete'];
+    }
     return ['accountType', 'credentials', 'location', 'details', 'photo', 'complete'];
   };
 

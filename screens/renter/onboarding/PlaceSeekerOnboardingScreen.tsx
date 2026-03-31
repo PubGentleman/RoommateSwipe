@@ -10,8 +10,15 @@ import { supabase } from '../../../lib/supabase';
 import { getNeighborhoodsByBorough, getNeighborhoodsForCity } from '../../../constants/neighborhoods';
 import { getRenterPreferenceAmenities } from '../../../constants/amenities';
 import OnboardingHeader from '../../../components/OnboardingHeader';
+import { PricePickerPair } from '../../../components/PricePicker';
 
-const TOTAL_STEPS = 3;
+const TOTAL_STEPS = 4;
+
+const ROOM_TYPES = [
+  { id: 'private', icon: 'lock' as const, label: 'Private Room', desc: 'Your own space with shared common areas' },
+  { id: 'shared', icon: 'users' as const, label: 'Shared Room', desc: 'Share a bedroom to save on rent' },
+  { id: 'apartment', icon: 'home' as const, label: 'Full Apartment', desc: 'An entire place to yourself' },
+];
 
 const NICE_TO_HAVE_ITEMS = [
   { id: 'natural_light', label: 'Natural Light', icon: 'sun' as const },
@@ -50,6 +57,9 @@ export default function PlaceSeekerOnboardingScreen() {
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [moveInDate, setMoveInDate] = useState<string>('');
   const [niceToHaves, setNiceToHaves] = useState<string[]>([]);
+  const [budgetMin, setBudgetMin] = useState<number>(1000);
+  const [budgetMax, setBudgetMax] = useState<number>(2500);
+  const [roomTypes, setRoomTypes] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
   const userCity = user?.profileData?.city || user?.profileData?.neighborhood || '';
@@ -80,6 +90,64 @@ export default function PlaceSeekerOnboardingScreen() {
         : [...prev, id]
     );
   };
+
+  const toggleRoomType = (id: string) => {
+    setRoomTypes(prev =>
+      prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]
+    );
+  };
+
+  const renderBudgetStep = () => (
+    <View>
+      <Text style={[styles.stepTitle, { color: theme.text }]}>What's your budget?</Text>
+      <Text style={[styles.stepSubtitle, { color: theme.textSecondary }]}>
+        Set your monthly rent range so we can find the right listings
+      </Text>
+
+      <Text style={[styles.sectionLabel, { color: theme.text }]}>Monthly Budget</Text>
+      <PricePickerPair
+        minValue={budgetMin}
+        maxValue={budgetMax}
+        onMinChange={setBudgetMin}
+        onMaxChange={setBudgetMax}
+        height={160}
+      />
+
+      <Text style={[styles.sectionLabel, { color: theme.text, marginTop: 28 }]}>Room Type</Text>
+      <Text style={[styles.sectionHint, { color: theme.textTertiary }]}>
+        Select all that apply
+      </Text>
+      <View style={{ gap: 10 }}>
+        {ROOM_TYPES.map(rt => {
+          const isActive = roomTypes.includes(rt.id);
+          return (
+            <Pressable
+              key={rt.id}
+              style={[
+                styles.roomCard,
+                { borderColor: isActive ? theme.primary : 'rgba(255,255,255,0.15)' },
+                isActive && { backgroundColor: `${theme.primary}15` },
+              ]}
+              onPress={() => toggleRoomType(rt.id)}
+            >
+              <View style={[styles.roomIconWrap, isActive && { backgroundColor: `${theme.primary}20` }]}>
+                <Feather name={rt.icon} size={20} color={isActive ? theme.primary : theme.textSecondary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.roomLabel, { color: isActive ? theme.primary : theme.text }]}>
+                  {rt.label}
+                </Text>
+                <Text style={[styles.roomDesc, { color: theme.textTertiary }]}>{rt.desc}</Text>
+              </View>
+              {isActive ? (
+                <Feather name="check-circle" size={20} color={theme.primary} />
+              ) : null}
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
 
   const renderStep1 = () => (
     <View>
@@ -297,6 +365,14 @@ export default function PlaceSeekerOnboardingScreen() {
         amenityPreferences: selectedAmenities,
         niceToHaveAmenities: niceToHaves,
         moveInTimeline: moveInDate || undefined,
+        profileData: {
+          ...user.profileData,
+          budget: budgetMax,
+          budgetMin: budgetMin,
+          budgetMax: budgetMax,
+          roomType: roomTypes.join(',') || undefined,
+          lookingFor: roomTypes.includes('apartment') ? 'entire_apartment' : (roomTypes.length > 0 ? 'room' : undefined),
+        },
       });
     } catch (err) {
       console.error('Error saving place seeker preferences:', err);
@@ -350,7 +426,7 @@ export default function PlaceSeekerOnboardingScreen() {
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {step === 1 ? renderStep1() : step === 2 ? renderStep2() : renderStep3()}
+        {step === 1 ? renderBudgetStep() : step === 2 ? renderStep1() : step === 3 ? renderStep2() : renderStep3()}
       </ScrollView>
 
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 8 }]}>
@@ -474,6 +550,31 @@ const styles = StyleSheet.create({
   amenityChipText: {
     fontSize: 13,
     fontWeight: '500',
+  },
+  roomCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    gap: 12,
+  },
+  roomIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  roomLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  roomDesc: {
+    fontSize: 12,
+    marginTop: 2,
   },
   bottomBar: {
     flexDirection: 'row',
