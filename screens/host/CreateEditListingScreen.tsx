@@ -24,10 +24,12 @@ type RouteParams = {
   CreateEditListing: { propertyId?: string };
 };
 
-const AMENITIES_LIST = [
-  'WiFi', 'Parking', 'In-unit Laundry', 'In-building Laundry', 'AC', 'Heating', 'Dishwasher',
-  'Gym', 'Pool', 'Pet Friendly', 'Furnished', 'Balcony', 'Storage',
-];
+import {
+  getHostAmenities,
+  AMENITY_CATEGORIES,
+  AmenityCategory,
+  normalizeLegacyAmenity,
+} from '../../constants/amenities';
 
 const BEDROOM_OPTIONS = [1, 2, 3, 4, 5, 6];
 const BATHROOM_OPTIONS = [1, 2, 3, 4];
@@ -74,6 +76,7 @@ export const CreateEditListingScreen = () => {
   const [availableDate, setAvailableDate] = useState('');
   const [showAvailableDatePicker, setShowAvailableDatePicker] = useState(false);
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
+  const [expandedHostCategories, setExpandedHostCategories] = useState<Set<AmenityCategory>>(new Set(['unit_features']));
   const [houseRules, setHouseRules] = useState('');
   const [photos, setPhotos] = useState<string[]>([]);
   const [transitOverride, setTransitOverride] = useState('');
@@ -144,7 +147,11 @@ export const CreateEditListingScreen = () => {
     setZipCode((prop as any).zip_code || '');
     setAddress(prop.address);
     setAvailableDate(prop.availableDate ? new Date(prop.availableDate).toISOString().split('T')[0] : '');
-    setSelectedAmenities(prop.amenities);
+    setSelectedAmenities(
+      (Array.isArray(prop.amenities) ? prop.amenities : [])
+        .map((a: string) => normalizeLegacyAmenity(a))
+        .filter(Boolean)
+    );
     setPhotos(prop.photos);
     if (prop.hostLivesIn !== undefined) setHostLivesIn(!!prop.hostLivesIn);
     if (prop.existing_roommates_count !== undefined) setExistingRoommatesCount(prop.existing_roommates_count);
@@ -983,28 +990,83 @@ export const CreateEditListingScreen = () => {
       <View style={styles.card}>
         {renderSectionTitle('Amenities')}
 
-        <View style={styles.chipRow}>
-          {AMENITIES_LIST.map(amenity => {
-            const selected = selectedAmenities.includes(amenity);
-            return (
+        {AMENITY_CATEGORIES.map(category => {
+          const categoryAmenities = getHostAmenities().filter(a => a.category === category.key);
+          if (categoryAmenities.length === 0) return null;
+          const selectedCount = categoryAmenities.filter(a => selectedAmenities.includes(a.id)).length;
+          const isExpanded = expandedHostCategories.has(category.key);
+
+          return (
+            <View key={category.key} style={{ marginBottom: 8 }}>
               <Pressable
-                key={amenity}
-                style={[
-                  styles.amenityChip,
-                  selected ? styles.amenityChipSelected : styles.amenityChipUnselected,
-                ]}
-                onPress={() => toggleAmenity(amenity)}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingVertical: 10,
+                  paddingHorizontal: 4,
+                }}
+                onPress={() => {
+                  setExpandedHostCategories(prev => {
+                    const next = new Set(prev);
+                    if (next.has(category.key)) next.delete(category.key);
+                    else next.add(category.key);
+                    return next;
+                  });
+                }}
               >
-                {selected ? (
-                  <Feather name="check" size={14} color="#fff" style={{ marginRight: 4 }} />
-                ) : null}
-                <ThemedText style={[styles.amenityChipText, { color: selected ? '#fff' : '#aaa' }]}>
-                  {amenity}
-                </ThemedText>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Feather name={category.icon} size={16} color="#888" />
+                  <ThemedText style={{ fontSize: 14, fontWeight: '600' }}>
+                    {category.label}
+                  </ThemedText>
+                  {selectedCount > 0 ? (
+                    <View style={{
+                      backgroundColor: '#ff6b5b',
+                      borderRadius: 10,
+                      minWidth: 20,
+                      height: 20,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      paddingHorizontal: 6,
+                    }}>
+                      <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>{selectedCount}</Text>
+                    </View>
+                  ) : null}
+                </View>
+                <Feather name={isExpanded ? 'chevron-up' : 'chevron-down'} size={16} color="#888" />
               </Pressable>
-            );
-          })}
-        </View>
+
+              {isExpanded ? (
+                <View style={styles.chipRow}>
+                  {categoryAmenities.map(amenity => {
+                    const selected = selectedAmenities.includes(amenity.id);
+                    return (
+                      <Pressable
+                        key={amenity.id}
+                        style={[
+                          styles.amenityChip,
+                          selected ? styles.amenityChipSelected : styles.amenityChipUnselected,
+                        ]}
+                        onPress={() => toggleAmenity(amenity.id)}
+                      >
+                        <Feather
+                          name={amenity.icon}
+                          size={14}
+                          color={selected ? '#fff' : '#888'}
+                          style={{ marginRight: 4 }}
+                        />
+                        <ThemedText style={[styles.amenityChipText, { color: selected ? '#fff' : '#aaa' }]}>
+                          {amenity.label}
+                        </ThemedText>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : null}
+            </View>
+          );
+        })}
       </View>
 
       <View style={styles.card}>

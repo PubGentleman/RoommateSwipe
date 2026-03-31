@@ -64,6 +64,17 @@ A tiered subscription model exists for renters, hosts, and agents, with payments
 
 Supabase PostgreSQL serves as the primary data store, complemented by AsyncStorage for local caching. TypeScript interfaces define data models. A centralized `listingService.ts` manages CRUD operations. The group system handles roommate and listing inquiry groups with plan-based limits.
 
+## Amenity System
+
+Centralized amenity definitions live in `constants/amenities.ts` — the single source of truth for all amenity data across the app. Contains 42 amenities in 6 categories (unit_features, kitchen_bath, building_amenities, outdoor_spaces, utilities_services, accessibility_safety). Key exports:
+- `ALL_AMENITIES` / `AMENITY_CATEGORIES` — master data
+- `getHostAmenities()` — amenities for host listing creation (excludes renter-only items)
+- `getRenterPreferenceAmenities()` — curated subset for renter onboarding (max 3 picks)
+- `normalizeLegacyAmenity()` — maps old string-format amenities (e.g. "In-unit Laundry") to canonical IDs (e.g. "in_unit_laundry")
+- `matchAmenityText()` — fuzzy text-to-ID matching via searchTerms
+
+All three amenity surfaces (ExploreScreen filters, CreateEditListingScreen, ApartmentPreferencesScreen) use collapsible categorized sections with badge counts. Legacy listing amenities are normalized on load/filter. Migration 057 provides a PostgreSQL `normalize_amenity()` function for server-side backward compatibility.
+
 ## Technical Decisions
 
 The architecture incorporates a Babel module resolver, platform-specific UI, performance optimizations (React Native's New Architecture, React Compiler, Reanimated), and robust error handling. Navigation uses separate stack navigators with history behavior, and efficient data fetching prevents N+1 issues.

@@ -41,11 +41,7 @@ const BEDROOM_OPTIONS = [
 ];
 
 
-const AMENITY_OPTIONS = [
-  'In-unit laundry', 'Laundry in building', 'Dishwasher', 'Elevator',
-  'Doorman / Security', 'Outdoor space', 'Pet friendly', 'Parking',
-  'Air conditioning', 'Gym', 'No fee', 'Furnished',
-];
+import { getRenterPreferenceAmenities } from '../../constants/amenities';
 
 export default function ApartmentPreferencesScreen() {
   const navigation = useNavigation();
@@ -370,23 +366,23 @@ export default function ApartmentPreferencesScreen() {
         Pick up to 3
       </ThemedText>
       <View style={styles.amenityGrid}>
-        {AMENITY_OPTIONS.map(a => {
-          const isSelected = amenities.includes(a);
+        {getRenterPreferenceAmenities().map(item => {
+          const isSelected = amenities.includes(item.id);
           return (
             <Pressable
-              key={a}
+              key={item.id}
               style={[
                 styles.amenityChip,
                 isSelected && styles.chipSelected,
                 amenities.length >= 3 && !isSelected && { opacity: 0.4 },
               ]}
-              onPress={() => toggleAmenity(a)}
+              onPress={() => toggleAmenity(item.id)}
             >
               <ThemedText style={[
                 styles.amenityLabel,
                 isSelected && styles.chipLabelSelected,
               ]}>
-                {a}
+                {item.label}
               </ThemedText>
             </Pressable>
           );

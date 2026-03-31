@@ -45,11 +45,12 @@ import { getReviewSummary, submitReview, checkReviewEligibility, ReviewSummary }
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { shouldShowRoommateFeatures } from '../../utils/renterIntentUtils';
-
-const COMMON_AMENITIES = [
-  'Parking', 'Gym', 'Pool', 'In-unit Laundry', 'In-building Laundry', 'Pet Friendly',
-  'Air Conditioning', 'Dishwasher', 'Balcony',
-];
+import {
+  ALL_AMENITIES,
+  AMENITY_CATEGORIES,
+  AmenityCategory,
+  normalizeLegacyAmenity,
+} from '../../constants/amenities';
 
 const BG = '#111';
 const CARD_BG = '#1a1a1a';
@@ -109,6 +110,7 @@ export const ExploreScreen = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const [expandedCategories, setExpandedCategories] = useState<Set<AmenityCategory>>(new Set(['unit_features']));
   const [filters, setFilters] = useState<PropertyFilter>({});
   const [tempFilters, setTempFilters] = useState<PropertyFilter>({});
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
@@ -799,17 +801,13 @@ export const ExploreScreen = () => {
       filtered = filtered.filter(p => p.bathrooms >= filters.minBathrooms!);
     }
     if (filters.amenities && filters.amenities.length > 0) {
-      filtered = filtered.filter(p =>
-        filters.amenities!.every(amenity => {
-          const amenityLower = amenity.toLowerCase();
-          return p.amenities.some(a => {
-            const aLower = a.toLowerCase();
-            if (amenityLower.includes('laundry')) {
-              return aLower.includes('laundry');
-            }
-            return aLower === amenityLower;
-          });
-        })
+      filtered = filtered.filter(p => {
+        const raw = Array.isArray(p.amenities) ? p.amenities : [];
+        const listingAmenityIds = raw.map(a => normalizeLegacyAmenity(a)).filter(Boolean);
+        return filters.amenities!.every(filterId =>
+          listingAmenityIds.includes(filterId)
+        );
+      }
       );
     }
 
@@ -1718,22 +1716,70 @@ export const ExploreScreen = () => {
             </View>
 
             <Text style={styles.fmSectionTitle}>Amenities</Text>
-            <View style={styles.fmAmenitiesWrap}>
-              {COMMON_AMENITIES.map(amenity => {
-                const isSelected = tempFilters.amenities?.includes(amenity) || false;
-                return (
+            {AMENITY_CATEGORIES.map(category => {
+              const categoryAmenities = ALL_AMENITIES.filter(a => a.category === category.key);
+              const selectedInCategory = categoryAmenities.filter(a =>
+                tempFilters.amenities?.includes(a.id)
+              ).length;
+
+              return (
+                <View key={category.key} style={styles.fmAmenityCategory}>
                   <Pressable
-                    key={amenity}
-                    style={[styles.fmAmenityChip, isSelected && styles.fmAmenityChipActive]}
-                    onPress={() => toggleAmenity(amenity)}
+                    style={styles.fmCategoryHeader}
+                    onPress={() => {
+                      setExpandedCategories(prev => {
+                        const next = new Set(prev);
+                        if (next.has(category.key)) next.delete(category.key);
+                        else next.add(category.key);
+                        return next;
+                      });
+                    }}
                   >
-                    <Text style={[styles.fmAmenityText, isSelected && styles.fmAmenityTextActive]}>
-                      {amenity}
-                    </Text>
+                    <View style={styles.fmCategoryHeaderLeft}>
+                      <Feather name={category.icon} size={16} color={theme.textSecondary} />
+                      <Text style={[styles.fmCategoryLabel, { color: theme.text }]}>
+                        {category.label}
+                      </Text>
+                      {selectedInCategory > 0 ? (
+                        <View style={styles.fmCategoryBadge}>
+                          <Text style={styles.fmCategoryBadgeText}>{selectedInCategory}</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                    <Feather
+                      name={expandedCategories.has(category.key) ? 'chevron-up' : 'chevron-down'}
+                      size={16}
+                      color={theme.textSecondary}
+                    />
                   </Pressable>
-                );
-              })}
-            </View>
+
+                  {expandedCategories.has(category.key) ? (
+                    <View style={styles.fmAmenitiesWrap}>
+                      {categoryAmenities.map(amenity => {
+                        const isSelected = tempFilters.amenities?.includes(amenity.id) || false;
+                        return (
+                          <Pressable
+                            key={amenity.id}
+                            style={[styles.fmAmenityChip, isSelected && styles.fmAmenityChipActive]}
+                            onPress={() => toggleAmenity(amenity.id)}
+                          >
+                            <Feather
+                              name={amenity.icon}
+                              size={14}
+                              color={isSelected ? '#fff' : theme.textSecondary}
+                              style={{ marginRight: 6 }}
+                            />
+                            <Text style={[styles.fmAmenityText, isSelected && styles.fmAmenityTextActive]}>
+                              {amenity.label}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  ) : null}
+                </View>
+              );
+            })}
 
             {!renterLimits.hasAdvancedFilters ? (
               <Pressable
@@ -3877,9 +3923,44 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
+  fmAmenityCategory: {
+    marginBottom: 8,
+  },
+  fmCategoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+  },
+  fmCategoryHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  fmCategoryLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  fmCategoryBadge: {
+    backgroundColor: '#ff6b5b',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  fmCategoryBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+  },
   fmAmenityChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 9,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 20,
     backgroundColor: '#1e1e1e',
     borderWidth: 1,
