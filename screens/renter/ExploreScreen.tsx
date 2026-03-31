@@ -1359,7 +1359,13 @@ export const ExploreScreen = () => {
                 {itemHostType === 'company'
                   ? `${hostUser?.unitsManaged ?? 1} units managed`
                   : itemHostType === 'agent'
-                    ? hostUser?.agencyName ?? 'Licensed Agent'
+                    ? (() => {
+                        const parts: string[] = [];
+                        if (hostUser?.agencyName) parts.push(hostUser.agencyName);
+                        const count = hostUser?.unitsManaged ?? 1;
+                        parts.push(`${count} ${count === 1 ? 'listing' : 'listings'}`);
+                        return parts.join(' · ');
+                      })()
                     : (() => {
                         const count = hostUser?.unitsManaged ?? 1;
                         return `Host · ${count} ${count === 1 ? 'listing' : 'listings'}`;
