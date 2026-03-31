@@ -17,6 +17,7 @@ import { BadgeProgressCard } from '../../components/BadgeProgressCard';
 import { getMyListings, mapListingToProperty, getAgentStats, getCompanyAgents, reassignListingAgent, getCompanyListingsWithAgents, getAgentDetailData, reassignConversation, AgentConversationSummary, AgentBookingSummary } from '../../services/listingService';
 import { getReceivedInterestCards, acceptInterestCard, rejectInterestCard } from '../../services/discoverService';
 import { supabase } from '../../lib/supabase';
+import { RhomeLogo } from '../../components/RhomeLogo';
 import { updateGroup } from '../../services/groupService';
 import { RhomeAISheet } from '../../components/RhomeAISheet';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
@@ -457,7 +458,11 @@ export const HostDashboardScreen = () => {
   return (
     <View style={[styles.container, { backgroundColor: BG }]}>
       <View style={[styles.topNav, { paddingTop: insets.top + 14 }]}>
-        <View style={{ flex: 1 }}>
+        <RhomeLogo variant="icon-only" size="sm" onPress={() => {
+          const parent = navigation.getParent?.();
+          if (parent) parent.navigate('Dashboard', { screen: 'DashboardMain' });
+        }} />
+        <View style={{ flex: 1, marginLeft: 10 }}>
           <Text style={styles.greetingTitle}>Host Dashboard</Text>
         </View>
         <View style={styles.navActions}>

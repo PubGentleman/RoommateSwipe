@@ -1240,7 +1240,7 @@ export const RoommatesScreen = () => {
       <View style={[styles.container, { backgroundColor: '#141414' }]}>
         <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
           <View style={{ width: 42 }} />
-          <RhomeLogo variant="horizontal" size="sm" />
+          <RhomeLogo variant="horizontal" size="sm" onPress={() => (navigation as any).getParent?.()?.navigate?.('Explore')} />
           <View style={{ width: 42 }} />
         </View>
         <View style={styles.emptyState}>
@@ -1279,7 +1279,7 @@ export const RoommatesScreen = () => {
       <View style={[styles.container, { backgroundColor: '#141414' }]}>
         <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
           <View style={{ width: 42 }} />
-          <RhomeLogo variant="horizontal" size="sm" />
+          <RhomeLogo variant="horizontal" size="sm" onPress={() => (navigation as any).getParent?.()?.navigate?.('Explore')} />
           <View style={{ width: 42 }} />
         </View>
         {renderCitySelector()}
@@ -1306,7 +1306,7 @@ export const RoommatesScreen = () => {
     return (
       <View style={[styles.container, { backgroundColor: '#141414' }]}>
         <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-          <RhomeLogo variant="horizontal" size="sm" />
+          <RhomeLogo variant="horizontal" size="sm" onPress={() => (navigation as any).getParent?.()?.navigate?.('Explore')} />
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <Pressable onPress={() => {
               if (user?.boostData?.isBoosted && user?.boostData?.boostExpiresAt && !isBoostExpired(String(user.boostData.boostExpiresAt))) {
@@ -1549,7 +1549,7 @@ export const RoommatesScreen = () => {
   return (
     <View style={[styles.container, { backgroundColor: '#141414' }]}>
       <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-        <RhomeLogo variant="horizontal" size="sm" />
+        <RhomeLogo variant="horizontal" size="sm" onPress={() => (navigation as any).getParent?.()?.navigate?.('Explore')} />
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <Pressable onPress={() => {
             if (user?.boostData?.isBoosted && user?.boostData?.boostExpiresAt && !isBoostExpired(String(user.boostData.boostExpiresAt))) {

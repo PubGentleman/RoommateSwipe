@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path } from 'react-native-svg';
 
@@ -7,6 +7,7 @@ interface RhomeLogoProps {
   variant?: 'horizontal' | 'stacked' | 'icon-only';
   size?: 'sm' | 'md' | 'lg';
   darkBackground?: boolean;
+  onPress?: () => void;
 }
 
 const SIZES = {
@@ -19,6 +20,7 @@ export const RhomeLogo: React.FC<RhomeLogoProps> = ({
   variant = 'horizontal',
   size = 'md',
   darkBackground = true,
+  onPress,
 }) => {
   const { icon: iconSize, wordmarkFontSize, spacing } = SIZES[size];
   const accentColor = '#FF6B6B';
@@ -82,24 +84,31 @@ export const RhomeLogo: React.FC<RhomeLogoProps> = ({
     </Text>
   );
 
+  const Wrapper = onPress ? Pressable : View;
+  const wrapperProps = onPress ? { onPress, hitSlop: { top: 8, bottom: 8, left: 8, right: 8 } } : {};
+
   if (variant === 'icon-only') {
-    return <PinIcon />;
+    return onPress ? (
+      <Pressable onPress={onPress} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <PinIcon />
+      </Pressable>
+    ) : <PinIcon />;
   }
 
   if (variant === 'stacked') {
     return (
-      <View style={[styles.stackedContainer, { gap: spacing * 0.6 }]}>
+      <Wrapper {...wrapperProps} style={[styles.stackedContainer, { gap: spacing * 0.6 }]}>
         <PinIcon />
         <Wordmark />
-      </View>
+      </Wrapper>
     );
   }
 
   return (
-    <View style={[styles.horizontalContainer, { gap: spacing }]}>
+    <Wrapper {...wrapperProps} style={[styles.horizontalContainer, { gap: spacing }]}>
       <PinIcon />
       <Wordmark />
-    </View>
+    </Wrapper>
   );
 };
 

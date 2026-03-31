@@ -15,6 +15,7 @@ import { getVerificationLevel } from '../../components/VerificationBadge';
 import { StorageService } from '../../utils/storage';
 import { RhomeAISheet } from '../../components/RhomeAISheet';
 import { AIFloatingButton } from '../../components/AIFloatingButton';
+import { RhomeLogo } from '../../components/RhomeLogo';
 import { getBoostTimeRemaining, getBoostDuration, isBoostExpired, RENTER_BOOST_OPTIONS, RenterBoostOptionId } from '../../utils/boostUtils';
 import { isDev } from '../../utils/envUtils';
 import { isHostTypeEditable, hoursRemainingInGracePeriod, getHostBadgeLabel, getHostBadgeColor, getHostBadgeIcon } from '../../utils/hostTypeUtils';
@@ -254,6 +255,13 @@ export const ProfileScreen = () => {
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <View style={styles.topNav}>
+        <RhomeLogo variant="icon-only" size="sm" onPress={() => {
+          const parent = navigation.getParent?.();
+          if (parent) {
+            const isHost = user?.role === 'host' || activeMode === 'host';
+            parent.navigate(isHost ? 'Dashboard' : 'Explore');
+          }
+        }} />
         <AIFloatingButton onPress={() => setShowAISheet(true)} position="inline" />
         <Pressable onPress={handleDevTap}>
           <Text style={styles.topNavTitle}>My Profile</Text>

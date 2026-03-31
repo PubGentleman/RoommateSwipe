@@ -38,6 +38,7 @@ import { shouldShowMatchScore, getHostBadgeLabel, getHostBadgeColor, getHostBadg
 import type { HostType } from '../../utils/hostTypeUtils';
 import { PropertyMapView } from '../../components/PropertyMapView';
 import { RhomeAISheet } from '../../components/RhomeAISheet';
+import { RhomeLogo } from '../../components/RhomeLogo';
 import { NeighborhoodAISheet } from '../../components/NeighborhoodAISheet';
 import { PropertyReviewsScreen } from '../shared/PropertyReviewsScreen';
 import { WriteReviewSheet } from '../../components/WriteReviewSheet';
@@ -1426,6 +1427,7 @@ export const ExploreScreen = () => {
   return (
     <View style={[styles.container, { backgroundColor: BG }]}>
       <View style={[styles.exploreHeaderRow, { paddingTop: insets.top + 12 }]}>
+        <RhomeLogo variant="icon-only" size="sm" />
         <Pressable style={styles.aiBtnWrap} onPress={() => setShowAISheet(true)}>
           <LinearGradient colors={['#ff6b5b', '#ff8c7a']} style={styles.aiBtn}>
             <Feather name="cpu" size={15} color="#fff" />
