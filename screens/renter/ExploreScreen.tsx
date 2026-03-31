@@ -67,9 +67,14 @@ const QUICK_FILTERS = [
   { key: 'availableNow', label: 'Available Now', icon: 'clock' as const },
 ];
 
-const LISTING_TYPE_CHIPS: { key: 'room' | 'entire' | 'sublet'; label: string; icon: 'user' | 'home' }[] = [
+const LISTING_TYPE_CHIPS: { key: string; label: string; icon: 'user' | 'home' | 'file-text' | 'clock' }[] = [
   { key: 'room', label: 'Private Room', icon: 'user' },
   { key: 'entire', label: 'Entire Unit', icon: 'home' },
+];
+
+const LEASE_TYPE_CHIPS: { key: string; label: string; icon: 'file-text' | 'clock' }[] = [
+  { key: 'lease', label: 'Lease', icon: 'file-text' },
+  { key: 'sublet', label: 'Sublet', icon: 'clock' },
 ];
 
 const LISTING_TYPE_OPTIONS = [
@@ -141,11 +146,13 @@ export const ExploreScreen = () => {
   const [paywallPlan, setPaywallPlan] = useState<'plus' | 'elite'>('plus');
   const [activeQuickFilters, setActiveQuickFilters] = useState<Set<string>>(new Set());
   const intentPref = user?.profileData?.listing_type_preference;
+  const isEntireApartmentSeeker = intentPref === 'entire_apartment';
   const [listingTypeFilter, setListingTypeFilter] = useState<string[]>(() => {
     if (intentPref === 'room') return ['room'];
     if (intentPref === 'entire_apartment') return ['entire'];
     return [];
   });
+  const [leaseTypeFilter, setLeaseTypeFilter] = useState<string[]>([]);
   const [showAISheet, setShowAISheet] = useState(false);
   const [interestNote, setInterestNote] = useState('');
   const [userGroups, setUserGroups] = useState<Group[]>([]);
@@ -201,7 +208,7 @@ export const ExploreScreen = () => {
 
   useEffect(() => {
     applyFilters();
-  }, [properties, filters, viewMode, saved, activeCity, activeSubArea, selectedNeighborhood, activeQuickFilters, listingTypeFilter]);
+  }, [properties, filters, viewMode, saved, activeCity, activeSubArea, selectedNeighborhood, activeQuickFilters, listingTypeFilter, leaseTypeFilter]);
 
   useEffect(() => {
     if (!showPropertyDetail || !selectedProperty) {
@@ -851,6 +858,13 @@ export const ExploreScreen = () => {
       });
     }
 
+    if (leaseTypeFilter.length > 0) {
+      filtered = filtered.filter(p => {
+        const pt = ((p as any).propertyType || '').toLowerCase();
+        return leaseTypeFilter.includes(pt);
+      });
+    }
+
     if (activeQuickFilters.has('under2k')) {
       filtered = filtered.filter(p => {
         const price = p.price ?? (p as any).rent ?? (p as any).monthly_price ?? 0;
@@ -1091,6 +1105,16 @@ export const ExploreScreen = () => {
   const handleListingTypeChip = (type: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setListingTypeFilter(prev => {
+      if (prev.includes(type)) {
+        return prev.filter(t => t !== type);
+      }
+      return [...prev, type];
+    });
+  };
+
+  const handleLeaseTypeChip = (type: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setLeaseTypeFilter(prev => {
       if (prev.includes(type)) {
         return prev.filter(t => t !== type);
       }
@@ -1520,15 +1544,27 @@ export const ExploreScreen = () => {
           style={styles.filterScrollView}
           contentContainerStyle={styles.chipScrollContent}
         >
-          {LISTING_TYPE_CHIPS.map(t => {
-            const active = listingTypeFilter.includes(t.key);
-            return (
-              <Pressable key={t.key} style={active ? styles.chipSelected : styles.chipUnselected} onPress={() => handleListingTypeChip(t.key)}>
-                <Feather name={t.icon} size={11} color={active ? '#fff' : 'rgba(255,255,255,0.45)'} />
-                <Text style={active ? styles.chipSelectedText : styles.chipUnselectedText}>{t.label}</Text>
-              </Pressable>
-            );
-          })}
+          {isEntireApartmentSeeker ? (
+            LEASE_TYPE_CHIPS.map(t => {
+              const active = leaseTypeFilter.includes(t.key);
+              return (
+                <Pressable key={t.key} style={active ? styles.chipSelected : styles.chipUnselected} onPress={() => handleLeaseTypeChip(t.key)}>
+                  <Feather name={t.icon} size={11} color={active ? '#fff' : 'rgba(255,255,255,0.45)'} />
+                  <Text style={active ? styles.chipSelectedText : styles.chipUnselectedText}>{t.label}</Text>
+                </Pressable>
+              );
+            })
+          ) : (
+            LISTING_TYPE_CHIPS.map(t => {
+              const active = listingTypeFilter.includes(t.key);
+              return (
+                <Pressable key={t.key} style={active ? styles.chipSelected : styles.chipUnselected} onPress={() => handleListingTypeChip(t.key)}>
+                  <Feather name={t.icon} size={11} color={active ? '#fff' : 'rgba(255,255,255,0.45)'} />
+                  <Text style={active ? styles.chipSelectedText : styles.chipUnselectedText}>{t.label}</Text>
+                </Pressable>
+              );
+            })
+          )}
           {QUICK_FILTERS.map(f => {
             const active = activeQuickFilters.has(f.key);
             return (
