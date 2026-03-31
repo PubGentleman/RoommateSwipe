@@ -1,12 +1,29 @@
-import React, { useRef } from 'react';
-import { View, StyleSheet, Pressable, Platform } from 'react-native';
+import React, { useState, useRef, useCallback } from 'react';
+import { View, StyleSheet, Pressable, TextInput, FlatList, ActivityIndicator } from 'react-native';
 import { Feather } from './VectorIcons';
 import { ThemedText } from './ThemedText';
 import { useTheme } from '../hooks/useTheme';
 import { Spacing, BorderRadius, Typography } from '../constants/theme';
-import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 
-const GOOGLE_PLACES_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+const NOMINATIM_BASE = 'https://nominatim.openstreetmap.org';
+
+interface NominatimResult {
+  place_id: number;
+  display_name: string;
+  lat: string;
+  lon: string;
+  address?: {
+    city?: string;
+    town?: string;
+    village?: string;
+    hamlet?: string;
+    suburb?: string;
+    neighbourhood?: string;
+    borough?: string;
+    county?: string;
+    state?: string;
+  };
+}
 
 interface LocationPickerProps {
   selectedState?: string;
@@ -28,42 +45,61 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
   showNeighborhood = true,
 }) => {
   const { theme } = useTheme();
-  const ref = useRef<any>(null);
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<NominatimResult[]>([]);
+  const [loading, setLoading] = useState(false);
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   const hasSelection = !!(selectedState && selectedCity);
 
-  const handlePlaceSelect = (data: any, details: any) => {
-    if (!details) return;
-    const components = details.address_components || [];
-    let city = '';
-    let stateCode = '';
-    let neighborhood = '';
-
-    for (const comp of components) {
-      const types: string[] = comp.types || [];
-      if (types.includes('locality')) city = comp.long_name;
-      if (types.includes('administrative_area_level_1')) stateCode = comp.short_name;
-      if (types.includes('neighborhood')) neighborhood = comp.long_name;
-      if (!neighborhood && (types.includes('sublocality') || types.includes('sublocality_level_1'))) {
-        neighborhood = comp.long_name;
+  const searchLocations = useCallback(async (text: string) => {
+    if (text.length < 2) {
+      setResults([]);
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `${NOMINATIM_BASE}/search?q=${encodeURIComponent(text)}&countrycodes=us&format=json&addressdetails=1&limit=5`,
+        { headers: { 'User-Agent': 'RhomeApp/1.0' } }
+      );
+      if (res.ok) {
+        setResults(await res.json());
       }
+    } catch {
+      setResults([]);
+    } finally {
+      setLoading(false);
     }
+  }, []);
 
-    if (!city) city = data.description?.split(',')[0] || '';
+  const handleTextChange = (text: string) => {
+    setQuery(text);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => searchLocations(text), 300);
+  };
 
-    onStateChange(stateCode);
-    onCityChange(city);
+  const handleSelect = (result: NominatimResult) => {
+    const addr = result.address || {};
+    const city = addr.city || addr.town || addr.village || addr.hamlet || addr.borough || addr.county || '';
+    const state = addr.state || '';
+    const neighborhood = addr.neighbourhood || addr.suburb || '';
+
+    onStateChange(state);
+    onCityChange(city || result.display_name.split(',')[0]);
     if (showNeighborhood) {
-      onNeighborhoodChange(neighborhood || '');
+      onNeighborhoodChange(neighborhood);
     }
+    setQuery('');
+    setResults([]);
   };
 
   const handleClear = () => {
     onStateChange('');
     onCityChange('');
     onNeighborhoodChange('');
-    ref.current?.clear();
-    ref.current?.setAddressText('');
+    setQuery('');
+    setResults([]);
   };
 
   return (
@@ -76,54 +112,43 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
       </ThemedText>
 
       <View style={styles.autocompleteWrap}>
-        <GooglePlacesAutocomplete
-          ref={ref}
+        <TextInput
+          value={query}
+          onChangeText={handleTextChange}
           placeholder="Search city, neighborhood, or ZIP..."
-          fetchDetails={true}
-          onPress={handlePlaceSelect}
-          query={{
-            key: GOOGLE_PLACES_KEY,
-            language: 'en',
-            types: '(regions)',
-            components: 'country:us',
-          }}
-          textInputProps={{
-            placeholderTextColor: theme.textSecondary,
-            returnKeyType: 'search',
-          }}
-          styles={{
-            container: { flex: 0 },
-            textInputContainer: { backgroundColor: 'transparent' },
-            textInput: {
+          placeholderTextColor={theme.textSecondary}
+          returnKeyType="search"
+          style={[
+            styles.textInput,
+            {
               backgroundColor: theme.backgroundDefault,
               color: theme.text,
-              borderRadius: BorderRadius.medium,
-              paddingHorizontal: Spacing.md,
-              height: 48,
-              fontSize: 15,
-              borderWidth: 1,
               borderColor: theme.border,
             },
-            listView: {
-              backgroundColor: theme.backgroundDefault,
-              borderRadius: BorderRadius.medium,
-              marginTop: 4,
-              borderWidth: 1,
-              borderColor: theme.border,
-              ...(Platform.OS === 'web' ? { zIndex: 1000 } : {}),
-            },
-            row: {
-              backgroundColor: 'transparent',
-              paddingHorizontal: Spacing.md,
-              paddingVertical: 13,
-            },
-            description: { color: theme.text, fontSize: 14 },
-            separator: { backgroundColor: theme.border },
-            poweredContainer: { display: 'none' },
-          }}
-          enablePoweredByContainer={false}
-          debounce={300}
+          ]}
         />
+        {loading ? (
+          <ActivityIndicator size="small" color={theme.primary} style={styles.loader} />
+        ) : null}
+        {results.length > 0 ? (
+          <View style={[styles.listView, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+            <FlatList
+              data={results}
+              keyExtractor={(item) => String(item.place_id)}
+              keyboardShouldPersistTaps="handled"
+              renderItem={({ item }) => (
+                <Pressable
+                  style={[styles.row, { borderBottomColor: theme.border }]}
+                  onPress={() => handleSelect(item)}
+                >
+                  <ThemedText style={[{ color: theme.text, fontSize: 14 }]} numberOfLines={2}>
+                    {item.display_name}
+                  </ThemedText>
+                </Pressable>
+              )}
+            />
+          </View>
+        ) : null}
       </View>
 
       {hasSelection ? (
@@ -173,6 +198,29 @@ const styles = StyleSheet.create({
   autocompleteWrap: {
     zIndex: 100,
     marginBottom: Spacing.md,
+  },
+  textInput: {
+    borderRadius: BorderRadius.medium,
+    paddingHorizontal: Spacing.md,
+    height: 48,
+    fontSize: 15,
+    borderWidth: 1,
+  },
+  loader: {
+    position: 'absolute',
+    right: 12,
+    top: 14,
+  },
+  listView: {
+    borderRadius: BorderRadius.medium,
+    marginTop: 4,
+    borderWidth: 1,
+    maxHeight: 200,
+  },
+  row: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 13,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   summaryCard: {
     borderWidth: 1,
