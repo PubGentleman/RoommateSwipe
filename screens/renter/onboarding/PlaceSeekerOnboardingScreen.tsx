@@ -12,7 +12,7 @@ import { getRenterPreferenceAmenities } from '../../../constants/amenities';
 import OnboardingHeader from '../../../components/OnboardingHeader';
 import { PricePickerPair } from '../../../components/PricePicker';
 
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 3;
 
 const ROOM_TYPES = [
   { id: 'private', icon: 'lock' as const, label: 'Private Room', desc: 'Your own space with shared common areas' },
@@ -66,12 +66,19 @@ export default function PlaceSeekerOnboardingScreen() {
     listingPref === 'room' ? ['private'] : []
   );
   const [loading, setLoading] = useState(false);
+  const [expandedBoroughs, setExpandedBoroughs] = useState<string[]>([]);
 
   useEffect(() => {
     if (roomTypeKnown && roomTypes.length === 0) {
       setRoomTypes(listingPref === 'entire_apartment' ? ['apartment'] : ['private']);
     }
   }, [listingPref]);
+
+  const toggleBorough = (borough: string) => {
+    setExpandedBoroughs(prev =>
+      prev.includes(borough) ? prev.filter(b => b !== borough) : [...prev, borough]
+    );
+  };
 
   const userCity = user?.profileData?.city || user?.profileData?.neighborhood || '';
   const boroughGroups = getNeighborhoodsByBorough(userCity);
@@ -108,11 +115,11 @@ export default function PlaceSeekerOnboardingScreen() {
     );
   };
 
-  const renderBudgetStep = () => (
+  const renderBudgetAndNeighborhoodsStep = () => (
     <View>
-      <Text style={[styles.stepTitle, { color: theme.text }]}>What's your budget?</Text>
+      <Text style={[styles.stepTitle, { color: theme.text }]}>Budget & Neighborhoods</Text>
       <Text style={[styles.stepSubtitle, { color: theme.textSecondary }]}>
-        Set your monthly rent range so we can find the right listings
+        Set your rent range and pick where you want to live
       </Text>
 
       <Text style={[styles.sectionLabel, { color: theme.text }]}>Monthly Budget</Text>
@@ -161,54 +168,65 @@ export default function PlaceSeekerOnboardingScreen() {
           </View>
         </>
       ) : null}
-    </View>
-  );
-
-  const renderStep1 = () => (
-    <View>
-      <Text style={[styles.stepTitle, { color: theme.text }]}>Where do you want to live?</Text>
-      <Text style={[styles.stepSubtitle, { color: theme.textSecondary }]}>
-        Pick your top neighborhoods — we'll prioritize listings in these areas
-      </Text>
 
       {hasBoroughs ? (
-        Array.from(boroughGroups.entries()).map(([borough, neighborhoods]) => (
-          <View key={borough} style={styles.boroughSection}>
-            <Text style={[styles.boroughLabel, { color: theme.textSecondary }]}>{borough}</Text>
-            <View style={styles.chipsWrap}>
-              {neighborhoods.map(area => {
-                const isActive = selectedNeighborhoods.includes(area.id);
-                return (
-                  <Pressable
-                    key={area.id}
-                    style={[
-                      styles.chip,
-                      { borderColor: isActive ? theme.primary : 'rgba(255,255,255,0.15)' },
-                      isActive && { backgroundColor: `${theme.primary}20` },
-                    ]}
-                    onPress={() => toggleNeighborhood(area.id)}
-                  >
-                    <Text style={[
-                      styles.chipText,
-                      { color: isActive ? theme.primary : theme.textSecondary },
-                    ]}>
-                      {area.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-        ))
-      ) : (
-        <Text style={[styles.stepSubtitle, { color: theme.textSecondary, marginTop: 16 }]}>
-          Neighborhood suggestions are available for NYC. Your preferences will still be saved from other onboarding data.
-        </Text>
-      )}
-
-      <Text style={[styles.chipHint, { color: theme.textTertiary }]}>
-        {selectedNeighborhoods.length}/5 selected
-      </Text>
+        <>
+          <Text style={[styles.sectionLabel, { color: theme.text, marginTop: 28 }]}>Neighborhoods</Text>
+          <Text style={[styles.sectionHint, { color: theme.textTertiary }]}>
+            Pick up to 5 — we'll prioritize listings in these areas
+          </Text>
+          {Array.from(boroughGroups.entries()).map(([borough, neighborhoods]) => {
+            const isExpanded = expandedBoroughs.includes(borough);
+            const selectedCount = neighborhoods.filter(n => selectedNeighborhoods.includes(n.id)).length;
+            return (
+              <View key={borough} style={styles.boroughDropdown}>
+                <Pressable
+                  style={styles.boroughHeader}
+                  onPress={() => toggleBorough(borough)}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                    <Text style={[styles.boroughLabel, { color: theme.text, marginBottom: 0 }]}>{borough}</Text>
+                    {selectedCount > 0 ? (
+                      <View style={[styles.boroughBadge, { backgroundColor: `${theme.primary}30` }]}>
+                        <Text style={[styles.boroughBadgeText, { color: theme.primary }]}>{selectedCount}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <Feather name={isExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={theme.textSecondary} />
+                </Pressable>
+                {isExpanded ? (
+                  <View style={styles.boroughChips}>
+                    {neighborhoods.map(area => {
+                      const isActive = selectedNeighborhoods.includes(area.id);
+                      return (
+                        <Pressable
+                          key={area.id}
+                          style={[
+                            styles.chip,
+                            { borderColor: isActive ? theme.primary : 'rgba(255,255,255,0.15)' },
+                            isActive && { backgroundColor: `${theme.primary}20` },
+                          ]}
+                          onPress={() => toggleNeighborhood(area.id)}
+                        >
+                          <Text style={[
+                            styles.chipText,
+                            { color: isActive ? theme.primary : theme.textSecondary },
+                          ]}>
+                            {area.label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                ) : null}
+              </View>
+            );
+          })}
+          <Text style={[styles.chipHint, { color: theme.textTertiary }]}>
+            {selectedNeighborhoods.length}/5 selected
+          </Text>
+        </>
+      ) : null}
     </View>
   );
 
@@ -441,7 +459,7 @@ export default function PlaceSeekerOnboardingScreen() {
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {step === 1 ? renderBudgetStep() : step === 2 ? renderStep1() : step === 3 ? renderStep2() : renderStep3()}
+        {step === 1 ? renderBudgetAndNeighborhoodsStep() : step === 2 ? renderStep2() : renderStep3()}
       </ScrollView>
 
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 8 }]}>
@@ -495,15 +513,42 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     lineHeight: 22,
   },
-  boroughSection: {
-    marginBottom: 16,
+  boroughDropdown: {
+    marginBottom: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    overflow: 'hidden',
+  },
+  boroughHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
   boroughLabel: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
-    marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  boroughBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  boroughBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  boroughChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingBottom: 14,
   },
   sectionLabel: {
     fontSize: 16,
