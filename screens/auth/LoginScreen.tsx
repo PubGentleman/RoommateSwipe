@@ -70,7 +70,15 @@ export const LoginScreen = () => {
       if (!password || password.length < 6) { setError('Password must be at least 6 characters'); setIsLoading(false); return; }
       await login(email.trim().toLowerCase(), password);
     } catch (err: any) {
-      setError(err?.message || 'Something went wrong. Please try again.');
+      const msg = (err?.message || '').toLowerCase();
+      if (msg.includes('invalid login credentials') || msg.includes('invalid email or password')) {
+        setError('Invalid email or password');
+      } else if (msg.includes('email not confirmed')) {
+        setPendingEmail(email.trim().toLowerCase());
+        setAuthView('verification');
+      } else {
+        setError('Something went wrong. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -105,7 +113,7 @@ export const LoginScreen = () => {
               placeholder="you@example.com"
               placeholderTextColor="rgba(255,255,255,0.3)"
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(t) => { setEmail(t); if (error) setError(''); }}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
@@ -128,7 +136,7 @@ export const LoginScreen = () => {
               placeholder="Enter your password"
               placeholderTextColor="rgba(255,255,255,0.3)"
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(t) => { setPassword(t); if (error) setError(''); }}
               secureTextEntry={!showPassword}
               textContentType="password"
               autoComplete="password"
