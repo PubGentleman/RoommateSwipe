@@ -1709,11 +1709,34 @@ async function getGroupShortlistFromLocal(groupId: string): Promise<GroupShortli
     const local = await AsyncStorage.getItem(`@rhome/group_shortlist_${groupId}`);
     if (!local) return [];
     const items = JSON.parse(local);
+
+    let listingMap: Record<string, any> = {};
+    try {
+      const propsData = await AsyncStorage.getItem('@rhome/properties');
+      if (propsData) {
+        const props = JSON.parse(propsData);
+        for (const p of props) {
+          listingMap[p.id] = {
+            id: p.id,
+            title: p.title || p.address,
+            address: p.address,
+            city: p.city || p.neighborhood,
+            state: p.state,
+            rent: p.rent || p.price,
+            bedrooms: p.bedrooms,
+            photos: p.photos || p.images,
+          };
+        }
+      }
+    } catch {
+      console.warn('[getGroupShortlist] Failed to load local properties for hydration');
+    }
+
     return items.map((item: any) => ({
       listing_id: item.listing_id,
       like_count: item.vote_count || 1,
       liked_by: [{ user_id: item.added_by, name: 'Group Member' }],
-      listing: null,
+      listing: listingMap[item.listing_id] || { id: item.listing_id, title: 'Listing', rent: 0, bedrooms: 0 },
     }));
   } catch (e) {
     console.warn('[getGroupShortlist] Local fallback failed:', e);
