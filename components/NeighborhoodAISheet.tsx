@@ -2,13 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, FlatList, TextInput,
   ActivityIndicator, StyleSheet, Modal, KeyboardAvoidingView, Platform,
-  Pressable,
+  Pressable, ScrollView,
 } from 'react-native';
 import { Feather } from './VectorIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../hooks/useTheme';
 import { supabase } from '../lib/supabase';
 import { AreaInfo } from '../services/neighborhoodService';
+import { getNeighborhoodScores, getScoreColor, NeighborhoodScores } from '../services/neighborhoodDataService';
 
 interface ChatMessage {
   id: string;
@@ -65,12 +66,18 @@ export function NeighborhoodAISheet({ visible, onClose, listingId, address, neig
   const [briefingLoaded, setBriefingLoaded] = useState(false);
   const [walkScore, setWalkScore] = useState<number | null>(null);
   const [transitScore, setTransitScore] = useState<number | null>(null);
+  const [neighborhoodScores, setNeighborhoodScores] = useState<NeighborhoodScores | null>(null);
   const [conversationHistory, setConversationHistory] = useState<{ role: string; content: string }[]>([]);
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
     if (visible && !briefingLoaded) {
       loadBriefing();
+      if (neighborhood) {
+        getNeighborhoodScores(neighborhood).then(scores => {
+          if (scores) setNeighborhoodScores(scores);
+        });
+      }
     }
   }, [visible]);
 
@@ -82,6 +89,7 @@ export function NeighborhoodAISheet({ visible, onClose, listingId, address, neig
         setBriefingLoaded(false);
         setWalkScore(null);
         setTransitScore(null);
+        setNeighborhoodScores(null);
         setInput('');
       }, 300);
       return () => clearTimeout(timer);
@@ -235,11 +243,22 @@ export function NeighborhoodAISheet({ visible, onClose, listingId, address, neig
           </Pressable>
         </View>
 
-        {(walkScore !== null || transitScore !== null) ? (
-          <View style={styles.scoreRow}>
-            {walkScore !== null ? <ScorePill label="Walk" score={walkScore} iconName="navigation" /> : null}
-            {transitScore !== null ? <ScorePill label="Transit" score={transitScore} iconName="truck" /> : null}
-          </View>
+        {(walkScore !== null || transitScore !== null || neighborhoodScores) ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.scoreRow}>
+            {neighborhoodScores?.safety !== null && neighborhoodScores?.safety !== undefined
+              ? <ScorePill label="Safety" score={neighborhoodScores.safety} iconName="shield" /> : null}
+            {walkScore !== null
+              ? <ScorePill label="Walk" score={walkScore} iconName="navigation" />
+              : neighborhoodScores?.walkability !== null && neighborhoodScores?.walkability !== undefined
+                ? <ScorePill label="Walk" score={neighborhoodScores.walkability} iconName="navigation" /> : null}
+            {transitScore !== null
+              ? <ScorePill label="Transit" score={transitScore} iconName="truck" />
+              : neighborhoodScores?.transit !== null && neighborhoodScores?.transit !== undefined
+                ? <ScorePill label="Transit" score={neighborhoodScores.transit} iconName="truck" /> : null}
+            {neighborhoodScores?.nightlife !== null && neighborhoodScores?.nightlife !== undefined
+              ? <ScorePill label="Nightlife" score={neighborhoodScores.nightlife} iconName="music" /> : null}
+          </ScrollView>
         ) : null}
 
         <FlatList

@@ -60,10 +60,12 @@ serve(async (req) => {
     const nearbyListings = await getNearbyListings(supabase, profile);
     const history = await getConversationHistory(supabase, user.id, sessionId);
 
+    const neighborhoodContext = await getNeighborhoodContext(supabase, message, profile, listing_context);
+
     const memoryContext = buildMemoryContext(aiMemory);
     let systemPrompt = isAgent
       ? buildAgentSystemPrompt(profile, nearbyListings, plan)
-      : buildSystemPrompt(profile, topMatches, nearbyListings, plan, memoryContext);
+      : buildSystemPrompt(profile, topMatches, nearbyListings, plan, memoryContext, neighborhoodContext);
 
     if (listing_context && !isAgent) {
       const tenantGenderPref = listing_context.preferred_tenant_gender === 'female_only'
@@ -464,7 +466,212 @@ Respond with JSON only:
   }
 }
 
-function buildSystemPrompt(profile: any, topMatches: any[], listings: any[], plan: string, memoryContext: string = ''): string {
+const NEIGHBORHOOD_KEYWORDS = [
+  'neighborhood', 'area', 'safe', 'safety', 'crime', 'transit', 'commute', 'subway',
+  'walkable', 'walkability', 'vibe', 'nightlife', 'grocery', 'park', 'gym',
+  'rent', 'median rent', 'expensive', 'affordable', 'cheap',
+  'noisy', 'quiet', 'loud', 'compare', 'vs', 'versus', 'better',
+  'move to', 'live in', 'living in', 'what about', 'tell me about',
+  'how is', 'how\'s', 'is it safe', 'what\'s it like',
+];
+
+const KNOWN_NEIGHBORHOODS = [
+  'Park Slope', 'Williamsburg', 'Bushwick', 'Greenpoint', 'Crown Heights',
+  'Bed-Stuy', 'Bedford-Stuyvesant', 'Carroll Gardens', 'Flatbush', 'Bay Ridge',
+  'Sunset Park', 'Clinton Hill', 'Gowanus', 'Ditmas Park', 'Prospect Heights',
+  'Downtown Brooklyn', 'Bensonhurst', 'Coney Island', 'Brighton Beach',
+  'Brownsville', 'East New York', 'East Flatbush', 'Canarsie',
+  'Harlem', 'Washington Heights', "Hell's Kitchen", 'Hells Kitchen',
+  'Upper West Side', 'Upper East Side', 'Midtown', 'Midtown East',
+  'Chelsea', 'Tribeca', 'Lower Manhattan', 'Lower East Side', 'East Village',
+  'West Village', 'SoHo', 'Murray Hill', 'Morningside Heights', 'Inwood',
+  'Hudson Yards',
+  'Astoria', 'Long Island City', 'LIC', 'Jackson Heights', 'Flushing',
+  'Woodside', 'Forest Hills', 'Jamaica', 'Ridgewood', 'Sunnyside',
+  'Woodhaven', 'Middle Village', 'Howard Beach', 'Ozone Park',
+  'Riverdale', 'Fordham', 'Mott Haven', 'Grand Concourse',
+  'Pelham Bay', 'Norwood', 'Wakefield', 'Woodlawn', 'Hunts Point',
+  'Jersey City', 'Hoboken', 'Newark', 'Harrison', 'Journal Square', 'Grove Street',
+];
+
+const NEIGHBORHOOD_ALIASES: Record<string, string> = {
+  'les': 'Lower East Side',
+  'uws': 'Upper West Side',
+  'ues': 'Upper East Side',
+  'lic': 'Long Island City',
+  'fidi': 'Lower Manhattan',
+  'financial district': 'Lower Manhattan',
+  'ev': 'East Village',
+  'wv': 'West Village',
+  'bed stuy': 'Bed-Stuy',
+  'bedford stuyvesant': 'Bedford-Stuyvesant',
+  'hells kitchen': "Hell's Kitchen",
+  'hell\'s kitchen': "Hell's Kitchen",
+  'bk heights': 'Brooklyn Heights',
+  'jc': 'Jersey City',
+  'soho': 'SoHo',
+  'dtbk': 'Downtown Brooklyn',
+  'prospect hts': 'Prospect Heights',
+  'crown hts': 'Crown Heights',
+  'wash heights': 'Washington Heights',
+  'fort greene': 'Fort Greene',
+  'south bronx': 'Mott Haven',
+};
+
+const COMPARISON_PATTERNS = [
+  /compare\s+(.+?)\s+(?:and|vs|versus|or|with|to)\s+(.+)/i,
+  /(.+?)\s+(?:vs|versus)\s+(.+)/i,
+  /(?:between|difference between)\s+(.+?)\s+(?:and|or)\s+(.+)/i,
+  /(.+?)\s+or\s+(.+?)[\s?]*(?:which|what|better|safer|cheaper)/i,
+];
+
+function extractNeighborhoodsFromMessage(message: string): string[] {
+  const lower = message.toLowerCase().replace(/[?!.,]/g, '');
+  const found: string[] = [];
+
+  for (const [alias, canonical] of Object.entries(NEIGHBORHOOD_ALIASES)) {
+    if (lower.includes(alias) && !found.includes(canonical)) {
+      found.push(canonical);
+    }
+  }
+
+  for (const name of KNOWN_NEIGHBORHOODS) {
+    if (lower.includes(name.toLowerCase()) && !found.includes(name)) {
+      found.push(name);
+    }
+  }
+
+  return found;
+}
+
+function detectNeighborhoodQuestion(message: string): { isNeighborhoodQuestion: boolean; neighborhoods: string[]; isComparison: boolean } {
+  const lower = message.toLowerCase();
+  const isNeighborhoodQuestion = NEIGHBORHOOD_KEYWORDS.some(kw => lower.includes(kw));
+  const extractedFromMessage = extractNeighborhoodsFromMessage(message);
+
+  let isComparison = false;
+  const detectedNeighborhoods: string[] = [...extractedFromMessage];
+
+  for (const pattern of COMPARISON_PATTERNS) {
+    const match = lower.match(pattern);
+    if (match) {
+      isComparison = true;
+      break;
+    }
+  }
+
+  if (extractedFromMessage.length >= 2) {
+    isComparison = true;
+  }
+
+  const hasNeighborhoodMention = extractedFromMessage.length > 0;
+
+  return {
+    isNeighborhoodQuestion: isNeighborhoodQuestion || hasNeighborhoodMention,
+    neighborhoods: detectedNeighborhoods,
+    isComparison,
+  };
+}
+
+async function getNeighborhoodInfo(supabase: any, neighborhoodName: string): Promise<any | null> {
+  const cleaned = neighborhoodName.trim();
+  const aliasKey = cleaned.toLowerCase();
+  const resolvedName = NEIGHBORHOOD_ALIASES[aliasKey] || cleaned;
+
+  const { data } = await supabase
+    .from('neighborhood_data')
+    .select('*')
+    .ilike('neighborhood', resolvedName)
+    .limit(1)
+    .maybeSingle();
+
+  if (data) return data;
+
+  const { data: fuzzy } = await supabase
+    .from('neighborhood_data')
+    .select('*')
+    .ilike('neighborhood', `%${resolvedName}%`)
+    .limit(1)
+    .maybeSingle();
+
+  return fuzzy;
+}
+
+async function getNeighborhoodsByNames(supabase: any, names: string[]): Promise<any[]> {
+  const results: any[] = [];
+  for (const name of names) {
+    const data = await getNeighborhoodInfo(supabase, name);
+    if (data) results.push(data);
+  }
+  return results;
+}
+
+function formatNeighborhoodData(n: any): string {
+  return `
+NEIGHBORHOOD DATA: ${n.neighborhood}, ${n.borough}
+Safety: ${n.safety_score}/100 — ${n.safety_summary}
+Tips: ${n.safety_tips}
+Crime trend: ${n.crime_trend} (${n.crime_trend_percent > 0 ? '+' : ''}${n.crime_trend_percent}% YoY)
+Transit score: ${n.transit_score}/100 — ${n.transit_summary}
+Subway lines: ${n.nearby_subway_lines?.join(', ') || 'none'}
+Stations: ${n.subway_stations?.join(', ') || 'none'}
+Commute to Midtown: ~${n.avg_commute_midtown_min} min | Downtown: ~${n.avg_commute_downtown_min} min
+Walkability: ${n.walkability_score}/100
+Grocery: ${n.grocery_stores?.join(', ') || 'unknown'}
+Parks: ${n.parks?.join(', ') || 'unknown'}
+Gyms: ${n.gyms?.join(', ') || 'unknown'}
+Nightlife: ${n.nightlife_rating}/5 | Restaurants: ${n.restaurant_density} density
+Noise: ${n.noise_level}
+Vibe: ${n.vibe_tags?.join(', ') || 'unknown'} — ${n.vibe_summary}
+Median rents: 1BR $${n.median_rent_1br} | 2BR $${n.median_rent_2br} | 3BR $${n.median_rent_3br}
+Age range: ${n.avg_age_range}`;
+}
+
+async function getNeighborhoodContext(supabase: any, message: string, profile: any, listingContext: any): Promise<string> {
+  const { isNeighborhoodQuestion, neighborhoods: extractedNeighborhoods, isComparison } = detectNeighborhoodQuestion(message);
+
+  const neighborhoodsToFetch: string[] = [];
+
+  if (extractedNeighborhoods.length > 0) {
+    for (const n of extractedNeighborhoods) {
+      if (!neighborhoodsToFetch.includes(n)) neighborhoodsToFetch.push(n);
+    }
+  }
+
+  if (isNeighborhoodQuestion && neighborhoodsToFetch.length === 0) {
+    if (listingContext?.neighborhood) {
+      neighborhoodsToFetch.push(listingContext.neighborhood);
+    }
+    if (profile.preferred_neighborhoods?.length) {
+      for (const n of profile.preferred_neighborhoods.slice(0, 3)) {
+        if (!neighborhoodsToFetch.includes(n)) neighborhoodsToFetch.push(n);
+      }
+    }
+    if (profile.neighborhood && !neighborhoodsToFetch.includes(profile.neighborhood)) {
+      neighborhoodsToFetch.push(profile.neighborhood);
+    }
+  }
+
+  if (neighborhoodsToFetch.length === 0) return '';
+
+  const data = await getNeighborhoodsByNames(supabase, neighborhoodsToFetch.slice(0, 4));
+  if (data.length === 0) return '';
+
+  let context = '\n\nNEIGHBORHOOD KNOWLEDGE BASE (use this real data when answering):';
+  for (const n of data) {
+    context += formatNeighborhoodData(n);
+  }
+
+  if (isComparison && data.length >= 2) {
+    context += `\n\nThe user is comparing neighborhoods. Use the data above to give a balanced, honest comparison. Mention specific trade-offs (safety vs. rent, commute vs. nightlife, etc.) rather than just listing facts. Give your opinion on which might be better for their specific situation based on their profile.`;
+  } else {
+    context += `\n\nUse this neighborhood data to give specific, data-backed answers. Reference actual scores, specific stores/stations, and real median rents. Don't just recite the data — weave it into natural conversation. If the user's budget doesn't match the median rent, mention that honestly.`;
+  }
+
+  return context;
+}
+
+function buildSystemPrompt(profile: any, topMatches: any[], listings: any[], plan: string, memoryContext: string = '', neighborhoodContext: string = ''): string {
   const matchSummary = topMatches.length > 0
     ? topMatches.map((m: any) =>
         `${m.name ?? 'Unknown'} (${m.score}% match, ${m.occupation ?? 'unknown occupation'}, ${m.zodiac_sign ?? 'unknown sign'})`
@@ -620,6 +827,10 @@ Use the user's bio for roommate matching (shared interests, lifestyle signals) a
 
 Only reference listings and matches that are listed above — never make up names or prices.
 If they ask about someone not in the matches list, say you don't have info on that person yet.`;
+
+  if (neighborhoodContext) {
+    systemPrompt += neighborhoodContext;
+  }
 
   systemPrompt += missingFieldInstructions;
 

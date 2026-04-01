@@ -31,7 +31,7 @@ The application uses React Native, Expo, and TypeScript, with React Navigation f
 - **Role-Specific Features:**
     - **Renter:** Swipe-based matching, 1-on-1 messaging, group management, property exploration with advanced filters, saved properties, AI Match Assistant, property reviews, and chat scheduling. Features an "Renter Intent System" for tailored onboarding.
     - **Host:** Dashboard for listing management (create, edit, delete, boost), inquiry handling, analytics, property review management, and group matches monetization. Supports Individual, Company, and Agent host types with features like Rhome Select Badge, Company Teams, and Group Bookings.
-- **AI-Powered Enhancements:** AI Assistant for personalized housing help, AI-generated match explanations, group and listing suggestions, AI tools for agents/companies, AI-suggested meetups, and AI Neighborhood Intelligence using real-time data.
+- **AI-Powered Enhancements:** AI Assistant for personalized housing help, AI-generated match explanations, group and listing suggestions, AI tools for agents/companies, AI-suggested meetups, and AI Neighborhood Intelligence using real-time data and a pre-seeded neighborhood knowledge base.
 - **Pi AI Matchmaker:** An AI matchmaker persona providing insights, deck rankings, host recommendations, and preference parsing, integrated with a subscription-tiered usage system.
 - **Pi Demand Intelligence:** Anonymous renter activity tracking feeds market context into Pi's listing advisor mode, aggregating neighborhood and listing demand.
 - **Contact Info Protection:** Platform-level contact info blurring in chat messages for free users, with auto-unlocking upon confirmed actions.
@@ -61,6 +61,7 @@ Supabase provides the complete backend infrastructure:
 - **Realtime:** Subscriptions for messaging and notifications.
 - **Storage:** For media assets.
 - **Edge Functions:** Used for webhooks, verification, background checks, payments, references, AI operations, match score calculations, group-to-listing matching, and public forms.
+- **Neighborhood Knowledge Base:** `neighborhood_data` table with pre-seeded data for 55 NYC/NJ neighborhoods (migrations 070-071). Covers safety scores, transit, amenities, vibe tags, median rents, walkability, and more. Pi AI queries this data in real-time for neighborhood questions. Frontend service (`services/neighborhoodDataService.ts`) provides cached access. NeighborhoodAISheet displays safety/walk/transit/nightlife score pills.
 
 ## Technical Decisions
 
