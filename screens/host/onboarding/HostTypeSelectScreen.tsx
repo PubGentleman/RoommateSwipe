@@ -133,15 +133,20 @@ export function HostTypeSelectScreen() {
   ) {
     setSaving(true);
     try {
-      await updateUser({ hostType, role: 'host', hostTypeLockedAt: undefined });
-
       if (hostType === 'company') {
+        await updateUser({ hostType, role: 'host', hostTypeLockedAt: undefined });
         navigation.navigate('HostCompanySetup');
       } else if (hostType === 'agent') {
+        await updateUser({ hostType, role: 'host', hostTypeLockedAt: undefined });
         navigation.navigate('HostAgentSetup');
       } else {
-        // Individual — lock immediately and proceed to subscription
-        await updateUser({ hostTypeLockedAt: new Date().toISOString() });
+        await updateUser({
+          hostType,
+          role: 'host',
+          hostTypeLockedAt: new Date().toISOString(),
+          hasCompletedHostOnboarding: true,
+          activeMode: 'host' as 'renter' | 'host',
+        });
         if (isFromSettings) {
           navigation.replace('HostSubscription');
         } else {
