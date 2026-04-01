@@ -40,6 +40,38 @@ export async function reportListing(listingId: string, reason: string, details?:
   return data;
 }
 
+export async function reportGroup(groupId: string, reason: string, details?: string) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { data, error } = await supabase
+    .from('reports')
+    .insert({
+      reporter_id: user.id,
+      reported_id: groupId,
+      reported_type: 'group',
+      reason,
+      details,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function getBlockedUserIds(): Promise<string[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data } = await supabase
+    .from('blocked_users')
+    .select('blocked_id')
+    .eq('blocker_id', user.id);
+
+  return (data || []).map(b => b.blocked_id);
+}
+
 export async function blockUser(blockedId: string) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');

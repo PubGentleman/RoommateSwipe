@@ -20,6 +20,8 @@ import { supabase } from '../../lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { GroupsStackParamList } from '../../navigation/GroupsStackNavigator';
+import { ReportBlockModal } from '../../components/ReportBlockModal';
+import { reportUser, blockUser as blockUserRemote } from '../../services/moderationService';
 
 type ScreenNavProp = NativeStackNavigationProp<GroupsStackParamList, 'PiGroupInvite'>;
 
@@ -51,7 +53,7 @@ function getCompatibilityColor(score: number): string {
 
 export const PiGroupInviteScreen = () => {
   const { theme } = useTheme();
-  const { user } = useAuth();
+  const { user, blockUser: blockUserLocal } = useAuth();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<ScreenNavProp>();
   const route = useRoute<RouteProp<GroupsStackParamList, 'PiGroupInvite'>>();
@@ -67,6 +69,8 @@ export const PiGroupInviteScreen = () => {
   const [timeRemaining, setTimeRemaining] = useState({ hours: 48, minutes: 0, isUrgent: false, expired: false });
   const [extendedTime, setExtendedTime] = useState(false);
   const [isReplacement, setIsReplacement] = useState(false);
+  const [showMemberReport, setShowMemberReport] = useState(false);
+  const [reportMemberTarget, setReportMemberTarget] = useState<{ id: string; name: string } | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadInvite = useCallback(async () => {
@@ -338,6 +342,13 @@ export const PiGroupInviteScreen = () => {
               {[member.age ? `${member.age}` : null, member.occupation].filter(Boolean).join(' · ') || 'Roommate'}
             </ThemedText>
           </View>
+          <Pressable
+            onPress={() => { setReportMemberTarget({ id: member.userId, name: member.name }); setShowMemberReport(true); }}
+            hitSlop={8}
+            style={{ padding: 4 }}
+          >
+            <Feather name="more-vertical" size={16} color={theme.textSecondary} />
+          </Pressable>
           {score > 0 ? (
             <View style={styles.scoreGauge}>
               <View style={[styles.scoreCircle, { borderColor: getCompatibilityColor(score) }]}>
@@ -649,6 +660,25 @@ export const PiGroupInviteScreen = () => {
           )}
         </Pressable>
       </View>
+      <ReportBlockModal
+        visible={showMemberReport}
+        onClose={() => { setShowMemberReport(false); setReportMemberTarget(null); }}
+        userName={reportMemberTarget?.name || 'User'}
+        type="user"
+        onReport={async (reason) => {
+          try { if (reportMemberTarget) await reportUser(reportMemberTarget.id, reason); } catch {}
+        }}
+        onBlock={async () => {
+          try {
+            if (reportMemberTarget) {
+              await blockUserRemote(reportMemberTarget.id);
+              await blockUserLocal(reportMemberTarget.id);
+              setShowMemberReport(false);
+              setReportMemberTarget(null);
+            }
+          } catch {}
+        }}
+      />
     </View>
   );
 };

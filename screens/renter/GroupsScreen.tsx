@@ -33,6 +33,8 @@ import { useConfirm } from '../../contexts/ConfirmContext';
 import { AIGroupSuggestionCard } from '../../components/AIGroupSuggestionCard';
 import { getPendingAutoGroupCount, isAutoMatchEnabled } from '../../services/piAutoMatchService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ReportBlockModal } from '../../components/ReportBlockModal';
+import { reportUser, blockUser as blockUserRemote } from '../../services/moderationService';
 import { withTimeout } from '../../utils/queryTimeout';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -42,7 +44,7 @@ type Tab = 'my-groups' | 'discover' | 'create';
 
 export const GroupsScreen = () => {
   const { theme } = useTheme();
-  const { user, purchaseUndoPass, hasActiveUndoPass } = useAuth();
+  const { user, purchaseUndoPass, hasActiveUndoPass, blockUser: blockUserLocal } = useAuth();
   const { confirm, alert: showAlert } = useConfirm();
   const renterPlan = normalizeRenterPlan(user?.subscription?.plan);
   const renterLimits = getRenterPlanLimits(renterPlan);
@@ -68,6 +70,8 @@ export const GroupsScreen = () => {
   const { activeCity, activeSubArea, recentCities, setActiveCity, setActiveSubArea } = useCityContext();
   const [showCityPicker, setShowCityPicker] = useState(false);
   const [showAISheet, setShowAISheet] = useState(false);
+  const [showMemberReportModal, setShowMemberReportModal] = useState(false);
+  const [reportMemberTarget, setReportMemberTarget] = useState<{ id: string; name: string } | null>(null);
   const GRP_COLLAPSE_H = 52;
   const grpScrollY = useSharedValue(0);
   const grpScrollHandler = useAnimatedScrollHandler({
@@ -272,6 +276,13 @@ export const GroupsScreen = () => {
         });
       }
       
+      const blockedIds = new Set(user?.blockedUsers || []);
+      if (blockedIds.size > 0) {
+        otherGroups = otherGroups.filter(g =>
+          !blockedIds.has(g.createdBy || '') &&
+          !(g.members || []).some(m => blockedIds.has(m))
+        );
+      }
       setMyGroups(userGroups);
       setAllGroups(otherGroups);
       setCurrentIndex(0);
@@ -2170,9 +2181,16 @@ export const GroupsScreen = () => {
           <View style={[styles.memberProfileModal, { backgroundColor: theme.backgroundSecondary }]}>
             <View style={styles.memberProfileHeader}>
               <ThemedText style={[Typography.h2]}>Member Profile</ThemedText>
-              <Pressable onPress={() => setShowMemberProfile(false)}>
-                <Feather name="x" size={24} color={theme.text} />
-              </Pressable>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                {selectedMember ? (
+                  <Pressable onPress={() => { setReportMemberTarget({ id: selectedMember.id, name: selectedMember.name }); setShowMemberReportModal(true); }}>
+                    <Feather name="more-vertical" size={22} color={theme.textSecondary} />
+                  </Pressable>
+                ) : null}
+                <Pressable onPress={() => setShowMemberProfile(false)}>
+                  <Feather name="x" size={24} color={theme.text} />
+                </Pressable>
+              </View>
             </View>
             {selectedMember ? (
               <ScrollView style={styles.memberProfileContent} showsVerticalScrollIndicator={false}>
@@ -2206,6 +2224,27 @@ export const GroupsScreen = () => {
         </View>
       </Modal>
 
+
+      <ReportBlockModal
+        visible={showMemberReportModal}
+        onClose={() => { setShowMemberReportModal(false); setReportMemberTarget(null); }}
+        userName={reportMemberTarget?.name || 'User'}
+        type="user"
+        onReport={async (reason) => {
+          try { if (reportMemberTarget) await reportUser(reportMemberTarget.id, reason); } catch {}
+        }}
+        onBlock={async () => {
+          try {
+            if (reportMemberTarget) {
+              await blockUserRemote(reportMemberTarget.id);
+              await blockUserLocal(reportMemberTarget.id);
+              setShowMemberReportModal(false);
+              setReportMemberTarget(null);
+              setShowMemberProfile(false);
+            }
+          } catch {}
+        }}
+      />
 
       <RhomeAISheet
         visible={showAISheet}

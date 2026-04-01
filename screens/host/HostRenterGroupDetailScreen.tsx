@@ -18,6 +18,8 @@ import {
 import { UNLOCK_PACKAGES } from '../../constants/planLimits';
 import { createListingInquiryGroup } from '../../services/groupService';
 import { isFreePlan } from '../../utils/hostPricing';
+import { ReportBlockModal } from '../../components/ReportBlockModal';
+import { reportUser, blockUser as blockUserRemote } from '../../services/moderationService';
 
 const BG = '#111';
 const CARD_BG = '#1a1a1a';
@@ -47,7 +49,7 @@ export const HostRenterGroupDetailScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, blockUser: blockUserLocal } = useAuth();
   const { alert: showAlert } = useConfirm();
   const group = route.params?.group;
 
@@ -63,6 +65,8 @@ export const HostRenterGroupDetailScreen = () => {
   const [sending, setSending] = useState(false);
 
   const [showUnlock, setShowUnlock] = useState(false);
+  const [showMemberReport, setShowMemberReport] = useState(false);
+  const [reportMemberTarget, setReportMemberTarget] = useState<{ id: string; name: string } | null>(null);
   const [purchasing, setPurchasing] = useState<string | null>(null);
 
   useEffect(() => {
@@ -244,7 +248,17 @@ export const HostRenterGroupDetailScreen = () => {
           <Feather name="arrow-left" size={22} color="#fff" />
         </Pressable>
         <Text style={styles.headerTitle} numberOfLines={1}>{group.name}</Text>
-        <View style={{ width: 40 }} />
+        <Pressable
+          onPress={() => {
+            if (members.length > 0) {
+              setReportMemberTarget({ id: members[0].id, name: members[0].name });
+              setShowMemberReport(true);
+            }
+          }}
+          style={styles.backBtn}
+        >
+          <Feather name="more-vertical" size={20} color="#999" />
+        </Pressable>
       </View>
 
       {loading ? (
@@ -390,6 +404,13 @@ export const HostRenterGroupDetailScreen = () => {
                           <Feather name="check" size={10} color="#22c55e" />
                         </View>
                       ) : null}
+                      <Pressable
+                        onPress={() => { setReportMemberTarget({ id: member.id, name: member.name }); setShowMemberReport(true); }}
+                        hitSlop={8}
+                        style={{ marginLeft: 'auto' }}
+                      >
+                        <Feather name="more-vertical" size={16} color="#666" />
+                      </Pressable>
                     </View>
                     <Text style={styles.memberOccupation}>{member.occupation}</Text>
                     {member.isCouple ? (
@@ -540,6 +561,27 @@ export const HostRenterGroupDetailScreen = () => {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <ReportBlockModal
+        visible={showMemberReport}
+        onClose={() => { setShowMemberReport(false); setReportMemberTarget(null); }}
+        userName={reportMemberTarget?.name || 'User'}
+        type="user"
+        onReport={async (reason) => {
+          try { if (reportMemberTarget) await reportUser(reportMemberTarget.id, reason); } catch {}
+        }}
+        onBlock={async () => {
+          try {
+            if (reportMemberTarget) {
+              await blockUserRemote(reportMemberTarget.id);
+              await blockUserLocal(reportMemberTarget.id);
+              setShowMemberReport(false);
+              setReportMemberTarget(null);
+              navigation.goBack();
+            }
+          } catch {}
+        }}
+      />
     </View>
   );
 };

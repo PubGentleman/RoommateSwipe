@@ -17,6 +17,8 @@ import { OpenGroupListing } from '../../types/models';
 import { Image } from 'expo-image';
 import { Spacing } from '../../constants/theme';
 import { needsRoommates } from '../../utils/renterIntentUtils';
+import { ReportBlockModal } from '../../components/ReportBlockModal';
+import { reportGroup } from '../../services/moderationService';
 
 export default function OpenGroupsScreen() {
   const insets = useSafeAreaInsets();
@@ -28,6 +30,8 @@ export default function OpenGroupsScreen() {
 
   const [groups, setGroups] = useState<OpenGroupListing[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showGroupReport, setShowGroupReport] = useState(false);
+  const [reportGroupTarget, setReportGroupTarget] = useState<{ id: string; name: string } | null>(null);
 
   const [error, setError] = useState<string | null>(null);
 
@@ -39,7 +43,13 @@ export default function OpenGroupsScreen() {
       const data = await getOpenGroups(user.id, {
         city: user.profileData?.city,
       });
-      setGroups(data);
+      const blockedIds = new Set(user?.blockedUsers || []);
+      const filtered = blockedIds.size > 0
+        ? data.filter((g: OpenGroupListing) =>
+            !(g.members || []).some(m => blockedIds.has(m.user_id))
+          )
+        : data;
+      setGroups(filtered);
     } catch (err) {
       console.error('[OpenGroupsScreen] Failed to load open groups:', err);
       setError('Failed to load groups. Pull down to retry.');
@@ -83,9 +93,17 @@ export default function OpenGroupsScreen() {
               </View>
             ) : null}
           </View>
-          <Text style={[styles.spotsText, { color: theme.primary }]}>
-            {item.spotsOpen} spot{item.spotsOpen !== 1 ? 's' : ''} open
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={[styles.spotsText, { color: theme.primary }]}>
+              {item.spotsOpen} spot{item.spotsOpen !== 1 ? 's' : ''} open
+            </Text>
+            <Pressable
+              onPress={(e) => { e.stopPropagation?.(); setReportGroupTarget({ id: item.id, name: item.name || 'Group' }); setShowGroupReport(true); }}
+              hitSlop={8}
+            >
+              <Feather name="flag" size={14} color={theme.textSecondary} />
+            </Pressable>
+          </View>
         </View>
 
         <View style={styles.membersRow}>
@@ -227,6 +245,16 @@ export default function OpenGroupsScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
+
+      <ReportBlockModal
+        visible={showGroupReport}
+        onClose={() => { setShowGroupReport(false); setReportGroupTarget(null); }}
+        userName={reportGroupTarget?.name || 'Group'}
+        type="group"
+        onReport={async (reason) => {
+          try { if (reportGroupTarget) await reportGroup(reportGroupTarget.id, reason); } catch {}
+        }}
+      />
     </View>
   );
 }

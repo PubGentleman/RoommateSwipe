@@ -38,6 +38,8 @@ import { GroupPropertySearchModal } from '../../components/GroupPropertySearchMo
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { StorageService } from '../../utils/storage';
+import { ReportBlockModal } from '../../components/ReportBlockModal';
+import { reportGroup, reportUser, blockUser as blockUserRemote } from '../../services/moderationService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -101,7 +103,7 @@ function SettingRow({ icon, label, description, value, onChange, theme }: {
 export function GroupInfoScreen({ route, navigation }: Props) {
   const { groupId, groupName: routeGroupName } = route.params;
   const { theme } = useTheme();
-  const { user } = useAuth();
+  const { user, blockUser: blockUserLocal } = useAuth();
   const insets = useSafeAreaInsets();
   const { confirm, alert } = useConfirm();
   const renterPlan = normalizeRenterPlan(user?.subscription?.plan);
@@ -120,6 +122,9 @@ export function GroupInfoScreen({ route, navigation }: Props) {
   const [groupLikers, setGroupLikers] = useState<any[]>([]);
   const [loadingLikers, setLoadingLikers] = useState(false);
   const [memberPiSummaries, setMemberPiSummaries] = useState<Record<string, string>>({});
+  const [showGroupReport, setShowGroupReport] = useState(false);
+  const [showMemberReport, setShowMemberReport] = useState(false);
+  const [reportMemberTarget, setReportMemberTarget] = useState<{ id: string; name: string } | null>(null);
 
   const isAdmin = group?.adminId === user?.id;
   const memberCount = group?.members?.length || 0;
@@ -673,6 +678,14 @@ export function GroupInfoScreen({ route, navigation }: Props) {
             <Feather name="arrow-left" size={20} color={theme.text} />
           </Pressable>
 
+          <Pressable
+            onPress={() => setShowGroupReport(true)}
+            hitSlop={12}
+            style={[styles.heroBackBtn, { backgroundColor: theme.card, borderColor: theme.border, top: insets.top + 16, left: undefined, right: 16, position: 'absolute' }]}
+          >
+            <Feather name="more-vertical" size={18} color={theme.textSecondary} />
+          </Pressable>
+
           {(() => {
             const memberPhotos = (group.members || [])
               .map((m: any) => ({ uri: m.photo, initial: (m.name || '?').charAt(0).toUpperCase() }))
@@ -1026,6 +1039,16 @@ export function GroupInfoScreen({ route, navigation }: Props) {
                     </Pressable>
                   </View>
                 ) : null}
+
+                {!isCurrentUser && !isAdmin ? (
+                  <Pressable
+                    onPress={() => { setReportMemberTarget({ id: member.id, name: member.name }); setShowMemberReport(true); }}
+                    hitSlop={8}
+                    style={styles.iconBtn}
+                  >
+                    <Feather name="more-vertical" size={14} color={theme.textSecondary} />
+                  </Pressable>
+                ) : null}
               </View>
             );
           })}
@@ -1319,6 +1342,36 @@ export function GroupInfoScreen({ route, navigation }: Props) {
           } else {
             await alert({ title: 'Error', message: 'Could not link property.', variant: 'warning' });
           }
+        }}
+      />
+
+      <ReportBlockModal
+        visible={showGroupReport}
+        onClose={() => setShowGroupReport(false)}
+        userName={group?.name || 'Group'}
+        type="group"
+        onReport={async (reason) => {
+          try { await reportGroup(groupId, reason); } catch {}
+        }}
+      />
+
+      <ReportBlockModal
+        visible={showMemberReport}
+        onClose={() => { setShowMemberReport(false); setReportMemberTarget(null); }}
+        userName={reportMemberTarget?.name || 'User'}
+        type="user"
+        onReport={async (reason) => {
+          try { if (reportMemberTarget) await reportUser(reportMemberTarget.id, reason); } catch {}
+        }}
+        onBlock={async () => {
+          try {
+            if (reportMemberTarget) {
+              await blockUserRemote(reportMemberTarget.id);
+              await blockUserLocal(reportMemberTarget.id);
+              setShowMemberReport(false);
+              setReportMemberTarget(null);
+            }
+          } catch {}
         }}
       />
     </View>

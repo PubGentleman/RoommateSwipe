@@ -6,9 +6,9 @@ import { useTheme } from '../hooks/useTheme';
 import { Spacing, BorderRadius, Typography } from '../constants/theme';
 import { useConfirm } from '../contexts/ConfirmContext';
 
-type ReportReason = 'Inappropriate content' | 'Fake profile' | 'Harassment' | 'Spam' | 'Other';
+type ReportType = 'user' | 'listing' | 'group';
 
-const REPORT_REASONS: ReportReason[] = [
+const USER_REPORT_REASONS = [
   'Inappropriate content',
   'Fake profile',
   'Harassment',
@@ -16,36 +16,120 @@ const REPORT_REASONS: ReportReason[] = [
   'Other',
 ];
 
+const LISTING_REPORT_REASONS = [
+  'Fake or misleading listing',
+  'Scam or fraud',
+  'Incorrect information',
+  'Inappropriate photos',
+  'Already rented / unavailable',
+  'Discriminatory content',
+  'Other',
+];
+
+const GROUP_REPORT_REASONS = [
+  'Inappropriate group name',
+  'Spam group',
+  'Suspicious activity',
+  'Harassment',
+  'Other',
+];
+
+function getReasonsForType(type: ReportType): string[] {
+  switch (type) {
+    case 'listing': return LISTING_REPORT_REASONS;
+    case 'group': return GROUP_REPORT_REASONS;
+    default: return USER_REPORT_REASONS;
+  }
+}
+
+function getLabelsForType(type: ReportType, name: string) {
+  switch (type) {
+    case 'listing':
+      return {
+        title: 'Options',
+        subtitle: 'What would you like to do with this listing?',
+        reportTitle: 'Report Listing',
+        reportLabel: 'Report Listing',
+        reportDesc: 'Flag this listing for review',
+        reportPrompt: 'Why are you reporting this listing?',
+        successMsg: "Thank you for reporting. We'll review this listing.",
+        blockLabel: `Block ${name}`,
+        blockDesc: 'Hide all listings from this host',
+        blockConfirmTitle: `Block ${name}?`,
+        blockConfirmMsg: `You won't see any listings from ${name}. They won't be able to contact you.`,
+        blockSuccessMsg: `${name} has been blocked. Their listings are now hidden.`,
+        showBlock: true,
+      };
+    case 'group':
+      return {
+        title: 'Options',
+        subtitle: 'What would you like to do with this group?',
+        reportTitle: 'Report Group',
+        reportLabel: 'Report Group',
+        reportDesc: 'Flag this group for review',
+        reportPrompt: 'Why are you reporting this group?',
+        successMsg: "Thank you for reporting. We'll review this group.",
+        blockLabel: '',
+        blockDesc: '',
+        blockConfirmTitle: '',
+        blockConfirmMsg: '',
+        blockSuccessMsg: '',
+        showBlock: false,
+      };
+    default:
+      return {
+        title: 'Options',
+        subtitle: `What would you like to do with ${name}'s profile?`,
+        reportTitle: 'Report User',
+        reportLabel: `Report ${name}`,
+        reportDesc: 'Flag this profile for review',
+        reportPrompt: `Why are you reporting ${name}?`,
+        successMsg: `Thank you for reporting. We'll review ${name}'s profile.`,
+        blockLabel: `Block ${name}`,
+        blockDesc: 'Prevent all future interactions',
+        blockConfirmTitle: `Block ${name}?`,
+        blockConfirmMsg: `${name} will no longer be able to see your profile or contact you. You won't see them in your feed.`,
+        blockSuccessMsg: `${name} has been blocked.`,
+        showBlock: true,
+      };
+  }
+}
+
 interface ReportBlockModalProps {
   visible: boolean;
   onClose: () => void;
   userName: string;
   onReport: (reason: string) => void;
-  onBlock: () => void;
+  onBlock?: () => void;
+  type?: ReportType;
 }
 
-export const ReportBlockModal = ({ visible, onClose, userName, onReport, onBlock }: ReportBlockModalProps) => {
+export const ReportBlockModal = ({ visible, onClose, userName, onReport, onBlock, type = 'user' }: ReportBlockModalProps) => {
   const { theme } = useTheme();
   const { confirm, alert: showAlert } = useConfirm();
-  const [selectedReason, setSelectedReason] = useState<ReportReason | null>(null);
+  const [selectedReason, setSelectedReason] = useState<string | null>(null);
   const [showReportSection, setShowReportSection] = useState(false);
+
+  const reasons = getReasonsForType(type);
+  const labels = getLabelsForType(type, userName);
 
   const handleReport = async () => {
     if (!selectedReason) {
-      await showAlert({ title: 'Select a Reason', message: 'Please select a reason for reporting this user.', variant: 'warning' });
+      await showAlert({ title: 'Select a Reason', message: 'Please select a reason for your report.', variant: 'warning' });
       return;
     }
     onReport(selectedReason);
     setSelectedReason(null);
     setShowReportSection(false);
     onClose();
-    await showAlert({ title: 'Report Submitted', message: `Thank you for reporting. We'll review ${userName}'s profile.`, variant: 'success' });
+    await showAlert({ title: 'Report Submitted', message: labels.successMsg, variant: 'success' });
   };
 
   const handleBlock = async () => {
+    if (!onBlock) return;
     const confirmed = await confirm({
-      title: `Block ${userName}?`,
-      message: `${userName} will no longer be able to see your profile or contact you. You won't see them in your feed.`,
+      title: labels.blockConfirmTitle,
+      message: labels.blockConfirmMsg,
       confirmText: 'Block',
       variant: 'danger',
     });
@@ -54,7 +138,7 @@ export const ReportBlockModal = ({ visible, onClose, userName, onReport, onBlock
       setSelectedReason(null);
       setShowReportSection(false);
       onClose();
-      await showAlert({ title: 'User Blocked', message: `${userName} has been blocked.`, variant: 'success' });
+      await showAlert({ title: 'Blocked', message: labels.blockSuccessMsg, variant: 'success' });
     }
   };
 
@@ -75,7 +159,7 @@ export const ReportBlockModal = ({ visible, onClose, userName, onReport, onBlock
         <View style={[styles.container, { backgroundColor: theme.backgroundSecondary }]}>
           <View style={styles.header}>
             <ThemedText style={[Typography.h2, { textAlign: 'center' }]}>
-              {showReportSection ? 'Report User' : 'Options'}
+              {showReportSection ? labels.reportTitle : labels.title}
             </ThemedText>
             <Pressable onPress={handleClose} style={styles.closeButton}>
               <Feather name="x" size={24} color={theme.textSecondary} />
@@ -85,7 +169,7 @@ export const ReportBlockModal = ({ visible, onClose, userName, onReport, onBlock
           {!showReportSection ? (
             <View style={styles.content}>
               <ThemedText style={[Typography.body, { color: theme.textSecondary, textAlign: 'center', marginBottom: Spacing.xl }]}>
-                What would you like to do with {userName}'s profile?
+                {labels.subtitle}
               </ThemedText>
 
               <Pressable
@@ -95,37 +179,39 @@ export const ReportBlockModal = ({ visible, onClose, userName, onReport, onBlock
                 <Feather name="flag" size={20} color={theme.warning} />
                 <View style={{ flex: 1, marginLeft: Spacing.md }}>
                   <ThemedText style={[Typography.body, { fontWeight: '600' }]}>
-                    Report {userName}
+                    {labels.reportLabel}
                   </ThemedText>
                   <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
-                    Flag this profile for review
+                    {labels.reportDesc}
                   </ThemedText>
                 </View>
                 <Feather name="chevron-right" size={20} color={theme.textSecondary} />
               </Pressable>
 
-              <Pressable
-                style={[styles.optionButton, { backgroundColor: theme.backgroundDefault, borderColor: '#DC2626' }]}
-                onPress={handleBlock}
-              >
-                <Feather name="slash" size={20} color="#DC2626" />
-                <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                  <ThemedText style={[Typography.body, { fontWeight: '600', color: '#DC2626' }]}>
-                    Block {userName}
-                  </ThemedText>
-                  <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
-                    Prevent all future interactions
-                  </ThemedText>
-                </View>
-              </Pressable>
+              {labels.showBlock && onBlock ? (
+                <Pressable
+                  style={[styles.optionButton, { backgroundColor: theme.backgroundDefault, borderColor: '#DC2626' }]}
+                  onPress={handleBlock}
+                >
+                  <Feather name="slash" size={20} color="#DC2626" />
+                  <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                    <ThemedText style={[Typography.body, { fontWeight: '600', color: '#DC2626' }]}>
+                      {labels.blockLabel}
+                    </ThemedText>
+                    <ThemedText style={[Typography.caption, { color: theme.textSecondary }]}>
+                      {labels.blockDesc}
+                    </ThemedText>
+                  </View>
+                </Pressable>
+              ) : null}
             </View>
           ) : (
             <View style={styles.content}>
               <ThemedText style={[Typography.body, { color: theme.textSecondary, marginBottom: Spacing.lg }]}>
-                Why are you reporting {userName}?
+                {labels.reportPrompt}
               </ThemedText>
 
-              {REPORT_REASONS.map((reason) => (
+              {reasons.map((reason) => (
                 <Pressable
                   key={reason}
                   style={[

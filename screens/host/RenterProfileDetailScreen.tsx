@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, Pressable } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AgentRenter } from '../../services/agentMatchmakerService';
+import { ReportBlockModal } from '../../components/ReportBlockModal';
+import { reportUser, blockUser as blockUserRemote } from '../../services/moderationService';
+import { useAuth } from '../../contexts/AuthContext';
 
 const BG = '#111';
-const CARD_BG = '#1a1a1a';
 const ACCENT = '#ff6b5b';
 const GREEN = '#2ecc71';
 
@@ -14,7 +16,10 @@ export const RenterProfileDetailScreen = () => {
   const navigation = useNavigation();
   const route = useRoute<any>();
   const insets = useSafeAreaInsets();
+  const { blockUser: blockUserLocal } = useAuth();
   const renter: AgentRenter = route.params?.renter;
+  const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+  const [showReportBlock, setShowReportBlock] = useState(false);
 
   if (!renter) {
     return (
@@ -24,6 +29,22 @@ export const RenterProfileDetailScreen = () => {
     );
   }
 
+  const handleReport = async (reason: string) => {
+    try {
+      if (renter.id) await reportUser(renter.id, reason);
+    } catch {}
+  };
+
+  const handleBlock = async () => {
+    try {
+      if (renter.id) {
+        await blockUserRemote(renter.id);
+        await blockUserLocal(renter.id);
+        navigation.goBack();
+      }
+    } catch {}
+  };
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
@@ -31,7 +52,9 @@ export const RenterProfileDetailScreen = () => {
           <Feather name="arrow-left" size={24} color="#fff" />
         </Pressable>
         <Text style={styles.title}>Renter Profile</Text>
-        <View style={{ width: 40 }} />
+        <Pressable onPress={() => setShowReportBlock(true)} style={styles.backBtn}>
+          <Feather name="more-vertical" size={22} color="#999" />
+        </Pressable>
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: 100, paddingHorizontal: 16 }}>
@@ -123,6 +146,15 @@ export const RenterProfileDetailScreen = () => {
           </View>
         ) : null}
       </ScrollView>
+
+      <ReportBlockModal
+        visible={showReportBlock}
+        onClose={() => setShowReportBlock(false)}
+        userName={renter.name || 'User'}
+        onReport={handleReport}
+        onBlock={handleBlock}
+        type="user"
+      />
     </View>
   );
 };

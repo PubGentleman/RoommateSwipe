@@ -49,13 +49,15 @@ import { TourScheduleForm } from '../../components/TourScheduleForm';
 import * as Linking from 'expo-linking';
 import { Spacing } from '../../constants/theme';
 import { supabase } from '../../lib/supabase';
+import { ReportBlockModal } from '../../components/ReportBlockModal';
+import { reportGroup, reportUser, blockUser as blockUserRemote } from '../../services/moderationService';
 
 type Tab = 'members' | 'shortlist' | 'tours' | 'settings';
 
 export default function MyGroupScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
-  const { user } = useAuth();
+  const { user, blockUser: blockUserLocal } = useAuth();
   const { theme } = useTheme();
 
   const [group, setGroup] = useState<PreformedGroup | null>(null);
@@ -74,6 +76,9 @@ export default function MyGroupScreen() {
   const [showTourForm, setShowTourForm] = useState(false);
   const [tourSubmitting, setTourSubmitting] = useState(false);
   const [shortlistFilter, setShortlistFilter] = useState<'all' | 'everyone' | 'mine'>('all');
+  const [showGroupReport, setShowGroupReport] = useState(false);
+  const [showMemberReport, setShowMemberReport] = useState(false);
+  const [reportMemberTarget, setReportMemberTarget] = useState<{ id: string; name: string } | null>(null);
 
   const isLead = group?.group_lead_id === user?.id;
 
@@ -306,9 +311,14 @@ export default function MyGroupScreen() {
           <View style={{ width: 36 }} />
         )}
         <Text style={styles.headerTitle}>{group.name || 'Your Group'}</Text>
-        <Pressable onPress={shareInvite} style={styles.headerAction}>
-          <Feather name="send" size={18} color="#22C55E" />
-        </Pressable>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Pressable onPress={shareInvite} style={styles.headerAction}>
+            <Feather name="send" size={18} color="#22C55E" />
+          </Pressable>
+          <Pressable onPress={() => setShowGroupReport(true)} style={styles.headerAction}>
+            <Feather name="more-vertical" size={18} color="#999" />
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.inviteBanner}>
@@ -684,6 +694,29 @@ export default function MyGroupScreen() {
             </View>
           ) : null}
 
+          {members.filter(m => m.status === 'joined' && m.user_id !== user?.id).length > 0 ? (
+            <View style={styles.settingsField}>
+              <Text style={styles.settingsLabel}>Members</Text>
+              {members
+                .filter(m => m.status === 'joined' && m.user_id !== user?.id)
+                .map(m => (
+                  <View key={`report-${m.id}`} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, marginTop: 4 }}>
+                    <Feather name="user" size={14} color="rgba(255,255,255,0.5)" />
+                    <Text style={{ color: '#ccc', fontSize: 13, flex: 1, marginLeft: 8 }}>{m.name || 'Member'}</Text>
+                    <Pressable
+                      onPress={() => {
+                        setReportMemberTarget({ id: m.user_id, name: m.name || 'Member' });
+                        setShowMemberReport(true);
+                      }}
+                      hitSlop={8}
+                    >
+                      <Feather name="more-vertical" size={18} color="rgba(255,255,255,0.4)" />
+                    </Pressable>
+                  </View>
+                ))}
+            </View>
+          ) : null}
+
           <Pressable style={styles.leaveBtn} onPress={handleLeave}>
             <Feather name="log-out" size={16} color="#EF4444" />
             <Text style={styles.leaveBtnText}>
@@ -692,6 +725,36 @@ export default function MyGroupScreen() {
           </Pressable>
         </View>
       ) : null}
+
+      <ReportBlockModal
+        visible={showGroupReport}
+        onClose={() => setShowGroupReport(false)}
+        userName={group?.name || 'Group'}
+        type="group"
+        onReport={async (reason) => {
+          try { if (group) await reportGroup(group.id, reason); } catch {}
+        }}
+      />
+
+      <ReportBlockModal
+        visible={showMemberReport}
+        onClose={() => { setShowMemberReport(false); setReportMemberTarget(null); }}
+        userName={reportMemberTarget?.name || 'User'}
+        type="user"
+        onReport={async (reason) => {
+          try { if (reportMemberTarget) await reportUser(reportMemberTarget.id, reason); } catch {}
+        }}
+        onBlock={async () => {
+          try {
+            if (reportMemberTarget) {
+              await blockUserRemote(reportMemberTarget.id);
+              await blockUserLocal(reportMemberTarget.id);
+              setShowMemberReport(false);
+              setReportMemberTarget(null);
+            }
+          } catch {}
+        }}
+      />
     </View>
   );
 }

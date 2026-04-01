@@ -44,6 +44,8 @@ import { NeighborhoodAISheet } from '../../components/NeighborhoodAISheet';
 import { PropertyReviewsScreen } from '../shared/PropertyReviewsScreen';
 import { WriteReviewSheet } from '../../components/WriteReviewSheet';
 import { getReviewSummary, submitReview, checkReviewEligibility, ReviewSummary } from '../../services/reviewService';
+import { ReportBlockModal } from '../../components/ReportBlockModal';
+import { reportListing, reportUser, blockUser as blockUserRemote } from '../../services/moderationService';
 
 import { useNotificationContext } from '../../contexts/NotificationContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
@@ -110,7 +112,7 @@ const getAvatarGradient = (id: string): [string, string] => {
 
 export const ExploreScreen = () => {
   const { theme } = useTheme();
-  const { user, canSendInterest, canSendSuperInterest, canViewListing, useListingView } = useAuth();
+  const { user, canSendInterest, canSendSuperInterest, canViewListing, useListingView, blockUser: blockUserLocal } = useAuth();
   const navigation = useNavigation();
   const route = useRoute<any>();
   const insets = useSafeAreaInsets();
@@ -174,6 +176,8 @@ export const ExploreScreen = () => {
   const [areaInfoLoading, setAreaInfoLoading] = useState(false);
   const [areaInfoError, setAreaInfoError] = useState(false);
   const [areaInfoListingId, setAreaInfoListingId] = useState<string | null>(null);
+  const [showListingReport, setShowListingReport] = useState(false);
+  const [showHostReport, setShowHostReport] = useState(false);
   const [areaDetailModal, setAreaDetailModal] = useState<{
     visible: boolean;
     category: 'transit' | 'restaurants' | 'grocery' | 'laundry' | 'parks' | null;
@@ -803,6 +807,11 @@ export const ExploreScreen = () => {
 
   const applyFilters = () => {
     let filtered = [...properties];
+
+    const blockedIds = new Set(user?.blockedUsers || []);
+    if (blockedIds.size > 0) {
+      filtered = filtered.filter(p => !blockedIds.has(p.hostId));
+    }
 
     filtered = filtered.filter(p => p.available);
 
@@ -2228,13 +2237,22 @@ export const ExploreScreen = () => {
                     </View>
                   ) : null}
 
-                  <Pressable
-                    style={styles.pdCloseBtn}
-                    onPress={() => setShowPropertyDetail(false)}
-                    hitSlop={8}
-                  >
-                    <Feather name="x" size={18} color="#fff" />
-                  </Pressable>
+                  <View style={styles.pdTopButtons}>
+                    <Pressable
+                      style={styles.pdFlagBtn}
+                      onPress={() => setShowListingReport(true)}
+                      hitSlop={8}
+                    >
+                      <Feather name="flag" size={16} color="#fff" />
+                    </Pressable>
+                    <Pressable
+                      style={styles.pdCloseBtn}
+                      onPress={() => setShowPropertyDetail(false)}
+                      hitSlop={8}
+                    >
+                      <Feather name="x" size={18} color="#fff" />
+                    </Pressable>
+                  </View>
                 </View>
               );
             })() : null}
@@ -2388,6 +2406,15 @@ export const ExploreScreen = () => {
                         </View>
                       ) : null}
                     </View>
+
+                    {selectedProperty.hostProfileId ? (
+                      <Pressable
+                        onPress={() => setShowHostReport(true)}
+                        style={{ alignSelf: 'flex-start', paddingVertical: 8 }}
+                      >
+                        <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>Report this host</Text>
+                      </Pressable>
+                    ) : null}
 
                     {selectedProperty.description ? (
                       <View style={styles.pdSection}>
@@ -2867,6 +2894,48 @@ export const ExploreScreen = () => {
           </View>
         </View>
       </Modal>
+
+      <ReportBlockModal
+        visible={showListingReport}
+        onClose={() => setShowListingReport(false)}
+        userName={selectedProperty?.hostName || 'Host'}
+        type="listing"
+        onReport={async (reason) => {
+          try { if (selectedProperty) await reportListing(selectedProperty.id, reason); } catch {}
+        }}
+        onBlock={async () => {
+          try {
+            if (selectedProperty?.hostProfileId) {
+              await blockUserRemote(selectedProperty.hostProfileId);
+              await blockUserLocal(selectedProperty.hostProfileId);
+              setShowPropertyDetail(false);
+              setShowListingReport(false);
+            }
+          } catch {}
+        }}
+      />
+
+      <ReportBlockModal
+        visible={showHostReport}
+        onClose={() => setShowHostReport(false)}
+        userName={selectedProperty?.hostName || 'Host'}
+        type="user"
+        onReport={async (reason) => {
+          try {
+            if (selectedProperty?.hostProfileId) await reportUser(selectedProperty.hostProfileId, reason);
+          } catch {}
+        }}
+        onBlock={async () => {
+          try {
+            if (selectedProperty?.hostProfileId) {
+              await blockUserRemote(selectedProperty.hostProfileId);
+              await blockUserLocal(selectedProperty.hostProfileId);
+              setShowPropertyDetail(false);
+              setShowHostReport(false);
+            }
+          } catch {}
+        }}
+      />
 
       <Modal
         visible={showMatchBreakdown && selectedProperty != null}
@@ -4453,10 +4522,22 @@ const styles = StyleSheet.create({
     width: 14,
     borderRadius: 3,
   },
-  pdCloseBtn: {
+  pdTopButtons: {
     position: 'absolute',
     top: 14,
     right: 14,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  pdFlagBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pdCloseBtn: {
     width: 30,
     height: 30,
     borderRadius: 15,
