@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GroupType, GroupMember } from '../types/models';
 import { isWithinActivityCutoff, getRecencyMultiplier } from '../utils/activityDecay';
+import { shouldLoadMockData } from '../utils/dataUtils';
 
 export interface GroupData {
   name: string;
@@ -1677,9 +1678,10 @@ export async function getGroupShortlist(groupId: string): Promise<GroupShortlist
     }
 
     const listingIds = Object.keys(byListing);
-    if (listingIds.length === 0) {
+    if (listingIds.length === 0 && shouldLoadMockData()) {
       return getGroupShortlistFromLocal(groupId);
     }
+    if (listingIds.length === 0) return [];
 
     const { data: listings } = await supabase
       .from('listings')
@@ -1700,7 +1702,8 @@ export async function getGroupShortlist(groupId: string): Promise<GroupShortlist
       }))
       .sort((a, b) => b.like_count - a.like_count);
   } catch {
-    return getGroupShortlistFromLocal(groupId);
+    if (shouldLoadMockData()) return getGroupShortlistFromLocal(groupId);
+    return [];
   }
 }
 
@@ -1811,6 +1814,8 @@ export async function getGroupTours(groupId: string) {
   } catch (e) {
     console.warn('[getGroupTours] Supabase query failed, checking local storage');
   }
+
+  if (!shouldLoadMockData()) return [];
 
   try {
     const local = await AsyncStorage.getItem(`@rhome/group_tours_${groupId}`);

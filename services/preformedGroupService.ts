@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PreformedGroup, PreformedGroupMember, GroupShortlistItem } from '../types/models';
+import { shouldLoadMockData } from '../utils/dataUtils';
 
 function generateInviteCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -111,7 +112,7 @@ export async function getGroupMembers(groupId: string): Promise<PreformedGroupMe
 
   if (data && data.length > 0) return data as PreformedGroupMember[];
 
-  if (error || !data || data.length === 0) {
+  if ((error || !data || data.length === 0) && shouldLoadMockData()) {
     try {
       const local = await AsyncStorage.getItem(`@rhome/preformed_members_${groupId}`);
       if (local) return JSON.parse(local) as PreformedGroupMember[];
@@ -300,7 +301,7 @@ export async function getShortlist(groupId: string): Promise<GroupShortlistItem[
 
   if (data && data.length > 0) return data as GroupShortlistItem[];
 
-  if (error || !data || data.length === 0) {
+  if ((error || !data || data.length === 0) && shouldLoadMockData()) {
     try {
       const local = await AsyncStorage.getItem(`@rhome/group_shortlist_${groupId}`);
       if (local) return JSON.parse(local) as GroupShortlistItem[];
@@ -370,21 +371,25 @@ export async function getUserPreformedGroup(userId?: string): Promise<PreformedG
 
   if (error) {
     console.warn('[getUserPreformedGroup] Supabase query failed, checking local storage');
-    try {
-      const local = await AsyncStorage.getItem(`@rhome/preformed_group_${uid}`);
-      if (local) return JSON.parse(local) as PreformedGroup;
-    } catch (e) {
-      console.warn('[getUserPreformedGroup] Local fallback failed:', e);
+    if (shouldLoadMockData()) {
+      try {
+        const local = await AsyncStorage.getItem(`@rhome/preformed_group_${uid}`);
+        if (local) return JSON.parse(local) as PreformedGroup;
+      } catch (e) {
+        console.warn('[getUserPreformedGroup] Local fallback failed:', e);
+      }
     }
     return null;
   }
 
   if (!memberData) {
-    try {
-      const local = await AsyncStorage.getItem(`@rhome/preformed_group_${uid}`);
-      if (local) return JSON.parse(local) as PreformedGroup;
-    } catch (e) {
-      console.warn('[getUserPreformedGroup] Local fallback failed:', e);
+    if (shouldLoadMockData()) {
+      try {
+        const local = await AsyncStorage.getItem(`@rhome/preformed_group_${uid}`);
+        if (local) return JSON.parse(local) as PreformedGroup;
+      } catch (e) {
+        console.warn('[getUserPreformedGroup] Local fallback failed:', e);
+      }
     }
     return null;
   }
