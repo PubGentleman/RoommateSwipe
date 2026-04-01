@@ -2371,8 +2371,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const hostType = user?.hostType as 'individual' | 'agent' | 'company' | null | undefined;
   const hasCompletedHostOnboarding = user?.hasCompletedHostOnboarding ?? false;
-  const canSwitchMode = hostType === 'individual' && hasCompletedHostOnboarding;
-  const isFirstTimeHost = !hasCompletedHostOnboarding && hostType !== 'agent' && hostType !== 'company';
+  const canSwitchMode = hostType === 'individual' && user?.role === 'host';
+  const isFirstTimeHost = !hasCompletedHostOnboarding && hostType !== 'agent' && hostType !== 'company' && user?.role !== 'host';
   const effectiveMode: 'renter' | 'host' =
     hostType === 'agent' || hostType === 'company'
       ? 'host'
