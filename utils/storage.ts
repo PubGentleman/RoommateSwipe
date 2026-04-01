@@ -1440,7 +1440,7 @@ export const StorageService = {
         console.log('[StorageService] Seeded company team members');
       }
 
-      const { createMockNotifications, createHostMockNotifications, createAgentMockNotifications, createCompanyMockNotifications, createMockInterestCards, createMockReceivedLikes, MOCK_SAVED_PROPERTY_IDS, createMockHostConversations } = await import('./mockSeedData');
+      const { createMockNotifications, createHostMockNotifications, createAgentMockNotifications, createCompanyMockNotifications, createMockInterestCards, createMockReceivedLikes, MOCK_SAVED_PROPERTY_IDS, createMockHostConversations, createMockPreformedGroup, createMockGroupMembers, createMockGroupShortlist, createMockGroupTours } = await import('./mockSeedData');
 
       const isHost = userRole === 'host' || hostType;
       let mockNotifs: Notification[];
@@ -1513,6 +1513,18 @@ export const StorageService = {
         await AsyncStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
       }
       console.log('[StorageService] Seeded received likes / profile views');
+
+      if (!isHost) {
+        const mockGroup = createMockPreformedGroup(userId);
+        const mockMembers = createMockGroupMembers(userId, mockGroup.id);
+        const mockShortlist = createMockGroupShortlist(userId, mockGroup.id);
+        const mockTours = createMockGroupTours(userId, mockGroup.id);
+        await AsyncStorage.setItem(`@rhome/preformed_group_${userId}`, JSON.stringify(mockGroup));
+        await AsyncStorage.setItem(`@rhome/preformed_members_${mockGroup.id}`, JSON.stringify(mockMembers));
+        await AsyncStorage.setItem(`@rhome/group_shortlist_${mockGroup.id}`, JSON.stringify(mockShortlist));
+        await AsyncStorage.setItem(`@rhome/group_tours_${mockGroup.id}`, JSON.stringify(mockTours));
+        console.log('[StorageService] Seeded preformed group with shortlist and tours');
+      }
 
       await AsyncStorage.setItem(seedKey, 'true');
       console.log('[StorageService] User-specific mock data seeding complete');

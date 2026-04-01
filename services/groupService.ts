@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GroupType, GroupMember } from '../types/models';
 import { isWithinActivityCutoff, getRecencyMultiplier } from '../utils/activityDecay';
 
@@ -1656,45 +1657,49 @@ export interface GroupShortlistListing {
 }
 
 export async function getGroupShortlist(groupId: string): Promise<GroupShortlistListing[]> {
-  const { data: likes, error } = await supabase
-    .from('group_listing_likes')
-    .select('listing_id, user_id, user:users(id, full_name, avatar_url)')
-    .eq('group_id', groupId);
-  if (error) throw error;
+  try {
+    const { data: likes, error } = await supabase
+      .from('group_listing_likes')
+      .select('listing_id, user_id, user:users(id, full_name, avatar_url)')
+      .eq('group_id', groupId);
+    if (error) throw error;
 
-  const byListing: Record<string, { users: any[] }> = {};
-  for (const like of (likes || [])) {
-    if (!byListing[like.listing_id]) {
-      byListing[like.listing_id] = { users: [] };
+    const byListing: Record<string, { users: any[] }> = {};
+    for (const like of (likes || [])) {
+      if (!byListing[like.listing_id]) {
+        byListing[like.listing_id] = { users: [] };
+      }
+      byListing[like.listing_id].users.push({
+        user_id: like.user_id,
+        name: (like.user as any)?.full_name || 'Unknown',
+        avatar_url: (like.user as any)?.avatar_url || null,
+      });
     }
-    byListing[like.listing_id].users.push({
-      user_id: like.user_id,
-      name: (like.user as any)?.full_name || 'Unknown',
-      avatar_url: (like.user as any)?.avatar_url || null,
-    });
+
+    const listingIds = Object.keys(byListing);
+    if (listingIds.length === 0) return [];
+
+    const { data: listings } = await supabase
+      .from('listings')
+      .select('id, title, address, city, state, rent, bedrooms, photos')
+      .in('id', listingIds);
+
+    const listingMap: Record<string, any> = {};
+    for (const l of (listings || [])) {
+      listingMap[l.id] = l;
+    }
+
+    return listingIds
+      .map(lid => ({
+        listing_id: lid,
+        like_count: byListing[lid].users.length,
+        liked_by: byListing[lid].users,
+        listing: listingMap[lid] || null,
+      }))
+      .sort((a, b) => b.like_count - a.like_count);
+  } catch {
+    return [];
   }
-
-  const listingIds = Object.keys(byListing);
-  if (listingIds.length === 0) return [];
-
-  const { data: listings } = await supabase
-    .from('listings')
-    .select('id, title, address, city, state, rent, bedrooms, photos')
-    .in('id', listingIds);
-
-  const listingMap: Record<string, any> = {};
-  for (const l of (listings || [])) {
-    listingMap[l.id] = l;
-  }
-
-  return listingIds
-    .map(lid => ({
-      listing_id: lid,
-      like_count: byListing[lid].users.length,
-      liked_by: byListing[lid].users,
-      listing: listingMap[lid] || null,
-    }))
-    .sort((a, b) => b.like_count - a.like_count);
 }
 
 export interface TourEventInput {
@@ -1748,18 +1753,31 @@ export async function createTourEvent(input: TourEventInput) {
 }
 
 export async function getGroupTours(groupId: string) {
-  const { data, error } = await supabase
-    .from('group_tour_events')
-    .select(`
-      *,
-      rsvps:group_tour_rsvps(user_id, status, responded_at),
-      creator:users!created_by(full_name, avatar_url),
-      listing:listings(id, title, address, city, photos)
-    `)
-    .eq('group_id', groupId)
-    .order('tour_date', { ascending: true });
-  if (error) throw error;
-  return data || [];
+  try {
+    const { data, error } = await supabase
+      .from('group_tour_events')
+      .select(`
+        *,
+        rsvps:group_tour_rsvps(user_id, status, responded_at),
+        creator:users!created_by(full_name, avatar_url),
+        listing:listings(id, title, address, city, photos)
+      `)
+      .eq('group_id', groupId)
+      .order('tour_date', { ascending: true });
+    if (error) throw error;
+    if (data && data.length > 0) return data;
+  } catch (e) {
+    console.warn('[getGroupTours] Supabase query failed, checking local storage');
+  }
+
+  try {
+    const local = await AsyncStorage.getItem(`@rhome/group_tours_${groupId}`);
+    if (local) return JSON.parse(local);
+  } catch (e) {
+    console.warn('[getGroupTours] Local fallback failed:', e);
+  }
+
+  return [];
 }
 
 export async function updateTourRSVP(tourId: string, status: 'going' | 'maybe' | 'not_going'): Promise<void> {

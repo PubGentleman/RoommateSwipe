@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PreformedGroup, PreformedGroupMember, GroupShortlistItem } from '../types/models';
 
 function generateInviteCode(): string {
@@ -102,13 +103,24 @@ export async function getGroupByInviteCode(code: string): Promise<PreformedGroup
 }
 
 export async function getGroupMembers(groupId: string): Promise<PreformedGroupMember[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('preformed_group_members')
     .select('*')
     .eq('preformed_group_id', groupId)
     .order('invited_at', { ascending: true });
 
-  return (data || []) as PreformedGroupMember[];
+  if (data && data.length > 0) return data as PreformedGroupMember[];
+
+  if (error || !data || data.length === 0) {
+    try {
+      const local = await AsyncStorage.getItem(`@rhome/preformed_members_${groupId}`);
+      if (local) return JSON.parse(local) as PreformedGroupMember[];
+    } catch (e) {
+      console.warn('[getGroupMembers] Local fallback failed:', e);
+    }
+  }
+
+  return [];
 }
 
 export async function joinGroupByCode(code: string, userName: string): Promise<{ success: boolean; group?: PreformedGroup }> {
@@ -280,13 +292,24 @@ export async function removeFromShortlist(groupId: string, listingId: string): P
 }
 
 export async function getShortlist(groupId: string): Promise<GroupShortlistItem[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('group_shortlist')
     .select('*')
     .eq('preformed_group_id', groupId)
     .order('created_at', { ascending: false });
 
-  return (data || []) as GroupShortlistItem[];
+  if (data && data.length > 0) return data as GroupShortlistItem[];
+
+  if (error || !data || data.length === 0) {
+    try {
+      const local = await AsyncStorage.getItem(`@rhome/group_shortlist_${groupId}`);
+      if (local) return JSON.parse(local) as GroupShortlistItem[];
+    } catch (e) {
+      console.warn('[getShortlist] Local fallback failed:', e);
+    }
+  }
+
+  return [];
 }
 
 export async function voteOnShortlistItem(itemId: string, increment: number): Promise<boolean> {
@@ -346,11 +369,25 @@ export async function getUserPreformedGroup(userId?: string): Promise<PreformedG
     .maybeSingle();
 
   if (error) {
-    console.error('[getUserPreformedGroup] Query error:', error);
+    console.warn('[getUserPreformedGroup] Supabase query failed, checking local storage');
+    try {
+      const local = await AsyncStorage.getItem(`@rhome/preformed_group_${uid}`);
+      if (local) return JSON.parse(local) as PreformedGroup;
+    } catch (e) {
+      console.warn('[getUserPreformedGroup] Local fallback failed:', e);
+    }
     return null;
   }
 
-  if (!memberData) return null;
+  if (!memberData) {
+    try {
+      const local = await AsyncStorage.getItem(`@rhome/preformed_group_${uid}`);
+      if (local) return JSON.parse(local) as PreformedGroup;
+    } catch (e) {
+      console.warn('[getUserPreformedGroup] Local fallback failed:', e);
+    }
+    return null;
+  }
 
   return getGroupById(memberData.preformed_group_id);
 }

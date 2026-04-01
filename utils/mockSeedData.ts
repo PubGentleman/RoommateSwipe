@@ -1,4 +1,4 @@
-import { Notification, InterestCard, Conversation } from '../types/models';
+import { Notification, InterestCard, Conversation, PreformedGroup, PreformedGroupMember, GroupShortlistItem } from '../types/models';
 
 export const createMockNotifications = (userId: string): Notification[] => {
   const now = Date.now();
@@ -497,5 +497,118 @@ export const createMockTeamMembers = (companyId: string) => [
     active_inquiries: 0,
     invited_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString(),
     status: 'pending' as const,
+  },
+];
+
+export const createMockPreformedGroup = (userId: string): PreformedGroup => ({
+  id: `pfg-${userId.slice(0, 6)}`,
+  name: 'NYC Apartment Hunters',
+  group_lead_id: userId,
+  group_size: 3,
+  status: 'searching',
+  invite_code: 'RHOME2K',
+  city: 'New York',
+  preferred_neighborhoods: ['Williamsburg', 'Park Slope', 'Bushwick'],
+  combined_budget_min: 3000,
+  combined_budget_max: 5000,
+  desired_bedroom_count: 3,
+  move_in_date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 45).toISOString().split('T')[0],
+  created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 14).toISOString(),
+  open_to_requests: true,
+});
+
+export const createMockGroupMembers = (userId: string, groupId: string): PreformedGroupMember[] => [
+  {
+    id: `pgm-${userId.slice(0, 6)}-1`,
+    preformed_group_id: groupId,
+    user_id: userId,
+    name: 'You',
+    status: 'joined',
+    invited_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 14).toISOString(),
+    joined_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 14).toISOString(),
+  },
+  {
+    id: `pgm-${userId.slice(0, 6)}-2`,
+    preformed_group_id: groupId,
+    user_id: '3',
+    name: 'Emily Rodriguez',
+    status: 'joined',
+    invited_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 12).toISOString(),
+    joined_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 11).toISOString(),
+  },
+  {
+    id: `pgm-${userId.slice(0, 6)}-3`,
+    preformed_group_id: groupId,
+    user_id: '5',
+    name: 'Jessica Park',
+    status: 'joined',
+    invited_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10).toISOString(),
+    joined_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 9).toISOString(),
+  },
+];
+
+export const createMockGroupShortlist = (userId: string, groupId: string): GroupShortlistItem[] => [
+  {
+    id: `gsi-${userId.slice(0, 6)}-1`,
+    preformed_group_id: groupId,
+    listing_id: '1',
+    added_by: userId,
+    notes: 'Great location near the subway. Living room is spacious.',
+    vote_count: 3,
+    created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(),
+  },
+  {
+    id: `gsi-${userId.slice(0, 6)}-2`,
+    preformed_group_id: groupId,
+    listing_id: '5',
+    added_by: '3',
+    notes: 'Rooftop access and in-unit laundry!',
+    vote_count: 2,
+    created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
+  },
+  {
+    id: `gsi-${userId.slice(0, 6)}-3`,
+    preformed_group_id: groupId,
+    listing_id: '8',
+    added_by: '5',
+    vote_count: 1,
+    created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 1).toISOString(),
+  },
+];
+
+export const createMockGroupTours = (userId: string, groupId: string) => [
+  {
+    id: `tour-${userId.slice(0, 6)}-1`,
+    group_id: groupId,
+    listing_id: '1',
+    tour_date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 3).toISOString(),
+    tour_time: '14:00',
+    status: 'scheduled',
+    notes: 'Meet at the lobby entrance',
+    created_by: userId,
+    created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
+    creator: { full_name: 'You', avatar_url: null },
+    listing: { id: '1', title: 'Modern 3BR in Williamsburg', address: '456 Bedford Ave', city: 'Brooklyn', photos: ['https://picsum.photos/800/600?random=11'] },
+    rsvps: [
+      { user_id: userId, status: 'going', responded_at: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString() },
+      { user_id: '3', status: 'going', responded_at: new Date(Date.now() - 1000 * 60 * 60 * 20).toISOString() },
+      { user_id: '5', status: 'maybe', responded_at: new Date(Date.now() - 1000 * 60 * 60 * 18).toISOString() },
+    ],
+  },
+  {
+    id: `tour-${userId.slice(0, 6)}-2`,
+    group_id: groupId,
+    listing_id: '5',
+    tour_date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 5).toISOString(),
+    tour_time: '11:00',
+    status: 'scheduled',
+    notes: 'Agent will show us around',
+    created_by: '3',
+    created_at: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+    creator: { full_name: 'Emily Rodriguez', avatar_url: 'https://picsum.photos/100/100?random=3' },
+    listing: { id: '5', title: 'Spacious 3BR in Park Slope', address: '789 Park Place', city: 'Brooklyn', photos: ['https://picsum.photos/800/600?random=15'] },
+    rsvps: [
+      { user_id: '3', status: 'going', responded_at: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString() },
+    ],
   },
 ];
