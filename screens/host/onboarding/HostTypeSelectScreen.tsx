@@ -28,7 +28,7 @@ const HOST_TYPES: Array<{
   {
     id: 'individual',
     icon: 'user',
-    label: 'Individual',
+    label: 'Host',
     description: "I'm renting out my own property",
     color: '#6C63FF',
     hostOnly: false,

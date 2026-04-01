@@ -57,7 +57,7 @@ const DEFAULT_PLAN_DISPLAY: PlanDisplayInfo[] = [
   {
     id: 'starter',
     subtitle: 'Homeowner with 1 room to fill',
-    badge: 'Individual',
+    badge: 'Host',
     badgeColor: '#60A5FA',
     ctaLabel: 'Get Started',
     isPopular: false,

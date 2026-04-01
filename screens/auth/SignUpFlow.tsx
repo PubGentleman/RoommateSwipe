@@ -70,6 +70,7 @@ const PROPERTY_TYPES = [
 const ACCOUNT_TYPES: { id: AccountType; icon: string; label: string; description: string; color: string }[] = [
   { id: 'renter', icon: 'search', label: 'Renter', description: "I'm looking for a place to rent", color: '#6C63FF' },
   { id: 'individual', icon: 'key', label: 'Host', description: 'I rent out my own property', color: '#3B82F6' },
+
   { id: 'agent', icon: 'briefcase', label: 'Agent', description: "I'm a licensed real estate agent", color: '#F59E0B' },
   { id: 'company', icon: 'grid', label: 'Company', description: 'I manage properties for clients', color: '#22C55E' },
 ];
