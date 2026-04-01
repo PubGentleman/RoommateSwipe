@@ -525,11 +525,11 @@ export const ProfileScreen = () => {
             </View>
           </View>
           <View style={styles.settingsCard}>
-            {isHost ? (() => {
+            {isHost && user?.hostType !== 'individual' ? (() => {
               const hostType = user?.hostType || 'individual';
               const canEdit = isHostTypeEditable(user?.hostTypeLockedAt || null);
               const hoursLeft = hoursRemainingInGracePeriod(user?.hostTypeLockedAt || null);
-              const typeLabel = hostType === 'individual' ? 'Host' : getHostBadgeLabel(hostType);
+              const typeLabel = getHostBadgeLabel(hostType);
               const badgeColor = getHostBadgeColor(hostType) || '#6C63FF';
               const badgeIcon = getHostBadgeIcon(hostType);
 
