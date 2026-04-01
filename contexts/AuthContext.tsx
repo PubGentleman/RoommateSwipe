@@ -2380,19 +2380,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const switchMode = async (mode: 'renter' | 'host') => {
     if (!canSwitchMode || !user) return;
+    const updated = { ...user, activeMode: mode as 'renter' | 'host' };
+    setUser(updated);
+    StorageService.setCurrentUser(updated).then(() => StorageService.addOrUpdateUser(updated));
     if (isSupabaseConfigured) {
-      const { error } = await supabase
+      supabase
         .from('profiles')
         .update({ active_mode: mode })
-        .eq('user_id', user.id);
-      if (error) {
-        console.error('[switchMode] Supabase error:', error);
-      }
+        .eq('user_id', user.id)
+        .then(({ error }) => {
+          if (error) console.error('[switchMode] Supabase error:', error);
+        });
     }
-    const updated = { ...user, activeMode: mode as 'renter' | 'host' };
-    await StorageService.setCurrentUser(updated);
-    await StorageService.addOrUpdateUser(updated);
-    setUser(updated);
   };
 
   function getTeamSeatLimitForPlan(plan: string): number {
