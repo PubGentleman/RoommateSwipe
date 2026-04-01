@@ -699,6 +699,7 @@ export interface Notification {
     matchId?: string;
     conversationId?: string;
     groupId?: string;
+    group_id?: string;
     propertyId?: string;
     applicationId?: string;
     interestCardId?: string;
@@ -707,8 +708,13 @@ export interface Notification {
     fromUserPhoto?: string;
     agentInviteId?: string;
     agentName?: string;
+    listingId?: string;
+    listing_id?: string;
     listingTitle?: string;
     listingRent?: number;
+    bookingId?: string;
+    companyId?: string;
+    companyName?: string;
     groupMembers?: Array<{ id: string; name: string; photo?: string; compatibility?: number }>;
   };
 }
