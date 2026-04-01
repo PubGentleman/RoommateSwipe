@@ -14,7 +14,7 @@ import { Typography, Spacing } from '../../../constants/theme';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import type { HostType } from '../../../utils/hostTypeUtils';
+import { isHostTypeEditable, type HostType } from '../../../utils/hostTypeUtils';
 
 const HOST_TYPES: Array<{
   id: HostType;
@@ -87,8 +87,8 @@ export function HostTypeSelectScreen() {
   );
   const [saving, setSaving] = useState(false);
 
-  // If the user's host type is already locked, show read-only state
-  const isLocked = !!user?.hostTypeLockedAt;
+  const hasValidLock = !!user?.hostTypeLockedAt && !!user?.hostType;
+  const isLocked = hasValidLock && !isHostTypeEditable(user?.hostTypeLockedAt || null);
   const lockedType = isLocked
     ? HOST_TYPES.find(t => t.id === user?.hostType)
     : null;
