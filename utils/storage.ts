@@ -1463,7 +1463,17 @@ export const StorageService = {
       console.log(`[StorageService] Seeded ${mockNotifs.length} notifications`);
 
       if (isHost) {
-        const hostProperties = (await this.getProperties()).filter(p => p.hostId === userId);
+        const allProperties = await this.getProperties();
+        let hostProperties = allProperties.filter(p => p.hostId === userId);
+        if (hostProperties.length === 0 && allProperties.length > 0) {
+          const assignCount = Math.min(3, allProperties.length);
+          for (let i = 0; i < assignCount; i++) {
+            (allProperties[i] as any).hostId = userId;
+          }
+          await AsyncStorage.setItem(STORAGE_KEYS.PROPERTIES, JSON.stringify(allProperties));
+          hostProperties = allProperties.slice(0, assignCount);
+          console.log(`[StorageService] Assigned ${assignCount} listings to host ${userId}`);
+        }
         const hostPropIds = hostProperties.map(p => p.id);
         if (hostPropIds.length > 0) {
           const interestCards = createMockInterestCards(userId, hostPropIds);
