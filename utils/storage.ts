@@ -1442,7 +1442,7 @@ export const StorageService = {
 
       const { createMockNotifications, createHostMockNotifications, createAgentMockNotifications, createCompanyMockNotifications, createMockInterestCards, createMockReceivedLikes, MOCK_SAVED_PROPERTY_IDS, createMockHostConversations, createMockPreformedGroup, createMockGroupMembers, createMockGroupShortlist, createMockGroupTours } = await import('./mockSeedData');
 
-      const isHost = userRole === 'host' || hostType;
+      const isHost = userRole === 'host' || hostType === 'individual' || hostType === 'agent' || hostType === 'company';
       let mockNotifs: Notification[];
       if (hostType === 'company') {
         mockNotifs = createCompanyMockNotifications(userId);
