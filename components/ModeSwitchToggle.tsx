@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Pressable, Text, StyleSheet, Alert } from 'react-native';
+import { View, Pressable, Text, StyleSheet } from 'react-native';
 import { Feather } from './VectorIcons';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -16,20 +16,7 @@ export function ModeSwitchToggle({ compact }: ModeSwitchToggleProps) {
 
   const handlePress = (targetMode: 'renter' | 'host') => {
     if (targetMode === activeMode) return;
-
-    Alert.alert(
-      targetMode === 'host' ? 'Switch to Host Mode?' : 'Switch to Renter Mode?',
-      targetMode === 'host'
-        ? "You'll see your listings and renter inquiries. Your renter profile and matches are saved."
-        : "You'll see your renter profile and matches. Your listings are saved and still active.",
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: targetMode === 'host' ? 'Switch to Host' : 'Switch to Renter',
-          onPress: () => switchMode(targetMode),
-        },
-      ]
-    );
+    switchMode(targetMode);
   };
 
   return (
@@ -41,7 +28,7 @@ export function ModeSwitchToggle({ compact }: ModeSwitchToggleProps) {
         <Feather
           name="search"
           size={compact ? 13 : 15}
-          color={!isHost ? '#fff' : '#666'}
+          color={!isHost ? '#fff' : '#999'}
         />
         <Text style={[styles.label, !isHost && styles.labelActive, compact && styles.labelCompact]}>
           Renter
@@ -55,7 +42,7 @@ export function ModeSwitchToggle({ compact }: ModeSwitchToggleProps) {
         <Feather
           name="home"
           size={compact ? 13 : 15}
-          color={isHost ? '#fff' : '#666'}
+          color={isHost ? '#fff' : '#999'}
         />
         <Text style={[styles.label, isHost && styles.labelActive, compact && styles.labelCompact]}>
           Host
@@ -68,7 +55,7 @@ export function ModeSwitchToggle({ compact }: ModeSwitchToggleProps) {
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.12)',
     borderRadius: 20,
     padding: 3,
     alignSelf: 'center',
@@ -90,7 +77,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#666',
+    color: '#999',
   },
   labelCompact: {
     fontSize: 12,
