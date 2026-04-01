@@ -1677,7 +1677,9 @@ export async function getGroupShortlist(groupId: string): Promise<GroupShortlist
     }
 
     const listingIds = Object.keys(byListing);
-    if (listingIds.length === 0) return [];
+    if (listingIds.length === 0) {
+      return getGroupShortlistFromLocal(groupId);
+    }
 
     const { data: listings } = await supabase
       .from('listings')
@@ -1698,6 +1700,23 @@ export async function getGroupShortlist(groupId: string): Promise<GroupShortlist
       }))
       .sort((a, b) => b.like_count - a.like_count);
   } catch {
+    return getGroupShortlistFromLocal(groupId);
+  }
+}
+
+async function getGroupShortlistFromLocal(groupId: string): Promise<GroupShortlistListing[]> {
+  try {
+    const local = await AsyncStorage.getItem(`@rhome/group_shortlist_${groupId}`);
+    if (!local) return [];
+    const items = JSON.parse(local);
+    return items.map((item: any) => ({
+      listing_id: item.listing_id,
+      like_count: item.vote_count || 1,
+      liked_by: [{ user_id: item.added_by, name: 'Group Member' }],
+      listing: null,
+    }));
+  } catch (e) {
+    console.warn('[getGroupShortlist] Local fallback failed:', e);
     return [];
   }
 }
