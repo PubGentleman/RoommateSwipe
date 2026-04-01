@@ -212,6 +212,11 @@ export const MessagesScreen = () => {
             (c.id.startsWith('conv-interest-') && c.hostId === user.id) ||
             (c.isInquiryThread && c.hostId === user.id)
           );
+        } else if (isPlaceSeeker()) {
+          return (
+            (c.isInquiryThread && c.hostId !== user.id) ||
+            (c.id.startsWith('conv-interest-') && c.participant.id !== user.id)
+          );
         } else {
           return (
             (c.isInquiryThread && c.hostId !== user.id) ||
@@ -728,7 +733,7 @@ export const MessagesScreen = () => {
   const renderHeader = () => {
     const showAI = chatFilter === 'all';
     const showInquiries = (chatFilter === 'all' || chatFilter === 'groups') && inquiryGroups.length > 0;
-    const showMatches = (chatFilter === 'all' || chatFilter === 'people') && !isHostMode && newMatches.length > 0;
+    const showMatches = (chatFilter === 'all' || chatFilter === 'people') && !isHostMode && !isPlaceSeeker() && newMatches.length > 0;
 
     return (
       <View>
@@ -867,9 +872,10 @@ export const MessagesScreen = () => {
     return convs;
   })();
 
+  const placeSeekerMode = isPlaceSeeker();
   const FILTER_TABS: { key: ChatFilterKey; label: string; count: number }[] = [
     { key: 'all',    label: 'All',     count: totalUnread },
-    { key: 'people', label: 'People',  count: peopleUnread },
+    ...(!placeSeekerMode ? [{ key: 'people' as ChatFilterKey, label: 'People', count: peopleUnread }] : []),
     { key: 'direct', label: 'Direct',  count: directUnread },
     { key: 'groups', label: 'Groups',  count: groupUnread },
   ];
