@@ -2421,18 +2421,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .eq('company_user_id', user.id)
         .neq('status', 'removed')
         .order('created_at', { ascending: true });
-      if (error || !data) return [];
-      return data.map((d: any) => ({
-        id: d.id,
-        companyUserId: d.company_user_id,
-        memberUserId: d.member_user_id ?? undefined,
-        email: d.email,
-        fullName: d.full_name ?? undefined,
-        role: d.role,
-        status: d.status,
-        invitedAt: d.invited_at,
-        joinedAt: d.joined_at ?? undefined,
-      }));
+      if (!error && data && data.length > 0) {
+        return data.map((d: any) => ({
+          id: d.id,
+          companyUserId: d.company_user_id,
+          memberUserId: d.member_user_id ?? undefined,
+          email: d.email,
+          fullName: d.full_name ?? undefined,
+          role: d.role,
+          status: d.status,
+          invitedAt: d.invited_at,
+          joinedAt: d.joined_at ?? undefined,
+        }));
+      }
     }
     try {
       const localData = await AsyncStorage.getItem(`@rhome/team_members_${user.id}`);
