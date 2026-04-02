@@ -89,7 +89,7 @@ function getPairBreakdown(a: AgentRenter, b: AgentRenter): PairBreakdown[] {
     items.push({
       label: 'Budget',
       icon: 'dollar-sign',
-      status: overlap ? 'match' : 'neutral',
+      status: overlap ? 'match' : 'mismatch',
       detail: `$${a.budgetMin}-${aMax} vs $${b.budgetMin}-${bMax}`,
     });
   }

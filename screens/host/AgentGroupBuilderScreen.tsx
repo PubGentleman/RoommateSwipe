@@ -22,6 +22,7 @@ import {
   calculatePairCompatibility,
 } from '../../services/agentMatchmakerService';
 import { canAgentCreateGroup, getAgentPlanLimits, type AgentPlan } from '../../constants/planLimits';
+import { resolveEffectiveAgentPlan } from '../../utils/planResolver';
 import { useAgentPairing } from '../../hooks/useAgentPairing';
 
 const BG = '#111';
@@ -55,11 +56,7 @@ export const AgentGroupBuilderScreen = () => {
   const [compatibleRenters, setCompatibleRenters] = useState<(AgentRenter & { avgScore: number })[]>([]);
   const [loadingCompatible, setLoadingCompatible] = useState(false);
 
-  const rawAgentPlan = user?.agentPlan || (user as any)?.agent_plan || '';
-  const subPlan = user?.hostSubscription?.plan || '';
-  const resolvedPlan = (rawAgentPlan && rawAgentPlan !== 'pay_per_use' && rawAgentPlan !== 'free') ? rawAgentPlan : subPlan;
-  const normalizedPlan = (resolvedPlan || '').replace(/^(agent_|company_)/, '');
-  const agentPlan: AgentPlan = (normalizedPlan || 'pay_per_use') as AgentPlan;
+  const agentPlan = resolveEffectiveAgentPlan(user) as AgentPlan;
   const planLimits = getAgentPlanLimits(agentPlan);
   const { getPairing, loading: pairingLoading, result: pairingResult, error: pairingError, reset: resetPairing } = useAgentPairing();
 

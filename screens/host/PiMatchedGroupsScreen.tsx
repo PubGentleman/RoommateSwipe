@@ -236,7 +236,7 @@ export const PiMatchedGroupsScreen = () => {
 
   const handleContactPreformedGroup = (group: PiAutoGroup) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    navigation.navigate('Chat' as never, { groupId: group.id } as never);
+    navigation.navigate('Chat' as never, { conversationId: `group-${group.id}` } as never);
   };
 
   const handleClaimGroup = async (group: PiAutoGroup) => {

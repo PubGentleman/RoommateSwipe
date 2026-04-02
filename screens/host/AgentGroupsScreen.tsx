@@ -17,6 +17,7 @@ import {
   getMonthlyPlacementCount,
 } from '../../services/agentMatchmakerService';
 import { getAgentPlanLimits, canAgentPlace, type AgentPlan } from '../../constants/planLimits';
+import { resolveEffectiveAgentPlan } from '../../utils/planResolver';
 
 const BG = '#111';
 const CARD_BG = '#1a1a1a';
@@ -46,8 +47,7 @@ export const AgentGroupsScreen = () => {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
-  const agentPlanResolved = (user?.agentPlan || (user?.hostSubscription?.plan || '').replace(/^(agent_|company_)/, '') || 'pay_per_use') as AgentPlan;
-  const agentPlan = agentPlanResolved;
+  const agentPlan = resolveEffectiveAgentPlan(user) as AgentPlan;
   const planLimits = getAgentPlanLimits(agentPlan);
 
   useFocusEffect(
@@ -235,7 +235,7 @@ export const AgentGroupsScreen = () => {
         <Text style={styles.title}>My Groups</Text>
         <Pressable
           style={styles.newGroupBtn}
-          onPress={() => navigation.navigate('BrowseRenters')}
+          onPress={() => navigation.navigate('AgentGroupBuilder')}
         >
           <Feather name="plus" size={16} color="#fff" />
           <Text style={styles.newGroupText}>New</Text>
@@ -267,7 +267,11 @@ export const AgentGroupsScreen = () => {
           </Text>
           <Pressable
             style={styles.startBtn}
-            onPress={() => navigation.navigate('BrowseRenters')}
+            onPress={() => {
+              const parent = navigation.getParent();
+              if (parent) parent.navigate('BrowseRenters');
+              else navigation.navigate('BrowseRenters' as never);
+            }}
           >
             <Text style={styles.startBtnText}>Browse Renters</Text>
           </Pressable>

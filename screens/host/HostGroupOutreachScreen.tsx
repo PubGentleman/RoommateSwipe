@@ -25,8 +25,9 @@ interface Props {
 }
 
 export function HostGroupOutreachScreen({ route, navigation }: Props) {
-  const { listingId, listingTitle } = route.params;
+  const { listingId, listingTitle } = route.params || {};
   const { theme } = useTheme();
+
   const { user } = useAuth();
   const { alert: showAlert } = useConfirm();
   const { presentOutreachPayment } = useOutreachPayment();
@@ -45,6 +46,7 @@ export function HostGroupOutreachScreen({ route, navigation }: Props) {
 
   useEffect(() => {
     async function load() {
+      if (!listingId) { setLoading(false); return; }
       try {
         const [groupData, status, contacted] = await Promise.all([
           getGroupsForListing(listingId),

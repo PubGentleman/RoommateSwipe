@@ -40,6 +40,7 @@ import {
   removeFromShortlist as companyRemoveFromShortlist,
 } from '../../services/companyMatchmakerService';
 import { NEIGHBORHOOD_TRAINS } from '../../constants/transitData';
+import { resolveEffectiveAgentPlan } from '../../utils/planResolver';
 
 const BG = '#111';
 const CARD_BG = '#1a1a1a';
@@ -78,11 +79,7 @@ export const BrowseRentersScreen = () => {
   const [piQuotaLimit, setPiQuotaLimit] = useState(0);
   const piRequestId = useRef(0);
 
-  const rawAgentPlan = user?.agentPlan || (user as any)?.agent_plan || '';
-  const subPlan = user?.hostSubscription?.plan || '';
-  const resolvedPlan = (rawAgentPlan && rawAgentPlan !== 'pay_per_use' && rawAgentPlan !== 'free') ? rawAgentPlan : subPlan;
-  const basePlan = (resolvedPlan || '').replace(/^(agent_|company_)/, '');
-  const agentPlan: AgentPlan = (basePlan || 'pay_per_use') as AgentPlan;
+  const agentPlan = resolveEffectiveAgentPlan(user) as AgentPlan;
   const planLimits = getAgentPlanLimits(agentPlan);
 
   useFocusEffect(
@@ -129,7 +126,7 @@ export const BrowseRentersScreen = () => {
           return scoreB - scoreA;
         });
         mapped = renterData.map((u: any) => {
-          const p = Array.isArray(u.profile) ? u.profile[0] : u.profile;
+          const p = Array.isArray(u.profile) ? (u.profile[0] ?? null) : (u.profile ?? null);
           return {
             id: u.id,
             name: u.full_name || 'Unknown',
@@ -154,7 +151,7 @@ export const BrowseRentersScreen = () => {
         });
 
         profiles = renterData.map((u: any) => {
-          const p = Array.isArray(u.profile) ? u.profile[0] : u.profile;
+          const p = Array.isArray(u.profile) ? (u.profile[0] ?? null) : (u.profile ?? null);
           return {
             id: u.id,
             name: u.full_name || 'Unknown',
@@ -279,6 +276,7 @@ export const BrowseRentersScreen = () => {
       }
     } catch (e) {
       console.warn('[BrowseRenters] Load error:', e);
+      showAlert({ title: 'Load Error', message: 'Failed to load renters. Pull down to retry.' });
     }
     setLoading(false);
   };
@@ -374,36 +372,35 @@ export const BrowseRentersScreen = () => {
 
   const isCompanyHost = user?.hostType === 'company';
 
+  const shortlistingRef = useRef(new Set<string>());
   const handleShortlist = async (renter: AgentRenter) => {
     if (!user) return;
+    if (shortlistingRef.current.has(renter.id)) return;
+    shortlistingRef.current.add(renter.id);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    if (shortlistedIds.has(renter.id)) {
-      try {
+    try {
+      if (shortlistedIds.has(renter.id)) {
         await removeFromShortlist(user.id, renter.id);
         if (isCompanyHost) {
-          await companyRemoveFromShortlist(user.id, renter.id, selectedListing?.id);
+          try { await companyRemoveFromShortlist(user.id, renter.id, selectedListing?.id); } catch {}
         }
         setShortlistedIds(prev => {
           const next = new Set(prev);
           next.delete(renter.id);
           return next;
         });
-      } catch (e) {
-        console.error('[BrowseRenters] Remove shortlist error:', e);
+        return;
       }
-      return;
-    }
 
-    if (!canAgentShortlist(agentPlan, shortlistedIds.size)) {
-      showAlert({
-        title: 'Shortlist Limit Reached',
-        message: `Your ${planLimits.label} plan allows up to ${planLimits.shortlistLimit} shortlisted renters. Upgrade to shortlist more.`,
-      });
-      return;
-    }
+      if (!canAgentShortlist(agentPlan, shortlistedIds.size)) {
+        showAlert({
+          title: 'Shortlist Limit Reached',
+          message: `Your ${planLimits.label} plan allows up to ${planLimits.shortlistLimit} shortlisted renters. Upgrade to shortlist more.`,
+        });
+        return;
+      }
 
-    try {
       const result = await addToShortlist(user.id, renter.id, selectedListing?.id);
       if (!result.success) {
         if (result.error) {
@@ -412,11 +409,13 @@ export const BrowseRentersScreen = () => {
         return;
       }
       if (isCompanyHost) {
-        await companyShortlistRenter(user.id, renter.id, selectedListing?.id);
+        try { await companyShortlistRenter(user.id, renter.id, selectedListing?.id); } catch {}
       }
       setShortlistedIds(prev => new Set(prev).add(renter.id));
     } catch (e) {
       console.error('[BrowseRenters] Shortlist error:', e);
+    } finally {
+      shortlistingRef.current.delete(renter.id);
     }
   };
 
@@ -754,7 +753,11 @@ export const BrowseRentersScreen = () => {
             </Text>
           </View>
           {piQuotaLimit !== -1 && piQuotaUsed >= piQuotaLimit ? (
-            <Pressable onPress={() => navigation.navigate('HostSubscription')}>
+            <Pressable onPress={() => {
+              const parent = navigation.getParent();
+              if (parent) parent.navigate('Dashboard', { screen: 'HostSubscription' });
+              else navigation.navigate('HostSubscription' as never);
+            }}>
               <Text style={{ color: '#a855f7', fontSize: 11, fontWeight: '700' }}>Upgrade</Text>
             </Pressable>
           ) : null}

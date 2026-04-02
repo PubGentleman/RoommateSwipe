@@ -36,6 +36,7 @@ export const InviteExistingRoommatesScreen = () => {
   const [creating, setCreating] = useState(false);
 
   const loadRoommates = useCallback(async () => {
+    if (!listingId) { setLoading(false); return; }
     try {
       const existing = await getExistingRoommatesForListing(listingId);
       if (existing.length > 0) {
