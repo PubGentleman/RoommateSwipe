@@ -449,6 +449,9 @@ export const ProfileQuestionnaireScreen = () => {
   const [photos, setPhotos] = useState<string[]>(user?.photos || (user?.profilePicture ? [user.profilePicture] : []));
   const [name, setName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
+  const [licenseNumber, setLicenseNumber] = useState(user?.licenseNumber || '');
+  const [agencyName, setAgencyName] = useState(user?.agencyName || '');
+  const [licensePhoto, setLicensePhoto] = useState<string | null>(user?.licenseDocumentUrl || null);
   const [birthday, setBirthday] = useState(user?.birthday || '');
   const [birthdayError, setBirthdayError] = useState('');
   const [showBirthdayPicker, setShowBirthdayPicker] = useState(false);
@@ -640,6 +643,11 @@ export const ProfileQuestionnaireScreen = () => {
       zodiacSign,
       photos: photos.length > 0 ? photos : user?.photos,
       profilePicture: photos[0] || user?.profilePicture,
+      ...(isHostProfessional ? {
+        licenseNumber: licenseNumber.trim() || undefined,
+        agencyName: agencyName.trim() || undefined,
+        licenseDocumentUrl: licensePhoto || undefined,
+      } : {}),
       profileData: {
         ...user?.profileData,
         bio: bio.trim() || undefined,
@@ -888,6 +896,76 @@ export const ProfileQuestionnaireScreen = () => {
                 </ThemedText>
               </View>
             </View>
+            {isHostProfessional ? (
+              <>
+                {renderSubSectionHeader('Agent License Info')}
+                <View style={styles.inputGroup}>
+                  <ThemedText style={styles.inputLabel}>Agency / Brokerage Name</ThemedText>
+                  <TextInput
+                    style={styles.textInput}
+                    value={agencyName}
+                    onChangeText={setAgencyName}
+                    placeholder="e.g. Compass, Corcoran, Keller Williams"
+                    placeholderTextColor="rgba(255,255,255,0.25)"
+                  />
+                </View>
+                <View style={styles.inputGroup}>
+                  <ThemedText style={styles.inputLabel}>License Number</ThemedText>
+                  <TextInput
+                    style={styles.textInput}
+                    value={licenseNumber}
+                    onChangeText={setLicenseNumber}
+                    placeholder="e.g. 10401234567"
+                    placeholderTextColor="rgba(255,255,255,0.25)"
+                    autoCapitalize="characters"
+                  />
+                </View>
+                <View style={styles.inputGroup}>
+                  <ThemedText style={styles.inputLabel}>License Photo</ThemedText>
+                  <ThemedText style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>
+                    Upload a photo of your real estate license for verification
+                  </ThemedText>
+                  {licensePhoto ? (
+                    <View style={{ borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#2a2a2a' }}>
+                      <Image source={{ uri: licensePhoto }} style={{ width: '100%', height: 180, borderRadius: 12 }} contentFit="cover" />
+                      <View style={{ flexDirection: 'row', gap: 10, marginTop: 10, marginBottom: 4 }}>
+                        <Pressable
+                          style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#1a1a1a', borderRadius: 8, paddingVertical: 10, borderWidth: 1, borderColor: '#333' }}
+                          onPress={async () => {
+                            const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 0.8 });
+                            if (!result.canceled && result.assets[0]) { setLicensePhoto(result.assets[0].uri); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }
+                          }}
+                        >
+                          <Feather name="refresh-cw" size={14} color="#a855f7" />
+                          <ThemedText style={{ fontSize: 13, color: '#a855f7', fontWeight: '600' }}>Replace</ThemedText>
+                        </Pressable>
+                        <Pressable
+                          style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#1a1a1a', borderRadius: 8, paddingVertical: 10, borderWidth: 1, borderColor: '#333' }}
+                          onPress={() => { setLicensePhoto(null); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+                        >
+                          <Feather name="trash-2" size={14} color="#ff6b5b" />
+                          <ThemedText style={{ fontSize: 13, color: '#ff6b5b', fontWeight: '600' }}>Remove</ThemedText>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ) : (
+                    <Pressable
+                      style={{ borderWidth: 1, borderColor: '#333', borderStyle: 'dashed', borderRadius: 12, paddingVertical: 30, alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#1a1a1a' }}
+                      onPress={async () => {
+                        const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 0.8 });
+                        if (!result.canceled && result.assets[0]) { setLicensePhoto(result.assets[0].uri); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }
+                      }}
+                    >
+                      <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#a855f7' + '15', alignItems: 'center', justifyContent: 'center' }}>
+                        <Feather name="upload" size={22} color="#a855f7" />
+                      </View>
+                      <ThemedText style={{ fontSize: 14, color: '#a855f7', fontWeight: '600' }}>Upload License Photo</ThemedText>
+                      <ThemedText style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>JPG, PNG supported</ThemedText>
+                    </Pressable>
+                  )}
+                </View>
+              </>
+            ) : null}
           </View>
         );
 
