@@ -100,6 +100,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [leakageDetected, setLeakageDetected] = useState(false);
   const [showChatActions, setShowChatActions] = useState(false);
   const [showVisitModal, setShowVisitModal] = useState(false);
+  const [counterProposalMessageId, setCounterProposalMessageId] = useState<string | null>(null);
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [cardActionLoading, setCardActionLoading] = useState<string | null>(null);
   const [chatAgentInfo, setChatAgentInfo] = useState<{ name?: string; isVerifiedAgent?: boolean; companyName?: string } | null>(null);
@@ -894,6 +895,17 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         );
         if (result?.id) dbId = result.id;
       } catch (_e) {}
+      if (counterProposalMessageId) {
+        try {
+          await updateMessageMetadata(counterProposalMessageId, { status: 'counter_proposed' });
+          setMessages(prev => prev.map(m =>
+            m.id === counterProposalMessageId
+              ? { ...m, metadata: { ...(m as any).metadata, status: 'counter_proposed' } }
+              : m
+          ));
+        } catch (_e) {}
+        setCounterProposalMessageId(null);
+      }
       const newMsg: Message = {
         id: dbId,
         senderId: user.id,
@@ -991,6 +1003,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   };
 
   const handleProposeNewTime = (messageId: string, _metadata: any) => {
+    setCounterProposalMessageId(messageId);
     setShowVisitModal(true);
   };
 
@@ -1962,7 +1975,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
 
       <VisitRequestModal
         visible={showVisitModal}
-        onClose={() => setShowVisitModal(false)}
+        onClose={() => { setShowVisitModal(false); setCounterProposalMessageId(null); }}
         onSubmit={handleSendVisitRequest}
         address={addressRevealed
           ? (inquiryGroup?.listingAddress || 'Address pending')

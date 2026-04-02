@@ -46,6 +46,8 @@ import { WriteReviewSheet } from '../../components/WriteReviewSheet';
 import { HostReviewsScreen } from '../shared/HostReviewsScreen';
 import { getReviewSummary, submitReview, checkReviewEligibility, ReviewSummary } from '../../services/reviewService';
 import { ReportBlockModal } from '../../components/ReportBlockModal';
+import { InquiryModal } from '../../components/InquiryModal';
+import { VisitRequestModal } from '../../components/VisitRequestModal';
 import { reportListing, reportUser, blockUser as blockUserRemote } from '../../services/moderationService';
 
 import { useNotificationContext } from '../../contexts/NotificationContext';
@@ -180,6 +182,8 @@ export const ExploreScreen = () => {
   const [areaInfoListingId, setAreaInfoListingId] = useState<string | null>(null);
   const [showListingReport, setShowListingReport] = useState(false);
   const [showHostReport, setShowHostReport] = useState(false);
+  const [showInquiryModal, setShowInquiryModal] = useState(false);
+  const [showTourModal, setShowTourModal] = useState(false);
   const [areaDetailModal, setAreaDetailModal] = useState<{
     visible: boolean;
     category: 'transit' | 'restaurants' | 'grocery' | 'laundry' | 'parks' | null;
@@ -2330,6 +2334,13 @@ export const ExploreScreen = () => {
                       <Feather name="flag" size={16} color="#fff" />
                     </Pressable>
                     <Pressable
+                      style={[styles.pdFlagBtn, saved.has(selectedProperty.id) && { backgroundColor: 'rgba(255,107,91,0.85)' }]}
+                      onPress={() => { if (selectedProperty) toggleSave(selectedProperty.id); }}
+                      hitSlop={8}
+                    >
+                      <Feather name="bookmark" size={16} color={saved.has(selectedProperty.id) ? '#fff' : '#fff'} />
+                    </Pressable>
+                    <Pressable
                       style={styles.pdCloseBtn}
                       onPress={() => setShowPropertyDetail(false)}
                       hitSlop={8}
@@ -2854,6 +2865,68 @@ export const ExploreScreen = () => {
                       ) : null}
                     </View>
 
+                    {(() => {
+                      const nearbyListings = properties.filter(p =>
+                        p.id !== selectedProperty.id &&
+                        (p.neighborhood === selectedProperty.neighborhood || p.city === selectedProperty.city) &&
+                        Math.abs((p.price || 0) - (selectedProperty.price || 0)) < (selectedProperty.price || 1) * 0.4
+                      ).slice(0, 4);
+                      if (nearbyListings.length === 0) return null;
+                      return (
+                        <View style={styles.pdSection}>
+                          <Text style={styles.pdSectionTitle}>Similar Listings Nearby</Text>
+                          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingRight: 8 }}>
+                            {nearbyListings.map(nl => (
+                              <Pressable
+                                key={nl.id}
+                                style={styles.pdNearbyCard}
+                                onPress={() => {
+                                  setSelectedProperty(nl);
+                                  setPhotoIndex(0);
+                                  setAreaInfoListingId(null);
+                                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                }}
+                              >
+                                <Image
+                                  source={{ uri: nl.photos?.[0] || 'https://via.placeholder.com/160x100' }}
+                                  style={styles.pdNearbyPhoto}
+                                  resizeMode="cover"
+                                />
+                                <View style={styles.pdNearbyInfo}>
+                                  <Text style={styles.pdNearbyPrice}>${nl.price?.toLocaleString()}/mo</Text>
+                                  <Text style={styles.pdNearbyTitle} numberOfLines={1}>{nl.title}</Text>
+                                  <Text style={styles.pdNearbySub}>{nl.bedrooms}BR / {nl.bathrooms}BA</Text>
+                                </View>
+                              </Pressable>
+                            ))}
+                          </ScrollView>
+                        </View>
+                      );
+                    })()}
+
+                    <View style={styles.pdQuickActions}>
+                      <Pressable
+                        style={styles.pdQuickActionBtn}
+                        onPress={() => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          setShowTourModal(true);
+                        }}
+                      >
+                        <Feather name="calendar" size={16} color="#ff6b5b" />
+                        <Text style={styles.pdQuickActionText}>Schedule Tour</Text>
+                      </Pressable>
+                      <Pressable
+                        style={styles.pdQuickActionBtn}
+                        onPress={() => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          setShowInquiryModal(true);
+                        }}
+                      >
+                        <Feather name="mail" size={16} color="#ff6b5b" />
+                        <Text style={styles.pdQuickActionText}>Send Inquiry</Text>
+                      </Pressable>
+                    </View>
+
                     <View style={{ height: 100 }} />
                   </>
                 );
@@ -3045,6 +3118,41 @@ export const ExploreScreen = () => {
           </View>
         </View>
       </Modal>
+
+      {selectedProperty ? (
+        <InquiryModal
+          visible={showInquiryModal}
+          onClose={() => setShowInquiryModal(false)}
+          onSubmit={async (data) => {
+            try {
+              const interest = interestMap.get(selectedProperty.id);
+              if (!interest) {
+                handleInterestPress();
+              }
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            } catch {}
+          }}
+          listingTitle={selectedProperty.title}
+          listingPrice={selectedProperty.price}
+          hasGroup={eligibleGroups.length > 0}
+          groupName={eligibleGroups[0]?.name}
+          groupSize={eligibleGroups[0]?.members?.length || 1}
+        />
+      ) : null}
+
+      {selectedProperty ? (
+        <VisitRequestModal
+          visible={showTourModal}
+          onClose={() => setShowTourModal(false)}
+          onSubmit={async (data) => {
+            try {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              setShowTourModal(false);
+            } catch {}
+          }}
+          address={selectedProperty.address || formatLocation(selectedProperty)}
+        />
+      ) : null}
 
       <ReportBlockModal
         visible={showListingReport}
@@ -5499,5 +5607,57 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: 'rgba(255,255,255,0.35)',
     lineHeight: 18,
+  },
+  pdNearbyCard: {
+    width: 160,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 12,
+    overflow: 'hidden' as const,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  pdNearbyPhoto: {
+    width: 160,
+    height: 100,
+  },
+  pdNearbyInfo: {
+    padding: 10,
+  },
+  pdNearbyPrice: {
+    color: '#ff6b5b',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  pdNearbyTitle: {
+    color: '#fff',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  pdNearbySub: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  pdQuickActions: {
+    flexDirection: 'row' as const,
+    gap: 10,
+    marginTop: 16,
+  },
+  pdQuickActionBtn: {
+    flex: 1,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,107,91,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,91,0.15)',
+  },
+  pdQuickActionText: {
+    color: '#ff6b5b',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

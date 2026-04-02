@@ -19,6 +19,9 @@ import {
 } from '../../services/piAutoMatchService';
 import { supabase } from '../../lib/supabase';
 import { getAutoClaimLimits, type AgentPlan } from '../../constants/planLimits';
+import { StorageService } from '../../utils/storage';
+import { Property } from '../../types/models';
+import { Image } from 'expo-image';
 
 const BG = '#111';
 const CARD_BG = '#1a1a1a';
@@ -53,6 +56,8 @@ export const PiMatchedGroupsScreen = () => {
   const [budgetMaxFilter, setBudgetMaxFilter] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('score');
   const [acceptanceProgress, setAcceptanceProgress] = useState<Record<string, { total: number; accepted: number; pending: number }>>({});
+  const [agentListings, setAgentListings] = useState<Property[]>([]);
+  const [groupListingMatches, setGroupListingMatches] = useState<Record<string, Property[]>>({});
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [tempCity, setTempCity] = useState('');
   const [tempNeighborhood, setTempNeighborhood] = useState('');
@@ -106,6 +111,32 @@ export const PiMatchedGroupsScreen = () => {
         limits.freePerMonth === -1 ? -1 : Math.max(0, limits.freePerMonth - usage.free)
       );
 
+      let myListings: Property[] = [];
+      try {
+        const { data: supaListings } = await supabase
+          .from('listings')
+          .select('*')
+          .eq('created_by', user.id)
+          .eq('is_active', true)
+          .eq('is_rented', false);
+        if (supaListings && supaListings.length > 0) {
+          myListings = supaListings.map((l: any) => ({
+            id: l.id, title: l.title, price: l.rent || l.price || 0,
+            bedrooms: l.bedrooms, bathrooms: l.bathrooms, city: l.city,
+            neighborhood: l.neighborhood, address: l.address,
+            photos: l.photos || [], amenities: l.amenities || [],
+            available: l.is_active, hostId: l.created_by,
+          } as Property));
+        } else {
+          const props = await StorageService.getProperties();
+          myListings = props.filter(p => p.hostId === user.id && p.available !== false);
+        }
+      } catch { 
+        const props = await StorageService.getProperties();
+        myListings = props.filter(p => p.hostId === user.id && p.available !== false);
+      }
+      setAgentListings(myListings);
+
       let allGroups = [...available, ...preformedAsAuto];
       if (passedListing?.bedrooms) {
         allGroups = allGroups.filter(g =>
@@ -113,6 +144,22 @@ export const PiMatchedGroupsScreen = () => {
           g.member_count === passedListing.bedrooms
         );
       }
+
+      const matchMap: Record<string, Property[]> = {};
+      for (const group of allGroups) {
+        const matched = myListings.filter(listing => {
+          const bedroomMatch = listing.bedrooms === group.max_members || listing.bedrooms === group.member_count;
+          const listingPrice = listing.price || 0;
+          const perPersonCost = listing.bedrooms > 0 ? Math.ceil(listingPrice / listing.bedrooms) : listingPrice;
+          const budgetMatch = !group.budget_max || !group.budget_min || (
+            perPersonCost <= group.budget_max * 1.1 && perPersonCost >= group.budget_min * 0.7
+          );
+          return bedroomMatch && budgetMatch;
+        });
+        if (matched.length > 0) matchMap[group.id] = matched;
+      }
+      setGroupListingMatches(matchMap);
+
       setGroups(allGroups);
       applyFiltersAndSort(allGroups, sizeFilter, sortBy, neighborhoodFilter, budgetMinFilter, budgetMaxFilter);
 
@@ -430,6 +477,40 @@ export const PiMatchedGroupsScreen = () => {
             <Text style={styles.infoText} numberOfLines={1}>
               Near: {item.location_preferences.slice(0, 3).join(', ')}
             </Text>
+          </View>
+        ) : null}
+
+        {groupListingMatches[item.id] && groupListingMatches[item.id].length > 0 ? (
+          <View style={{ backgroundColor: '#0d1117', borderRadius: 8, padding: 10, marginTop: 8, borderWidth: 1, borderColor: ACCENT + '25' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+              <Feather name="home" size={12} color={ACCENT} />
+              <Text style={{ color: ACCENT, fontSize: 12, fontWeight: '600' }}>
+                Matches {groupListingMatches[item.id].length} of your listing{groupListingMatches[item.id].length > 1 ? 's' : ''}
+              </Text>
+            </View>
+            {groupListingMatches[item.id].slice(0, 2).map(listing => (
+              <View key={listing.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                {listing.photos && listing.photos.length > 0 ? (
+                  <Image source={{ uri: listing.photos[0] }} style={{ width: 32, height: 32, borderRadius: 6 }} />
+                ) : (
+                  <View style={{ width: 32, height: 32, borderRadius: 6, backgroundColor: '#222', alignItems: 'center', justifyContent: 'center' }}>
+                    <Feather name="home" size={14} color="#555" />
+                  </View>
+                )}
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: '500' }} numberOfLines={1}>{listing.title}</Text>
+                  <Text style={{ color: '#888', fontSize: 11 }}>{listing.bedrooms}BR · ${listing.price ? listing.price.toLocaleString() : '?'}/mo</Text>
+                </View>
+              </View>
+            ))}
+            {groupListingMatches[item.id].length > 2 ? (
+              <Text style={{ color: '#666', fontSize: 11, marginTop: 2 }}>+{groupListingMatches[item.id].length - 2} more</Text>
+            ) : null}
+          </View>
+        ) : agentListings.length > 0 ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, opacity: 0.5 }}>
+            <Feather name="alert-circle" size={11} color="#888" />
+            <Text style={{ color: '#888', fontSize: 11 }}>No matching listings for this group</Text>
           </View>
         ) : null}
 
