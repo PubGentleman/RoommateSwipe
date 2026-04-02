@@ -478,17 +478,19 @@ export const BrowseRentersScreen = () => {
               </Text>
             ) : null}
           </View>
-          <Pressable
-            onPress={() => optedOut ? showAlert({ title: 'Not Available', message: 'This renter is not accepting offers from agents.' }) : handleShortlist(item)}
-            style={[styles.shortlistBtn, isShortlisted ? styles.shortlistBtnActive : null]}
-            disabled={optedOut && !isShortlisted}
-          >
-            <Feather
-              name="heart"
-              size={20}
-              color={optedOut ? '#444' : isShortlisted ? ACCENT : '#666'}
-            />
-          </Pressable>
+          {!wantsEntire ? (
+            <Pressable
+              onPress={() => optedOut ? showAlert({ title: 'Not Available', message: 'This renter is not accepting offers from agents.' }) : handleShortlist(item)}
+              style={[styles.shortlistBtn, isShortlisted ? styles.shortlistBtnActive : null]}
+              disabled={optedOut && !isShortlisted}
+            >
+              <Feather
+                name="heart"
+                size={20}
+                color={optedOut ? '#444' : isShortlisted ? ACCENT : '#666'}
+              />
+            </Pressable>
+          ) : null}
         </View>
 
         <View style={styles.tagRow}>
@@ -742,22 +744,24 @@ export const BrowseRentersScreen = () => {
 
       <View style={styles.statsRow}>
         <Text style={styles.statsText}>{filteredRenters.length} renters{user?.city ? ` in ${user.city}` : ''}</Text>
-        <Pressable
-          onPress={() => {
-            if (planLimits.hasCompatibilityMatrix && shortlistedIds.size >= 2) {
-              const shortlisted = renters.filter(r => shortlistedIds.has(r.id));
-              navigation.navigate('RenterCompatibility', { renters: shortlisted, listingId: selectedListing?.id });
-            } else if (!planLimits.hasCompatibilityMatrix) {
-              showAlert({ title: 'Pro Feature', message: 'Compatibility Matrix is available on Pro and Business plans.' });
-            } else {
-              showAlert({ title: 'Need More Renters', message: 'Shortlist at least 2 renters to view the compatibility matrix.' });
-            }
-          }}
-          style={styles.matrixBtn}
-        >
-          <Feather name="grid" size={14} color={ACCENT} />
-          <Text style={styles.matrixBtnText}>Matrix ({shortlistedIds.size})</Text>
-        </Pressable>
+        {roomTypeFilter !== 'entire_apartment' ? (
+          <Pressable
+            onPress={() => {
+              if (planLimits.hasCompatibilityMatrix && shortlistedIds.size >= 2) {
+                const shortlisted = renters.filter(r => shortlistedIds.has(r.id));
+                navigation.navigate('RenterCompatibility', { renters: shortlisted, listingId: selectedListing?.id });
+              } else if (!planLimits.hasCompatibilityMatrix) {
+                showAlert({ title: 'Pro Feature', message: 'Compatibility Matrix is available on Pro and Business plans.' });
+              } else {
+                showAlert({ title: 'Need More Renters', message: 'Shortlist at least 2 renters to view the compatibility matrix.' });
+              }
+            }}
+            style={styles.matrixBtn}
+          >
+            <Feather name="grid" size={14} color={ACCENT} />
+            <Text style={styles.matrixBtnText}>Matrix ({shortlistedIds.size})</Text>
+          </Pressable>
+        ) : null}
       </View>
 
       {transitFilterSummary && selectedListing ? (
