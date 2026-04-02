@@ -557,7 +557,7 @@ export const HostDashboardScreen = () => {
       <Animated.View style={dashCollapsibleStyle}>
         <View style={{ paddingHorizontal: 20, paddingBottom: 6 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Text style={styles.greetingSub}>{getGreeting()}</Text>
+            <Text style={styles.greetingSub}>{getGreeting()}{user?.city ? ` \u00B7 ${user.city}` : ''}</Text>
             {hostSub ? <HostPlanBadge plan={hostSub.plan} isVerifiedAgent={hostSub.isVerifiedAgent} /> : null}
           </View>
           {hostSub ? (

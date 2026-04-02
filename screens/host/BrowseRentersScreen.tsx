@@ -94,7 +94,7 @@ export const BrowseRentersScreen = () => {
       let myListings: Property[] = [];
 
       if (isSupabaseConfigured) {
-        const { data: supaRenters } = await supabase
+        let query = supabase
           .from('users')
           .select(`
             id, full_name, avatar_url, age, city, occupation, last_active_at, bio, gender,
@@ -110,6 +110,12 @@ export const BrowseRentersScreen = () => {
           .eq('onboarding_step', 'complete')
           .neq('id', user?.id || '')
           .limit(100);
+
+        if (user?.city) {
+          query = query.eq('city', user.city);
+        }
+
+        const { data: supaRenters } = await query;
 
         const renterData = (supaRenters || []).filter((u: any) => isWithinActivityCutoff(u.last_active_at));
         renterData.sort((a: any, b: any) => {
@@ -226,6 +232,14 @@ export const BrowseRentersScreen = () => {
 
         const props = await StorageService.getProperties();
         myListings = props.filter(p => p.hostId === user?.id && p.available);
+      }
+
+      if (user?.city) {
+        const agentCityLower = user.city.toLowerCase();
+        mapped = mapped.filter(r =>
+          r.city?.toLowerCase().includes(agentCityLower) ||
+          r.preferredNeighborhoods?.some(n => n.toLowerCase().includes(agentCityLower))
+        );
       }
 
       setAllProfiles(profiles);
@@ -651,7 +665,7 @@ export const BrowseRentersScreen = () => {
       ) : null}
 
       <View style={styles.statsRow}>
-        <Text style={styles.statsText}>{filteredRenters.length} renters</Text>
+        <Text style={styles.statsText}>{filteredRenters.length} renters{user?.city ? ` in ${user.city}` : ''}</Text>
         <Pressable
           onPress={() => {
             if (planLimits.hasCompatibilityMatrix && shortlistedIds.size >= 2) {
