@@ -523,6 +523,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const fallbackUser = await StorageService.getCurrentUser();
         if (fallbackUser) {
           StorageService.seedUserSpecificMockData(fallbackUser.id, fallbackUser.name, fallbackUser.role, fallbackUser.hostType).catch(() => {});
+          if (fallbackUser.hostType === 'agent' && !fallbackUser.licenseNumber) {
+            fallbackUser.licenseNumber = 'NY-10987654';
+            fallbackUser.agencyName = 'Premier Realty Group';
+            fallbackUser.licenseState = 'NY';
+            await StorageService.setCurrentUser(fallbackUser);
+          }
           setUser(fallbackUser);
         }
       } catch {

@@ -1432,6 +1432,15 @@ export const StorageService = {
         }
         await AsyncStorage.setItem(shortlistKey, JSON.stringify(existingShortlists));
         console.log('[StorageService] Seeded agent shortlists (merged)');
+
+        const currentUser = await this.getCurrentUser();
+        if (currentUser && currentUser.id === userId && !currentUser.licenseNumber) {
+          currentUser.licenseNumber = 'NY-10987654';
+          currentUser.agencyName = 'Premier Realty Group';
+          currentUser.licenseState = 'NY';
+          await this.setCurrentUser(currentUser);
+          console.log('[StorageService] Seeded agent license data');
+        }
       }
 
       if (hostType === 'company') {
