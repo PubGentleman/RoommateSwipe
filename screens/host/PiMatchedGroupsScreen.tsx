@@ -139,16 +139,17 @@ export const PiMatchedGroupsScreen = () => {
 
       let allGroups = [...available, ...preformedAsAuto];
       if (passedListing?.bedrooms) {
-        allGroups = allGroups.filter(g =>
-          g.max_members === passedListing.bedrooms ||
-          g.member_count === passedListing.bedrooms
-        );
+        allGroups = allGroups.filter(g => {
+          const targetBedrooms = g.desired_bedrooms || g.max_members;
+          return targetBedrooms === passedListing.bedrooms;
+        });
       }
 
       const matchMap: Record<string, Property[]> = {};
       for (const group of allGroups) {
         const matched = myListings.filter(listing => {
-          const bedroomMatch = listing.bedrooms === group.max_members || listing.bedrooms === group.member_count;
+          const targetSize = group.desired_bedrooms || group.max_members;
+          const bedroomMatch = listing.bedrooms === targetSize;
           const listingPrice = listing.price || 0;
           const perPersonCost = listing.bedrooms > 0 ? Math.ceil(listingPrice / listing.bedrooms) : listingPrice;
           const budgetMatch = !group.budget_max || !group.budget_min || (
@@ -394,7 +395,9 @@ export const PiMatchedGroupsScreen = () => {
             <View style={[styles.sizeBadge, { backgroundColor: PURPLE + '20' }]}>
               <Feather name="users" size={14} color={PURPLE} />
               <Text style={[styles.sizeBadgeText, { color: PURPLE }]}>
-                {item.max_members} {item.max_members === 1 ? 'person' : 'people'}
+                {isForming && item.member_count < item.max_members
+                  ? `${item.member_count}/${item.max_members} people`
+                  : `${item.max_members} ${item.max_members === 1 ? 'person' : 'people'}`}
               </Text>
             </View>
             {item.desired_bedrooms !== 0 ? (

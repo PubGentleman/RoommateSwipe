@@ -415,7 +415,18 @@ export async function getGroupAcceptanceProgress(groupId: string): Promise<{
       .select('status')
       .eq('group_id', groupId);
 
-    if (!data) return { total: 0, accepted: 0, pending: 0, declined: 0 };
+    if (!data || data.length === 0) {
+      const mockGroup = MOCK_PI_GROUPS.find(g => g.id === groupId);
+      if (mockGroup && mockGroup.status === 'forming') {
+        return {
+          total: mockGroup.max_members,
+          accepted: mockGroup.member_count,
+          pending: mockGroup.max_members - mockGroup.member_count,
+          declined: 0,
+        };
+      }
+      return { total: 0, accepted: 0, pending: 0, declined: 0 };
+    }
 
     return {
       total: data.length,
@@ -424,6 +435,15 @@ export async function getGroupAcceptanceProgress(groupId: string): Promise<{
       declined: data.filter(m => m.status === 'declined').length,
     };
   } catch {
+    const mockGroup = MOCK_PI_GROUPS.find(g => g.id === groupId);
+    if (mockGroup && mockGroup.status === 'forming') {
+      return {
+        total: mockGroup.max_members,
+        accepted: mockGroup.member_count,
+        pending: mockGroup.max_members - mockGroup.member_count,
+        declined: 0,
+      };
+    }
     return { total: 0, accepted: 0, pending: 0, declined: 0 };
   }
 }
