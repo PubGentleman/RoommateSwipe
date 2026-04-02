@@ -137,8 +137,11 @@ export const HostDashboardScreen = () => {
   });
   const AnimatedScrollView = Animated.ScrollView;
 
+  const isOnFreeTier = isAgent
+    ? (!agentPlan || agentPlan === 'pay_per_use')
+    : (hostSub && isFreePlan(hostSub.plan));
   useEffect(() => {
-    if (hostSub && isFreePlan(hostSub.plan)) {
+    if (isOnFreeTier) {
       AsyncStorage.getItem(UPGRADE_BANNER_KEY).then(val => {
         if (!val) { setShowUpgradeBanner(true); return; }
         const dismissed = parseInt(val, 10);
@@ -148,7 +151,7 @@ export const HostDashboardScreen = () => {
     } else {
       setShowUpgradeBanner(false);
     }
-  }, [hostSub]);
+  }, [hostSub, isOnFreeTier]);
 
   const dismissUpgradeBanner = () => {
     AsyncStorage.setItem(UPGRADE_BANNER_KEY, Date.now().toString());
@@ -379,9 +382,9 @@ export const HostDashboardScreen = () => {
       });
     }
 
-    if ((card as any).groupId) {
+    if (card.groupId) {
       try {
-        await updateGroup((card as any).groupId, { address_revealed: true, inquiry_status: 'accepted' });
+        await updateGroup(card.groupId, { address_revealed: true, inquiry_status: 'accepted' });
       } catch {}
     }
 
@@ -478,11 +481,11 @@ export const HostDashboardScreen = () => {
       });
     }
 
-    if ((card as any).groupId) {
+    if (card.groupId) {
       try {
-        await updateGroup((card as any).groupId, { inquiry_status: 'declined' });
+        await updateGroup(card.groupId, { inquiry_status: 'declined' });
       } catch {}
-      await StorageService.updateConversation(`inquiry-conv-${(card as any).groupId}`, {
+      await StorageService.updateConversation(`inquiry-conv-${card.groupId}`, {
         inquiryStatus: 'declined',
         lastMessage: 'The host passed on this inquiry.',
       });
@@ -610,7 +613,11 @@ export const HostDashboardScreen = () => {
             <View style={styles.upgradeBannerContent}>
               <Feather name="zap" size={16} color={PURPLE} />
               <Text style={styles.upgradeBannerText}>
-                You're on the Free plan. Upgrade to browse renter groups and fill your room faster.
+                {isAgent
+                  ? "You're on Pay Per Use. Upgrade for AI tools, more placements, and priority support."
+                  : isCompany
+                    ? "You're on the Free plan. Upgrade to manage your portfolio and team more effectively."
+                    : "You're on the Free plan. Upgrade to browse renter groups and fill your room faster."}
               </Text>
             </View>
             <View style={styles.upgradeBannerActions}>
@@ -779,7 +786,7 @@ export const HostDashboardScreen = () => {
           })
         )}
 
-        {activeCount > 0 ? (
+        {activeCount > 0 && !isAgent ? (
           <Pressable
             style={styles.groupMatchCard}
             onPress={() => {
@@ -1249,21 +1256,25 @@ export const HostDashboardScreen = () => {
           <Pressable style={styles.qaSecondary} onPress={() => navigation.navigate('Analytics')}>
             <Feather name="bar-chart-2" size={15} color="rgba(255,255,255,0.6)" />
             <Text style={styles.qaSecondaryText}>Analytics</Text>
-            {hostPlan === 'free' || hostPlan === 'none' || hostPlan === 'starter' ? (
-              <View style={styles.proBadge}>
-                <Text style={styles.proBadgeText}>Pro</Text>
-              </View>
-            ) : null}
+            {isAgent
+              ? (!agentPlan || agentPlan === 'pay_per_use' || agentPlan === 'starter'
+                ? <View style={styles.proBadge}><Text style={styles.proBadgeText}>Pro</Text></View>
+                : null)
+              : (hostPlan === 'free' || hostPlan === 'none' || hostPlan === 'starter'
+                ? <View style={styles.proBadge}><Text style={styles.proBadgeText}>Pro</Text></View>
+                : null)}
           </Pressable>
           <Pressable style={styles.qaSecondary} onPress={() => navigation.navigate('HostSubscription')}>
             <Feather name="star" size={15} color={GOLD} />
             <Text style={styles.qaSecondaryText}>Plans</Text>
           </Pressable>
-          {hostPlan === 'business' ? (
+          {(isAgent ? agentPlan === 'business' : hostPlan === 'business') ? (
             <Pressable style={styles.qaSecondary} onPress={() => {
               showAlert({
                 title: 'Dedicated Support',
-                message: 'As a Business host, you have access to priority support.\n\nEmail: hello@rhomeapp.io\nResponse time: Within 2 hours\n\nOur dedicated team is here to help you with any questions or issues.',
+                message: isAgent
+                  ? 'As a Business agent, you have access to priority support.\n\nEmail: hello@rhomeapp.io\nResponse time: Within 2 hours\n\nOur dedicated team is here to help you with any questions or issues.'
+                  : 'As a Business host, you have access to priority support.\n\nEmail: hello@rhomeapp.io\nResponse time: Within 2 hours\n\nOur dedicated team is here to help you with any questions or issues.',
                 variant: 'info',
               });
             }}>
