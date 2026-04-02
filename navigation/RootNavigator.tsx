@@ -50,7 +50,7 @@ function HostMain() { return <HostTabNavigator />; }
 HostMain.displayName = 'HostMain';
 
 export const RootNavigator = () => {
-  const { user, isLoading, passwordRecoveryMode, clearPasswordRecovery, logout } = useAuth();
+  const { user, isLoading, passwordRecoveryMode, clearPasswordRecovery, logout, completeOnboardingStep } = useAuth();
   const { theme } = useTheme();
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -156,6 +156,10 @@ export const RootNavigator = () => {
   }
 
   if (step === 'hostType' && user.role === 'host') {
+    if (user.hostType) {
+      completeOnboardingStep('plan');
+      return null;
+    }
     return (
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="OnboardingHostType" component={HostTypeSelectScreen} />
