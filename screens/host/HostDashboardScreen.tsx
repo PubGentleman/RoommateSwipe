@@ -487,7 +487,7 @@ export const HostDashboardScreen = () => {
           if (parent) parent.navigate('Dashboard', { screen: 'DashboardMain' });
         }} />
         <View style={{ flex: 1, marginLeft: 10 }}>
-          <Text style={styles.greetingTitle}>Host Dashboard</Text>
+          <Text style={styles.greetingTitle}>{isAgent ? 'Agent Dashboard' : isCompany ? 'Company Dashboard' : 'Host Dashboard'}</Text>
         </View>
         <View style={styles.navActions}>
           {canUseAI ? <AIFloatingButton onPress={() => setShowAISheet(true)} position="inline" /> : null}
@@ -582,8 +582,8 @@ export const HostDashboardScreen = () => {
 
         <View style={styles.roleRow}>
           <View style={styles.hostBadge}>
-            <Feather name="home" size={12} color={ACCENT} />
-            <Text style={styles.hostBadgeText}>Host Mode</Text>
+            <Feather name={isAgent ? 'briefcase' : isCompany ? 'grid' : 'home'} size={12} color={ACCENT} />
+            <Text style={styles.hostBadgeText}>{isAgent ? 'Agent Mode' : isCompany ? 'Company Mode' : 'Host Mode'}</Text>
           </View>
           <Pressable style={styles.periodPill} onPress={() => navigation.navigate('Analytics')}>
             <Feather name="clock" size={11} color="rgba(255,255,255,0.4)" />
