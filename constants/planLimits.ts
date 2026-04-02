@@ -98,7 +98,7 @@ export const PLAN_LIMITS: Record<HostPlan, PlanLimits> = {
     plan: 'pro',
     label: 'Host Pro',
     price: '$49.99/mo',
-    maxListings: -1,
+    maxListings: 5,
     proactiveOutreachPerDay: 5,
     proactiveOutreachPerHour: 2,
     groupCooldownDays: 30,
@@ -106,12 +106,12 @@ export const PLAN_LIMITS: Record<HostPlan, PlanLimits> = {
     groupProfileAccess: 'full',
     listingPlacement: 'top',
     hasAnalytics: true,
-    analyticsLevel: 'basic',
+    analyticsLevel: 'advanced',
     hasCompanyBranding: false,
     hasDedicatedSupport: false,
     hasVerifiedBadge: true,
     hasBoosts: true,
-    freeBoostsPerMonth: 1,
+    freeBoostsPerMonth: 2,
     simultaneousBoosts: 3,
     piCallsPerMonth: 100,
     freeAutoClaimsPerMonth: 0,
@@ -121,7 +121,7 @@ export const PLAN_LIMITS: Record<HostPlan, PlanLimits> = {
     plan: 'business',
     label: 'Host Business',
     price: '$99.99/mo',
-    maxListings: -1,
+    maxListings: 15,
     proactiveOutreachPerDay: 10,
     proactiveOutreachPerHour: 3,
     groupCooldownDays: 30,
@@ -231,7 +231,7 @@ const _agentBase = {
     shortlistLimit: 50,
     activeGroupsLimit: 5,
     monthlyPlacementLimit: 10,
-    listingLimit: -1,
+    listingLimit: 30,
     hasAISuggestions: true,
     hasAIGroupSuggestions: true,
     hasCompatibilityMatrix: true,
@@ -314,15 +314,18 @@ export type CompanyPlan = 'starter' | 'pro' | 'enterprise';
 export interface CompanyPlanLimits {
   plan: CompanyPlan;
   label: string;
+  maxListings: number;
   piCallsPerMonth: number;
   freeAutoClaimsPerMonth: number;
   extraClaimPriceCents: number;
+  maxTeamMembers: number;
+  shortlistLimit: number;
 }
 
 export const COMPANY_PI_LIMITS: Record<CompanyPlan, CompanyPlanLimits> = {
-  starter: { plan: 'starter', label: 'Company Starter', piCallsPerMonth: 200, freeAutoClaimsPerMonth: 10, extraClaimPriceCents: 2000 },
-  pro: { plan: 'pro', label: 'Company Pro', piCallsPerMonth: 500, freeAutoClaimsPerMonth: 30, extraClaimPriceCents: 1000 },
-  enterprise: { plan: 'enterprise', label: 'Company Enterprise', piCallsPerMonth: -1, freeAutoClaimsPerMonth: -1, extraClaimPriceCents: 0 },
+  starter: { plan: 'starter', label: 'Company Starter', maxListings: 25, piCallsPerMonth: 200, freeAutoClaimsPerMonth: 10, extraClaimPriceCents: 2000, maxTeamMembers: 5, shortlistLimit: 100 },
+  pro: { plan: 'pro', label: 'Company Pro', maxListings: 100, piCallsPerMonth: 500, freeAutoClaimsPerMonth: 30, extraClaimPriceCents: 1000, maxTeamMembers: 20, shortlistLimit: -1 },
+  enterprise: { plan: 'enterprise', label: 'Company Enterprise', maxListings: -1, piCallsPerMonth: -1, freeAutoClaimsPerMonth: -1, extraClaimPriceCents: 0, maxTeamMembers: -1, shortlistLimit: -1 },
 };
 
 export function getCompanyPiMonthlyLimit(plan: string): number {

@@ -52,7 +52,7 @@ export const BrowseRentersScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, getHostPlan } = useAuth();
   const { alert: showAlert, confirm } = useConfirm();
   const routeListingId = route.params?.listingId as string | undefined;
 
@@ -111,6 +111,7 @@ export const BrowseRentersScreen = () => {
           .eq('role', 'renter')
           .eq('onboarding_step', 'complete')
           .neq('id', user?.id || '')
+          .order('last_active_at', { ascending: false })
           .limit(100);
 
         if (user?.city) {
@@ -135,8 +136,8 @@ export const BrowseRentersScreen = () => {
             photos: p?.photos || (u.avatar_url ? [u.avatar_url] : []),
             city: u.city,
             preferredNeighborhoods: p?.preferred_neighborhoods || [],
-            budgetMin: p?.budget_per_person_min || (p?.budget_max ? p.budget_max * 0.8 : undefined),
-            budgetMax: p?.budget_per_person_max || p?.budget_max,
+            budgetMin: p?.budget_per_person_min ?? (p?.budget_max ? p.budget_max * 0.8 : undefined),
+            budgetMax: p?.budget_per_person_max ?? p?.budget_max,
             moveInDate: p?.move_in_date,
             cleanliness: p?.cleanliness,
             sleepSchedule: p?.sleep_schedule,
@@ -161,7 +162,7 @@ export const BrowseRentersScreen = () => {
             bio: p?.bio || u.bio || '',
             gender: u.gender || '',
             lookingFor: p?.room_type || '',
-            budget: p?.budget_max || 0,
+            budget: p?.budget_max ?? 0,
             preferences: { location: u.city || '' },
             preferredNeighborhoods: p?.preferred_neighborhoods || [],
             lifestyle: {
@@ -260,8 +261,7 @@ export const BrowseRentersScreen = () => {
 
       if (user) {
         try {
-          const sub = await StorageService.getHostSubscription(user.id);
-          const rawPlan = sub?.plan || 'free';
+          const rawPlan = getHostPlan();
           const hostType = user.hostType;
           const limit = getHostPiMonthlyLimit(rawPlan, hostType);
           setPiQuotaLimit(limit);

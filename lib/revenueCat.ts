@@ -22,6 +22,7 @@ export const RC_ENTITLEMENTS = {
   HOST_AGENT_BUSINESS: 'host_agent_business',
   HOST_COMPANY_STARTER: 'host_company_starter',
   HOST_COMPANY_PRO: 'host_company_pro',
+  HOST_COMPANY_ENTERPRISE: 'host_company_enterprise',
 } as const;
 
 export const RC_OFFERING_KEYS = {
@@ -46,6 +47,9 @@ const RC_PRODUCT_TO_PLAN: Record<string, { plan: string; billingCycle: 'monthly'
   rhome_agent_business_monthly: { plan: 'agent_business', billingCycle: 'monthly', planType: 'host' },
   rhome_company_starter_monthly: { plan: 'company_starter', billingCycle: 'monthly', planType: 'host' },
   rhome_company_pro_monthly: { plan: 'company_pro', billingCycle: 'monthly', planType: 'host' },
+  rhome_company_enterprise_monthly: { plan: 'company_enterprise', billingCycle: 'monthly', planType: 'host' },
+  rhome_company_enterprise_3month: { plan: 'company_enterprise', billingCycle: '3month', planType: 'host' },
+  rhome_company_enterprise_annual: { plan: 'company_enterprise', billingCycle: 'annual', planType: 'host' },
 };
 
 function getApiKey(): string {
@@ -127,7 +131,7 @@ export function findPackage(
 function getProductIdentifier(plan: string, billingCycle: 'monthly' | '3month' | 'annual'): string {
   const hostPlans = ['starter', 'pro', 'business'];
   const agentPlans = ['agent_starter', 'agent_pro', 'agent_business'];
-  const companyPlans = ['company_starter', 'company_pro'];
+  const companyPlans = ['company_starter', 'company_pro', 'company_enterprise'];
   if (agentPlans.includes(plan) || companyPlans.includes(plan)) {
     return `rhome_${plan}_${billingCycle}`;
   }
@@ -186,6 +190,7 @@ export function getActivePlanFromEntitlements(info: CustomerInfo): { plan: strin
   if (hasEntitlement(info, RC_ENTITLEMENTS.HOST_AGENT_BUSINESS)) return { plan: 'agent_business', planType: 'host' };
   if (hasEntitlement(info, RC_ENTITLEMENTS.HOST_AGENT_PRO)) return { plan: 'agent_pro', planType: 'host' };
   if (hasEntitlement(info, RC_ENTITLEMENTS.HOST_AGENT_STARTER)) return { plan: 'agent_starter', planType: 'host' };
+  if (hasEntitlement(info, RC_ENTITLEMENTS.HOST_COMPANY_ENTERPRISE)) return { plan: 'company_enterprise', planType: 'host' };
   if (hasEntitlement(info, RC_ENTITLEMENTS.HOST_COMPANY_PRO)) return { plan: 'company_pro', planType: 'host' };
   if (hasEntitlement(info, RC_ENTITLEMENTS.HOST_COMPANY_STARTER)) return { plan: 'company_starter', planType: 'host' };
   if (hasEntitlement(info, RC_ENTITLEMENTS.HOST_BUSINESS)) return { plan: 'business', planType: 'host' };

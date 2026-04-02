@@ -95,18 +95,14 @@ export async function addToShortlist(agentId: string, renterId: string, listingI
     return { success: false, error: 'This renter is not accepting offers from agents' };
   }
 
-  const { data: existing } = await supabase
+  const { data, error } = await supabase
     .from('agent_shortlists')
-    .select('id')
-    .eq('agent_id', agentId)
-    .eq('renter_id', renterId)
-    .maybeSingle();
-
-  if (existing) return { success: false, error: 'Already shortlisted' };
-
-  const { error } = await supabase
-    .from('agent_shortlists')
-    .insert({ agent_id: agentId, renter_id: renterId, listing_id: listingId || null });
+    .upsert(
+      { agent_id: agentId, renter_id: renterId, listing_id: listingId || null },
+      { onConflict: 'agent_id,renter_id', ignoreDuplicates: true }
+    )
+    .select()
+    .single();
 
   if (error) {
     console.warn('[AgentService] addToShortlist error:', error.message);
@@ -155,7 +151,9 @@ export async function getAgentGroups(agentId: string): Promise<AgentGroup[]> {
         group_members(
           user_id,
           role,
-          user:users!user_id(id, full_name, avatar_url, age, occupation)
+          user:users!user_id(id, full_name, avatar_url, age, occupation,
+            profile:profiles(budget_min, budget_max)
+          )
         ),
         listing:listings!target_listing_id(id, title, rent, bedrooms, neighborhood)
       `)
@@ -163,8 +161,13 @@ export async function getAgentGroups(agentId: string): Promise<AgentGroup[]> {
       .eq('agent_assembled', true)
       .order('created_at', { ascending: false });
 
-    const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000));
-    const result = await Promise.race([queryPromise, timeout]);
+    let queryFinished = false;
+    const wrappedQuery = queryPromise.then(result => { queryFinished = true; return result; });
+    const timeout = new Promise<null>((resolve) => setTimeout(() => {
+      if (!queryFinished) console.warn('[AgentService] getAgentGroups query timed out');
+      resolve(null);
+    }, 5000));
+    const result = await Promise.race([wrappedQuery, timeout]);
     if (!result) {
       console.warn('[AgentService] getAgentGroups timed out, falling back to local');
       return getAgentGroupsFromLocal(agentId);
@@ -191,6 +194,21 @@ export async function getAgentGroups(agentId: string): Promise<AgentGroup[]> {
       }));
 
       const listing = Array.isArray(g.listing) ? g.listing[0] : g.listing;
+      const listingPrice = listing?.rent ?? 0;
+
+      const avgCompatibility = (g as any).avg_compatibility ?? 0;
+      const combinedBudgetMin = memberProfiles.reduce((sum: number, _m: any, i: number) => {
+        const rawMember = rawMembers[i] as any;
+        const profile = rawMember?.user?.profile;
+        const p = Array.isArray(profile) ? profile[0] : profile;
+        return sum + (p?.budget_min ?? 0);
+      }, 0);
+      const combinedBudgetMax = memberProfiles.reduce((sum: number, _m: any, i: number) => {
+        const rawMember = rawMembers[i] as any;
+        const profile = rawMember?.user?.profile;
+        const p = Array.isArray(profile) ? profile[0] : profile;
+        return sum + (p?.budget_max ?? 0);
+      }, 0);
 
       return {
         id: g.id,
@@ -207,10 +225,10 @@ export async function getAgentGroups(agentId: string): Promise<AgentGroup[]> {
         members: memberProfiles,
         memberIds: rawMembers.map((m: any) => m.user_id),
         groupStatus: g.group_status || 'assembling',
-        avgCompatibility: 0,
-        combinedBudgetMin: 0,
-        combinedBudgetMax: 0,
-        coversRent: false,
+        avgCompatibility,
+        combinedBudgetMin,
+        combinedBudgetMax,
+        coversRent: listingPrice > 0 ? combinedBudgetMax >= listingPrice : false,
         invites: [],
         createdAt: g.created_at,
       };
@@ -246,8 +264,8 @@ export async function createAgentGroup(group: AgentGroup): Promise<AgentGroup> {
     .single();
 
   if (error || !newGroup) {
-    console.warn('[AgentService] createAgentGroup error:', error?.message);
-    return group;
+    console.error('[AgentService] createAgentGroup error:', error?.message);
+    throw new Error(error?.message || 'Failed to create group');
   }
 
   return { ...group, id: newGroup.id };
@@ -388,13 +406,15 @@ export async function sendAgentInvites(
       user_id: inv.renter_id,
       type: 'agent_invite',
       title: `${agentName} wants you in their group!`,
-      body: `"${listing.title}" - ${listing.bedrooms}BR at $${listing.price?.toLocaleString()}/mo`,
+      body: listing
+        ? `"${listing.title}" - ${listing.bedrooms}BR at $${listing.price?.toLocaleString()}/mo`
+        : 'You have a new group invitation from an agent',
       data: {
         agentInviteId: inv.id,
         groupId,
-        listingTitle: listing.title,
-        listingRent: listing.price,
-        listingBedrooms: listing.bedrooms,
+        listingTitle: listing?.title,
+        listingRent: listing?.price,
+        listingBedrooms: listing?.bedrooms,
         groupMembers: memberNames,
       },
       read: false,
@@ -523,16 +543,8 @@ export async function recordPlacement(
     .single();
 
   if (error || !data) {
-    console.warn('[AgentService] recordPlacement error:', error?.message);
-    return {
-      id: `pl_${Date.now()}`,
-      agentId,
-      groupId,
-      listingId,
-      placementFeeCents,
-      placedAt: new Date().toISOString(),
-      billingStatus: 'pending',
-    };
+    console.error('[AgentService] recordPlacement error:', error?.message);
+    throw new Error(error?.message || 'Failed to record placement');
   }
 
   return {
@@ -565,7 +577,7 @@ export async function chargeAgentPlacementFee(
 
   try {
     const { data, error } = await supabase.functions.invoke('charge-placement-fee', {
-      body: { placementId, groupId, listingId },
+      body: { placementId, groupId, listingId, agentId },
     });
 
     if (error) {

@@ -84,26 +84,31 @@ export const AgentGroupsScreen = () => {
       message: `A placement fee of ${feeDisplay} will be charged to your payment method on file.`,
     });
     if (confirmed) {
-      const placement = await recordPlacement(
-        user.id,
-        group.id,
-        group.targetListingId ?? '',
-        planLimits.placementFeeCents
-      );
+      try {
+        const placement = await recordPlacement(
+          user.id,
+          group.id,
+          group.targetListingId ?? '',
+          planLimits.placementFeeCents
+        );
 
-      const chargeResult = await chargeAgentPlacementFee(
-        user.id,
-        placement.id,
-        group.id,
-        group.targetListingId ?? ''
-      );
+        const chargeResult = await chargeAgentPlacementFee(
+          user.id,
+          placement.id,
+          group.id,
+          group.targetListingId ?? ''
+        );
 
-      if (chargeResult.success) {
-        await updateAgentGroupStatus(group.id, 'placed');
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } else {
+        if (chargeResult.success) {
+          await updateAgentGroupStatus(group.id, 'placed');
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } else {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          showAlert({ title: 'Payment Issue', message: chargeResult.error ?? 'Placement fee could not be charged. Please check your payment method.' });
+        }
+      } catch (e: any) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        showAlert({ title: 'Payment Issue', message: chargeResult.error ?? 'Placement fee could not be charged. Please check your payment method.' });
+        showAlert({ title: 'Error', message: e?.message || 'Failed to record placement. Please try again.' });
       }
       loadGroups();
     }
