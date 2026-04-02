@@ -706,7 +706,7 @@ export function generateBestGroupSuggestion(
   return scored.sort((a, b) => b.score - a.score)[0] ?? null;
 }
 
-function calculatePairCompatibility(a: AgentRenter, b: AgentRenter): number {
+export function calculatePairCompatibility(a: AgentRenter, b: AgentRenter): number {
   let score = 50;
   if (a.cleanliness !== undefined && b.cleanliness !== undefined) {
     const diff = Math.abs(a.cleanliness - b.cleanliness);

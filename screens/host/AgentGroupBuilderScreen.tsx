@@ -19,6 +19,7 @@ import {
   createAgentGroup,
   sendAgentInvites,
   calculatePairMatrix,
+  calculatePairCompatibility,
 } from '../../services/agentMatchmakerService';
 import { canAgentCreateGroup, getAgentPlanLimits, type AgentPlan } from '../../constants/planLimits';
 import { useAgentPairing } from '../../hooks/useAgentPairing';
@@ -49,6 +50,9 @@ export const AgentGroupBuilderScreen = () => {
   const [sending, setSending] = useState(false);
   const [step, setStep] = useState<'select' | 'review'>('select');
   const [showPairingModal, setShowPairingModal] = useState(false);
+  const [showCompatiblePicker, setShowCompatiblePicker] = useState(false);
+  const [compatibleRenters, setCompatibleRenters] = useState<(AgentRenter & { avgScore: number })[]>([]);
+  const [loadingCompatible, setLoadingCompatible] = useState(false);
 
   const rawAgentPlan = user?.agentPlan || (user as any)?.agent_plan || '';
   const subPlan = user?.hostSubscription?.plan || '';
@@ -57,6 +61,83 @@ export const AgentGroupBuilderScreen = () => {
   const agentPlan: AgentPlan = (normalizedPlan || 'pay_per_use') as AgentPlan;
   const planLimits = getAgentPlanLimits(agentPlan);
   const { getPairing, loading: pairingLoading, result: pairingResult, error: pairingError, reset: resetPairing } = useAgentPairing();
+
+  const loadCompatibleRenters = async () => {
+    setLoadingCompatible(true);
+    try {
+      const selectedMembers = allRenters.filter(r => selectedIds.has(r.id));
+      let pool: AgentRenter[] = [];
+
+      if (isSupabaseConfigured) {
+        try {
+          const { data } = await supabase
+            .from('users')
+            .select(`
+              id, full_name, avatar_url, age, occupation, gender, bio,
+              profile:profiles(
+                budget_max, budget_min, budget_per_person_min, budget_per_person_max,
+                move_in_date, room_type, cleanliness, sleep_schedule, smoking, pets, interests, photos, bio
+              )
+            `)
+            .eq('role', 'renter')
+            .limit(100);
+          pool = (data || []).map((u: any) => {
+            const p = Array.isArray(u.profile) ? u.profile[0] : u.profile;
+            return {
+              id: u.id, name: u.full_name || 'Unknown', age: u.age || 0,
+              occupation: u.occupation || '',
+              photos: p?.photos || (u.avatar_url ? [u.avatar_url] : []),
+              budgetMin: p?.budget_per_person_min ?? (p?.budget_max ? p.budget_max * 0.8 : undefined),
+              budgetMax: p?.budget_per_person_max ?? p?.budget_max,
+              moveInDate: p?.move_in_date, cleanliness: p?.cleanliness,
+              sleepSchedule: p?.sleep_schedule, smoking: p?.smoking,
+              pets: p?.pets === 'yes' || p?.pets === true,
+              interests: p?.interests || [], roomType: p?.room_type,
+              gender: u.gender, bio: p?.bio || u.bio,
+            };
+          });
+        } catch {}
+      }
+
+      if (pool.length === 0) {
+        const profiles: RoommateProfile[] = await StorageService.getRoommateProfiles();
+        pool = profiles.map(p => ({
+          id: p.id, name: p.name, age: p.age, occupation: p.occupation,
+          photos: p.photos || [], budgetMin: p.budget ? p.budget * 0.8 : undefined,
+          budgetMax: p.budget, moveInDate: p.preferences?.moveInDate,
+          cleanliness: p.lifestyle?.cleanliness, sleepSchedule: p.lifestyle?.workSchedule,
+          smoking: p.lifestyle?.smoking, pets: p.lifestyle?.pets,
+          interests: p.profileData?.interests || [], roomType: p.lookingFor,
+          bio: p.bio, gender: p.gender,
+        }));
+      }
+
+      const candidates = pool
+        .filter(r => !selectedIds.has(r.id) && !allRenters.some(ar => ar.id === r.id))
+        .map(candidate => {
+          const scores = selectedMembers.map(m => calculatePairCompatibility(m, candidate));
+          const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+          return { ...candidate, avgScore };
+        })
+        .filter(c => c.avgScore >= 50)
+        .sort((a, b) => b.avgScore - a.avgScore)
+        .slice(0, 20);
+
+      setCompatibleRenters(candidates);
+      setShowCompatiblePicker(true);
+    } catch (e) {
+      console.warn('[AgentGroupBuilder] loadCompatibleRenters failed:', e);
+    } finally {
+      setLoadingCompatible(false);
+    }
+  };
+
+  const addCompatibleRenter = (renter: AgentRenter & { avgScore: number }) => {
+    setAllRenters(prev => [...prev, renter]);
+    setSelectedIds(prev => new Set([...prev, renter.id]));
+    setCompatibleRenters(prev => prev.filter(r => r.id !== renter.id));
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
 
   const handleAIPairing = async () => {
     if (!selectedListing || selectedIds.size < 2) return;
@@ -464,13 +545,66 @@ export const AgentGroupBuilderScreen = () => {
         ) : null}
 
         {allRenters.length > 0 && allRenters.length < 10 ? (
-          <Pressable
-            style={styles.addMoreBtn}
-            onPress={() => navigation.goBack()}
-          >
-            <Feather name="plus" size={16} color={ACCENT} />
-            <Text style={styles.addMoreText}>Shortlist More Renters</Text>
-          </Pressable>
+          <View>
+            <Pressable
+              style={styles.addMoreBtn}
+              onPress={loadCompatibleRenters}
+              disabled={loadingCompatible}
+            >
+              {loadingCompatible ? (
+                <ActivityIndicator size="small" color={ACCENT} />
+              ) : (
+                <Feather name="user-plus" size={16} color={ACCENT} />
+              )}
+              <Text style={styles.addMoreText}>
+                {showCompatiblePicker ? 'Refresh Compatible Renters' : 'Find Compatible Renters'}
+              </Text>
+            </Pressable>
+
+            {showCompatiblePicker ? (
+              <View style={{ marginTop: 12 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>
+                    Compatible with your group
+                  </Text>
+                  <Pressable onPress={() => setShowCompatiblePicker(false)}>
+                    <Feather name="x" size={18} color="#888" />
+                  </Pressable>
+                </View>
+                {compatibleRenters.length === 0 ? (
+                  <Text style={{ color: '#888', fontSize: 13, textAlign: 'center', paddingVertical: 20 }}>
+                    No compatible renters found
+                  </Text>
+                ) : (
+                  compatibleRenters.map(candidate => {
+                    const scoreColor = candidate.avgScore >= 80 ? GREEN : candidate.avgScore >= 60 ? YELLOW : '#888';
+                    return (
+                      <View key={candidate.id} style={[styles.renterCard, { borderColor: scoreColor + '40' }]}>
+                        <Image
+                          source={{ uri: candidate.photos?.[0] || 'https://via.placeholder.com/40' }}
+                          style={{ width: 40, height: 40, borderRadius: 20 }}
+                        />
+                        <View style={{ flex: 1, marginLeft: 12 }}>
+                          <Text style={styles.renterName}>{candidate.name}{candidate.age ? `, ${candidate.age}` : ''}</Text>
+                          <Text style={styles.renterOccupation}>{candidate.occupation}</Text>
+                        </View>
+                        <View style={{ alignItems: 'center', marginRight: 12 }}>
+                          <Text style={{ color: scoreColor, fontSize: 16, fontWeight: '700' }}>{candidate.avgScore}%</Text>
+                          <Text style={{ color: '#888', fontSize: 10 }}>match</Text>
+                        </View>
+                        <Pressable
+                          style={{ backgroundColor: scoreColor + '20', borderColor: scoreColor, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 }}
+                          onPress={() => addCompatibleRenter(candidate)}
+                        >
+                          <Feather name="plus" size={14} color={scoreColor} />
+                        </Pressable>
+                      </View>
+                    );
+                  })
+                )}
+              </View>
+            ) : null}
+          </View>
         ) : null}
       </ScrollView>
 
