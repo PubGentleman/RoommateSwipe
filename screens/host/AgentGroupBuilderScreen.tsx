@@ -500,7 +500,7 @@ export const AgentGroupBuilderScreen = () => {
           />
         </ScrollView>
 
-        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
+        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 80 }]}>
           <Pressable
             style={[styles.sendBtn, sending ? styles.sendBtnDisabled : null]}
             onPress={handleSendInvites}
