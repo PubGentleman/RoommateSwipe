@@ -374,6 +374,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         userData.onboarding_step = 'profile';
       }
 
+      const authMeta = session.user.user_metadata || {};
+      if (!userData.host_type && authMeta.host_type) {
+        userData.host_type = authMeta.host_type;
+        try {
+          const patch: Record<string, any> = { host_type: authMeta.host_type };
+          if (authMeta.company_name) patch.company_name = authMeta.company_name;
+          if (authMeta.first_name) patch.first_name = authMeta.first_name;
+          if (authMeta.last_name) patch.last_name = authMeta.last_name;
+          if (userData.onboarding_step === 'hostType') {
+            patch.onboarding_step = 'plan';
+            userData.onboarding_step = 'plan';
+          }
+          await supabase.from('users').update(patch).eq('id', session.user.id);
+        } catch (e) {
+          console.warn('[Auth] Failed to patch host_type from auth metadata:', e);
+        }
+      }
+
       let mappedUser = mapSupabaseToUser(userData, profileData, subscriptionData);
       mappedUser = await checkAndApplyScheduledChanges(mappedUser);
       mappedUser.lastActiveAt = new Date();
