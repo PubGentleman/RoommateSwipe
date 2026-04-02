@@ -349,16 +349,16 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         setGroupMembers(members);
         return;
       }
-    } catch {}
+    } catch (e) { console.warn('[ChatScreen] Supabase group members load failed:', e); }
     try {
       const groups = await StorageService.getGroups();
-      const g = groups.find((gr: any) => gr.id === groupId);
+      const g = groups.find((gr: { id: string }) => gr.id === groupId);
       if (g?.members) {
         const users = await StorageService.getUsers();
         const profiles = await StorageService.getRoommateProfiles();
         const members = g.members.map((memberId: string) => {
-          const u = users.find((usr: any) => usr.id === memberId);
-          const p = profiles.find((pr: any) => pr.id === memberId);
+          const u = users.find((usr: { id: string }) => usr.id === memberId);
+          const p = profiles.find((pr: { id: string }) => pr.id === memberId);
           const photo = p?.photos?.[0] || p?.profilePicture || u?.profilePicture || u?.profileData?.photos?.[0] || null;
           return {
             id: memberId,
@@ -370,7 +370,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         });
         setGroupMembers(members);
       }
-    } catch {}
+    } catch (e) { console.warn('[ChatScreen] Local group members load failed:', e); }
   };
 
   useEffect(() => {
@@ -1686,7 +1686,7 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
               } catch {
                 try {
                   tabNav.navigate('Listings', { viewListingId: linkedListing.id });
-                } catch {}
+                } catch (e) { console.warn('[ChatScreen] Navigation fallback failed:', e); }
               }
             }
           }}

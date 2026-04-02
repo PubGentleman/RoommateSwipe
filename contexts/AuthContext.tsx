@@ -178,7 +178,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (user.hostSubscription?.scheduledPlan && user.hostSubscription?.scheduledChangeDate) {
       const changeDate = user.hostSubscription.scheduledChangeDate instanceof Date 
         ? user.hostSubscription.scheduledChangeDate 
-        : new Date(user.hostSubscription.scheduledChangeDate as any);
+        : new Date(String(user.hostSubscription.scheduledChangeDate));
       if (!isNaN(changeDate.getTime()) && changeDate.getTime() <= now.getTime()) {
         updated = {
           ...updated,
@@ -443,8 +443,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 hostSubscription: localUser.hostSubscription,
                 agentPlan: localUser.agentPlan || mappedUser.agentPlan,
               };
-              if ((localUser as any).companyPlan) {
-                (mappedUser as any).companyPlan = (localUser as any).companyPlan;
+              if ('companyPlan' in localUser && localUser.companyPlan) {
+                (mappedUser as User & { companyPlan?: string }).companyPlan = localUser.companyPlan as string;
               }
               console.log(`[Auth] Restored host plan from local user: ${localUser.hostSubscription.plan}`);
               restoredFromLocal = true;
@@ -463,12 +463,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     agentPlan: mappedUser.hostType === 'agent' ? savedBase : mappedUser.agentPlan,
                   };
                   if (mappedUser.hostType === 'company') {
-                    (mappedUser as any).companyPlan = savedBase;
+                    (mappedUser as User & { companyPlan?: string }).companyPlan = savedBase;
                   }
                   console.log(`[Auth] Restored host plan from HOST_SUBSCRIPTIONS: ${savedHostSub.plan}`);
                 }
               }
-            } catch {}
+            } catch (e) { console.warn('[Auth] Failed to restore host subscription:', e); }
           }
         }
       }
@@ -497,7 +497,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 intentOverrides.listing_type_preference = parsed.listing_type_preference;
               }
             }
-          } catch {}
+          } catch (e) { console.warn('[Auth] Failed to parse renter intent:', e); }
         }
 
         if (Object.keys(intentOverrides).length > 0) {
@@ -554,7 +554,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             currentUser.profileData.listing_type_preference = parsed.listing_type_preference;
           }
         }
-      } catch {}
+      } catch (e) { console.warn('[Auth] Failed to restore renter intent:', e); }
     }
     if (currentUser?.profileData?.apartment_search_type) {
       await StorageService.setCurrentUser(currentUser);
@@ -573,13 +573,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 currentUser.agentPlan = savedBase || currentUser.agentPlan;
               }
               if (currentUser.hostType === 'company') {
-                (currentUser as any).companyPlan = savedBase || (currentUser as any).companyPlan;
+                (currentUser as User & { companyPlan?: string }).companyPlan = savedBase || (currentUser as User & { companyPlan?: string }).companyPlan;
               }
               await StorageService.setCurrentUser(currentUser);
               console.log(`[Auth] Restored host plan from HOST_SUBSCRIPTIONS: ${savedHostSub.plan}`);
             }
           }
-        } catch {}
+        } catch (e) { console.warn('[Auth] Failed to restore host subscription on focus:', e); }
       }
       if (currentUser.messageCount === undefined) {
         currentUser.messageCount = 0;
@@ -648,7 +648,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const checkWeeklySummary = async (loginUser: User): Promise<User | null> => {
-    const lastSummary = (loginUser as any).lastAISummaryDate;
+    const lastSummary = (loginUser as User & { lastAISummaryDate?: string }).lastAISummaryDate;
     const now = new Date();
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
@@ -1725,7 +1725,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           ...user,
           undoPassData: {
             hasUndoPass: false,
-            undoPassExpiresAt: null as any,
+            undoPassExpiresAt: null as unknown as Date,
           },
         };
 
