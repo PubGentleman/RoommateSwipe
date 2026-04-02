@@ -62,7 +62,7 @@ export const BrowseRentersScreen = () => {
   const [listings, setListings] = useState<Property[]>([]);
   const [selectedListing, setSelectedListing] = useState<Property | null>(null);
   const [showListingPicker, setShowListingPicker] = useState(false);
-  const [roomTypeFilter, setRoomTypeFilter] = useState<string>('any');
+  const [roomTypeFilter, setRoomTypeFilter] = useState<string>('room');
   const [neighborhoodFilter, setNeighborhoodFilter] = useState<string>('');
   const [transitFilterSummary, setTransitFilterSummary] = useState<TransitFilterSummary | null>(null);
   const [allProfiles, setAllProfiles] = useState<RoommateProfile[]>([]);
@@ -346,9 +346,12 @@ export const BrowseRentersScreen = () => {
       setTransitFilterSummary(null);
     }
 
-    if (roomTypeFilter !== 'any') {
-      filtered = filtered.filter(r => r.roomType === roomTypeFilter);
-    }
+    filtered = filtered.filter(r => {
+      if (roomTypeFilter === 'entire_apartment') {
+        return r.roomType === 'entire_apartment' || r.roomType === 'entire' || r.roomType === 'apartment';
+      }
+      return r.roomType !== 'entire_apartment' && r.roomType !== 'entire' && r.roomType !== 'apartment';
+    });
 
     if (neighborhoodFilter) {
       const nfLower = neighborhoodFilter.toLowerCase();
@@ -698,14 +701,14 @@ export const BrowseRentersScreen = () => {
             </Text>
           </Pressable>
         ) : null}
-        {['any', 'room', 'entire_apartment'].map(type => (
+        {['room', 'entire_apartment'].map(type => (
           <Pressable
             key={type}
             style={[styles.filterChip, roomTypeFilter === type ? styles.filterChipActive : null]}
             onPress={() => setRoomTypeFilter(type)}
           >
             <Text style={[styles.filterChipText, roomTypeFilter === type ? styles.filterChipTextActive : null]}>
-              {type === 'any' ? 'All' : type === 'room' ? 'Room' : 'Entire'}
+              {type === 'room' ? 'Room' : 'Entire'}
             </Text>
           </Pressable>
         ))}
@@ -857,9 +860,9 @@ export const BrowseRentersScreen = () => {
               <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, marginTop: 8, textAlign: 'center' }}>
                 Try adjusting your search criteria or selecting a different listing
               </Text>
-              {(selectedListing || roomTypeFilter !== 'any' || neighborhoodFilter) ? (
+              {(selectedListing || neighborhoodFilter) ? (
                 <Pressable
-                  onPress={() => { setSelectedListing(null); setRoomTypeFilter('any'); setNeighborhoodFilter(''); }}
+                  onPress={() => { setSelectedListing(null); setRoomTypeFilter('room'); setNeighborhoodFilter(''); }}
                   style={{ marginTop: 20, paddingVertical: 10, paddingHorizontal: 20, backgroundColor: ACCENT, borderRadius: 10 }}
                 >
                   <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 14 }}>
