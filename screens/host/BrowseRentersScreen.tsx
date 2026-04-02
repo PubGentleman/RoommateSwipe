@@ -508,13 +508,41 @@ export const BrowseRentersScreen = () => {
           </View>
         ) : null}
 
-        <Pressable
-          style={styles.viewProfileBtn}
-          onPress={() => navigation.navigate('RenterProfileDetail', { renter: item })}
-        >
-          <Text style={styles.viewProfileText}>View Profile</Text>
-          <Feather name="chevron-right" size={16} color={ACCENT} />
-        </Pressable>
+        <View style={styles.cardActions}>
+          <Pressable
+            style={styles.cardActionBtn}
+            onPress={() => {
+              navigation.navigate('Chat', {
+                conversationId: `agent-${user?.id}-${item.id}`,
+                otherUser: { id: item.id, name: item.name, photos: item.photos },
+              });
+            }}
+          >
+            <Feather name="message-circle" size={14} color="#fff" />
+            <Text style={styles.cardActionText}>Message</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.cardActionBtn, { backgroundColor: ACCENT }]}
+            onPress={() => {
+              navigation.navigate('AgentGroupBuilder', {
+                preselectedIds: [item.id],
+                listingId: selectedListing?.id,
+              });
+            }}
+          >
+            <Feather name="users" size={14} color="#fff" />
+            <Text style={styles.cardActionText}>Add to Group</Text>
+          </Pressable>
+          <Pressable
+            style={styles.cardActionBtn}
+            onPress={() => navigation.navigate('RenterProfileDetail', {
+              renter: item,
+              isShortlisted: isShortlisted,
+            })}
+          >
+            <Feather name="chevron-right" size={14} color="#fff" />
+          </Pressable>
+        </View>
       </View>
     );
   };
@@ -874,6 +902,9 @@ const styles = StyleSheet.create({
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 },
   tag: { backgroundColor: '#222', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 },
   tagText: { color: '#aaa', fontSize: 11 },
+  cardActions: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  cardActionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#222', borderRadius: 10, paddingVertical: 10 },
+  cardActionText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   viewProfileBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 12, paddingVertical: 8 },
   viewProfileText: { color: ACCENT, fontSize: 14, fontWeight: '600', marginRight: 4 },
   aiPanel: { backgroundColor: '#1a1a2e', borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(248,195,49,0.2)' },

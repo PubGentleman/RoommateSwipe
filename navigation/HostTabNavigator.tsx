@@ -28,6 +28,7 @@ import { CompanyListingAIScreen } from '../screens/host/CompanyListingAIScreen';
 import { PiMatchedGroupsScreen } from '../screens/host/PiMatchedGroupsScreen';
 import { PiClaimedGroupDetailScreen } from '../screens/host/PiClaimedGroupDetailScreen';
 import { InviteExistingRoommatesScreen } from '../screens/host/InviteExistingRoommatesScreen';
+import { ChatScreen } from '../screens/shared/ChatScreen';
 import { HostMessagesStackNavigator } from './HostMessagesStackNavigator';
 import { NotificationsScreen } from '../screens/shared/NotificationsScreen';
 import { ProfileStackNavigator } from './ProfileStackNavigator';
@@ -62,6 +63,8 @@ export type HostDashboardStackParamList = {
   PiMatchedGroups: undefined;
   PiClaimedGroupDetail: { groupId: string };
   MyListings: undefined;
+  Chat: { conversationId: string; otherUser: any };
+  AgentGroupBuilder: { preselectedIds?: string[]; listingId?: string };
 };
 
 export type HostGroupsStackParamList = {
@@ -71,16 +74,18 @@ export type HostGroupsStackParamList = {
 
 export type AgentBrowseStackParamList = {
   BrowseRenters: undefined;
-  RenterProfileDetail: { renter: any };
+  RenterProfileDetail: { renter: any; isShortlisted?: boolean };
   RenterCompatibility: { renters: any[] };
   AgentGroupBuilder: { preselectedIds?: string[]; listingId?: string };
   PiMatchedGroups: undefined;
   PiClaimedGroupDetail: { groupId: string };
+  Chat: { conversationId: string; otherUser: any };
 };
 
 export type AgentGroupsStackParamList = {
   AgentGroupsList: undefined;
   AgentGroupBuilder: { preselectedIds?: string[]; listingId?: string };
+  Chat: { conversationId: string; otherUser: any };
 };
 
 export type HostTabParamList = {
@@ -122,6 +127,8 @@ function DashboardStackNavigator() {
       <DashboardStack.Screen name="PiMatchedGroups" component={PiMatchedGroupsScreen} />
       <DashboardStack.Screen name="PiClaimedGroupDetail" component={PiClaimedGroupDetailScreen} />
       <DashboardStack.Screen name="MyListings" component={MyListingsScreen} />
+      <DashboardStack.Screen name="Chat" component={ChatScreen} />
+      <DashboardStack.Screen name="AgentGroupBuilder" component={AgentGroupBuilderScreen} />
     </DashboardStack.Navigator>
   );
 }
@@ -156,6 +163,7 @@ function AgentBrowseStackNavigator() {
       <AgentBrowseStack.Screen name="AgentGroupBuilder" component={AgentGroupBuilderScreen} />
       <AgentBrowseStack.Screen name="PiMatchedGroups" component={PiMatchedGroupsScreen} />
       <AgentBrowseStack.Screen name="PiClaimedGroupDetail" component={PiClaimedGroupDetailScreen} />
+      <AgentBrowseStack.Screen name="Chat" component={ChatScreen} />
     </AgentBrowseStack.Navigator>
   );
 }
@@ -165,6 +173,7 @@ function AgentGroupsStackNavigator() {
     <AgentGroupsStack.Navigator screenOptions={{ headerShown: false }}>
       <AgentGroupsStack.Screen name="AgentGroupsList" component={AgentGroupsScreen} />
       <AgentGroupsStack.Screen name="AgentGroupBuilder" component={AgentGroupBuilderScreen} />
+      <AgentGroupsStack.Screen name="Chat" component={ChatScreen} />
     </AgentGroupsStack.Navigator>
   );
 }

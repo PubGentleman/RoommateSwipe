@@ -3,23 +3,25 @@ import { View, Text, StyleSheet, ScrollView, Image, Pressable } from 'react-nati
 import { Feather } from '../../components/VectorIcons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AgentRenter } from '../../services/agentMatchmakerService';
+import { AgentRenter, addToShortlist, removeFromShortlist } from '../../services/agentMatchmakerService';
 import { ReportBlockModal } from '../../components/ReportBlockModal';
 import { reportUser, blockUser as blockUserRemote } from '../../services/moderationService';
 import { useAuth } from '../../contexts/AuthContext';
+import * as Haptics from 'expo-haptics';
 
 const BG = '#111';
 const ACCENT = '#ff6b5b';
 const GREEN = '#2ecc71';
+const BLUE = '#3b82f6';
 
 export const RenterProfileDetailScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const insets = useSafeAreaInsets();
-  const { blockUser: blockUserLocal } = useAuth();
+  const { user, blockUser: blockUserLocal } = useAuth();
   const renter: AgentRenter = route.params?.renter;
-  const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [showReportBlock, setShowReportBlock] = useState(false);
+  const [isShortlisted, setIsShortlisted] = useState(route.params?.isShortlisted ?? false);
 
   if (!renter) {
     return (
@@ -45,6 +47,33 @@ export const RenterProfileDetailScreen = () => {
     } catch {}
   };
 
+  const handleShortlistToggle = async () => {
+    if (!user) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (isShortlisted) {
+      await removeFromShortlist(user.id, renter.id);
+      setIsShortlisted(false);
+    } else {
+      const result = await addToShortlist(user.id, renter.id);
+      if (result.success) {
+        setIsShortlisted(true);
+      }
+    }
+  };
+
+  const handleMessage = () => {
+    navigation.navigate('Chat', {
+      conversationId: `agent-${user?.id}-${renter.id}`,
+      otherUser: { id: renter.id, name: renter.name, photos: renter.photos },
+    });
+  };
+
+  const handleBuildGroup = () => {
+    navigation.navigate('AgentGroupBuilder', {
+      preselectedIds: [renter.id],
+    });
+  };
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
@@ -57,7 +86,7 @@ export const RenterProfileDetailScreen = () => {
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 100, paddingHorizontal: 16 }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 120, paddingHorizontal: 16 }}>
         {renter.photos?.[0] ? (
           <Image source={{ uri: renter.photos[0] }} style={styles.heroImage} />
         ) : (
@@ -136,7 +165,18 @@ export const RenterProfileDetailScreen = () => {
           </View>
         ) : null}
 
-        {renter.neighborhood ? (
+        {renter.preferredNeighborhoods && renter.preferredNeighborhoods.length > 0 ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Preferred Neighborhoods</Text>
+            <View style={styles.tagRow}>
+              {renter.preferredNeighborhoods.map((n, idx) => (
+                <View key={idx} style={[styles.tag, { backgroundColor: 'rgba(59,130,246,0.15)' }]}>
+                  <Text style={[styles.tagText, { color: BLUE }]}>{n}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : renter.neighborhood ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Location</Text>
             <View style={styles.detailRow}>
@@ -146,6 +186,26 @@ export const RenterProfileDetailScreen = () => {
           </View>
         ) : null}
       </ScrollView>
+
+      <View style={[styles.bottomActions, { paddingBottom: insets.bottom + 16 }]}>
+        <Pressable
+          style={[styles.actionBtn, isShortlisted ? styles.actionBtnActive : null]}
+          onPress={handleShortlistToggle}
+        >
+          <Feather name="heart" size={18} color={isShortlisted ? ACCENT : '#fff'} />
+          <Text style={[styles.actionBtnText, isShortlisted ? { color: ACCENT } : null]}>
+            {isShortlisted ? 'Shortlisted' : 'Shortlist'}
+          </Text>
+        </Pressable>
+        <Pressable style={[styles.actionBtn, styles.messageBtnStyle]} onPress={handleMessage}>
+          <Feather name="message-circle" size={18} color="#fff" />
+          <Text style={styles.actionBtnText}>Message</Text>
+        </Pressable>
+        <Pressable style={[styles.actionBtn, styles.groupBtnStyle]} onPress={handleBuildGroup}>
+          <Feather name="users" size={18} color="#fff" />
+          <Text style={styles.actionBtnText}>Add to Group</Text>
+        </Pressable>
+      </View>
 
       <ReportBlockModal
         visible={showReportBlock}
@@ -177,4 +237,35 @@ const styles = StyleSheet.create({
   tag: { backgroundColor: '#222', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 6 },
   tagText: { color: '#aaa', fontSize: 12 },
   errorText: { color: '#999', fontSize: 16, textAlign: 'center', marginTop: 40 },
+  bottomActions: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    backgroundColor: BG,
+    borderTopWidth: 1,
+    borderTopColor: '#222',
+  },
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#222',
+    borderRadius: 12,
+    paddingVertical: 12,
+  },
+  actionBtnActive: {
+    backgroundColor: 'rgba(255,107,91,0.15)',
+    borderWidth: 1,
+    borderColor: ACCENT,
+  },
+  actionBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  messageBtnStyle: { backgroundColor: BLUE },
+  groupBtnStyle: { backgroundColor: ACCENT },
 });
