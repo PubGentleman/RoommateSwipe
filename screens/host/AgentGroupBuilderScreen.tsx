@@ -295,7 +295,7 @@ export const AgentGroupBuilderScreen = () => {
   };
 
   const handleSendInvites = async () => {
-    if (!user || !selectedListing || selectedRenters.length < 2) return;
+    if (!user || selectedRenters.length < 2) return;
 
     const existingGroups = await getAgentGroups(user.id);
     const activeGroupCount = existingGroups.filter(
@@ -308,12 +308,15 @@ export const AgentGroupBuilderScreen = () => {
 
     setSending(true);
     try {
+      const groupName = selectedListing
+        ? `${selectedListing.title} - Agent Group`
+        : `Agent Group - ${selectedRenters.map(r => r.name.split(' ')[0]).join(', ')}`;
       const group: AgentGroup = {
         id: `ag_${Date.now()}`,
-        name: `${selectedListing.title} - Agent Group`,
+        name: groupName,
         agentId: user.id,
-        targetListingId: selectedListing.id,
-        targetListing: selectedListing,
+        targetListingId: selectedListing?.id,
+        targetListing: selectedListing || undefined,
         members: selectedRenters,
         memberIds: selectedRenters.map(r => r.id),
         groupStatus: 'invited',
@@ -608,7 +611,7 @@ export const AgentGroupBuilderScreen = () => {
         ) : null}
       </ScrollView>
 
-      {selectedIds.size >= 2 && selectedListing ? (
+      {selectedIds.size >= 2 ? (
         <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
           <Pressable style={styles.reviewBtn} onPress={() => setStep('review')}>
             <Text style={styles.reviewBtnText}>Review Group ({selectedIds.size} members)</Text>
