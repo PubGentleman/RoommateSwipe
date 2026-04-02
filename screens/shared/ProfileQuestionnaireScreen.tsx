@@ -433,8 +433,15 @@ export const ProfileQuestionnaireScreen = () => {
   const stepsToShow = filteredSteps || autoFilteredSteps || onboardingSteps;
   const [currentFilteredIndex, setCurrentFilteredIndex] = useState(0);
   const useFilteredMapping = isMissingMode || isOnboarding || isPlaceSeekerUser || !!autoFilteredSteps;
+
+  useEffect(() => {
+    if (currentFilteredIndex >= stepsToShow.length && stepsToShow.length > 0) {
+      setCurrentFilteredIndex(stepsToShow.length - 1);
+    }
+  }, [stepsToShow.length]);
+
   const currentStep = useFilteredMapping
-    ? STEP_ORDER.indexOf(stepsToShow[currentFilteredIndex])
+    ? STEP_ORDER.indexOf(stepsToShow[Math.min(currentFilteredIndex, stepsToShow.length - 1)])
     : currentFilteredIndex;
   const [direction, setDirection] = useState<'forward' | 'back'>('forward');
   const [isSaving, setIsSaving] = useState(false);
