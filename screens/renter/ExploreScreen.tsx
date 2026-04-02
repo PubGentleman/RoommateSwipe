@@ -43,6 +43,7 @@ import { RhomeLogo } from '../../components/RhomeLogo';
 import { NeighborhoodAISheet } from '../../components/NeighborhoodAISheet';
 import { PropertyReviewsScreen } from '../shared/PropertyReviewsScreen';
 import { WriteReviewSheet } from '../../components/WriteReviewSheet';
+import { HostReviewsScreen } from '../shared/HostReviewsScreen';
 import { getReviewSummary, submitReview, checkReviewEligibility, ReviewSummary } from '../../services/reviewService';
 import { ReportBlockModal } from '../../components/ReportBlockModal';
 import { reportListing, reportUser, blockUser as blockUserRemote } from '../../services/moderationService';
@@ -130,6 +131,7 @@ export const ExploreScreen = () => {
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [criticalAgentIds, setCriticalAgentIds] = useState<string[]>([]);
   const [showPropertyDetail, setShowPropertyDetail] = useState(false);
+  const [hostReviewsTarget, setHostReviewsTarget] = useState<{ id: string; name: string } | null>(null);
   const [showNeighborhoodSheet, setShowNeighborhoodSheet] = useState(false);
   const [photoIndex, setPhotoIndex] = useState(0);
   const [showMatchBreakdown, setShowMatchBreakdown] = useState(false);
@@ -401,7 +403,7 @@ export const ExploreScreen = () => {
       const result = await Promise.race([
         supabase
           .from('users')
-          .select('id, full_name, avatar_url, host_type, company_name, agency_name, license_verified, units_managed, license_number, bio')
+          .select('id, full_name, avatar_url, host_type, company_name, agency_name, license_verified, units_managed, license_number, bio, host_avg_rating, host_review_count')
           .eq('role', 'host'),
         new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
       ]);
@@ -420,6 +422,8 @@ export const ExploreScreen = () => {
             licenseVerified: u.license_verified,
             licenseNumber: u.license_number,
             unitsManaged: u.units_managed,
+            hostAvgRating: u.host_avg_rating || 0,
+            hostReviewCount: u.host_review_count || 0,
             role: 'host',
             profileData: { bio: u.bio || '' },
           };
@@ -1459,11 +1463,19 @@ export const ExploreScreen = () => {
                       })()}
               </Text>
             </View>
-            {(hostUser?.licenseVerified || hostUser?.verifiedBusiness || (hostUser?.hostPlan && hostUser.hostPlan !== 'free' && hostUser.hostPlan !== 'none') || itemHostType === 'company' || itemHostType === 'agent') ? (
-              <View style={styles.respBadge}>
-                <Text style={styles.respBadgeText}>Fast reply</Text>
-              </View>
-            ) : null}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              {hostUser?.hostReviewCount && hostUser.hostReviewCount > 0 ? (
+                <View style={[styles.respBadge, { backgroundColor: 'rgba(167,139,250,0.12)', borderColor: 'rgba(167,139,250,0.25)' }]}>
+                  <Feather name="star" size={9} color="#a78bfa" />
+                  <Text style={[styles.respBadgeText, { color: '#a78bfa' }]}>{hostUser.hostAvgRating}</Text>
+                </View>
+              ) : null}
+              {(hostUser?.licenseVerified || hostUser?.verifiedBusiness || (hostUser?.hostPlan && hostUser.hostPlan !== 'free' && hostUser.hostPlan !== 'none') || itemHostType === 'company' || itemHostType === 'agent') ? (
+                <View style={styles.respBadge}>
+                  <Text style={styles.respBadgeText}>Fast reply</Text>
+                </View>
+              ) : null}
+            </View>
           </View>
           {discoverableGroups.has(item.id) ? (
             <Pressable
@@ -2359,6 +2371,21 @@ export const ExploreScreen = () => {
                               <Feather name="check-circle" size={10} color="#3b82f6" />
                               <Text style={{ fontSize: 10, fontWeight: '700', color: '#3b82f6' }}>Verified Agent</Text>
                             </View>
+                          ) : null}
+                          {(detailHostUser?.hostAvgRating || detailHostUser?.hostReviewCount) ? (
+                            <Pressable
+                              onPress={() => {
+                                const hId = selectedProperty.hostProfileId || (selectedProperty as any).hostId || '';
+                                if (hId) setHostReviewsTarget({ id: hId, name: selectedProperty.hostName || 'Host' });
+                              }}
+                              style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}
+                            >
+                              <Feather name="star" size={10} color="#a78bfa" />
+                              <Text style={{ fontSize: 10, fontWeight: '700', color: '#a78bfa' }}>
+                                {detailHostUser.hostAvgRating} ({detailHostUser.hostReviewCount} review{detailHostUser.hostReviewCount !== 1 ? 's' : ''})
+                              </Text>
+                              <Feather name="chevron-right" size={10} color="#a78bfa" />
+                            </Pressable>
                           ) : null}
                         </View>
                         {detailHostType !== 'individual' ? (
@@ -3433,6 +3460,16 @@ export const ExploreScreen = () => {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {hostReviewsTarget ? (
+        <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setHostReviewsTarget(null)}>
+          <HostReviewsScreen
+            hostId={hostReviewsTarget.id}
+            hostName={hostReviewsTarget.name}
+            onClose={() => setHostReviewsTarget(null)}
+          />
+        </Modal>
+      ) : null}
     </View>
   );
 };
@@ -4114,6 +4151,9 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   respBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
     backgroundColor: 'rgba(46,204,113,0.12)',
     borderWidth: 1,
     borderColor: 'rgba(46,204,113,0.25)',

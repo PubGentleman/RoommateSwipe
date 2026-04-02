@@ -569,6 +569,8 @@ export interface User {
   pi_auto_match_enabled?: boolean;
   pi_last_match_attempt?: string;
   responseRate?: number;
+  hostAvgRating?: number;
+  hostReviewCount?: number;
   profileData?: {
     bio?: string;
     budget?: number;

@@ -12,19 +12,21 @@ import {
   Platform,
 } from 'react-native';
 import { Feather } from './VectorIcons';
-import { REVIEW_TAGS } from '../services/reviewService';
+import { REVIEW_TAGS, HOST_REVIEW_TAGS } from '../services/reviewService';
 import * as Haptics from 'expo-haptics';
 
 interface WriteReviewSheetProps {
   visible: boolean;
   onClose: () => void;
   onSubmit: (data: { rating: number; reviewText: string; tags: string[] }) => Promise<void>;
+  reviewType?: 'property' | 'host';
 }
 
 export const WriteReviewSheet: React.FC<WriteReviewSheetProps> = ({
   visible,
   onClose,
   onSubmit,
+  reviewType = 'property',
 }) => {
   const [rating, setRating] = useState(0);
   const [reviewText, setReviewText] = useState('');
@@ -73,7 +75,7 @@ export const WriteReviewSheet: React.FC<WriteReviewSheetProps> = ({
       >
         <View style={s.sheet}>
           <View style={s.handle} />
-          <Text style={s.title}>Write a Review</Text>
+          <Text style={s.title}>{reviewType === 'host' ? 'Review this Host' : 'Write a Review'}</Text>
 
           <Text style={s.label}>Rating</Text>
           <View style={s.starsRow}>
@@ -92,7 +94,7 @@ export const WriteReviewSheet: React.FC<WriteReviewSheetProps> = ({
           <Text style={s.label}>Your Experience (optional)</Text>
           <TextInput
             style={s.textInput}
-            placeholder="Share your experience living here..."
+            placeholder={reviewType === 'host' ? 'How was your experience working with this host/agent?' : 'Share your experience living here...'}
             placeholderTextColor="rgba(255,255,255,0.3)"
             value={reviewText}
             onChangeText={t => setReviewText(t.slice(0, 500))}
@@ -105,7 +107,7 @@ export const WriteReviewSheet: React.FC<WriteReviewSheetProps> = ({
           <Text style={s.label}>Tags (optional)</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.tagsScroll}>
             <View style={s.tagsRow}>
-              {REVIEW_TAGS.map(tag => {
+              {(reviewType === 'host' ? HOST_REVIEW_TAGS : REVIEW_TAGS).map(tag => {
                 const active = selectedTags.includes(tag);
                 return (
                   <Pressable

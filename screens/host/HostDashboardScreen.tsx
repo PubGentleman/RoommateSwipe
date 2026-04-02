@@ -27,6 +27,7 @@ import { getAgentPlanLimits, type AgentPlan } from '../../constants/planLimits';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getAgentResponseAlerts } from '../../services/responseTrackingService';
 import { getHostCompletionPercentage } from '../../utils/profileReminderUtils';
+import { HostReviewsScreen } from '../shared/HostReviewsScreen';
 import { getMonthlyUsageCount, getHostPiMonthlyLimit } from '../../services/piMatchingService';
 import { getAvailableGroups } from '../../services/piAutoMatchService';
 
@@ -122,7 +123,10 @@ export const HostDashboardScreen = () => {
   const [agentPlacementCount, setAgentPlacementCount] = useState(0);
   const [reviewCount, setReviewCount] = useState(0);
   const [avgRating, setAvgRating] = useState(0);
+  const [hostReviewCount, setHostReviewCount] = useState(0);
+  const [hostAvgRating, setHostAvgRating] = useState(0);
   const [teamMemberCount, setTeamMemberCount] = useState(0);
+  const [showHostReviews, setShowHostReviews] = useState(false);
 
   const DASH_COLLAPSE_H = 50;
   const dashScrollY = useSharedValue(0);
@@ -307,6 +311,21 @@ export const HostDashboardScreen = () => {
           setAvgRating(0);
         }
       } catch { setReviewCount(0); setAvgRating(0); }
+
+      try {
+        const { data: hostReviewData } = await supabase
+          .from('host_reviews')
+          .select('rating')
+          .eq('host_id', user.id);
+        if (hostReviewData && hostReviewData.length > 0) {
+          setHostReviewCount(hostReviewData.length);
+          const avg = hostReviewData.reduce((sum: number, r: any) => sum + (r.rating || 0), 0) / hostReviewData.length;
+          setHostAvgRating(Math.round(avg * 10) / 10);
+        } else {
+          setHostReviewCount(0);
+          setHostAvgRating(0);
+        }
+      } catch { setHostReviewCount(0); setHostAvgRating(0); }
 
       if (user.hostType === 'company') {
         try {
@@ -871,6 +890,34 @@ export const HostDashboardScreen = () => {
           </View>
         ) : null}
 
+        <Pressable
+          style={styles.groupMatchCard}
+          onPress={() => setShowHostReviews(true)}
+        >
+          <View style={styles.groupMatchLeft}>
+            <View style={[styles.groupMatchIconWrap, { backgroundColor: 'rgba(167,139,250,0.15)' }]}>
+              <Feather name="message-circle" size={18} color="#a78bfa" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.groupMatchTitle}>My Reviews</Text>
+              <Text style={styles.groupMatchSub}>
+                {hostReviewCount > 0
+                  ? `${hostAvgRating} avg rating · ${hostReviewCount} review${hostReviewCount !== 1 ? 's' : ''} from renters`
+                  : 'No reviews yet — renters can review you after connecting'}
+              </Text>
+            </View>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            {hostReviewCount > 0 ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                <Feather name="star" size={13} color="#a78bfa" />
+                <Text style={{ color: '#a78bfa', fontSize: 13, fontWeight: '700' }}>{hostAvgRating}</Text>
+              </View>
+            ) : null}
+            <Feather name="chevron-right" size={18} color="#888" />
+          </View>
+        </Pressable>
+
         {(user?.hostType === 'agent' || user?.hostType === 'company') ? (
           <Pressable
             style={styles.groupMatchCard}
@@ -1359,6 +1406,16 @@ export const HostDashboardScreen = () => {
           </View>
         </View>
       </Modal>
+
+      {showHostReviews ? (
+        <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowHostReviews(false)}>
+          <HostReviewsScreen
+            hostId={user?.id || ''}
+            hostName={user?.name || 'Host'}
+            onClose={() => setShowHostReviews(false)}
+          />
+        </Modal>
+      ) : null}
     </View>
   );
 };
