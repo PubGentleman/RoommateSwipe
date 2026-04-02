@@ -50,7 +50,6 @@ export const ApplicationsScreen = () => {
       console.log('[Applications] Supabase fetch failed, falling back to StorageService:', error);
     }
     await StorageService.initializeWithMockData();
-    await StorageService.assignPropertiesToHost(user.id, user.name);
     const allProperties = await StorageService.getProperties();
     const myPropertyIds = allProperties
       .filter((p: Property) => p.hostId === user.id)

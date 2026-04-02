@@ -103,13 +103,7 @@ export const MyListingsScreen = () => {
       } else {
         const allProperties = await StorageService.getProperties();
         const myListings = allProperties.filter(p => p.hostId === user.id);
-        if (myListings.length > 0) {
-          setListings(myListings);
-        } else {
-          await StorageService.assignPropertiesToHost(user.id, user.name);
-          const refreshed = await StorageService.getProperties();
-          setListings(refreshed.filter(p => p.hostId === user.id));
-        }
+        setListings(myListings);
       }
     } catch {
       const allProperties = await StorageService.getProperties();
@@ -281,9 +275,8 @@ export const MyListingsScreen = () => {
     const statusColor = getStatusColor(status);
     const listingInquiries = getInquiriesForListing(listing.id);
     const pendingInquiries = listingInquiries.filter(c => c.status === 'pending');
-    const viewsHash = listing.id.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
-    const views = (viewsHash % 180) + 10;
-    const rate = listingInquiries.length > 0 ? ((listingInquiries.length / views) * 100).toFixed(1) : '0.0';
+    const views = listing.listingViewData?.totalViews || 0;
+    const rate = views > 0 && listingInquiries.length > 0 ? ((listingInquiries.length / views) * 100).toFixed(1) : '0.0';
 
     return (
       <View key={listing.id} style={styles.card}>
@@ -309,7 +302,7 @@ export const MyListingsScreen = () => {
               ${listing.price?.toLocaleString()}<Text style={styles.pricePeriod}>/mo</Text>
             </Text>
           </View>
-          {listing.featured ? (
+          {listing.featured && !isListingBoosted(listing) ? (
             <View style={styles.boostBadge}>
               <Feather name="star" size={10} color={GOLD} />
               <Text style={styles.boostBadgeText}>Featured</Text>
@@ -318,20 +311,20 @@ export const MyListingsScreen = () => {
           {isListingBoosted(listing) ? (
             <View style={[
               styles.boostedPill,
-              listing.listingBoost?.includesFeaturedBadge
+              listing.featured || listing.listingBoost?.includesFeaturedBadge
                 ? { backgroundColor: 'rgba(123,94,167,0.3)', borderColor: 'rgba(123,94,167,0.5)' }
                 : null,
             ]}>
               <Feather
-                name={listing.listingBoost?.includesFeaturedBadge ? 'star' : 'zap'}
+                name={listing.featured || listing.listingBoost?.includesFeaturedBadge ? 'star' : 'zap'}
                 size={10}
-                color={listing.listingBoost?.includesFeaturedBadge ? '#ffd700' : '#a855f7'}
+                color={listing.featured || listing.listingBoost?.includesFeaturedBadge ? '#ffd700' : '#a855f7'}
               />
               <Text style={[
                 styles.boostedPillText,
-                listing.listingBoost?.includesFeaturedBadge ? { color: '#ffd700' } : null,
+                listing.featured || listing.listingBoost?.includesFeaturedBadge ? { color: '#ffd700' } : null,
               ]}>
-                {listing.listingBoost?.includesFeaturedBadge ? 'Featured' : 'Boosted'}
+                {listing.featured || listing.listingBoost?.includesFeaturedBadge ? 'Featured' : 'Boosted'}
               </Text>
             </View>
           ) : null}

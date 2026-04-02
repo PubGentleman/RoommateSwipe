@@ -1428,20 +1428,6 @@ export const StorageService = {
       }
 
       if (hostType === 'company') {
-        const properties = await this.getProperties();
-        const companyListingIds: string[] = [];
-        for (let i = 0; i < Math.min(4, properties.length); i++) {
-          if (!properties[i].hostId || properties[i].hostId === '1') {
-            properties[i].hostId = userId;
-            properties[i].hostType = 'company';
-            companyListingIds.push(properties[i].id);
-          }
-        }
-        if (companyListingIds.length > 0) {
-          await this.setProperties(properties);
-          console.log(`[StorageService] Assigned ${companyListingIds.length} listings to company host`);
-        }
-
         const { createMockTeamMembers } = await import('./mockSeedData');
         const teamMembers = createMockTeamMembers(userId);
         await AsyncStorage.setItem(`@rhome/team_members_${userId}`, JSON.stringify(teamMembers));
@@ -1470,16 +1456,7 @@ export const StorageService = {
 
       if (isHost) {
         const allProperties = await this.getProperties();
-        let hostProperties = allProperties.filter(p => p.hostId === userId);
-        if (hostProperties.length === 0 && allProperties.length > 0) {
-          const assignCount = Math.min(3, allProperties.length);
-          for (let i = 0; i < assignCount; i++) {
-            allProperties[i].hostId = userId;
-          }
-          await AsyncStorage.setItem(STORAGE_KEYS.PROPERTIES, JSON.stringify(allProperties));
-          hostProperties = allProperties.slice(0, assignCount);
-          console.log(`[StorageService] Assigned ${assignCount} listings to host ${userId}`);
-        }
+        const hostProperties = allProperties.filter(p => p.hostId === userId);
         const hostPropIds = hostProperties.map(p => p.id);
         if (hostPropIds.length > 0) {
           const interestCards = createMockInterestCards(userId, hostPropIds);
