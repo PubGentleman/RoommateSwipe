@@ -417,10 +417,14 @@ export const BrowseRentersScreen = () => {
     }
   };
 
+  const isEntireSeeker = (renter: AgentRenter) => renter.roomType === 'entire_apartment' || renter.roomType === 'entire' || renter.roomType === 'apartment';
+  const isRoomSeeker = (renter: AgentRenter) => !isEntireSeeker(renter);
+
   const renderRenterCard = ({ item }: { item: AgentRenter }) => {
     const isShortlisted = shortlistedIds.has(item.id);
     const photo = item.photos?.[0];
     const optedOut = item.acceptAgentOffers === false;
+    const wantsEntire = isEntireSeeker(item);
 
     return (
       <View style={[styles.card, optedOut ? { opacity: 0.5 } : undefined]}>
@@ -433,8 +437,12 @@ export const BrowseRentersScreen = () => {
             </View>
           )}
           <View style={styles.cardInfo}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               <Text style={styles.cardName}>{item.name}, {item.age}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: wantsEntire ? '#3b82f620' : '#34d39920', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 }}>
+                <Feather name={wantsEntire ? 'home' : 'users'} size={9} color={wantsEntire ? '#3b82f6' : '#34d399'} />
+                <Text style={{ color: wantsEntire ? '#3b82f6' : '#34d399', fontSize: 10, fontWeight: '600' }}>{wantsEntire ? 'Entire' : 'Room'}</Text>
+              </View>
               {piRecommendedIds.has(item.id) ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#a855f7' + '20', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 }}>
                   <Feather name="cpu" size={10} color="#a855f7" />
@@ -525,29 +533,31 @@ export const BrowseRentersScreen = () => {
             <Feather name="message-circle" size={14} color="#fff" />
             <Text style={styles.cardActionText}>Message</Text>
           </Pressable>
-          <Pressable
-            style={[styles.cardActionBtn, { backgroundColor: ACCENT }]}
-            onPress={async () => {
-              if (!shortlistedIds.has(item.id) && user) {
-                try {
-                  const result = await addToShortlist(user.id, item.id, selectedListing?.id);
-                  if (result.success) {
-                    if (isCompanyHost) {
-                      await companyShortlistRenter(user.id, item.id, selectedListing?.id);
+          {!wantsEntire ? (
+            <Pressable
+              style={[styles.cardActionBtn, { backgroundColor: ACCENT }]}
+              onPress={async () => {
+                if (!shortlistedIds.has(item.id) && user) {
+                  try {
+                    const result = await addToShortlist(user.id, item.id, selectedListing?.id);
+                    if (result.success) {
+                      if (isCompanyHost) {
+                        await companyShortlistRenter(user.id, item.id, selectedListing?.id);
+                      }
+                      setShortlistedIds(prev => new Set(prev).add(item.id));
                     }
-                    setShortlistedIds(prev => new Set(prev).add(item.id));
-                  }
-                } catch (_e) {}
-              }
-              navigation.navigate('AgentGroupBuilder', {
-                preselectedIds: [item.id],
-                listingId: selectedListing?.id,
-              });
-            }}
-          >
-            <Feather name="users" size={14} color="#fff" />
-            <Text style={styles.cardActionText}>Add to Group</Text>
-          </Pressable>
+                  } catch (_e) {}
+                }
+                navigation.navigate('AgentGroupBuilder', {
+                  preselectedIds: [item.id],
+                  listingId: selectedListing?.id,
+                });
+              }}
+            >
+              <Feather name="users" size={14} color="#fff" />
+              <Text style={styles.cardActionText}>Add to Group</Text>
+            </Pressable>
+          ) : null}
           <Pressable
             style={styles.cardActionBtn}
             onPress={() => navigation.navigate('RenterProfileDetail', {
@@ -701,6 +711,16 @@ export const BrowseRentersScreen = () => {
         ))}
       </ScrollView>
 
+      {roomTypeFilter === 'entire_apartment' ? (
+        <Text style={{ color: '#888', fontSize: 11, marginBottom: 8, paddingHorizontal: 4 }}>
+          These renters are looking for an entire apartment — connect with them directly via message.
+        </Text>
+      ) : roomTypeFilter === 'room' ? (
+        <Text style={{ color: '#888', fontSize: 11, marginBottom: 8, paddingHorizontal: 4 }}>
+          These renters are looking for a room — shortlist and build groups for your listings.
+        </Text>
+      ) : null}
+
       {piQuotaLimit !== 0 && selectedListing ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#a855f7' + '10', borderRadius: 10, padding: 10, marginBottom: 10 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -794,23 +814,28 @@ export const BrowseRentersScreen = () => {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <Text style={styles.title}>Browse Renters</Text>
-        <Pressable
-          style={styles.buildBtn}
-          onPress={() => {
-            if (shortlistedIds.size < 2) {
-              showAlert({ title: 'Need More', message: 'Tap the heart icon on at least 2 renters to shortlist them, then tap Build Group.' });
-              return;
-            }
-            const shortlisted = renters.filter(r => shortlistedIds.has(r.id));
-            navigation.navigate('AgentGroupBuilder', {
-              preselectedIds: shortlisted.map(r => r.id),
-              listingId: selectedListing?.id,
-            });
-          }}
-        >
-          <Feather name="users" size={16} color="#fff" />
-          <Text style={styles.buildBtnText}>Build Group</Text>
-        </Pressable>
+        {roomTypeFilter !== 'entire_apartment' ? (() => {
+          const roomShortlistCount = renters.filter(r => shortlistedIds.has(r.id) && isRoomSeeker(r)).length;
+          return (
+            <Pressable
+              style={[styles.buildBtn, roomShortlistCount >= 2 ? styles.buildBtnReady : null]}
+              onPress={() => {
+                const roomShortlisted = renters.filter(r => shortlistedIds.has(r.id) && isRoomSeeker(r));
+                if (roomShortlisted.length < 2) {
+                  showAlert({ title: 'Need More', message: 'Tap the heart icon on at least 2 room-seeking renters to shortlist them, then tap Build Group.' });
+                  return;
+                }
+                navigation.navigate('AgentGroupBuilder', {
+                  preselectedIds: roomShortlisted.map(r => r.id),
+                  listingId: selectedListing?.id,
+                });
+              }}
+            >
+              <Feather name="users" size={16} color="#fff" />
+              <Text style={styles.buildBtnText}>Build Group{roomShortlistCount > 0 ? ` (${roomShortlistCount})` : ''}</Text>
+            </Pressable>
+          );
+        })() : null}
       </View>
 
       {loading ? (
@@ -890,7 +915,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
   title: { fontSize: 24, fontWeight: '700', color: '#fff' },
-  buildBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: ACCENT, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
+  buildBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#333', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
+  buildBtnReady: { backgroundColor: ACCENT },
   buildBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
   listingSelector: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: CARD_BG, borderRadius: 12, padding: 14, marginBottom: 12 },
   listingSelectorText: { flex: 1, color: '#ccc', fontSize: 14 },
