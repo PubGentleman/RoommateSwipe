@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Pressable, FlatList, TextInput, KeyboardAvoidingView, Platform, Modal, Linking, Text } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, StyleSheet, Pressable, FlatList, TextInput, KeyboardAvoidingView, Platform, Modal, Linking, Text, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
 import { ThemedText } from '../../components/ThemedText';
 import { useTheme } from '../../hooks/useTheme';
@@ -109,6 +109,13 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const [responseDelayHours, setResponseDelayHours] = useState<number>(0);
   const [requestedDifferentAgent, setRequestedDifferentAgent] = useState(false);
   const [showUnlockModal, setShowUnlockModal] = useState(false);
+  const [paywallRequiredPlan, setPaywallRequiredPlan] = useState<string>('elite');
+  const isNearBottom = useRef(true);
+
+  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    isNearBottom.current = contentOffset.y + layoutMeasurement.height >= contentSize.height - 100;
+  }, []);
 
   const hasMessagingAccess = canAccessMessages(user || null);
   const isConvUnlocked = canAccessConversation(user || null, conversationId);
@@ -369,7 +376,9 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   useEffect(() => {
     if (!conversationId.startsWith('group-')) return;
     const groupId = conversationId.replace('group-', '');
+    let isMounted = true;
     const subscription = subscribeToGroupMessages(groupId, (newMsg: any) => {
+      if (!isMounted) return;
       if (newMsg.senderId !== user?.id) {
         const mapped: Message = {
           id: newMsg.id,
@@ -380,34 +389,46 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           timestamp: new Date(newMsg.createdAt),
           read: true,
         } as any;
-        setMessages(prev => [...prev, mapped]);
-        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+        setMessages(prev => {
+          if (prev.some(m => m.id === newMsg.id)) return prev;
+          return [...prev, mapped];
+        });
+        if (isNearBottom.current) {
+          setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+        }
       }
     });
-    return () => { subscription.unsubscribe(); };
+    return () => { isMounted = false; subscription.unsubscribe(); };
   }, [conversationId, user?.id]);
 
   useEffect(() => {
     if (!matchIdFromConversation || conversationId.startsWith('group-') || conversationId.startsWith('conv-interest-')) return;
+    let isMounted = true;
     const unsubscribe = subscribeToMessages(matchIdFromConversation, (newMsg: any) => {
+      if (!isMounted) return;
       if (newMsg.sender_id !== user?.id || newMsg.sender_id === null || newMsg.is_system_message) {
-        const mapped: Message = {
-          id: newMsg.id,
-          senderId: newMsg.is_system_message ? 'system' : newMsg.sender_id,
-          text: newMsg.content,
-          content: newMsg.content,
-          timestamp: new Date(newMsg.created_at),
-          read: newMsg.read || false,
-          readAt: newMsg.read_at ? new Date(newMsg.read_at) : undefined,
-          message_type: newMsg.message_type || 'text',
-          metadata: newMsg.metadata || undefined,
-        };
-        setMessages(prev => [...prev, mapped]);
-        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+        setMessages(prev => {
+          if (prev.some(m => m.id === newMsg.id)) return prev;
+          const mapped: Message = {
+            id: newMsg.id,
+            senderId: newMsg.is_system_message ? 'system' : newMsg.sender_id,
+            text: newMsg.content,
+            content: newMsg.content,
+            timestamp: new Date(newMsg.created_at),
+            read: newMsg.read || false,
+            readAt: newMsg.read_at ? new Date(newMsg.read_at) : undefined,
+            message_type: newMsg.message_type || 'text',
+            metadata: newMsg.metadata || undefined,
+          };
+          return [...prev, mapped];
+        });
+        if (isNearBottom.current) {
+          setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+        }
         try { markSupabaseMessagesAsRead(matchIdFromConversation); } catch (_e) {}
       }
     });
-    return () => { unsubscribe(); };
+    return () => { isMounted = false; unsubscribe(); };
   }, [matchIdFromConversation, user?.id]);
 
   const loadMeetupSuggestion = async () => {
@@ -687,7 +708,17 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const sendMessage = async () => {
     if (!inputText.trim() || !user) return;
 
-    if (messagingLocked) return;
+    if (messagingLocked) {
+      if (canUnlock) {
+        setShowUnlockModal(true);
+      } else {
+        alert({
+          title: 'Messaging Locked',
+          message: `Upgrade to ${upgradePlan.plan} (${upgradePlan.price}) to send messages.`,
+        });
+      }
+      return;
+    }
 
     if (isColdMessage && !coldMessageResponded) {
       const coldCheck = await canSendColdMessage();
@@ -1010,17 +1041,44 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
   const handleAcceptBooking = async (messageId: string, metadata: any) => {
     setCardActionLoading(messageId);
     try {
+      const monthlyRent = Number(metadata.monthly_rent);
+      const securityDeposit = metadata.security_deposit ? Number(metadata.security_deposit) : null;
+      const leaseLength = Number(metadata.lease_length);
+
+      if (isNaN(monthlyRent) || monthlyRent <= 0 || monthlyRent > 50000) {
+        await alert({ title: 'Invalid Data', message: 'Monthly rent is invalid.' });
+        return;
+      }
+      if (isNaN(leaseLength) || leaseLength < 1 || leaseLength > 36) {
+        await alert({ title: 'Invalid Data', message: 'Lease length is invalid.' });
+        return;
+      }
+      if (securityDeposit !== null && (isNaN(securityDeposit) || securityDeposit < 0)) {
+        await alert({ title: 'Invalid Data', message: 'Security deposit is invalid.' });
+        return;
+      }
+
       const bookingHostId = inquiryGroup?.hostId ?? otherUser?.id;
       const bookingListingId = metadata.listing_id || inquiryGroup?.listingId || conversationListingId;
+
+      if (!bookingHostId) {
+        await alert({ title: 'Error', message: 'Cannot determine listing host.' });
+        return;
+      }
+      if (!bookingListingId) {
+        await alert({ title: 'Error', message: 'No listing associated with this conversation.' });
+        return;
+      }
+
       if (bookingListingId && bookingHostId) {
         const bookingResult = await createBooking({
           listingId: bookingListingId,
           hostId: bookingHostId,
           renterId: user?.id || '',
           moveInDate: metadata.move_in_date,
-          leaseLength: metadata.lease_length,
-          monthlyRent: metadata.monthly_rent,
-          securityDeposit: metadata.security_deposit || null,
+          leaseLength,
+          monthlyRent,
+          securityDeposit,
           groupId: chatGroupSize > 1 ? inquiryGroup?.id : null,
         });
         if (!bookingResult.success) {
@@ -1714,7 +1772,13 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
           renderItem={renderMessage}
           keyExtractor={item => item.id}
           contentContainerStyle={[styles.messagesList, { paddingBottom: Spacing.lg }]}
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+          onContentSizeChange={() => {
+            if (isNearBottom.current) {
+              flatListRef.current?.scrollToEnd({ animated: true });
+            }
+          }}
+          onScroll={handleScroll}
+          scrollEventThrottle={100}
         />
       </View>
 
@@ -1898,19 +1962,21 @@ export const ChatScreen = ({ route, navigation }: ChatScreenProps) => {
         }}
       />
 
-      {otherUser ? (
+      {(otherUser || inquiryGroup?.hostId) ? (
         <ReportBlockModal
           visible={showReportBlockModal}
           onClose={() => setShowReportBlockModal(false)}
-          userName={otherUser.name}
+          userName={otherUser?.name || inquiryGroup?.hostName || 'User'}
           onReport={async (reason) => {
-            if (otherUser) {
-              await reportUser(otherUser.id, reason);
+            const targetId = otherUser?.id || inquiryGroup?.hostId;
+            if (targetId) {
+              await reportUser(targetId, reason);
             }
           }}
           onBlock={async () => {
-            if (otherUser) {
-              await blockUser(otherUser.id);
+            const targetId = otherUser?.id || inquiryGroup?.hostId;
+            if (targetId) {
+              await blockUser(targetId);
               navigation.goBack();
             }
           }}

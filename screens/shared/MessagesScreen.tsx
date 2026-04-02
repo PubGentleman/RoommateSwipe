@@ -14,10 +14,19 @@ import { Image } from 'expo-image';
 import { calculateCompatibility } from '../../utils/matchingAlgorithm';
 import { LinearGradient } from 'expo-linear-gradient';
 import { User } from '../../types/models';
-import { getConversations as getSupabaseConversations, subscribeToAllMessages } from '../../services/messageService';
+import { getConversations as getSupabaseConversations, subscribeToAllMessages, getHostConversations } from '../../services/messageService';
 import { getMyInquiryGroups } from '../../services/groupService';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { Group } from '../../types/models';
+
+function safeDate(value: any): Date {
+  if (value instanceof Date && !isNaN(value.getTime())) return value;
+  if (typeof value === 'string' || typeof value === 'number') {
+    const d = new Date(value);
+    if (!isNaN(d.getTime())) return d;
+  }
+  return new Date();
+}
 
 type MessagesScreenNavigationProp = NativeStackNavigationProp<MessagesStackParamList, 'MessagesList'>;
 
@@ -82,7 +91,7 @@ export const MessagesScreen = () => {
   useFocusEffect(
     React.useCallback(() => {
       loadConversations();
-    }, [user])
+    }, [user, isHostMode])
   );
 
   const loadConversationsFromSupabase = async (): Promise<Conversation[]> => {
@@ -96,7 +105,7 @@ export const MessagesScreen = () => {
         online: false,
       },
       lastMessage: sc.lastMessage || 'You matched!',
-      timestamp: new Date(sc.lastMessageAt),
+      timestamp: safeDate(sc.lastMessageAt),
       unread: sc.unreadCount || 0,
       messages: [],
       matchType: sc.matchType === 'super_interest' ? 'super_interest' : sc.matchType === 'cold' ? 'cold' : 'mutual',
@@ -127,6 +136,36 @@ export const MessagesScreen = () => {
       for (const localConv of localConversations) {
         if (!existingConversations.some(c => c.id === localConv.id)) {
           existingConversations.push(localConv);
+        }
+      }
+
+      if (isHostMode && user?.id) {
+        try {
+          const hostConvs = await getHostConversations(user.id);
+          for (const hc of hostConvs) {
+            if (!existingConversations.some(c => c.id === hc.id)) {
+              existingConversations.push({
+                id: hc.id,
+                participant: {
+                  id: hc.participant?.id || '',
+                  name: hc.name || hc.participant?.full_name || 'Renter',
+                  photo: hc.avatar || hc.participant?.avatar_url || undefined,
+                  online: false,
+                },
+                lastMessage: hc.lastMessage || 'New inquiry',
+                timestamp: safeDate(hc.timestamp),
+                unread: hc.unread || 0,
+                messages: [],
+                isInquiryThread: true,
+                hostId: hc.hostId || user.id,
+                inquiryStatus: hc.inquiryStatus,
+                listingId: hc.listingId,
+                listingAddress: hc.listingAddress,
+              } as any);
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to load host conversations:', e);
         }
       }
 
@@ -230,10 +269,15 @@ export const MessagesScreen = () => {
         }
       });
 
-      userConversations.sort((a, b) => {
+      const accessibleConversations = userConversations.map(c => ({
+        ...c,
+        unread: canAccessConversation(user, c.id) ? c.unread : 0,
+      }));
+
+      accessibleConversations.sort((a, b) => {
         if (a.isInquiryThread && a.isSuperInterest && !(b.isInquiryThread && b.isSuperInterest)) return -1;
         if (b.isInquiryThread && b.isSuperInterest && !(a.isInquiryThread && a.isSuperInterest)) return 1;
-        return b.timestamp.getTime() - a.timestamp.getTime();
+        return safeDate(b.timestamp).getTime() - safeDate(a.timestamp).getTime();
       });
 
       const safeToSave = existingConversations.map(c => {
@@ -244,7 +288,7 @@ export const MessagesScreen = () => {
         return c;
       });
       await StorageService.setConversations(safeToSave);
-      setConversations(userConversations);
+      setConversations(accessibleConversations);
       if (!isHostMode) {
         try {
           const groups = await getMyInquiryGroups();
@@ -276,7 +320,8 @@ export const MessagesScreen = () => {
 
   const formatTime = (date: Date) => {
     const now = new Date();
-    const diff = now.getTime() - date.getTime();
+    const safe = safeDate(date);
+    const diff = now.getTime() - safe.getTime();
     const mins = Math.floor(diff / (1000 * 60));
     const hours = Math.floor(diff / (1000 * 60 * 60));
 

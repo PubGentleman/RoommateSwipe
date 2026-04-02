@@ -7,11 +7,15 @@ async function checkMessagingPaywall(conversationId?: string) {
 
   const { data: userRow } = await supabase
     .from('users')
-    .select('role, host_type, agent_plan, free_message_unlock_used, free_message_unlock_conversation_id')
+    .select('role, host_type, agent_plan, company_plan, free_message_unlock_used, free_message_unlock_conversation_id')
     .eq('id', authUser.id)
     .single();
 
   if (!userRow) return;
+
+  let hostPlan = 'free';
+  if (userRow.agent_plan) hostPlan = userRow.agent_plan;
+  if (userRow.company_plan) hostPlan = userRow.company_plan;
 
   const fakeUser = {
     role: userRow.role,
@@ -19,7 +23,7 @@ async function checkMessagingPaywall(conversationId?: string) {
     agentPlan: userRow.agent_plan,
     freeMessageUnlockUsed: userRow.free_message_unlock_used,
     freeMessageUnlockConversationId: userRow.free_message_unlock_conversation_id,
-    hostSubscription: { plan: 'free' },
+    hostSubscription: { plan: hostPlan },
   } as any;
 
   if (!canAccessMessages(fakeUser)) {
@@ -232,7 +236,7 @@ export function subscribeToMessages(matchId: string, onMessage: (message: any) =
 
 export function subscribeToAllMessages(userId: string, onUpdate: () => void) {
   const channel = supabase
-    .channel('all-messages')
+    .channel(`user-messages-${userId}`)
     .on(
       'postgres_changes',
       {
@@ -240,8 +244,11 @@ export function subscribeToAllMessages(userId: string, onUpdate: () => void) {
         schema: 'public',
         table: 'messages',
       },
-      () => {
-        onUpdate();
+      (payload) => {
+        const msg = payload.new as any;
+        if (msg.sender_id !== userId) {
+          onUpdate();
+        }
       }
     )
     .subscribe();
@@ -249,4 +256,62 @@ export function subscribeToAllMessages(userId: string, onUpdate: () => void) {
   return () => {
     supabase.removeChannel(channel);
   };
+}
+
+export async function getHostConversations(hostId: string): Promise<any[]> {
+  try {
+    const { data: inquiryGroups, error } = await supabase
+      .from('inquiry_groups')
+      .select(`
+        id,
+        host_id,
+        listing_id,
+        listing_address,
+        status,
+        created_at,
+        updated_at,
+        members:group_members(
+          user_id,
+          users:user_id(id, full_name, avatar_url)
+        ),
+        messages:group_messages(
+          id, content, sender_id, created_at, read
+        )
+      `)
+      .eq('host_id', hostId)
+      .order('updated_at', { ascending: false })
+      .limit(50);
+
+    if (error || !inquiryGroups) return [];
+
+    return inquiryGroups.map((group: any) => {
+      const sortedMsgs = (group.messages || []).sort(
+        (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      const lastMsg = sortedMsgs[0];
+      const unread = (group.messages || []).filter(
+        (m: any) => m.sender_id !== hostId && !m.read
+      ).length;
+      const memberUser = group.members?.[0]?.users;
+
+      return {
+        id: `conv-interest-${group.id}`,
+        hostId: group.host_id,
+        listingId: group.listing_id,
+        listingAddress: group.listing_address,
+        isInquiryThread: true,
+        inquiryStatus: group.status,
+        name: memberUser?.full_name || 'Renter',
+        avatar: memberUser?.avatar_url || null,
+        participant: memberUser || null,
+        lastMessage: lastMsg?.content || '',
+        timestamp: new Date(lastMsg?.created_at || group.updated_at),
+        unread,
+        messages: [],
+      };
+    });
+  } catch (e) {
+    console.warn('[messageService] Failed to load host conversations:', e);
+    return [];
+  }
 }

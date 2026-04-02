@@ -92,10 +92,72 @@ serve(async (req) => {
     const { conversationId, userId1, userId2, messages } = await req.json();
 
     if (authUser.id !== userId1 && authUser.id !== userId2) {
-      return new Response(JSON.stringify({ error: 'Forbidden' }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      const { data: userRecord } = await supabase
+        .from('users')
+        .select('role, company_id')
+        .eq('id', authUser.id)
+        .single();
+
+      const isAgentOrHost = userRecord?.role === 'agent' || userRecord?.role === 'host';
+
+      if (!isAgentOrHost) {
+        return new Response(JSON.stringify({ error: 'Forbidden' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const matchIdFromConversation = conversationId?.replace('conv_', '') || '';
+      const { data: matchOwnership } = await supabase
+        .from('matches')
+        .select('id, user_id_1, user_id_2')
+        .eq('id', matchIdFromConversation)
+        .maybeSingle();
+
+      if (!matchOwnership) {
+        const { data: inquiryOwnership } = await supabase
+          .from('inquiry_groups')
+          .select('id, host_id')
+          .or(`host_id.eq.${authUser.id}`)
+          .or(`id.eq.${conversationId?.replace('conv-interest-', '') || ''}`)
+          .maybeSingle();
+
+        const isInquiryHost = inquiryOwnership?.host_id === authUser.id;
+        let isCompanyTeamMember = false;
+
+        if (!isInquiryHost && userRecord?.company_id && inquiryOwnership) {
+          const { data: hostRecord } = await supabase
+            .from('users')
+            .select('company_id')
+            .eq('id', inquiryOwnership.host_id)
+            .single();
+
+          if (hostRecord?.company_id === userRecord.company_id) {
+            const { data: teamCheck } = await supabase
+              .from('company_team_members')
+              .select('id')
+              .eq('company_id', userRecord.company_id)
+              .eq('user_id', authUser.id)
+              .maybeSingle();
+            isCompanyTeamMember = !!teamCheck;
+          }
+        }
+
+        if (!isInquiryHost && !isCompanyTeamMember) {
+          return new Response(JSON.stringify({ error: 'Forbidden' }), {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      } else {
+        const isParticipant = matchOwnership.user_id_1 === authUser.id || matchOwnership.user_id_2 === authUser.id;
+        if (!isParticipant) {
+          return new Response(JSON.stringify({ error: 'Forbidden' }), {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
     }
 
     const { data: existing } = await supabase

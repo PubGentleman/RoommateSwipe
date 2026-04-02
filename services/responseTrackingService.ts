@@ -25,7 +25,7 @@ export async function updateRenterMessageTimestamp(conversationId: string): Prom
         response_status: 'active',
       })
       .eq('id', conversationId);
-  } catch {}
+  } catch (e) { console.warn('[ResponseTracking] Failed to update renter timestamp:', e); }
 
   const conversations = await StorageService.getConversations();
   const conv = conversations.find(c => c.id === conversationId);
@@ -46,7 +46,7 @@ export async function updateAgentResponseTimestamp(conversationId: string): Prom
         response_status: 'active',
       })
       .eq('id', conversationId);
-  } catch {}
+  } catch (e) { console.warn('[ResponseTracking] Failed to update agent timestamp:', e); }
 
   const conversations = await StorageService.getConversations();
   const conv = conversations.find(c => c.id === conversationId);
@@ -145,7 +145,7 @@ export async function calculateResponseRate(agentId: string): Promise<number> {
       .from('users')
       .update({ response_rate: Math.round(rate * 100) / 100 })
       .eq('id', agentId);
-  } catch {}
+  } catch (e) { console.warn('[ResponseTracking] Failed to update response rate:', e); }
 
   const users = await StorageService.getUsers();
   const userIdx = users.findIndex(u => u.id === agentId);
@@ -170,7 +170,7 @@ export async function getAgentResponseAlerts(companyId: string): Promise<Respons
       const companyAgentIds = teamMembers.map(m => m.user_id);
       return allAlerts.filter(alert => companyAgentIds.includes(alert.agentId));
     }
-  } catch {}
+  } catch (e) { console.warn('[ResponseTracking] Failed to fetch company team members:', e); }
 
   const users = await StorageService.getUsers();
   const companyAgentIds = users
@@ -222,15 +222,34 @@ export async function requestDifferentAgent(
   renterName: string,
   agentName: string
 ): Promise<void> {
-  const users = await StorageService.getUsers();
-  const companyOwner = users.find(
-    u => u.id === companyId || ((u as any).company_id === companyId && (u as any).teamRole === 'owner')
-  );
-  if (!companyOwner) return;
+  let ownerId: string | null = null;
+
+  try {
+    const { data: companyOwner } = await supabase
+      .from('company_team_members')
+      .select('user_id')
+      .eq('company_id', companyId)
+      .eq('role', 'owner')
+      .limit(1)
+      .single();
+    if (companyOwner) ownerId = companyOwner.user_id;
+  } catch (e) {
+    console.warn('[ResponseTracking] Failed to find company owner via Supabase:', e);
+  }
+
+  if (!ownerId) {
+    const users = await StorageService.getUsers();
+    const fallback = users.find(
+      (u: any) => u.company_id === companyId && u.teamRole === 'owner'
+    );
+    if (fallback) ownerId = fallback.id;
+  }
+
+  if (!ownerId) return;
 
   await StorageService.addNotification({
     id: `notif_reassign_${Date.now()}`,
-    userId: companyOwner.id,
+    userId: ownerId!,
     type: 'system',
     title: 'Agent Reassignment Requested',
     body: `${renterName} has requested a different agent. ${agentName} has not responded within 48 hours.`,

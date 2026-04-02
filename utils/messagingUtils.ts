@@ -18,11 +18,16 @@ export async function getDailyColdMessageCount(userId: string): Promise<number> 
   return stored ? parseInt(stored, 10) : 0;
 }
 
+let coldMessageMutex = Promise.resolve();
+
 export async function incrementDailyColdMessageCount(userId: string): Promise<void> {
-  const today = new Date().toISOString().split('T')[0];
-  const key = `cold_msg_count_${userId}_${today}`;
-  const current = await getDailyColdMessageCount(userId);
-  await AsyncStorage.setItem(key, String(current + 1));
+  coldMessageMutex = coldMessageMutex.then(async () => {
+    const today = new Date().toISOString().split('T')[0];
+    const key = `cold_msg_count_${userId}_${today}`;
+    const current = parseInt(await AsyncStorage.getItem(key) || '0', 10);
+    await AsyncStorage.setItem(key, String(current + 1));
+  });
+  await coldMessageMutex;
 }
 
 export const MESSAGING_LIMITS = {

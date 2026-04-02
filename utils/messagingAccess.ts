@@ -12,7 +12,7 @@ function isPaidPlan(plan: string | undefined | null): boolean {
 }
 
 export function canAccessMessages(user: User | null): boolean {
-  if (!user) return true;
+  if (!user) return false;
   const hostType = user.hostType || (user as any).host_type;
 
   if (hostType === 'agent') {
@@ -35,7 +35,7 @@ export function canAccessMessages(user: User | null): boolean {
 }
 
 export function canAccessConversation(user: User | null, conversationId: string): boolean {
-  if (!user) return true;
+  if (!user) return false;
   if (canAccessMessages(user)) return true;
 
   const unlockedConvoId = user.freeMessageUnlockConversationId ||

@@ -18,6 +18,13 @@ const SENSITIVE_PATTERNS = [
   /\bsnapchat\s*:?\s*[\w.]+/gi,
   /\bwhatsapp\s*:?\s*[\d+\s()-]+/gi,
   /\btelegram\s*:?\s*@?[\w.]+/gi,
+  /\b[\w.-]+@[\w.-]+\.\w{2,}\b/g,
+  /\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/g,
+  /\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b/g,
+  /https?:\/\/[^\s]+/gi,
+  /\bvenmo\s*:?\s*@?[\w.]+/gi,
+  /\bcashapp\s*:?\s*\$?[\w.]+/gi,
+  /\bzelle\s*:?\s*[\w@.]+/gi,
 ]
 
 const containsSensitiveInfo = (text: string): boolean => {
