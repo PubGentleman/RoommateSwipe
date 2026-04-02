@@ -7,7 +7,7 @@ export function canAccessMessages(user: User | null): boolean {
 
   if (hostType === 'agent') {
     const plan = user.agentPlan || (user as any).agent_plan;
-    return plan !== 'pay_per_use' && plan !== null && plan !== undefined;
+    return !!plan && plan !== 'pay_per_use' && plan !== 'free' && plan !== 'none';
   }
 
   if (hostType === 'company') {

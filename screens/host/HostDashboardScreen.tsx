@@ -142,7 +142,7 @@ export const HostDashboardScreen = () => {
   const AnimatedScrollView = Animated.ScrollView;
 
   const isOnFreeTier = isAgent
-    ? (!agentPlan || agentPlan === 'pay_per_use')
+    ? (!agentPlan || agentPlan === 'pay_per_use' || agentPlan === 'free')
     : (hostSub && isFreePlan(hostSub.plan));
   useEffect(() => {
     if (isOnFreeTier) {
@@ -603,9 +603,9 @@ export const HostDashboardScreen = () => {
             <Text style={styles.planSummaryText}>
               {isAgent
                 ? (agentPlan === 'pay_per_use' ? 'Pay Per Use \u00B7 Upgrade for more features' :
-                   agentPlan === 'starter' ? 'Agent Starter \u00B7 $29.99/mo' :
-                   agentPlan === 'pro' ? 'Agent Pro \u00B7 $79.99/mo' :
-                   `Agent Business \u00B7 $149.99/mo \u00B7 ${activeCount} listings active`)
+                   agentPlan === 'starter' || agentPlan === 'agent_starter' ? 'Agent Starter \u00B7 $49/mo' :
+                   agentPlan === 'pro' || agentPlan === 'agent_pro' ? 'Agent Pro \u00B7 $99/mo' :
+                   `Agent Business \u00B7 $149/mo \u00B7 ${activeCount} listings active`)
                 : isCompany
                   ? (hostSub.plan === 'starter' ? 'Company Starter \u00B7 $99/mo' :
                      hostSub.plan === 'pro' ? 'Company Pro \u00B7 $199/mo' :
@@ -1304,7 +1304,7 @@ export const HostDashboardScreen = () => {
             <Feather name="bar-chart-2" size={15} color="rgba(255,255,255,0.6)" />
             <Text style={styles.qaSecondaryText}>Analytics</Text>
             {isAgent
-              ? (!agentPlan || agentPlan === 'pay_per_use' || agentPlan === 'starter'
+              ? (!agentPlan || agentPlan === 'pay_per_use' || agentPlan === 'starter' || agentPlan === 'free' || agentPlan === 'agent_starter'
                 ? <View style={styles.proBadge}><Text style={styles.proBadgeText}>Pro</Text></View>
                 : null)
               : (hostPlan === 'free' || hostPlan === 'none' || hostPlan === 'starter'
@@ -1315,7 +1315,7 @@ export const HostDashboardScreen = () => {
             <Feather name="star" size={15} color={GOLD} />
             <Text style={styles.qaSecondaryText}>Plans</Text>
           </Pressable>
-          {(isAgent ? agentPlan === 'business' : hostPlan === 'business') ? (
+          {(isAgent ? (agentPlan === 'business' || agentPlan === 'agent_business') : hostPlan === 'business') ? (
             <Pressable style={styles.qaSecondary} onPress={() => {
               showAlert({
                 title: 'Dedicated Support',

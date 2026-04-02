@@ -178,14 +178,18 @@ export const HostSubscriptionScreen = () => {
       const newSub = subscriptionFromPlan('free' as HostPlanType, hostSub);
       await StorageService.updateHostSubscription(user.id, newSub);
       setHostSub(newSub);
-      await updateUser({
+      const downgradeUpdates: any = {
         hostSubscription: {
           ...user.hostSubscription,
           plan: 'free' as const,
           status: 'active' as const,
           billingCycle: 'monthly' as const,
         },
-      });
+      };
+      if (hostType === 'agent') {
+        downgradeUpdates.agentPlan = 'pay_per_use';
+      }
+      await updateUser(downgradeUpdates);
       if (isFirstTimeHost) {
         await completeHostOnboarding();
       }
@@ -209,14 +213,19 @@ export const HostSubscriptionScreen = () => {
       const newSub = subscriptionFromPlan(plan, hostSub);
       await StorageService.updateHostSubscription(user.id, newSub);
       setHostSub(newSub);
-      await updateUser({
+      const userUpdates: any = {
         hostSubscription: {
           ...user.hostSubscription,
           plan: plan as 'starter' | 'pro' | 'business',
           status: 'active' as const,
           billingCycle: billingCycle as any,
         },
-      });
+      };
+      if (hostType === 'agent') {
+        const normalizedAgentPlan = plan.replace('agent_', '');
+        userUpdates.agentPlan = normalizedAgentPlan === 'free' ? 'pay_per_use' : normalizedAgentPlan;
+      }
+      await updateUser(userUpdates);
       if (isFirstTimeHost) {
         await completeHostOnboarding();
       }

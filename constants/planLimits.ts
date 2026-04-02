@@ -210,7 +210,7 @@ const _agentBase = {
     shortlistLimit: 10,
     activeGroupsLimit: 1,
     monthlyPlacementLimit: 2,
-    listingLimit: 5,
+    listingLimit: 10,
     hasAISuggestions: false,
     hasAIGroupSuggestions: false,
     hasCompatibilityMatrix: false,
