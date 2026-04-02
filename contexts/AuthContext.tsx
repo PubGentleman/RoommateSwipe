@@ -285,6 +285,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         listing_type_preference: profile.listing_type_preference || 'any',
         apartment_search_type: profile.apartment_search_type || null,
       } : {
+        bio: supabaseUser.bio || undefined,
+        occupation: supabaseUser.occupation || undefined,
         neighborhood: supabaseUser.neighborhood || 'Williamsburg',
         city: supabaseUser.city || 'New York',
         state: supabaseUser.state || 'NY',
@@ -1054,6 +1056,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updatedUser: User = {
       ...user,
       ...updates,
+      profileData: updates.profileData
+        ? { ...user.profileData, ...updates.profileData }
+        : user.profileData,
     };
 
     await StorageService.setCurrentUser(updatedUser);
