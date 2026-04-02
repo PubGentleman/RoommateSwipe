@@ -533,6 +533,7 @@ export const PlansScreen = () => {
             <Text style={[styles.billingChipText, billingCycle === '3month' ? styles.billingChipTextActive : null]}>
               3 Months
             </Text>
+            {billingCycle !== '3month' ? <View style={styles.saveBadgeInline}><Text style={styles.saveBadgeInlineText}>-10%</Text></View> : null}
           </Pressable>
           <Pressable
             onPress={() => setBillingCycle('annual')}
@@ -541,12 +542,8 @@ export const PlansScreen = () => {
             <Text style={[styles.billingChipText, billingCycle === 'annual' ? styles.billingChipTextActive : null]}>
               Annual
             </Text>
+            {billingCycle !== 'annual' ? <View style={styles.saveBadgeInline}><Text style={styles.saveBadgeInlineText}>-17%</Text></View> : null}
           </Pressable>
-          {billingCycle !== 'monthly' ? (
-            <View style={styles.savePill}>
-              <Text style={styles.savePillText}>{billingCycle === '3month' ? 'Save 10%' : 'Save 17%'}</Text>
-            </View>
-          ) : null}
         </View>
 
         {PLAN_DISPLAY.map(renderPlanCard)}
@@ -679,9 +676,10 @@ const styles = StyleSheet.create({
   },
   billingChip: {
     paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     borderRadius: 10,
     backgroundColor: '#1a1a1a',
+    alignItems: 'center' as const,
   },
   billingChipActive: {
     backgroundColor: ROOMDR_CORAL,
@@ -695,6 +693,14 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   savePillText: { fontSize: 11, fontWeight: '700', color: '#fff' },
+  saveBadgeInline: {
+    backgroundColor: '#16A34A',
+    borderRadius: 8,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    marginTop: 2,
+  },
+  saveBadgeInlineText: { fontSize: 9, fontWeight: '700', color: '#fff' },
 
   planCard: {
     backgroundColor: CARD_BG,
