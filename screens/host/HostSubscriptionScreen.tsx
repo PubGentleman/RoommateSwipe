@@ -210,10 +210,13 @@ export const HostSubscriptionScreen = () => {
     if (!selectedPlan || !user || !hostSub) return;
     setSubscribing(true);
     try {
-      const basePlan = selectedPlan as HostPlanType;
-      const storedPlan = hostType === 'agent' ? `agent_${basePlan}` as HostPlanType
-        : hostType === 'company' ? `company_${basePlan}` as HostPlanType
-        : basePlan;
+      const rawPlan = selectedPlan as string;
+      const alreadyPrefixed = rawPlan.startsWith('agent_') || rawPlan.startsWith('company_');
+      const storedPlan = alreadyPrefixed ? rawPlan as HostPlanType
+        : hostType === 'agent' ? `agent_${rawPlan}` as HostPlanType
+        : hostType === 'company' ? `company_${rawPlan}` as HostPlanType
+        : rawPlan as HostPlanType;
+      const basePlan = rawPlan.replace(/^(agent_|company_)/, '') as HostPlanType;
       const planData = HOST_PLANS[storedPlan] || HOST_PLANS[basePlan];
       const price = billingPrice(planData.price, billingCycle);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
