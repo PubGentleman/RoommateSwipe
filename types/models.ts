@@ -86,7 +86,7 @@ export interface GroupApartmentVote {
   createdAt: string;
 }
 
-export type HostPlanType = 'free' | 'none' | 'starter' | 'pro' | 'business';
+export type HostPlanType = 'free' | 'none' | 'starter' | 'pro' | 'business' | 'enterprise' | 'agent_starter' | 'agent_pro' | 'agent_business' | 'company_starter' | 'company_pro' | 'company_enterprise';
 export type AgentPlanType = 'pay_per_use' | 'starter' | 'pro' | 'business';
 export type AgentGroupStatus = 'assembling' | 'invited' | 'active' | 'placed' | 'dissolved';
 
