@@ -2234,7 +2234,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const getHostPlan = (): string => {
     const plan = user?.hostSubscription?.plan;
     if (!plan) return 'free';
-    return plan;
+    const base = plan.replace(/^(agent_|company_)/, '');
+    return base || 'free';
   };
 
   const upgradeHostPlan = async (plan: string, billingCycle: 'monthly' | '3month' | 'annual' = 'monthly') => {
@@ -2273,10 +2274,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ],
       },
     };
-    if (isAgentPlan) {
+    if (isAgentPlan || user.hostType === 'agent') {
       updated.agentPlan = basePlan;
     }
-    if (isCompanyPlan) {
+    if (isCompanyPlan || user.hostType === 'company') {
       updated.companyPlan = basePlan;
     }
     await StorageService.setCurrentUser(updated);

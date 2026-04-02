@@ -142,7 +142,8 @@ export const HostSubscriptionScreen = () => {
       navigation.goBack();
       return;
     }
-    if (plan === hostSub.plan) return;
+    const currentBase = (hostSub.plan || '').replace(/^(agent_|company_)/, '');
+    if (plan === hostSub.plan || plan === currentBase) return;
     if (isFreePlan(plan as HostPlanType) && isFreePlan(hostSub.plan)) return;
 
     if (isFreePlan(plan as HostPlanType)) {
@@ -280,7 +281,8 @@ export const HostSubscriptionScreen = () => {
     const hostPlanConfig = HOST_PLANS[planKey as HostPlanType];
     const typePlanConfig = hostTypePlans.find(p => p.id === planKey);
     const isContactSales = display.ctaLabel === 'Contact Sales';
-    const isCurrentPlan = hostSub.plan === planKey || (isFreePlan(hostSub.plan) && isFreePlan(planKey as HostPlanType));
+    const hostSubBase = (hostSub.plan || '').replace(/^(agent_|company_)/, '');
+    const isCurrentPlan = hostSubBase === planKey || hostSub.plan === planKey || (isFreePlan(hostSub.plan) && isFreePlan(planKey as HostPlanType));
 
     const planLabel = typePlanConfig?.name ?? hostPlanConfig?.label ?? display.badge;
     const planPrice = isContactSales ? 0 : (hostPlanConfig?.price ?? typePlanConfig?.monthlyPrice ?? 0);
@@ -486,7 +488,7 @@ export const HostSubscriptionScreen = () => {
 
         {PLAN_DISPLAY.map(renderPlanCard)}
 
-        {hostSub.plan === 'business' && !hostSub.agentVerificationPaid ? (
+        {((hostSub.plan || '').replace(/^(agent_|company_)/, '') === 'business') && !hostSub.agentVerificationPaid ? (
           <Pressable style={styles.agentCard} onPress={handleAgentVerification}>
             <View style={styles.agentHeader}>
               <View style={styles.agentIcon}>
@@ -546,9 +548,9 @@ export const HostSubscriptionScreen = () => {
             <Text style={styles.costTitle}>Monthly Cost Summary</Text>
             <View style={styles.costRow}>
               <Text style={styles.costLabel}>Plan base</Text>
-              <Text style={styles.costValue}>${billingPrice(HOST_PLANS[hostSub.plan].price, billingCycle).toFixed(2)}</Text>
+              <Text style={styles.costValue}>${billingPrice((HOST_PLANS[hostSub.plan as HostPlanType] || HOST_PLANS[(hostSub.plan || '').replace(/^(agent_|company_)/, '') as HostPlanType])?.price ?? 0, billingCycle).toFixed(2)}</Text>
             </View>
-            {hostSub.plan === 'business' && hostSub.activeListingCount > hostSub.listingsIncluded ? (
+            {((hostSub.plan || '').replace(/^(agent_|company_)/, '') === 'business') && hostSub.activeListingCount > hostSub.listingsIncluded ? (
               <View style={styles.costRow}>
                 <Text style={styles.costLabel}>
                   Overage ({hostSub.activeListingCount - hostSub.listingsIncluded} extra)
@@ -593,7 +595,7 @@ export const HostSubscriptionScreen = () => {
         <PurchaseConfirmModal
           visible={!!selectedPlan}
           config={HOST_PLAN_CONFIGS[selectedPlan]}
-          currentPlan={currentPlanIsFree ? 'Free' : HOST_PLANS[hostSub.plan]?.label ?? 'Free'}
+          currentPlan={currentPlanIsFree ? 'Free' : (HOST_PLANS[hostSub.plan as HostPlanType] || HOST_PLANS[(hostSub.plan || '').replace(/^(agent_|company_)/, '') as HostPlanType])?.label ?? 'Free'}
           loading={subscribing}
           onConfirm={handleConfirmSubscription}
           onCancel={() => setSelectedPlan(null)}
@@ -604,7 +606,7 @@ export const HostSubscriptionScreen = () => {
         <PurchaseConfirmModal
           visible={showDowngradeModal}
           config={HOST_DOWNGRADE_CONFIG}
-          currentPlan={HOST_PLANS[hostSub.plan]?.label ?? 'Free'}
+          currentPlan={(HOST_PLANS[hostSub.plan as HostPlanType] || HOST_PLANS[(hostSub.plan || '').replace(/^(agent_|company_)/, '') as HostPlanType])?.label ?? 'Free'}
           loading={downgrading}
           onConfirm={handleConfirmDowngrade}
           onCancel={() => setShowDowngradeModal(false)}

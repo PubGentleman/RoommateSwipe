@@ -46,7 +46,8 @@ export const AgentGroupsScreen = () => {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
-  const agentPlan: AgentPlan = (user?.agentPlan as AgentPlan) || 'pay_per_use';
+  const agentPlanResolved = (user?.agentPlan || (user?.hostSubscription?.plan || '').replace(/^(agent_|company_)/, '') || 'pay_per_use') as AgentPlan;
+  const agentPlan = agentPlanResolved;
   const planLimits = getAgentPlanLimits(agentPlan);
 
   useFocusEffect(

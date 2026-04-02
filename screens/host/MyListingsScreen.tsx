@@ -82,7 +82,8 @@ export const MyListingsScreen = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const isAgent = user?.hostType === 'agent';
-  const agentPlan = isAgent ? (user?.agentPlan as AgentPlan) || 'pay_per_use' : null;
+  const agentPlanRaw = isAgent ? (user?.agentPlan || (user?.hostSubscription?.plan || '').replace(/^(agent_|company_)/, '') || 'pay_per_use') : null;
+  const agentPlan = agentPlanRaw as AgentPlan | null;
   const agentLimits = agentPlan ? getAgentPlanLimits(agentPlan) : null;
   const canUseAI = isAgent ? (agentLimits?.hasAIChat ?? false) : true;
   const [listings, setListings] = useState<Property[]>([]);

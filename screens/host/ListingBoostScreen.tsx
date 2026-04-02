@@ -76,8 +76,11 @@ export const ListingBoostScreen = () => {
   }, [user, listingId]);
 
   const isAgent = user?.hostType === 'agent';
-  const agentPlan = user?.agentPlan;
-  const isAgentFree = isAgent && (!agentPlan || agentPlan === 'pay_per_use' || agentPlan === 'free');
+  const rawAgentPlan = user?.agentPlan || (user as any)?.agent_plan || '';
+  const agentSubPlan = user?.hostSubscription?.plan || '';
+  const agentPlan = (rawAgentPlan && rawAgentPlan !== 'pay_per_use' && rawAgentPlan !== 'free') ? rawAgentPlan : agentSubPlan;
+  const agentPlanBase = (agentPlan || '').replace(/^(agent_|company_)/, '');
+  const isAgentFree = isAgent && (!agentPlanBase || agentPlanBase === 'pay_per_use' || agentPlanBase === 'free');
   const canPayPerBoost = isAgentFree;
 
   const isBoosted = listing ? isListingBoosted(listing) : false;

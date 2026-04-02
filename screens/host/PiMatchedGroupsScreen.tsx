@@ -60,10 +60,11 @@ export const PiMatchedGroupsScreen = () => {
 
   const hostPlan = user?.hostSubscription?.plan || 'free';
   const hostType = user?.hostType || 'individual';
-  const agentPlan = user?.agentPlan as AgentPlan | undefined;
+  const agentPlanResolved = (user?.agentPlan || (hostPlan || '').replace(/^(agent_|company_)/, '')) as AgentPlan | undefined;
+  const agentPlan = agentPlanResolved;
   const isFreePlan = hostType === 'agent'
-    ? (!agentPlan || agentPlan === 'pay_per_use')
-    : (hostPlan === 'free' || hostPlan === 'none');
+    ? (!agentPlan || agentPlan === 'pay_per_use' || agentPlan === 'free')
+    : (hostPlan === 'free' || hostPlan === 'none' || (hostPlan || '').replace(/^(agent_|company_)/, '') === 'free');
 
   const loadData = useCallback(async () => {
     if (!user) return;

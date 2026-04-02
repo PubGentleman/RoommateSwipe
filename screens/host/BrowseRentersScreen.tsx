@@ -78,7 +78,10 @@ export const BrowseRentersScreen = () => {
   const [piQuotaLimit, setPiQuotaLimit] = useState(0);
   const piRequestId = useRef(0);
 
-  const agentPlan: AgentPlan = (user?.agentPlan as AgentPlan) || 'pay_per_use';
+  const rawAgentPlan = user?.agentPlan || (user as any)?.agent_plan || '';
+  const subPlan = user?.hostSubscription?.plan || '';
+  const effectivePlan = (rawAgentPlan && rawAgentPlan !== 'pay_per_use' && rawAgentPlan !== 'free') ? rawAgentPlan : subPlan;
+  const agentPlan: AgentPlan = (effectivePlan as AgentPlan) || 'pay_per_use';
   const planLimits = getAgentPlanLimits(agentPlan);
 
   useFocusEffect(

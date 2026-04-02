@@ -49,7 +49,10 @@ export const AgentGroupBuilderScreen = () => {
   const [step, setStep] = useState<'select' | 'review'>('select');
   const [showPairingModal, setShowPairingModal] = useState(false);
 
-  const agentPlan: AgentPlan = (user?.agentPlan as AgentPlan) || 'pay_per_use';
+  const rawAgentPlan = user?.agentPlan || (user as any)?.agent_plan || '';
+  const subPlan = user?.hostSubscription?.plan || '';
+  const effectivePlan = (rawAgentPlan && rawAgentPlan !== 'pay_per_use' && rawAgentPlan !== 'free') ? rawAgentPlan : subPlan;
+  const agentPlan: AgentPlan = (effectivePlan as AgentPlan) || 'pay_per_use';
   const planLimits = getAgentPlanLimits(agentPlan);
   const { getPairing, loading: pairingLoading, result: pairingResult, error: pairingError, reset: resetPairing } = useAgentPairing();
 

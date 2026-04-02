@@ -91,7 +91,10 @@ export const HostDashboardScreen = () => {
   const isAgent = user?.hostType === 'agent';
   const isCompany = user?.hostType === 'company';
   const { badge: hostBadge } = useHostBadge(user?.id);
-  const agentPlan = isAgent ? (user?.agentPlan as AgentPlan) || 'pay_per_use' : null;
+  const rawAgentPlan = isAgent ? (user?.agentPlan || (user as any)?.agent_plan || '') : '';
+  const subPlan = user?.hostSubscription?.plan || '';
+  const effectiveAgentPlan = (rawAgentPlan && rawAgentPlan !== 'pay_per_use' && rawAgentPlan !== 'free') ? rawAgentPlan : subPlan;
+  const agentPlan = isAgent ? ((effectiveAgentPlan as AgentPlan) || 'pay_per_use') : null;
   const agentLimits = agentPlan ? getAgentPlanLimits(agentPlan) : null;
   const canUseAI = isAgent ? (agentLimits?.hasAIChat ?? false) : true;
   const navigation = useNavigation<any>();
@@ -141,8 +144,11 @@ export const HostDashboardScreen = () => {
   });
   const AnimatedScrollView = Animated.ScrollView;
 
+  const agentPlanBase = agentPlan ? agentPlan.replace(/^(agent_|company_)/, '') : '';
   const isOnFreeTier = isAgent
-    ? (!agentPlan || agentPlan === 'pay_per_use' || agentPlan === 'free')
+    ? (!agentPlan || agentPlan === 'pay_per_use' || agentPlan === 'free' || agentPlanBase === 'pay_per_use' || agentPlanBase === 'free')
+    : isCompany
+    ? (!subPlan || isFreePlan(subPlan.replace(/^company_/, '') as any))
     : (hostSub && isFreePlan(hostSub.plan));
   useEffect(() => {
     if (isOnFreeTier) {
@@ -602,19 +608,21 @@ export const HostDashboardScreen = () => {
           {hostSub ? (
             <Text style={styles.planSummaryText}>
               {isAgent
-                ? (agentPlan === 'pay_per_use' ? 'Pay Per Use \u00B7 Upgrade for more features' :
-                   agentPlan === 'starter' || agentPlan === 'agent_starter' ? 'Agent Starter \u00B7 $49/mo' :
-                   agentPlan === 'pro' || agentPlan === 'agent_pro' ? 'Agent Pro \u00B7 $99/mo' :
+                ? (agentPlanBase === 'pay_per_use' || !agentPlanBase || agentPlanBase === 'free' ? 'Pay Per Use \u00B7 Upgrade for more features' :
+                   agentPlanBase === 'starter' ? 'Agent Starter \u00B7 $49/mo' :
+                   agentPlanBase === 'pro' ? 'Agent Pro \u00B7 $99/mo' :
                    `Agent Business \u00B7 $149/mo \u00B7 ${activeCount} listings active`)
                 : isCompany
-                  ? (hostSub.plan === 'starter' ? 'Company Starter \u00B7 $99/mo' :
-                     hostSub.plan === 'pro' ? 'Company Pro \u00B7 $199/mo' :
-                     hostSub.plan === 'enterprise' ? `Company Enterprise \u00B7 Custom \u00B7 ${activeCount} listings active` :
-                     'Free Plan \u00B7 Upgrade to unlock all features')
-                  : (isFreePlan(hostSub.plan) ? 'Free Plan \u00B7 Upgrade to unlock all features' :
-                     hostSub.plan === 'starter' ? 'Host Starter \u00B7 $19.99/mo' :
-                     hostSub.plan === 'pro' ? 'Host Pro \u00B7 $49.99/mo' :
-                     `Host Business \u00B7 $99/mo \u00B7 ${activeCount} listings active`)}
+                  ? (() => { const cp = (hostSub.plan || '').replace(/^company_/, ''); return (
+                     cp === 'starter' ? 'Company Starter \u00B7 $199/mo' :
+                     cp === 'pro' ? 'Company Pro \u00B7 $399/mo' :
+                     cp === 'enterprise' ? `Company Enterprise \u00B7 Custom \u00B7 ${activeCount} listings active` :
+                     'Free Plan \u00B7 Upgrade to unlock all features'); })()
+                  : (() => { const bp = (hostSub.plan || '').replace(/^(agent_|company_)/, ''); return (
+                     isFreePlan(hostSub.plan) ? 'Free Plan \u00B7 Upgrade to unlock all features' :
+                     bp === 'starter' ? 'Host Starter \u00B7 $19.99/mo' :
+                     bp === 'pro' ? 'Host Pro \u00B7 $49.99/mo' :
+                     `Host Business \u00B7 $99/mo \u00B7 ${activeCount} listings active`); })()}
             </Text>
           ) : null}
         </View>
@@ -862,7 +870,7 @@ export const HostDashboardScreen = () => {
             earned={false}
             checks={isAgent ? [
               { label: 'License verified', met: user?.licenseVerificationStatus === 'verified' },
-              { label: 'Paid plan', met: !!agentPlan && agentPlan !== 'pay_per_use' },
+              { label: 'Paid plan', met: !!agentPlanBase && agentPlanBase !== 'pay_per_use' && agentPlanBase !== 'free' },
               { label: '2+ months on Rhome', met: !!user?.createdAt && (Date.now() - new Date(user.createdAt).getTime()) > 60 * 24 * 60 * 60 * 1000 },
               { label: '85%+ response rate', met: inquiries.length >= 10 && typeof user?.responseRate === 'number' && user.responseRate >= 85 },
               { label: '3+ successful placements', met: agentPlacementCount >= 3 },
@@ -871,7 +879,7 @@ export const HostDashboardScreen = () => {
               { label: '<15% cancellation rate', met: agentPlacementCount >= 5 && (agentPlacementCount === 0 || (listings.filter(l => l.rentedDate).length / Math.max(1, agentPlacementCount)) <= 0.15) },
             ] : [
               { label: 'Company name set', met: !!user?.companyName },
-              { label: 'Pro or Enterprise plan', met: !!hostSub && !isFreePlan(hostSub.plan) && (hostSub.plan === 'pro' || hostSub.plan === 'enterprise') },
+              { label: 'Pro or Enterprise plan', met: !!hostSub && !isFreePlan(hostSub.plan) && (() => { const bp = (hostSub.plan || '').replace(/^(agent_|company_)/, ''); return bp === 'pro' || bp === 'enterprise'; })() },
               { label: '3+ months on Rhome', met: !!user?.createdAt && (Date.now() - new Date(user.createdAt).getTime()) > 90 * 24 * 60 * 60 * 1000 },
               { label: '90%+ response rate', met: inquiries.length >= 15 && typeof user?.responseRate === 'number' && user.responseRate >= 90 },
               { label: '5+ active listings', met: listings.filter(l => l.available).length >= 5 },
@@ -1304,7 +1312,7 @@ export const HostDashboardScreen = () => {
             <Feather name="bar-chart-2" size={15} color="rgba(255,255,255,0.6)" />
             <Text style={styles.qaSecondaryText}>Analytics</Text>
             {isAgent
-              ? (!agentPlan || agentPlan === 'pay_per_use' || agentPlan === 'starter' || agentPlan === 'free' || agentPlan === 'agent_starter'
+              ? (!agentPlanBase || agentPlanBase === 'pay_per_use' || agentPlanBase === 'starter' || agentPlanBase === 'free'
                 ? <View style={styles.proBadge}><Text style={styles.proBadgeText}>Pro</Text></View>
                 : null)
               : (hostPlan === 'free' || hostPlan === 'none' || hostPlan === 'starter'
@@ -1315,7 +1323,7 @@ export const HostDashboardScreen = () => {
             <Feather name="star" size={15} color={GOLD} />
             <Text style={styles.qaSecondaryText}>Plans</Text>
           </Pressable>
-          {(isAgent ? (agentPlan === 'business' || agentPlan === 'agent_business') : hostPlan === 'business') ? (
+          {(isAgent ? agentPlanBase === 'business' : hostPlan === 'business') ? (
             <Pressable style={styles.qaSecondary} onPress={() => {
               showAlert({
                 title: 'Dedicated Support',

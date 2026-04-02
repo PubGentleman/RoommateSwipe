@@ -24,6 +24,7 @@ import { ModeSwitchToggle } from '../../components/ModeSwitchToggle';
 import { getAffiliateForUser } from '../../services/affiliateService';
 import { normalizeRenterPlan, getRenterPlanLimits } from '../../constants/renterPlanLimits';
 import { PlanBadgeInline } from '../../components/LockedFeatureOverlay';
+import { getHostPlanDisplayInfo, resolveEffectiveHostPlan, isFreeTier } from '../../utils/planResolver';
 
 type ProfileScreenNavigationProp = NativeStackNavigationProp<ProfileStackParamList, 'ProfileMain'>;
 
@@ -313,7 +314,7 @@ export const ProfileScreen = () => {
                 <Feather name="clock" size={14} color="#F59E0B" />
                 <Text style={styles.pendingBadgeText}>Verification Pending</Text>
               </View>
-            ) : (user?.purchases?.hostVerificationBadge === true || (user?.role === 'host' && user?.hostSubscription?.plan && user.hostSubscription.plan !== 'free' && user.hostSubscription.plan !== 'none')) ? (
+            ) : (user?.purchases?.hostVerificationBadge === true || (user?.role === 'host' && !isFreeTier(user?.hostSubscription?.plan))) ? (
               <View style={styles.verifiedBadge}>
                 <Feather name="shield" size={14} color="#3ECF8E" />
                 <Text style={styles.verifiedBadgeText}>Verified</Text>
@@ -442,22 +443,21 @@ export const ProfileScreen = () => {
               <Text style={styles.subLabel}>Current Plan</Text>
               <Text style={styles.subPlan}>
                 {isHost
-                  ? (user?.hostSubscription?.plan === 'pro' ? 'Pro · $49.99/mo'
-                    : user?.hostSubscription?.plan === 'business' ? 'Business · $99/mo'
-                    : user?.hostSubscription?.plan === 'starter' ? 'Starter · $19.99/mo'
-                    : 'Free')
+                  ? (() => {
+                      const info = getHostPlanDisplayInfo(user);
+                      return info.isFree ? info.label : `${info.label} · ${info.price}`;
+                    })()
                   : (user?.subscription?.plan === 'basic' ? 'Basic · Free' : user?.subscription?.plan === 'plus' ? 'Plus' : user?.subscription?.plan === 'elite' ? 'Elite' : 'Basic · Free')
                 }
               </Text>
               <Text style={styles.subDesc}>
                 {isHost
-                  ? (!user?.hostSubscription?.plan || user?.hostSubscription?.plan === 'free' || user?.hostSubscription?.plan === 'none'
-                    ? 'Upgrade to reach more renters' : 'You have full access')
+                  ? getHostPlanDisplayInfo(user).description
                   : (user?.subscription?.plan === 'basic' ? 'Upgrade to unlock unlimited matches' : 'You have full access')
                 }
               </Text>
             </View>
-            {(isHost ? (!user?.hostSubscription?.plan || user?.hostSubscription?.plan === 'free' || user?.hostSubscription?.plan === 'none') : user?.subscription?.plan === 'basic') ? (
+            {(isHost ? getHostPlanDisplayInfo(user).isFree : user?.subscription?.plan === 'basic') ? (
               <Pressable onPress={() => navigation.navigate(isHost ? 'HostSubscription' : 'Plans')}>
                 <LinearGradient colors={['#ff6b5b', '#e83a2a']} style={styles.upgradeBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
                   <Text style={styles.upgradeBtnText}>Upgrade</Text>

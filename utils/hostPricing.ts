@@ -224,21 +224,23 @@ export const BOOST_OPTIONS = [
 export const AGENT_VERIFICATION_FEE = 9.99;
 
 export function isFreePlan(plan: HostPlanType | string): boolean {
-  return plan === 'free' || plan === 'none' || plan === 'pay_per_use';
+  const base = (plan || '').replace(/^(agent_|company_)/, '');
+  return base === 'free' || base === 'none' || base === 'pay_per_use' || !base;
 }
 
 export function calculateHostMonthlyCost(plan: HostPlanType, activeListings: number): number {
   if (isFreePlan(plan)) return 0;
-  const p = HOST_PLANS[plan];
+  const p = HOST_PLANS[plan] || HOST_PLANS[(plan || '').replace(/^(agent_|company_)/, '') as HostPlanType];
+  if (!p) return 0;
   const base = p.price;
   const overage = Math.max(0, activeListings - p.listingsIncluded) * p.overagePerListing;
   return base + overage;
 }
 
 export function canAddListingCheck(subscription: HostSubscriptionData): { allowed: boolean; message: string; upgradeRequired?: boolean } {
-  const plan = HOST_PLANS[subscription.plan];
-  if (subscription.plan === 'pro' || subscription.plan === 'business'
-      || subscription.plan === 'agent_pro' || subscription.plan === 'agent_business') {
+  const basePlan = (subscription.plan || '').replace(/^(agent_|company_)/, '');
+  const plan = HOST_PLANS[subscription.plan as HostPlanType] || HOST_PLANS[basePlan as HostPlanType] || HOST_PLANS.free;
+  if (basePlan === 'pro' || basePlan === 'business') {
     return { allowed: true, message: '' };
   }
   if (subscription.activeListingCount >= plan.listingsIncluded) {
