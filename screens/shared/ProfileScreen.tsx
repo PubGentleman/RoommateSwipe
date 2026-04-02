@@ -318,8 +318,6 @@ export const ProfileScreen = () => {
               </View>
             ) : null}
           </View>
-          <Text style={styles.profileEmail}>{user?.email || ''}</Text>
-
           <View style={styles.statsRow}>
             {isHost ? (
               <>
