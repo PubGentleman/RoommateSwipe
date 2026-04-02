@@ -20,17 +20,31 @@ export const GAP_MESSAGES: Record<string, string> = {
 
 export const getProfileGaps = (user: User): ProfileGap[] => {
   const gaps: ProfileGap[] = [];
+  const isHostProfessional = user.hostType === 'agent' || user.hostType === 'company';
 
   if (!(user.photos?.length || user.profilePicture)) {
     gaps.push({
       field: 'photo',
       label: 'Profile Photo',
-      impact: 'Profiles with photos get 8x more matches',
+      impact: isHostProfessional ? 'A professional photo builds trust with renters' : 'Profiles with photos get 8x more matches',
       icon: 'image',
       screen: 'ProfileQuestionnaire',
       screenParams: { missingSteps: ['photos'] },
     });
   }
+
+  if (!user.profileData?.bio || user.profileData.bio.trim().length < 20) {
+    gaps.push({
+      field: 'bio',
+      label: isHostProfessional ? 'About' : 'About You',
+      impact: isHostProfessional ? 'Tell renters about your experience and specialties' : 'A short bio lets people know who you are',
+      icon: 'file-text',
+      screen: 'ProfileQuestionnaire',
+      screenParams: { missingSteps: ['basicInfo'] },
+    });
+  }
+
+  if (isHostProfessional) return gaps;
 
   if (!user.profileData?.occupation) {
     gaps.push({
@@ -39,17 +53,6 @@ export const getProfileGaps = (user: User): ProfileGap[] => {
       impact: 'Occupation helps match you with roommates who have compatible schedules',
       icon: 'briefcase',
       screen: 'OccupationPicker',
-    });
-  }
-
-  if (!user.profileData?.bio || user.profileData.bio.trim().length < 20) {
-    gaps.push({
-      field: 'bio',
-      label: 'About You',
-      impact: 'A short bio lets people know who you are',
-      icon: 'file-text',
-      screen: 'ProfileQuestionnaire',
-      screenParams: { missingSteps: ['basicInfo'] },
     });
   }
 
@@ -107,12 +110,19 @@ export const getCompletionPercentage = (user: User): number => {
 };
 
 export const getHostCompletionPercentage = (user: User): number => {
+  const isAgent = user.hostType === 'agent';
+  const isCompany = user.hostType === 'company';
+  if (isAgent || isCompany) {
+    let score = 0;
+    if (user.photos?.length || user.profilePicture) score += 50;
+    if (user.profileData?.bio && user.profileData.bio.trim().length >= 20) score += 50;
+    return Math.min(score, 100);
+  }
   let score = 0;
-  if (user.photos?.length || user.profilePicture) score += 15;
-  if (user.profileData?.bio && user.profileData.bio.trim().length >= 20) score += 15;
-  if (user.licenseNumber) score += 30;
-  if (user.agencyName || user.companyName) score += 20;
-  if (user.hostType) score += 20;
+  if (user.photos?.length || user.profilePicture) score += 25;
+  if (user.profileData?.bio && user.profileData.bio.trim().length >= 20) score += 25;
+  if (user.hostType) score += 25;
+  if (user.profileData?.city || user.profileData?.neighborhood) score += 25;
   return Math.min(score, 100);
 };
 
