@@ -70,7 +70,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
   }, []);
 
   const checkForNewNotifications = useCallback(async () => {
-    if (!user?.id) return;
+    if (!user?.id || user.onboardingStep !== 'complete') return;
     try {
       const notifications = await StorageService.getNotifications(user.id);
       const count = notifications.filter(n => !n.isRead).length;
@@ -106,7 +106,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     } catch (error) {
       // silently fail
     }
-  }, [user?.id, user?.blockedUsers, enqueueToast]);
+  }, [user?.id, user?.onboardingStep, user?.blockedUsers, enqueueToast]);
 
   const showToast = useCallback((toast: ToastNotification) => {
     enqueueToast(toast);
@@ -127,7 +127,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
   }, []);
 
   useEffect(() => {
-    if (!user?.id) {
+    if (!user?.id || user.onboardingStep !== 'complete') {
       setUnreadCount(0);
       return;
     }
@@ -148,7 +148,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
       if (intervalRef.current) clearInterval(intervalRef.current);
       subscription.remove();
     };
-  }, [user?.id]);
+  }, [user?.id, user?.onboardingStep]);
 
   return (
     <NotificationContext.Provider value={{ unreadCount, refreshUnreadCount, showToast, lastNotificationId }}>
