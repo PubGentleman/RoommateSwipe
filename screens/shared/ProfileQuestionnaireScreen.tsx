@@ -413,7 +413,7 @@ export const ProfileQuestionnaireScreen = () => {
   const isHostUser = user?.role === 'host';
   const isHostProfessional = isHostUser && (user?.hostType === 'agent' || user?.hostType === 'company');
   const HOST_EXCLUDED_STEPS: StepId[] = isHostProfessional
-    ? ['budgetLocation', 'dealbreakers', 'sleepCleanliness', 'smokingPets', 'housing', 'roommateSetup', 'idealRoommate', 'lifestyle', 'interests', 'personality']
+    ? ['budgetLocation', 'dealbreakers', 'sleepCleanliness', 'smokingPets', 'housing', 'roommateSetup', 'idealRoommate', 'lifestyle', 'interests', 'personality', 'profileNote']
     : ['budgetLocation', 'dealbreakers', 'sleepCleanliness', 'smokingPets', 'housing', 'roommateSetup', 'idealRoommate'];
   const autoFilteredSteps = React.useMemo(() => {
     if (filteredSteps || isOnboarding) return null;
