@@ -22,6 +22,7 @@ import { RenterProfileDetailScreen } from '../screens/host/RenterProfileDetailSc
 import { RenterCompatibilityScreen } from '../screens/host/RenterCompatibilityScreen';
 import { AgentGroupBuilderScreen } from '../screens/host/AgentGroupBuilderScreen';
 import { AgentGroupsScreen } from '../screens/host/AgentGroupsScreen';
+import { AgentGroupDetailScreen } from '../screens/host/AgentGroupDetailScreen';
 import { HostGroupMatchesScreen } from '../screens/host/HostGroupMatchesScreen';
 import { CompanyFillPipelineScreen } from '../screens/host/CompanyFillPipelineScreen';
 import { CompanyListingAIScreen } from '../screens/host/CompanyListingAIScreen';
@@ -84,6 +85,7 @@ export type AgentBrowseStackParamList = {
 
 export type AgentGroupsStackParamList = {
   AgentGroupsList: undefined;
+  AgentGroupDetail: { groupId: string; group: any };
   AgentGroupBuilder: { preselectedIds?: string[]; preselectedRenters?: any[]; listingId?: string };
   Chat: { conversationId: string; otherUser: any };
 };
@@ -172,6 +174,7 @@ function AgentGroupsStackNavigator() {
   return (
     <AgentGroupsStack.Navigator screenOptions={{ headerShown: false }}>
       <AgentGroupsStack.Screen name="AgentGroupsList" component={AgentGroupsScreen} />
+      <AgentGroupsStack.Screen name="AgentGroupDetail" component={AgentGroupDetailScreen} />
       <AgentGroupsStack.Screen name="AgentGroupBuilder" component={AgentGroupBuilderScreen} />
       <AgentGroupsStack.Screen name="Chat" component={ChatScreen} />
     </AgentGroupsStack.Navigator>

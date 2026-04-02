@@ -21,6 +21,7 @@ import {
   removeFromShortlist,
   generateAISuggestions,
   generateBestGroupSuggestion,
+  calculateRenterRelevance,
 } from '../../services/agentMatchmakerService';
 import { calculateListingLocationScore } from '../../utils/listingMatchUtils';
 import { getHostRecommendations, getMonthlyUsageCount, getHostPiMonthlyLimit } from '../../services/piMatchingService';
@@ -105,7 +106,8 @@ export const BrowseRentersScreen = () => {
               sleep_schedule, smoking, pets, interests, photos, bio,
               preferred_trains, budget_per_person_min, budget_per_person_max,
               desired_bedrooms, location_flexible, wfh, apartment_prefs_complete,
-              preferred_neighborhoods, zip_code
+              preferred_neighborhoods, zip_code,
+              guest_policy, noise_tolerance, work_location, no_pets_allergy
             )
           `)
           .eq('role', 'renter')
@@ -148,6 +150,12 @@ export const BrowseRentersScreen = () => {
             gender: u.gender,
             bio: p?.bio || u.bio,
             acceptAgentOffers: u.accept_agent_offers !== false,
+            lastActiveAt: u.last_active_at,
+            guestPolicy: p?.guest_policy,
+            noiseTolerance: p?.noise_tolerance,
+            workLocation: p?.work_location || (p?.wfh ? 'remote' : undefined),
+            hasPets: p?.pets === 'yes' || p?.pets === true,
+            noPetsAllergy: p?.no_pets_allergy,
           };
         });
 
@@ -372,6 +380,8 @@ export const BrowseRentersScreen = () => {
         const bPi = piRecommendedIds.has(b.id) ? 1 : 0;
         return bPi - aPi;
       });
+    } else if (selectedListing) {
+      filtered.sort((a, b) => calculateRenterRelevance(b, selectedListing) - calculateRenterRelevance(a, selectedListing));
     }
 
     setFilteredRenters(filtered);

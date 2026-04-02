@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, FlatList, StyleSheet, Pressable, Image, ActivityIndicator,
 } from 'react-native';
@@ -18,6 +18,8 @@ import {
 } from '../../services/agentMatchmakerService';
 import { getAgentPlanLimits, canAgentPlace, type AgentPlan } from '../../constants/planLimits';
 import { resolveEffectiveAgentPlan } from '../../utils/planResolver';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { shouldLoadMockData } from '../../utils/dataUtils';
 
 const BG = '#111';
 const CARD_BG = '#1a1a1a';
@@ -55,6 +57,19 @@ export const AgentGroupsScreen = () => {
       if (user) loadGroups();
     }, [user])
   );
+
+  useEffect(() => {
+    if (!user || !isSupabaseConfigured || shouldLoadMockData()) return;
+    const channel = supabase
+      .channel('agent-group-invites')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'agent_group_invites',
+      }, () => { loadGroups(); })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.id]);
 
   const loadGroups = async () => {
     if (!user) return;
@@ -134,7 +149,7 @@ export const AgentGroupsScreen = () => {
     const config = STATUS_CONFIG[item.groupStatus] ?? STATUS_CONFIG.assembling;
 
     return (
-      <View style={styles.card}>
+      <Pressable style={styles.card} onPress={() => navigation.navigate('AgentGroupDetail', { groupId: item.id, group: item })}>
         <View style={styles.cardHeader}>
           <View style={[styles.statusBadge, { backgroundColor: config.color + '20' }]}>
             <Feather name={config.icon as any} size={12} color={config.color} />
@@ -230,7 +245,7 @@ export const AgentGroupsScreen = () => {
             </Pressable>
           ) : null}
         </View>
-      </View>
+      </Pressable>
     );
   };
 

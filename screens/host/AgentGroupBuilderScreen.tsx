@@ -20,6 +20,9 @@ import {
   sendAgentInvites,
   calculatePairMatrix,
   calculatePairCompatibility,
+  analyzeGroupDynamics,
+  scoreGroupForListing,
+  getOptimalGroupSize,
 } from '../../services/agentMatchmakerService';
 import { canAgentCreateGroup, getAgentPlanLimits, type AgentPlan } from '../../constants/planLimits';
 import { resolveEffectiveAgentPlan } from '../../utils/planResolver';
@@ -290,6 +293,12 @@ export const AgentGroupBuilderScreen = () => {
   const combinedBudgetMax = selectedRenters.reduce((sum, r) => sum + (r.budgetMax ?? 0), 0);
   const coversRent = selectedListing ? combinedBudgetMax >= selectedListing.price : false;
 
+  const dynamics = selectedRenters.length >= 2 ? analyzeGroupDynamics(selectedRenters) : null;
+  const listingFit = selectedListing && selectedRenters.length >= 2
+    ? scoreGroupForListing(selectedRenters, selectedListing as any, matrix)
+    : null;
+  const optimalSize = selectedListing ? getOptimalGroupSize(selectedListing as any) : null;
+
   const toggleRenter = (id: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSelectedIds(prev => {
@@ -419,6 +428,66 @@ export const AgentGroupBuilderScreen = () => {
               </View>
             ) : null}
           </View>
+
+          {optimalSize && selectedRenters.length !== optimalSize.recommended ? (
+            <View style={[styles.summaryCard, { borderLeftWidth: 3, borderLeftColor: YELLOW }]}>
+              <View style={styles.summaryRow}>
+                <Feather name="info" size={14} color={YELLOW} />
+                <Text style={[styles.summaryLabel, { marginLeft: 6, flex: 1 }]}>
+                  Optimal group size: {optimalSize.recommended} ({optimalSize.reason})
+                </Text>
+              </View>
+            </View>
+          ) : null}
+
+          {dynamics ? (
+            <View style={styles.summaryCard}>
+              <Text style={[styles.sectionTitle, { marginBottom: 8 }]}>Group Dynamics</Text>
+              {dynamics.strengths.length > 0 ? (
+                <View style={{ marginBottom: 8 }}>
+                  {dynamics.strengths.map((s, i) => (
+                    <View key={`s-${i}`} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                      <Feather name="check-circle" size={13} color={GREEN} />
+                      <Text style={[styles.summaryLabel, { marginLeft: 6 }]}>{s}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+              {dynamics.conflicts.length > 0 ? (
+                <View>
+                  {dynamics.conflicts.map((c, i) => (
+                    <View key={`c-${i}`} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                      <Feather name="alert-triangle" size={13} color={YELLOW} />
+                      <Text style={[styles.summaryLabel, { marginLeft: 6 }]}>{c}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+
+          {listingFit ? (
+            <View style={styles.summaryCard}>
+              <Text style={[styles.sectionTitle, { marginBottom: 8 }]}>Listing Fit Score</Text>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Overall:</Text>
+                <Text style={[styles.summaryValue, { color: listingFit.total >= 70 ? GREEN : listingFit.total >= 50 ? YELLOW : ACCENT }]}>
+                  {listingFit.total}%
+                </Text>
+              </View>
+              {([
+                ['compatibility', 'Compatibility'],
+                ['budgetFit', 'Budget'],
+                ['locationFit', 'Location'],
+                ['timelineFit', 'Timeline'],
+              ] as const).map(([key, label]) => (
+                <View key={key} style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>{label}:</Text>
+                  <Text style={styles.summaryValue}>{listingFit[key]}%</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
 
           <Text style={styles.sectionTitle}>Your Message (optional)</Text>
           <TextInput

@@ -26,8 +26,10 @@ export interface AgentRenter {
   moveInDate?: string;
   cleanliness?: number;
   sleepSchedule?: string;
-  smoking?: boolean;
+  smoking?: string | boolean;
   pets?: boolean;
+  hasPets?: boolean;
+  noPetsAllergy?: boolean;
   interests?: string[];
   roomType?: string;
   gender?: string;
@@ -35,6 +37,10 @@ export interface AgentRenter {
   compatibility?: number;
   isShortlisted?: boolean;
   acceptAgentOffers?: boolean;
+  guestPolicy?: string;
+  noiseTolerance?: number;
+  workLocation?: string;
+  lastActiveAt?: string;
 }
 
 export interface AgentGroup {
@@ -719,21 +725,90 @@ export function generateBestGroupSuggestion(
 }
 
 export function calculatePairCompatibility(a: AgentRenter, b: AgentRenter): number {
-  let score = 50;
-  if (a.cleanliness !== undefined && b.cleanliness !== undefined) {
-    const diff = Math.abs(a.cleanliness - b.cleanliness);
-    score += diff <= 2 ? 15 : diff <= 4 ? 5 : -5;
-  }
+  let score = 0;
+  let maxScore = 0;
+
+  maxScore += 15;
   if (a.sleepSchedule && b.sleepSchedule) {
-    score += a.sleepSchedule === b.sleepSchedule ? 15 : -5;
-  }
-  if (a.smoking !== undefined && b.smoking !== undefined) {
-    score += a.smoking === b.smoking ? 10 : -10;
-  }
-  if (a.pets !== undefined && b.pets !== undefined) {
-    score += a.pets === b.pets ? 5 : -5;
-  }
-  return Math.max(0, Math.min(100, score));
+    if (a.sleepSchedule === b.sleepSchedule) score += 15;
+    else if (a.sleepSchedule === 'flexible' || b.sleepSchedule === 'flexible') score += 10;
+  } else { score += 7; }
+
+  maxScore += 15;
+  if (a.cleanliness != null && b.cleanliness != null) {
+    const diff = Math.abs(a.cleanliness - b.cleanliness);
+    if (diff <= 1) score += 15;
+    else if (diff <= 2) score += 12;
+    else if (diff <= 3) score += 8;
+    else if (diff <= 4) score += 4;
+  } else { score += 7; }
+
+  const smokingA = typeof a.smoking === 'string' ? a.smoking : (a.smoking ? 'yes' : 'no');
+  const smokingB = typeof b.smoking === 'string' ? b.smoking : (b.smoking ? 'yes' : 'no');
+  maxScore += 12;
+  if (smokingA && smokingB) {
+    if (smokingA === smokingB) score += 12;
+    else if (smokingA === 'outside_only' || smokingB === 'outside_only') score += 6;
+  } else { score += 6; }
+
+  maxScore += 8;
+  const hasPetsA = a.hasPets ?? a.pets;
+  const hasPetsB = b.hasPets ?? b.pets;
+  if (hasPetsA != null && hasPetsB != null) {
+    if (hasPetsA === hasPetsB) score += 8;
+    else if (!a.noPetsAllergy && !b.noPetsAllergy) score += 4;
+  } else { score += 4; }
+
+  maxScore += 10;
+  if (a.guestPolicy && b.guestPolicy) {
+    if (a.guestPolicy === b.guestPolicy) score += 10;
+    else if (Math.abs(guestPolicyRank(a.guestPolicy) - guestPolicyRank(b.guestPolicy)) <= 1) score += 6;
+    else score += 2;
+  } else { score += 5; }
+
+  maxScore += 8;
+  if (a.noiseTolerance != null && b.noiseTolerance != null) {
+    const diff = Math.abs(a.noiseTolerance - b.noiseTolerance);
+    if (diff <= 1) score += 8;
+    else if (diff <= 2) score += 5;
+    else score += 1;
+  } else { score += 4; }
+
+  maxScore += 10;
+  if (a.budgetMax && b.budgetMax) {
+    const ratio = Math.min(a.budgetMax, b.budgetMax) / Math.max(a.budgetMax, b.budgetMax);
+    if (ratio >= 0.85) score += 10;
+    else if (ratio >= 0.65) score += 6;
+    else score += 2;
+  } else { score += 5; }
+
+  maxScore += 8;
+  if (a.moveInDate && b.moveInDate) {
+    const daysDiff = Math.abs((new Date(a.moveInDate).getTime() - new Date(b.moveInDate).getTime()) / (1000 * 60 * 60 * 24));
+    if (daysDiff <= 14) score += 8;
+    else if (daysDiff <= 30) score += 5;
+    else if (daysDiff <= 60) score += 2;
+  } else { score += 4; }
+
+  maxScore += 6;
+  if (a.workLocation && b.workLocation) {
+    if (a.workLocation === b.workLocation) score += 6;
+    else score += 3;
+  } else { score += 3; }
+
+  maxScore += 8;
+  if (a.interests?.length && b.interests?.length) {
+    const shared = a.interests.filter(i => b.interests!.includes(i)).length;
+    const total = new Set([...a.interests, ...b.interests]).size;
+    score += total > 0 ? Math.round((shared / total) * 8) : 2;
+  } else { score += 2; }
+
+  return maxScore > 0 ? Math.round((score / maxScore) * 100) : 50;
+}
+
+function guestPolicyRank(policy: string): number {
+  const ranks: Record<string, number> = { 'never': 0, 'rarely': 1, 'sometimes': 2, 'often': 3, 'anytime': 4 };
+  return ranks[policy] ?? 2;
 }
 
 function getCombinations<T>(arr: T[], k: number): T[][] {
@@ -782,4 +857,314 @@ export function calculatePairMatrix(renters: AgentRenter[]): { a: string; b: str
     }
   }
   return pairs;
+}
+
+export function analyzeGroupDynamics(renters: AgentRenter[]): {
+  avgScore: number;
+  minPairScore: number;
+  weakestPair: { a: string; b: string; score: number } | null;
+  conflicts: string[];
+  strengths: string[];
+} {
+  const pairs = calculatePairMatrix(renters);
+  const avgScore = pairs.length > 0
+    ? Math.round(pairs.reduce((sum, p) => sum + p.score, 0) / pairs.length)
+    : 0;
+
+  const weakest = pairs.length > 0
+    ? pairs.reduce((min, p) => p.score < min.score ? p : min, { a: '', b: '', score: 100 })
+    : null;
+  const minPairScore = weakest?.score ?? 0;
+
+  const conflicts: string[] = [];
+  const strengths: string[] = [];
+
+  for (const pair of pairs) {
+    if (pair.score < 35) {
+      const rA = renters.find(r => r.id === pair.a);
+      const rB = renters.find(r => r.id === pair.b);
+      conflicts.push(`${rA?.name || 'Unknown'} and ${rB?.name || 'Unknown'} have low compatibility (${pair.score}%)`);
+    }
+  }
+
+  const smokingValues = renters.map(r => typeof r.smoking === 'string' ? r.smoking : (r.smoking ? 'yes' : 'no'));
+  const hasSmokers = smokingValues.some(s => s === 'yes' || s === 'inside');
+  const hasNonSmokers = smokingValues.some(s => s === 'no' || s === 'never');
+  if (hasSmokers && hasNonSmokers) {
+    conflicts.push('Group has both smokers and non-smokers');
+  }
+
+  const schedules = renters.map(r => r.sleepSchedule).filter(Boolean);
+  if (schedules.includes('early') && schedules.includes('late')) {
+    conflicts.push('Group has both early birds and night owls');
+  }
+
+  const cleanScores = renters.map(r => r.cleanliness).filter(c => c != null) as number[];
+  if (cleanScores.length >= 2) {
+    const spread = Math.max(...cleanScores) - Math.min(...cleanScores);
+    if (spread >= 5) {
+      conflicts.push(`Cleanliness standards vary widely (${Math.min(...cleanScores)}-${Math.max(...cleanScores)}/10)`);
+    }
+  }
+
+  if (avgScore >= 80) strengths.push('Excellent overall group compatibility');
+  if (minPairScore >= 60) strengths.push('No weak links — all pairs are compatible');
+
+  const budgets = renters.map(r => r.budgetMax).filter(Boolean) as number[];
+  if (budgets.length >= 2) {
+    const ratio = Math.min(...budgets) / Math.max(...budgets);
+    if (ratio >= 0.85) strengths.push('Budgets are well-aligned');
+  }
+
+  const moveIns = renters.map(r => r.moveInDate).filter(Boolean);
+  if (moveIns.length >= 2) {
+    const dates = moveIns.map(d => new Date(d!).getTime());
+    const spread = Math.max(...dates) - Math.min(...dates);
+    if (spread <= 14 * 24 * 60 * 60 * 1000) {
+      strengths.push('Move-in dates are aligned (within 2 weeks)');
+    }
+  }
+
+  return { avgScore, minPairScore, weakestPair: weakest, conflicts, strengths };
+}
+
+export function scoreGroupForListing(
+  members: AgentRenter[],
+  listing: Property,
+  pairMatrix: { a: string; b: string; score: number }[]
+): { total: number; compatibility: number; budgetFit: number; locationFit: number; timelineFit: number } {
+  const avgPairScore = pairMatrix.length > 0
+    ? pairMatrix.reduce((sum, p) => sum + p.score, 0) / pairMatrix.length : 50;
+  const minPairScore = pairMatrix.length > 0
+    ? Math.min(...pairMatrix.map(p => p.score)) : 50;
+  const compatibilityScore = avgPairScore * 0.7 + minPairScore * 0.3;
+
+  const combinedMax = members.reduce((sum, m) => sum + (m.budgetMax ?? 0), 0);
+  const combinedMin = members.reduce((sum, m) => sum + (m.budgetMin ?? 0), 0);
+  let budgetFit = 50;
+  if (combinedMax >= listing.price && combinedMin <= listing.price) budgetFit = 100;
+  else if (combinedMax >= listing.price) budgetFit = 80;
+  else if (combinedMax >= listing.price * 0.9) budgetFit = 60;
+  else budgetFit = 30;
+
+  const neighborhoodMatches = members.filter(m =>
+    m.preferredNeighborhoods?.includes(listing.neighborhood ?? '')
+  ).length;
+  const locationFit = members.length > 0 ? Math.round((neighborhoodMatches / members.length) * 100) : 50;
+
+  let timelineFit = 50;
+  if (listing.availableDate) {
+    const availDate = new Date(listing.availableDate instanceof Date ? listing.availableDate : listing.availableDate);
+    const avgDaysDiff = members.reduce((sum, m) => {
+      if (!m.moveInDate) return sum + 30;
+      return sum + Math.abs((availDate.getTime() - new Date(m.moveInDate).getTime()) / (1000 * 60 * 60 * 24));
+    }, 0) / members.length;
+
+    if (avgDaysDiff <= 7) timelineFit = 100;
+    else if (avgDaysDiff <= 14) timelineFit = 85;
+    else if (avgDaysDiff <= 30) timelineFit = 65;
+    else if (avgDaysDiff <= 60) timelineFit = 40;
+    else timelineFit = 20;
+  }
+
+  const total = Math.round(
+    compatibilityScore * 0.40 + budgetFit * 0.25 + locationFit * 0.20 + timelineFit * 0.15
+  );
+
+  return { total, compatibility: Math.round(compatibilityScore), budgetFit, locationFit, timelineFit };
+}
+
+export function getOptimalGroupSize(listing: Property): { recommended: number; reason: string } {
+  const bedrooms = listing.bedrooms || 1;
+  const price = listing.price || 0;
+  if (bedrooms === 1) return { recommended: 1, reason: 'Studio/1BR — best for individual or couple' };
+  if (bedrooms === 2) return { recommended: 2, reason: '2BR — ideal for 2 renters sharing' };
+  if (bedrooms === 3) {
+    const perBedroom = price / bedrooms;
+    if (perBedroom > 2000) return { recommended: 2, reason: '3BR luxury — 2 renters each getting more space' };
+    return { recommended: 3, reason: '3BR — one renter per room' };
+  }
+  if (bedrooms >= 4) return { recommended: bedrooms, reason: `${bedrooms}BR — one renter per room` };
+  return { recommended: 2, reason: 'Standard group size' };
+}
+
+export function calculateRenterRelevance(renter: AgentRenter, listing: Property): number {
+  let score = 0;
+  const perPersonRent = listing.price / (listing.bedrooms || 1);
+  if ((renter.budgetMax ?? 0) >= perPersonRent) score += 30;
+  else if ((renter.budgetMax ?? 0) >= perPersonRent * 0.8) score += 15;
+
+  if (listing.availableDate && renter.moveInDate) {
+    const daysDiff = Math.abs((new Date(listing.availableDate instanceof Date ? listing.availableDate : listing.availableDate).getTime() - new Date(renter.moveInDate).getTime()) / (1000 * 60 * 60 * 24));
+    if (daysDiff <= 14) score += 20;
+    else if (daysDiff <= 30) score += 10;
+    else if (daysDiff <= 60) score += 5;
+  }
+
+  if (renter.preferredNeighborhoods?.includes(listing.neighborhood ?? '')) score += 20;
+
+  if (listing.bedrooms === 1 && renter.roomType === 'entire') score += 15;
+  else if ((listing.bedrooms ?? 0) > 1 && renter.roomType === 'room') score += 15;
+
+  if (renter.lastActiveAt) {
+    const hoursSince = (Date.now() - new Date(renter.lastActiveAt).getTime()) / (1000 * 60 * 60);
+    if (hoursSince < 24) score += 15;
+    else if (hoursSince < 72) score += 10;
+    else if (hoursSince < 168) score += 5;
+  }
+
+  return score;
+}
+
+export async function getGroupInviteStatuses(groupId: string): Promise<{
+  renterId: string;
+  renterName: string;
+  avatarUrl?: string;
+  status: 'pending' | 'accepted' | 'declined';
+  respondedAt: string | null;
+}[]> {
+  if (useLocalData()) {
+    const data = await AsyncStorage.getItem(AGENT_INVITES_KEY);
+    const invites = data ? JSON.parse(data) : [];
+    return invites
+      .filter((inv: any) => inv.groupId === groupId)
+      .map((inv: any) => ({
+        renterId: inv.renterId,
+        renterName: inv.renterName || 'Unknown',
+        status: inv.status || 'pending',
+        respondedAt: inv.respondedAt || null,
+      }));
+  }
+
+  const { data, error } = await supabase
+    .from('agent_group_invites')
+    .select('renter_id, status, responded_at, user:users!renter_id(full_name, avatar_url)')
+    .eq('group_id', groupId)
+    .order('created_at', { ascending: true });
+
+  if (error || !data) return [];
+
+  return data.map((inv: any) => ({
+    renterId: inv.renter_id,
+    renterName: inv.user?.full_name || 'Unknown',
+    avatarUrl: inv.user?.avatar_url,
+    status: inv.status,
+    respondedAt: inv.responded_at,
+  }));
+}
+
+export async function addMemberToGroup(groupId: string, renterId: string, agentId: string): Promise<{ success: boolean; error?: string }> {
+  if (useLocalData()) {
+    const data = await AsyncStorage.getItem(AGENT_INVITES_KEY);
+    const invites = data ? JSON.parse(data) : [];
+    invites.push({ id: `inv_${Date.now()}`, groupId, renterId, status: 'pending', invitedBy: agentId, createdAt: new Date().toISOString() });
+    await AsyncStorage.setItem(AGENT_INVITES_KEY, JSON.stringify(invites));
+    return { success: true };
+  }
+
+  const { data: group } = await supabase.from('groups').select('group_status').eq('id', groupId).single();
+  if (!group || !['assembling', 'invited'].includes(group.group_status)) {
+    return { success: false, error: 'Group cannot be modified in current status' };
+  }
+
+  const { error } = await supabase
+    .from('agent_group_invites')
+    .insert({ group_id: groupId, renter_id: renterId, status: 'pending', invited_by: agentId });
+
+  if (error) return { success: false, error: error.message };
+  return { success: true };
+}
+
+export async function removeMemberFromGroup(groupId: string, renterId: string): Promise<{ success: boolean; error?: string }> {
+  if (useLocalData()) {
+    const data = await AsyncStorage.getItem(AGENT_INVITES_KEY);
+    const invites = data ? JSON.parse(data) : [];
+    const filtered = invites.filter((inv: any) => !(inv.groupId === groupId && inv.renterId === renterId));
+    await AsyncStorage.setItem(AGENT_INVITES_KEY, JSON.stringify(filtered));
+    return { success: true };
+  }
+
+  const { data: group } = await supabase.from('groups').select('group_status').eq('id', groupId).single();
+  if (!group || !['assembling', 'invited'].includes(group.group_status)) {
+    return { success: false, error: 'Group cannot be modified in current status' };
+  }
+
+  await supabase.from('agent_group_invites').delete().eq('group_id', groupId).eq('renter_id', renterId);
+  await supabase.from('group_members').delete().eq('group_id', groupId).eq('user_id', renterId);
+  return { success: true };
+}
+
+export async function changeGroupListing(groupId: string, newListingId: string): Promise<{ success: boolean; error?: string }> {
+  if (useLocalData()) {
+    const data = await AsyncStorage.getItem(AGENT_GROUPS_KEY);
+    const groups = data ? JSON.parse(data) : [];
+    const idx = groups.findIndex((g: any) => g.id === groupId);
+    if (idx >= 0) { groups[idx].targetListingId = newListingId; await AsyncStorage.setItem(AGENT_GROUPS_KEY, JSON.stringify(groups)); }
+    return { success: true };
+  }
+
+  const { data: group } = await supabase.from('groups').select('group_status').eq('id', groupId).single();
+  if (!group || !['assembling', 'invited', 'active'].includes(group.group_status)) {
+    return { success: false, error: 'Group cannot be modified in current status' };
+  }
+
+  const { error } = await supabase.from('groups').update({ target_listing_id: newListingId }).eq('id', groupId);
+  if (error) return { success: false, error: error.message };
+  return { success: true };
+}
+
+export async function recordPlacementFeedback(
+  placementId: string,
+  agentId: string,
+  feedback: { stillTogether: boolean; monthsElapsed: number; satisfaction: 1 | 2 | 3 | 4 | 5; notes?: string }
+): Promise<void> {
+  if (useLocalData()) {
+    const key = '@rhome/placement_feedback';
+    const data = await AsyncStorage.getItem(key);
+    const list = data ? JSON.parse(data) : [];
+    list.push({ placementId, agentId, ...feedback, createdAt: new Date().toISOString() });
+    await AsyncStorage.setItem(key, JSON.stringify(list));
+    return;
+  }
+
+  await supabase.from('agent_placement_feedback').upsert({
+    placement_id: placementId,
+    agent_id: agentId,
+    still_together: feedback.stillTogether,
+    months_elapsed: feedback.monthsElapsed,
+    satisfaction_rating: feedback.satisfaction,
+    notes: feedback.notes,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'placement_id' });
+}
+
+export function mapToAgentRenter(user: any, profile: any): AgentRenter {
+  const p = Array.isArray(profile) ? (profile[0] ?? null) : (profile ?? null);
+  return {
+    id: user.id,
+    name: user.full_name || 'Unknown',
+    age: user.age || 0,
+    occupation: user.occupation || '',
+    photos: p?.photos || (user.avatar_url ? [user.avatar_url] : []),
+    city: user.city,
+    preferredNeighborhoods: p?.preferred_neighborhoods || [],
+    budgetMin: p?.budget_per_person_min ?? (p?.budget_max ? p.budget_max * 0.8 : undefined),
+    budgetMax: p?.budget_per_person_max ?? p?.budget_max,
+    moveInDate: p?.move_in_date,
+    cleanliness: p?.cleanliness,
+    sleepSchedule: p?.sleep_schedule,
+    smoking: p?.smoking,
+    pets: p?.pets === 'yes' || p?.pets === true,
+    hasPets: p?.pets === 'yes' || p?.pets === true,
+    noPetsAllergy: p?.no_pets_allergy === true,
+    interests: p?.interests || p?.interest_tags || [],
+    roomType: p?.room_type,
+    gender: user.gender,
+    bio: p?.bio || user.bio,
+    acceptAgentOffers: user.accept_agent_offers !== false,
+    guestPolicy: p?.guest_policy,
+    noiseTolerance: p?.noise_tolerance,
+    workLocation: p?.work_location,
+    lastActiveAt: user.last_active_at,
+  };
 }
