@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { View, StyleSheet, Pressable, Text, ScrollView, Modal } from 'react-native';
+import { View, StyleSheet, Pressable, Text, ScrollView, Modal, Linking } from 'react-native';
 import Animated, { useSharedValue, useAnimatedScrollHandler, useAnimatedStyle, interpolate, Extrapolation } from 'react-native-reanimated';
 import { Feather } from '../../components/VectorIcons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -1325,12 +1325,12 @@ export const HostDashboardScreen = () => {
           </Pressable>
           {(isAgent ? agentPlanBase === 'business' : hostPlan === 'business') ? (
             <Pressable style={styles.qaSecondary} onPress={() => {
-              showAlert({
-                title: 'Dedicated Support',
-                message: isAgent
-                  ? 'As a Business agent, you have access to priority support.\n\nEmail: hello@rhomeapp.io\nResponse time: Within 2 hours\n\nOur dedicated team is here to help you with any questions or issues.'
-                  : 'As a Business host, you have access to priority support.\n\nEmail: hello@rhomeapp.io\nResponse time: Within 2 hours\n\nOur dedicated team is here to help you with any questions or issues.',
-                variant: 'info',
+              Linking.openURL(`mailto:hello@rhomeapp.io?subject=${encodeURIComponent('Support Request — ' + (user?.name || 'Business Account'))}`).catch(() => {
+                showAlert({
+                  title: 'Dedicated Support',
+                  message: 'Email: hello@rhomeapp.io\nResponse time: Within 2 hours\n\nOur dedicated team is here to help you with any questions or issues.',
+                  variant: 'info',
+                });
               });
             }}>
               <Feather name="headphones" size={15} color="#667eea" />
