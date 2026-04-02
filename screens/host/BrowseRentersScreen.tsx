@@ -697,7 +697,7 @@ export const BrowseRentersScreen = () => {
 
       <Pressable
         style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#a855f7' + '12', borderRadius: 10, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#a855f7' + '30' }}
-        onPress={() => navigation.navigate('PiMatchedGroups')}
+        onPress={() => navigation.navigate('PiMatchedGroups', { listing: selectedListing || undefined })}
       >
         <Feather name="users" size={16} color="#a855f7" />
         <View style={{ flex: 1 }}>

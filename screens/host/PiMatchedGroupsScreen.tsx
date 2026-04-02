@@ -4,7 +4,7 @@ import {
   ActivityIndicator, TextInput,
 } from 'react-native';
 import { Feather } from '../../components/VectorIcons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -31,9 +31,11 @@ type SortOption = 'score' | 'budget' | 'newest';
 
 export const PiMatchedGroupsScreen = () => {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { confirm, alert: showAlert } = useConfirm();
+  const passedListing = route.params?.listing;
 
   const [groups, setGroups] = useState<PiAutoGroup[]>([]);
   const [filteredGroups, setFilteredGroups] = useState<PiAutoGroup[]>([]);
@@ -104,7 +106,13 @@ export const PiMatchedGroupsScreen = () => {
         limits.freePerMonth === -1 ? -1 : Math.max(0, limits.freePerMonth - usage.free)
       );
 
-      const allGroups = [...available, ...preformedAsAuto];
+      let allGroups = [...available, ...preformedAsAuto];
+      if (passedListing?.bedrooms) {
+        allGroups = allGroups.filter(g =>
+          g.max_members === passedListing.bedrooms ||
+          g.member_count === passedListing.bedrooms
+        );
+      }
       setGroups(allGroups);
       applyFiltersAndSort(allGroups, sizeFilter, sortBy, neighborhoodFilter, budgetMinFilter, budgetMaxFilter);
 
@@ -128,7 +136,7 @@ export const PiMatchedGroupsScreen = () => {
     }
     setLoading(false);
     setRefreshing(false);
-  }, [user, cityFilter, sizeFilter, sortBy, agentPlan, hostPlan, hostType, neighborhoodFilter, budgetMinFilter, budgetMaxFilter]);
+  }, [user, cityFilter, sizeFilter, sortBy, agentPlan, hostPlan, hostType, neighborhoodFilter, budgetMinFilter, budgetMaxFilter, passedListing]);
 
   useFocusEffect(
     useCallback(() => {
@@ -510,6 +518,18 @@ export const PiMatchedGroupsScreen = () => {
         </View>
       ) : null}
 
+      {passedListing ? (
+        <View style={{ backgroundColor: '#1a1a1a', borderRadius: 10, padding: 10, marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: ACCENT + '30' }}>
+          <Feather name="home" size={14} color={ACCENT} />
+          <Text style={{ color: '#ccc', fontSize: 12, flex: 1 }}>
+            Showing groups of <Text style={{ color: '#fff', fontWeight: '700' }}>{passedListing.bedrooms}</Text> for <Text style={{ color: '#fff', fontWeight: '600' }}>{passedListing.title}</Text>
+          </Text>
+          <Pressable onPress={() => navigation.setParams({ listing: undefined })}>
+            <Feather name="x" size={14} color="#666" />
+          </Pressable>
+        </View>
+      ) : null}
+
       <View style={styles.sortRow}>
         {(['score', 'budget', 'newest'] as SortOption[]).map(opt => (
           <Pressable
@@ -536,9 +556,11 @@ export const PiMatchedGroupsScreen = () => {
       </View>
       <Text style={styles.emptyTitle}>No matched groups available</Text>
       <Text style={styles.emptySubtitle}>
-        {hasActiveFilters
-          ? 'No groups match your filters. Try adjusting or clearing them.'
-          : 'No matched groups available in your area yet. Pi is working on it!'}
+        {passedListing
+          ? `No groups of ${passedListing.bedrooms} found for "${passedListing.title}". Try clearing the listing filter or check back later.`
+          : hasActiveFilters
+            ? 'No groups match your filters. Try adjusting or clearing them.'
+            : 'No matched groups available in your area yet. Pi is working on it!'}
       </Text>
     </View>
   );

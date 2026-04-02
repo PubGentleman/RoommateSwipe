@@ -60,7 +60,7 @@ export type HostDashboardStackParamList = {
   BrowseRenters: { targetListingId?: string };
   RenterProfileDetail: { renter: any };
   InviteExistingRoommates: { listingId: string; count: number; listingAddress?: string };
-  PiMatchedGroups: undefined;
+  PiMatchedGroups: { listing?: any } | undefined;
   PiClaimedGroupDetail: { groupId: string };
   MyListings: undefined;
   Chat: { conversationId: string; otherUser: any };
@@ -77,7 +77,7 @@ export type AgentBrowseStackParamList = {
   RenterProfileDetail: { renter: any; isShortlisted?: boolean };
   RenterCompatibility: { renters: any[] };
   AgentGroupBuilder: { preselectedIds?: string[]; preselectedRenters?: any[]; listingId?: string };
-  PiMatchedGroups: undefined;
+  PiMatchedGroups: { listing?: any } | undefined;
   PiClaimedGroupDetail: { groupId: string };
   Chat: { conversationId: string; otherUser: any };
 };
