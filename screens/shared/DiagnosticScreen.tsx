@@ -381,9 +381,12 @@ function DevModePanel({ user, updateUser, upgradeToPlus, upgradeToElite, upgrade
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       if (plan === 'free') {
-        await updateUser({
+        const freeUpdate: any = {
           hostSubscription: { plan: 'free', status: 'active', billingCycle: 'monthly', inquiryResponsesUsed: 0 },
-        });
+        };
+        if (currentHostType === 'agent') freeUpdate.agentPlan = 'pay_per_use';
+        if (currentHostType === 'company') freeUpdate.companyPlan = 'free';
+        await updateUser(freeUpdate);
       } else {
         const prefixed = (currentHostType === 'agent') ? `agent_${plan}` :
                          (currentHostType === 'company') ? `company_${plan}` : plan;

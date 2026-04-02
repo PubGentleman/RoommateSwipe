@@ -2252,7 +2252,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     const amount = hostPrices[plan]?.[billingCycle] ?? 0;
     const prevHistory = user.hostSubscription?.billingHistory || [];
-    const updated = {
+    const basePlan = plan.replace(/^(agent_|company_)/, '');
+    const isAgentPlan = plan.startsWith('agent_');
+    const isCompanyPlan = plan.startsWith('company_');
+    const updated: any = {
       ...user,
       hostSubscription: {
         ...user.hostSubscription,
@@ -2270,6 +2273,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ],
       },
     };
+    if (isAgentPlan) {
+      updated.agentPlan = basePlan;
+    }
+    if (isCompanyPlan) {
+      updated.companyPlan = basePlan;
+    }
     await StorageService.setCurrentUser(updated);
     await StorageService.addOrUpdateUser(updated);
     setUser(updated);
@@ -2298,7 +2307,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const canAddListing = (currentCount: number): { allowed: boolean; limit: number; reason?: string } => {
     if (user?.hostType === 'agent') {
-      const agPlan = (user.agentPlan as AgentPlan) || 'pay_per_use';
+      const subPlan = user.hostSubscription?.plan;
+      const resolvedAgentPlan = subPlan?.startsWith('agent_') ? subPlan.replace('agent_', '') : undefined;
+      const agPlan = (user.agentPlan || resolvedAgentPlan || 'pay_per_use') as AgentPlan;
       const agentLimits = getAgentPlanLimits(agPlan);
       const limit = agentLimits.listingLimit;
       if (limit === -1) return { allowed: true, limit: -1 };

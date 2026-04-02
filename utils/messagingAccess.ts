@@ -1,19 +1,34 @@
 import { User } from '../types/models';
 import { supabase } from '../lib/supabase';
 
+function extractBasePlan(plan: string | undefined | null): string {
+  if (!plan) return '';
+  return plan.replace(/^(agent_|company_)/, '');
+}
+
+function isPaidPlan(plan: string | undefined | null): boolean {
+  const base = extractBasePlan(plan);
+  return base === 'starter' || base === 'pro' || base === 'business' || base === 'enterprise';
+}
+
 export function canAccessMessages(user: User | null): boolean {
   if (!user) return true;
   const hostType = user.hostType || (user as any).host_type;
 
   if (hostType === 'agent') {
-    const plan = user.agentPlan || (user as any).agent_plan;
-    return !!plan && plan !== 'pay_per_use' && plan !== 'free' && plan !== 'none';
+    const agentPlan = user.agentPlan || (user as any).agent_plan;
+    if (isPaidPlan(agentPlan)) return true;
+    const subPlan = user.hostSubscription?.plan;
+    if (isPaidPlan(subPlan)) return true;
+    return false;
   }
 
   if (hostType === 'company') {
-    const plan = (user as any).companyPlan || (user as any).company_plan ||
-      user.hostSubscription?.plan;
-    return plan === 'starter' || plan === 'pro' || plan === 'enterprise' || plan === 'business';
+    const companyPlan = (user as any).companyPlan || (user as any).company_plan;
+    if (isPaidPlan(companyPlan)) return true;
+    const subPlan = user.hostSubscription?.plan;
+    if (isPaidPlan(subPlan)) return true;
+    return false;
   }
 
   return true;
