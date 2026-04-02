@@ -587,23 +587,40 @@ export const ProfileScreen = () => {
             </View>
           </View>
           <View style={styles.settingsCard}>
-            <SettingsItem
-              iconName="heart"
-              iconColor="#ff6b5b"
-              iconBgColor="rgba(255,107,91,0.12)"
-              iconBorderColor="rgba(255,107,91,0.18)"
-              title="My Interests"
-              subtitle="Interest cards you've sent"
-              onPress={() => navigation.navigate('MyInterests')}
-              badge={pendingInterestCount}
-            />
+            {!isHost ? (
+              <SettingsItem
+                iconName="heart"
+                iconColor="#ff6b5b"
+                iconBgColor="rgba(255,107,91,0.12)"
+                iconBorderColor="rgba(255,107,91,0.18)"
+                title="My Interests"
+                subtitle="Interest cards you've sent"
+                onPress={() => navigation.navigate('MyInterests')}
+                badge={pendingInterestCount}
+              />
+            ) : (
+              <SettingsItem
+                iconName="inbox"
+                iconColor="#a855f7"
+                iconBgColor="rgba(168,85,247,0.12)"
+                iconBorderColor="rgba(168,85,247,0.18)"
+                title="Received Inquiries"
+                subtitle="Renter interest in your listings"
+                onPress={() => {
+                  const parent = navigation.getParent();
+                  if (parent) {
+                    parent.navigate('Dashboard', { screen: 'MyListings' });
+                  }
+                }}
+              />
+            )}
             <SettingsItem
               iconName="bell"
               iconColor="#2ecc71"
               iconBgColor="rgba(46,204,113,0.12)"
               iconBorderColor="rgba(46,204,113,0.18)"
               title="Notifications"
-              subtitle="Matches, messages, activity"
+              subtitle={isHost ? 'Inquiries, messages, activity' : 'Matches, messages, activity'}
               onPress={() => navigation.navigate('Notifications')}
               badge={unreadCount}
               isLast
