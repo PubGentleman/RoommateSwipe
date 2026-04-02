@@ -71,14 +71,16 @@ export const ProfileScreen = () => {
     setDevTapTimer(setTimeout(() => setDevTapCount(0), 3000));
   };
 
+  const isHost = activeMode === 'host';
   const getRoleLabel = () => {
     if (!user) return 'User';
+    if (isHost && user.hostType === 'agent') return 'Agent';
+    if (isHost && user.hostType === 'company') return 'Company';
     const mode = activeMode || user.role;
     return mode.charAt(0).toUpperCase() + mode.slice(1);
   };
 
   const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : 'U';
-  const isHost = activeMode === 'host';
   const renterPlan = normalizeRenterPlan(user?.subscription?.plan);
   const renterLimits = getRenterPlanLimits(renterPlan);
   const [matchCount, setMatchCount] = useState(0);
