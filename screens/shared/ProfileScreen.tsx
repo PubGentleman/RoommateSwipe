@@ -384,6 +384,10 @@ export const ProfileScreen = () => {
             )}
           </View>
 
+        </View>
+        </LinearGradient>
+        </Animated.View>
+
           {isHost ? (
             <TouchableOpacity
               activeOpacity={0.7}
@@ -418,9 +422,6 @@ export const ProfileScreen = () => {
               </View>
             </TouchableOpacity>
           )}
-        </View>
-        </LinearGradient>
-        </Animated.View>
 
         {!isHost ? (
           <View style={styles.section}>
