@@ -588,7 +588,7 @@ export const BrowseRentersScreen = () => {
         <View style={styles.aiPanelHeader}>
           <Feather name="zap" size={18} color={YELLOW} />
           <Text style={styles.aiPanelTitle}>
-            Rhome AI — Top picks for "{selectedListing.title}"
+            Pi — Top picks for "{selectedListing.title}"
           </Text>
         </View>
 
@@ -661,7 +661,7 @@ export const BrowseRentersScreen = () => {
           >
             <Feather name="zap" size={16} color="#fff" />
             <Text style={styles.fullAiPairText}>
-              Ask Claude: Who should I group? ({shortlistedIds.size} shortlisted)
+              Ask Pi: Who should I group? ({shortlistedIds.size} shortlisted)
             </Text>
           </Pressable>
         ) : null}

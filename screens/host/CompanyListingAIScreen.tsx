@@ -203,7 +203,7 @@ export const CompanyListingAIScreen = () => {
             <Feather name="zap" size={18} color="#fff" />
             <Text style={styles.aiButtonText}>
               {isReadyToPair
-                ? 'Ask Claude: Who Should Move In?'
+                ? 'Ask Pi: Who Should Move In?'
                 : `Add ${bedroomsNeeded - shortlisted.length} more to run AI pairing`}
             </Text>
           </Pressable>
