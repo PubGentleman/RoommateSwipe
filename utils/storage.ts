@@ -1316,7 +1316,7 @@ export const StorageService = {
         console.log('[StorageService] Populated conversations with messages');
       }
 
-      if (hostType === 'agent' || userRole === 'host') {
+      if (hostType === 'agent') {
         const agentGroupsKey = '@rhome/agent_groups';
         const existingAgentData = await AsyncStorage.getItem(agentGroupsKey);
         const existingAgentGroups = existingAgentData ? JSON.parse(existingAgentData) : [];
@@ -1456,7 +1456,19 @@ export const StorageService = {
 
       if (isHost) {
         const allProperties = await this.getProperties();
-        const hostProperties = allProperties.filter(p => p.hostId === userId);
+        let hostProperties = allProperties.filter(p => p.hostId === userId);
+        if (hostProperties.length === 0) {
+          const unassignedIds = ['1', '2', '3'];
+          for (const pid of unassignedIds) {
+            const prop = allProperties.find(p => p.id === pid);
+            if (prop) {
+              prop.hostId = userId;
+              prop.createdBy = userId;
+            }
+          }
+          await this.setProperties(allProperties);
+          hostProperties = allProperties.filter(p => p.hostId === userId);
+        }
         const hostPropIds = hostProperties.map(p => p.id);
         if (hostPropIds.length > 0) {
           const interestCards = createMockInterestCards(userId, hostPropIds);
