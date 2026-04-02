@@ -1,4 +1,4 @@
-import { StorageService } from '../utils/storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Property, RoommateProfile, AgentGroupInvite, AgentPlacement } from '../types/models';
 import { calculateCompatibility } from '../utils/matchingAlgorithm';
 import { AgentPlan, getAgentPlanLimits, canAgentShortlist, canAgentCreateGroup, canAgentPlace } from '../constants/planLimits';
@@ -57,7 +57,7 @@ export interface AgentGroup {
 
 export async function getShortlistedRenterIds(agentId: string): Promise<string[]> {
   if (useLocalData()) {
-    const data = await StorageService.getData(SHORTLIST_KEY);
+    const data = await AsyncStorage.getItem(SHORTLIST_KEY);
     const list = data ? JSON.parse(data) : [];
     return list.filter((s: any) => s.agentId === agentId).map((s: any) => s.renterId);
   }
@@ -76,12 +76,12 @@ export async function getShortlistedRenterIds(agentId: string): Promise<string[]
 
 export async function addToShortlist(agentId: string, renterId: string, listingId?: string): Promise<{ success: boolean; error?: string }> {
   if (useLocalData()) {
-    const data = await StorageService.getData(SHORTLIST_KEY);
+    const data = await AsyncStorage.getItem(SHORTLIST_KEY);
     const list = data ? JSON.parse(data) : [];
     const exists = list.find((s: any) => s.agentId === agentId && s.renterId === renterId);
     if (exists) return { success: false, error: 'Already shortlisted' };
     list.push({ id: `sl_${Date.now()}`, agentId, renterId, listingId, createdAt: new Date().toISOString() });
-    await StorageService.storeData(SHORTLIST_KEY, JSON.stringify(list));
+    await AsyncStorage.setItem(SHORTLIST_KEY, JSON.stringify(list));
     return { success: true };
   }
 
@@ -117,10 +117,10 @@ export async function addToShortlist(agentId: string, renterId: string, listingI
 
 export async function removeFromShortlist(agentId: string, renterId: string): Promise<void> {
   if (useLocalData()) {
-    const data = await StorageService.getData(SHORTLIST_KEY);
+    const data = await AsyncStorage.getItem(SHORTLIST_KEY);
     const list = data ? JSON.parse(data) : [];
     const filtered = list.filter((s: any) => !(s.agentId === agentId && s.renterId === renterId));
-    await StorageService.storeData(SHORTLIST_KEY, JSON.stringify(filtered));
+    await AsyncStorage.setItem(SHORTLIST_KEY, JSON.stringify(filtered));
     return;
   }
 
@@ -132,7 +132,7 @@ export async function removeFromShortlist(agentId: string, renterId: string): Pr
 }
 
 async function getAgentGroupsFromLocal(agentId: string): Promise<AgentGroup[]> {
-  const data = await StorageService.getData(AGENT_GROUPS_KEY);
+  const data = await AsyncStorage.getItem(AGENT_GROUPS_KEY);
   const groups = data ? JSON.parse(data) : [];
   return groups.filter((g: AgentGroup) => g.agentId === agentId);
 }
@@ -223,10 +223,10 @@ export async function getAgentGroups(agentId: string): Promise<AgentGroup[]> {
 
 export async function createAgentGroup(group: AgentGroup): Promise<AgentGroup> {
   if (useLocalData()) {
-    const data = await StorageService.getData(AGENT_GROUPS_KEY);
+    const data = await AsyncStorage.getItem(AGENT_GROUPS_KEY);
     const groups = data ? JSON.parse(data) : [];
     groups.push(group);
-    await StorageService.storeData(AGENT_GROUPS_KEY, JSON.stringify(groups));
+    await AsyncStorage.setItem(AGENT_GROUPS_KEY, JSON.stringify(groups));
     return group;
   }
 
@@ -258,12 +258,12 @@ export async function updateAgentGroupStatus(
   status: 'assembling' | 'invited' | 'active' | 'placed' | 'dissolved'
 ): Promise<void> {
   if (useLocalData()) {
-    const data = await StorageService.getData(AGENT_GROUPS_KEY);
+    const data = await AsyncStorage.getItem(AGENT_GROUPS_KEY);
     const groups = data ? JSON.parse(data) : [];
     const idx = groups.findIndex((g: AgentGroup) => g.id === groupId);
     if (idx >= 0) {
       groups[idx].groupStatus = status;
-      await StorageService.storeData(AGENT_GROUPS_KEY, JSON.stringify(groups));
+      await AsyncStorage.setItem(AGENT_GROUPS_KEY, JSON.stringify(groups));
     }
     return;
   }
@@ -276,7 +276,7 @@ export async function updateAgentGroupStatus(
 
 export async function getAgentInvitesForRenter(renterId: string): Promise<AgentGroupInvite[]> {
   if (useLocalData()) {
-    const data = await StorageService.getData(AGENT_INVITES_KEY);
+    const data = await AsyncStorage.getItem(AGENT_INVITES_KEY);
     const invites = data ? JSON.parse(data) : [];
     return invites.filter((i: AgentGroupInvite) => i.renterId === renterId);
   }
@@ -319,7 +319,7 @@ export async function sendAgentInvites(
   memberNames: Array<{ id: string; name: string; photo?: string }>
 ): Promise<void> {
   if (useLocalData()) {
-    const data = await StorageService.getData(AGENT_INVITES_KEY);
+    const data = await AsyncStorage.getItem(AGENT_INVITES_KEY);
     const invites = data ? JSON.parse(data) : [];
 
     for (const renterId of renterIds) {
@@ -342,7 +342,7 @@ export async function sendAgentInvites(
       });
     }
 
-    await StorageService.storeData(AGENT_INVITES_KEY, JSON.stringify(invites));
+    await AsyncStorage.setItem(AGENT_INVITES_KEY, JSON.stringify(invites));
     return;
   }
 
@@ -414,17 +414,17 @@ export async function sendAgentInvites(
 
 export async function respondToInvite(inviteId: string, accept: boolean): Promise<void> {
   if (useLocalData()) {
-    const data = await StorageService.getData(AGENT_INVITES_KEY);
+    const data = await AsyncStorage.getItem(AGENT_INVITES_KEY);
     const invites = data ? JSON.parse(data) : [];
     const idx = invites.findIndex((i: AgentGroupInvite) => i.id === inviteId);
     if (idx >= 0) {
       invites[idx].status = accept ? 'accepted' : 'declined';
       invites[idx].respondedAt = new Date().toISOString();
-      await StorageService.storeData(AGENT_INVITES_KEY, JSON.stringify(invites));
+      await AsyncStorage.setItem(AGENT_INVITES_KEY, JSON.stringify(invites));
 
       if (accept) {
         const invite = invites[idx];
-        const groupData = await StorageService.getData(AGENT_GROUPS_KEY);
+        const groupData = await AsyncStorage.getItem(AGENT_GROUPS_KEY);
         const groups = groupData ? JSON.parse(groupData) : [];
         const gIdx = groups.findIndex((g: AgentGroup) => g.id === invite.groupId);
         if (gIdx >= 0) {
@@ -433,7 +433,7 @@ export async function respondToInvite(inviteId: string, accept: boolean): Promis
           );
           if (pendingInvites.length === 0) {
             groups[gIdx].groupStatus = 'active';
-            await StorageService.storeData(AGENT_GROUPS_KEY, JSON.stringify(groups));
+            await AsyncStorage.setItem(AGENT_GROUPS_KEY, JSON.stringify(groups));
           }
         }
       }
@@ -503,10 +503,10 @@ export async function recordPlacement(
       placedAt: new Date().toISOString(),
       billingStatus: 'pending',
     };
-    const data = await StorageService.getData(AGENT_PLACEMENTS_KEY);
+    const data = await AsyncStorage.getItem(AGENT_PLACEMENTS_KEY);
     const placements = data ? JSON.parse(data) : [];
     placements.push(placement);
-    await StorageService.storeData(AGENT_PLACEMENTS_KEY, JSON.stringify(placements));
+    await AsyncStorage.setItem(AGENT_PLACEMENTS_KEY, JSON.stringify(placements));
     return placement;
   }
 
@@ -553,12 +553,12 @@ export async function chargeAgentPlacementFee(
   listingId: string
 ): Promise<{ success: boolean; error?: string }> {
   if (useLocalData()) {
-    const data = await StorageService.getData(AGENT_PLACEMENTS_KEY);
+    const data = await AsyncStorage.getItem(AGENT_PLACEMENTS_KEY);
     const placements: AgentPlacement[] = data ? JSON.parse(data) : [];
     const idx = placements.findIndex(p => p.id === placementId);
     if (idx >= 0) {
       placements[idx].billingStatus = 'charged';
-      await StorageService.storeData(AGENT_PLACEMENTS_KEY, JSON.stringify(placements));
+      await AsyncStorage.setItem(AGENT_PLACEMENTS_KEY, JSON.stringify(placements));
     }
     return { success: true };
   }
@@ -580,7 +580,7 @@ export async function chargeAgentPlacementFee(
 
 export async function getMonthlyPlacementCount(agentId: string): Promise<number> {
   if (useLocalData()) {
-    const data = await StorageService.getData(AGENT_PLACEMENTS_KEY);
+    const data = await AsyncStorage.getItem(AGENT_PLACEMENTS_KEY);
     const placements: AgentPlacement[] = data ? JSON.parse(data) : [];
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);

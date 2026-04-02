@@ -76,8 +76,10 @@ export const AgentGroupBuilderScreen = () => {
   const loadData = async () => {
     if (!user) return;
     const shortlistedIds = await getShortlistedRenterIds(user.id);
+    const allIdsSet = new Set([...shortlistedIds, ...preselectedIds]);
+    const allIds = Array.from(allIdsSet);
 
-    if (shortlistedIds.length > 0 && isSupabaseConfigured) {
+    if (allIds.length > 0 && isSupabaseConfigured) {
       try {
         const { data: supaRenters } = await supabase
           .from('users')
@@ -88,7 +90,7 @@ export const AgentGroupBuilderScreen = () => {
               move_in_date, room_type, cleanliness, sleep_schedule, smoking, pets, interests, photos, bio
             )
           `)
-          .in('id', shortlistedIds);
+          .in('id', allIds);
 
         const mapped: AgentRenter[] = (supaRenters || []).map((u: any) => {
           const p = Array.isArray(u.profile) ? u.profile[0] : u.profile;
@@ -116,7 +118,7 @@ export const AgentGroupBuilderScreen = () => {
         console.warn('[AgentGroupBuilder] Supabase renter load failed, falling back:', e);
         const profiles: RoommateProfile[] = await StorageService.getRoommateProfiles();
         const mapped: AgentRenter[] = profiles
-          .filter(p => shortlistedIds.includes(p.id))
+          .filter(p => allIdsSet.has(p.id))
           .map(p => ({
             id: p.id, name: p.name, age: p.age, occupation: p.occupation,
             photos: p.photos || [], budgetMin: p.budget ? p.budget * 0.8 : undefined,
@@ -128,10 +130,10 @@ export const AgentGroupBuilderScreen = () => {
           }));
         setAllRenters(mapped);
       }
-    } else if (shortlistedIds.length > 0) {
+    } else if (allIds.length > 0) {
       const profiles: RoommateProfile[] = await StorageService.getRoommateProfiles();
       const mapped: AgentRenter[] = profiles
-        .filter(p => shortlistedIds.includes(p.id))
+        .filter(p => allIdsSet.has(p.id))
         .map(p => ({
           id: p.id, name: p.name, age: p.age, occupation: p.occupation,
           photos: p.photos || [], budgetMin: p.budget ? p.budget * 0.8 : undefined,
@@ -404,7 +406,9 @@ export const AgentGroupBuilderScreen = () => {
           ) : null}
         </View>
 
-        <Text style={styles.sectionTitle}>Select Renters from Shortlist</Text>
+        <Text style={styles.sectionTitle}>
+          {allRenters.length > 0 ? 'Select Renters' : 'No Renters Available'}
+        </Text>
         {allRenters.map(r => {
           const isSelected = selectedIds.has(r.id);
           return (
@@ -437,9 +441,26 @@ export const AgentGroupBuilderScreen = () => {
         {allRenters.length === 0 ? (
           <View style={styles.emptyState}>
             <Feather name="users" size={40} color="#555" />
-            <Text style={styles.emptyTitle}>No Shortlisted Renters</Text>
-            <Text style={styles.emptyDesc}>Browse renters and shortlist some first.</Text>
+            <Text style={styles.emptyTitle}>No Renters Selected</Text>
+            <Text style={styles.emptyDesc}>Shortlist renters from the Browse tab, then come back to build a group.</Text>
+            <Pressable
+              style={[styles.reviewBtn, { marginTop: 16, alignSelf: 'center', paddingHorizontal: 24 }]}
+              onPress={() => navigation.goBack()}
+            >
+              <Feather name="search" size={16} color="#fff" />
+              <Text style={styles.reviewBtnText}>Browse Renters</Text>
+            </Pressable>
           </View>
+        ) : null}
+
+        {allRenters.length > 0 && allRenters.length < 10 ? (
+          <Pressable
+            style={styles.addMoreBtn}
+            onPress={() => navigation.goBack()}
+          >
+            <Feather name="plus" size={16} color={ACCENT} />
+            <Text style={styles.addMoreText}>Shortlist More Renters</Text>
+          </Pressable>
         ) : null}
       </ScrollView>
 
@@ -626,7 +647,9 @@ const styles = StyleSheet.create({
   sendBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   emptyState: { alignItems: 'center', paddingVertical: 40 },
   emptyTitle: { color: '#fff', fontSize: 18, fontWeight: '700', marginTop: 12 },
-  emptyDesc: { color: '#888', fontSize: 14, marginTop: 4 },
+  emptyDesc: { color: '#888', fontSize: 14, marginTop: 4, textAlign: 'center', paddingHorizontal: 24 },
+  addMoreBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, marginTop: 8, borderWidth: 1, borderColor: 'rgba(255,107,91,0.3)', borderRadius: 12, borderStyle: 'dashed' },
+  addMoreText: { color: ACCENT, fontSize: 14, fontWeight: '600' },
   aiPairButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: ACCENT, borderRadius: 12, paddingVertical: 12, marginBottom: 12 },
   aiPairButtonText: { color: '#fff', fontSize: 14, fontWeight: '700' },
   aiPairButtonLocked: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: 'rgba(255,107,91,0.08)', borderRadius: 12, paddingVertical: 10, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(255,107,91,0.2)' },

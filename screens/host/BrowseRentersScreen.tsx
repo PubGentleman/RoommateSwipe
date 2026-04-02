@@ -526,7 +526,18 @@ export const BrowseRentersScreen = () => {
           </Pressable>
           <Pressable
             style={[styles.cardActionBtn, { backgroundColor: ACCENT }]}
-            onPress={() => {
+            onPress={async () => {
+              if (!shortlistedIds.has(item.id) && user) {
+                try {
+                  const result = await addToShortlist(user.id, item.id, selectedListing?.id);
+                  if (result.success) {
+                    if (isCompanyHost) {
+                      await companyShortlistRenter(user.id, item.id, selectedListing?.id);
+                    }
+                    setShortlistedIds(prev => new Set(prev).add(item.id));
+                  }
+                } catch (_e) {}
+              }
               navigation.navigate('AgentGroupBuilder', {
                 preselectedIds: [item.id],
                 listingId: selectedListing?.id,
@@ -786,7 +797,7 @@ export const BrowseRentersScreen = () => {
           style={styles.buildBtn}
           onPress={() => {
             if (shortlistedIds.size < 2) {
-              showAlert({ title: 'Need More', message: 'Shortlist at least 2 renters to build a group.' });
+              showAlert({ title: 'Need More', message: 'Tap the heart icon on at least 2 renters to shortlist them, then tap Build Group.' });
               return;
             }
             const shortlisted = renters.filter(r => shortlistedIds.has(r.id));
