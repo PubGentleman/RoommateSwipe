@@ -28,7 +28,7 @@ const GOLD = '#ffd700';
 const PURPLE = '#a855f7';
 const ROOMDR_PURPLE = '#7B5EA7';
 
-type BillingCycle = 'monthly' | 'annual';
+type BillingCycle = 'monthly' | 'quarterly' | 'annual';
 
 interface PlanDisplayInfo {
   id: HostPlanType;
@@ -91,6 +91,7 @@ const DEFAULT_PLAN_DISPLAY: PlanDisplayInfo[] = [
 
 function billingPrice(base: number, cycle: BillingCycle): number {
   if (base === 0) return 0;
+  if (cycle === 'quarterly') return +(base * 0.9).toFixed(2);
   if (cycle === 'annual') return +(base * 0.8).toFixed(2);
   return base;
 }
@@ -213,7 +214,7 @@ export const HostSubscriptionScreen = () => {
           ...user.hostSubscription,
           plan: plan as 'starter' | 'pro' | 'business',
           status: 'active' as const,
-          billingCycle: billingCycle === 'annual' ? 'annual' as any : 'monthly' as const,
+          billingCycle: billingCycle as any,
         },
       });
       if (isFirstTimeHost) {
@@ -447,16 +448,23 @@ export const HostSubscriptionScreen = () => {
             </Text>
           </Pressable>
           <Pressable
+            onPress={() => setBillingCycle('quarterly')}
+            style={[styles.billingChip, billingCycle === 'quarterly' ? styles.billingChipActive : null]}
+          >
+            <Text style={[styles.billingChipText, billingCycle === 'quarterly' ? styles.billingChipTextActive : null]}>
+              3 Months
+            </Text>
+            {billingCycle !== 'quarterly' ? <View style={styles.saveBadgeInline}><Text style={styles.saveBadgeInlineText}>-10%</Text></View> : null}
+          </Pressable>
+          <Pressable
             onPress={() => setBillingCycle('annual')}
             style={[styles.billingChip, billingCycle === 'annual' ? styles.billingChipActive : null]}
           >
             <Text style={[styles.billingChipText, billingCycle === 'annual' ? styles.billingChipTextActive : null]}>
               Annual
             </Text>
+            {billingCycle !== 'annual' ? <View style={styles.saveBadgeInline}><Text style={styles.saveBadgeInlineText}>-20%</Text></View> : null}
           </Pressable>
-          <View style={styles.saveBadge}>
-            <Text style={styles.saveBadgeText}>Save 20%</Text>
-          </View>
         </View>
 
         {PLAN_DISPLAY.map(renderPlanCard)}
@@ -655,9 +663,10 @@ const styles = StyleSheet.create({
   },
   billingChip: {
     paddingVertical: 8,
-    paddingHorizontal: 18,
+    paddingHorizontal: 14,
     borderRadius: 10,
     backgroundColor: CARD_BG,
+    alignItems: 'center' as const,
   },
   billingChipActive: {
     backgroundColor: ROOMDR_PURPLE,
@@ -671,6 +680,14 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   saveBadgeText: { fontSize: 11, fontWeight: '700', color: '#fff' },
+  saveBadgeInline: {
+    backgroundColor: '#16A34A',
+    borderRadius: 8,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    marginTop: 2,
+  },
+  saveBadgeInlineText: { fontSize: 9, fontWeight: '700', color: '#fff' },
 
   planCard: {
     backgroundColor: '#161616',
