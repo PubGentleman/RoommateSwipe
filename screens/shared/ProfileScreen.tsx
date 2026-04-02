@@ -73,7 +73,8 @@ export const ProfileScreen = () => {
 
   const getRoleLabel = () => {
     if (!user) return 'User';
-    return user.role.charAt(0).toUpperCase() + user.role.slice(1);
+    const mode = activeMode || user.role;
+    return mode.charAt(0).toUpperCase() + mode.slice(1);
   };
 
   const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : 'U';
