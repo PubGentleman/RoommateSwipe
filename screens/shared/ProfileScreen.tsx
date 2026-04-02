@@ -388,18 +388,7 @@ export const ProfileScreen = () => {
         </LinearGradient>
         </Animated.View>
 
-          {isHost ? (
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => navigation.navigate('HostSubscription')}
-              style={styles.boostBtnWrap}
-            >
-              <View style={[styles.boostBtn, { backgroundColor: '#7B5EA7' }]}>
-                <Feather name="briefcase" size={14} color="#fff" />
-                <Text style={styles.boostBtnText}>Manage Plan</Text>
-              </View>
-            </TouchableOpacity>
-          ) : isPlaceSeeker() ? null : renterLimits.hasProfileBoost ? (
+          {isHost ? null : isPlaceSeeker() ? null : renterLimits.hasProfileBoost ? (
             <TouchableOpacity activeOpacity={0.7} onPress={handleBoostPress} style={styles.boostBtnWrap}>
               {boostIsActive ? (
                 <View style={styles.boostActiveBtn}>
