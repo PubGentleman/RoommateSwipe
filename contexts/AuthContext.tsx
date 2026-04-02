@@ -343,6 +343,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       household_gender_preference: profile?.household_gender_preference || undefined,
       pi_auto_match_enabled: profile?.pi_auto_match_enabled ?? undefined,
       pi_last_match_attempt: profile?.pi_last_match_attempt || undefined,
+      createdAt: supabaseUser.created_at || undefined,
+      responseRate: supabaseUser.response_rate ?? undefined,
     };
   };
 

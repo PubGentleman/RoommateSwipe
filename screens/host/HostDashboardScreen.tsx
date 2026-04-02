@@ -16,7 +16,7 @@ import { HostBadge } from '../../components/HostBadge';
 import { BadgeProgressCard } from '../../components/BadgeProgressCard';
 import { getMyListings, mapListingToProperty, getAgentStats, getCompanyAgents, reassignListingAgent, getCompanyListingsWithAgents, getAgentDetailData, reassignConversation, AgentConversationSummary, AgentBookingSummary } from '../../services/listingService';
 import { getReceivedInterestCards, acceptInterestCard, rejectInterestCard } from '../../services/discoverService';
-import { supabase } from '../../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { RhomeLogo } from '../../components/RhomeLogo';
 import { updateGroup } from '../../services/groupService';
 import { RhomeAISheet } from '../../components/RhomeAISheet';
@@ -119,6 +119,10 @@ export const HostDashboardScreen = () => {
   const [piMonthlyLimit, setPiMonthlyLimit] = useState(0);
   const [piTopPicks, setPiTopPicks] = useState<{ name: string; reason: string; strength: string }[]>([]);
   const [piAvailableGroups, setPiAvailableGroups] = useState(0);
+  const [agentPlacementCount, setAgentPlacementCount] = useState(0);
+  const [reviewCount, setReviewCount] = useState(0);
+  const [avgRating, setAvgRating] = useState(0);
+  const [teamMemberCount, setTeamMemberCount] = useState(0);
 
   const DASH_COLLAPSE_H = 50;
   const dashScrollY = useSharedValue(0);
@@ -268,6 +272,50 @@ export const HostDashboardScreen = () => {
         setResponseAlerts(alerts);
       } catch {}
     }
+
+    if (isSupabaseConfigured && user.id) {
+      try {
+        const { count: placementCount } = await supabase
+          .from('agent_placements')
+          .select('id', { count: 'exact', head: true })
+          .eq('agent_id', user.id);
+        setAgentPlacementCount(placementCount || 0);
+      } catch { setAgentPlacementCount(0); }
+
+      try {
+        const listingIds = freshListings.length > 0
+          ? freshListings.map(l => l.id)
+          : listings.map(l => l.id);
+        if (listingIds.length > 0) {
+          const { data: reviewData } = await supabase
+            .from('reviews')
+            .select('rating')
+            .in('listing_id', listingIds);
+          if (reviewData && reviewData.length > 0) {
+            setReviewCount(reviewData.length);
+            const avg = reviewData.reduce((sum: number, r: any) => sum + (r.rating || 0), 0) / reviewData.length;
+            setAvgRating(Math.round(avg * 10) / 10);
+          } else {
+            setReviewCount(0);
+            setAvgRating(0);
+          }
+        } else {
+          setReviewCount(0);
+          setAvgRating(0);
+        }
+      } catch { setReviewCount(0); setAvgRating(0); }
+
+      if (user.hostType === 'company') {
+        try {
+          const { count: tmCount } = await supabase
+            .from('team_members')
+            .select('id', { count: 'exact', head: true })
+            .eq('company_user_id', user.id)
+            .eq('status', 'active');
+          setTeamMemberCount(tmCount || 0);
+        } catch { setTeamMemberCount(0); }
+      }
+    }
   }, [user]);
 
   useFocusEffect(
@@ -285,6 +333,10 @@ export const HostDashboardScreen = () => {
     .slice(0, 3);
 
   const navigateToTab = (tabName: string) => {
+    if (tabName === 'Listings' && isAgent) {
+      navigation.navigate('MyListings');
+      return;
+    }
     const parent = navigation.getParent();
     if (parent) parent.navigate(tabName);
   };
@@ -759,22 +811,22 @@ export const HostDashboardScreen = () => {
               { label: 'License verified', met: user?.licenseVerificationStatus === 'verified' },
               { label: 'Paid plan', met: !!agentPlan && agentPlan !== 'pay_per_use' },
               { label: '2+ months on Rhome', met: !!user?.createdAt && (Date.now() - new Date(user.createdAt).getTime()) > 60 * 24 * 60 * 60 * 1000 },
-              { label: '85%+ response rate', met: (user?.responseRate || 0) >= 85 },
-              { label: '3+ successful placements', met: false },
-              { label: '5+ reviews', met: false },
-              { label: '4.7+ average rating', met: false },
+              { label: '85%+ response rate', met: typeof user?.responseRate === 'number' && user.responseRate >= 85 },
+              { label: '3+ successful placements', met: agentPlacementCount >= 3 },
+              { label: '5+ reviews', met: reviewCount >= 5 },
+              { label: '4.7+ average rating', met: avgRating >= 4.7 },
               { label: '<15% cancellation rate', met: true },
             ] : [
               { label: 'Company name set', met: !!user?.companyName },
-              { label: 'Pro or Enterprise plan', met: false },
+              { label: 'Pro or Enterprise plan', met: !!hostSub && !isFreePlan(hostSub.plan) && (hostSub.plan === 'pro' || hostSub.plan === 'enterprise') },
               { label: '3+ months on Rhome', met: !!user?.createdAt && (Date.now() - new Date(user.createdAt).getTime()) > 90 * 24 * 60 * 60 * 1000 },
-              { label: '90%+ response rate', met: (user?.responseRate || 0) >= 90 },
+              { label: '90%+ response rate', met: typeof user?.responseRate === 'number' && user.responseRate >= 90 },
               { label: '5+ active listings', met: listings.filter(l => l.available).length >= 5 },
-              { label: '10+ reviews', met: false },
-              { label: '4.6+ average rating', met: false },
+              { label: '10+ reviews', met: reviewCount >= 10 },
+              { label: '4.6+ average rating', met: avgRating >= 4.6 },
               { label: 'Under 45 day avg vacancy', met: true },
               { label: '60%+ fill rate', met: true },
-              { label: '2+ team members', met: false },
+              { label: '2+ team members', met: teamMemberCount >= 2 },
             ]}
           />
         ) : null}
@@ -1147,7 +1199,7 @@ export const HostDashboardScreen = () => {
                 confirmText: 'Upgrade Plan',
                 variant: 'warning',
               }).then(confirmed => {
-                if (confirmed) navigation.navigate(isAgent ? 'AgentSubscription' : 'HostSubscription');
+                if (confirmed) navigation.navigate('HostSubscription');
               });
               return;
             }

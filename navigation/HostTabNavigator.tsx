@@ -61,6 +61,7 @@ export type HostDashboardStackParamList = {
   InviteExistingRoommates: { listingId: string; count: number; listingAddress?: string };
   PiMatchedGroups: undefined;
   PiClaimedGroupDetail: { groupId: string };
+  MyListings: undefined;
 };
 
 export type HostGroupsStackParamList = {
@@ -120,6 +121,7 @@ function DashboardStackNavigator() {
       <DashboardStack.Screen name="InviteExistingRoommates" component={InviteExistingRoommatesScreen} />
       <DashboardStack.Screen name="PiMatchedGroups" component={PiMatchedGroupsScreen} />
       <DashboardStack.Screen name="PiClaimedGroupDetail" component={PiClaimedGroupDetailScreen} />
+      <DashboardStack.Screen name="MyListings" component={MyListingsScreen} />
     </DashboardStack.Navigator>
   );
 }

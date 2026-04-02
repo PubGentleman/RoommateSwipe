@@ -568,6 +568,7 @@ export interface User {
   household_gender_preference?: GenderPreference;
   pi_auto_match_enabled?: boolean;
   pi_last_match_attempt?: string;
+  responseRate?: number;
   profileData?: {
     bio?: string;
     budget?: number;
