@@ -203,9 +203,7 @@ export const PlanSelectionScreen = () => {
         {(['monthly', '3month', 'annual'] as BillingCycle[]).map(cycle => {
           const active = billingCycle === cycle;
           const label = cycle === 'monthly' ? 'Monthly' : cycle === '3month' ? '3 Months' : 'Annual';
-          const save = isHost
-            ? (cycle === '3month' ? 'Save 10%' : cycle === 'annual' ? 'Save 20%' : null)
-            : (cycle === '3month' ? 'Save 10%' : cycle === 'annual' ? 'Save 17%' : null);
+          const save = cycle === '3month' ? 'Save 10%' : cycle === 'annual' ? 'Save 17%' : null;
           return (
             <Pressable
               key={cycle}

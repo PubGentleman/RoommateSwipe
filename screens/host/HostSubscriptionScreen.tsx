@@ -92,7 +92,7 @@ const DEFAULT_PLAN_DISPLAY: PlanDisplayInfo[] = [
 function billingPrice(base: number, cycle: BillingCycle): number {
   if (base === 0) return 0;
   if (cycle === 'quarterly') return +(base * 0.9).toFixed(2);
-  if (cycle === 'annual') return +(base * 0.8).toFixed(2);
+  if (cycle === 'annual') return +(base * 0.83).toFixed(2);
   return base;
 }
 
@@ -471,7 +471,7 @@ export const HostSubscriptionScreen = () => {
             <Text style={[styles.billingChipText, billingCycle === 'annual' ? styles.billingChipTextActive : null]}>
               Annual
             </Text>
-            {billingCycle !== 'annual' ? <View style={styles.saveBadgeInline}><Text style={styles.saveBadgeInlineText}>-20%</Text></View> : null}
+            {billingCycle !== 'annual' ? <View style={styles.saveBadgeInline}><Text style={styles.saveBadgeInlineText}>-17%</Text></View> : null}
           </Pressable>
         </View>
 
