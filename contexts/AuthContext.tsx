@@ -429,19 +429,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const localUser = await StorageService.getCurrentUser();
 
       if (localUser?.id === mappedUser.id) {
-        if (localUser.hostSubscription && localUser.hostSubscription.plan && localUser.hostSubscription.plan !== 'free') {
-          const localPlan = localUser.hostSubscription.plan;
-          const supabasePlan = mappedUser.hostSubscription?.plan;
-          if (!supabasePlan || supabasePlan === 'free' || supabasePlan === 'pay_per_use') {
-            mappedUser = {
-              ...mappedUser,
-              hostSubscription: localUser.hostSubscription,
-              agentPlan: localUser.agentPlan || mappedUser.agentPlan,
-            };
-            if ((localUser as any).companyPlan) {
-              (mappedUser as any).companyPlan = (localUser as any).companyPlan;
+        const supabasePlan = mappedUser.hostSubscription?.plan;
+        const supabaseBase = (supabasePlan || '').replace(/^(agent_|company_)/, '');
+        const needsRestore = !supabaseBase || supabaseBase === 'free' || supabaseBase === 'basic' || supabaseBase === 'pay_per_use';
+
+        if (needsRestore) {
+          let restoredFromLocal = false;
+          if (localUser.hostSubscription && localUser.hostSubscription.plan && localUser.hostSubscription.plan !== 'free') {
+            const localBase = (localUser.hostSubscription.plan || '').replace(/^(agent_|company_)/, '');
+            if (localBase && localBase !== 'free' && localBase !== 'basic' && localBase !== 'pay_per_use') {
+              mappedUser = {
+                ...mappedUser,
+                hostSubscription: localUser.hostSubscription,
+                agentPlan: localUser.agentPlan || mappedUser.agentPlan,
+              };
+              if ((localUser as any).companyPlan) {
+                (mappedUser as any).companyPlan = (localUser as any).companyPlan;
+              }
+              console.log(`[Auth] Restored host plan from local user: ${localUser.hostSubscription.plan}`);
+              restoredFromLocal = true;
             }
-            console.log(`[Auth] Restored locally saved host plan: ${localPlan}`);
+          }
+
+          if (!restoredFromLocal && mappedUser.hostType) {
+            try {
+              const savedHostSub = await StorageService.getHostSubscription(mappedUser.id);
+              if (savedHostSub && savedHostSub.plan) {
+                const savedBase = (savedHostSub.plan || '').replace(/^(agent_|company_)/, '');
+                if (savedBase && savedBase !== 'free' && savedBase !== 'basic' && savedBase !== 'pay_per_use') {
+                  mappedUser = {
+                    ...mappedUser,
+                    hostSubscription: { ...mappedUser.hostSubscription, ...savedHostSub },
+                    agentPlan: mappedUser.hostType === 'agent' ? savedBase : mappedUser.agentPlan,
+                  };
+                  if (mappedUser.hostType === 'company') {
+                    (mappedUser as any).companyPlan = savedBase;
+                  }
+                  console.log(`[Auth] Restored host plan from HOST_SUBSCRIPTIONS: ${savedHostSub.plan}`);
+                }
+              }
+            } catch {}
           }
         }
       }
@@ -527,6 +554,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await StorageService.setCurrentUser(currentUser);
     }
     if (currentUser) {
+      if (currentUser.hostType && currentUser.id) {
+        try {
+          const savedHostSub = await StorageService.getHostSubscription(currentUser.id);
+          if (savedHostSub && savedHostSub.plan && savedHostSub.plan !== 'free') {
+            const currentPlan = currentUser.hostSubscription?.plan || '';
+            const currentBase = currentPlan.replace(/^(agent_|company_)/, '');
+            const savedBase = (savedHostSub.plan || '').replace(/^(agent_|company_)/, '');
+            if (!currentBase || currentBase === 'free' || currentBase === 'basic' || currentBase === 'pay_per_use') {
+              currentUser.hostSubscription = { ...currentUser.hostSubscription, ...savedHostSub };
+              if (currentUser.hostType === 'agent') {
+                currentUser.agentPlan = savedBase || currentUser.agentPlan;
+              }
+              if (currentUser.hostType === 'company') {
+                (currentUser as any).companyPlan = savedBase || (currentUser as any).companyPlan;
+              }
+              await StorageService.setCurrentUser(currentUser);
+              console.log(`[Auth] Restored host plan from HOST_SUBSCRIPTIONS: ${savedHostSub.plan}`);
+            }
+          }
+        } catch {}
+      }
       if (currentUser.messageCount === undefined) {
         currentUser.messageCount = 0;
       }
