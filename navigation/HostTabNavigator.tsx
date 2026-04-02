@@ -287,7 +287,7 @@ export const HostTabNavigator = () => {
   if (hostType === 'agent') {
     return (
       <Tab.Navigator
-        initialRouteName="Listings"
+        initialRouteName="Dashboard"
         tabBar={(props) => <HostCustomTabBar {...props} />}
         backBehavior="history"
         screenOptions={{
@@ -296,7 +296,7 @@ export const HostTabNavigator = () => {
           freezeOnBlur: true,
         }}
       >
-        <Tab.Screen name="Listings" component={ListingsStackNavigator} />
+        <Tab.Screen name="Dashboard" component={DashboardStackNavigator} />
         <Tab.Screen name="BrowseRenters" component={AgentBrowseStackNavigator} />
         <Tab.Screen name="AgentGroups" component={AgentGroupsStackNavigator} />
         <Tab.Screen name="Messages" component={HostMessagesStackNavigator} />
