@@ -83,7 +83,7 @@ function formatBudget(range?: string): string {
 }
 
 export const HostDashboardScreen = () => {
-  const { user, getHostPlan, canAddListing } = useAuth();
+  const { user, getHostPlan, canAddListing, canRespondToInquiry, useInquiryResponse } = useAuth();
   const { confirm, alert: showAlert } = useConfirm();
   const { refreshUnreadCount } = useNotificationContext();
   const hostPlan = getHostPlan();
@@ -291,6 +291,18 @@ export const HostDashboardScreen = () => {
 
   const handleAcceptInterest = async (card: InterestCard) => {
     if (!user) return;
+
+    const responseCheck = await canRespondToInquiry();
+    if (!responseCheck.allowed) {
+      await showAlert({
+        title: 'Response Limit Reached',
+        message: responseCheck.reason || `You've used all ${responseCheck.limit} inquiry responses for this period. Upgrade your plan for more.`,
+        variant: 'warning',
+      });
+      return;
+    }
+    await useInquiryResponse();
+
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const now = new Date();
 
@@ -380,6 +392,18 @@ export const HostDashboardScreen = () => {
 
   const handlePassInterest = async (card: InterestCard) => {
     if (!user) return;
+
+    const responseCheck = await canRespondToInquiry();
+    if (!responseCheck.allowed) {
+      await showAlert({
+        title: 'Response Limit Reached',
+        message: responseCheck.reason || `You've used all ${responseCheck.limit} inquiry responses for this period. Upgrade your plan for more.`,
+        variant: 'warning',
+      });
+      return;
+    }
+    await useInquiryResponse();
+
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const now = new Date();
 

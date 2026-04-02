@@ -273,12 +273,8 @@ export const ExploreScreen = () => {
       setError(null);
 
       await StorageService.initializeWithMockData();
-      const localProperties = (await StorageService.getProperties())
-        .filter((p: Property) => p.hostId !== user?.id);
-      setProperties(localProperties);
-      setFilteredProperties(localProperties);
-      setIsLoading(false);
 
+      let usedSupabase = false;
       try {
         const supabaseListings = await Promise.race([
           getListings({ ...(activeCity ? { city: activeCity } : {}) }),
@@ -290,11 +286,21 @@ export const ExploreScreen = () => {
             .filter((p: Property) => p.hostId !== user?.id);
           setProperties(mapped);
           setFilteredProperties(mapped);
+          setIsLoading(false);
+          usedSupabase = true;
           loadDiscoverableGroups(mapped);
           getAgentsWithCriticalStatus().then(setCriticalAgentIds).catch(() => {});
         }
       } catch (supabaseErr) {
         console.warn('Supabase getListings failed, using local data:', supabaseErr);
+      }
+
+      if (!usedSupabase) {
+        const localProperties = (await StorageService.getProperties())
+          .filter((p: Property) => p.hostId !== user?.id);
+        setProperties(localProperties);
+        setFilteredProperties(localProperties);
+        setIsLoading(false);
       }
     } catch (err) {
       setError('Failed to load properties');

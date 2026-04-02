@@ -58,6 +58,8 @@ export const CreateEditListingScreen = () => {
   const propertyId = route.params?.propertyId;
   const isEditing = !!propertyId;
   const [hostSub, setHostSub] = useState<HostSubscriptionData | null>(null);
+  const [existingIsPaused, setExistingIsPaused] = useState(false);
+  const [existingIsRented, setExistingIsRented] = useState(false);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -133,6 +135,9 @@ export const CreateEditListingScreen = () => {
       }
     }
     if (!prop) return;
+
+    if (prop.is_paused || prop.isPaused) setExistingIsPaused(true);
+    if (prop.is_rented || prop.isRented || prop.rentedDate) setExistingIsRented(true);
 
     setTitle(prop.title);
     setDescription(prop.description);
@@ -334,9 +339,9 @@ export const CreateEditListingScreen = () => {
         amenities: selectedAmenities,
         photos: photos,
         available_date: resolvedAvailableDate,
-        is_active: true,
-        is_paused: false,
-        is_rented: false,
+        is_active: isEditing ? !(existingIsPaused || existingIsRented) : true,
+        is_paused: isEditing ? existingIsPaused : false,
+        is_rented: isEditing ? existingIsRented : false,
         host_name: user?.name || '',
         host_profile_id: user?.id || '',
       };

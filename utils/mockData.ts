@@ -2082,7 +2082,7 @@ export const mockProperties: Property[] = [
       { gender: 'male', onApp: true, userId: '4' },
       { gender: 'female', onApp: false },
     ],
-    hostProfileId: '4',
+    hostProfileId: 'host3',
     preferred_tenant_gender: 'male_only',
     walkScore: 90,
     transitInfo: {

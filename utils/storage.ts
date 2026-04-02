@@ -1945,6 +1945,12 @@ export const StorageService = {
         await AsyncStorage.setItem(STORAGE_KEYS.SAVED_PROPERTIES, JSON.stringify(savedProperties));
       }
 
+      const interestCards = await this.getInterestCards();
+      const filteredCards = interestCards.filter(
+        (c: InterestCard) => c.renterId !== userId && c.hostId !== userId
+      );
+      await AsyncStorage.setItem(STORAGE_KEYS.INTEREST_CARDS, JSON.stringify(filteredCards));
+
       const notificationsData = await AsyncStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
       if (notificationsData) {
         const notifications = JSON.parse(notificationsData);
@@ -2018,11 +2024,13 @@ export const StorageService = {
   },
 
   async getInterestCardsForHost(hostId: string): Promise<InterestCard[]> {
+    await this.expireOldInterestCards();
     const cards = await this.getInterestCards();
     return cards.filter(c => c.hostId === hostId);
   },
 
   async getInterestCardsForRenter(renterId: string): Promise<InterestCard[]> {
+    await this.expireOldInterestCards();
     const cards = await this.getInterestCards();
     return cards.filter(c => c.renterId === renterId);
   },
