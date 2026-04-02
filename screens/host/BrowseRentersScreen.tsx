@@ -80,8 +80,9 @@ export const BrowseRentersScreen = () => {
 
   const rawAgentPlan = user?.agentPlan || (user as any)?.agent_plan || '';
   const subPlan = user?.hostSubscription?.plan || '';
-  const effectivePlan = (rawAgentPlan && rawAgentPlan !== 'pay_per_use' && rawAgentPlan !== 'free') ? rawAgentPlan : subPlan;
-  const agentPlan: AgentPlan = (effectivePlan as AgentPlan) || 'pay_per_use';
+  const resolvedPlan = (rawAgentPlan && rawAgentPlan !== 'pay_per_use' && rawAgentPlan !== 'free') ? rawAgentPlan : subPlan;
+  const basePlan = (resolvedPlan || '').replace(/^(agent_|company_)/, '');
+  const agentPlan: AgentPlan = (basePlan || 'pay_per_use') as AgentPlan;
   const planLimits = getAgentPlanLimits(agentPlan);
 
   useFocusEffect(

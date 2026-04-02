@@ -51,8 +51,9 @@ export const AgentGroupBuilderScreen = () => {
 
   const rawAgentPlan = user?.agentPlan || (user as any)?.agent_plan || '';
   const subPlan = user?.hostSubscription?.plan || '';
-  const effectivePlan = (rawAgentPlan && rawAgentPlan !== 'pay_per_use' && rawAgentPlan !== 'free') ? rawAgentPlan : subPlan;
-  const agentPlan: AgentPlan = (effectivePlan as AgentPlan) || 'pay_per_use';
+  const resolvedPlan = (rawAgentPlan && rawAgentPlan !== 'pay_per_use' && rawAgentPlan !== 'free') ? rawAgentPlan : subPlan;
+  const normalizedPlan = (resolvedPlan || '').replace(/^(agent_|company_)/, '');
+  const agentPlan: AgentPlan = (normalizedPlan || 'pay_per_use') as AgentPlan;
   const planLimits = getAgentPlanLimits(agentPlan);
   const { getPairing, loading: pairingLoading, result: pairingResult, error: pairingError, reset: resetPairing } = useAgentPairing();
 
