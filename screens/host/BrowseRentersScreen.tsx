@@ -749,7 +749,7 @@ export const BrowseRentersScreen = () => {
             onPress={() => {
               if (planLimits.hasCompatibilityMatrix && shortlistedIds.size >= 2) {
                 const shortlisted = renters.filter(r => shortlistedIds.has(r.id));
-                navigation.navigate('RenterCompatibility', { renters: shortlisted, listingId: selectedListing?.id });
+                navigation.navigate('RenterCompatibility', { renters: shortlisted, listingId: selectedListing?.id, listing: selectedListing });
               } else if (!planLimits.hasCompatibilityMatrix) {
                 showAlert({ title: 'Pro Feature', message: 'Compatibility Matrix is available on Pro and Business plans.' });
               } else {

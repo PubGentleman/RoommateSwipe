@@ -40,6 +40,7 @@ export const AgentGroupBuilderScreen = () => {
   const preselectedIds: string[] = route.params?.preselectedIds ?? [];
   const preselectedRenters: AgentRenter[] = route.params?.preselectedRenters ?? [];
   const preselectedListingId: string | undefined = route.params?.listingId;
+  const preselectedListingObj: Property | undefined = route.params?.preselectedListing;
   const openAIPairing: boolean = route.params?.openAIPairing ?? false;
 
   const [allRenters, setAllRenters] = useState<AgentRenter[]>([]);
@@ -265,11 +266,19 @@ export const AgentGroupBuilderScreen = () => {
       const props = await StorageService.getProperties();
       myListings = props.filter(p => p.hostId === user.id && p.available);
     }
+    if (preselectedListingObj && !myListings.some(l => l.id === preselectedListingObj.id)) {
+      myListings = [preselectedListingObj, ...myListings];
+    }
     setListings(myListings);
 
-    if (preselectedListingId) {
-      const found = myListings.find(l => l.id === preselectedListingId);
-      if (found) setSelectedListing(found);
+    if (preselectedListingId || preselectedListingObj) {
+      const targetId = preselectedListingId || preselectedListingObj?.id;
+      const found = myListings.find(l => l.id === targetId);
+      if (found) {
+        setSelectedListing(found);
+      } else if (preselectedListingObj) {
+        setSelectedListing(preselectedListingObj);
+      }
     }
   };
 
@@ -456,23 +465,48 @@ export const AgentGroupBuilderScreen = () => {
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: 120, paddingHorizontal: 16 }}>
-        <Text style={styles.sectionTitle}>Select Target Listing</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
-          {listings.map(l => (
-            <Pressable
-              key={l.id}
-              style={[styles.listingChip, selectedListing?.id === l.id ? styles.listingChipActive : null]}
-              onPress={() => setSelectedListing(l)}
-            >
-              <Text style={[styles.listingChipText, selectedListing?.id === l.id ? { color: '#fff' } : null]}>
-                {l.title} ({l.bedrooms}BR)
+        {selectedListing ? (
+          <View style={styles.listingBanner}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: '#aaa', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>Building group for</Text>
+              <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700', marginTop: 2 }}>{selectedListing.title}</Text>
+              <Text style={{ color: '#aaa', fontSize: 13, marginTop: 2 }}>
+                {selectedListing.bedrooms}BR · ${selectedListing.price?.toLocaleString()}/mo
+                {selectedListing.neighborhood ? ` · ${selectedListing.neighborhood}` : ''}
               </Text>
-            </Pressable>
-          ))}
-          {listings.length === 0 ? (
-            <Text style={styles.emptyText}>No active listings</Text>
-          ) : null}
-        </ScrollView>
+            </View>
+            {listings.length > 1 ? (
+              <Pressable
+                onPress={() => {
+                  setSelectedListing(null);
+                }}
+                style={{ padding: 8 }}
+              >
+                <Feather name="repeat" size={16} color="#aaa" />
+              </Pressable>
+            ) : null}
+          </View>
+        ) : (
+          <View>
+            <Text style={styles.sectionTitle}>Select Target Listing</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+              {listings.map(l => (
+                <Pressable
+                  key={l.id}
+                  style={[styles.listingChip, styles.listingChipActive]}
+                  onPress={() => setSelectedListing(l)}
+                >
+                  <Text style={[styles.listingChipText, { color: '#fff' }]}>
+                    {l.title} ({l.bedrooms}BR · ${l.price?.toLocaleString()}/mo)
+                  </Text>
+                </Pressable>
+              ))}
+              {listings.length === 0 ? (
+                <Text style={styles.emptyText}>No active listings</Text>
+              ) : null}
+            </ScrollView>
+          </View>
+        )}
 
         {planLimits.hasAIGroupSuggestions && selectedListing && selectedIds.size >= 2 ? (
           <Pressable style={styles.aiPairButton} onPress={handleAIPairing}>
@@ -758,6 +792,7 @@ const styles = StyleSheet.create({
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   title: { color: '#fff', fontSize: 18, fontWeight: '700' },
   sectionTitle: { color: '#fff', fontSize: 16, fontWeight: '700', marginBottom: 12, marginTop: 8 },
+  listingBanner: { backgroundColor: CARD_BG, borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: ACCENT + '40', flexDirection: 'row', alignItems: 'center' },
   listingChip: { backgroundColor: CARD_BG, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10, marginRight: 8, borderWidth: 1, borderColor: '#333' },
   listingChipActive: { borderColor: ACCENT, backgroundColor: 'rgba(255,107,91,0.15)' },
   listingChipText: { color: '#aaa', fontSize: 13, fontWeight: '600' },

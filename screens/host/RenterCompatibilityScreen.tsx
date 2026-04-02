@@ -172,6 +172,7 @@ export const RenterCompatibilityScreen = () => {
   const allRenters: AgentRenter[] = route.params?.renters ?? [];
   const renters = useMemo(() => allRenters.filter(r => !isEntireSeeker(r)), [allRenters]);
   const listingId: string | undefined = route.params?.listingId;
+  const listing: any | undefined = route.params?.listing;
 
   const [detailPair, setDetailPair] = useState<{ a: AgentRenter; b: AgentRenter; score: number } | null>(null);
 
@@ -197,6 +198,7 @@ export const RenterCompatibilityScreen = () => {
       preselectedIds: ids,
       preselectedRenters,
       listingId,
+      preselectedListing: listing,
     });
   };
 
