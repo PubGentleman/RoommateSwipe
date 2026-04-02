@@ -117,6 +117,12 @@ async function checkTopAgentServer(supabase: any, host: any): Promise<string | n
   cutoff.setMonth(cutoff.getMonth() - 2);
   if (new Date(host.created_at) > cutoff) return null;
 
+  const { count: inquiryCount } = await supabase
+    .from('interest_cards')
+    .select('id', { count: 'exact', head: true })
+    .eq('recipient_id', host.id);
+
+  if ((inquiryCount || 0) < 10) return null;
   if ((host.response_rate || 0) < 85) return null;
 
   const { count: placementCount } = await supabase
@@ -142,6 +148,8 @@ async function checkTopAgentServer(supabase: any, host: any): Promise<string | n
   );
   if (totalReviews > 0 && weightedSum / totalReviews < 4.7) return null;
 
+  if ((placementCount || 0) < 5) return null;
+
   const { data: bookings } = await supabase
     .from('bookings')
     .select('status')
@@ -163,6 +171,12 @@ async function checkTopCompanyServer(supabase: any, host: any): Promise<string |
   cutoff.setMonth(cutoff.getMonth() - 3);
   if (new Date(host.created_at) > cutoff) return null;
 
+  const { count: companyInquiryCount } = await supabase
+    .from('interest_cards')
+    .select('id', { count: 'exact', head: true })
+    .eq('recipient_id', host.id);
+
+  if ((companyInquiryCount || 0) < 15) return null;
   if ((host.response_rate || 0) < 90) return null;
 
   const { data: listings } = await supabase

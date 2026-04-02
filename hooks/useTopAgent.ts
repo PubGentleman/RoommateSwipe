@@ -12,6 +12,8 @@ const MIN_REVIEWS = 5;
 const MIN_RATING = 4.7;
 const MIN_RESPONSE_RATE = 85;
 const MAX_CANCELLATION_RATE = 0.15;
+const MIN_INQUIRIES_FOR_RESPONSE_RATE = 10;
+const MIN_PLACEMENTS_FOR_CANCELLATION_RATE = 5;
 
 export function useTopAgent(agentId: string | undefined): TopAgentResult {
   const [isTopAgent, setIsTopAgent] = useState(false);
@@ -56,6 +58,12 @@ export async function checkTopAgent(agentId: string): Promise<boolean> {
     cutoff.setMonth(cutoff.getMonth() - MIN_ACCOUNT_AGE_MONTHS);
     if (new Date(agent.created_at) > cutoff) return false;
 
+    const { count: inquiryCount } = await supabase
+      .from('interest_cards')
+      .select('id', { count: 'exact', head: true })
+      .eq('recipient_id', agentId);
+
+    if ((inquiryCount || 0) < MIN_INQUIRIES_FOR_RESPONSE_RATE) return false;
     if ((agent.response_rate || 0) < MIN_RESPONSE_RATE) return false;
 
     const { count: placementCount } = await supabase
@@ -86,6 +94,8 @@ export async function checkTopAgent(agentId: string): Promise<boolean> {
       .from('bookings')
       .select('status')
       .in('listing_id', listings.map(l => l.id));
+
+    if ((placementCount || 0) < MIN_PLACEMENTS_FOR_CANCELLATION_RATE) return false;
 
     if (bookings && bookings.length > 0) {
       const cancelledByHost = bookings.filter(b => b.status === 'cancelled_by_host').length;
