@@ -325,13 +325,21 @@ export const HostSubscriptionScreen = () => {
           {isContactSales ? null : <Text style={styles.pricePeriod}>/mo</Text>}
         </View>
 
+        {!isContactSales && !isFreePlan(planKey as HostPlanType) && billingCycle !== 'monthly' ? (
+          <Text style={styles.billedTotal}>
+            {billingCycle === 'quarterly'
+              ? `$${planPrice.toFixed(2)}/mo · Billed $${(price * 3).toFixed(2)} every 3 months`
+              : `$${planPrice.toFixed(2)}/mo · Billed $${(price * 12).toFixed(2)}/yr`}
+          </Text>
+        ) : null}
+
         {isContactSales ? (
           <Text style={styles.noCreditCard}>Custom pricing for your organization</Text>
         ) : isFreePlan(planKey as HostPlanType) ? (
           <Text style={styles.noCreditCard}>No credit card required</Text>
-        ) : (
+        ) : billingCycle === 'monthly' ? (
           <Text style={styles.noCreditCard}>No overage fees</Text>
-        )}
+        ) : null}
 
         {planKey === 'business' && hostType === 'individual' ? (
           <View style={styles.overageNote}>
@@ -739,6 +747,7 @@ const styles = StyleSheet.create({
   },
   planPrice: { fontSize: 36, fontWeight: '800', color: '#fff', letterSpacing: -2 },
   pricePeriod: { fontSize: 15, color: '#666', fontWeight: '400' },
+  billedTotal: { fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 2 },
   noCreditCard: { fontSize: 13, color: '#555', marginBottom: 16 },
   overageNote: {
     flexDirection: 'row',
