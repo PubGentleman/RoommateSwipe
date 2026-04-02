@@ -33,6 +33,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
   const initialLoadRef = useRef(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const prevUserIdRef = useRef<string | null>(null);
+  const loginGraceRef = useRef(true);
 
   useEffect(() => {
     if (prevUserIdRef.current && prevUserIdRef.current !== user?.id) {
@@ -60,6 +61,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
   }, [user?.id]);
 
   const enqueueToast = useCallback((toast: ToastNotification) => {
+    if (loginGraceRef.current) return;
     setCurrentToast(prev => {
       if (prev === null) {
         return toast;
@@ -133,10 +135,14 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     }
 
     initialLoadRef.current = true;
+    loginGraceRef.current = true;
     lastSeenIdsRef.current = new Set();
-    checkForNewNotifications();
 
-    intervalRef.current = setInterval(checkForNewNotifications, POLL_INTERVAL);
+    const graceTimer = setTimeout(() => {
+      loginGraceRef.current = false;
+      checkForNewNotifications();
+      intervalRef.current = setInterval(checkForNewNotifications, POLL_INTERVAL);
+    }, 3000);
 
     const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
       if (nextState === 'active') {
@@ -145,6 +151,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     });
 
     return () => {
+      clearTimeout(graceTimer);
       if (intervalRef.current) clearInterval(intervalRef.current);
       subscription.remove();
     };
