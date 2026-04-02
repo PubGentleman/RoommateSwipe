@@ -579,6 +579,10 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
       setError('License number is required');
       return;
     }
+    if (state.accountType === 'agent' && !state.agencyName.trim()) {
+      setError('Agency name is required');
+      return;
+    }
     goForward();
   };
 
@@ -628,12 +632,12 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
           </View>
         </View>
         <View style={styles.field}>
-          <Text style={styles.fieldLabel}>AGENCY NAME (OPTIONAL)</Text>
+          <Text style={styles.fieldLabel}>AGENCY NAME</Text>
           <View style={styles.inputWrap}>
             <Feather name="briefcase" size={16} color="rgba(255,255,255,0.35)" />
             <TextInput
               style={styles.input}
-              placeholder="Your agency"
+              placeholder="Required"
               placeholderTextColor="rgba(255,255,255,0.35)"
               value={state.agencyName}
               onChangeText={(v) => updateState({ agencyName: v })}
