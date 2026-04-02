@@ -401,7 +401,7 @@ export const ExploreScreen = () => {
       const result = await Promise.race([
         supabase
           .from('users')
-          .select('id, full_name, avatar_url, host_type, company_name, agency_name, license_verified, units_managed')
+          .select('id, full_name, avatar_url, host_type, company_name, agency_name, license_verified, units_managed, license_number, bio')
           .eq('role', 'host'),
         new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
       ]);
@@ -418,8 +418,10 @@ export const ExploreScreen = () => {
             companyName: u.company_name,
             agencyName: u.agency_name,
             licenseVerified: u.license_verified,
+            licenseNumber: u.license_number,
             unitsManaged: u.units_managed,
             role: 'host',
+            profileData: { bio: u.bio || '' },
           };
           profileMap.set(u.id, mapped as User);
         });
@@ -2345,7 +2347,9 @@ export const ExploreScreen = () => {
                               ? detailHostUser.companyName
                               : selectedProperty.hostName}
                           </Text>
-                          {detailHostType === 'company' && detailHostUser?.unitsManaged ? (
+                          {detailHostType === 'agent' && detailHostUser?.companyName ? (
+                            <Text style={styles.pdHostMeta}>{detailHostUser.companyName}</Text>
+                          ) : detailHostType === 'company' && detailHostUser?.unitsManaged ? (
                             <Text style={styles.pdHostMeta}>{detailHostUser.unitsManaged} units managed</Text>
                           ) : detailHostType === 'agent' && detailHostUser?.agencyName ? (
                             <Text style={styles.pdHostMeta}>{detailHostUser.agencyName}</Text>
@@ -2366,6 +2370,56 @@ export const ExploreScreen = () => {
                           </View>
                         ) : null}
                       </View>
+
+                      {(detailHostType === 'agent' || detailHostType === 'company') ? (
+                        <View style={styles.pdAgentDetails}>
+                          {detailHostType === 'agent' && selectedProperty.hostName ? (
+                            <View style={styles.pdAgentDetailRow}>
+                              <Feather name="user" size={13} color="rgba(255,255,255,0.5)" />
+                              <Text style={styles.pdAgentDetailLabel}>Full Name</Text>
+                              <Text style={styles.pdAgentDetailValue}>{selectedProperty.hostName}</Text>
+                            </View>
+                          ) : null}
+                          {detailHostType === 'agent' && detailHostUser?.companyName ? (
+                            <View style={styles.pdAgentDetailRow}>
+                              <Feather name="briefcase" size={13} color="rgba(255,255,255,0.5)" />
+                              <Text style={styles.pdAgentDetailLabel}>Company</Text>
+                              <Text style={styles.pdAgentDetailValue}>{detailHostUser.companyName}</Text>
+                            </View>
+                          ) : detailHostType === 'agent' && detailHostUser?.agencyName ? (
+                            <View style={styles.pdAgentDetailRow}>
+                              <Feather name="briefcase" size={13} color="rgba(255,255,255,0.5)" />
+                              <Text style={styles.pdAgentDetailLabel}>Agency</Text>
+                              <Text style={styles.pdAgentDetailValue}>{detailHostUser.agencyName}</Text>
+                            </View>
+                          ) : null}
+                          {detailHostUser?.licenseNumber ? (
+                            <View style={styles.pdAgentDetailRow}>
+                              <Feather name="file-text" size={13} color="rgba(255,255,255,0.5)" />
+                              <Text style={styles.pdAgentDetailLabel}>License #</Text>
+                              <Text style={styles.pdAgentDetailValue}>{detailHostUser.licenseNumber}</Text>
+                              {detailHostUser?.licenseVerified ? (
+                                <View style={styles.pdAgentVerifiedPill}>
+                                  <Feather name="check" size={9} color="#fff" />
+                                </View>
+                              ) : null}
+                            </View>
+                          ) : null}
+                          {detailHostType === 'company' && detailHostUser?.unitsManaged ? (
+                            <View style={styles.pdAgentDetailRow}>
+                              <Feather name="home" size={13} color="rgba(255,255,255,0.5)" />
+                              <Text style={styles.pdAgentDetailLabel}>Portfolio</Text>
+                              <Text style={styles.pdAgentDetailValue}>{detailHostUser.unitsManaged} units managed</Text>
+                            </View>
+                          ) : null}
+                          {detailHostUser?.profileData?.bio ? (
+                            <View style={styles.pdAgentBioSection}>
+                              <Text style={styles.pdAgentBioLabel}>About</Text>
+                              <Text style={styles.pdAgentBioText} numberOfLines={4}>{detailHostUser.profileData.bio}</Text>
+                            </View>
+                          ) : null}
+                        </View>
+                      ) : null}
                       {selectedProperty.host_badge ? (
                         <HostBadge badge={selectedProperty.host_badge} size="large" />
                       ) : (selectedProperty.average_rating || 0) >= 4.8 && (selectedProperty.review_count || 0) >= 10 ? (
@@ -4617,6 +4671,54 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: 'rgba(255,255,255,0.4)',
     marginTop: 1,
+  },
+  pdAgentDetails: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.06)',
+    gap: 8,
+  },
+  pdAgentDetailRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+  },
+  pdAgentDetailLabel: {
+    fontSize: 11.5,
+    color: 'rgba(255,255,255,0.4)',
+    width: 72,
+  },
+  pdAgentDetailValue: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: '#fff',
+    flex: 1,
+  },
+  pdAgentVerifiedPill: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#3b82f6',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+  },
+  pdAgentBioSection: {
+    marginTop: 4,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.04)',
+  },
+  pdAgentBioLabel: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.35)',
+    fontWeight: '500' as const,
+    marginBottom: 4,
+  },
+  pdAgentBioText: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.7)',
+    lineHeight: 19,
   },
   pdHostBadge: {
     flexDirection: 'row',
