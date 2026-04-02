@@ -75,6 +75,11 @@ export const ListingBoostScreen = () => {
     loadData();
   }, [user, listingId]);
 
+  const isAgent = user?.hostType === 'agent';
+  const agentPlan = user?.agentPlan;
+  const isAgentFree = isAgent && (!agentPlan || agentPlan === 'pay_per_use' || agentPlan === 'free');
+  const canPayPerBoost = isAgentFree;
+
   const isBoosted = listing ? isListingBoosted(listing) : false;
   const planLimits = getPlanLimits(getHostPlan() as HostPlan);
   const maxSimultaneous = canPayPerBoost ? 1 : planLimits.simultaneousBoosts;
@@ -82,10 +87,6 @@ export const ListingBoostScreen = () => {
   const hasReachedBoostLimit = maxSimultaneous > 0 && boostsExcludingThis >= maxSimultaneous;
   const hasFreeBoosts = hostSub && hostSub.freeBoostsRemaining > 0;
   const isOnFreePlan = hostSub && isFreePlan(hostSub.plan);
-  const isAgent = user?.hostType === 'agent';
-  const agentPlan = user?.agentPlan;
-  const isAgentFree = isAgent && (!agentPlan || agentPlan === 'pay_per_use' || agentPlan === 'free');
-  const canPayPerBoost = isAgentFree;
 
   if (isOnFreePlan && hostSub && !canPayPerBoost) {
     return (
