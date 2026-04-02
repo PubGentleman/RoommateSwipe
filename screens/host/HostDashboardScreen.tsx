@@ -103,7 +103,7 @@ export const HostDashboardScreen = () => {
   const [showUpgradeBanner, setShowUpgradeBanner] = useState(false);
   const [completionBannerDismissed, setCompletionBannerDismissed] = useState(false);
   const hostCompletion = user ? getHostCompletionPercentage(user) : 100;
-  const [agentStats, setAgentStats] = useState<{ agentId: string; agentName: string; activeListings: number; pendingBookings: number }[]>([]);
+  const [agentStats, setAgentStats] = useState<{ agentId: string; agentName: string; activeListings: number; pendingBookings: number; confirmedBookings: number }[]>([]);
   const [expandedAgentId, setExpandedAgentId] = useState<string | null>(null);
   const [teamFilter, setTeamFilter] = useState<'all' | 'active' | 'pending' | 'confirmed'>('all');
   const [showReassignModal, setShowReassignModal] = useState(false);
@@ -333,8 +333,18 @@ export const HostDashboardScreen = () => {
     .slice(0, 3);
 
   const navigateToTab = (tabName: string) => {
-    if (tabName === 'Listings' && isAgent) {
-      navigation.navigate('MyListings');
+    if (tabName === 'Listings') {
+      if (isAgent) {
+        navigation.navigate('MyListings');
+      } else {
+        const parent = navigation.getParent();
+        if (parent) parent.navigate('Listings');
+      }
+      return;
+    }
+    if (tabName === 'Team' && isCompany) {
+      const parent = navigation.getParent();
+      if (parent) parent.navigate('Team');
       return;
     }
     const parent = navigation.getParent();
@@ -516,6 +526,11 @@ export const HostDashboardScreen = () => {
         ? { text: `${value} rented`, color: GREEN }
         : { text: 'No rentals yet', color: 'rgba(255,255,255,0.2)' };
     }
+    if (label === 'Placements') {
+      return value > 0
+        ? { text: `${value} placed`, color: GREEN }
+        : { text: 'No placements yet', color: 'rgba(255,255,255,0.2)' };
+    }
     if (label === 'Messages') {
       return value > 0
         ? { text: `${value} unread`, color: ACCENT }
@@ -527,7 +542,9 @@ export const HostDashboardScreen = () => {
   const statCards = [
     { icon: 'home' as const, value: activeCount, label: 'Active', color: '#3b82f6', iconBg: 'rgba(59,130,246,0.12)', iconBorder: 'rgba(59,130,246,0.2)', onPress: () => navigateToTab('Listings') },
     { icon: 'heart' as const, value: pendingInquiries, label: 'Inquiries', color: ACCENT, iconBg: 'rgba(255,107,91,0.15)', iconBorder: 'rgba(255,107,91,0.2)', onPress: () => navigation.navigate('Inquiries', { filter: 'pending' }) },
-    { icon: 'check' as const, value: rentedCount, label: 'Rented', color: GREEN, iconBg: 'rgba(46,204,113,0.12)', iconBorder: 'rgba(46,204,113,0.18)', onPress: () => navigateToTab('Listings') },
+    isAgent
+      ? { icon: 'award' as const, value: agentPlacementCount, label: 'Placements', color: GREEN, iconBg: 'rgba(46,204,113,0.12)', iconBorder: 'rgba(46,204,113,0.18)', onPress: () => navigateToTab('Listings') }
+      : { icon: 'check' as const, value: rentedCount, label: 'Rented', color: GREEN, iconBg: 'rgba(46,204,113,0.12)', iconBorder: 'rgba(46,204,113,0.18)', onPress: () => navigateToTab('Listings') },
     { icon: 'message-square' as const, value: messageCount, label: 'Messages', color: 'rgba(255,255,255,0.5)', iconBg: 'rgba(255,255,255,0.06)', iconBorder: 'rgba(255,255,255,0.08)', onPress: () => navigateToTab('Messages') },
   ];
 
@@ -562,10 +579,20 @@ export const HostDashboardScreen = () => {
           </View>
           {hostSub ? (
             <Text style={styles.planSummaryText}>
-              {isFreePlan(hostSub.plan) ? 'Free Plan \u00B7 Upgrade to unlock all features' :
-               hostSub.plan === 'starter' ? 'Host Starter \u00B7 $19.99/mo' :
-               hostSub.plan === 'pro' ? 'Host Pro \u00B7 $49.99/mo' :
-               `Host Business \u00B7 $99/mo \u00B7 ${activeCount} listings active`}
+              {isAgent
+                ? (agentPlan === 'pay_per_use' ? 'Pay Per Use \u00B7 Upgrade for more features' :
+                   agentPlan === 'starter' ? 'Agent Starter \u00B7 $29.99/mo' :
+                   agentPlan === 'pro' ? 'Agent Pro \u00B7 $79.99/mo' :
+                   `Agent Business \u00B7 $149.99/mo \u00B7 ${activeCount} listings active`)
+                : isCompany
+                  ? (hostSub.plan === 'starter' ? 'Company Starter \u00B7 $99/mo' :
+                     hostSub.plan === 'pro' ? 'Company Pro \u00B7 $199/mo' :
+                     hostSub.plan === 'enterprise' ? `Company Enterprise \u00B7 Custom \u00B7 ${activeCount} listings active` :
+                     'Free Plan \u00B7 Upgrade to unlock all features')
+                  : (isFreePlan(hostSub.plan) ? 'Free Plan \u00B7 Upgrade to unlock all features' :
+                     hostSub.plan === 'starter' ? 'Host Starter \u00B7 $19.99/mo' :
+                     hostSub.plan === 'pro' ? 'Host Pro \u00B7 $49.99/mo' :
+                     `Host Business \u00B7 $99/mo \u00B7 ${activeCount} listings active`)}
             </Text>
           ) : null}
         </View>
@@ -773,7 +800,7 @@ export const HostDashboardScreen = () => {
           </Pressable>
         ) : null}
 
-        {activeCount > 0 ? (
+        {activeCount > 0 && !isAgent ? (
           <Pressable
             style={styles.groupMatchCard}
             onPress={() => {
@@ -1016,7 +1043,7 @@ export const HostDashboardScreen = () => {
           <>
             <View style={[styles.sectionHeader, { marginTop: 6 }]}>
               <Text style={styles.sectionTitle}>TEAM ACTIVITY</Text>
-              <Pressable onPress={() => navigation.navigate('TeamManagement')}>
+              <Pressable onPress={() => navigateToTab('Team')}>
                 <Text style={styles.sectionLink}>Manage</Text>
               </Pressable>
             </View>
@@ -1042,7 +1069,7 @@ export const HostDashboardScreen = () => {
             {agentStats.filter(a => {
               if (teamFilter === 'active') return a.activeListings > 0;
               if (teamFilter === 'pending') return a.pendingBookings > 0;
-              if (teamFilter === 'confirmed') return a.pendingBookings > 0;
+              if (teamFilter === 'confirmed') return a.confirmedBookings > 0;
               return true;
             }).map(agent => {
               const expanded = expandedAgentId === agent.agentId;
@@ -1104,7 +1131,7 @@ export const HostDashboardScreen = () => {
                     <View style={{ flex: 1 }}>
                       <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>{agent.agentName}</Text>
                       <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 2 }}>
-                        {agent.activeListings} active listing{agent.activeListings !== 1 ? 's' : ''} · {agent.pendingBookings} booking{agent.pendingBookings !== 1 ? 's' : ''}
+                        {agent.activeListings} active listing{agent.activeListings !== 1 ? 's' : ''} · {agent.pendingBookings} pending · {agent.confirmedBookings} confirmed
                       </Text>
                     </View>
                     <Feather name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color="rgba(255,255,255,0.3)" />
@@ -1236,7 +1263,7 @@ export const HostDashboardScreen = () => {
             <Pressable style={styles.qaSecondary} onPress={() => {
               showAlert({
                 title: 'Dedicated Support',
-                message: 'As a Business host, you have access to priority support.\n\nEmail: support@rhome.com\nResponse time: Within 2 hours\n\nOur dedicated team is here to help you with any questions or issues.',
+                message: 'As a Business host, you have access to priority support.\n\nEmail: hello@rhomeapp.io\nResponse time: Within 2 hours\n\nOur dedicated team is here to help you with any questions or issues.',
                 variant: 'info',
               });
             }}>

@@ -60,7 +60,7 @@ export default function AboutScreen() {
         </View>
         <Text style={s.heroTitle}>Finding home{'\n'}shouldn't feel like{'\n'}a gamble</Text>
         <Text style={s.heroSub}>Rhome was built to solve one of the biggest problems in city living -- finding a roommate you actually get along with.</Text>
-        <Pressable onPress={() => Linking.openURL('mailto:support@rhome.app')}>
+        <Pressable onPress={() => Linking.openURL('mailto:hello@rhomeapp.io')}>
           <LinearGradient colors={[ACCENT, ACCENT_DARK]} style={s.heroCta}>
             <Text style={s.heroCtaText}>Get in Touch</Text>
             <Feather name="arrow-right" size={15} color="#fff" />
@@ -131,7 +131,7 @@ export default function AboutScreen() {
           <Text style={s.featuresCaption}>Whether you're looking for a roommate, a room, a sublet, or tenants for your listing -- Rhome brings clarity, connection, and community to the housing search.</Text>
         </View>
 
-        <Pressable style={s.contactCard} onPress={() => Linking.openURL('mailto:support@rhome.app')}>
+        <Pressable style={s.contactCard} onPress={() => Linking.openURL('mailto:hello@rhomeapp.io')}>
           <View style={s.contactText}>
             <Text style={s.contactTitle}>Have questions about Rhome?</Text>
             <Text style={s.contactSub}>Our team is here to help. Reach out any time.</Text>

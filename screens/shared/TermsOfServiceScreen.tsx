@@ -252,13 +252,13 @@ export default function TermsOfServiceScreen() {
 
         <Section num="16" title="Contact Us">
           <P>For questions about these Terms, contact:</P>
-          <Pressable style={s.contactCard} onPress={() => Linking.openURL('mailto:support@rhome.app')}>
+          <Pressable style={s.contactCard} onPress={() => Linking.openURL('mailto:hello@rhomeapp.io')}>
             <LinearGradient colors={[ACCENT, ACCENT_DARK]} style={s.contactIcon}>
               <Feather name="mail" size={22} color="#fff" />
             </LinearGradient>
             <View style={s.contactInfo}>
               <Text style={s.contactName}>Rhome Support</Text>
-              <Text style={s.contactEmail}>support@rhome.app</Text>
+              <Text style={s.contactEmail}>hello@rhomeapp.io</Text>
             </View>
           </Pressable>
         </Section>

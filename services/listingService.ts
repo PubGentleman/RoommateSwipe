@@ -323,6 +323,7 @@ export async function getAgentStats(companyUserId: string): Promise<{
   agentName: string;
   activeListings: number;
   pendingBookings: number;
+  confirmedBookings: number;
 }[]> {
   try {
     const agents = await getCompanyAgents(companyUserId);
@@ -339,7 +340,7 @@ export async function getAgentStats(companyUserId: string): Promise<{
       .from('bookings')
       .select('id, host_id, status')
       .in('host_id', agentIds)
-      .eq('status', 'confirmed');
+      .in('status', ['pending', 'confirmed']);
 
     return agents.map(agent => ({
       agentId: agent.id,
@@ -347,7 +348,8 @@ export async function getAgentStats(companyUserId: string): Promise<{
       activeListings: (listings || []).filter(l =>
         l.assigned_agent_id === agent.id && l.is_active && !l.is_rented && !l.is_paused
       ).length,
-      pendingBookings: (bookings || []).filter(b => b.host_id === agent.id).length,
+      pendingBookings: (bookings || []).filter(b => b.host_id === agent.id && b.status === 'pending').length,
+      confirmedBookings: (bookings || []).filter(b => b.host_id === agent.id && b.status === 'confirmed').length,
     }));
   } catch {
     return [];

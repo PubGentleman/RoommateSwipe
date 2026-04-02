@@ -282,7 +282,7 @@ export const DownloadDataScreen = () => {
       </Pressable>
 
       <ThemedText style={[Typography.small, { textAlign: 'center', color: theme.textSecondary, marginTop: Spacing.md }]}>
-        Questions about your data? Contact support@rhome.app
+        Questions about your data? Contact hello@rhomeapp.io
       </ThemedText>
     </ScreenScrollView>
   );

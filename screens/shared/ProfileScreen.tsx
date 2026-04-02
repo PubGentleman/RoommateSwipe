@@ -531,9 +531,9 @@ export const ProfileScreen = () => {
                         `Hi Rhome Support,\n\nI'd like to change my host type.\n\nAccount email: ${user?.email}\nCurrent type: ${hostType}\nRequested type: [FILL IN]\n\nReason: [FILL IN]`
                       );
                       if (Platform.OS === 'web') {
-                        window.open(`mailto:support@rhome.com?subject=${subject}&body=${body}`);
+                        window.open(`mailto:hello@rhomeapp.io?subject=${subject}&body=${body}`);
                       } else {
-                        Linking.openURL(`mailto:support@rhome.com?subject=${subject}&body=${body}`);
+                        Linking.openURL(`mailto:hello@rhomeapp.io?subject=${subject}&body=${body}`);
                       }
                     }
                   }}
@@ -782,7 +782,7 @@ export const ProfileScreen = () => {
                       : "We'll get back to you as soon as possible")
                 }
                 onPress={async () => {
-                  const emailAddress = isHost ? 'hosts@rhome.com' : 'support@rhome.com';
+                  const emailAddress = 'hello@rhomeapp.io';
                   let subject: string;
                   if (isHost) {
                     const plan = getHostPlan() || 'standard';

@@ -152,7 +152,7 @@ export default function PrivacyPolicyScreen() {
           <BulletPoint>Request deletion of your account</BulletPoint>
           <BulletPoint>Opt out of marketing emails or notifications</BulletPoint>
           <ThemedText style={[Typography.body, { marginTop: Spacing.md }]}>
-            To delete your data entirely, contact: support@rhome.app
+            To delete your data entirely, contact: hello@rhomeapp.io
           </ThemedText>
         </Section>
 
@@ -207,7 +207,7 @@ export default function PrivacyPolicyScreen() {
             Rhome Support
           </ThemedText>
           <ThemedText style={Typography.body}>
-            Email: support@rhome.app
+            Email: hello@rhomeapp.io
           </ThemedText>
         </Section>
 

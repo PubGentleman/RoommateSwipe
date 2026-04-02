@@ -224,7 +224,7 @@ export function HostTypeSelectScreen() {
           <Feather name="info" size={15} color={theme.textSecondary} />
           <Text style={[Typography.small, { color: theme.textSecondary, flex: 1 }]}>
             To change your host type, contact{' '}
-            <Text style={{ color: theme.primary }}>support@rhome.app</Text>
+            <Text style={{ color: theme.primary }}>hello@rhomeapp.io</Text>
           </Text>
         </View>
       </View>
