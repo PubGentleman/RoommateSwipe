@@ -7,6 +7,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../contexts/AuthContext';
 import { getWorkStyleTag } from '../../utils/matchingAlgorithm';
 import { Colors } from '../../constants/theme';
+import * as Haptics from 'expo-haptics';
+import { StorageService } from '../../utils/storage';
+import type { User } from '../../types/models';
 
 const BG = '#111111';
 const CARD_BG = '#1a1a1a';
@@ -28,9 +31,10 @@ const safeRequire = (fn: () => any): boolean => {
 export const DiagnosticScreen = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
-  const { user, getSubscriptionDetails } = useAuth();
+  const { user, updateUser, upgradeToPlus, upgradeToElite, upgradeHostPlan, getSubscriptionDetails } = useAuth();
   const [results, setResults] = useState<CheckResult[]>([]);
   const [running, setRunning] = useState(true);
+  const [switching, setSwitching] = useState(false);
 
   useEffect(() => {
     runChecks();
@@ -237,10 +241,290 @@ export const DiagnosticScreen = () => {
             </Text>
           </View>
         ))}
+
+        <DevModePanel
+          user={user}
+          updateUser={updateUser}
+          upgradeToPlus={upgradeToPlus}
+          upgradeToElite={upgradeToElite}
+          upgradeHostPlan={upgradeHostPlan}
+          switching={switching}
+          setSwitching={setSwitching}
+        />
       </ScrollView>
     </View>
   );
 };
+
+const DEV_PURPLE = '#a78bfa';
+
+interface DevModePanelProps {
+  user: User | null;
+  updateUser: (updates: Partial<User>) => Promise<void>;
+  upgradeToPlus: (billingCycle?: 'monthly' | '3month' | 'annual') => Promise<void>;
+  upgradeToElite: (billingCycle?: 'monthly' | '3month' | 'annual') => Promise<void>;
+  upgradeHostPlan: (plan: string, billingCycle?: 'monthly' | '3month' | 'annual') => Promise<void>;
+  switching: boolean;
+  setSwitching: (v: boolean) => void;
+}
+
+const ChipRow = ({ label, options, value, onSelect, accentColor }: {
+  label: string;
+  options: { key: string; label: string }[];
+  value: string | undefined;
+  onSelect: (key: string) => void;
+  accentColor?: string;
+}) => {
+  const color = accentColor || ACCENT;
+  return (
+    <View style={ds.chipSection}>
+      <Text style={ds.chipLabel}>{label}</Text>
+      <View style={ds.chipRow}>
+        {options.map(opt => {
+          const active = opt.key === (value || '');
+          return (
+            <Pressable
+              key={opt.key}
+              style={[ds.chip, active && { backgroundColor: color + '25', borderColor: color }]}
+              onPress={() => onSelect(opt.key)}
+            >
+              <Text style={[ds.chipText, active && { color }]}>{opt.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+};
+
+function DevModePanel({ user, updateUser, upgradeToPlus, upgradeToElite, upgradeHostPlan, switching, setSwitching }: DevModePanelProps) {
+  if (!user) return null;
+
+  const currentRole = user.role || 'renter';
+  const currentHostType = user.hostType || 'individual';
+  const currentRenterPlan = user.subscription?.plan || 'basic';
+  const currentHostPlan = user.hostSubscription?.plan || 'free';
+  const currentAgentPlan = user.agentPlan || 'pay_per_use';
+
+  const handleSwitchRole = async (role: 'renter' | 'host') => {
+    if (switching || role === currentRole) return;
+    setSwitching(true);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    try {
+      const updates: Partial<User> = { role };
+      if (role === 'host' && !user.hostType) {
+        updates.hostType = 'individual';
+      }
+      if (role === 'host') {
+        updates.activeMode = 'host';
+        updates.hasCompletedHostOnboarding = true;
+        updates.onboardingStep = 'complete';
+      } else {
+        updates.activeMode = 'renter';
+        updates.onboardingStep = 'complete';
+      }
+      await updateUser(updates);
+    } finally {
+      setSwitching(false);
+    }
+  };
+
+  const handleSwitchHostType = async (hostType: 'individual' | 'agent' | 'company') => {
+    if (switching || hostType === currentHostType) return;
+    setSwitching(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      const updates: Partial<User> = {
+        hostType,
+        role: 'host',
+        activeMode: 'host',
+        hasCompletedHostOnboarding: true,
+        onboardingStep: 'complete',
+        typeOnboardingComplete: true,
+      };
+      if (hostType === 'company') {
+        updates.companyName = updates.companyName || 'Test Company Inc.';
+        updates.verifiedBusiness = true;
+      }
+      if (hostType === 'agent') {
+        updates.licenseVerified = true;
+        updates.licenseVerificationStatus = 'verified';
+      }
+      await updateUser(updates);
+    } finally {
+      setSwitching(false);
+    }
+  };
+
+  const handleRenterPlan = async (plan: string) => {
+    if (switching || plan === currentRenterPlan) return;
+    setSwitching(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      if (plan === 'plus') {
+        await upgradeToPlus('monthly');
+      } else if (plan === 'elite') {
+        await upgradeToElite('monthly');
+      } else {
+        await updateUser({
+          subscription: { plan: 'basic', status: 'active', billingCycle: 'monthly', billingHistory: [] },
+        });
+      }
+    } finally {
+      setSwitching(false);
+    }
+  };
+
+  const handleHostPlan = async (plan: string) => {
+    if (switching || plan === currentHostPlan) return;
+    setSwitching(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      if (plan === 'free') {
+        await updateUser({
+          hostSubscription: { plan: 'free', status: 'active', billingCycle: 'monthly', inquiryResponsesUsed: 0 },
+        });
+      } else {
+        const prefixed = (currentHostType === 'agent') ? `agent_${plan}` :
+                         (currentHostType === 'company') ? `company_${plan}` : plan;
+        await upgradeHostPlan(prefixed, 'monthly');
+      }
+    } finally {
+      setSwitching(false);
+    }
+  };
+
+  const handleAgentPlan = async (plan: string) => {
+    if (switching || plan === currentAgentPlan) return;
+    setSwitching(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      await updateUser({ agentPlan: plan as any });
+    } finally {
+      setSwitching(false);
+    }
+  };
+
+  const isHost = currentRole === 'host';
+  const isAgent = currentHostType === 'agent';
+  const isCompany = currentHostType === 'company';
+
+  return (
+    <View style={ds.container}>
+      <View style={ds.header}>
+        <View style={ds.headerIconWrap}>
+          <Feather name="terminal" size={16} color={DEV_PURPLE} />
+        </View>
+        <Text style={ds.headerTitle}>Dev Mode Panel</Text>
+        {switching ? <Text style={ds.switchingLabel}>Switching...</Text> : null}
+      </View>
+
+      <View style={ds.currentCard}>
+        <Text style={ds.currentLabel}>CURRENT STATE</Text>
+        <Text style={ds.currentValue}>
+          {user.name} — {currentRole === 'host' ? `Host (${currentHostType})` : 'Renter'}
+        </Text>
+        <Text style={ds.currentSub}>
+          Renter: {currentRenterPlan.toUpperCase()} | Host: {currentHostPlan.toUpperCase()}
+          {isAgent || isCompany ? ` | Agent Plan: ${currentAgentPlan}` : ''}
+        </Text>
+      </View>
+
+      <ChipRow
+        label="ROLE"
+        options={[
+          { key: 'renter', label: 'Renter' },
+          { key: 'host', label: 'Host' },
+        ]}
+        value={currentRole}
+        onSelect={(k) => handleSwitchRole(k as 'renter' | 'host')}
+        accentColor={DEV_PURPLE}
+      />
+
+      {isHost ? (
+        <ChipRow
+          label="HOST TYPE"
+          options={[
+            { key: 'individual', label: 'Individual' },
+            { key: 'agent', label: 'Agent' },
+            { key: 'company', label: 'Company' },
+          ]}
+          value={currentHostType}
+          onSelect={(k) => handleSwitchHostType(k as any)}
+          accentColor="#3b82f6"
+        />
+      ) : null}
+
+      <ChipRow
+        label="RENTER PLAN"
+        options={[
+          { key: 'basic', label: 'Basic (Free)' },
+          { key: 'plus', label: 'Plus' },
+          { key: 'elite', label: 'Elite' },
+        ]}
+        value={currentRenterPlan}
+        onSelect={handleRenterPlan}
+        accentColor="#22c55e"
+      />
+
+      {isHost ? (
+        <ChipRow
+          label="HOST PLAN"
+          options={[
+            { key: 'free', label: 'Free' },
+            { key: 'starter', label: 'Starter' },
+            { key: 'pro', label: 'Pro' },
+            { key: 'business', label: 'Business' },
+          ]}
+          value={currentHostPlan.replace(/^(agent_|company_)/, '')}
+          onSelect={handleHostPlan}
+          accentColor="#f59e0b"
+        />
+      ) : null}
+
+      {isHost && (isAgent || isCompany) ? (
+        <ChipRow
+          label="AGENT PLAN"
+          options={[
+            { key: 'pay_per_use', label: 'Pay Per Use' },
+            { key: 'starter', label: 'Starter' },
+            { key: 'pro', label: 'Pro' },
+            { key: 'business', label: 'Business' },
+          ]}
+          value={currentAgentPlan.replace(/^agent_/, '')}
+          onSelect={handleAgentPlan}
+          accentColor="#ec4899"
+        />
+      ) : null}
+
+      <View style={ds.notice}>
+        <Feather name="info" size={12} color="rgba(255,255,255,0.3)" />
+        <Text style={ds.noticeText}>
+          Changes apply instantly. Subscription bypasses are local only — no payment charged.
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+const ds = StyleSheet.create({
+  container: { marginTop: 20, marginBottom: 20, backgroundColor: CARD_BG, borderRadius: 20, borderWidth: 1, borderColor: DEV_PURPLE + '30', padding: 16, overflow: 'hidden' },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
+  headerIconWrap: { width: 32, height: 32, borderRadius: 16, backgroundColor: DEV_PURPLE + '20', alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: 16, fontWeight: '800', color: DEV_PURPLE, flex: 1 },
+  switchingLabel: { fontSize: 11, fontWeight: '600', color: '#f59e0b' },
+  currentCard: { backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
+  currentLabel: { fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.35)', letterSpacing: 1, marginBottom: 6 },
+  currentValue: { fontSize: 15, fontWeight: '700', color: '#fff', marginBottom: 2 },
+  currentSub: { fontSize: 12, color: 'rgba(255,255,255,0.5)' },
+  chipSection: { marginBottom: 14 },
+  chipLabel: { fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.35)', letterSpacing: 1, marginBottom: 8 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', backgroundColor: 'rgba(255,255,255,0.04)' },
+  chipText: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.6)' },
+  notice: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 8 },
+  noticeText: { fontSize: 11, color: 'rgba(255,255,255,0.3)', flex: 1 },
+});
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
