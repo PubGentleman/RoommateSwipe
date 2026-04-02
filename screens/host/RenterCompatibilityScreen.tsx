@@ -241,35 +241,36 @@ export const RenterCompatibilityScreen = () => {
                 if (!a || !b) return null;
                 const color = getScoreColor(pair.score);
                 return (
-                  <Pressable
-                    key={`${pair.a}-${pair.b}`}
-                    style={styles.pairCard}
-                    onPress={() => openDetail(pair.a, pair.b)}
-                  >
-                    <View style={styles.pairAvatars}>
-                      <Avatar renter={a} size={40} />
-                      <View style={styles.pairConnector}>
-                        <View style={[styles.connectorLine, { backgroundColor: color + '60' }]} />
-                        <View style={[styles.scoreBadge, { backgroundColor: color + '25', borderColor: color }]}>
-                          <Text style={[styles.scoreBadgeText, { color }]}>{pair.score}%</Text>
+                  <View key={`${pair.a}-${pair.b}`} style={styles.pairCard}>
+                    <Pressable
+                      style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 }}
+                      onPress={() => openDetail(pair.a, pair.b)}
+                    >
+                      <View style={styles.pairAvatars}>
+                        <Avatar renter={a} size={40} />
+                        <View style={styles.pairConnector}>
+                          <View style={[styles.connectorLine, { backgroundColor: color + '60' }]} />
+                          <View style={[styles.scoreBadge, { backgroundColor: color + '25', borderColor: color }]}>
+                            <Text style={[styles.scoreBadgeText, { color }]}>{pair.score}%</Text>
+                          </View>
+                          <View style={[styles.connectorLine, { backgroundColor: color + '60' }]} />
                         </View>
-                        <View style={[styles.connectorLine, { backgroundColor: color + '60' }]} />
+                        <Avatar renter={b} size={40} />
                       </View>
-                      <Avatar renter={b} size={40} />
-                    </View>
-                    <View style={styles.pairInfo}>
-                      <Text style={styles.pairNames}>{a.name.split(' ')[0]} + {b.name.split(' ')[0]}</Text>
-                      <Text style={[styles.pairLabel, { color }]}>{getScoreLabel(pair.score)}</Text>
-                    </View>
+                      <View style={styles.pairInfo}>
+                        <Text style={styles.pairNames}>{a.name.split(' ')[0]} + {b.name.split(' ')[0]}</Text>
+                        <Text style={[styles.pairLabel, { color }]}>{getScoreLabel(pair.score)}</Text>
+                      </View>
+                    </Pressable>
                     <Pressable
                       style={[styles.groupBtn, { borderColor: color }]}
-                      onPress={(e) => { e.stopPropagation(); handleCreateGroup([pair.a, pair.b]); }}
+                      onPress={() => handleCreateGroup([pair.a, pair.b])}
                       hitSlop={8}
                     >
                       <Feather name="users" size={14} color={color} />
                       <Text style={[styles.groupBtnText, { color }]}>Group</Text>
                     </Pressable>
-                  </Pressable>
+                  </View>
                 );
               })}
             </View>
