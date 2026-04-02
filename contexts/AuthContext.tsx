@@ -624,11 +624,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.warn('Failed to create initial profile row:', profileErr);
       }
 
+      if (role === 'host' && hostType) {
+        try {
+          const userUpdate: Record<string, any> = {
+            host_type: hostType,
+            first_name: firstName ?? null,
+            last_name: lastName ?? null,
+          };
+          if (hostType) {
+            userUpdate.onboarding_step = 'profile';
+          }
+          if (companyName) {
+            userUpdate.company_name = companyName;
+          }
+          await supabase.from('users').update(userUpdate).eq('id', data.user.id);
+        } catch (e) {
+          console.warn('Failed to update host_type on users table:', e);
+        }
+      }
+
       if (data.session) {
         await loadUserFromSupabase(data.session);
       } else {
         const isVerified = !!data.user.email_confirmed_at;
-        const nextStep = role === 'host' ? 'hostType' : 'complete';
+        const nextStep = role === 'host' ? (hostType ? 'profile' : 'hostType') : 'complete';
         const agentOccupation = hostType === 'agent' ? 'Real Estate Agent' : undefined;
         const newUser: User = {
           id: data.user.id,
