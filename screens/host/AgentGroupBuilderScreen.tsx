@@ -464,7 +464,7 @@ export const AgentGroupBuilderScreen = () => {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 120, paddingHorizontal: 16 }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 160, paddingHorizontal: 16 }}>
         {selectedListing ? (
           <View style={styles.listingBanner}>
             <View style={{ flex: 1 }}>
@@ -646,7 +646,7 @@ export const AgentGroupBuilderScreen = () => {
       </ScrollView>
 
       {selectedIds.size >= 2 ? (
-        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
+        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 80 }]}>
           <Pressable style={styles.reviewBtn} onPress={() => setStep('review')}>
             <Text style={styles.reviewBtnText}>Review Group ({selectedIds.size} members)</Text>
             <Feather name="arrow-right" size={18} color="#fff" />
