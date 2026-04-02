@@ -617,7 +617,7 @@ export const HostDashboardScreen = () => {
                      cp === 'starter' ? 'Company Starter \u00B7 $199/mo' :
                      cp === 'pro' ? 'Company Pro \u00B7 $399/mo' :
                      cp === 'enterprise' ? `Company Enterprise \u00B7 Custom \u00B7 ${activeCount} listings active` :
-                     'Free Plan \u00B7 Upgrade to unlock all features'); })()
+                     'Company Free \u00B7 Upgrade to unlock all features'); })()
                   : (() => { const bp = (hostSub.plan || '').replace(/^(agent_|company_)/, ''); return (
                      isFreePlan(hostSub.plan) ? 'Free Plan \u00B7 Upgrade to unlock all features' :
                      bp === 'starter' ? 'Host Starter \u00B7 $19.99/mo' :

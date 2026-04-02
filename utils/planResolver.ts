@@ -61,7 +61,7 @@ export function getHostPlanDisplayInfo(user: User | null): { label: string; pric
       case 'starter': return { label: 'Company Starter', price: '$199/mo', description: 'You have full access', isFree: false };
       case 'pro': return { label: 'Company Pro', price: '$399/mo', description: 'You have full access', isFree: false };
       case 'enterprise': return { label: 'Company Enterprise', price: 'Custom', description: 'You have full access', isFree: false };
-      default: return { label: 'Free', price: '$0', description: 'Upgrade to reach more renters', isFree: true };
+      default: return { label: 'Company Free', price: '$0', description: 'Upgrade to reach more renters', isFree: true };
     }
   }
 

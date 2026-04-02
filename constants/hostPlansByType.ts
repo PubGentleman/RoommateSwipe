@@ -114,7 +114,7 @@ const INDIVIDUAL_PLANS: HostPlanTier[] = [
 const AGENT_PLANS: HostPlanTier[] = [
   {
     id: 'free',
-    name: 'Host Free',
+    name: 'Pay Per Use',
     monthlyPrice: 0,
     threeMonthPrice: 0,
     annualPrice: 0,
@@ -182,7 +182,7 @@ const AGENT_PLANS: HostPlanTier[] = [
 const COMPANY_PLANS: HostPlanTier[] = [
   {
     id: 'free',
-    name: 'Host Free',
+    name: 'Company Free',
     monthlyPrice: 0,
     threeMonthPrice: 0,
     annualPrice: 0,

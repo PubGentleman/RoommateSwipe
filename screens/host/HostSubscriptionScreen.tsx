@@ -603,7 +603,7 @@ export const HostSubscriptionScreen = () => {
         <PurchaseConfirmModal
           visible={!!selectedPlan}
           config={HOST_PLAN_CONFIGS[selectedPlan]}
-          currentPlan={currentPlanIsFree ? 'Free' : (HOST_PLANS[hostSub.plan as HostPlanType] || HOST_PLANS[(hostSub.plan || '').replace(/^(agent_|company_)/, '') as HostPlanType])?.label ?? 'Free'}
+          currentPlan={currentPlanIsFree ? (hostType === 'agent' ? 'Pay Per Use' : hostType === 'company' ? 'Company Free' : 'Free') : (HOST_PLANS[hostSub.plan as HostPlanType] || HOST_PLANS[(hostSub.plan || '').replace(/^(agent_|company_)/, '') as HostPlanType])?.label ?? 'Free'}
           loading={subscribing}
           onConfirm={handleConfirmSubscription}
           onCancel={() => setSelectedPlan(null)}
