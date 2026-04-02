@@ -733,7 +733,10 @@ export const ProfileQuestionnaireScreen = () => {
     try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
     setIsSaving(false);
     if (user?.onboardingStep === 'profile') {
-      await completeOnboardingStep(user?.role === 'host' ? 'hostType' : 'plan');
+      const nextStep = user?.role === 'host'
+        ? (user?.hostType ? 'plan' : 'hostType')
+        : 'plan';
+      await completeOnboardingStep(nextStep);
     } else {
       navigation.goBack();
     }
