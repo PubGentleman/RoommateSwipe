@@ -192,8 +192,10 @@ export const RenterCompatibilityScreen = () => {
   const getFirstName = (id: string) => getRenter(id)?.name?.split(' ')[0] ?? '?';
 
   const handleCreateGroup = (ids: string[]) => {
+    const preselectedRenters = allRenters.filter(r => ids.includes(r.id));
     navigation.push('AgentGroupBuilder', {
       preselectedIds: ids,
+      preselectedRenters,
       listingId,
     });
   };

@@ -64,7 +64,7 @@ export type HostDashboardStackParamList = {
   PiClaimedGroupDetail: { groupId: string };
   MyListings: undefined;
   Chat: { conversationId: string; otherUser: any };
-  AgentGroupBuilder: { preselectedIds?: string[]; listingId?: string };
+  AgentGroupBuilder: { preselectedIds?: string[]; preselectedRenters?: any[]; listingId?: string };
 };
 
 export type HostGroupsStackParamList = {
@@ -76,7 +76,7 @@ export type AgentBrowseStackParamList = {
   BrowseRenters: undefined;
   RenterProfileDetail: { renter: any; isShortlisted?: boolean };
   RenterCompatibility: { renters: any[] };
-  AgentGroupBuilder: { preselectedIds?: string[]; listingId?: string };
+  AgentGroupBuilder: { preselectedIds?: string[]; preselectedRenters?: any[]; listingId?: string };
   PiMatchedGroups: undefined;
   PiClaimedGroupDetail: { groupId: string };
   Chat: { conversationId: string; otherUser: any };
@@ -84,7 +84,7 @@ export type AgentBrowseStackParamList = {
 
 export type AgentGroupsStackParamList = {
   AgentGroupsList: undefined;
-  AgentGroupBuilder: { preselectedIds?: string[]; listingId?: string };
+  AgentGroupBuilder: { preselectedIds?: string[]; preselectedRenters?: any[]; listingId?: string };
   Chat: { conversationId: string; otherUser: any };
 };
 

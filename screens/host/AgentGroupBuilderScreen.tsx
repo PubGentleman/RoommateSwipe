@@ -37,6 +37,7 @@ export const AgentGroupBuilderScreen = () => {
   const { alert: showAlert, confirm } = useConfirm();
 
   const preselectedIds: string[] = route.params?.preselectedIds ?? [];
+  const preselectedRenters: AgentRenter[] = route.params?.preselectedRenters ?? [];
   const preselectedListingId: string | undefined = route.params?.listingId;
   const openAIPairing: boolean = route.params?.openAIPairing ?? false;
 
@@ -145,6 +146,14 @@ export const AgentGroupBuilderScreen = () => {
           bio: p.bio, gender: p.gender,
         }));
       setAllRenters(mapped);
+    }
+
+    if (preselectedRenters.length > 0) {
+      setAllRenters(prev => {
+        const existingIds = new Set(prev.map(r => r.id));
+        const missing = preselectedRenters.filter(r => !existingIds.has(r.id));
+        return missing.length > 0 ? [...prev, ...missing] : prev;
+      });
     }
 
     let myListings: Property[] = [];
