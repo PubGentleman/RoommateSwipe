@@ -314,6 +314,62 @@ export async function findReplacementMember(autoGroupId: string): Promise<boolea
   }
 }
 
+const MOCK_PI_GROUPS: PiAutoGroup[] = [
+  {
+    id: 'pi_grp_1', status: 'ready', match_score: 92, member_count: 3, max_members: 3,
+    desired_bedrooms: 3, budget_min: 800, budget_max: 1200, city: 'New York', state: 'NY',
+    neighborhoods: ['Williamsburg', 'Bushwick'], gender_composition: 'Mixed',
+    move_in_window_start: new Date(Date.now() + 14 * 86400000).toISOString(),
+    move_in_window_end: new Date(Date.now() + 45 * 86400000).toISOString(),
+    pi_rationale: 'All three renters share similar sleep schedules, cleanliness standards, and budget ranges. Two work in tech and one in design, creating complementary lifestyles.',
+    created_at: new Date(Date.now() - 2 * 86400000).toISOString(),
+    ready_at: new Date(Date.now() - 1 * 86400000).toISOString(),
+    expires_at: new Date(Date.now() + 5 * 86400000).toISOString(),
+  },
+  {
+    id: 'pi_grp_2', status: 'ready', match_score: 88, member_count: 2, max_members: 2,
+    desired_bedrooms: 2, budget_min: 1000, budget_max: 1500, city: 'New York', state: 'NY',
+    neighborhoods: ['Financial District', 'Tribeca'], gender_composition: 'Female only',
+    move_in_window_start: new Date(Date.now() + 7 * 86400000).toISOString(),
+    move_in_window_end: new Date(Date.now() + 30 * 86400000).toISOString(),
+    pi_rationale: 'Both renters are young professionals with early schedules, non-smokers, and pet-friendly. Budget overlap is strong for FiDi 2BRs.',
+    created_at: new Date(Date.now() - 3 * 86400000).toISOString(),
+    ready_at: new Date(Date.now() - 2 * 86400000).toISOString(),
+    expires_at: new Date(Date.now() + 4 * 86400000).toISOString(),
+  },
+  {
+    id: 'pi_grp_3', status: 'forming', match_score: 85, member_count: 2, max_members: 3,
+    desired_bedrooms: 3, budget_min: 900, budget_max: 1300, city: 'New York', state: 'NY',
+    neighborhoods: ['Park Slope', 'Prospect Heights'], gender_composition: 'Mixed',
+    move_in_window_start: new Date(Date.now() + 21 * 86400000).toISOString(),
+    move_in_window_end: new Date(Date.now() + 60 * 86400000).toISOString(),
+    pi_rationale: 'Two of three spots filled. Both current members are remote workers who prefer quiet evenings. Looking for a third with similar lifestyle.',
+    created_at: new Date(Date.now() - 1 * 86400000).toISOString(),
+  },
+  {
+    id: 'pi_grp_4', status: 'ready', match_score: 95, member_count: 2, max_members: 2,
+    desired_bedrooms: 2, budget_min: 1100, budget_max: 1400, city: 'New York', state: 'NY',
+    neighborhoods: ['East Village', 'Lower East Side'], gender_composition: 'Male only',
+    move_in_window_start: new Date(Date.now() + 10 * 86400000).toISOString(),
+    move_in_window_end: new Date(Date.now() + 35 * 86400000).toISOString(),
+    pi_rationale: 'Exceptionally compatible pair — identical cleanliness scores, both night owls, shared interests in fitness and cooking. Budget alignment is near-perfect.',
+    created_at: new Date(Date.now() - 4 * 86400000).toISOString(),
+    ready_at: new Date(Date.now() - 3 * 86400000).toISOString(),
+    expires_at: new Date(Date.now() + 3 * 86400000).toISOString(),
+  },
+  {
+    id: 'pi_grp_5', status: 'ready', match_score: 82, member_count: 4, max_members: 4,
+    desired_bedrooms: 4, budget_min: 700, budget_max: 1000, city: 'New York', state: 'NY',
+    neighborhoods: ['Astoria', 'Long Island City'], gender_composition: 'Mixed',
+    move_in_window_start: new Date(Date.now() + 30 * 86400000).toISOString(),
+    move_in_window_end: new Date(Date.now() + 60 * 86400000).toISOString(),
+    pi_rationale: 'Budget-conscious group of four. All are early-career professionals with flexible schedules. Good cleanliness alignment across all members.',
+    created_at: new Date(Date.now() - 5 * 86400000).toISOString(),
+    ready_at: new Date(Date.now() - 4 * 86400000).toISOString(),
+    expires_at: new Date(Date.now() + 2 * 86400000).toISOString(),
+  },
+];
+
 export async function getAvailableGroups(filters?: {
   city?: string;
   minSize?: number;
@@ -335,10 +391,16 @@ export async function getAvailableGroups(filters?: {
     if (filters?.maxSize) query = query.lte('max_members', filters.maxSize);
 
     const { data } = await query.order('created_at', { ascending: false });
-    return (data as PiAutoGroup[]) ?? [];
-  } catch {
-    return [];
-  }
+    if (data && data.length > 0) return data as PiAutoGroup[];
+  } catch {}
+
+  let mockGroups = MOCK_PI_GROUPS.filter(g =>
+    filters?.includeForming ? true : g.status === 'ready'
+  );
+  if (filters?.city) mockGroups = mockGroups.filter(g => g.city === filters.city);
+  if (filters?.minSize) mockGroups = mockGroups.filter(g => g.max_members >= filters.minSize!);
+  if (filters?.maxSize) mockGroups = mockGroups.filter(g => g.max_members <= filters.maxSize!);
+  return mockGroups;
 }
 
 export async function getGroupAcceptanceProgress(groupId: string): Promise<{
