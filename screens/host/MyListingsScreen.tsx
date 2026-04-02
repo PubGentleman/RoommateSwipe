@@ -341,7 +341,7 @@ export const MyListingsScreen = () => {
               ${listing.price?.toLocaleString()}<Text style={styles.pricePeriod}>/mo</Text>
             </Text>
           </View>
-          {listing.featured && !isListingBoosted(listing) ? (
+          {listing.featured && !isListingBoosted(listing) && getHostPlan() === 'business' ? (
             <View style={styles.boostBadge}>
               <Feather name="star" size={10} color={GOLD} />
               <Text style={styles.boostBadgeText}>Featured</Text>
@@ -350,20 +350,20 @@ export const MyListingsScreen = () => {
           {isListingBoosted(listing) ? (
             <View style={[
               styles.boostedPill,
-              listing.featured || listing.listingBoost?.includesFeaturedBadge
+              listing.listingBoost?.includesFeaturedBadge
                 ? { backgroundColor: 'rgba(123,94,167,0.3)', borderColor: 'rgba(123,94,167,0.5)' }
                 : null,
             ]}>
               <Feather
-                name={listing.featured || listing.listingBoost?.includesFeaturedBadge ? 'star' : 'zap'}
+                name={listing.listingBoost?.includesFeaturedBadge ? 'star' : 'zap'}
                 size={10}
-                color={listing.featured || listing.listingBoost?.includesFeaturedBadge ? '#ffd700' : '#a855f7'}
+                color={listing.listingBoost?.includesFeaturedBadge ? '#ffd700' : '#a855f7'}
               />
               <Text style={[
                 styles.boostedPillText,
-                listing.featured || listing.listingBoost?.includesFeaturedBadge ? { color: '#ffd700' } : null,
+                listing.listingBoost?.includesFeaturedBadge ? { color: '#ffd700' } : null,
               ]}>
-                {listing.featured || listing.listingBoost?.includesFeaturedBadge ? 'Featured' : 'Boosted'}
+                {listing.listingBoost?.includesFeaturedBadge ? 'Featured' : 'Boosted'}
               </Text>
             </View>
           ) : null}
