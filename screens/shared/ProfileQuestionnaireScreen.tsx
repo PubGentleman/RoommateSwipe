@@ -413,7 +413,7 @@ export const ProfileQuestionnaireScreen = () => {
   const isHostUser = user?.role === 'host';
   const isHostProfessional = isHostUser && (user?.hostType === 'agent' || user?.hostType === 'company');
   const HOST_EXCLUDED_STEPS: StepId[] = isHostProfessional
-    ? ['budgetLocation', 'dealbreakers', 'sleepCleanliness', 'smokingPets', 'housing', 'roommateSetup', 'idealRoommate', 'lifestyle']
+    ? ['budgetLocation', 'dealbreakers', 'sleepCleanliness', 'smokingPets', 'housing', 'roommateSetup', 'idealRoommate', 'lifestyle', 'interests', 'personality']
     : ['budgetLocation', 'dealbreakers', 'sleepCleanliness', 'smokingPets', 'housing', 'roommateSetup', 'idealRoommate'];
   const autoFilteredSteps = React.useMemo(() => {
     if (filteredSteps || isOnboarding) return null;
@@ -426,7 +426,7 @@ export const ProfileQuestionnaireScreen = () => {
   const renterOnboarding = isOnboarding && user?.role === 'renter';
   const baseOnboardingSteps = isLiteOnboarding ? ONBOARDING_STEPS_LITE : isOnboarding ? ONBOARDING_STEPS : allStepsForType;
   const onboardingSteps = isHostProfessional
-    ? baseOnboardingSteps.filter(s => s !== 'budgetLocation' && s !== 'housing')
+    ? baseOnboardingSteps.filter(s => !HOST_EXCLUDED_STEPS.includes(s))
     : (renterOnboarding || isHostUser)
       ? baseOnboardingSteps.filter(s => s !== 'budgetLocation' && s !== 'housing')
       : baseOnboardingSteps;
