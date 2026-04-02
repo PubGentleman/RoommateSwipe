@@ -159,6 +159,19 @@ export async function calculateResponseRate(agentId: string): Promise<number> {
 
 export async function getAgentResponseAlerts(companyId: string): Promise<ResponseAlert[]> {
   const allAlerts = await runResponseStatusCheck();
+
+  try {
+    const { data: teamMembers } = await supabase
+      .from('company_team_members')
+      .select('user_id')
+      .eq('company_id', companyId);
+
+    if (teamMembers && teamMembers.length > 0) {
+      const companyAgentIds = teamMembers.map(m => m.user_id);
+      return allAlerts.filter(alert => companyAgentIds.includes(alert.agentId));
+    }
+  } catch {}
+
   const users = await StorageService.getUsers();
   const companyAgentIds = users
     .filter(u => u.hostType === 'agent' && (u as any).company_id === companyId)

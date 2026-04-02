@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { View, StyleSheet, Pressable, Text, ScrollView, Modal, Linking } from 'react-native';
 import Animated, { useSharedValue, useAnimatedScrollHandler, useAnimatedStyle, interpolate, Extrapolation } from 'react-native-reanimated';
 import { Feather } from '../../components/VectorIcons';
@@ -24,6 +24,8 @@ import { AIFloatingButton } from '../../components/AIFloatingButton';
 import { HostPlanBadge } from '../../components/HostPlanBadge';
 import { isFreePlan } from '../../utils/hostPricing';
 import { getAgentPlanLimits, type AgentPlan } from '../../constants/planLimits';
+import { resolveEffectiveAgentPlan } from '../../utils/planResolver';
+import { CommonActions } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getAgentResponseAlerts } from '../../services/responseTrackingService';
 import { getHostCompletionPercentage } from '../../utils/profileReminderUtils';
@@ -91,10 +93,11 @@ export const HostDashboardScreen = () => {
   const isAgent = user?.hostType === 'agent';
   const isCompany = user?.hostType === 'company';
   const { badge: hostBadge } = useHostBadge(user?.id);
-  const rawAgentPlan = isAgent ? (user?.agentPlan || (user as any)?.agent_plan || '') : '';
-  const subPlan = user?.hostSubscription?.plan || '';
-  const effectiveAgentPlan = (rawAgentPlan && rawAgentPlan !== 'pay_per_use' && rawAgentPlan !== 'free') ? rawAgentPlan : subPlan;
-  const agentPlan = isAgent ? ((effectiveAgentPlan as AgentPlan) || 'pay_per_use') : null;
+  const VALID_AGENT_PLANS = ['pay_per_use', 'starter', 'pro', 'business'] as const;
+  const rawResolvedPlan = isAgent ? resolveEffectiveAgentPlan(user) : '';
+  const agentPlan = isAgent
+    ? (VALID_AGENT_PLANS.includes(rawResolvedPlan as any) ? (rawResolvedPlan as AgentPlan) : 'pay_per_use')
+    : null;
   const agentLimits = agentPlan ? getAgentPlanLimits(agentPlan) : null;
   const canUseAI = isAgent ? (agentLimits?.hasAIChat ?? false) : true;
   const navigation = useNavigation<any>();
@@ -124,6 +127,7 @@ export const HostDashboardScreen = () => {
   const [piTopPicks, setPiTopPicks] = useState<{ name: string; reason: string; strength: string }[]>([]);
   const [piAvailableGroups, setPiAvailableGroups] = useState(0);
   const [agentPlacementCount, setAgentPlacementCount] = useState(0);
+  const [agentCancellationRate, setAgentCancellationRate] = useState(0);
   const [reviewCount, setReviewCount] = useState(0);
   const [avgRating, setAvgRating] = useState(0);
   const [hostReviewCount, setHostReviewCount] = useState(0);
@@ -192,13 +196,21 @@ export const HostDashboardScreen = () => {
 
     let unreadMessages = 0;
     try {
-      const { data: msgData } = await supabase
-        .from('messages')
-        .select('id')
-        .eq('read', false)
-        .neq('sender_id', user.id)
-        .limit(100);
-      unreadMessages = msgData?.length || 0;
+      const { data: userGroups } = await supabase
+        .from('group_members')
+        .select('group_id')
+        .eq('user_id', user.id);
+      const groupIds = userGroups?.map(g => g.group_id) || [];
+
+      if (groupIds.length > 0) {
+        const { count: unreadCount } = await supabase
+          .from('messages')
+          .select('id', { count: 'exact', head: true })
+          .in('group_id', groupIds)
+          .eq('read', false)
+          .neq('sender_id', user.id);
+        unreadMessages = unreadCount || 0;
+      }
     } catch {
       const allConvos = await StorageService.getConversations();
       unreadMessages = allConvos.reduce((sum, c) => sum + (c.unread || 0), 0);
@@ -291,9 +303,18 @@ export const HostDashboardScreen = () => {
         const { count: placementCount } = await supabase
           .from('agent_placements')
           .select('id', { count: 'exact', head: true })
-          .eq('agent_id', user.id);
+          .eq('agent_id', user.id)
+          .eq('status', 'completed');
         setAgentPlacementCount(placementCount || 0);
-      } catch { setAgentPlacementCount(0); }
+
+        const { count: cancelledCount } = await supabase
+          .from('agent_placements')
+          .select('id', { count: 'exact', head: true })
+          .eq('agent_id', user.id)
+          .eq('status', 'cancelled');
+        const totalPlacements = (placementCount || 0) + (cancelledCount || 0);
+        setAgentCancellationRate(totalPlacements > 0 ? (cancelledCount || 0) / totalPlacements : 0);
+      } catch { setAgentPlacementCount(0); setAgentCancellationRate(0); }
 
       try {
         const listingIds = freshListings.length > 0
@@ -355,10 +376,13 @@ export const HostDashboardScreen = () => {
   const activeCount = listings.filter(p => p.available && !p.rentedDate).length;
   const rentedCount = listings.filter(p => !!p.rentedDate).length;
   const pendingInquiries = inquiries.filter(c => c.status === 'pending').length;
-  const recentPendingInquiries = [...inquiries]
-    .filter(c => c.status === 'pending')
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 3);
+  const recentPendingInquiries = useMemo(() =>
+    [...inquiries]
+      .filter(c => c.status === 'pending')
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 3),
+    [inquiries]
+  );
 
   const navigateToTab = (tabName: string) => {
     if (tabName === 'Listings') {
@@ -664,7 +688,7 @@ export const HostDashboardScreen = () => {
         {hostCompletion < 100 && !completionBannerDismissed ? (
           <Pressable
             style={styles.completionBanner}
-            onPress={() => navigation.navigate('ProfileCompletion')}
+            onPress={() => navigation.dispatch(CommonActions.navigate({ name: 'ProfileCompletion' }))}
           >
             <View style={{ flex: 1, gap: 8 }}>
               <Text style={styles.completionBannerText}>
@@ -872,21 +896,21 @@ export const HostDashboardScreen = () => {
               { label: 'License verified', met: user?.licenseVerificationStatus === 'verified' },
               { label: 'Paid plan', met: !!agentPlanBase && agentPlanBase !== 'pay_per_use' && agentPlanBase !== 'free' },
               { label: '2+ months on Rhome', met: !!user?.createdAt && (Date.now() - new Date(user.createdAt).getTime()) > 60 * 24 * 60 * 60 * 1000 },
-              { label: '85%+ response rate', met: inquiries.length >= 10 && typeof user?.responseRate === 'number' && user.responseRate >= 85 },
+              { label: '85%+ response rate', met: inquiries.length < 3 || (typeof user?.responseRate === 'number' && user.responseRate >= 85) },
               { label: '3+ successful placements', met: agentPlacementCount >= 3 },
               { label: '5+ reviews', met: reviewCount >= 5 },
               { label: '4.7+ average rating', met: avgRating >= 4.7 },
-              { label: '<15% cancellation rate', met: agentPlacementCount >= 5 && (agentPlacementCount === 0 || (listings.filter(l => l.rentedDate).length / Math.max(1, agentPlacementCount)) <= 0.15) },
+              { label: '<15% cancellation rate', met: agentPlacementCount >= 3 && agentCancellationRate <= 0.15 },
             ] : [
               { label: 'Company name set', met: !!user?.companyName },
               { label: 'Pro or Enterprise plan', met: !!hostSub && !isFreePlan(hostSub.plan) && (() => { const bp = (hostSub.plan || '').replace(/^(agent_|company_)/, ''); return bp === 'pro' || bp === 'enterprise'; })() },
               { label: '3+ months on Rhome', met: !!user?.createdAt && (Date.now() - new Date(user.createdAt).getTime()) > 90 * 24 * 60 * 60 * 1000 },
-              { label: '90%+ response rate', met: inquiries.length >= 15 && typeof user?.responseRate === 'number' && user.responseRate >= 90 },
+              { label: '90%+ response rate', met: inquiries.length < 5 || (typeof user?.responseRate === 'number' && user.responseRate >= 90) },
               { label: '5+ active listings', met: listings.filter(l => l.available).length >= 5 },
               { label: '10+ reviews', met: reviewCount >= 10 },
               { label: '4.6+ average rating', met: avgRating >= 4.6 },
-              { label: 'Under 45 day avg vacancy', met: listings.length >= 3 && listings.filter(l => l.available).length >= Math.ceil(listings.length * 0.6) },
-              { label: '60%+ fill rate', met: listings.length >= 3 && listings.filter(l => l.rentedDate || !l.available).length / Math.max(1, listings.length) >= 0.6 },
+              { label: 'Under 45 day avg vacancy', met: listings.length >= 3 && listings.filter(l => !l.available || !!l.rentedDate).length >= Math.ceil(listings.length * 0.6) },
+              { label: '60%+ fill rate', met: listings.length >= 3 && listings.filter(l => !!l.rentedDate).length / Math.max(1, listings.length) >= 0.6 },
               { label: '2+ team members', met: teamMemberCount >= 2 },
             ]}
           />
@@ -1006,7 +1030,7 @@ export const HostDashboardScreen = () => {
                 {piTopPicks.map((pick, idx) => {
                   const strengthColor = pick.strength === 'strong' ? GREEN : pick.strength === 'good' ? GOLD : '#3b82f6';
                   return (
-                    <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                    <View key={`pick-${pick.name}-${idx}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                       <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: strengthColor }} />
                       <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600', flex: 0 }} numberOfLines={1}>{pick.name}</Text>
                       <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, flex: 1 }} numberOfLines={1}>{pick.reason}</Text>
@@ -1048,7 +1072,7 @@ export const HostDashboardScreen = () => {
               const statusLabel = isCritical ? 'Critical' : isDelayed ? 'Delayed' : 'Unresponsive';
               return (
                 <Pressable
-                  key={`alert-${idx}`}
+                  key={`alert-${alertItem.agentId}-${alertItem.conversationId || idx}`}
                   style={{
                     backgroundColor: isCritical ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)',
                     borderWidth: 1,
@@ -1148,8 +1172,9 @@ export const HostDashboardScreen = () => {
                     next.set(agent.agentId, { conversations: [], bookings: [], loading: true });
                     return next;
                   });
-                  const data = await getAgentDetailData(agent.agentId);
+                  const data = await getAgentDetailData(agent.agentId, user?.id);
                   setAgentDetailMap(prev => {
+                    if (prev.get(agent.agentId)?.loading === false) return prev;
                     const next = new Map(prev);
                     next.set(agent.agentId, { ...data, loading: false });
                     return next;
@@ -1166,14 +1191,7 @@ export const HostDashboardScreen = () => {
                 if (s === 'cancelled_by_renter') return 'Cancelled';
                 return s.charAt(0).toUpperCase() + s.slice(1);
               };
-              const timeAgo = (dateStr: string) => {
-                const diff = Date.now() - new Date(dateStr).getTime();
-                const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-                if (days === 0) return 'Today';
-                if (days === 1) return 'Yesterday';
-                if (days < 7) return `${days}d ago`;
-                return `${Math.floor(days / 7)}w ago`;
-              };
+              const timeAgo = formatTimeAgo;
               return (
                 <Pressable
                   key={agent.agentId}
@@ -1353,7 +1371,7 @@ export const HostDashboardScreen = () => {
           }
         }}
         onNavigate={(screen, params) => {
-          try { navigation.navigate(screen as any, params); } catch {}
+          try { navigation.navigate(screen as any, params); } catch (e) { console.warn('[HostDashboard] Navigation failed:', screen, e); }
         }}
       /> : null}
       <Modal visible={showReassignModal} transparent animationType="fade" onRequestClose={() => { setShowReassignModal(false); setReassignListingId(null); setReassignConvId(null); setReassignConvListingId(null); }}>
@@ -1377,7 +1395,7 @@ export const HostDashboardScreen = () => {
                 }}
                 onPress={async () => {
                   if (reassignConvId) {
-                    const ok = await reassignConversation(reassignConvId, reassignConvListingId || '', agent.id);
+                    const ok = await reassignConversation(reassignConvId, reassignConvListingId || '', agent.id, user?.id);
                     if (ok) {
                       showAlert({ title: 'Reassigned', message: `Conversation reassigned to ${agent.full_name}. They will handle all future interactions.`, variant: 'success' });
                       setAgentDetailMap(new Map());
@@ -1386,7 +1404,7 @@ export const HostDashboardScreen = () => {
                       showAlert({ title: 'Error', message: 'Failed to reassign conversation. Please try again.', variant: 'warning' });
                     }
                   } else if (reassignListingId) {
-                    const ok = await reassignListingAgent(reassignListingId, agent.id);
+                    const ok = await reassignListingAgent(reassignListingId, agent.id, user?.id);
                     if (ok) {
                       showAlert({ title: 'Reassigned', message: `Listing reassigned to ${agent.full_name}. Future messages will go to them.`, variant: 'success' });
                       loadData();

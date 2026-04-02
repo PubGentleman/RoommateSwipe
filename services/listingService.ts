@@ -158,13 +158,17 @@ export async function createListing(listing: ListingData) {
   return data;
 }
 
-export async function updateListing(id: string, updates: Partial<ListingData>) {
-  const { data, error } = await supabase
+export async function updateListing(id: string, updates: Partial<ListingData>, userId?: string) {
+  let query = supabase
     .from('listings')
     .update(updates)
-    .eq('id', id)
-    .select()
-    .single();
+    .eq('id', id);
+
+  if (userId) {
+    query = query.eq('created_by', userId);
+  }
+
+  const { data, error } = await query.select().single();
 
   if (error) throw error;
   return data;
@@ -283,8 +287,44 @@ export async function getCompanyAgents(companyUserId: string): Promise<{ id: str
   }
 }
 
-export async function reassignListingAgent(listingId: string, newAgentId: string): Promise<boolean> {
+export async function reassignListingAgent(listingId: string, newAgentId: string, callerId?: string): Promise<boolean> {
   try {
+    const { data: listing } = await supabase
+      .from('listings')
+      .select('created_by')
+      .eq('id', listingId)
+      .single();
+
+    if (!listing) return false;
+
+    if (callerId && listing.created_by !== callerId) {
+      const { data: callerTeam } = await supabase
+        .from('company_team_members')
+        .select('company_id, role')
+        .eq('user_id', callerId)
+        .in('role', ['owner', 'manager'])
+        .limit(1)
+        .single();
+
+      if (!callerTeam) {
+        console.error('[listingService] Unauthorized reassignment attempt');
+        return false;
+      }
+
+      const { data: ownerTeam } = await supabase
+        .from('company_team_members')
+        .select('company_id')
+        .eq('user_id', listing.created_by)
+        .eq('company_id', callerTeam.company_id)
+        .limit(1)
+        .single();
+
+      if (!ownerTeam) {
+        console.error('[listingService] Cross-company reassignment blocked');
+        return false;
+      }
+    }
+
     const { error } = await supabase
       .from('listings')
       .update({ assigned_agent_id: newAgentId })
@@ -378,10 +418,37 @@ export interface AgentBookingSummary {
   createdAt: string;
 }
 
-export async function getAgentDetailData(agentId: string): Promise<{
+export async function getAgentDetailData(agentId: string, callerId?: string): Promise<{
   conversations: AgentConversationSummary[];
   bookings: AgentBookingSummary[];
 }> {
+  if (callerId && agentId !== callerId) {
+    const { data: callerTeam } = await supabase
+      .from('company_team_members')
+      .select('company_id, role')
+      .eq('user_id', callerId)
+      .in('role', ['owner', 'manager'])
+      .limit(1)
+      .single();
+
+    if (!callerTeam) {
+      console.warn('[listingService] Unauthorized agent detail access');
+      return { conversations: [], bookings: [] };
+    }
+
+    const { data: agentTeam } = await supabase
+      .from('company_team_members')
+      .select('company_id')
+      .eq('user_id', agentId)
+      .eq('company_id', callerTeam.company_id)
+      .limit(1)
+      .single();
+
+    if (!agentTeam) {
+      console.warn('[listingService] Cross-company agent detail access blocked');
+      return { conversations: [], bookings: [] };
+    }
+  }
   try {
     const { data: groups } = await supabase
       .from('groups')
@@ -468,9 +535,46 @@ export async function getAgentDetailData(agentId: string): Promise<{
 export async function reassignConversation(
   groupId: string,
   listingId: string,
-  newAgentId: string
+  newAgentId: string,
+  callerId?: string
 ): Promise<boolean> {
   try {
+    const { data: group } = await supabase
+      .from('groups')
+      .select('host_id')
+      .eq('id', groupId)
+      .single();
+
+    if (!group) return false;
+
+    if (callerId && group.host_id !== callerId) {
+      const { data: callerTeam } = await supabase
+        .from('company_team_members')
+        .select('company_id, role')
+        .eq('user_id', callerId)
+        .in('role', ['owner', 'manager'])
+        .limit(1)
+        .single();
+
+      if (!callerTeam) {
+        console.error('[listingService] Unauthorized conversation reassignment');
+        return false;
+      }
+
+      const { data: hostTeam } = await supabase
+        .from('company_team_members')
+        .select('company_id')
+        .eq('user_id', group.host_id)
+        .eq('company_id', callerTeam.company_id)
+        .limit(1)
+        .single();
+
+      if (!hostTeam) {
+        console.error('[listingService] Cross-company conversation reassignment blocked');
+        return false;
+      }
+    }
+
     const { error: groupErr } = await supabase
       .from('groups')
       .update({ host_id: newAgentId })

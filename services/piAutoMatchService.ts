@@ -391,16 +391,10 @@ export async function getAvailableGroups(filters?: {
     if (filters?.maxSize) query = query.lte('max_members', filters.maxSize);
 
     const { data } = await query.order('created_at', { ascending: false });
-    if (data && data.length > 0) return data as PiAutoGroup[];
-  } catch {}
-
-  let mockGroups = MOCK_PI_GROUPS.filter(g =>
-    filters?.includeForming ? true : g.status === 'ready'
-  );
-  if (filters?.city) mockGroups = mockGroups.filter(g => g.city === filters.city);
-  if (filters?.minSize) mockGroups = mockGroups.filter(g => g.max_members >= filters.minSize!);
-  if (filters?.maxSize) mockGroups = mockGroups.filter(g => g.max_members <= filters.maxSize!);
-  return mockGroups;
+    return (data as PiAutoGroup[]) || [];
+  } catch {
+    return [];
+  }
 }
 
 export async function getGroupAcceptanceProgress(groupId: string): Promise<{
