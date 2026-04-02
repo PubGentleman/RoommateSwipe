@@ -152,8 +152,8 @@ export const AgentGroupBuilderScreen = () => {
       try {
         const { data: supaListings } = await supabase
           .from('listings')
-          .select('id, title, rent, bedrooms, bathrooms, city, neighborhood, address, photos, amenities, host_id, available_date, coordinates, is_active, is_paused, is_rented')
-          .eq('host_id', user.id)
+          .select('id, title, rent, bedrooms, bathrooms, city, neighborhood, address, photos, amenities, created_by, available_date, coordinates, is_active, is_paused, is_rented')
+          .eq('created_by', user.id)
           .eq('is_active', true)
           .eq('is_rented', false);
 
@@ -161,7 +161,7 @@ export const AgentGroupBuilderScreen = () => {
           id: l.id, title: l.title, price: l.rent || 0, bedrooms: l.bedrooms,
           bathrooms: l.bathrooms, city: l.city, neighborhood: l.neighborhood,
           address: l.address, photos: l.photos || [], amenities: l.amenities || [],
-          hostId: l.host_id, available: true,
+          hostId: l.created_by, available: true,
           availableDate: l.available_date ? new Date(l.available_date) : undefined,
           latitude: l.coordinates?.lat ?? l.coordinates?.latitude,
           longitude: l.coordinates?.lng ?? l.coordinates?.longitude,
