@@ -50,6 +50,9 @@ interface SignUpState {
   locationLat: number;
   locationLng: number;
   licenseNumber: string;
+  licensePhoto: string | null;
+  licensePhotoValidation: 'none' | 'scanning' | 'valid' | 'expired' | 'unreadable';
+  licenseExpirationDate: string | null;
   agencyName: string;
   companyName: string;
   propertyCount: string;
@@ -99,6 +102,9 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
     locationLat: 0,
     locationLng: 0,
     licenseNumber: '',
+    licensePhoto: null,
+    licensePhotoValidation: 'none',
+    licenseExpirationDate: null,
     agencyName: '',
     companyName: '',
     propertyCount: '',
@@ -285,6 +291,35 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
     goForward();
   };
 
+  const handleLicensePhotoUpload = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets?.[0]) {
+        const uri = result.assets[0].uri;
+        updateState({ licensePhoto: uri, licensePhotoValidation: 'scanning', licenseExpirationDate: null });
+        try {
+          const scanResult = await scanLicenseExpiration(uri);
+          updateState({
+            licensePhotoValidation: scanResult.status,
+            licenseExpirationDate: scanResult.expirationDate,
+          });
+        } catch {
+          updateState({ licensePhotoValidation: 'unreadable' });
+        }
+      }
+    } catch {
+      await showAlert({ title: 'Error', message: 'Could not open photo library', variant: 'warning' });
+    }
+  };
+
+  const handleRemoveLicensePhoto = () => {
+    updateState({ licensePhoto: null, licensePhotoValidation: 'none', licenseExpirationDate: null });
+  };
+
   const handlePhotoUpload = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
@@ -306,6 +341,28 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
       const companyName = state.accountType === 'company' && state.companyName.trim() ? state.companyName.trim() : undefined;
       const fullName = `${state.firstName.trim()} ${state.lastName.trim()}`;
       await register(state.email.trim().toLowerCase(), state.password, fullName, role as any, hostType, companyName, state.firstName.trim(), state.lastName.trim());
+      if (state.accountType === 'agent' && state.licensePhoto) {
+        try {
+          const { supabase, isSupabaseConfigured } = await import('../../lib/supabase');
+          const { data: { user: authUser } } = await supabase.auth.getUser();
+          if (authUser && isSupabaseConfigured) {
+            const ext = state.licensePhoto.split('.').pop()?.toLowerCase() || 'jpg';
+            const filePath = `${authUser.id}/license.${ext}`;
+            const response = await fetch(state.licensePhoto);
+            const blob = await response.blob();
+            const arrayBuffer = await new Response(blob).arrayBuffer();
+            const { error: uploadErr } = await supabase.storage
+              .from('license-documents')
+              .upload(filePath, arrayBuffer, {
+                contentType: `image/${ext}`,
+                upsert: true,
+              });
+            if (!uploadErr) {
+              await supabase.from('users').update({ license_document_url: filePath }).eq('id', authUser.id);
+            }
+          }
+        } catch (_) {}
+      }
       if (state.referralCode.trim()) {
         try {
           const { supabase } = await import('../../lib/supabase');
@@ -604,6 +661,18 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
       setError('Agency name is required');
       return;
     }
+    if (state.accountType === 'agent' && !state.licensePhoto) {
+      setError('Please upload a photo of your license ID');
+      return;
+    }
+    if (state.accountType === 'agent' && state.licensePhotoValidation === 'scanning') {
+      setError('Please wait while Pi verifies your license');
+      return;
+    }
+    if (state.accountType === 'agent' && state.licensePhotoValidation === 'expired') {
+      setError('Your license appears to be expired. Please upload a current license.');
+      return;
+    }
     goForward();
   };
 
@@ -664,6 +733,50 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
               onChangeText={(v) => updateState({ agencyName: v })}
             />
           </View>
+        </View>
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>LICENSE ID PHOTO</Text>
+          <Text style={licenseStyles.fieldHint}>Upload a photo of your real estate license. Pi will verify it.</Text>
+          {state.licensePhoto ? (
+            <View style={licenseStyles.photoContainer}>
+              <Image source={{ uri: state.licensePhoto }} style={licenseStyles.photoPreview} resizeMode="cover" />
+              <Pressable style={licenseStyles.removeBtn} onPress={handleRemoveLicensePhoto}>
+                <Feather name="x" size={16} color="#fff" />
+              </Pressable>
+              {state.licensePhotoValidation === 'scanning' ? (
+                <View style={licenseStyles.statusBadge}>
+                  <ActivityIndicator size="small" color="#ff6b5b" />
+                  <Text style={licenseStyles.statusText}>Pi is scanning your license...</Text>
+                </View>
+              ) : state.licensePhotoValidation === 'valid' ? (
+                <View style={[licenseStyles.statusBadge, licenseStyles.statusValid]}>
+                  <Feather name="check-circle" size={14} color="#22C55E" />
+                  <Text style={[licenseStyles.statusText, { color: '#22C55E' }]}>
+                    Valid{state.licenseExpirationDate ? ` — Expires ${state.licenseExpirationDate}` : ''}
+                  </Text>
+                </View>
+              ) : state.licensePhotoValidation === 'expired' ? (
+                <View style={[licenseStyles.statusBadge, licenseStyles.statusExpired]}>
+                  <Feather name="alert-circle" size={14} color="#EF4444" />
+                  <Text style={[licenseStyles.statusText, { color: '#EF4444' }]}>
+                    License expired{state.licenseExpirationDate ? ` on ${state.licenseExpirationDate}` : ''}
+                  </Text>
+                </View>
+              ) : state.licensePhotoValidation === 'unreadable' ? (
+                <View style={[licenseStyles.statusBadge, licenseStyles.statusWarning]}>
+                  <Feather name="alert-triangle" size={14} color="#F59E0B" />
+                  <Text style={[licenseStyles.statusText, { color: '#F59E0B' }]}>Could not read expiration date. You may continue.</Text>
+                </View>
+              ) : null}
+            </View>
+          ) : (
+            <Pressable style={licenseStyles.uploadBtn} onPress={handleLicensePhotoUpload}>
+              <View style={licenseStyles.uploadIconWrap}>
+                <Feather name="camera" size={24} color="rgba(255,255,255,0.5)" />
+              </View>
+              <Text style={licenseStyles.uploadText}>Tap to upload license photo</Text>
+            </Pressable>
+          )}
         </View>
       </>
     );
@@ -845,6 +958,126 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
     </KeyboardAvoidingView>
   );
 };
+
+async function scanLicenseExpiration(
+  imageUri: string
+): Promise<{ status: 'valid' | 'expired' | 'unreadable'; expirationDate: string | null }> {
+  try {
+    const { isSupabaseConfigured } = await import('../../lib/supabase');
+    if (isSupabaseConfigured) {
+      const { supabase } = await import('../../lib/supabase');
+
+      let base64Data: string | null = null;
+      try {
+        const response = await fetch(imageUri);
+        const blob = await response.blob();
+        base64Data = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve((reader.result as string).split(',')[1] || '');
+          reader.readAsDataURL(blob);
+        });
+      } catch {}
+
+      const { data, error } = await supabase.functions.invoke('scan-license-expiration', {
+        body: { imageBase64: base64Data },
+      });
+      if (!error && data?.expirationDate) {
+        const expDate = new Date(data.expirationDate);
+        const now = new Date();
+        return {
+          status: expDate > now ? 'valid' : 'expired',
+          expirationDate: data.expirationDate,
+        };
+      }
+      if (!error && data?.status === 'unreadable') {
+        return { status: 'unreadable', expirationDate: null };
+      }
+    }
+  } catch {}
+
+  const isDev = __DEV__;
+  if (isDev) {
+    await new Promise(r => setTimeout(r, 1500));
+    return { status: 'unreadable', expirationDate: null };
+  }
+
+  return { status: 'unreadable', expirationDate: null };
+}
+
+const licenseStyles = StyleSheet.create({
+  fieldHint: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.45)',
+    marginBottom: 12,
+    lineHeight: 18,
+  },
+  uploadBtn: {
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.15)',
+    borderStyle: 'dashed',
+    borderRadius: 14,
+    paddingVertical: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  uploadIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  uploadText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.5)',
+  },
+  photoContainer: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  photoPreview: {
+    width: '100%',
+    height: 180,
+    borderRadius: 14,
+  },
+  removeBtn: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: 'rgba(255,107,91,0.08)',
+  },
+  statusValid: {
+    backgroundColor: 'rgba(34,197,94,0.08)',
+  },
+  statusExpired: {
+    backgroundColor: 'rgba(239,68,68,0.08)',
+  },
+  statusWarning: {
+    backgroundColor: 'rgba(245,158,11,0.08)',
+  },
+  statusText: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.7)',
+    flex: 1,
+  },
+});
 
 const styles = StyleSheet.create({
   root: {
