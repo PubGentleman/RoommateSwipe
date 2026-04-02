@@ -175,6 +175,8 @@ export interface Property {
   hostType?: 'individual' | 'company' | 'agent';
   host_badge?: 'rhome_select' | 'top_agent' | 'top_company' | null;
   preferred_tenant_gender?: 'any' | 'female_only' | 'male_only';
+  isArchived?: boolean;
+  archivedAt?: string;
 }
 
 export interface PropertyFilter {

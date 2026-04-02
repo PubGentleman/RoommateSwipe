@@ -28,7 +28,7 @@ const GOLD = '#ffd700';
 const BLUE = '#5b8cff';
 const ORANGE = '#ffa500';
 
-type FilterStatus = 'all' | 'active' | 'paused' | 'rented';
+type FilterStatus = 'all' | 'active' | 'paused' | 'rented' | 'archived';
 
 const AVATAR_GRADIENTS: [string, string][] = [
   ['#667eea', '#764ba2'],
@@ -39,7 +39,10 @@ const AVATAR_GRADIENTS: [string, string][] = [
   ['#a18cd1', '#fbc2eb'],
 ];
 
-const getListingStatus = (listing: Property): 'active' | 'paused' | 'rented' => {
+const ARCHIVED_COLOR = '#6b7280';
+
+const getListingStatus = (listing: Property): 'active' | 'paused' | 'rented' | 'archived' => {
+  if (listing.isArchived) return 'archived';
   if (listing.rentedDate && !listing.available) return 'rented';
   if (!listing.available) return 'paused';
   return 'active';
@@ -48,12 +51,14 @@ const getListingStatus = (listing: Property): 'active' | 'paused' | 'rented' => 
 const getStatusColor = (status: string) => {
   if (status === 'active') return GREEN;
   if (status === 'paused') return ORANGE;
+  if (status === 'archived') return ARCHIVED_COLOR;
   return BLUE;
 };
 
 const getStatusLabel = (status: string) => {
   if (status === 'active') return 'Active';
   if (status === 'paused') return 'Paused';
+  if (status === 'archived') return 'Archived';
   return 'Rented';
 };
 
@@ -147,14 +152,17 @@ export const MyListingsScreen = () => {
     }, [loadData])
   );
 
+  const nonArchivedListings = listings.filter(p => getListingStatus(p) !== 'archived');
   const filteredListings = listings.filter(listing => {
-    if (filter === 'all') return true;
-    return getListingStatus(listing) === filter;
+    const status = getListingStatus(listing);
+    if (filter === 'all') return status !== 'archived';
+    return status === filter;
   });
 
   const activeCount = listings.filter(p => getListingStatus(p) === 'active').length;
   const pausedCount = listings.filter(p => getListingStatus(p) === 'paused').length;
   const rentedCount = listings.filter(p => getListingStatus(p) === 'rented').length;
+  const archivedCount = listings.filter(p => getListingStatus(p) === 'archived').length;
 
   const getInquiriesForListing = (propertyId: string) =>
     inquiries.filter(c => c.propertyId === propertyId);
@@ -209,35 +217,65 @@ export const MyListingsScreen = () => {
     await loadData();
   };
 
-  const executeDeleteListing = async (propertyId: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+  const archiveListing = async (propertyId: string) => {
     const property = listings.find(p => p.id === propertyId);
+    if (!property) return;
+    const confirmed = await confirm({
+      title: 'Archive Listing',
+      message: `Archive "${property.title}"? It will be hidden from renters but you can restore it anytime.`,
+      confirmText: 'Archive',
+      variant: 'warning',
+    });
+    if (!confirmed) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
-      await deleteListingSupa(propertyId);
-    } catch {
-    }
-    if (property) {
-      await StorageService.notifyPropertyEvent(
-        propertyId,
-        'property_update',
-        'Listing Removed',
-        `${property.title} is no longer available`,
-      );
-    }
-    await StorageService.deleteProperty(propertyId);
+      await updateListing(propertyId, { is_active: false, is_paused: false, is_rented: false, is_archived: true, archived_at: new Date().toISOString() });
+    } catch {}
+    const updated = { ...property, isArchived: true, archivedAt: new Date().toISOString(), available: false };
+    await StorageService.addOrUpdateProperty(updated);
+    await StorageService.notifyPropertyEvent(
+      propertyId,
+      'property_update',
+      'Listing Archived',
+      `${property.title} has been archived`,
+    );
     await loadData();
   };
 
-  const deleteListingHandler = async (propertyId: string) => {
+  const restoreListing = async (propertyId: string) => {
+    const property = listings.find(p => p.id === propertyId);
+    if (!property) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      await updateListing(propertyId, { is_active: true, is_paused: false, is_rented: false, is_archived: false, archived_at: null });
+    } catch {}
+    const updated = { ...property, isArchived: false, archivedAt: undefined, available: true, rentedDate: undefined };
+    await StorageService.addOrUpdateProperty(updated);
+    await loadData();
+  };
+
+  const permanentlyDeleteListing = async (propertyId: string) => {
+    const property = listings.find(p => p.id === propertyId);
+    if (!property) return;
     const confirmed = await confirm({
-      title: 'Delete Listing',
-      message: 'Are you sure you want to delete this listing? This action cannot be undone.',
-      confirmText: 'Delete',
+      title: 'Permanently Delete',
+      message: `This will permanently delete "${property.title}". This cannot be undone.`,
+      confirmText: 'Delete Forever',
       variant: 'danger',
     });
-    if (confirmed) {
-      executeDeleteListing(propertyId);
-    }
+    if (!confirmed) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    try {
+      await deleteListingSupa(propertyId);
+    } catch {}
+    await StorageService.deleteProperty(propertyId);
+    await StorageService.notifyPropertyEvent(
+      propertyId,
+      'property_update',
+      'Listing Removed',
+      `${property.title} has been permanently deleted`,
+    );
+    await loadData();
   };
 
   const toggleFeatured = async (propertyId: string) => {
@@ -264,10 +302,11 @@ export const MyListingsScreen = () => {
   };
 
   const filterTabs: { key: FilterStatus; label: string; count: number }[] = [
-    { key: 'all', label: 'All', count: listings.length },
+    { key: 'all', label: 'All', count: nonArchivedListings.length },
     { key: 'active', label: 'Active', count: activeCount },
     { key: 'paused', label: 'Paused', count: pausedCount },
     { key: 'rented', label: 'Rented', count: rentedCount },
+    ...(archivedCount > 0 ? [{ key: 'archived' as FilterStatus, label: 'Archived', count: archivedCount }] : []),
   ];
 
   const renderListingCard = (listing: Property) => {
@@ -475,7 +514,17 @@ export const MyListingsScreen = () => {
                 <Text style={styles.actOutreachText}>Roommates</Text>
               </Pressable>
             ) : null}
-            {status === 'active' ? (
+            {status === 'archived' ? (
+              <>
+                <Pressable style={styles.actRented} onPress={() => restoreListing(listing.id)}>
+                  <Feather name="rotate-ccw" size={13} color={GREEN} />
+                  <Text style={styles.actRentedText}>Restore</Text>
+                </Pressable>
+                <Pressable style={styles.actDelete} onPress={() => permanentlyDeleteListing(listing.id)}>
+                  <Feather name="trash-2" size={14} color="#ff4d4d" />
+                </Pressable>
+              </>
+            ) : status === 'active' ? (
               <>
                 <Pressable
                   style={styles.actBoost}
@@ -524,9 +573,11 @@ export const MyListingsScreen = () => {
                 ) : null}
               </>
             )}
-            <Pressable style={styles.actDelete} onPress={() => deleteListingHandler(listing.id)}>
-              <Feather name="trash-2" size={14} color="#ff4d4d" />
-            </Pressable>
+            {status !== 'archived' ? (
+              <Pressable style={styles.actArchive} onPress={() => archiveListing(listing.id)}>
+                <Feather name="archive" size={14} color={ARCHIVED_COLOR} />
+              </Pressable>
+            ) : null}
           </View>
         </View>
       </View>
@@ -539,7 +590,7 @@ export const MyListingsScreen = () => {
         <View>
           <Text style={styles.topTitle}>My Listings</Text>
           <Text style={styles.topSub}>
-            {listings.length} listing{listings.length !== 1 ? 's' : ''} · {activeCount} active
+            {nonArchivedListings.length} listing{nonArchivedListings.length !== 1 ? 's' : ''} · {activeCount} active
           </Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -1104,6 +1155,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,77,77,0.1)',
     borderWidth: 1,
     borderColor: 'rgba(255,77,77,0.18)',
+  },
+  actArchive: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(107,114,128,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(107,114,128,0.18)',
   },
 
   emptyState: {

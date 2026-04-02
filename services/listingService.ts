@@ -88,6 +88,8 @@ export function mapListingToProperty(l: any, fallbackHostName?: string): Propert
     hostType: l.host?.host_type || l.host_type || undefined,
     host_badge: l.host_badge ?? null,
     preferred_tenant_gender: l.preferred_tenant_gender || 'any',
+    isArchived: l.is_archived ?? false,
+    archivedAt: l.archived_at ?? undefined,
   };
 }
 
