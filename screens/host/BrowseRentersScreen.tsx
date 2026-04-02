@@ -265,14 +265,21 @@ export const BrowseRentersScreen = () => {
           const hostType = user.hostType;
           const limit = getHostPiMonthlyLimit(rawPlan, hostType);
           setPiQuotaLimit(limit);
-          const used = await getMonthlyUsageCount(user.id);
-          setPiQuotaUsed(used);
+          if (!shouldLoadMockData()) {
+            const used = await Promise.race([
+              getMonthlyUsageCount(user.id),
+              new Promise<number>(resolve => setTimeout(() => resolve(0), 5000)),
+            ]);
+            setPiQuotaUsed(used);
+          }
         } catch {}
       }
 
       if (user) {
-        const ids = await getShortlistedRenterIds(user.id);
-        setShortlistedIds(new Set(ids));
+        try {
+          const ids = await getShortlistedRenterIds(user.id);
+          setShortlistedIds(new Set(ids));
+        } catch {}
       }
     } catch (e) {
       console.warn('[BrowseRenters] Load error:', e);
