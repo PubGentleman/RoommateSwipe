@@ -486,9 +486,12 @@ export const BrowseRentersScreen = () => {
             >
               <Feather
                 name="heart"
-                size={20}
+                size={16}
                 color={optedOut ? '#444' : isShortlisted ? ACCENT : '#666'}
               />
+              <Text style={{ fontSize: 10, fontWeight: '600', color: optedOut ? '#444' : isShortlisted ? ACCENT : '#666', marginTop: 2 }}>
+                {isShortlisted ? 'Saved' : 'Shortlist'}
+              </Text>
             </Pressable>
           ) : null}
         </View>
@@ -862,7 +865,7 @@ export const BrowseRentersScreen = () => {
               onPress={() => {
                 const roomShortlisted = renters.filter(r => shortlistedIds.has(r.id) && isRoomSeeker(r));
                 if (roomShortlisted.length < 2) {
-                  showAlert({ title: 'Need More', message: 'Tap the heart icon on at least 2 room-seeking renters to shortlist them, then tap Build Group.' });
+                  showAlert({ title: 'Need More', message: 'Tap Shortlist on at least 2 room-seeking renters, then tap Build Group.' });
                   return;
                 }
                 navigation.navigate('AgentGroupBuilder', {
@@ -1016,7 +1019,7 @@ const styles = StyleSheet.create({
   cardOccupation: { color: '#999', fontSize: 13, marginTop: 2 },
   cardBudget: { color: GREEN, fontSize: 13, fontWeight: '600', marginTop: 4 },
   cardMeta: { color: '#888', fontSize: 12, marginTop: 2 },
-  shortlistBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#222', alignItems: 'center', justifyContent: 'center' },
+  shortlistBtn: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#222', alignItems: 'center', justifyContent: 'center' },
   shortlistBtnActive: { backgroundColor: 'rgba(255,107,91,0.15)' },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 },
   tag: { backgroundColor: '#222', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 },
