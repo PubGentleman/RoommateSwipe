@@ -243,7 +243,9 @@ export const ProfileCompletionScreen = () => {
             maxLength={BIO_MAX}
             textAlignVertical="top"
           />
-          <Text style={styles.charCount}>{bio.length}/{BIO_MAX}</Text>
+          <Text style={[styles.charCount, bio.trim().length < 20 ? { color: ACCENT } : null]}>
+            {bio.trim().length < 20 ? `${20 - bio.trim().length} more chars needed` : `${bio.length}/${BIO_MAX}`}
+          </Text>
         </View>
 
         {!isHostProfessional ? (
