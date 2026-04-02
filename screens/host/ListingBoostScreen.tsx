@@ -77,13 +77,17 @@ export const ListingBoostScreen = () => {
 
   const isBoosted = listing ? isListingBoosted(listing) : false;
   const planLimits = getPlanLimits(getHostPlan() as HostPlan);
-  const maxSimultaneous = planLimits.simultaneousBoosts;
+  const maxSimultaneous = canPayPerBoost ? 1 : planLimits.simultaneousBoosts;
   const boostsExcludingThis = isBoosted ? activeBoostCount - 1 : activeBoostCount;
   const hasReachedBoostLimit = maxSimultaneous > 0 && boostsExcludingThis >= maxSimultaneous;
   const hasFreeBoosts = hostSub && hostSub.freeBoostsRemaining > 0;
   const isOnFreePlan = hostSub && isFreePlan(hostSub.plan);
+  const isAgent = user?.hostType === 'agent';
+  const agentPlan = user?.agentPlan;
+  const isAgentFree = isAgent && (!agentPlan || agentPlan === 'pay_per_use' || agentPlan === 'free');
+  const canPayPerBoost = isAgentFree;
 
-  if (isOnFreePlan && hostSub) {
+  if (isOnFreePlan && hostSub && !canPayPerBoost) {
     return (
       <View style={[{ flex: 1, backgroundColor: BG }, { paddingTop: insets.top }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 12 }}>
@@ -246,6 +250,30 @@ export const ListingBoostScreen = () => {
           </Pressable>
         ) : null}
 
+        {canPayPerBoost && !isBoosted ? (
+          <View style={styles.payPerBoostBanner}>
+            <LinearGradient colors={['rgba(168,85,247,0.12)', 'rgba(168,85,247,0.04)']} style={styles.payPerBoostGradient}>
+              <View style={styles.payPerBoostContent}>
+                <View style={styles.payPerBoostIcon}>
+                  <Feather name="zap" size={16} color={PURPLE} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.payPerBoostTitle}>Pay-Per-Boost</Text>
+                  <Text style={styles.payPerBoostSub}>
+                    Purchase individual boosts without a subscription. 1 active boost at a time.
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.payPerBoostUpgrade}>
+                <Feather name="arrow-up" size={11} color="rgba(255,255,255,0.4)" />
+                <Text style={styles.payPerBoostUpgradeText}>
+                  Upgrade for more simultaneous boosts and free monthly boosts
+                </Text>
+              </View>
+            </LinearGradient>
+          </View>
+        ) : null}
+
         {!isBoosted ? (
           <View style={styles.optionsSection}>
             <Text style={styles.sectionTitle}>Boost Options</Text>
@@ -347,7 +375,9 @@ export const ListingBoostScreen = () => {
         </View>
 
         <Text style={styles.notice}>
-          Your plan allows up to {maxSimultaneous} simultaneous boost{maxSimultaneous !== 1 ? 's' : ''}. Boosts cannot be cancelled once applied.
+          {canPayPerBoost
+            ? 'Pay-per-boost: 1 active boost at a time. Upgrade your plan for more simultaneous boosts. Boosts cannot be cancelled once applied.'
+            : `Your plan allows up to ${maxSimultaneous} simultaneous boost${maxSimultaneous !== 1 ? 's' : ''}. Boosts cannot be cancelled once applied.`}
         </Text>
 
         <View style={{ height: 40 }} />
@@ -528,4 +558,33 @@ const styles = StyleSheet.create({
     marginTop: 12,
     lineHeight: 16,
   },
+  payPerBoostBanner: { marginBottom: 16 },
+  payPerBoostGradient: {
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(168,85,247,0.15)',
+  },
+  payPerBoostContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  payPerBoostIcon: {
+    width: 36, height: 36, borderRadius: 10,
+    backgroundColor: 'rgba(168,85,247,0.2)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  payPerBoostTitle: { fontSize: 14, fontWeight: '700', color: PURPLE },
+  payPerBoostSub: { fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 2, lineHeight: 16 },
+  payPerBoostUpgrade: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.06)',
+  },
+  payPerBoostUpgradeText: { fontSize: 11, color: 'rgba(255,255,255,0.35)', flex: 1 },
 });

@@ -215,7 +215,7 @@ export const BOOST_OPTIONS = [
 export const AGENT_VERIFICATION_FEE = 9.99;
 
 export function isFreePlan(plan: HostPlanType | string): boolean {
-  return plan === 'free' || plan === 'none';
+  return plan === 'free' || plan === 'none' || plan === 'pay_per_use';
 }
 
 export function calculateHostMonthlyCost(plan: HostPlanType, activeListings: number): number {
