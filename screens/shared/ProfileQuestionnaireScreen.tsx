@@ -410,13 +410,20 @@ export const ProfileQuestionnaireScreen = () => {
     return null;
   }, []);
   const isMissingMode = !!filteredSteps;
-  const autoFilteredSteps = React.useMemo(() => {
-    if (filteredSteps || isOnboarding) return null;
-    return allStepsForType.filter(s => !shouldSkipStep(s));
-  }, [allStepsForType, user]);
-  const renterOnboarding = isOnboarding && user?.role === 'renter';
   const isHostUser = user?.role === 'host';
   const isHostProfessional = isHostUser && (user?.hostType === 'agent' || user?.hostType === 'company');
+  const HOST_EXCLUDED_STEPS: StepId[] = isHostProfessional
+    ? ['budgetLocation', 'dealbreakers', 'sleepCleanliness', 'smokingPets', 'housing', 'roommateSetup', 'idealRoommate', 'lifestyle']
+    : ['budgetLocation', 'dealbreakers', 'sleepCleanliness', 'smokingPets', 'housing', 'roommateSetup', 'idealRoommate'];
+  const autoFilteredSteps = React.useMemo(() => {
+    if (filteredSteps || isOnboarding) return null;
+    let steps = allStepsForType.filter(s => !shouldSkipStep(s));
+    if (isHostUser) {
+      steps = steps.filter(s => !HOST_EXCLUDED_STEPS.includes(s));
+    }
+    return steps;
+  }, [allStepsForType, user, isHostUser]);
+  const renterOnboarding = isOnboarding && user?.role === 'renter';
   const baseOnboardingSteps = isLiteOnboarding ? ONBOARDING_STEPS_LITE : isOnboarding ? ONBOARDING_STEPS : allStepsForType;
   const onboardingSteps = isHostProfessional
     ? baseOnboardingSteps.filter(s => s !== 'budgetLocation' && s !== 'housing')
