@@ -416,10 +416,13 @@ export const ProfileQuestionnaireScreen = () => {
   }, [allStepsForType, user]);
   const renterOnboarding = isOnboarding && user?.role === 'renter';
   const isHostUser = user?.role === 'host';
+  const isHostProfessional = isHostUser && (user?.hostType === 'agent' || user?.hostType === 'company');
   const baseOnboardingSteps = isLiteOnboarding ? ONBOARDING_STEPS_LITE : isOnboarding ? ONBOARDING_STEPS : allStepsForType;
-  const onboardingSteps = (renterOnboarding || isHostUser)
-    ? baseOnboardingSteps.filter(s => s !== 'budgetLocation' && s !== 'housing')
-    : baseOnboardingSteps;
+  const onboardingSteps = isHostProfessional
+    ? baseOnboardingSteps.filter(s => s !== 'budgetLocation' && s !== 'housing' && s !== 'photos')
+    : (renterOnboarding || isHostUser)
+      ? baseOnboardingSteps.filter(s => s !== 'budgetLocation' && s !== 'housing')
+      : baseOnboardingSteps;
   const stepsToShow = filteredSteps || autoFilteredSteps || onboardingSteps;
   const [currentFilteredIndex, setCurrentFilteredIndex] = useState(0);
   const useFilteredMapping = isMissingMode || isOnboarding || isPlaceSeekerUser || !!autoFilteredSteps;
