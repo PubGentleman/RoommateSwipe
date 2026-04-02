@@ -83,7 +83,6 @@ export const AgentGroupsScreen = () => {
       message: `A placement fee of ${feeDisplay} will be charged to your payment method on file.`,
     });
     if (confirmed) {
-      await updateAgentGroupStatus(group.id, 'placed');
       const placement = await recordPlacement(
         user.id,
         group.id,
@@ -99,6 +98,7 @@ export const AgentGroupsScreen = () => {
       );
 
       if (chargeResult.success) {
+        await updateAgentGroupStatus(group.id, 'placed');
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);

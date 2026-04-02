@@ -97,7 +97,7 @@ export const BrowseRentersScreen = () => {
         let query = supabase
           .from('users')
           .select(`
-            id, full_name, avatar_url, age, city, occupation, last_active_at, bio, gender,
+            id, full_name, avatar_url, age, city, occupation, last_active_at, bio, gender, accept_agent_offers,
             profile:profiles(
               budget_max, budget_min, move_in_date, room_type, cleanliness,
               sleep_schedule, smoking, pets, interests, photos, bio,
@@ -144,6 +144,7 @@ export const BrowseRentersScreen = () => {
             roomType: p?.room_type,
             gender: u.gender,
             bio: p?.bio || u.bio,
+            acceptAgentOffers: u.accept_agent_offers !== false,
           };
         });
 
@@ -182,7 +183,7 @@ export const BrowseRentersScreen = () => {
         const { data: supaListings } = await supabase
           .from('listings')
           .select('*')
-          .eq('host_id', user?.id || '')
+          .eq('created_by', user?.id || '')
           .eq('is_active', true)
           .eq('is_rented', false)
           .eq('is_paused', false);
@@ -190,7 +191,7 @@ export const BrowseRentersScreen = () => {
         myListings = (supaListings || []).map((l: any) => ({
           id: l.id,
           title: l.title,
-          price: l.price,
+          price: l.rent || l.price || 0,
           bedrooms: l.bedrooms,
           bathrooms: l.bathrooms,
           city: l.city,
@@ -199,8 +200,8 @@ export const BrowseRentersScreen = () => {
           description: l.description,
           photos: l.photos || [],
           amenities: l.amenities || [],
-          available: l.available,
-          hostId: l.host_id,
+          available: l.is_active,
+          hostId: l.created_by,
           availableDate: l.available_date ? new Date(l.available_date) : undefined,
           latitude: l.latitude,
           longitude: l.longitude,
@@ -414,9 +415,10 @@ export const BrowseRentersScreen = () => {
   const renderRenterCard = ({ item }: { item: AgentRenter }) => {
     const isShortlisted = shortlistedIds.has(item.id);
     const photo = item.photos?.[0];
+    const optedOut = item.acceptAgentOffers === false;
 
     return (
-      <View style={styles.card}>
+      <View style={[styles.card, optedOut ? { opacity: 0.5 } : undefined]}>
         <View style={styles.cardRow}>
           {photo ? (
             <Image source={{ uri: photo }} style={styles.avatar} />
@@ -432,6 +434,12 @@ export const BrowseRentersScreen = () => {
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#a855f7' + '20', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 }}>
                   <Feather name="cpu" size={10} color="#a855f7" />
                   <Text style={{ color: '#a855f7', fontSize: 10, fontWeight: '600' }}>{'\u03C0'} Pi Pick</Text>
+                </View>
+              ) : null}
+              {optedOut ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#e74c3c20', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 }}>
+                  <Feather name="slash" size={10} color="#e74c3c" />
+                  <Text style={{ color: '#e74c3c', fontSize: 10, fontWeight: '600' }}>Not accepting</Text>
                 </View>
               ) : null}
             </View>

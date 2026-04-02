@@ -31,6 +31,7 @@ export interface AgentRenter {
   bio?: string;
   compatibility?: number;
   isShortlisted?: boolean;
+  acceptAgentOffers?: boolean;
 }
 
 export interface AgentGroup {
@@ -146,7 +147,7 @@ export async function getAgentGroups(agentId: string): Promise<AgentGroup[]> {
       group_members(
         user_id,
         role,
-        user:users!user_id(id, full_name, avatar_url)
+        user:users!user_id(id, full_name, avatar_url, age, occupation)
       ),
       listing:listings!target_listing_id(id, title, rent, bedrooms, neighborhood)
     `)
@@ -164,8 +165,8 @@ export async function getAgentGroups(agentId: string): Promise<AgentGroup[]> {
     const memberProfiles = rawMembers.map((m: any) => ({
       id: m.user?.id ?? m.user_id,
       name: m.user?.full_name ?? 'Unknown',
-      age: 0,
-      occupation: '',
+      age: m.user?.age ?? 0,
+      occupation: m.user?.occupation ?? '',
       photos: m.user?.avatar_url ? [m.user.avatar_url] : [],
     }));
 
@@ -223,15 +224,6 @@ export async function createAgentGroup(group: AgentGroup): Promise<AgentGroup> {
   if (error || !newGroup) {
     console.warn('[AgentService] createAgentGroup error:', error?.message);
     return group;
-  }
-
-  if (group.memberIds.length > 0) {
-    const members = group.memberIds.map(userId => ({
-      group_id: newGroup.id,
-      user_id: userId,
-      role: 'member' as const,
-    }));
-    await supabase.from('group_members').insert(members);
   }
 
   return { ...group, id: newGroup.id };
@@ -650,15 +642,20 @@ export function generateBestGroupSuggestion(
   const combinations = getCombinations(shortlisted, needed);
   if (combinations.length === 0) return null;
 
+  const sharePerPerson = listing.price / Math.max(needed, 1);
+
   const scored = combinations.map(group => {
     const combinedMin = group.reduce((sum, r) => sum + (r.budgetMin ?? 0), 0);
     const combinedMax = group.reduce((sum, r) => sum + (r.budgetMax ?? 0), 0);
     const coversRent = combinedMax >= listing.price;
+    const allCanAffordShare = group.every(r => (r.budgetMax ?? 0) >= sharePerPerson);
 
     const pairs = getPairs(group);
     const avgCompatibility = pairs.length > 0
       ? Math.round(pairs.reduce((sum, [a, b]) => sum + calculatePairCompatibility(a, b), 0) / pairs.length)
       : 70;
+
+    const budgetScore = allCanAffordShare ? 1 : coversRent ? 0.75 : 0.5;
 
     return {
       group,
@@ -667,7 +664,7 @@ export function generateBestGroupSuggestion(
       combinedBudgetMin: combinedMin,
       combinedBudgetMax: combinedMax,
       coversRent,
-      score: coversRent ? avgCompatibility : avgCompatibility * 0.5,
+      score: avgCompatibility * budgetScore,
     };
   });
 
