@@ -669,14 +669,30 @@ export const BrowseRentersScreen = () => {
   const renderHeader = () => (
     <View>
       <Pressable
-        style={styles.listingSelector}
+        style={[styles.listingSelector, selectedListing ? styles.listingSelectorActive : null]}
         onPress={() => setShowListingPicker(true)}
       >
-        <Feather name="home" size={16} color="#999" />
-        <Text style={styles.listingSelectorText}>
-          {selectedListing ? selectedListing.title : 'Select a listing to filter renters'}
-        </Text>
-        <Feather name="chevron-down" size={16} color="#999" />
+        {selectedListing?.photos?.[0] ? (
+          <Image source={{ uri: selectedListing.photos[0] }} style={styles.listingSelectorThumb} />
+        ) : (
+          <View style={[styles.listingSelectorThumb, { backgroundColor: '#333', alignItems: 'center', justifyContent: 'center' }]}>
+            <Feather name="home" size={14} color="#888" />
+          </View>
+        )}
+        <View style={{ flex: 1 }}>
+          {selectedListing ? (
+            <>
+              <Text style={styles.listingSelectorTitle} numberOfLines={1}>{selectedListing.title}</Text>
+              <Text style={styles.listingSelectorMeta}>
+                {selectedListing.bedrooms}BR · ${selectedListing.price?.toLocaleString()}/mo
+                {selectedListing.neighborhood ? ` · ${selectedListing.neighborhood}` : ''}
+              </Text>
+            </>
+          ) : (
+            <Text style={styles.listingSelectorPlaceholder}>Select a listing to filter renters</Text>
+          )}
+        </View>
+        <Feather name="chevron-down" size={16} color={selectedListing ? ACCENT : '#666'} />
       </Pressable>
 
       <Pressable
@@ -883,32 +899,61 @@ export const BrowseRentersScreen = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Listing</Text>
-              <Pressable onPress={() => setShowListingPicker(false)}>
-                <Feather name="x" size={24} color="#fff" />
+              <Text style={styles.modalTitle}>Your Listings</Text>
+              <Pressable onPress={() => setShowListingPicker(false)} style={{ padding: 4 }}>
+                <Feather name="x" size={22} color="#aaa" />
               </Pressable>
             </View>
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView showsVerticalScrollIndicator={false} style={{ paddingHorizontal: 16 }}>
               <Pressable
-                style={styles.listingOption}
+                style={[styles.listingPickerAll, !selectedListing ? styles.listingPickerAllActive : null]}
                 onPress={() => { setSelectedListing(null); setShowListingPicker(false); }}
               >
-                <Text style={styles.listingOptionText}>All Renters (no filter)</Text>
+                <View style={[styles.listingSelectorThumb, { backgroundColor: '#333', alignItems: 'center', justifyContent: 'center' }]}>
+                  <Feather name="globe" size={14} color="#888" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>All Renters</Text>
+                  <Text style={{ color: '#888', fontSize: 12 }}>No listing filter applied</Text>
+                </View>
+                {!selectedListing ? <Feather name="check-circle" size={18} color={GREEN} /> : null}
               </Pressable>
-              {listings.map(l => (
-                <Pressable
-                  key={l.id}
-                  style={[styles.listingOption, selectedListing?.id === l.id ? styles.listingOptionActive : null]}
-                  onPress={() => { setSelectedListing(l); setShowListingPicker(false); }}
-                >
-                  <Text style={styles.listingOptionText}>{l.title}</Text>
-                  <Text style={styles.listingOptionMeta}>
-                    ${l.price.toLocaleString()}/mo - {l.bedrooms}BR
-                  </Text>
-                </Pressable>
-              ))}
+
+              {listings.map(l => {
+                const isActive = selectedListing?.id === l.id;
+                return (
+                  <Pressable
+                    key={l.id}
+                    style={[styles.listingPickerCard, isActive ? styles.listingPickerCardActive : null]}
+                    onPress={() => { setSelectedListing(l); setShowListingPicker(false); }}
+                  >
+                    {l.photos?.[0] ? (
+                      <Image source={{ uri: l.photos[0] }} style={styles.listingPickerPhoto} />
+                    ) : (
+                      <View style={[styles.listingPickerPhoto, { backgroundColor: '#333', alignItems: 'center', justifyContent: 'center' }]}>
+                        <Feather name="home" size={20} color="#666" />
+                      </View>
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }} numberOfLines={1}>{l.title}</Text>
+                      <Text style={{ color: ACCENT, fontSize: 14, fontWeight: '600', marginTop: 2 }}>
+                        ${l.price?.toLocaleString()}/mo
+                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                        <Text style={{ color: '#888', fontSize: 12 }}>{l.bedrooms}BR · {l.bathrooms}BA</Text>
+                        {l.neighborhood ? <Text style={{ color: '#888', fontSize: 12 }}>{l.neighborhood}</Text> : null}
+                      </View>
+                    </View>
+                    {isActive ? <Feather name="check-circle" size={18} color={GREEN} /> : null}
+                  </Pressable>
+                );
+              })}
               {listings.length === 0 ? (
-                <Text style={styles.emptyText}>No active listings. Create a listing first.</Text>
+                <View style={{ alignItems: 'center', paddingVertical: 30 }}>
+                  <Feather name="home" size={32} color="#444" />
+                  <Text style={{ color: '#888', fontSize: 14, marginTop: 8 }}>No active listings</Text>
+                  <Text style={{ color: '#666', fontSize: 12, marginTop: 4 }}>Create a listing to start filtering renters</Text>
+                </View>
               ) : null}
             </ScrollView>
           </View>
@@ -925,8 +970,17 @@ const styles = StyleSheet.create({
   buildBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#333', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
   buildBtnReady: { backgroundColor: ACCENT },
   buildBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
-  listingSelector: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: CARD_BG, borderRadius: 12, padding: 14, marginBottom: 12 },
-  listingSelectorText: { flex: 1, color: '#ccc', fontSize: 14 },
+  listingSelector: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: CARD_BG, borderRadius: 12, padding: 10, marginBottom: 12, borderWidth: 1, borderColor: '#2a2a2a' },
+  listingSelectorActive: { borderColor: ACCENT + '50', backgroundColor: ACCENT + '08' },
+  listingSelectorThumb: { width: 36, height: 36, borderRadius: 8, overflow: 'hidden' },
+  listingSelectorTitle: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  listingSelectorMeta: { color: '#888', fontSize: 12, marginTop: 1 },
+  listingSelectorPlaceholder: { color: '#666', fontSize: 14 },
+  listingPickerAll: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 12, marginBottom: 8, backgroundColor: CARD_BG, borderWidth: 1, borderColor: '#2a2a2a' },
+  listingPickerAllActive: { borderColor: GREEN + '50', backgroundColor: GREEN + '08' },
+  listingPickerCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, borderRadius: 12, marginBottom: 8, backgroundColor: CARD_BG, borderWidth: 1, borderColor: '#2a2a2a' },
+  listingPickerCardActive: { borderColor: ACCENT + '50', backgroundColor: ACCENT + '08' },
+  listingPickerPhoto: { width: 56, height: 56, borderRadius: 10, overflow: 'hidden' },
   filterRow: { marginBottom: 12 },
   filterChip: { backgroundColor: CARD_BG, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, marginRight: 8, flexDirection: 'row' as const, alignItems: 'center' as const, gap: 4 },
   filterChipActive: { backgroundColor: ACCENT },
