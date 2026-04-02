@@ -1112,6 +1112,9 @@ export const StorageService = {
         await AsyncStorage.removeItem(STORAGE_KEYS.USERS);
         for (const profileUser of mockProfileUsers) {
           await this.addOrUpdateUser(profileUser);
+          if (profileUser.hostSubscription && profileUser.id) {
+            await this.updateHostSubscription(profileUser.id, profileUser.hostSubscription);
+          }
         }
 
         const allKeys = await AsyncStorage.getAllKeys();
@@ -1153,11 +1156,13 @@ export const StorageService = {
       await this.setGroups(mockGroups);
       console.log(`[StorageService] ✓ Loaded ${mockGroups.length} groups`);
       
-      // Only seed users if they don't exist yet
       if (existingUsers.length === 0) {
         console.log('[StorageService] No existing users found, seeding profile users...');
         for (const profileUser of mockProfileUsers) {
           await this.addOrUpdateUser(profileUser);
+          if (profileUser.hostSubscription && profileUser.id) {
+            await this.updateHostSubscription(profileUser.id, profileUser.hostSubscription);
+          }
         }
         console.log(`[StorageService] ✓ Seeded ${mockProfileUsers.length} profile users`);
       } else {
@@ -1199,11 +1204,13 @@ export const StorageService = {
       await AsyncStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(mockApplications));
       console.log(`[StorageService] Loaded ${mockApplications.length} applications`);
       
-      // Clear and reseed users
       await AsyncStorage.removeItem(STORAGE_KEYS.USERS);
       console.log('[StorageService] Cleared all users');
       for (const profileUser of mockProfileUsers) {
         await this.addOrUpdateUser(profileUser);
+        if (profileUser.hostSubscription && profileUser.id) {
+          await this.updateHostSubscription(profileUser.id, profileUser.hostSubscription);
+        }
       }
       console.log(`[StorageService] ✓ Reseeded ${mockProfileUsers.length} profile users`);
       

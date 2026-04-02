@@ -4,7 +4,7 @@ import { additionalProfiles } from './additionalProfiles';
 import { extraProfiles } from './extraProfiles';
 import { extraConversations, extraProperties, extraGroups, extraApplications } from './extraMockData';
 
-export const MOCK_DATA_VERSION = '3.3.0';
+export const MOCK_DATA_VERSION = '3.4.0';
 
 export const mockProfileUsers: User[] = [
   {
@@ -667,7 +667,7 @@ export const mockProfileUsers: User[] = [
     profilePicture: 'https://picsum.photos/400/500?random=301',
     photos: ['https://picsum.photos/400/500?random=301', 'https://picsum.photos/400/500?random=302'],
     subscription: { plan: 'elite', status: 'active' },
-    hostSubscription: { plan: 'pro', status: 'active', billingCycle: 'monthly', inquiryResponsesUsed: 15 },
+    hostSubscription: { plan: 'agent_business', status: 'active', billingCycle: 'monthly', inquiryResponsesUsed: 15 },
     verifiedBusiness: true,
     verifiedBusinessAt: '2025-09-01',
     avgResponseHours: 2,
@@ -682,7 +682,7 @@ export const mockProfileUsers: User[] = [
     },
     hasCompletedHostOnboarding: true,
     activeMode: 'host',
-    agentPlan: 'pro',
+    agentPlan: 'business',
   },
   {
     id: 'agent2',
@@ -702,7 +702,7 @@ export const mockProfileUsers: User[] = [
     profilePicture: 'https://picsum.photos/400/500?random=303',
     photos: ['https://picsum.photos/400/500?random=303', 'https://picsum.photos/400/500?random=304'],
     subscription: { plan: 'elite', status: 'active' },
-    hostSubscription: { plan: 'pro', status: 'active', billingCycle: 'yearly', inquiryResponsesUsed: 22 },
+    hostSubscription: { plan: 'agent_pro', status: 'active', billingCycle: 'yearly', inquiryResponsesUsed: 22 },
     verifiedBusiness: true,
     verifiedBusinessAt: '2025-06-15',
     avgResponseHours: 1,
@@ -735,7 +735,7 @@ export const mockProfileUsers: User[] = [
     profilePicture: 'https://picsum.photos/400/500?random=305',
     photos: ['https://picsum.photos/400/500?random=305', 'https://picsum.photos/400/500?random=306'],
     subscription: { plan: 'plus', status: 'active' },
-    hostSubscription: { plan: 'starter', status: 'active', billingCycle: 'monthly', inquiryResponsesUsed: 5 },
+    hostSubscription: { plan: 'agent_starter', status: 'active', billingCycle: 'monthly', inquiryResponsesUsed: 5 },
     verifiedBusiness: true,
     verifiedBusinessAt: '2025-11-20',
     avgResponseHours: 4,
@@ -750,7 +750,7 @@ export const mockProfileUsers: User[] = [
     },
     hasCompletedHostOnboarding: true,
     activeMode: 'host',
-    agentPlan: 'pay_per_use',
+    agentPlan: 'starter',
   },
   {
     id: 'company1',

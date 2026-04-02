@@ -190,6 +190,9 @@ export const HostSubscriptionScreen = () => {
       if (hostType === 'agent') {
         downgradeUpdates.agentPlan = 'pay_per_use';
       }
+      if (hostType === 'company') {
+        downgradeUpdates.companyPlan = 'free';
+      }
       await updateUser(downgradeUpdates);
       if (isFirstTimeHost) {
         await completeHostOnboarding();
@@ -207,24 +210,29 @@ export const HostSubscriptionScreen = () => {
     if (!selectedPlan || !user || !hostSub) return;
     setSubscribing(true);
     try {
-      const plan = selectedPlan as HostPlanType;
-      const planData = HOST_PLANS[plan];
+      const basePlan = selectedPlan as HostPlanType;
+      const storedPlan = hostType === 'agent' ? `agent_${basePlan}` as HostPlanType
+        : hostType === 'company' ? `company_${basePlan}` as HostPlanType
+        : basePlan;
+      const planData = HOST_PLANS[storedPlan] || HOST_PLANS[basePlan];
       const price = billingPrice(planData.price, billingCycle);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      const newSub = subscriptionFromPlan(plan, hostSub);
+      const newSub = subscriptionFromPlan(storedPlan, hostSub);
       await StorageService.updateHostSubscription(user.id, newSub);
       setHostSub(newSub);
       const userUpdates: any = {
         hostSubscription: {
           ...user.hostSubscription,
-          plan: plan as 'starter' | 'pro' | 'business',
+          plan: storedPlan,
           status: 'active' as const,
           billingCycle: billingCycle as any,
         },
       };
       if (hostType === 'agent') {
-        const normalizedAgentPlan = plan.replace('agent_', '');
-        userUpdates.agentPlan = normalizedAgentPlan === 'free' ? 'pay_per_use' : normalizedAgentPlan;
+        userUpdates.agentPlan = basePlan === 'free' ? 'pay_per_use' : basePlan;
+      }
+      if (hostType === 'company') {
+        userUpdates.companyPlan = basePlan;
       }
       await updateUser(userUpdates);
       if (isFirstTimeHost) {
@@ -232,14 +240,14 @@ export const HostSubscriptionScreen = () => {
       }
       setSelectedPlan(null);
       await StorageService.addNotification({
-        id: `notif-host-plan-${plan}-${Date.now()}`,
+        id: `notif-host-plan-${storedPlan}-${Date.now()}`,
         userId: user.id,
         type: 'system',
         title: 'Plan Updated',
         body: `You're now on the ${planData.label} plan at $${price}/mo`,
         isRead: false,
         createdAt: new Date(),
-        data: { plan },
+        data: { plan: storedPlan },
       });
       const successMsg = `You're now on the ${planData.label} plan at $${price}/mo!`;
       await showAlert({ title: 'Plan Updated', message: successMsg, variant: 'success' });
