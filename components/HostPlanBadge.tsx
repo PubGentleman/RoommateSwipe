@@ -1,6 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { Feather } from './VectorIcons';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import { HostPlanType } from '../types/models';
 
 interface Props {
@@ -17,13 +16,25 @@ const PLAN_CONFIG: Record<HostPlanType, { color: string; bg: string; label: stri
   business: { color: '#ffd700', bg: 'rgba(255,215,0,0.15)', label: 'Business' },
 };
 
+let FeatherIcon: React.ComponentType<{ name: string; size?: number; color?: string }> | null = null;
+try {
+  const VectorIcons = require('./VectorIcons');
+  FeatherIcon = VectorIcons.Feather;
+} catch {}
+
 export const HostPlanBadge = ({ plan, showLabel = true, isVerifiedAgent }: Props) => {
-  const config = PLAN_CONFIG[plan];
+  const config = PLAN_CONFIG[plan] || PLAN_CONFIG.free;
 
   return (
     <View style={[styles.badge, { backgroundColor: config.bg, borderColor: config.color }]}>
       {isVerifiedAgent ? (
-        <Feather name="shield" size={10} color={config.color} style={{ marginRight: 3 }} />
+        FeatherIcon && Platform.OS !== 'web' ? (
+          <View style={{ marginRight: 3 }}>
+            <FeatherIcon name="shield" size={10} color={config.color} />
+          </View>
+        ) : (
+          <Text style={[styles.shieldText, { color: config.color }]}>&#x25C6;</Text>
+        )
       ) : null}
       {showLabel ? (
         <Text style={[styles.label, { color: config.color }]}>{config.label}</Text>
@@ -45,5 +56,10 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.3,
+  },
+  shieldText: {
+    fontSize: 8,
+    marginRight: 3,
+    fontWeight: '700',
   },
 });

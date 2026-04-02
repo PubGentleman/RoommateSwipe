@@ -128,73 +128,94 @@ export async function removeFromShortlist(agentId: string, renterId: string): Pr
     .eq('renter_id', renterId);
 }
 
+async function getAgentGroupsFromLocal(agentId: string): Promise<AgentGroup[]> {
+  const data = await StorageService.getData(AGENT_GROUPS_KEY);
+  const groups = data ? JSON.parse(data) : [];
+  return groups.filter((g: AgentGroup) => g.agentId === agentId);
+}
+
 export async function getAgentGroups(agentId: string): Promise<AgentGroup[]> {
   if (!isSupabaseConfigured) {
-    const data = await StorageService.getData(AGENT_GROUPS_KEY);
-    const groups = data ? JSON.parse(data) : [];
-    return groups.filter((g: AgentGroup) => g.agentId === agentId);
+    return getAgentGroupsFromLocal(agentId);
   }
 
-  const { data: groups, error } = await supabase
-    .from('groups')
-    .select(`
-      id,
-      name,
-      created_by_agent,
-      target_listing_id,
-      group_status,
-      created_at,
-      group_members(
-        user_id,
-        role,
-        user:users!user_id(id, full_name, avatar_url, age, occupation)
-      ),
-      listing:listings!target_listing_id(id, title, rent, bedrooms, neighborhood)
-    `)
-    .eq('created_by_agent', agentId)
-    .eq('agent_assembled', true)
-    .order('created_at', { ascending: false });
+  try {
+    const queryPromise = supabase
+      .from('groups')
+      .select(`
+        id,
+        name,
+        created_by_agent,
+        target_listing_id,
+        group_status,
+        created_at,
+        group_members(
+          user_id,
+          role,
+          user:users!user_id(id, full_name, avatar_url, age, occupation)
+        ),
+        listing:listings!target_listing_id(id, title, rent, bedrooms, neighborhood)
+      `)
+      .eq('created_by_agent', agentId)
+      .eq('agent_assembled', true)
+      .order('created_at', { ascending: false });
 
-  if (error || !groups) {
-    console.warn('[AgentService] getAgentGroups error:', error?.message);
-    return [];
+    const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000));
+    const result = await Promise.race([queryPromise, timeout]);
+    if (!result) {
+      console.warn('[AgentService] getAgentGroups timed out, falling back to local');
+      return getAgentGroupsFromLocal(agentId);
+    }
+    const { data: groups, error } = result;
+
+    if (error || !groups) {
+      console.warn('[AgentService] getAgentGroups error, falling back to local:', error?.message);
+      return getAgentGroupsFromLocal(agentId);
+    }
+
+    if (groups.length === 0) {
+      return getAgentGroupsFromLocal(agentId);
+    }
+
+    return groups.map(g => {
+      const rawMembers = g.group_members || [];
+      const memberProfiles = rawMembers.map((m: any) => ({
+        id: m.user?.id ?? m.user_id,
+        name: m.user?.full_name ?? 'Unknown',
+        age: m.user?.age ?? 0,
+        occupation: m.user?.occupation ?? '',
+        photos: m.user?.avatar_url ? [m.user.avatar_url] : [],
+      }));
+
+      const listing = Array.isArray(g.listing) ? g.listing[0] : g.listing;
+
+      return {
+        id: g.id,
+        name: g.name || 'Untitled Group',
+        agentId: g.created_by_agent,
+        targetListingId: g.target_listing_id,
+        targetListing: listing ? {
+          id: listing.id,
+          title: listing.title,
+          price: listing.rent || 0,
+          bedrooms: listing.bedrooms,
+          neighborhood: listing.neighborhood,
+        } as any : undefined,
+        members: memberProfiles,
+        memberIds: rawMembers.map((m: any) => m.user_id),
+        groupStatus: g.group_status || 'assembling',
+        avgCompatibility: 0,
+        combinedBudgetMin: 0,
+        combinedBudgetMax: 0,
+        coversRent: false,
+        invites: [],
+        createdAt: g.created_at,
+      };
+    });
+  } catch (e) {
+    console.warn('[AgentService] getAgentGroups exception, falling back to local:', e);
+    return getAgentGroupsFromLocal(agentId);
   }
-
-  return groups.map(g => {
-    const rawMembers = g.group_members || [];
-    const memberProfiles = rawMembers.map((m: any) => ({
-      id: m.user?.id ?? m.user_id,
-      name: m.user?.full_name ?? 'Unknown',
-      age: m.user?.age ?? 0,
-      occupation: m.user?.occupation ?? '',
-      photos: m.user?.avatar_url ? [m.user.avatar_url] : [],
-    }));
-
-    const listing = Array.isArray(g.listing) ? g.listing[0] : g.listing;
-
-    return {
-      id: g.id,
-      name: g.name || 'Untitled Group',
-      agentId: g.created_by_agent,
-      targetListingId: g.target_listing_id,
-      targetListing: listing ? {
-        id: listing.id,
-        title: listing.title,
-        price: listing.rent || 0,
-        bedrooms: listing.bedrooms,
-        neighborhood: listing.neighborhood,
-      } as any : undefined,
-      members: memberProfiles,
-      memberIds: rawMembers.map((m: any) => m.user_id),
-      groupStatus: g.group_status || 'assembling',
-      avgCompatibility: 0,
-      combinedBudgetMin: 0,
-      combinedBudgetMax: 0,
-      coversRent: false,
-      invites: [],
-      createdAt: g.created_at,
-    };
-  });
 }
 
 export async function createAgentGroup(group: AgentGroup): Promise<AgentGroup> {
