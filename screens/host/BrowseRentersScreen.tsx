@@ -12,6 +12,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { StorageService } from '../../utils/storage';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { shouldLoadMockData } from '../../utils/dataUtils';
 import { Property, RoommateProfile } from '../../types/models';
 import {
   AgentRenter,
@@ -93,7 +94,7 @@ export const BrowseRentersScreen = () => {
       let profiles: RoommateProfile[] = [];
       let myListings: Property[] = [];
 
-      if (isSupabaseConfigured) {
+      if (isSupabaseConfigured && !shouldLoadMockData()) {
         let query = supabase
           .from('users')
           .select(`

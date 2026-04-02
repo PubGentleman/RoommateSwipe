@@ -3,6 +3,9 @@ import { Property, RoommateProfile, AgentGroupInvite, AgentPlacement } from '../
 import { calculateCompatibility } from '../utils/matchingAlgorithm';
 import { AgentPlan, getAgentPlanLimits, canAgentShortlist, canAgentCreateGroup, canAgentPlace } from '../constants/planLimits';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { shouldLoadMockData } from '../utils/dataUtils';
+
+const useLocalData = () => shouldLoadMockData() || !isSupabaseConfigured;
 
 const SHORTLIST_KEY = '@rhome/agent_shortlists';
 const AGENT_GROUPS_KEY = '@rhome/agent_groups';
@@ -53,7 +56,7 @@ export interface AgentGroup {
 }
 
 export async function getShortlistedRenterIds(agentId: string): Promise<string[]> {
-  if (!isSupabaseConfigured) {
+  if (useLocalData()) {
     const data = await StorageService.getData(SHORTLIST_KEY);
     const list = data ? JSON.parse(data) : [];
     return list.filter((s: any) => s.agentId === agentId).map((s: any) => s.renterId);
@@ -72,7 +75,7 @@ export async function getShortlistedRenterIds(agentId: string): Promise<string[]
 }
 
 export async function addToShortlist(agentId: string, renterId: string, listingId?: string): Promise<{ success: boolean; error?: string }> {
-  if (!isSupabaseConfigured) {
+  if (useLocalData()) {
     const data = await StorageService.getData(SHORTLIST_KEY);
     const list = data ? JSON.parse(data) : [];
     const exists = list.find((s: any) => s.agentId === agentId && s.renterId === renterId);
@@ -113,7 +116,7 @@ export async function addToShortlist(agentId: string, renterId: string, listingI
 }
 
 export async function removeFromShortlist(agentId: string, renterId: string): Promise<void> {
-  if (!isSupabaseConfigured) {
+  if (useLocalData()) {
     const data = await StorageService.getData(SHORTLIST_KEY);
     const list = data ? JSON.parse(data) : [];
     const filtered = list.filter((s: any) => !(s.agentId === agentId && s.renterId === renterId));
@@ -135,7 +138,7 @@ async function getAgentGroupsFromLocal(agentId: string): Promise<AgentGroup[]> {
 }
 
 export async function getAgentGroups(agentId: string): Promise<AgentGroup[]> {
-  if (!isSupabaseConfigured) {
+  if (useLocalData()) {
     return getAgentGroupsFromLocal(agentId);
   }
 
@@ -219,7 +222,7 @@ export async function getAgentGroups(agentId: string): Promise<AgentGroup[]> {
 }
 
 export async function createAgentGroup(group: AgentGroup): Promise<AgentGroup> {
-  if (!isSupabaseConfigured) {
+  if (useLocalData()) {
     const data = await StorageService.getData(AGENT_GROUPS_KEY);
     const groups = data ? JSON.parse(data) : [];
     groups.push(group);
@@ -254,7 +257,7 @@ export async function updateAgentGroupStatus(
   groupId: string,
   status: 'assembling' | 'invited' | 'active' | 'placed' | 'dissolved'
 ): Promise<void> {
-  if (!isSupabaseConfigured) {
+  if (useLocalData()) {
     const data = await StorageService.getData(AGENT_GROUPS_KEY);
     const groups = data ? JSON.parse(data) : [];
     const idx = groups.findIndex((g: AgentGroup) => g.id === groupId);
@@ -272,7 +275,7 @@ export async function updateAgentGroupStatus(
 }
 
 export async function getAgentInvitesForRenter(renterId: string): Promise<AgentGroupInvite[]> {
-  if (!isSupabaseConfigured) {
+  if (useLocalData()) {
     const data = await StorageService.getData(AGENT_INVITES_KEY);
     const invites = data ? JSON.parse(data) : [];
     return invites.filter((i: AgentGroupInvite) => i.renterId === renterId);
@@ -315,7 +318,7 @@ export async function sendAgentInvites(
   message: string,
   memberNames: Array<{ id: string; name: string; photo?: string }>
 ): Promise<void> {
-  if (!isSupabaseConfigured) {
+  if (useLocalData()) {
     const data = await StorageService.getData(AGENT_INVITES_KEY);
     const invites = data ? JSON.parse(data) : [];
 
@@ -410,7 +413,7 @@ export async function sendAgentInvites(
 }
 
 export async function respondToInvite(inviteId: string, accept: boolean): Promise<void> {
-  if (!isSupabaseConfigured) {
+  if (useLocalData()) {
     const data = await StorageService.getData(AGENT_INVITES_KEY);
     const invites = data ? JSON.parse(data) : [];
     const idx = invites.findIndex((i: AgentGroupInvite) => i.id === inviteId);
@@ -490,7 +493,7 @@ export async function recordPlacement(
   listingId: string,
   placementFeeCents: number
 ): Promise<AgentPlacement> {
-  if (!isSupabaseConfigured) {
+  if (useLocalData()) {
     const placement: AgentPlacement = {
       id: `pl_${Date.now()}`,
       agentId,
@@ -549,7 +552,7 @@ export async function chargeAgentPlacementFee(
   groupId: string,
   listingId: string
 ): Promise<{ success: boolean; error?: string }> {
-  if (!isSupabaseConfigured) {
+  if (useLocalData()) {
     const data = await StorageService.getData(AGENT_PLACEMENTS_KEY);
     const placements: AgentPlacement[] = data ? JSON.parse(data) : [];
     const idx = placements.findIndex(p => p.id === placementId);
@@ -576,7 +579,7 @@ export async function chargeAgentPlacementFee(
 }
 
 export async function getMonthlyPlacementCount(agentId: string): Promise<number> {
-  if (!isSupabaseConfigured) {
+  if (useLocalData()) {
     const data = await StorageService.getData(AGENT_PLACEMENTS_KEY);
     const placements: AgentPlacement[] = data ? JSON.parse(data) : [];
     const now = new Date();
