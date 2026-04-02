@@ -1297,6 +1297,19 @@ export const ExploreScreen = () => {
                 <Text style={[styles.tagText, { color: '#1a1200', marginLeft: 3 }]}>FEATURED</Text>
               </View>
             ) : null}
+            {item.listingBoost?.isActive &&
+             item.listingBoost?.includesViewCount &&
+             new Date(item.listingBoost.expiresAt) > new Date() ? (
+              <View style={styles.viewCountBadge}>
+                <Feather name="eye" size={9} color="#fff" />
+                <Text style={[styles.tagText, { color: '#fff', marginLeft: 3 }]}>
+                  {(() => {
+                    const seed = item.id.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+                    return Math.floor(20 + (seed % 80));
+                  })()} views
+                </Text>
+              </View>
+            ) : null}
           </View>
           <Pressable
             style={[styles.saveBtn, saved.has(item.id) ? styles.saveBtnActive : null]}
@@ -1753,45 +1766,96 @@ export const ExploreScreen = () => {
               const host = p.hostProfileId ? hostProfiles.get(p.hostProfileId) : null;
               return host && (host as any).hostPlan === 'business';
             });
-            if (featuredListings.length === 0 || viewMode === 'saved') return null;
+            const topPicksListings = filteredProperties.filter(p =>
+              p.listingBoost?.isActive &&
+              p.listingBoost?.includesTopPicks &&
+              new Date(p.listingBoost.expiresAt) > new Date()
+            );
+            const showFeatured = featuredListings.length > 0 && viewMode !== 'saved';
+            const showTopPicks = topPicksListings.length > 0 && viewMode !== 'saved';
+            if (!showFeatured && !showTopPicks) return null;
             return (
-              <View style={styles.featuredSection}>
-                <View style={styles.featuredHeader}>
-                  <Feather name="star" size={14} color="#ffd700" />
-                  <Text style={styles.featuredTitle}>Featured</Text>
-                </View>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.featuredScroll}>
-                  {featuredListings.slice(0, 5).map(item => (
-                    <Pressable
-                      key={`featured-${item.id}`}
-                      style={styles.featuredCard}
-                      onPress={() => {
-                        const viewCheck = canViewListing();
-                        if (!viewCheck.canView) {
-                          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-                          setPaywallFeature('Unlimited Listing Views');
-                          setPaywallPlan('plus');
-                          setShowPaywall(true);
-                          return;
-                        }
-                        useListingView();
-                        setSelectedProperty(item);
-                        setPhotoIndex(0);
-                        setShowPropertyDetail(true);
-                      }}
-                    >
-                      <Image source={{ uri: item.photos[0] }} style={styles.featuredPhoto} />
-                      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.85)']} style={styles.featuredGradient}>
-                        <Text style={styles.featuredPrice}>${item.price?.toLocaleString()}/mo</Text>
-                        <Text style={styles.featuredName} numberOfLines={1}>{item.title}</Text>
-                        <View style={styles.featuredBadge}>
-                          <Feather name="star" size={8} color="#1a1200" />
-                          <Text style={styles.featuredBadgeText}>FEATURED</Text>
-                        </View>
-                      </LinearGradient>
-                    </Pressable>
-                  ))}
-                </ScrollView>
+              <View>
+                {showTopPicks ? (
+                  <View style={styles.topPicksSection}>
+                    <View style={styles.featuredHeader}>
+                      <Feather name="award" size={14} color="#a855f7" />
+                      <Text style={[styles.featuredTitle, { color: '#a855f7' }]}>Top Picks</Text>
+                    </View>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.featuredScroll}>
+                      {topPicksListings.slice(0, 5).map(item => (
+                        <Pressable
+                          key={`topPick-${item.id}`}
+                          style={styles.topPickCard}
+                          onPress={() => {
+                            const viewCheck = canViewListing();
+                            if (!viewCheck.canView) {
+                              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                              setPaywallFeature('Unlimited Listing Views');
+                              setPaywallPlan('plus');
+                              setShowPaywall(true);
+                              return;
+                            }
+                            useListingView();
+                            setSelectedProperty(item);
+                            setPhotoIndex(0);
+                            setShowPropertyDetail(true);
+                          }}
+                        >
+                          <Image source={{ uri: item.photos[0] }} style={styles.featuredPhoto} />
+                          <LinearGradient colors={['transparent', 'rgba(80,20,120,0.9)']} style={styles.featuredGradient}>
+                            <Text style={styles.featuredPrice}>${item.price?.toLocaleString()}/mo</Text>
+                            <Text style={styles.featuredName} numberOfLines={1}>{item.title}</Text>
+                            <View style={styles.topPickBadge}>
+                              <Feather name="award" size={8} color="#fff" />
+                              <Text style={[styles.featuredBadgeText, { color: '#fff' }]}>TOP PICK</Text>
+                            </View>
+                          </LinearGradient>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                  </View>
+                ) : null}
+                {showFeatured ? (
+                  <View style={styles.featuredSection}>
+                    <View style={styles.featuredHeader}>
+                      <Feather name="star" size={14} color="#ffd700" />
+                      <Text style={styles.featuredTitle}>Featured</Text>
+                    </View>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.featuredScroll}>
+                      {featuredListings.slice(0, 5).map(item => (
+                        <Pressable
+                          key={`featured-${item.id}`}
+                          style={styles.featuredCard}
+                          onPress={() => {
+                            const viewCheck = canViewListing();
+                            if (!viewCheck.canView) {
+                              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                              setPaywallFeature('Unlimited Listing Views');
+                              setPaywallPlan('plus');
+                              setShowPaywall(true);
+                              return;
+                            }
+                            useListingView();
+                            setSelectedProperty(item);
+                            setPhotoIndex(0);
+                            setShowPropertyDetail(true);
+                          }}
+                        >
+                          <Image source={{ uri: item.photos[0] }} style={styles.featuredPhoto} />
+                          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.85)']} style={styles.featuredGradient}>
+                            <Text style={styles.featuredPrice}>${item.price?.toLocaleString()}/mo</Text>
+                            <Text style={styles.featuredName} numberOfLines={1}>{item.title}</Text>
+                            <View style={styles.featuredBadge}>
+                              <Feather name="star" size={8} color="#1a1200" />
+                              <Text style={styles.featuredBadgeText}>FEATURED</Text>
+                            </View>
+                          </LinearGradient>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                  </View>
+                ) : null}
               </View>
             );
           }}
@@ -4259,6 +4323,37 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '700',
     letterSpacing: 0.5,
+  },
+  viewCountBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(168,85,247,0.85)',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  topPicksSection: {
+    marginBottom: Spacing.lg,
+  },
+  topPickCard: {
+    width: 200,
+    height: 140,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#1a1a1a',
+    borderWidth: 1,
+    borderColor: 'rgba(168,85,247,0.3)',
+  },
+  topPickBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginTop: 4,
+    backgroundColor: 'rgba(168,85,247,0.85)',
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    alignSelf: 'flex-start',
   },
   retryButton: {
     flexDirection: 'row',

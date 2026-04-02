@@ -113,6 +113,9 @@ export interface ListingBoost {
   usedFreeboost: boolean;
   includesFeaturedBadge: boolean;
   badgeLabel: string | null;
+  includesViewCount: boolean;
+  includesTopPicks: boolean;
+  includesAnalytics: boolean;
 }
 
 export interface Property {

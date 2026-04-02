@@ -1866,6 +1866,9 @@ export const mockProperties: Property[] = [
       usedFreeboost: false,
       includesFeaturedBadge: false,
       badgeLabel: null,
+      includesViewCount: true,
+      includesTopPicks: false,
+      includesAnalytics: false,
     },
   },
   {
@@ -1946,6 +1949,9 @@ export const mockProperties: Property[] = [
       usedFreeboost: false,
       includesFeaturedBadge: true,
       badgeLabel: 'Featured',
+      includesViewCount: true,
+      includesTopPicks: true,
+      includesAnalytics: true,
     },
   },
   {
@@ -2024,6 +2030,9 @@ export const mockProperties: Property[] = [
       usedFreeboost: false,
       includesFeaturedBadge: true,
       badgeLabel: 'Featured',
+      includesViewCount: true,
+      includesTopPicks: true,
+      includesAnalytics: true,
     },
   },
   {
