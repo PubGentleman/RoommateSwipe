@@ -61,6 +61,8 @@ export const ProfileCompletionScreen = () => {
   const insets = useSafeAreaInsets();
 
   const isAgent = user?.hostType === 'agent';
+  const isCompany = user?.hostType === 'company';
+  const isHostProfessional = isAgent || isCompany;
 
   const [photo, setPhoto] = useState<string | null>(user?.profilePicture || (user?.photos?.length ? user.photos[0] : null));
   const [bio, setBio] = useState(user?.profileData?.bio || '');
@@ -106,14 +108,14 @@ export const ProfileCompletionScreen = () => {
 
   const photoComplete = !!photo;
   const bioComplete = bio.trim().length >= 20;
-  const occupationComplete = isAgent || !!occupation;
-  const lifestyleComplete = lifestyleTags.length >= 2;
-  const budgetComplete = budgetTouched;
-  const interestsComplete = interestTags.length >= 3;
+  const occupationComplete = isHostProfessional || !!occupation;
+  const lifestyleComplete = isHostProfessional || lifestyleTags.length >= 2;
+  const budgetComplete = isHostProfessional || budgetTouched;
+  const interestsComplete = isHostProfessional || interestTags.length >= 3;
 
-  const sectionsDone = [photoComplete, bioComplete, occupationComplete, lifestyleComplete, budgetComplete, interestsComplete];
-  const totalSections = isAgent ? sectionsDone.length - 1 : sectionsDone.length;
-  const completedCount = sectionsDone.filter(Boolean).length - (isAgent && occupationComplete ? 0 : 0);
+  const sectionsDone = isHostProfessional
+    ? [photoComplete, bioComplete]
+    : [photoComplete, bioComplete, occupationComplete, lifestyleComplete, budgetComplete, interestsComplete];
   const progressPct = Math.round((sectionsDone.filter(Boolean).length / sectionsDone.length) * 100);
 
   const handlePickPhoto = async () => {
@@ -229,13 +231,13 @@ export const ProfileCompletionScreen = () => {
           <Feather name="chevron-right" size={18} color="rgba(255,255,255,0.25)" />
         </Pressable>
 
-        <SectionHeader icon="edit-2" title="Bio" complete={bioComplete} />
+        <SectionHeader icon="edit-2" title={isHostProfessional ? 'About' : 'Bio'} complete={bioComplete} />
         <View style={styles.inputCard}>
           <TextInput
             style={styles.bioInput}
             value={bio}
             onChangeText={(t) => setBio(t.slice(0, BIO_MAX))}
-            placeholder="Tell people about yourself..."
+            placeholder={isAgent ? 'Tell renters about your experience and specialties...' : isCompany ? 'Describe your company and the properties you manage...' : 'Tell people about yourself...'}
             placeholderTextColor="rgba(255,255,255,0.25)"
             multiline
             maxLength={BIO_MAX}
@@ -244,61 +246,65 @@ export const ProfileCompletionScreen = () => {
           <Text style={styles.charCount}>{bio.length}/{BIO_MAX}</Text>
         </View>
 
-        {!isAgent ? (
+        {!isHostProfessional ? (
           <>
             <SectionHeader icon="briefcase" title="Occupation" complete={!!occupation} />
             <OccupationBarSelector selectedOccupation={occupation} onChange={setOccupation} />
           </>
         ) : null}
 
-        <SectionHeader icon="sun" title="Lifestyle preferences" complete={lifestyleComplete} />
-        <Text style={styles.tagHint}>Select at least 2</Text>
-        <View style={styles.tagGrid}>
-          {LIFESTYLE_OPTIONS.map(opt => {
-            const selected = lifestyleTags.includes(opt.id);
-            return (
-              <Pressable
-                key={opt.id}
-                style={[styles.tag, selected ? styles.tagSelected : null]}
-                onPress={() => toggleLifestyle(opt.id)}
-              >
-                <Feather name={opt.icon as any} size={14} color={selected ? ACCENT : 'rgba(255,255,255,0.45)'} />
-                <Text style={[styles.tagText, selected ? styles.tagTextSelected : null]}>{opt.label}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <SectionHeader icon="dollar-sign" title="Budget range" complete={budgetComplete} />
-        <PricePickerPair
-          minValue={budgetMin}
-          maxValue={budgetMax}
-          onMinChange={(val) => { setBudgetMin(val); setBudgetTouched(true); }}
-          onMaxChange={(val) => { setBudgetMax(val); setBudgetTouched(true); }}
-          height={140}
-        />
-
-        <SectionHeader icon="tag" title="Interest tags" complete={interestsComplete} />
-        <Text style={styles.tagHint}>Select at least 3</Text>
-        {Object.entries(INTEREST_TAGS).map(([key, category]) => (
-          <View key={key} style={styles.tagCategory}>
-            <Text style={styles.tagCatLabel}>{category.label}</Text>
+        {!isHostProfessional ? (
+          <>
+            <SectionHeader icon="sun" title="Lifestyle preferences" complete={lifestyleComplete} />
+            <Text style={styles.tagHint}>Select at least 2</Text>
             <View style={styles.tagGrid}>
-              {category.tags.map(tag => {
-                const selected = interestTags.includes(tag.id);
+              {LIFESTYLE_OPTIONS.map(opt => {
+                const selected = lifestyleTags.includes(opt.id);
                 return (
                   <Pressable
-                    key={tag.id}
+                    key={opt.id}
                     style={[styles.tag, selected ? styles.tagSelected : null]}
-                    onPress={() => toggleInterest(tag.id)}
+                    onPress={() => toggleLifestyle(opt.id)}
                   >
-                    <Text style={[styles.tagText, selected ? styles.tagTextSelected : null]}>{tag.label}</Text>
+                    <Feather name={opt.icon as any} size={14} color={selected ? ACCENT : 'rgba(255,255,255,0.45)'} />
+                    <Text style={[styles.tagText, selected ? styles.tagTextSelected : null]}>{opt.label}</Text>
                   </Pressable>
                 );
               })}
             </View>
-          </View>
-        ))}
+
+            <SectionHeader icon="dollar-sign" title="Budget range" complete={budgetComplete} />
+            <PricePickerPair
+              minValue={budgetMin}
+              maxValue={budgetMax}
+              onMinChange={(val) => { setBudgetMin(val); setBudgetTouched(true); }}
+              onMaxChange={(val) => { setBudgetMax(val); setBudgetTouched(true); }}
+              height={140}
+            />
+
+            <SectionHeader icon="tag" title="Interest tags" complete={interestsComplete} />
+            <Text style={styles.tagHint}>Select at least 3</Text>
+            {Object.entries(INTEREST_TAGS).map(([key, category]) => (
+              <View key={key} style={styles.tagCategory}>
+                <Text style={styles.tagCatLabel}>{category.label}</Text>
+                <View style={styles.tagGrid}>
+                  {category.tags.map(tag => {
+                    const selected = interestTags.includes(tag.id);
+                    return (
+                      <Pressable
+                        key={tag.id}
+                        style={[styles.tag, selected ? styles.tagSelected : null]}
+                        onPress={() => toggleInterest(tag.id)}
+                      >
+                        <Text style={[styles.tagText, selected ? styles.tagTextSelected : null]}>{tag.label}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            ))}
+          </>
+        ) : null}
       </ScrollView>
 
       <View style={[styles.saveWrap, { paddingBottom: insets.bottom + 16 }]}>
