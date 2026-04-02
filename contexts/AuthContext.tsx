@@ -426,11 +426,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch (e) {}
       }
 
+      const localUser = await StorageService.getCurrentUser();
+
+      if (localUser?.id === mappedUser.id) {
+        if (localUser.hostSubscription && localUser.hostSubscription.plan && localUser.hostSubscription.plan !== 'free') {
+          const localPlan = localUser.hostSubscription.plan;
+          const supabasePlan = mappedUser.hostSubscription?.plan;
+          if (!supabasePlan || supabasePlan === 'free' || supabasePlan === 'pay_per_use') {
+            mappedUser = {
+              ...mappedUser,
+              hostSubscription: localUser.hostSubscription,
+              agentPlan: localUser.agentPlan || mappedUser.agentPlan,
+            };
+            if ((localUser as any).companyPlan) {
+              (mappedUser as any).companyPlan = (localUser as any).companyPlan;
+            }
+            console.log(`[Auth] Restored locally saved host plan: ${localPlan}`);
+          }
+        }
+      }
+
       if (mappedUser.profileData) {
-        const localUser = await StorageService.getCurrentUser();
         const intentOverrides: Record<string, string> = {};
 
-        if (localUser?.id === mappedUser.id && localUser.profileData) {
+        if (localUser?.id === mappedUser.id && localUser?.profileData) {
           if (!mappedUser.profileData.apartment_search_type && localUser.profileData.apartment_search_type) {
             intentOverrides.apartment_search_type = localUser.profileData.apartment_search_type;
           }
@@ -2283,6 +2302,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await StorageService.setCurrentUser(updated);
     await StorageService.addOrUpdateUser(updated);
     setUser(updated);
+
+    if (isSupabaseConfigured) {
+      try {
+        const patch: Record<string, any> = {};
+        if (isAgentPlan || user.hostType === 'agent') patch.agent_plan = basePlan;
+        if (isCompanyPlan || user.hostType === 'company') patch.company_plan = basePlan;
+        if (Object.keys(patch).length > 0) {
+          await supabase.from('users').update(patch).eq('id', user.id);
+        }
+        await supabase.from('subscriptions').upsert({
+          user_id: user.id,
+          plan,
+          status: 'active',
+          billing_cycle: billingCycle,
+          current_period_end: expiresAt.toISOString(),
+        }, { onConflict: 'user_id' });
+      } catch (e) {
+        console.warn('[Auth] Failed to sync host plan to Supabase:', e);
+      }
+    }
   };
 
   const downgradeHostPlan = async (plan: string) => {
