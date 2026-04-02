@@ -1325,10 +1325,10 @@ export const HostDashboardScreen = () => {
           </Pressable>
           {(isAgent ? agentPlanBase === 'business' : hostPlan === 'business') ? (
             <Pressable style={styles.qaSecondary} onPress={() => {
-              Linking.openURL(`mailto:hello@rhomeapp.io?subject=${encodeURIComponent('Support Request — ' + (user?.name || 'Business Account'))}`).catch(() => {
+              Linking.openURL(`mailto:support@rhomeapp.io?subject=${encodeURIComponent('Support Request — ' + (user?.name || 'Business Account'))}`).catch(() => {
                 showAlert({
                   title: 'Dedicated Support',
-                  message: 'Email: hello@rhomeapp.io\nResponse time: Within 2 hours\n\nOur dedicated team is here to help you with any questions or issues.',
+                  message: 'Email: support@rhomeapp.io\nResponse time: Within 2 hours\n\nOur dedicated team is here to help you with any questions or issues.',
                   variant: 'info',
                 });
               });
