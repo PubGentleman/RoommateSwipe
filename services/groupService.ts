@@ -4,6 +4,26 @@ import { GroupType, GroupMember } from '../types/models';
 import { isWithinActivityCutoff, getRecencyMultiplier } from '../utils/activityDecay';
 import { shouldLoadMockData } from '../utils/dataUtils';
 
+interface SupabaseGroupMessageRow {
+  id: string;
+  group_id: string;
+  sender_id: string;
+  content: string;
+  created_at: string;
+  read?: boolean;
+}
+
+interface SupabaseUserRef {
+  id: string;
+  full_name?: string;
+  avatar_url?: string;
+}
+
+interface GroupWithListing {
+  listings?: { bedrooms?: number };
+  [key: string]: unknown;
+}
+
 export interface GroupData {
   name: string;
   description?: string;
@@ -228,7 +248,7 @@ export async function createListingInquiryGroup(
       if (listing?.assigned_agent_id) {
         effectiveHostId = listing.assigned_agent_id;
       }
-    } catch {}
+    } catch (e) { console.warn('[groupService] Agent lookup failed:', e); }
 
     let renterIds: string[] = [];
 
@@ -290,7 +310,7 @@ export async function createListingInquiryGroup(
       if (listing?.assigned_agent_id) {
         fallbackHostId = listing.assigned_agent_id;
       }
-    } catch {}
+    } catch (e) { console.warn('[groupService] Fallback listing lookup failed:', e); }
     const localGroup = {
       id: `local-inquiry-${Date.now()}`,
       name: groupName,
@@ -306,7 +326,7 @@ export async function createListingInquiryGroup(
       inquiry_status: 'pending',
     };
     const existingGroups = await StorageService.getGroups();
-    existingGroups.push(localGroup as any);
+    existingGroups.push(localGroup as unknown as typeof existingGroups[0]);
     await StorageService.setGroups(existingGroups);
     return localGroup;
   }
@@ -645,7 +665,7 @@ export function subscribeToGroupMessages(
       'postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'group_messages', filter: `group_id=eq.${groupId}` },
       async (payload) => {
-        const msg = payload.new as any;
+        const msg = payload.new as SupabaseGroupMessageRow;
         const { data: senderData } = await supabase
           .from('users')
           .select('full_name, avatar_url')
@@ -762,7 +782,7 @@ export async function sendGroupInvite(groupId: string, invitedUserId: string): P
     .eq('group_id', groupId);
 
   const creatorPlan = await getUserPlan(group?.created_by);
-  const linkedBedrooms = (group as any)?.listings?.bedrooms ?? null;
+  const linkedBedrooms = (group as GroupWithListing)?.listings?.bedrooms ?? null;
   const limit = getMemberLimit(creatorPlan, linkedBedrooms);
 
   if ((memberData?.length || 0) >= limit) {
@@ -809,7 +829,7 @@ export async function respondToInvite(
       .eq('group_id', invite.group_id);
 
     const creatorPlan = await getUserPlan(group?.created_by);
-    const linkedBedrooms = (group as any)?.listings?.bedrooms ?? null;
+    const linkedBedrooms = (group as GroupWithListing)?.listings?.bedrooms ?? null;
     const limit = getMemberLimit(creatorPlan, linkedBedrooms);
 
     if ((memberData?.length || 0) >= limit) {
@@ -986,7 +1006,7 @@ export async function joinGroupByCode(code: string): Promise<{ groupId: string; 
     .eq('group_id', group.id);
 
   const creatorPlan = await getUserPlan(group.created_by);
-  const linkedBedrooms = (group as any)?.listings?.bedrooms ?? null;
+  const linkedBedrooms = (group as GroupWithListing)?.listings?.bedrooms ?? null;
   const limit = getMemberLimit(creatorPlan, linkedBedrooms);
 
   if ((memberData?.length || 0) >= limit) {
@@ -1273,7 +1293,7 @@ export async function respondToJoinRequest(
       .eq('group_id', groupId);
 
     const creatorPlan = await getUserPlan(group?.created_by);
-    const linkedBedrooms = (group as any)?.listings?.bedrooms ?? null;
+    const linkedBedrooms = (group as GroupWithListing)?.listings?.bedrooms ?? null;
     const limit = getMemberLimit(creatorPlan, linkedBedrooms);
 
     if ((count || 0) >= limit) {
@@ -1665,15 +1685,16 @@ export async function getGroupShortlist(groupId: string): Promise<GroupShortlist
       .eq('group_id', groupId);
     if (error) throw error;
 
-    const byListing: Record<string, { users: any[] }> = {};
+    const byListing: Record<string, { users: { user_id: string; name: string; avatar_url: string | null }[] }> = {};
     for (const like of (likes || [])) {
       if (!byListing[like.listing_id]) {
         byListing[like.listing_id] = { users: [] };
       }
+      const userRef = like.user as SupabaseUserRef | null;
       byListing[like.listing_id].users.push({
         user_id: like.user_id,
-        name: (like.user as any)?.full_name || 'Unknown',
-        avatar_url: (like.user as any)?.avatar_url || null,
+        name: userRef?.full_name || 'Unknown',
+        avatar_url: userRef?.avatar_url || null,
       });
     }
 
