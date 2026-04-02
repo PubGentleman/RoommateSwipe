@@ -43,7 +43,12 @@ export const NotificationsScreen = () => {
     let mapped: Notification[] = [];
     try {
       const supabaseNotifications = await getNotifications();
-      mapped = supabaseNotifications.map(mapSupabaseNotification);
+      if (supabaseNotifications.length > 0) {
+        mapped = supabaseNotifications.map(mapSupabaseNotification);
+      } else {
+        const userNotifications = await StorageService.getNotifications(user.id);
+        mapped = userNotifications;
+      }
     } catch (error) {
       console.error('Error loading notifications from Supabase, falling back to StorageService:', error);
       try {

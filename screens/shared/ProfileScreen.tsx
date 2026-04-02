@@ -598,22 +598,7 @@ export const ProfileScreen = () => {
                 onPress={() => navigation.navigate('MyInterests')}
                 badge={pendingInterestCount}
               />
-            ) : (
-              <SettingsItem
-                iconName="inbox"
-                iconColor="#a855f7"
-                iconBgColor="rgba(168,85,247,0.12)"
-                iconBorderColor="rgba(168,85,247,0.18)"
-                title="Received Inquiries"
-                subtitle="Renter interest in your listings"
-                onPress={() => {
-                  const parent = navigation.getParent();
-                  if (parent) {
-                    parent.navigate('Dashboard', { screen: 'MyListings' });
-                  }
-                }}
-              />
-            )}
+            ) : null}
             <SettingsItem
               iconName="bell"
               iconColor="#2ecc71"
