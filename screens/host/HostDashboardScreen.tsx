@@ -281,8 +281,8 @@ export const HostDashboardScreen = () => {
       try {
         const available = await getAvailableGroups(user.city ? { city: user.city } : undefined);
         setPiAvailableGroups(available.length);
-      } catch {}
-    } catch {}
+      } catch (e) { console.warn('[HostDashboard] Failed to load available groups:', e); }
+    } catch (e) { console.warn('[HostDashboard] Failed to load Pi matchmaker data:', e); }
 
     if (user.hostType === 'company') {
       try {
@@ -295,7 +295,7 @@ export const HostDashboardScreen = () => {
         setUnassignedListings(noAgent);
         const alerts = await getAgentResponseAlerts(user.id);
         setResponseAlerts(alerts);
-      } catch {}
+      } catch (e) { console.warn('[HostDashboard] Failed to load company data:', e); }
     }
 
     if (isSupabaseConfigured && user.id) {
@@ -314,7 +314,7 @@ export const HostDashboardScreen = () => {
           .eq('status', 'cancelled');
         const totalPlacements = (placementCount || 0) + (cancelledCount || 0);
         setAgentCancellationRate(totalPlacements > 0 ? (cancelledCount || 0) / totalPlacements : 0);
-      } catch { setAgentPlacementCount(0); setAgentCancellationRate(0); }
+      } catch (e) { console.warn('[HostDashboard] Failed to load placement data:', e); setAgentPlacementCount(0); setAgentCancellationRate(0); }
 
       try {
         const listingIds = freshListings.length > 0
@@ -434,7 +434,7 @@ export const HostDashboardScreen = () => {
     if (card.groupId) {
       try {
         await updateGroup(card.groupId, { address_revealed: true, inquiry_status: 'accepted' });
-      } catch {}
+      } catch (e) { console.warn('[HostDashboard] Failed to update group on accept:', e); }
     }
 
     const conversationId = `conv-interest-${card.id}`;
@@ -533,7 +533,7 @@ export const HostDashboardScreen = () => {
     if (card.groupId) {
       try {
         await updateGroup(card.groupId, { inquiry_status: 'declined' });
-      } catch {}
+      } catch (e) { console.warn('[HostDashboard] Failed to update group on decline:', e); }
       await StorageService.updateConversation(`inquiry-conv-${card.groupId}`, {
         inquiryStatus: 'declined',
         lastMessage: 'The host passed on this inquiry.',
@@ -1085,7 +1085,7 @@ export const HostDashboardScreen = () => {
                         conversationId: alertItem.conversationId,
                         readOnly: true,
                       });
-                    } catch {}
+                    } catch (e) { console.warn('[HostDashboard] Alert nav failed:', e); }
                   }}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
