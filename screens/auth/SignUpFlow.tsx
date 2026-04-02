@@ -240,6 +240,22 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
       return;
     }
     if (!state.password || state.password.length < 6) { setError('Password must be at least 6 characters'); return; }
+
+    try {
+      const { supabase, isSupabaseConfigured } = await import('../../lib/supabase');
+      if (isSupabaseConfigured) {
+        const { data: existingUser } = await supabase
+          .from('users')
+          .select('id')
+          .eq('email', state.email.trim().toLowerCase())
+          .maybeSingle();
+        if (existingUser) {
+          setError('An account with this email already exists. Please sign in instead.');
+          return;
+        }
+      }
+    } catch (_) {}
+
     goForward();
   };
 
@@ -300,7 +316,12 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
         } catch (_) {}
       }
     } catch (err: any) {
-      await showAlert({ title: 'Error', message: err?.message || 'Failed to create account. Please try again.', variant: 'warning' });
+      const msg = err?.message || '';
+      if (msg.toLowerCase().includes('already registered') || msg.toLowerCase().includes('already exists')) {
+        await showAlert({ title: 'Account Exists', message: 'An account with this email already exists. Please sign in instead.', variant: 'info' });
+      } else {
+        await showAlert({ title: 'Error', message: msg || 'Failed to create account. Please try again.', variant: 'warning' });
+      }
     } finally {
       setIsLoading(false);
     }
