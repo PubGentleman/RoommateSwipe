@@ -341,6 +341,39 @@ export const SignUpFlow = ({ onBackToLogin }: { onBackToLogin: () => void }) => 
       const companyName = state.accountType === 'company' && state.companyName.trim() ? state.companyName.trim() : undefined;
       const fullName = `${state.firstName.trim()} ${state.lastName.trim()}`;
       await register(state.email.trim().toLowerCase(), state.password, fullName, role as any, hostType, companyName, state.firstName.trim(), state.lastName.trim());
+      if (state.profilePhoto) {
+        try {
+          const { supabase, isSupabaseConfigured } = await import('../../lib/supabase');
+          const { data: { user: authUser } } = await supabase.auth.getUser();
+          if (authUser && isSupabaseConfigured) {
+            const rawExt = state.profilePhoto.split('.').pop()?.split('?')[0]?.toLowerCase() || 'jpg';
+            const ext = rawExt === 'jpg' ? 'jpeg' : rawExt;
+            const filePath = `${authUser.id}/profile.${ext}`;
+            const response = await fetch(state.profilePhoto);
+            const blob = await response.blob();
+            const arrayBuffer = await new Response(blob).arrayBuffer();
+            const { error: uploadErr } = await supabase.storage
+              .from('avatars')
+              .upload(filePath, arrayBuffer, {
+                contentType: `image/${ext}`,
+                upsert: true,
+              });
+            if (!uploadErr) {
+              const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
+              if (urlData?.publicUrl) {
+                await supabase.from('users').update({
+                  avatar_url: urlData.publicUrl,
+                  photos: [urlData.publicUrl],
+                }).eq('id', authUser.id);
+              }
+            } else {
+              console.warn('[SignUp] Profile photo upload failed:', uploadErr.message);
+            }
+          }
+        } catch (photoErr) {
+          console.warn('[SignUp] Profile photo save failed:', photoErr);
+        }
+      }
       if (state.accountType === 'agent' && state.licensePhoto) {
         try {
           const { supabase, isSupabaseConfigured } = await import('../../lib/supabase');

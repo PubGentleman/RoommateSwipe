@@ -419,7 +419,7 @@ export const ProfileQuestionnaireScreen = () => {
   const isHostProfessional = isHostUser && (user?.hostType === 'agent' || user?.hostType === 'company');
   const baseOnboardingSteps = isLiteOnboarding ? ONBOARDING_STEPS_LITE : isOnboarding ? ONBOARDING_STEPS : allStepsForType;
   const onboardingSteps = isHostProfessional
-    ? baseOnboardingSteps.filter(s => s !== 'budgetLocation' && s !== 'housing' && s !== 'photos')
+    ? baseOnboardingSteps.filter(s => s !== 'budgetLocation' && s !== 'housing')
     : (renterOnboarding || isHostUser)
       ? baseOnboardingSteps.filter(s => s !== 'budgetLocation' && s !== 'housing')
       : baseOnboardingSteps;
@@ -574,6 +574,7 @@ export const ProfileQuestionnaireScreen = () => {
         const v = validateBirthday(birthday);
         if (!v.valid) { setBirthdayError(v.error); await showAlert({ title: 'Error', message: v.error, variant: 'warning' }); return false; }
         if (!gender) { await showAlert({ title: 'Required', message: 'Please select your gender', variant: 'warning' }); return false; }
+        if (bio.trim().length < 20) { await showAlert({ title: 'About You', message: 'Please write at least 20 characters about yourself', variant: 'warning' }); return false; }
         return true;
       }
       case 'budgetLocation':
@@ -854,9 +855,9 @@ export const ProfileQuestionnaireScreen = () => {
               onSelect={(v) => setGender(v as any)}
             />
             <View style={{ marginTop: 20 }}>
-              <ThemedText style={styles.inputLabel}>About You</ThemedText>
+              <ThemedText style={styles.inputLabel}>About You *</ThemedText>
               <ThemedText style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>
-                Write a short bio to introduce yourself
+                Write a short bio to introduce yourself (at least 20 characters)
               </ThemedText>
               <TextInput
                 style={styles.bioInput}
@@ -869,9 +870,16 @@ export const ProfileQuestionnaireScreen = () => {
                 placeholderTextColor="rgba(255,255,255,0.3)"
                 textAlignVertical="top"
               />
-              <ThemedText style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', textAlign: 'right', marginTop: 4 }}>
-                {bio.length}/500
-              </ThemedText>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                {bio.trim().length < 20 ? (
+                  <ThemedText style={{ fontSize: 11, color: theme.error }}>
+                    {20 - bio.trim().length} more chars needed
+                  </ThemedText>
+                ) : <View />}
+                <ThemedText style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>
+                  {bio.length}/500
+                </ThemedText>
+              </View>
             </View>
           </View>
         );
