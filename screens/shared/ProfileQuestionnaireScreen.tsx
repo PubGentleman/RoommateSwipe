@@ -415,8 +415,9 @@ export const ProfileQuestionnaireScreen = () => {
     return allStepsForType.filter(s => !shouldSkipStep(s));
   }, [allStepsForType, user]);
   const renterOnboarding = isOnboarding && user?.role === 'renter';
+  const isHostUser = user?.role === 'host';
   const baseOnboardingSteps = isLiteOnboarding ? ONBOARDING_STEPS_LITE : isOnboarding ? ONBOARDING_STEPS : allStepsForType;
-  const onboardingSteps = renterOnboarding
+  const onboardingSteps = (renterOnboarding || isHostUser)
     ? baseOnboardingSteps.filter(s => s !== 'budgetLocation' && s !== 'housing')
     : baseOnboardingSteps;
   const stepsToShow = filteredSteps || autoFilteredSteps || onboardingSteps;
