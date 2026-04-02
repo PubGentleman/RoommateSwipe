@@ -763,19 +763,36 @@ export const BrowseRentersScreen = () => {
         {roomTypeFilter !== 'entire_apartment' ? (
           <Pressable
             onPress={() => {
-              if (planLimits.hasCompatibilityMatrix && shortlistedIds.size >= 2) {
-                const shortlisted = renters.filter(r => shortlistedIds.has(r.id));
-                navigation.navigate('RenterCompatibility', { renters: shortlisted, listingId: selectedListing?.id, listing: selectedListing });
-              } else if (!planLimits.hasCompatibilityMatrix) {
+              if (!planLimits.hasCompatibilityMatrix) {
                 showAlert({ title: 'Pro Feature', message: 'Compatibility Matrix is available on Pro and Business plans.' });
-              } else {
-                showAlert({ title: 'Need More Renters', message: 'Shortlist at least 2 renters to view the compatibility matrix.' });
+                return;
               }
+              let shortlisted = renters.filter(r => shortlistedIds.has(r.id));
+              if (selectedListing) {
+                const perPersonRent = selectedListing.bedrooms > 0
+                  ? Math.ceil(selectedListing.price / selectedListing.bedrooms)
+                  : selectedListing.price;
+                shortlisted = shortlisted.filter(r => {
+                  const canAfford = !r.budgetMax || r.budgetMax >= perPersonRent * 0.7;
+                  const rightType = !r.roomType || r.roomType === 'room' || r.roomType === 'private_room' || r.roomType === 'shared_room';
+                  return canAfford && rightType;
+                });
+              }
+              if (shortlisted.length < 2) {
+                showAlert({
+                  title: 'Not Enough Matches',
+                  message: selectedListing
+                    ? `Only ${shortlisted.length} shortlisted renter${shortlisted.length === 1 ? '' : 's'} match${shortlisted.length === 1 ? 'es' : ''} "${selectedListing.title}". Shortlist more compatible renters first.`
+                    : 'Shortlist at least 2 renters to view the compatibility matrix.'
+                });
+                return;
+              }
+              navigation.navigate('RenterCompatibility', { renters: shortlisted, listingId: selectedListing?.id, listing: selectedListing });
             }}
             style={styles.matrixBtn}
           >
             <Feather name="grid" size={14} color={ACCENT} />
-            <Text style={styles.matrixBtnText}>Matrix ({shortlistedIds.size})</Text>
+            <Text style={styles.matrixBtnText}>Matrix ({shortlistedIds.size}){selectedListing ? ' for listing' : ''}</Text>
           </Pressable>
         ) : null}
       </View>

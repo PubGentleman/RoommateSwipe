@@ -233,6 +233,14 @@ export const RenterCompatibilityScreen = () => {
           </View>
         ) : (
           <View>
+            {listing ? (
+              <View style={{ backgroundColor: '#1a1a1a', borderRadius: 10, padding: 10, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#ff6b5b30' }}>
+                <Feather name="home" size={14} color="#ff6b5b" />
+                <Text style={{ color: '#ccc', fontSize: 12, flex: 1 }}>
+                  Showing {renters.length} renters compatible with <Text style={{ color: '#fff', fontWeight: '600' }}>{listing.title}</Text>
+                </Text>
+              </View>
+            ) : null}
             <Text style={styles.subtitle}>
               Tap a pair to create a group. Tap the grid below for details.
             </Text>
