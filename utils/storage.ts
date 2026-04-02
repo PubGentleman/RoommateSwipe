@@ -327,7 +327,7 @@ export const StorageService = {
       const groups = await this.getGroups();
       const roommateGroups = groups.filter(g =>
         (g.type === 'roommate' || !g.type) &&
-        (g as any).is_visible_to_hosts !== false
+        g.is_visible_to_hosts !== false
       );
       const profiles = await this.getRoommateProfiles();
       return roommateGroups
@@ -351,13 +351,13 @@ export const StorageService = {
             description: g.description || '',
             memberCount: g.members?.length || 2,
             maxMembers: g.maxMembers || 4,
-            budgetMin: (g as any).budgetMin ?? (g as any).budget_min ?? 1500,
-            budgetMax: (g as any).budgetMax ?? (g as any).budget_max ?? 2500,
-            moveInDate: (g as any).moveInDate ?? (g as any).move_in_date ?? 'Flexible',
+            budgetMin: g.budgetMin ?? 1500,
+            budgetMax: g.budgetMax ?? 2500,
+            moveInDate: g.moveInDate ?? 'Flexible',
             location: g.preferredLocation || g.city || '',
-            neighborhoods: (g as any).neighborhoods ?? [],
-            lifestyleTags: (g as any).lifestyleTags ?? (g as any).lifestyle_tags ?? [],
-            occupationTypes: (g as any).occupationTypes ?? (g as any).occupation_types ?? [],
+            neighborhoods: [],
+            lifestyleTags: [],
+            occupationTypes: [],
             memberPhotos,
             createdAt: g.createdAt instanceof Date ? g.createdAt.toISOString() : g.createdAt,
           };
@@ -861,7 +861,7 @@ export const StorageService = {
       if (user) {
         user.undoPassData = {
           hasUndoPass: false,
-          undoPassExpiresAt: null as any,
+          undoPassExpiresAt: undefined,
         };
         await this.addOrUpdateUser(user);
       }
@@ -870,7 +870,7 @@ export const StorageService = {
       if (currentUser && currentUser.id === userId) {
         currentUser.undoPassData = {
           hasUndoPass: false,
-          undoPassExpiresAt: null as any,
+          undoPassExpiresAt: undefined,
         };
         await this.setCurrentUser(currentUser);
       }
@@ -1474,7 +1474,7 @@ export const StorageService = {
         if (hostProperties.length === 0 && allProperties.length > 0) {
           const assignCount = Math.min(3, allProperties.length);
           for (let i = 0; i < assignCount; i++) {
-            (allProperties[i] as any).hostId = userId;
+            allProperties[i].hostId = userId;
           }
           await AsyncStorage.setItem(STORAGE_KEYS.PROPERTIES, JSON.stringify(allProperties));
           hostProperties = allProperties.slice(0, assignCount);
