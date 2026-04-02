@@ -295,15 +295,9 @@ export const ProfileScreen = () => {
             </View>
           </View>
 
-          {canSwitchMode ? (
-            <View style={{ marginBottom: 10 }}>
-              <ModeSwitchToggle compact />
-            </View>
-          ) : (
-            <View style={[styles.roleBadge, isHost && styles.roleBadgeHost]}>
-              <Text style={[styles.roleBadgeText, isHost && styles.roleBadgeTextHost]}>{getRoleLabel()}</Text>
-            </View>
-          )}
+          <View style={[styles.roleBadge, isHost && styles.roleBadgeHost]}>
+            <Text style={[styles.roleBadgeText, isHost && styles.roleBadgeTextHost]}>{getRoleLabel()}</Text>
+          </View>
 
           <View style={styles.nameRow}>
             <Text style={styles.profileName}>{user?.name || 'User'}</Text>
