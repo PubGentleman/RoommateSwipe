@@ -586,27 +586,38 @@ export function generateAISuggestions(renters: AgentRenter[], listing: Property)
   listingFitScore: number;
   reason: string;
 }> {
-  const sharePerPerson = listing.price / listing.bedrooms;
+  const sharePerPerson = listing.bedrooms > 1 ? listing.price / listing.bedrooms : listing.price;
 
   return renters
     .map(renter => {
-      const budgetOk = (renter.budgetMax ?? 0) >= sharePerPerson;
+      const renterShare = renter.roomType === 'entire_apartment' ? listing.price : sharePerPerson;
+      const budgetOk = (renter.budgetMax ?? 0) >= renterShare;
       const moveInOk = isMoveInCompatible(renter.moveInDate ?? null, listing.availableDate?.toString() ?? null);
 
       if (!budgetOk || !moveInOk) return null;
 
-      const budgetScore = Math.min(100, ((renter.budgetMax ?? 0) / sharePerPerson) * 100);
+      const budgetScore = Math.min(100, ((renter.budgetMax ?? 0) / renterShare) * 100);
       const profileComplete = renter.bio && renter.photos.length > 0 ? 80 : 50;
-      const lifestyleScore = 70;
+
+      let lifestyleScore = 50;
+      if (renter.cleanliness !== undefined) lifestyleScore += renter.cleanliness >= 7 ? 15 : 5;
+      if (renter.sleepSchedule) lifestyleScore += 10;
+      if (renter.smoking === false) lifestyleScore += 10;
+      if (renter.interests && renter.interests.length > 0) lifestyleScore += 5;
+      lifestyleScore = Math.min(100, lifestyleScore);
 
       const listingFitScore = Math.round(
         (budgetScore * 0.4) + (profileComplete * 0.3) + (lifestyleScore * 0.3)
       );
 
-      let reason = '';
-      if (listingFitScore >= 90) reason = 'Strong profile, move-in ready';
-      else if (listingFitScore >= 75) reason = 'Good fit, verify lifestyle preferences';
-      else reason = 'Marginal fit — check budget flexibility';
+      const reasons: string[] = [];
+      if (budgetScore >= 90) reasons.push('budget well-matched');
+      if (profileComplete >= 80) reasons.push('complete profile');
+      if (renter.cleanliness !== undefined && renter.cleanliness >= 7) reasons.push('high cleanliness');
+      if (renter.smoking === false) reasons.push('non-smoker');
+      const reason = reasons.length > 0
+        ? reasons.slice(0, 2).join(', ').replace(/^./, c => c.toUpperCase())
+        : (listingFitScore >= 75 ? 'Good fit, verify lifestyle preferences' : 'Marginal fit — check budget flexibility');
 
       return { renter, listingFitScore, reason };
     })

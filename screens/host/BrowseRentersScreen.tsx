@@ -463,13 +463,14 @@ export const BrowseRentersScreen = () => {
             ) : null}
           </View>
           <Pressable
-            onPress={() => handleShortlist(item)}
+            onPress={() => optedOut ? showAlert({ title: 'Not Available', message: 'This renter is not accepting offers from agents.' }) : handleShortlist(item)}
             style={[styles.shortlistBtn, isShortlisted ? styles.shortlistBtnActive : null]}
+            disabled={optedOut && !isShortlisted}
           >
             <Feather
-              name={isShortlisted ? 'heart' : 'heart'}
+              name="heart"
               size={20}
-              color={isShortlisted ? ACCENT : '#666'}
+              color={optedOut ? '#444' : isShortlisted ? ACCENT : '#666'}
             />
           </Pressable>
         </View>
@@ -787,13 +788,13 @@ export const BrowseRentersScreen = () => {
               <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, marginTop: 8, textAlign: 'center' }}>
                 Try adjusting your search criteria or selecting a different listing
               </Text>
-              {selectedListing ? (
+              {(selectedListing || roomTypeFilter !== 'any' || neighborhoodFilter) ? (
                 <Pressable
-                  onPress={() => setSelectedListing(null)}
+                  onPress={() => { setSelectedListing(null); setRoomTypeFilter('any'); setNeighborhoodFilter(''); }}
                   style={{ marginTop: 20, paddingVertical: 10, paddingHorizontal: 20, backgroundColor: ACCENT, borderRadius: 10 }}
                 >
                   <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 14 }}>
-                    Clear listing filter
+                    Clear all filters
                   </Text>
                 </Pressable>
               ) : null}
@@ -811,27 +812,29 @@ export const BrowseRentersScreen = () => {
                 <Feather name="x" size={24} color="#fff" />
               </Pressable>
             </View>
-            <Pressable
-              style={styles.listingOption}
-              onPress={() => { setSelectedListing(null); setShowListingPicker(false); }}
-            >
-              <Text style={styles.listingOptionText}>All Renters (no filter)</Text>
-            </Pressable>
-            {listings.map(l => (
+            <ScrollView showsVerticalScrollIndicator={false}>
               <Pressable
-                key={l.id}
-                style={[styles.listingOption, selectedListing?.id === l.id ? styles.listingOptionActive : null]}
-                onPress={() => { setSelectedListing(l); setShowListingPicker(false); }}
+                style={styles.listingOption}
+                onPress={() => { setSelectedListing(null); setShowListingPicker(false); }}
               >
-                <Text style={styles.listingOptionText}>{l.title}</Text>
-                <Text style={styles.listingOptionMeta}>
-                  ${l.price.toLocaleString()}/mo - {l.bedrooms}BR
-                </Text>
+                <Text style={styles.listingOptionText}>All Renters (no filter)</Text>
               </Pressable>
-            ))}
-            {listings.length === 0 ? (
-              <Text style={styles.emptyText}>No active listings. Create a listing first.</Text>
-            ) : null}
+              {listings.map(l => (
+                <Pressable
+                  key={l.id}
+                  style={[styles.listingOption, selectedListing?.id === l.id ? styles.listingOptionActive : null]}
+                  onPress={() => { setSelectedListing(l); setShowListingPicker(false); }}
+                >
+                  <Text style={styles.listingOptionText}>{l.title}</Text>
+                  <Text style={styles.listingOptionMeta}>
+                    ${l.price.toLocaleString()}/mo - {l.bedrooms}BR
+                  </Text>
+                </Pressable>
+              ))}
+              {listings.length === 0 ? (
+                <Text style={styles.emptyText}>No active listings. Create a listing first.</Text>
+              ) : null}
+            </ScrollView>
           </View>
         </View>
       </Modal>
