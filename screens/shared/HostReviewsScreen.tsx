@@ -24,6 +24,8 @@ import {
 import { WriteReviewSheet } from '../../components/WriteReviewSheet';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Linking from 'expo-linking';
+import { Platform } from 'react-native';
 
 interface HostReviewsScreenProps {
   hostId: string;
@@ -91,6 +93,19 @@ export const HostReviewsScreen: React.FC<HostReviewsScreenProps> = ({
       prev.map(r => r.id === reviewId ? { ...r, helpful_count: r.helpful_count + 1 } : r)
     );
     await incrementHostReviewHelpful(reviewId);
+  };
+
+  const handleAppealReview = (review: HostReview) => {
+    const subject = encodeURIComponent('Review Appeal Request');
+    const body = encodeURIComponent(
+      `Hi Rhome Support,\n\nI'd like to appeal a review on my profile.\n\nReview ID: ${review.id}\nReviewer: ${review.reviewer_name || 'Anonymous'}\nRating: ${review.rating}/5\nDate: ${formatDate(review.created_at)}\nReview text: "${review.review_text || '(no text)'}"\n\nReason for appeal:\n[Please describe why this review should be removed]\n\nAccount email: ${user?.email}\n\nThank you.`
+    );
+    const url = `mailto:hello@rhomeapp.io?subject=${subject}&body=${body}`;
+    if (Platform.OS === 'web') {
+      window.open(url);
+    } else {
+      Linking.openURL(url);
+    }
   };
 
   const handleSubmitHostReply = async (reviewId: string) => {
@@ -265,19 +280,28 @@ export const HostReviewsScreen: React.FC<HostReviewsScreenProps> = ({
               ) : null}
 
               <View style={s.reviewActions}>
-                <Pressable
-                  style={[s.helpfulBtn, helpedIds.has(review.id) ? s.helpfulBtnActive : null]}
-                  onPress={() => handleHelpful(review.id)}
-                >
-                  <Feather name="thumbs-up" size={14} color={helpedIds.has(review.id) ? '#a78bfa' : 'rgba(255,255,255,0.4)'} />
-                  <Text style={[s.helpfulText, helpedIds.has(review.id) ? { color: '#a78bfa' } : null]}>
-                    Helpful{review.helpful_count > 0 ? ` (${review.helpful_count})` : ''}
-                  </Text>
-                </Pressable>
-                <Pressable style={s.reportBtn}>
-                  <Feather name="flag" size={14} color="rgba(255,255,255,0.3)" />
-                  <Text style={s.reportText}>Report</Text>
-                </Pressable>
+                {isHost ? (
+                  <Pressable style={s.appealBtn} onPress={() => handleAppealReview(review)}>
+                    <Feather name="alert-circle" size={14} color="#f59e0b" />
+                    <Text style={s.appealText}>Appeal Review</Text>
+                  </Pressable>
+                ) : (
+                  <>
+                    <Pressable
+                      style={[s.helpfulBtn, helpedIds.has(review.id) ? s.helpfulBtnActive : null]}
+                      onPress={() => handleHelpful(review.id)}
+                    >
+                      <Feather name="thumbs-up" size={14} color={helpedIds.has(review.id) ? '#a78bfa' : 'rgba(255,255,255,0.4)'} />
+                      <Text style={[s.helpfulText, helpedIds.has(review.id) ? { color: '#a78bfa' } : null]}>
+                        Helpful{review.helpful_count > 0 ? ` (${review.helpful_count})` : ''}
+                      </Text>
+                    </Pressable>
+                    <Pressable style={s.reportBtn}>
+                      <Feather name="flag" size={14} color="rgba(255,255,255,0.3)" />
+                      <Text style={s.reportText}>Report</Text>
+                    </Pressable>
+                  </>
+                )}
               </View>
 
               {review.host_reply ? (
@@ -405,6 +429,8 @@ const s = StyleSheet.create({
   helpfulText: { fontSize: 13, color: 'rgba(255,255,255,0.4)' },
   reportBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4 },
   reportText: { fontSize: 13, color: 'rgba(255,255,255,0.3)' },
+  appealBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4 },
+  appealText: { fontSize: 13, color: '#f59e0b', fontWeight: '500' },
   hostReplyBox: {
     marginTop: 12, padding: 12, borderRadius: 10,
     backgroundColor: 'rgba(167,139,250,0.08)', borderLeftWidth: 3, borderLeftColor: ACCENT,
