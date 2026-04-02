@@ -517,7 +517,7 @@ export const createMockPreformedGroup = (userId: string): PreformedGroup => ({
   open_to_requests: true,
 });
 
-export const createMockGroupMembers = (userId: string, groupId: string): PreformedGroupMember[] => [
+export const createMockGroupMembers = (userId: string, groupId: string): (PreformedGroupMember & { photo?: string; gender?: string; occupation?: string; budget_min?: number; budget_max?: number })[] => [
   {
     id: `pgm-${userId.slice(0, 6)}-1`,
     preformed_group_id: groupId,
@@ -526,6 +526,11 @@ export const createMockGroupMembers = (userId: string, groupId: string): Preform
     status: 'joined',
     invited_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 14).toISOString(),
     joined_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 14).toISOString(),
+    photo: 'https://picsum.photos/100/100?random=self',
+    gender: 'male',
+    occupation: 'Software Engineer',
+    budget_min: 1000,
+    budget_max: 1500,
   },
   {
     id: `pgm-${userId.slice(0, 6)}-2`,
@@ -535,6 +540,11 @@ export const createMockGroupMembers = (userId: string, groupId: string): Preform
     status: 'joined',
     invited_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 12).toISOString(),
     joined_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 11).toISOString(),
+    photo: 'https://picsum.photos/100/100?random=3',
+    gender: 'female',
+    occupation: 'UX Designer',
+    budget_min: 900,
+    budget_max: 1300,
   },
   {
     id: `pgm-${userId.slice(0, 6)}-3`,
@@ -544,6 +554,11 @@ export const createMockGroupMembers = (userId: string, groupId: string): Preform
     status: 'joined',
     invited_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10).toISOString(),
     joined_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 9).toISOString(),
+    photo: 'https://picsum.photos/100/100?random=5',
+    gender: 'female',
+    occupation: 'Marketing Manager',
+    budget_min: 1100,
+    budget_max: 1500,
   },
 ];
 
